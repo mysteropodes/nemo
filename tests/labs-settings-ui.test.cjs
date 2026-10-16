@@ -1,0 +1,52 @@
+// Ordinary script/event controls. Optional baseline directory pins the pre-extraction scripts.
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const ROOT=path.resolve(__dirname,'..'),BASE=process.env.NEMO_LABS_BASELINE;
+const modes=process.env.NEMO_LABS_ONLY_BASELINE?['baseline']:(BASE?['baseline','actual']:['actual']);
+const copy=x=>JSON.parse(JSON.stringify(x));
+class Element{
+ constructor(tag,doc){this.tag=tag;this.doc=doc;this.children=[];this.listeners={};this.style={};this.dataset={};this.className='';this._value='';this._text='';this._html='';this.checked=false;this.disabled=false;this.offsetWidth=160;this.offsetHeight=50;this.classList={contains:k=>this.className.split(' ').includes(k),toggle:(k,on)=>{const s=new Set(this.className.split(' ').filter(Boolean));if(on===undefined)on=!s.has(k);if(on)s.add(k);else s.delete(k);this.className=[...s].join(' ');return on;}};}
+ set value(v){this._value=String(v);}get value(){if(this.tag==='select'&&!this._value)return (this.children.find(x=>x.selected)||this.children[0]||{}).value||'';return this._value;}
+ set textContent(v){this._text=String(v);this.children=[];}get textContent(){return this._text;}
+ set innerHTML(v){this._html=String(v);this.children=[];}get innerHTML(){return this._html;}
+ appendChild(n){this.children.push(n);return n;}addEventListener(k,fn){(this.listeners[k]||(this.listeners[k]=[])).push(fn);}
+ fire(k,e={}){for(const fn of this.listeners[k]||[])fn.call(this,{target:this,preventDefault:()=>this.doc.trace.push(['prevent']),...e});}click(){this.fire('click');}
+ contains(n){return this===n||this.children.some(x=>x.contains(n));}setPointerCapture(id){this.doc.trace.push(['capture',id]);}releasePointerCapture(id){this.doc.trace.push(['release',id]);}
+ getBoundingClientRect(){return this.doc.rect;}
+}
+function descendants(n){return n.children.flatMap(c=>[c,...descendants(c)]);}
+function fixture(mode,file,options={}){
+ const trace=[],nodes=new Map(),events={},timers=[],storage=new Map(Object.entries(options.storage||{}));
+ const document={trace,rect:{left:100,top:50,width:700,height:500},activeElement:null,readyState:options.ready||'loading',getElementById:id=>nodes.get(id)||null,createElement:tag=>new Element(tag,document),createTextNode:text=>{const n=new Element('#text',document);n.textContent=text;return n;},addEventListener:(k,fn)=>(events['doc:'+k]||(events['doc:'+k]=[])).push(fn)};
+ for(const id of ['labs-tools-list','labs-actions-list','labs-float-panel','labs-float-icons','labs-float-params','labs-float-handle','canvas-area','p-sym-on','p-persp-on','p-sym-mode','p-sym-sectors'])if(!(options.missing||[]).includes(id))nodes.set(id,new Element(id,document));
+ const state={tool:'draw',layers:[{name:'A'},{name:'B'}],activeLayerIdx:0,symmetryEnabled:false,symmetryMode:'y',symmetryRadialSectors:6,symmetryExtend:false,perspectiveEnabled:false,perspectiveMode:'1pt',fsSelectMode:'rect',...options.state};
+ const context={document,state,console:{warn:(...a)=>trace.push(['warn',...a.map(String)])},setTimeout:fn=>{timers.push(fn);return timers.length;},localStorage:{getItem(k){assert.equal(this,context.localStorage);trace.push(['get',k]);return storage.get(k)||null;},setItem(k,v){assert.equal(this,context.localStorage);trace.push(['set',k,v]);storage.set(k,v);}},addEventListener:(k,fn)=>(events[k]||(events[k]=[])).push(fn),showToast:t=>trace.push(['toast',t]),SM:options.noTranslation?{}:{t:k=>'en:'+k}};context.window=context;
+ vm.createContext(context);const win=vm.runInContext('window',context);
+ if(mode==='actual')for(const name of ['labs-registry-model','labs-settings-ui','labs-floating-ui']){const f=path.join(ROOT,'src/js/adapters',name+'.js');if(fs.existsSync(f)){let source=fs.readFileSync(f,'utf8');const mutation=process.env.NEMO_LABS_MUTATION&&JSON.parse(process.env.NEMO_LABS_MUTATION);if(mutation&&mutation.file===name){assert.ok(source.includes(mutation.from),'mutation target');source=source.replace(mutation.from,mutation.to);}vm.runInContext(source,context,{filename:name});}}
+ const source=name=>fs.readFileSync(mode==='baseline'?path.join(BASE,name):path.join(ROOT,'src/js/labs',name),'utf8');
+ vm.runInContext(source('labs-core.js'),context);
+ const L=context.SMLabs;
+ const names=['predictive-stroke','vector-sculpt','french-curve','canvas-grid','view-filter','flip-roll','mirror-check','lagoon-menu','out-of-pegs','timeline-markers','timeline-zoom','xsheet','diagnostics-panel','reference-3d','multiframe-draw'];
+ for(const n of names)L.register(n,{flag:'flag-'+n,describe:'describe-'+n,onEnable(){trace.push(['enable',n,this.flag]);},onDisable(){trace.push(['disable',n,this.flag]);}});
+ for(const name of ['setSculptRadius','setGridStep','setViewFilter','setFlipSpeed','setFlipSpan','setPegOffset','resetPegs','resetTimelineZoom','openCC0AvatarReference','openCC0HandReference','openCharacterReference','openHandReference','moveSelectionToLayer','pingpongCycle','retimeExposure','intervalAssistant','savePose','stampPose','deletePose','speedLines','boil','followPath','referenceFillAtPointer','setKnifeTrimActive'])L[name]=function(...a){assert.equal(this,L);trace.push(['owner',name,...copy(a)]);};
+ L.listPoses=function(){assert.equal(this,L);return {pose:{}};};L.selectedStrokeId=()=>options.selectedStroke||'stroke-1';L.isKnifeTrimActive=()=>false;
+ context.BrushMenu={isOpen(){return false;},toggle(btn){assert.equal(this,context.BrushMenu);trace.push(['brush',btn.className]);}};
+ context.SMShadowBrush={isArmed(){return false;},toggle(){assert.equal(this,context.SMShadowBrush);trace.push(['shadow']);}};
+ context.SMEngineBridge={renderNow(){assert.equal(this,context.SMEngineBridge);trace.push(['render']);},setFSBreakMarks(v){assert.equal(this,context.SMEngineBridge);trace.push(['breakmarks',copy(v)]);}};
+ let vps=[{locked:false},{locked:true}];context.ensurePerspectiveVPs=function(){assert.equal(this,win);trace.push(['vps']);return vps;};
+ for(const name of ['ensureSymmetryAxis','ensureSymmetryRadialCenter','syncSymmetryPanelVisibility','resetSymmetryGuide','resetPerspectiveVPs'])context[name]=function(){assert.equal(this,win);trace.push(['guide',name]);};
+ context.setSymmetryMode=function(v){assert.equal(this,win);state.symmetryMode=v;trace.push(['symmode',v]);};context.setPerspectiveMode=function(v){assert.equal(this,win);state.perspectiveMode=v;trace.push(['perspmode',v]);};
+ context.renderLabsPanel=()=>trace.push(['other-settings']);context.renderLabsFloatPanel=()=>trace.push(['other-floating']);
+ vm.runInContext(source(file),context,{filename:file});
+ const snapshotNode=n=>({tag:n.tag,value:n.value,text:n.textContent,html:n.innerHTML,class:n.className,checked:n.checked,disabled:n.disabled,style:n.style,dataset:n.dataset,children:n.children.map(snapshotNode)});
+ return {context,state,L,nodes,trace,storage,document,timers,vps,boot(){for(const fn of events['doc:DOMContentLoaded']||[])fn();},load(){for(const fn of events.load||[])fn();},resize(){for(const fn of events.resize||[])fn();},snapshot(){return copy({trace,state,vps,storage:[...storage],nodes:[...nodes].map(([id,n])=>[id,snapshotNode(n)])});},all(id){return descendants(nodes.get(id));}};
+}
+function parity(file,options,scenario){const results=modes.map(mode=>{const f=fixture(mode,file,options);scenario(f);return f;});if(results.length===2)assert.deepEqual(results[1].snapshot(),results[0].snapshot());return results.at(-1);}
+
+test('settings exposes original renderer without early rendering and defers language registration',()=>{parity('labs-panel.js',{},f=>{assert.equal(f.nodes.get('labs-tools-list').children.length,0);assert.equal((f.context.SM.afterI18n||[]).length,0);f.load();assert.equal(f.context.SM.afterI18n.length,1);f.context.SM.afterI18n[0]();assert.ok(f.nodes.get('labs-tools-list').children.length>10);});});
+test('settings checkbox invokes same registry receiver and refreshes both entry points',()=>{const f=parity('labs-panel.js',{},f=>{f.context.renderLabsPanel();const cb=f.all('labs-tools-list').find(n=>n.tag==='input'&&n.type==='checkbox');cb.checked=true;cb.fire('change');assert.equal(f.L.isOn('predictive-stroke'),true);assert.ok(f.trace.some(x=>x[0]==='other-floating'));});assert.ok(f.trace.some(x=>x[0]==='enable'));});
+test('enabled settings parameters and default peg offsets keep owner arguments',()=>{parity('labs-panel.js',{storage:{'flag-vector-sculpt':'1','flag-out-of-pegs':'1','flag-canvas-grid':'1'}},f=>{f.context.renderLabsPanel();const num=f.all('labs-tools-list').find(n=>n.tag==='input'&&n.type==='number');num.value='44';num.fire('change');assert.ok(f.trace.some(x=>x[0]==='owner'&&x[1]==='setSculptRadius'&&x[2]===44));assert.deepEqual(f.trace.filter(x=>x[0]==='owner'&&x[1]==='setPegOffset').map(x=>x.slice(2)),[['prev',-60,0],['next',60,0]]);});});
+test('ordinary one-shot action buttons preserve layer, cycle, exposure, pose and trajectory arguments',()=>{parity('labs-panel.js',{},f=>{f.context.renderLabsPanel();const rows=f.nodes.get('labs-actions-list').children;for(const i of [0,1,2,3,4,5,6,7,8,9])for(const b of descendants(rows[i]).filter(x=>x.tag==='button'))b.click();for(const name of ['moveSelectionToLayer','pingpongCycle','retimeExposure','intervalAssistant','stampPose','deletePose','speedLines','boil','followPath','referenceFillAtPointer','setKnifeTrimActive'])assert.ok(f.trace.some(x=>x[0]==='owner'&&x[1]===name),name);const move=f.trace.find(x=>x[1]==='moveSelectionToLayer');assert.equal(move[2],1);});});
+test('language callback uses current translator and missing roots retain no-op behavior',()=>{parity('labs-panel.js',{},f=>{f.load();f.context.SM.t=k=>'ja:'+k;f.context.SM.afterI18n[0]();assert.ok(f.all('labs-tools-list').some(n=>n.textContent.startsWith('ja:')));});parity('labs-panel.js',{missing:['labs-tools-list']},f=>{f.load();f.context.SM.afterI18n[0]();f.context.renderLabsPanel();assert.equal(f.nodes.get('labs-actions-list').children.length,0);});});
+
+test('plain presentation factory creates without calling provider ports',()=>{const module=require('../src/js/adapters/labs-settings-ui.js');assert.doesNotThrow(()=>module.create(new Proxy({}, {get(target,key){if(['document','tools','actions','contexts','realFeatures','always','names','icons','params','symModes','perspModes','perspLabels','symLabels'].includes(key))return undefined;throw Error('early provider '+String(key));}})));});

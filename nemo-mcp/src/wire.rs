@@ -209,12 +209,7 @@ pub async fn call(
         }
         Ok(response)
     };
-    tokio::select! {
-        biased;
-        _ = cancel.cancelled() => Err(io::Error::new(io::ErrorKind::Interrupted, "request cancelled; query state before retrying a write")),
-        result = tokio::time::timeout(Duration::from_secs(30), round_trip) =>
-            result.map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "application timeout; query state before retrying a write"))?,
-    }
+    cancellable(round_trip, cancel).await
 }
 
 pub async fn call_native(
@@ -260,7 +255,21 @@ fn validate_native_response(
     response: &NativeApplicationResponse,
     request: &NativeApplicationRequest,
 ) -> io::Result<()> {
-    let identity_is_valid = response.api_version == NATIVE_API_VERSION
+    let policy_command = request.operation == crate::native_contract::layer_policy::OP;
+    let correlated_operation =
+        request.operation == crate::native_contract::metadata::OP || policy_command;
+    let correlated_identity = !correlated_operation
+        || (response.request_id == request.request_id
+            && response.instance_id == request.instance_id
+            && (response.document_id == request.document_id
+                || (!response.ok
+                    && response
+                        .error
+                        .as_ref()
+                        .is_some_and(|e| e.code == "wrong_document")))
+            && serde_json::to_vec(response).is_ok_and(|b| b.len() <= NATIVE_MAX_MESSAGE_BYTES));
+    let identity_is_valid = correlated_identity
+        && response.api_version == NATIVE_API_VERSION
         && bounded_identifier(&response.request_id)
         && bounded_identifier(&response.instance_id)
         && bounded_identifier(&response.document_id)
@@ -275,16 +284,20 @@ fn validate_native_response(
                         == Some(response.content_revision))
                 && (!matches!(
                     request.operation.as_str(),
-                    "query.document.object" | "query.document.object.layer.timing"
+                    "query.document.object"
+                        | "query.document.object.layer.timing"
+                        | crate::native_contract::metadata::OP
                 ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
                     == Some(response.content_revision))
-                && (request.operation != "query.document.object.layer.timing"
-                    || (response.instance_id == request.instance_id
-                        && response.document_id == request.document_id
-                        && result.get("instanceId").and_then(serde_json::Value::as_str)
-                            == Some(response.instance_id.as_str())
-                        && result.get("documentId").and_then(serde_json::Value::as_str)
-                            == Some(response.document_id.as_str())))
+                && (!matches!(
+                    request.operation.as_str(),
+                    "query.document.object.layer.timing" | crate::native_contract::metadata::OP
+                ) || (response.instance_id == request.instance_id
+                    && response.document_id == request.document_id
+                    && result.get("instanceId").and_then(serde_json::Value::as_str)
+                        == Some(response.instance_id.as_str())
+                    && result.get("documentId").and_then(serde_json::Value::as_str)
+                        == Some(response.document_id.as_str())))
                 && (request.operation != "command.document.object.layer.create"
                     || request
                         .expected_revision
@@ -296,6 +309,13 @@ fn validate_native_response(
                         response.content_revision,
                         result,
                     ))
+                && (!policy_command
+                    || crate::native_contract::layer_policy::revision_matches(
+                        request.expected_revision,
+                        response.content_revision,
+                        result,
+                    ))
+                && crate::native_contract::font::response_matches(request, response)
                 && crate::native_contract::validate_result(
                     &request.operation,
                     &request.document_id,
@@ -393,11 +413,20 @@ async fn cancellable<T>(
     round_trip: impl std::future::Future<Output = io::Result<T>>,
     cancel: CancellationToken,
 ) -> io::Result<T> {
+    cancellable_for(round_trip, cancel, Duration::from_secs(30)).await
+}
+
+// Private duration seam: all production callers retain the same 30-second bound.
+async fn cancellable_for<T>(
+    round_trip: impl std::future::Future<Output = io::Result<T>>,
+    cancel: CancellationToken,
+    timeout: Duration,
+) -> io::Result<T> {
     tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(io::Error::new(io::ErrorKind::Interrupted,
             "request cancelled; query state before retrying a write")),
-        result = tokio::time::timeout(Duration::from_secs(30), round_trip) =>
+        result = tokio::time::timeout(timeout, round_trip) =>
             result.map_err(|_| io::Error::new(io::ErrorKind::TimedOut,
                 "application timeout; query state before retrying a write"))?,
     }
@@ -410,3 +439,15 @@ mod object_tests;
 #[cfg(test)]
 #[path = "native_project_settings_wire_tests.rs"]
 mod project_settings_tests;
+
+#[cfg(test)]
+#[path = "native_property_metadata_wire_tests.rs"]
+mod property_metadata_tests;
+
+#[cfg(test)]
+#[path = "wire_failure_tests.rs"]
+mod failure_tests;
+
+#[cfg(test)]
+#[path = "native_layer_policy_wire_tests.rs"]
+mod layer_policy_tests;

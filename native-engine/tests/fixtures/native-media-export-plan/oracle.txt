@@ -1,0 +1,334 @@
+# L09-E oracle: baseline fbe4b8a33e6d5a229f014154df2ba21988a9fabc src/js/export.js (blob sha256 af6ffbf09234462ebb76ac1465645ebd96d31836b5a17e3bbc56620d97123864)
+# rows R 104, P 7, S 11, F 34, V 176; format in tools/gen.js
+R	o	-	-	0	47	0	47
+R	o	-	0	0	47	0	0
+R	o	-	3	0	47	0	3
+R	o	-	12	0	47	0	12
+R	o	-	99	0	47	0	99
+R	o	0	-	0	47	0	47
+R	o	0	0	0	47	0	0
+R	o	0	3	0	47	0	3
+R	o	0	12	0	47	0	12
+R	o	0	99	0	47	0	99
+R	o	3	-	0	47	3	47
+R	o	3	0	0	47	3	0
+R	o	3	3	0	47	3	3
+R	o	3	12	0	47	3	12
+R	o	3	99	0	47	3	99
+R	o	12	-	0	47	12	47
+R	o	12	0	0	47	12	0
+R	o	12	3	0	47	12	3
+R	o	12	12	0	47	12	12
+R	o	12	99	0	47	12	99
+R	o	99	-	0	47	99	47
+R	o	99	0	0	47	99	0
+R	o	99	3	0	47	99	3
+R	o	99	12	0	47	99	12
+R	o	99	99	0	47	99	99
+R	n	-	-	0	47	0	47
+R	o	-	-	10	20	10	20
+R	o	-	0	10	20	10	0
+R	o	-	3	10	20	10	3
+R	o	-	12	10	20	10	12
+R	o	-	99	10	20	10	99
+R	o	0	-	10	20	0	20
+R	o	0	0	10	20	0	0
+R	o	0	3	10	20	0	3
+R	o	0	12	10	20	0	12
+R	o	0	99	10	20	0	99
+R	o	3	-	10	20	3	20
+R	o	3	0	10	20	3	0
+R	o	3	3	10	20	3	3
+R	o	3	12	10	20	3	12
+R	o	3	99	10	20	3	99
+R	o	12	-	10	20	12	20
+R	o	12	0	10	20	12	0
+R	o	12	3	10	20	12	3
+R	o	12	12	10	20	12	12
+R	o	12	99	10	20	12	99
+R	o	99	-	10	20	99	20
+R	o	99	0	10	20	99	0
+R	o	99	3	10	20	99	3
+R	o	99	12	10	20	99	12
+R	o	99	99	10	20	99	99
+R	n	-	-	10	20	10	20
+R	o	-	-	5	5	5	5
+R	o	-	0	5	5	5	0
+R	o	-	3	5	5	5	3
+R	o	-	12	5	5	5	12
+R	o	-	99	5	5	5	99
+R	o	0	-	5	5	0	5
+R	o	0	0	5	5	0	0
+R	o	0	3	5	5	0	3
+R	o	0	12	5	5	0	12
+R	o	0	99	5	5	0	99
+R	o	3	-	5	5	3	5
+R	o	3	0	5	5	3	0
+R	o	3	3	5	5	3	3
+R	o	3	12	5	5	3	12
+R	o	3	99	5	5	3	99
+R	o	12	-	5	5	12	5
+R	o	12	0	5	5	12	0
+R	o	12	3	5	5	12	3
+R	o	12	12	5	5	12	12
+R	o	12	99	5	5	12	99
+R	o	99	-	5	5	99	5
+R	o	99	0	5	5	99	0
+R	o	99	3	5	5	99	3
+R	o	99	12	5	5	99	12
+R	o	99	99	5	5	99	99
+R	n	-	-	5	5	5	5
+R	o	-	-	100	200	100	200
+R	o	-	0	100	200	100	0
+R	o	-	3	100	200	100	3
+R	o	-	12	100	200	100	12
+R	o	-	99	100	200	100	99
+R	o	0	-	100	200	0	200
+R	o	0	0	100	200	0	0
+R	o	0	3	100	200	0	3
+R	o	0	12	100	200	0	12
+R	o	0	99	100	200	0	99
+R	o	3	-	100	200	3	200
+R	o	3	0	100	200	3	0
+R	o	3	3	100	200	3	3
+R	o	3	12	100	200	3	12
+R	o	3	99	100	200	3	99
+R	o	12	-	100	200	12	200
+R	o	12	0	100	200	12	0
+R	o	12	3	100	200	12	3
+R	o	12	12	100	200	12	12
+R	o	12	99	100	200	12	99
+R	o	99	-	100	200	99	200
+R	o	99	0	100	200	99	0
+R	o	99	3	100	200	99	3
+R	o	99	12	100	200	99	12
+R	o	99	99	100	200	99	99
+R	n	-	-	100	200	100	200
+P	0	0	1	frame_0001.png	1/1
+P	5	5	1	frame_0001.png	1/1
+P	3	7	5	frame_0001.png,frame_0002.png,frame_0003.png,frame_0004.png,frame_0005.png	1/5,2/5,3/5,4/5,5/5
+P	0	34	35	frame_0001.png,frame_0002.png,frame_0003.png,frame_0004.png,frame_0005.png,frame_0006.png,frame_0007.png,frame_0008.png,frame_0009.png,frame_0010.png,frame_0011.png,frame_0012.png,frame_0013.png,frame_0014.png,frame_0015.png,frame_0016.png,frame_0017.png,frame_0018.png,frame_0019.png,frame_0020.png,frame_0021.png,frame_0022.png,frame_0023.png,frame_0024.png,frame_0025.png,frame_0026.png,frame_0027.png,frame_0028.png,frame_0029.png,frame_0030.png,frame_0031.png,frame_0032.png,frame_0033.png,frame_0034.png,frame_0035.png	1/35,2/35,3/35,4/35,5/35,6/35,7/35,8/35,9/35,10/35,11/35,12/35,13/35,14/35,15/35,16/35,17/35,18/35,19/35,20/35,21/35,22/35,23/35,24/35,25/35,26/35,27/35,28/35,29/35,30/35,31/35,32/35,33/35,34/35,35/35
+P	9998	10001	4	frame_0001.png,frame_0002.png,frame_0003.png,frame_0004.png	1/4,2/4,3/4,4/4
+P	7	6	0		
+P	0	99	100	frame_0001.png,frame_0002.png,frame_0003.png,frame_0004.png,frame_0005.png,frame_0006.png,frame_0007.png,frame_0008.png,frame_0009.png,frame_0010.png,frame_0011.png,frame_0012.png,frame_0013.png,frame_0014.png,frame_0015.png,frame_0016.png,frame_0017.png,frame_0018.png,frame_0019.png,frame_0020.png,frame_0021.png,frame_0022.png,frame_0023.png,frame_0024.png,frame_0025.png,frame_0026.png,frame_0027.png,frame_0028.png,frame_0029.png,frame_0030.png,frame_0031.png,frame_0032.png,frame_0033.png,frame_0034.png,frame_0035.png,frame_0036.png,frame_0037.png,frame_0038.png,frame_0039.png,frame_0040.png,frame_0041.png,frame_0042.png,frame_0043.png,frame_0044.png,frame_0045.png,frame_0046.png,frame_0047.png,frame_0048.png,frame_0049.png,frame_0050.png,frame_0051.png,frame_0052.png,frame_0053.png,frame_0054.png,frame_0055.png,frame_0056.png,frame_0057.png,frame_0058.png,frame_0059.png,frame_0060.png,frame_0061.png,frame_0062.png,frame_0063.png,frame_0064.png,frame_0065.png,frame_0066.png,frame_0067.png,frame_0068.png,frame_0069.png,frame_0070.png,frame_0071.png,frame_0072.png,frame_0073.png,frame_0074.png,frame_0075.png,frame_0076.png,frame_0077.png,frame_0078.png,frame_0079.png,frame_0080.png,frame_0081.png,frame_0082.png,frame_0083.png,frame_0084.png,frame_0085.png,frame_0086.png,frame_0087.png,frame_0088.png,frame_0089.png,frame_0090.png,frame_0091.png,frame_0092.png,frame_0093.png,frame_0094.png,frame_0095.png,frame_0096.png,frame_0097.png,frame_0098.png,frame_0099.png,frame_0100.png	1/100,2/100,3/100,4/100,5/100,6/100,7/100,8/100,9/100,10/100,11/100,12/100,13/100,14/100,15/100,16/100,17/100,18/100,19/100,20/100,21/100,22/100,23/100,24/100,25/100,26/100,27/100,28/100,29/100,30/100,31/100,32/100,33/100,34/100,35/100,36/100,37/100,38/100,39/100,40/100,41/100,42/100,43/100,44/100,45/100,46/100,47/100,48/100,49/100,50/100,51/100,52/100,53/100,54/100,55/100,56/100,57/100,58/100,59/100,60/100,61/100,62/100,63/100,64/100,65/100,66/100,67/100,68/100,69/100,70/100,71/100,72/100,73/100,74/100,75/100,76/100,77/100,78/100,79/100,80/100,81/100,82/100,83/100,84/100,85/100,86/100,87/100,88/100,89/100,90/100,91/100,92/100,93/100,94/100,95/100,96/100,97/100,98/100,99/100,100/100
+S	1	frame_0001.svg
+S	2	frame_0002.svg
+S	9	frame_0009.svg
+S	10	frame_0010.svg
+S	99	frame_0099.svg
+S	100	frame_0100.svg
+S	999	frame_0999.svg
+S	1000	frame_1000.svg
+S	9999	frame_9999.svg
+S	10000	frame_10000.svg
+S	12345	frame_12345.svg
+F	4038000000000000	24
+F	4039000000000000	25
+F	403e000000000000	30
+F	4028000000000000	12
+F	4020000000000000	8
+F	3ff0000000000000	1
+F	3fe0000000000000	0.5
+F	403df851eb851eb8	29.97
+F	4037f9db22d0e560	23.976
+F	404df851eb851eb8	59.94
+F	3fd3333333333334	0.30000000000000004
+F	4062000000000001	144.00000000000003
+F	3eb0c6f7a0b5ed8d	0.000001
+F	3eb92a737110e454	0.0000015
+F	3eb4b3fd5942cd96	0.000001234
+F	3e7ad7f29abcaf48	1e-7
+F	3e8421f5f40d8376	1.5e-7
+F	0000000000000001	5e-324
+F	441ac53a7e04bcda	123456789012345680000
+F	444b1ae4d6e2ef50	1e+21
+F	4454542ba12a337c	1.5e+21
+F	7fefffffffffffff	1.7976931348623157e+308
+F	4059000000000000	100
+F	40f86a0000000000	100000
+F	41efffffffe00000	4294967295
+F	3fb999999999999a	0.1
+F	3fe5555555555555	0.6666666666666666
+F	4415af1d78b58c40	100000000000000000000
+F	444b1ae4d6e2ef4f	999999999999999900000
+F	c038000000000000	-24
+F	bfe0000000000000	-0.5
+F	be7ad7f29abcaf48	-1e-7
+F	c44b1ae4d6e2ef50	-1e+21
+F	0000000000000000	0
+V	u	u	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	u	s:draft	403e000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	u	s:medium	0000000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	0	47
+V	u	s:high	7ff8000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	u	s:best	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	0	47
+V	u	s:bogus	403e000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	u	s:	0000000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	u	s:HIGH	7ff8000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	u	s:constructor	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	u	s:__proto__	403e000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	u	s:toString	0000000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	n	u	7ff8000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	n	s:draft	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	2	9
+V	n	s:medium	403e000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	n	s:high	0000000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	n	s:best	7ff8000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	n	s:bogus	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	n	s:	403e000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	n	s:HIGH	0000000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	n	s:constructor	7ff8000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	n	s:__proto__	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	n	s:toString	403e000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:0000000000000000	u	0000000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:0000000000000000	s:draft	7ff8000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:0000000000000000	s:medium	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	2	9
+V	h:0000000000000000	s:high	403e000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:0000000000000000	s:best	0000000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	0	47
+V	h:0000000000000000	s:bogus	7ff8000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:0000000000000000	s:	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:0000000000000000	s:HIGH	403e000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:0000000000000000	s:constructor	0000000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|0|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:0000000000000000	s:__proto__	7ff8000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|NaN|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:0000000000000000	s:toString	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4038000000000000	u	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:4038000000000000	s:draft	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4038000000000000	s:medium	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4038000000000000	s:high	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:4038000000000000	s:best	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4038000000000000	s:bogus	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4038000000000000	s:	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:4038000000000000	s:HIGH	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4038000000000000	s:constructor	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4038000000000000	s:__proto__	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:4038000000000000	s:toString	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|24|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4039000000000000	u	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4039000000000000	s:draft	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:4039000000000000	s:medium	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4039000000000000	s:high	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4039000000000000	s:best	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	2	9
+V	h:4039000000000000	s:bogus	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4039000000000000	s:	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4039000000000000	s:HIGH	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:4039000000000000	s:constructor	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4039000000000000	s:__proto__	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4039000000000000	s:toString	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|25|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:403e000000000000	u	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:403e000000000000	s:draft	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	0	47
+V	h:403e000000000000	s:medium	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:403e000000000000	s:high	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:403e000000000000	s:best	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:403e000000000000	s:bogus	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:403e000000000000	s:	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:403e000000000000	s:HIGH	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:403e000000000000	s:constructor	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:403e000000000000	s:__proto__	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:403e000000000000	s:toString	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|30|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:403df851eb851eb8	u	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:403df851eb851eb8	s:draft	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:403df851eb851eb8	s:medium	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	0	47
+V	h:403df851eb851eb8	s:high	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:403df851eb851eb8	s:best	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	0	47
+V	h:403df851eb851eb8	s:bogus	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:403df851eb851eb8	s:	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:403df851eb851eb8	s:HIGH	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:403df851eb851eb8	s:constructor	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:403df851eb851eb8	s:__proto__	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:403df851eb851eb8	s:toString	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|29.97|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4037f9db22d0e560	u	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4037f9db22d0e560	s:draft	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	2	9
+V	h:4037f9db22d0e560	s:medium	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4037f9db22d0e560	s:high	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4037f9db22d0e560	s:best	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:4037f9db22d0e560	s:bogus	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4037f9db22d0e560	s:	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4037f9db22d0e560	s:HIGH	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:4037f9db22d0e560	s:constructor	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4037f9db22d0e560	s:__proto__	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4037f9db22d0e560	s:toString	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|23.976|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:404df851eb851eb8	u	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:404df851eb851eb8	s:draft	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:404df851eb851eb8	s:medium	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	2	9
+V	h:404df851eb851eb8	s:high	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:404df851eb851eb8	s:best	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	0	47
+V	h:404df851eb851eb8	s:bogus	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:404df851eb851eb8	s:	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:404df851eb851eb8	s:HIGH	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:404df851eb851eb8	s:constructor	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:404df851eb851eb8	s:__proto__	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:404df851eb851eb8	s:toString	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|59.94|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3fd3333333333334	u	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:3fd3333333333334	s:draft	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3fd3333333333334	s:medium	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3fd3333333333334	s:high	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:3fd3333333333334	s:best	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3fd3333333333334	s:bogus	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3fd3333333333334	s:	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:3fd3333333333334	s:HIGH	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3fd3333333333334	s:constructor	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3fd3333333333334	s:__proto__	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:3fd3333333333334	s:toString	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|0.30000000000000004|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3e7ad7f29abcaf48	u	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3e7ad7f29abcaf48	s:draft	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:3e7ad7f29abcaf48	s:medium	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3e7ad7f29abcaf48	s:high	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3e7ad7f29abcaf48	s:best	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	2	9
+V	h:3e7ad7f29abcaf48	s:bogus	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3e7ad7f29abcaf48	s:	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3e7ad7f29abcaf48	s:HIGH	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:3e7ad7f29abcaf48	s:constructor	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3e7ad7f29abcaf48	s:__proto__	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3e7ad7f29abcaf48	s:toString	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|1e-7|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:444b1ae4d6e2ef50	u	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:444b1ae4d6e2ef50	s:draft	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	0	47
+V	h:444b1ae4d6e2ef50	s:medium	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:444b1ae4d6e2ef50	s:high	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:444b1ae4d6e2ef50	s:best	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:444b1ae4d6e2ef50	s:bogus	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:444b1ae4d6e2ef50	s:	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:444b1ae4d6e2ef50	s:HIGH	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:444b1ae4d6e2ef50	s:constructor	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:444b1ae4d6e2ef50	s:__proto__	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:444b1ae4d6e2ef50	s:toString	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|1e+21|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3fe0000000000000	u	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:3fe0000000000000	s:draft	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3fe0000000000000	s:medium	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3fe0000000000000	s:high	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:3fe0000000000000	s:best	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3fe0000000000000	s:bogus	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3fe0000000000000	s:	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:3fe0000000000000	s:HIGH	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:3fe0000000000000	s:constructor	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:3fe0000000000000	s:__proto__	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:3fe0000000000000	s:toString	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|0.5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4062000000000000	u	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4062000000000000	s:draft	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	2	9
+V	h:4062000000000000	s:medium	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4062000000000000	s:high	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4062000000000000	s:best	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:4062000000000000	s:bogus	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4062000000000000	s:	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4062000000000000	s:HIGH	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	S	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:4062000000000000	s:constructor	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:4062000000000000	s:__proto__	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:4062000000000000	s:toString	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	X	-y|-framerate|144|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:c014000000000000	u	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:c014000000000000	s:draft	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:c014000000000000	s:medium	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/tmp/o.mp4	2	9
+V	h:c014000000000000	s:high	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:c014000000000000	s:best	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/tmp/o.mp4	0	47
+V	h:c014000000000000	s:bogus	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:c014000000000000	s:	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:c014000000000000	s:HIGH	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:c014000000000000	s:constructor	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:c014000000000000	s:__proto__	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:c014000000000000	s:toString	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|-5|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	0	47
+V	h:7ff0000000000000	u	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:7ff0000000000000	s:draft	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|35|-profile:v|high|/tmp/o.mp4	0	47
+V	h:7ff0000000000000	s:medium	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|50|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:7ff0000000000000	s:high	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	2	9
+V	h:7ff0000000000000	s:best	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|80|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:7ff0000000000000	s:bogus	4038000000000000	-	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:7ff0000000000000	s:	4038000000000000	2	9	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/Users/ivg/My Movies/out file.mp4	2	9
+V	h:7ff0000000000000	s:HIGH	4038000000000000	0	-	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|65|-profile:v|high|/tmp/o.mp4	0	47
+V	h:7ff0000000000000	s:constructor	4038000000000000	-	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47
+V	h:7ff0000000000000	s:__proto__	4038000000000000	2	9	/tmp/o.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/tmp/o.mp4	2	9
+V	h:7ff0000000000000	s:toString	4038000000000000	0	-	/Users/ivg/My Movies/out file.mp4	/tmp/sm-export-1700000000000	R	-y|-framerate|Infinity|-i|/tmp/sm-export-1700000000000/frame_%04d.png|-c:v|h264_videotoolbox|-pix_fmt|yuv420p|-q:v|<non-string>|-profile:v|high|/Users/ivg/My Movies/out file.mp4	0	47

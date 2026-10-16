@@ -106,49 +106,7 @@ async fn run_ffmpeg(
 // is a separate, not-yet-built piece — this command only covers desktop.
 #[tauri::command]
 async fn fetch_google_font(family: String, weight: u32, italic: bool) -> Result<String, String> {
-    use base64::Engine;
-    let axis = if italic { "ital,wght@1," } else { "wght@" };
-    let css_url = format!(
-        "https://fonts.googleapis.com/css2?family={}:{}{}&display=swap",
-        family.replace(' ', "+"),
-        axis,
-        weight
-    );
-    let client = reqwest::Client::new();
-    let css = client
-        .get(&css_url)
-        .header("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2)")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .text()
-        .await
-        .map_err(|e| e.to_string())?;
-    // The response is one @font-face block per requested weight/style —
-    // just one here since exactly one weight/italic combo was asked for.
-    // Extract the URL inside its first src: url(...) rather than a full
-    // CSS parse — this endpoint's own output shape is stable/simple enough
-    // (confirmed via curl) that a real parser would be pure overhead.
-    let ttf_url = css
-        .split("url(")
-        .nth(1)
-        .and_then(|rest| rest.split(')').next())
-        .ok_or_else(|| {
-            format!(
-                "no font URL found for '{}' — family name may not exist on Google Fonts",
-                family
-            )
-        })?
-        .to_string();
-    let bytes = client
-        .get(&ttf_url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .bytes()
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
+    application_mcp::fetch_google_font(family, weight, italic).await
 }
 
 // Native stylus pressure (macOS): tablet drivers (XP-Pen, Huion, Wacom…)

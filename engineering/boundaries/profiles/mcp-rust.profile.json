@@ -4,33 +4,99 @@
       "id": "mcp.transport",
       "layer": "adapters",
       "dir": "nemo-mcp",
-      "files": ["build.rs", "src/capabilities.rs", "src/capability_contract.rs", "src/contract.rs", "src/contract_tests.rs",
-      "src/native_request_input.rs",
-      "src/native_request_input_tests.rs", "src/lib.rs", "src/main.rs", "src/native_contract.rs", "src/native_object_contract.rs", "src/native_object_contract_tests.rs", "src/native_object_wire_tests.rs", "src/native_reproduction_contract.rs", "src/raw_envelope.rs", "src/stdio_transport.rs", "src/stdio_output.rs", "src/raw_envelope_tests.rs", "src/registry.rs", "src/schema.rs", "src/server.rs", "src/wire.rs", "src/native_project_settings_contract.rs", "src/native_project_settings_wire_tests.rs"],
-      "publicApi": ["src/capabilities.rs", "src/lib.rs", "src/contract.rs", "src/native_request_input.rs", "src/registry.rs", "src/wire.rs"],
+      "files": [
+        "build.rs",
+        "src/capabilities.rs",
+        "src/capability_contract.rs",
+        "src/contract.rs",
+        "src/contract_tests.rs",
+        "src/native_request_input.rs",
+        "src/native_request_input_tests.rs",
+        "src/lib.rs",
+        "src/main.rs",
+        "src/main_trace_tests.rs",
+        "src/native_contract.rs",
+        "src/native_object_contract.rs",
+        "src/native_object_contract_tests.rs",
+        "src/native_object_wire_tests.rs",
+        "src/native_reproduction_contract.rs",
+        "src/raw_envelope.rs",
+        "src/stdio_transport.rs",
+        "src/stdio_output.rs",
+        "src/raw_envelope_tests.rs",
+        "src/registry.rs",
+        "src/schema.rs",
+        "src/server.rs",
+        "src/wire.rs",
+        "src/wire_failure_tests.rs",
+        "src/native_project_settings_contract.rs",
+        "src/native_project_settings_wire_tests.rs",
+        "src/native_property_metadata_contract.rs",
+        "src/native_property_metadata_wire_tests.rs",
+        "src/native_diagnostics_contract.rs",
+        "src/native_layer_policy_contract.rs",
+        "src/native_layer_policy_wire_tests.rs",
+        "src/native_contract_tests.rs",
+        "src/native_font_contract.rs",
+        "src/native_font_contract_tests.rs"
+      ],
+      "publicApi": [
+        "src/capabilities.rs",
+        "src/lib.rs",
+        "src/contract.rs",
+        "src/native_request_input.rs",
+        "src/registry.rs",
+        "src/wire.rs"
+      ],
       "sizeProfile": "Rust production module"
     },
     {
       "id": "mcp.desktop",
       "layer": "adapters",
       "dir": "src-tauri/src",
-      "files": ["application_mcp.rs", "native_application_reservations.rs", "native_revision_sync.rs"],
-      "publicApi": ["application_mcp.rs"],
+      "files": [
+        "application_mcp.rs",
+        "native_application_reservations.rs",
+        "native_revision_sync.rs",
+        "native_font_source.rs"
+      ],
+      "publicApi": [
+        "application_mcp.rs"
+      ],
       "sizeProfile": "Rust production module"
     },
     {
       "id": "mcp.desktop.tests",
       "layer": "tests",
       "dir": "src-tauri/src",
-      "files": ["application_mcp_tests.rs", "application_mcp_diagnostics_tests.rs", "application_mcp_reproduction_tests.rs", "native_revision_sync_tests.rs"],
+      "files": [
+        "application_mcp_tests.rs",
+        "application_mcp_diagnostics_tests.rs",
+        "application_mcp_reproduction_tests.rs",
+        "native_revision_sync_tests.rs",
+        "native_font_source_tests.rs"
+      ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     }
   ],
   "layerRules": {
-    "adapters": {"allowedLayers": ["adapters"]},
-    "tests": {"allowedLayers": ["adapters"]}
+    "adapters": {
+      "allowedLayers": [
+        "adapters"
+      ]
+    },
+    "tests": {
+      "allowedLayers": [
+        "adapters"
+      ]
+    }
   },
-  "sizeProfiles": {"Rust production module": {"warn": 350, "hardMax": 500}},
+  "sizeProfiles": {
+    "Rust production module": {
+      "warn": 350,
+      "hardMax": 500
+    }
+  },
   "exceptions": []
 }

@@ -205,6 +205,7 @@ mod tests {
             ],
             objects,
             property_holders: Presence::Missing,
+            layer_folders: Presence::Missing,
             composition_order: if version == 1 {
                 Presence::Missing
             } else {

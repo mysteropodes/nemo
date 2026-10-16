@@ -1,0 +1,553 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mysteropodes/nemo/engineering/application/native-font-assets-v1.schema.json",
+  "description": "PRIVATE proposed shared font resource contract; requires coherent native/host/UI/SDK/MCP registration and acceptance.",
+  "$defs": {
+    "Revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "Opaque": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[^\\u0000]+$",
+      "description": "Exact spelling; native/SDK additionally enforce trim-nonempty and <=255 UTF8 bytes."
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16777216
+    },
+    "Source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "fontKey"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bundled"
+            },
+            "fontKey": {
+              "enum": [
+                "Roboto-Regular",
+                "Roboto-Bold",
+                "DejaVuSans-Regular",
+                "DejaVuSans-Bold",
+                "DejaVuSerif-Regular",
+                "DejaVuSerif-Bold",
+                "Manrope-Regular",
+                "Inter-Regular"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "family",
+            "weight",
+            "italic"
+          ],
+          "properties": {
+            "kind": {
+              "const": "google"
+            },
+            "family": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "weight": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "italic": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "Import": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "documentSnapshotId",
+        "lifecycleGeneration",
+        "source"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.asset.font.import"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lifecycleGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        }
+      }
+    },
+    "Query": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "atRevision",
+            "documentSnapshotId",
+            "offset",
+            "limit"
+          ],
+          "properties": {
+            "action": {
+              "const": "list"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            "limit": {
+              "const": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "atRevision",
+            "documentSnapshotId",
+            "assetId"
+          ],
+          "properties": {
+            "action": {
+              "const": "inspect"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "assetId": {
+              "$ref": "#/$defs/Opaque"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "atRevision",
+            "documentSnapshotId",
+            "assetId",
+            "offset",
+            "length"
+          ],
+          "properties": {
+            "action": {
+              "const": "read"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "assetId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777215
+            },
+            "length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1536
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "forRequestId"
+          ],
+          "properties": {
+            "action": {
+              "const": "receipt"
+            },
+            "forRequestId": {
+              "$ref": "#/$defs/Identifier"
+            }
+          }
+        }
+      ]
+    },
+    "Row": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assetId",
+            "name",
+            "sourceKind",
+            "available",
+            "mediaType",
+            "encodedBytes",
+            "encodedSha256"
+          ],
+          "properties": {
+            "assetId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "name": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "sourceKind": {
+              "const": "embedded"
+            },
+            "available": {
+              "const": true
+            },
+            "mediaType": {
+              "const": "font/ttf"
+            },
+            "encodedBytes": {
+              "$ref": "#/$defs/Size"
+            },
+            "encodedSha256": {
+              "$ref": "#/$defs/Sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assetId",
+            "name",
+            "sourceKind",
+            "available",
+            "reason"
+          ],
+          "properties": {
+            "assetId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "name": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "sourceKind": {
+              "const": "linked"
+            },
+            "available": {
+              "const": false
+            },
+            "reason": {
+              "const": "linked_font_unavailable"
+            }
+          }
+        }
+      ]
+    },
+    "Imported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "assetId",
+        "mediaType",
+        "encodedBytes",
+        "encodedSha256"
+      ],
+      "properties": {
+        "applied": {
+          "const": true
+        },
+        "historyEntriesAdded": {
+          "const": 1
+        },
+        "assetId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "mediaType": {
+          "const": "font/ttf"
+        },
+        "encodedBytes": {
+          "$ref": "#/$defs/Size"
+        },
+        "encodedSha256": {
+          "$ref": "#/$defs/Sha256"
+        }
+      }
+    },
+    "ListResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "offset",
+        "nextOffset",
+        "totalFontRecords",
+        "rows"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "nextOffset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 1023
+        },
+        "totalFontRecords": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "rows": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/Row"
+          }
+        }
+      }
+    },
+    "InspectResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "font"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "font": {
+          "$ref": "#/$defs/Row"
+        }
+      }
+    },
+    "ReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "assetId",
+        "offset",
+        "returnedLength",
+        "totalLength",
+        "encodedSha256",
+        "base64"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "assetId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777215
+        },
+        "returnedLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1536
+        },
+        "totalLength": {
+          "$ref": "#/$defs/Size"
+        },
+        "encodedSha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "base64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 2048,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        }
+      }
+    },
+    "Receipt": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "forRequestId"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_found"
+            },
+            "forRequestId": {
+              "$ref": "#/$defs/Identifier"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "forRequestId",
+            "requestFingerprintSha256",
+            "contentRevision",
+            "assetId",
+            "mediaType",
+            "encodedBytes",
+            "encodedSha256"
+          ],
+          "properties": {
+            "status": {
+              "const": "committed"
+            },
+            "forRequestId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "requestFingerprintSha256": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "contentRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "assetId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "mediaType": {
+              "const": "font/ttf"
+            },
+            "encodedBytes": {
+              "$ref": "#/$defs/Size"
+            },
+            "encodedSha256": {
+              "$ref": "#/$defs/Sha256"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "forRequestId",
+            "requestFingerprintSha256",
+            "contentRevision",
+            "code"
+          ],
+          "properties": {
+            "status": {
+              "const": "refused"
+            },
+            "forRequestId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "requestFingerprintSha256": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "contentRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "code": {
+              "enum": [
+                "invalid_request",
+                "wrong_instance",
+                "wrong_document",
+                "stale_revision",
+                "busy_conflict",
+                "unavailable",
+                "not_found",
+                "cancelled_before_dispatch",
+                "internal"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Output": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Imported"
+        },
+        {
+          "$ref": "#/$defs/ListResult"
+        },
+        {
+          "$ref": "#/$defs/InspectResult"
+        },
+        {
+          "$ref": "#/$defs/ReadResult"
+        },
+        {
+          "$ref": "#/$defs/Receipt"
+        }
+      ]
+    }
+  },
+  "$comment": "Bounds and request/reply correlation are also enforced by common Rust/SDK validators."
+}

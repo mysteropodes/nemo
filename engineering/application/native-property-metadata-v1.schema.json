@@ -1,0 +1,804 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mysteropodes/nemo/engineering/application/native-property-metadata-v1.schema.json",
+  "title": "Native property metadata read projection; no property writer",
+  "$defs": {
+    "Target": {
+      "type": "object",
+      "properties": {
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strokeId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "contextId",
+        "layerUid"
+      ],
+      "additionalProperties": false
+    },
+    "View": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "targets"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "kind",
+            "offset",
+            "limit"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "properties"
+            },
+            "target": {
+              "$ref": "#/$defs/Target"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "offset",
+            "limit"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "storedProperty"
+            },
+            "target": {
+              "$ref": "#/$defs/Target"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "property"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Selector": {
+      "type": "object",
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "view": {
+          "$ref": "#/$defs/View"
+        }
+      },
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "additionalProperties": false
+    },
+    "Authored": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "availability": {
+              "const": "available"
+            },
+            "keyCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "hasStaticOverride": {
+              "type": "boolean"
+            },
+            "expressionEnabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "availability",
+            "keyCount",
+            "hasStaticOverride",
+            "expressionEnabled"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "availability": {
+              "const": "unavailable"
+            },
+            "reason": {
+              "const": "separate-property-owner"
+            }
+          },
+          "required": [
+            "availability",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Availability": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "const": "available"
+        },
+        "applicability": {
+          "enum": [
+            "available",
+            "unavailable"
+          ]
+        },
+        "propertyWrite": {
+          "const": "unavailable"
+        },
+        "reason": {
+          "enum": [
+            "read-only-description-not-command-availability",
+            "stored-metadata-does-not-prove-applicability"
+          ]
+        }
+      },
+      "required": [
+        "metadata",
+        "applicability",
+        "propertyWrite",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "Descriptor": {
+      "type": "object",
+      "properties": {
+        "property": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "unit": {
+          "type": "string"
+        },
+        "defaultValue": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          ]
+        },
+        "animatable": {
+          "type": "boolean"
+        },
+        "controlType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "controlName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authored": {
+          "$ref": "#/$defs/Authored"
+        },
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        }
+      },
+      "required": [
+        "property",
+        "dimension",
+        "unit",
+        "defaultValue",
+        "animatable",
+        "controlType",
+        "controlName",
+        "authored",
+        "availability"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "defaultValue": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": 2
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "defaultValue": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": 3
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "defaultValue": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": 4
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "defaultValue": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "property": {
+                "enum": [
+                  "order",
+                  "timeRemap"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "authored": {
+                "properties": {
+                  "availability": {
+                    "const": "unavailable"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "authored": {
+                "properties": {
+                  "availability": {
+                    "const": "available"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TargetItem": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "context"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "contextId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "layer"
+            },
+            "target": {
+              "type": "object",
+              "properties": {
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "contextId",
+                "layerUid"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "target"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "element"
+            },
+            "target": {
+              "type": "object",
+              "properties": {
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "strokeId": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "contextId",
+                "layerUid",
+                "strokeId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "kind",
+            "target"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ReadResult": {
+      "type": "object",
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "documentId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "targets",
+            "properties",
+            "storedProperty"
+          ]
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/Target"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TargetItem"
+              },
+              {
+                "$ref": "#/$defs/Descriptor"
+              }
+            ]
+          }
+        },
+        "nextOffset": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          ]
+        },
+        "unavailableCategories": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "enum": [
+                  "conditionalMotionRows",
+                  "pathVerticesTrimStrokeBrushMesh",
+                  "referenceOnlyElements",
+                  "expressionDiagnostics",
+                  "layerEffectMatteReveal",
+                  "propertyWrites"
+                ]
+              },
+              "state": {
+                "const": "unavailable"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "category",
+              "state",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "allOf": [
+            {
+              "contains": {
+                "properties": {
+                  "category": {
+                    "const": "conditionalMotionRows"
+                  }
+                },
+                "required": [
+                  "category"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {
+                  "category": {
+                    "const": "pathVerticesTrimStrokeBrushMesh"
+                  }
+                },
+                "required": [
+                  "category"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {
+                  "category": {
+                    "const": "referenceOnlyElements"
+                  }
+                },
+                "required": [
+                  "category"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {
+                  "category": {
+                    "const": "expressionDiagnostics"
+                  }
+                },
+                "required": [
+                  "category"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {
+                  "category": {
+                    "const": "layerEffectMatteReveal"
+                  }
+                },
+                "required": [
+                  "category"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {
+                  "category": {
+                    "const": "propertyWrites"
+                  }
+                },
+                "required": [
+                  "category"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
+        }
+      },
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "kind",
+        "target",
+        "items",
+        "nextOffset",
+        "unavailableCategories"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "targets"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "type": "null"
+              },
+              "items": {
+                "items": {
+                  "$ref": "#/$defs/TargetItem"
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "items": {
+                "items": {
+                  "$ref": "#/$defs/Descriptor"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "storedProperty"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "properties": {
+                    "availability": {
+                      "properties": {
+                        "applicability": {
+                          "const": "unavailable"
+                        },
+                        "reason": {
+                          "const": "stored-metadata-does-not-prove-applicability"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "nextOffset": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "properties"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "items": {
+                  "items": {
+                    "properties": {
+                      "availability": {
+                        "properties": {
+                          "applicability": {
+                            "const": "available"
+                          },
+                          "reason": {
+                            "const": "read-only-description-not-command-availability"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
