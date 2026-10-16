@@ -1035,6 +1035,10 @@ JS_EXTERN JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
                           const char *filename, int eval_flags);
 JS_EXTERN JSValue JS_Eval2(JSContext *ctx, const char *input, size_t input_len,
                            JSEvalOptions *options);
+/* Nemo E2: 'input' must be zero terminated. Exactly one function expression,
+   then EOF; its kind and parameters are whatever 'input' declares. */
+JS_EXTERN JSValue JS_EvalSingleFunction(JSContext *ctx, const char *input,
+                                        size_t input_len, const char *filename);
 JS_EXTERN JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj,
                               const char *input, size_t input_len,
                               const char *filename, int eval_flags);

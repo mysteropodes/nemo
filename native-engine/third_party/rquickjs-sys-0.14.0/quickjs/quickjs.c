@@ -38061,6 +38061,31 @@ static __exception int js_parse_program(JSParseState *s)
     return 0;
 }
 
+/* Nemo E2: parse exactly one function expression, then EOF, and nothing
+   else. The input must start with the 'function' keyword; the body is
+   delimited by the function's own braces, so input after the closing '}'
+   (other than whitespace/comments) is a SyntaxError and no part of the input
+   is evaluated before the caller invokes the returned function.
+   JS_FUNC_NORMAL is only the initial kind: as for any function expression,
+   'function *' is parsed as a generator. This parser does not fix the kind
+   or the parameters; a caller that needs them fixed must supply that header
+   itself before any untrusted text. */
+static __exception int js_parse_single_function(JSParseState *s)
+{
+    if (next_token(s))
+        return -1;
+    if (s->token.val != TOK_FUNCTION)
+        return js_parse_error(s, "function expected");
+    if (js_parse_function_decl(s, JS_PARSE_FUNC_EXPR, JS_FUNC_NORMAL,
+                               JS_ATOM_NULL, s->token.ptr,
+                               s->token.line_num, s->token.col_num))
+        return -1;
+    if (s->token.val != TOK_EOF)
+        return js_parse_error(s, "unexpected token after function");
+    emit_return(s, true);
+    return 0;
+}
+
 #endif // QJS_DISABLE_PARSER
 
 static void js_parse_init(JSContext *ctx, JSParseState *s,
@@ -38118,6 +38143,9 @@ JSValue JS_EvalFunction(JSContext *ctx, JSValue fun_obj)
 {
     return JS_EvalFunctionInternal(ctx, fun_obj, ctx->global_obj, NULL, NULL);
 }
+
+/* internal: see JS_EvalSingleFunction() */
+#define JS_EVAL_FLAG_SINGLE_FUNCTION_INTERNAL (1 << 30)
 
 #ifndef QJS_DISABLE_PARSER
 
@@ -38202,7 +38230,10 @@ static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
     push_scope(s); /* body scope */
     fd->body_scope = fd->scope_level;
 
-    err = js_parse_program(s);
+    if (flags & JS_EVAL_FLAG_SINGLE_FUNCTION_INTERNAL)
+        err = js_parse_single_function(s);
+    else
+        err = js_parse_program(s);
     if (err) {
     fail:
         free_token(s, &s->token);
@@ -38328,6 +38359,20 @@ JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
 JSValue JS_Eval2(JSContext *ctx, const char *input, size_t input_len, JSEvalOptions *options)
 {
     return JS_EvalThis2(ctx, ctx->global_obj, input, input_len, options);
+}
+
+/* Nemo E2: returns the function object of `input`, which must be exactly one
+   function expression followed by EOF, parsed as a strict global script
+   (like JS_Eval's default in rquickjs). The kind and parameters are those
+   written in `input` ('function *' gives a generator). Only the closure is
+   created; nothing in the function body runs. Anything else throws a
+   SyntaxError. */
+JSValue JS_EvalSingleFunction(JSContext *ctx, const char *input,
+                              size_t input_len, const char *filename)
+{
+    return JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename, 1,
+                           JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT |
+                           JS_EVAL_FLAG_SINGLE_FUNCTION_INTERNAL, -1);
 }
 
 int JS_ResolveModule(JSContext *ctx, JSValueConst obj)
