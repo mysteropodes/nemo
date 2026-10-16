@@ -290,6 +290,12 @@ fn validate_native_response(
                         .expected_revision
                         .and_then(|revision| revision.checked_add(1))
                         == Some(response.content_revision))
+                && (request.operation != "command.document.object.project.settings.edit"
+                    || crate::native_contract::settings::revision_matches(
+                        request.expected_revision,
+                        response.content_revision,
+                        result,
+                    ))
                 && crate::native_contract::validate_result(
                     &request.operation,
                     &request.document_id,
@@ -400,3 +406,7 @@ async fn cancellable<T>(
 #[cfg(test)]
 #[path = "native_object_wire_tests.rs"]
 mod object_tests;
+
+#[cfg(test)]
+#[path = "native_project_settings_wire_tests.rs"]
+mod project_settings_tests;

@@ -58,6 +58,10 @@ fn blank_project(
     if !frames.is_finite() || frames > u32::MAX as f64 {
         return Err(DispatchErrorCode::InvalidRequest);
     }
+    let metadata = metadata
+        .with_canvas_background(Some("#ffffff"))
+        .and_then(|value| value.with_work_area(Some(0.0), Some(frames - 1.0)))
+        .map_err(|_| DispatchErrorCode::InvalidRequest)?;
     let drawing = ObjectDocument {
         format: OBJECT_DOCUMENT_FORMAT.into(),
         format_version: 2,
@@ -326,13 +330,22 @@ fn project_snapshot_info(
             "opacity":image.opacity(), "offsetFrames":image.offset_frames()}),
     };
     let (width, height) = project.project().canvas_dimensions();
-    Ok(
-        serde_json::json!({"documentSnapshotId":snapshot.snapshot_id(),
+    let mut info = serde_json::json!({"documentSnapshotId":snapshot.snapshot_id(),
         "contentRevision":snapshot.content_revision(), "documentDigest":digest,
         "byteCount":bytes.len(), "canvasW":width, "canvasH":height,
         "fps":project.project().fps(), "totalFrames":project.drawing().total_frames,
-        "layers":layers, "reference":reference}),
-    )
+        "layers":layers, "reference":reference});
+    if let Some(background) = project.project().canvas_background() {
+        info["canvasBg"] = background.into();
+    }
+    let (wa_in, wa_out) = project.project().work_area();
+    if let Some(value) = wa_in {
+        info["waIn"] = value.into();
+    }
+    if let Some(value) = wa_out {
+        info["waOut"] = value.into();
+    }
+    Ok(info)
 }
 
 #[cfg(test)]

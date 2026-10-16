@@ -5,7 +5,7 @@
     "regions",
     "functions"
   ],
-  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose — see T04/#1053.",
+  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose \u2014 see T04/#1053.",
   "crate": "nemo-mcp",
   "manifestPath": "nemo-mcp/Cargo.toml",
   "recorded": {
@@ -151,6 +151,17 @@
       "regions": 91.32,
       "functions": 100,
       "note": "N25R1/#1651: clean measured source 765745927ab11307b20d8af22f939c6a7ca1b3b6, pinned cargo-llvm-cov 0.9.1, default instrumented 103 tests passed/0 failed. lines 113/123; regions 179/196; functions 10/10. Report reports/20261008T145043Z-7657459/coverage-rust/coverage.json SHA256 24183386ab5a3a8d9d878d226923d5e6ce02e08cfbffe613485710f9ec079c05. Only this new measured entry added; every prior file/total floor, tool/exclusion/history retained. Protected ed9 comparison confirms inherited 18 coverage failures; registration is not whole coverage acceptance."
+    },
+    "nemo-mcp/src/native_project_settings_contract.rs": {
+      "lines": 100.0,
+      "regions": 100.0,
+      "functions": 100.0,
+      "note": "F04/#2080: pinned cargo-llvm-cov 0.9.1 measured clean source aa258dedbf5688a53c2f618388f53eb27d195c01; 16 binaries, 119 tests passed, none failed. Artifact: reports/f04-coverage-20261016T144640Z/coverage.json SHA256 c4bb28830ca4f9cc0f350d67e8ad32daee7b43ac26f1bf5f591c619cf8fce99e. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged. Whole-crate ratchet remains RED18; additive registration is not coverage acceptance. Measured 109/109 lines, 280/280 regions and 20/20 functions."
+    },
+    "nemo-mcp/src/native_project_settings_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "F04/#2080: pinned cargo-llvm-cov 0.9.1 measured clean source aa258dedbf5688a53c2f618388f53eb27d195c01; 16 binaries, 119 tests passed, none failed. Artifact: reports/f04-coverage-20261016T144640Z/coverage.json SHA256 c4bb28830ca4f9cc0f350d67e8ad32daee7b43ac26f1bf5f591c619cf8fce99e. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged. Whole-crate ratchet remains RED18; additive registration is not coverage acceptance. This cfg(test) child is absent from the real LLVM export; explicitly listed, not excluded or assigned a guessed zero floor."
     }
   },
   "nativeObjectContractRegistration": {

@@ -10,6 +10,9 @@ mod reproduction;
 #[path = "native_object_contract.rs"]
 mod object;
 
+#[path = "native_project_settings_contract.rs"]
+pub(crate) mod settings;
+
 const OPACITY_CURVE: [[f64; 2]; 5] = [
     [0.0, 0.0],
     [0.25, 0.156],
@@ -71,6 +74,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "query.document.object" => object::request(payload),
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
+        "command.document.object.project.settings.edit" => settings::request(payload),
         "command.document.object.layer.create" => object::create_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -216,6 +220,9 @@ pub(crate) fn validate_result(
     }
     if operation == "query.document.object.layer.timing" {
         return object::timing_result(request_document_id, payload, result);
+    }
+    if operation == "command.document.object.project.settings.edit" {
+        return settings::result(result);
     }
     if operation == "command.document.object.layer.create" {
         return object::create_result(result);

@@ -405,14 +405,21 @@
       return true;
     }
     function stop() {
-      var wasNative = !!controller, restore = false;
+      var wasNative = !!controller, restore = false, owner = controller, origin = identity;
       if (wasNative) {
         try { restore = ports.controller() === controller && controller.isActive() &&
           sameIdentity(identity, controller.identity()); } catch (_) {}
       }
       ++generation; observe('schedulerState', 'play-stop', generation, identity); controller = null; identity = null;
       if (raf !== null) { ports.cancel(raf); raf = null; }
-      return Object.freeze({ wasNative: wasNative, restore: restore });
+      var stopped = generation;
+      return Object.freeze({ wasNative: wasNative, restore: restore, canResume: function () {
+        try { var now = owner && owner.identity(); return wasNative && generation === stopped && !controller &&
+          !ports.playing() && ports.controller() === owner && owner.isActive() && now && origin &&
+          now.instanceId === origin.instanceId && now.documentId === origin.documentId &&
+          Number.isSafeInteger(now.contentRevision) && now.contentRevision >= origin.contentRevision; }
+        catch (_) { return false; }
+      } });
     }
     return Object.freeze({ start: start, stop: stop });
   }
