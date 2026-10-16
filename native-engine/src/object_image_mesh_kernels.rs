@@ -2,4 +2,5 @@
 //! declared here so evaluation.rs needs a single `#[path]` line for the family.
 
 #[path = "object_image_mesh_geometry.rs"]
+#[allow(dead_code)]
 pub(crate) mod object_image_mesh_geometry;
