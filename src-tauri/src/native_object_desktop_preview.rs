@@ -129,8 +129,8 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             ));
         }
     }
-    request.output_spec.admit()?;
-    request.viewport.admit()?;
+    let output = request.output_spec.admit_object()?;
+    request.viewport.admit_object(&output)?;
     Ok(request)
 }
 
@@ -166,7 +166,8 @@ pub(crate) fn preview_with_target(
     target: impl FnOnce(ObjectPreviewConsumer<'_>) -> HostResult<PresentationReceipt>,
 ) -> HostResult<NativePreviewReceipt> {
     let selector = request.selector();
-    let output: OutputSpec = request.output_spec.admit()?;
+    let output: OutputSpec = request.output_spec.admit_object()?;
+    request.viewport.admit_object(&output)?;
     let revision_event = request
         .revision_sync
         .as_ref()
@@ -184,6 +185,7 @@ pub(crate) fn preview_with_target(
             &selector,
             revision_sync,
             |owner| {
+                owner.require_project_output(output.dimensions())?;
                 owner.with_prepared_object_preview(&selector, output, |owner| {
                     Ok(target(ObjectPreviewConsumer {
                         owner,
@@ -217,7 +219,9 @@ pub(crate) async fn nemo_native_object_preview(
                 &app_for_main,
                 &request.instance_id,
                 request.lifecycle_generation,
-                request.viewport.admit()?,
+                request
+                    .viewport
+                    .admit_object(&request.output_spec.admit_object()?)?,
                 consumer,
             )
         })
