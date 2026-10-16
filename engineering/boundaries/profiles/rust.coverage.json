@@ -9,7 +9,9 @@
   "scope": {
     "sourceRoot": ".",
     "profileSourceRoot": "engineering/boundaries/profiles",
-    "sourceKinds": [".rs"],
+    "sourceKinds": [
+      ".rs"
+    ],
     "selection": "Git candidate inventory via discoverRepositoryFiles (scripts/nemo/lib/boundaries-repository.cjs): all tracked paths plus non-ignored untracked paths, filtered to the .rs suffix. Selection is not a filesystem walk and applies no root, vendor or generated policy of its own.",
     "pathConvention": "Repository-relative POSIX paths.",
     "outsideSelection": "Ignored build output is never a Git candidate, so generated Rust under */target/ is outside the selection rather than an exclusion. This is a reviewed consequence of the committed .gitignore, not a filename heuristic: no rule in this policy matches on the substring 'target'. At the candidate commit the working tree carried 5 generated .rs files under nemo-mcp/target/; that count is local build state and is deliberately not asserted as a repository fact. The regression test asserts the mechanism instead, on a purpose-built scratch repository."
@@ -97,7 +99,7 @@
       "untrackedRustCandidates": 0
     },
     "nativeRegistration": "N06/#1338 registered the existing N03/N04 proof sources unchanged from base bdb44fa6e5b3953aea0e6816fa676bdc0e97f0fe and native-engine/src/lib.rs. The frozen baseline was extended only for those existing proof paths, including their measured 655/814-line debt. N07/#1339 registered native-engine/src/document.rs, native-engine/src/codec.rs and native-engine/tests/codec.rs. N08/#1340 registered native-engine/src/commands.rs, native-engine/src/request_receipts.rs, native-engine/src/revision.rs and native-engine/tests/commands.rs. N09/#1341 registered native-engine/src/history.rs, native-engine/src/transaction.rs and native-engine/tests/history.rs. N10/#1342 registered native-engine/src/evaluation.rs and native-engine/tests/evaluation.rs. N11/#1343 registered native-engine/src/resource_leases.rs, native-engine/src/scheduler.rs and native-engine/tests/scheduler.rs. N12/#1344 registers native-engine/src/render_scene.rs, native-engine/src/compositor.rs and native-engine/tests/compositor.rs. N13/#1345 registers the staged desktop_viewport host and its test: it borrows N12 GPU resources through an injected SurfacePort, has no production Tauri binding, and fails closed until N16 proves the same-context surface seam. N14/#1346 registers native-engine/src/export_job.rs, native-engine/src/png_output.rs and native-engine/tests/export_job.rs for pinned-revision RGBA8 PNG sequence staging and publication. N15/#1347 registers native-engine/src/application.rs, native-engine/src/protocol.rs and native-engine/tests/application.rs for the staged common v2 dispatcher and opaque-resource transport. N16/#1348 registers src-tauri/src/native_viewport.rs and src-tauri/src/application_mcp_tests.rs: the macOS host binds the compositor-owned GPU context to a real surface without startup activation, while the focused host test proves one retained native application is shared by UI and MCP dispatch. N18A/#1367 registers the dormant desktop application bootstrap, Tauri commands, strict contract, concrete ports and tests, main-thread viewport owner, and shared dispatch seam under src-tauri/src/native_application*.rs and native_dispatch.rs. N19F/#1384 registers native_revision_sync.rs and native_revision_sync_tests.rs as private members of the existing MCP adapter/test modules with unchanged baseline, edge policy and ordinary limits. Every N07-N18A source uses the ordinary budget with zero exclusions or exceptions. The frozen baseline remains unchanged because these are newly adopted sources, not inherited debt.",
-    "lineCounter": "countNonBlankLines (scripts/nemo/lib/boundaries.cjs) — the same counter the size checker uses, so recorded ceilings and enforced ceilings cannot drift.",
+    "lineCounter": "countNonBlankLines (scripts/nemo/lib/boundaries.cjs) \u2014 the same counter the size checker uses, so recorded ceilings and enforced ceilings cannot drift.",
     "profiles": {
       "candidate": "engineering/boundaries/profiles/rust.profile.json",
       "baseline": "engineering/boundaries/profiles/rust.baseline.json"
@@ -114,7 +116,11 @@
   "layerEnforcement": {
     "claimed": false,
     "reason": "Module.layer values in rust.profile.json are classification labels for this whole-tree source-size packet. Its own checks remain discovery, size and baseline comparison; adopted per-crate edge policies such as nemo-desktop.edges.json are enforced separately by the Rust-aware analyzer in scripts/nemo/lib/boundaries-rust.cjs. layerRules remains deliberately omitted here, and checkProfile is a JavaScript lexer that is never run against Rust source.",
-    "checksApplied": ["checkSourceCoverage", "checkSourceSizes", "compareSizeBaseline"]
+    "checksApplied": [
+      "checkSourceCoverage",
+      "checkSourceSizes",
+      "compareSizeBaseline"
+    ]
   },
   "sizePolicy": {
     "ordinaryProfile": "Rust production module",
@@ -122,20 +128,63 @@
     "hardMax": 500,
     "singleProfileRationale": "One ordinary budget covers production, test and build sources. Introducing a laxer test-specific budget here would define existing debt away instead of recording it; a future packet that actually reviews Rust test-size policy can add one, and compareSizeBaseline will surface it as size-baseline-new-profile if it exceeds the prior ordinary maximum.",
     "warnOnlyAtAdoption": [
-      { "path": "geometry-wasm/src/interp.rs", "nonblankLines": 384 },
-      { "path": "geometry-wasm/src/track.rs", "nonblankLines": 410 },
-      { "path": "src-tauri/src/native_viewport.rs", "nonblankLines": 497 },
-      { "path": "src-tauri/src/task_runtime.rs", "nonblankLines": 367 }
+      {
+        "path": "geometry-wasm/src/interp.rs",
+        "nonblankLines": 384
+      },
+      {
+        "path": "geometry-wasm/src/track.rs",
+        "nonblankLines": 410
+      },
+      {
+        "path": "src-tauri/src/native_viewport.rs",
+        "nonblankLines": 497
+      },
+      {
+        "path": "src-tauri/src/task_runtime.rs",
+        "nonblankLines": 367
+      }
     ]
   },
   "retainedCeilings": [
-    { "path": "native-feasibility/n03-headless-evaluator/src/lib.rs", "ceiling": 655, "nonblankLinesAtAdoption": 655 },
-    { "path": "native-feasibility/n04-native-viewport/src/native_surface.rs", "ceiling": 814, "nonblankLinesAtAdoption": 814 },
-    { "path": "geometry-wasm/src/engine.rs", "ceiling": 4151, "nonblankLinesAtAdoption": 4151, "nonblankLinesNow": 4019 },
-    { "path": "geometry-wasm/src/fill.rs", "ceiling": 998, "nonblankLinesAtAdoption": 998 },
-    { "path": "geometry-wasm/src/tweenmatch.rs", "ceiling": 1074, "nonblankLinesAtAdoption": 1074 },
-    { "path": "geometry-wasm/tests/effect_layer_overlay_repro.rs", "ceiling": 503, "nonblankLinesAtAdoption": 503 },
-    { "path": "src-tauri/src/video_decode.rs", "ceiling": 2266, "nonblankLinesAtAdoption": 2266, "nonblankLinesNow": 2160, "note": "nonblankLinesAtAdoption is the P11/#1013 adoption record and is deliberately not rewritten; nonblankLinesNow records the 106-line reduction P28/#1030 produced by moving the ffmpeg probe parser out to src-tauri/src/media_probe.rs, so the win stays visible instead of being erased. The ceiling stays at the adoption value: an extraction packet changes code, not size policy, and lowering the candidate ceiling without lowering the frozen baseline would give the baseline growth check 106 lines of slack." }
+    {
+      "path": "native-feasibility/n03-headless-evaluator/src/lib.rs",
+      "ceiling": 655,
+      "nonblankLinesAtAdoption": 655
+    },
+    {
+      "path": "native-feasibility/n04-native-viewport/src/native_surface.rs",
+      "ceiling": 814,
+      "nonblankLinesAtAdoption": 814
+    },
+    {
+      "path": "geometry-wasm/src/engine.rs",
+      "ceiling": 4151,
+      "nonblankLinesAtAdoption": 4151,
+      "nonblankLinesNow": 4019
+    },
+    {
+      "path": "geometry-wasm/src/fill.rs",
+      "ceiling": 998,
+      "nonblankLinesAtAdoption": 998
+    },
+    {
+      "path": "geometry-wasm/src/tweenmatch.rs",
+      "ceiling": 1074,
+      "nonblankLinesAtAdoption": 1074
+    },
+    {
+      "path": "geometry-wasm/tests/effect_layer_overlay_repro.rs",
+      "ceiling": 503,
+      "nonblankLinesAtAdoption": 503
+    },
+    {
+      "path": "src-tauri/src/video_decode.rs",
+      "ceiling": 2266,
+      "nonblankLinesAtAdoption": 2266,
+      "nonblankLinesNow": 2160,
+      "note": "nonblankLinesAtAdoption is the P11/#1013 adoption record and is deliberately not rewritten; nonblankLinesNow records the 106-line reduction P28/#1030 produced by moving the ffmpeg probe parser out to src-tauri/src/media_probe.rs, so the win stays visible instead of being erased. The ceiling stays at the adoption value: an extraction packet changes code, not size policy, and lowering the candidate ceiling without lowering the frozen baseline would give the baseline growth check 106 lines of slack."
+    }
   ],
   "exclusions": [],
   "nativeReadRegistration": "N19A/#1373 adds native-engine/src/read_queries.rs and native-engine/tests/application_read.rs under the existing application feature and test target, plus nemo-mcp/src/native_contract.rs for the shared pinned-read wire validator. Ordinary budgets, baseline and exclusions are unchanged.",
@@ -153,7 +202,7 @@
   "exclusionsRationale": "Every discovered Rust candidate, including feasibility proofs and staged native-engine modules, must be adopted into a module; no source is hidden through exclusions. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
   "integration": {
     "gate": "tests/nemo-boundaries-rust.test.cjs",
-    "runsUnder": "npm test and the test:unit job, which is in both the quick and full verify profiles — normal local validation, not an opt-in CLI.",
+    "runsUnder": "npm test and the test:unit job, which is in both the quick and full verify profiles \u2014 normal local validation, not an opt-in CLI.",
     "requiredChecks": [
       "every discovered .rs is declared or exactly excluded",
       "no declared .rs exceeds its effective ceiling",
@@ -249,5 +298,6 @@
   "nativeObjectLayerCreateRegistration": "W02-LAYER-CREATE/#2034 extends four already registered native-engine sources with sealed scalar blank-layer preparation, collision-checked native identity, complete v1/v2 layer/order metadata and one monotonic commit through the existing ObjectFillOwner/NativeObjectHistory revision and receipt authority. Registers tests/object_layer_create.rs as a cfg(test) child of existing object_history.rs, reached by the existing feature/test families; no duplicate lib.rs test mapping. Focused controls retain immutable history, project/reference save-reopen and frame metadata, and distinguish raw core preparation from unavailable host/public/UI admission. Existing module roots, public API, layers, edges, Cargo features/dependencies, baselines, size ceilings, coverage floors and exclusions remain unchanged. This is source-only native structural core, not installed Add Layer or public application/MCP/UI acceptance.",
   "nativeHeldExposureRegistration": "T03-HELD-EXPOSURE/#2050 registers object_exposure.rs and native_object_exposure_tests.rs only in existing engine/host test modules. Deliberate actual desktop preview/export use a distinct exposure-required native producer, selecting each explicit layer source while retaining requested evaluation time, original object targets and complete paint joins. Missing/mixed/hidden unknown timing and Reference-object display remain Unavailable; the separate exact-scoped native query is never an automatic fallback. Existing reference media remains viewport-only/excluded from export, without a new temporal-media claim. The existing native.dispatch port replaces unused exact-frame preparation with exposure preparation; no new module/layer edge, exception, root export, Cargo feature/dependency, baseline, coverage floor, size ceiling or exclusion is admitted. Author/code registration is not a passing compiled/pixel/installed gate; those actual checks and final acceptance remain pending.",
   "nativeLayerTimingRegistration": "T01-NATIVE-TIMING/#2048 registers object_layer_timing.rs as a private child of the existing native-document module, object_timing_snapshot.rs under existing immutable native-read-queries, and tests/object_timing.rs under the existing native-engine test module. Optional versioned drawing timing preserves missing versus explicit blank keys, bounded sparse keys/samples, exact native snapshot pins, and existing project/reference/history/New/Create storage. Existing file-info UI metadata remains UID/name/visible; actual held-exposure framepacket/render/export, host/application/MCP timing and component/installed acceptance remain open. Every prior module root, public API file, edge, Cargo feature/dependency, baseline, coverage floor, size ceiling and exclusion is unchanged. This is native storage/private-read source registration, not feature activation or coverage/desktop acceptance.",
-  "nativeObjectLayerCreateContractRegistration": "W02-LAYER-CREATE-CONTRACT/#2041 retains the actual native-created layerUid in the existing owner receipt store, including exact historical replay after undo, and prepares one closed scalar application/SDK/MCP create contract. Its separate feature declaration remains unavailable; the existing catalog validation refuses public host and MCP execution before owner locks, mutation or TCP connection. Registers src/native_object_wire_tests.rs in existing rust.mcp.transport and mcp.transport memberships as wire.rs's cfg(test) object_tests child, preserving the former inline tests and adding original-byte, bounded result and unavailable-transport controls. The pinned named coverage export at clean 37ab73195809987a85a16c852962fdd089845d41 ran 109 passing tests and contains no executable file record for this child; its explicit noRegions entry in rust-mcp.baseline.json is measured, not a guessed floor or exclusion. Every prior file/aggregate floor, tool/history value, module root/edge, public API file, Cargo feature/dependency, ceiling and exclusion is unchanged. Whole-crate coverage remains failed, with old percentage deficits reported separately; this registration is not coverage acceptance. Existing object query/visibility remain available. Source contract preparation is not command activation, native timeline/selected-row presentation, synchronous script/plugin parity, installed Add Layer or final desktop acceptance."
+  "nativeObjectLayerCreateContractRegistration": "W02-LAYER-CREATE-CONTRACT/#2041 retains the actual native-created layerUid in the existing owner receipt store, including exact historical replay after undo, and prepares one closed scalar application/SDK/MCP create contract. Its separate feature declaration remains unavailable; the existing catalog validation refuses public host and MCP execution before owner locks, mutation or TCP connection. Registers src/native_object_wire_tests.rs in existing rust.mcp.transport and mcp.transport memberships as wire.rs's cfg(test) object_tests child, preserving the former inline tests and adding original-byte, bounded result and unavailable-transport controls. The pinned named coverage export at clean 37ab73195809987a85a16c852962fdd089845d41 ran 109 passing tests and contains no executable file record for this child; its explicit noRegions entry in rust-mcp.baseline.json is measured, not a guessed floor or exclusion. Every prior file/aggregate floor, tool/history value, module root/edge, public API file, Cargo feature/dependency, ceiling and exclusion is unchanged. Whole-crate coverage remains failed, with old percentage deficits reported separately; this registration is not coverage acceptance. Existing object query/visibility remain available. Source contract preparation is not command activation, native timeline/selected-row presentation, synchronous script/plugin parity, installed Add Layer or final desktop acceptance.",
+  "nativeFontCurrentOwnerRegistration": "G41/#2062 source composition registers the existing Font admission/project/payload, history, MCP contract and host font children under their current parent owners. The ordinary desktop Font contract and resource consumer join the sole current Project session. Existing paired Font feature keys and optional exactly pinned read-fonts remain. No module/layer edge, ceiling, coverage baseline/floor or exclusion changes; composed Rust is uncompiled and native, persistence/history, host and installed Font acceptance remain open."
 }

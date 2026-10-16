@@ -315,6 +315,7 @@ fn validate_native_response(
                         response.content_revision,
                         result,
                     ))
+                && crate::native_contract::font::response_matches(request, response)
                 && crate::native_contract::validate_result(
                     &request.operation,
                     &request.document_id,

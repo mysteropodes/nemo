@@ -1,9 +1,10 @@
 /* N15 pure v2 transport/validation adapter. N16 owns host bindings. */
 (function (root, factory) {
-  const api = factory();
+  const fontContract = typeof module === 'object' && module.exports ? require('./native-font-contract.js') : root.NemoNativeFontContract;
+  const api = factory(fontContract);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeApplicationAdapter = api;
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (fontContract) {
   'use strict';
 
   const operations = new Set([
@@ -57,6 +58,7 @@
     return value;
   }
   function objectIdPaths(operation) {
+    if (fontContract && fontContract.admitted(operation)) return fontContract.paths(operation);
     if(operation==='query.document.object.property.metadata') return {has:p=>p==='payload.view.property'||/^(?:payload\.view\.target|result\.target|result\.items\.\d+\.target)\.(?:contextId|layerUid|strokeId)$/.test(p)||/^result\.items\.\d+\.(?:contextId|controlName|property)$/.test(p)};
     if (operation === 'query.document.object.layer.timing') return new Set(['payload.layerUid', 'result.layerUid']);
     if (operation === 'query.document.object') return new Set([
@@ -180,7 +182,8 @@
     if(r.kind==='storedProperty'){if(r.items.length!==1||r.items[0].property!==p.view.property||r.nextOffset!==null)throw new TypeError('stored property mismatch');}
     else if(r.items.length>p.view.limit||r.nextOffset!==null&&(!r.items.length||r.nextOffset!==p.view.offset+r.items.length))throw new TypeError('nonadvancing/mismatched page cursor');
   }
-  function validatePayload(operation, payload) {
+  function validatePayload(operation, payload, envelope) {
+    if (fontContract && fontContract.admitted(operation)) return fontContract.payload(operation, payload, envelope);
     if(operation==='query.document.object.property.metadata') metadataPayload(payload);
     else if (operation === 'query.document.object') {
       exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
@@ -258,12 +261,12 @@
     exact(value, ['apiVersion', 'requestId', 'instanceId', 'documentId', 'operation', 'payload'], ['expectedRevision', 'cancelledBeforeDispatch'], 'request');
     if (value.apiVersion !== 2) throw new TypeError('apiVersion must be 2');
     ['requestId', 'instanceId', 'documentId'].forEach((key) => id(value[key], key));
-    if (!operations.has(value.operation)) throw new TypeError('operation is not admitted');
-    const needsRevision = requiredRevision.has(value.operation);
+    if (!operations.has(value.operation) && !(fontContract && fontContract.admitted(value.operation))) throw new TypeError('operation is not admitted');
+    const needsRevision = requiredRevision.has(value.operation) || !!(fontContract && fontContract.requiresRevision(value.operation));
     if (needsRevision !== has(value, 'expectedRevision')) throw new TypeError(`${value.operation} has invalid expectedRevision presence`);
     if (needsRevision) revision(value.expectedRevision, 'expectedRevision');
     if (has(value, 'cancelledBeforeDispatch') && typeof value.cancelledBeforeDispatch !== 'boolean') throw new TypeError('cancelledBeforeDispatch must be boolean');
-    validatePayload(value.operation, value.payload);
+    validatePayload(value.operation, value.payload, value);
     const encoded = JSON.stringify(value);
     const encodedBytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
     if (typeof encoded !== 'string' || encodedBytes > 4096) throw new TypeError('request exceeds 4096 encoded bytes');
@@ -341,6 +344,7 @@
   }
   function validateResult(value, operation) {
     if (!operation) return;
+    if (fontContract && fontContract.admitted(operation)) return fontContract.result(operation, value);
     if(operation==='query.document.object.property.metadata') metadataResult(value);
     else if (operation === 'query.document.object') {
       exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
@@ -421,7 +425,7 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value, undefined, objectIdPaths(operation));
-    if (['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
+    if ((fontContract && fontContract.admitted(operation)) || ['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
     'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
@@ -488,6 +492,7 @@
                 (evaluate ? result.contentRevision : result.atRevision) !== outbound.payload.atRevision ||
                 (evaluate && (result.documentId !== outbound.documentId || result.contextId !== outbound.payload.contextId || result.frame !== outbound.payload.frame))) throw new TypeError('pinned read identity mismatch');
           }
+          if (fontContract && fontContract.admitted(outbound.operation)) fontContract.correlate(outbound, response);
           return response;
         });
       },

@@ -45,8 +45,10 @@ impl ObjectRevisionOwner {
         let inventory = AssetInventory::new(records, Vec::new(), 1024, 0)
             .map_err(|_| "font catalog unavailable")?;
         let next = project.with_asset_inventory(Some(inventory));
-        let tickets =
-            super::asset_admission::pending_charges(&next, &encoded_retention_budget::shared())?;
+        let tickets = crate::revision::object_revision::asset_admission::pending_charges(
+            &next,
+            &encoded_retention_budget::shared(),
+        )?;
         for ticket in tickets {
             ticket
                 .commit()

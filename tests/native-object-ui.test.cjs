@@ -338,10 +338,13 @@ test('production composition reuses frozen callback identities and resolves sess
   h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){bindings.push(ports);return render(root,info,frameOnly,ports);}};
   await h.open();const first=bindings[0],old=first.currentSession().info(),button=eye(h.root,0);
   h.root.updateUI(true);assert.equal(eye(h.root,0),button);assert.equal(Object.isFrozen(first),true);
-  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','layerPolicy','projectSettings','projectionReady','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','layerPolicy','projectSettings','projectionReady','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  const generation=first.readTransportGeneration();assert.equal(generation,first.currentSession().readSubscriptionGeneration());
   await h.external([A,B,C]);assert.equal(first.currentSession().info().contentRevision,old.contentRevision+1);
+  assert.equal(first.readTransportGeneration(),generation,'content revision does not invent a subscription generation');
   await h.file.newProject({w:320,h:180,fps:24,name:'Replacement'});
   assert.notEqual(first.currentSession().info().documentId,old.documentId);assert.ok(bindings.every(value=>value===first));
+  assert.ok(first.readTransportGeneration()>generation,'replacement advances the existing owner subscription ticket');
   const before=h.calls.length;assert.equal(await button.click(),false);assert.equal(h.calls.length,before);
 });
 for(const name of ['projectionReady','currentSession','selectLayer','repaint'])test('actual row and eye events fail closed if injected '+name+' disappears',async()=>{

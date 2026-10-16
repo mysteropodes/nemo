@@ -1,8 +1,11 @@
 //! PRIVATE draft. Scalar commands and borrowed host bytes, original owner only.
 //! Host must reject raw JSON duplicates and fence lifecycle before/after I/O.
-use super::*;
+use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::object_document::{AssetId, AssetKind, AssetRecord};
-use crate::request_receipts::{sha256, OpacityRequest, RequestFingerprint, ResponseEnvelope};
+use crate::request_receipts::{
+    sha256, DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,
+};
+use crate::revision::ObjectSnapshot;
 use crate::transaction::{CompactFailure, CompactResult, ReceiptLookup, RetainedDisposition};
 use base64::Engine;
 use serde::Deserialize;

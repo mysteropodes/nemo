@@ -55,8 +55,11 @@ impl NativeApplicationRequest {
                 | crate::native_contract::layer_policy::OP
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
+                | crate::native_contract::font::IMPORT
         ) {
-            let action = if self.operation == crate::native_contract::layer_policy::OP {
+            let action = if self.operation == crate::native_contract::font::IMPORT {
+                "font import"
+            } else if self.operation == crate::native_contract::layer_policy::OP {
                 "layer policy"
             } else if self.operation.ends_with(".settings.edit") {
                 "project settings"

@@ -733,6 +733,18 @@
       ]
     },
     {
+      "id": "app.labs.registry.model.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "labs-registry-model.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "labs-registry-model.js"
+      ]
+    },
+    {
       "id": "app.labs.labs.core",
       "layer": "app-legacy",
       "dir": "src/js/labs",
@@ -745,6 +757,18 @@
       ]
     },
     {
+      "id": "app.labs.floating.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "labs-floating-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "labs-floating-ui.js"
+      ]
+    },
+    {
       "id": "app.labs.labs.float.panel",
       "layer": "app-legacy",
       "dir": "src/js/labs",
@@ -754,6 +778,18 @@
       "sizeProfile": "App JS unclassified (pre-R01)",
       "publicApi": [
         "labs-float-panel.js"
+      ]
+    },
+    {
+      "id": "app.labs.settings.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "labs-settings-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "labs-settings-ui.js"
       ]
     },
     {
@@ -2152,9 +2188,13 @@
       "id": "app.native.viewport.underlay.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
-      "files": ["native-viewport-underlay.js"],
+      "files": [
+        "native-viewport-underlay.js"
+      ],
       "sizeProfile": "Platform/engine adapter",
-      "publicApi": ["native-viewport-underlay.js"]
+      "publicApi": [
+        "native-viewport-underlay.js"
+      ]
     },
     {
       "id": "app.native.object.project-metadata.adapter",
@@ -2173,7 +2213,8 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-project.js"
+        "native-object-project.js",
+        "native-object-project-desktop.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -2493,6 +2534,20 @@
       ]
     },
     {
+      "id": "app.native.motion.properties.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-motion-property-view.js",
+        "native-motion-property-panel.js",
+        "native-motion-property-binding.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-motion-property-binding.js"
+      ]
+    },
+    {
       "id": "app.font.assets.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2502,6 +2557,30 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "font-assets.js"
+      ]
+    },
+    {
+      "id": "app.native.font.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-font-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-font-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.font.resources.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-font-resources.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-font-resources.js"
       ]
     }
   ],

@@ -19,8 +19,35 @@
   else root.NemoNativeObjectUI=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
-  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap();
+  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap(),motionBindings=new WeakMap();
+  function retireMotion(root){var hooks=motionBindings.get(root);if(hooks)hooks.retire();var prior=inspectors.get(root);if(prior&&prior.motion){var saved=prior.motion;saved.body.replaceChildren.apply(saved.body,saved.children);saved.section.hidden=saved.hidden;saved.section.style.display=saved.display;prior.motion=null;}}
+  function bindMotion(root,hooks){
+    if(!root||!hooks||typeof hooks.paint!=='function'||typeof hooks.retire!=='function')throw new TypeError('Native Motion UI hooks unavailable');
+    if(motionBindings.has(root))throw new Error('Native Motion UI already bound');motionBindings.set(root,hooks);
+    return Object.freeze({dispose:function(){if(motionBindings.get(root)!==hooks)return;retireMotion(root);motionBindings.delete(root);}});
+  }
+  function paintMotion(root,ports,prior){
+    if(!root.state||root.state.appMode!=='motion'){retireMotion(root);prior.notice.textContent='Native drawing property inspectors are unavailable.';return;}
+    var hooks=motionBindings.get(root),section=root.document.getElementById('motion-props-sec'),body=root.document.getElementById('motion-props-body');
+    var header=section&&section.querySelector('.phdr');
+    prior.notice.textContent='Native Motion property values and edits are unavailable.';
+    if(!hooks||!section||!body||!header)return;
+    if(prior.motion&&(prior.motion.section!==section||prior.motion.body!==body||prior.motion.header!==header))retireMotion(root);
+    if(!prior.motion){prior.motion={section:section,body:body,header:header,children:Array.from(body.childNodes||body.children),hidden:section.hidden,display:section.style.display};body.replaceChildren();}
+    section.hidden=false;section.style.display='';
+    if(hooks.paint(ports,body,header)!==true){retireMotion(root);prior.notice.textContent='Native Motion property metadata is unavailable.';}
+  }
+  function routeMotionShortcut(root,key,shift){
+    var hooks=motionBindings.get(root);if(!hooks||typeof hooks.shortcut!=='function'||!paintMotionInspector(root))return false;
+    Promise.resolve(hooks.shortcut(key,shift)).catch(function(){});return true;
+  }
+  function paintMotionInspector(root){
+    var view=views.get(root),prior=inspectors.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),info=session&&session.info();
+    if(!prior||!info||!session.isActive()||!sameTimingPin(view.pin,info)||ports.projectionReady(info)!==true||!confirmed(root,info,session.readPresentedObjectSession()))return false;
+    unavailableInspector(root,ports,info);return true;
+  }
   function restoreInspector(root){
+    retireMotion(root);
     retirePolicy(root);
     views.delete(root);
     var timing=timings.get(root);if(timing){timing.latest=null;timing.serial++;timing.job=null;}
@@ -82,7 +109,7 @@
       var rail=root.document.getElementById('props-panel-rail'),trigger=root.document.getElementById('p-ref-menu');
       prior={panel:panel,children:Array.from(panel.children).filter(function(child){return !['props-panel-hdr-row','props-panel-rail'].includes(child.id);})
         .map(function(child){return {node:child,hidden:child.hidden,display:child.style.display};}),section:section,
-        rail:rail,railChildren:rail?Array.from(rail.children):[],previousShow:root._lastPropsShow,show:{'native-object-inspector':true}};
+        notice:notice,rail:rail,railChildren:rail?Array.from(rail.children):[],previousShow:root._lastPropsShow,show:{'native-object-inspector':true}};
       if(trigger&&trigger.parentNode){
         var reference=createNativeObjectUiText(root,'div','Reference');reference.className='pr';
         prior.trigger={node:trigger,parent:trigger.parentNode,next:trigger.nextSibling};prior.reference=reference;
@@ -95,6 +122,7 @@
     }
     settingsInspector(root,prior,ports,info);
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
+    paintMotion(root,ports,prior);
   }
   function nativeObjectUiPortsReady(ports){
     return !!ports&&['projectionReady','currentSession','selectLayer','repaint'].every(function(k){return typeof ports[k]==='function';});
@@ -340,5 +368,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
 }));

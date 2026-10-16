@@ -5,6 +5,19 @@ pub(crate) use crate::object_document::object_deserialize;
 pub use crate::object_document::{
     FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
 };
+#[cfg(feature = "font_asset_admission")]
+#[path = "font_asset_admission.rs"]
+mod font_assets;
+#[cfg(feature = "font_asset_wire")]
+pub(crate) use font_assets::admitted_font_source;
+#[cfg(feature = "font_asset_admission")]
+pub(crate) use font_assets::{
+    admit_reserved_font, validate_font, AdmittedFont, FontAssetError, FontAssetLimits,
+    FontAssetMetadata,
+};
+
+#[cfg(feature = "font_asset_wire")]
+pub(crate) use crate::object_document::{AssetId, AssetKind, AssetRecord};
 use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 pub(crate) use crate::object_document::{Presence, PropertyHolder};
 use serde::Deserialize;

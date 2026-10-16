@@ -76,7 +76,7 @@ impl ObjectSnapshot {
         id: String,
         name: String,
         source: &[u8],
-    ) -> Result<Arc<crate::object_document::AssetRecord>, DispatchErrorCode> {
+    ) -> Result<Arc<crate::object_codec::AssetRecord>, DispatchErrorCode> {
         self.admit_font_asset_using(
             id,
             name,
@@ -95,8 +95,8 @@ impl ObjectSnapshot {
         reserve: impl FnOnce(usize) -> Result<R, &'static str>,
         allocate: impl FnOnce(&mut R) -> Result<Vec<u8>, &'static str>,
         bind: impl FnOnce(&mut R, &Arc<Vec<u8>>) -> Result<(), &'static str>,
-    ) -> Result<Arc<crate::object_document::AssetRecord>, DispatchErrorCode> {
-        use crate::object_document::{AssetId, AssetKind, AssetRecord};
+    ) -> Result<Arc<crate::object_codec::AssetRecord>, DispatchErrorCode> {
+        use crate::object_codec::{AssetId, AssetKind, AssetRecord};
         let invalid = DispatchErrorCode::InvalidRequest;
         let unavailable = DispatchErrorCode::Unavailable;
         let project = self.project().ok_or(unavailable)?;

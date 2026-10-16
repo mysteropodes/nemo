@@ -18,7 +18,8 @@
     // Names use the document AssetRecord contract; exact spelling is retained.
     if(typeof v.name!=='string'||!v.name.trim()||v.name.includes('\0')||new TextEncoder().encode(v.name).length>255)fail('font name invalid');
   }
-  function payload(op,p){
+  function payload(op,p,envelope){
+    if(op===QUERY&&envelope&&envelope.cancelledBeforeDispatch===true)throw new TypeError('font reads cannot be cancelled dispatches');
     if(op===IMPORT){exact(p,['command','documentSnapshotId','lifecycleGeneration','source']);if(p.command!=='object.asset.font.import')fail('font command invalid');id(p.documentSnapshotId);int(p.lifecycleGeneration,1);
       if(p.source&&p.source.kind==='bundled'){exact(p.source,['kind','fontKey']);if(!fonts.has(p.source.fontKey))fail('font key invalid');}
       else{exact(p.source,['kind','family','weight','italic']);if(p.source.kind!=='google'||typeof p.source.italic!=='boolean')fail('font source invalid');opaque(p.source.family);int(p.source.weight,1,1000);}return;}
