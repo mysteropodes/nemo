@@ -601,6 +601,18 @@
       ]
     },
     {
+      "id": "app.updater.platform.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "updater-platform.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "updater-platform.js"
+      ]
+    },
+    {
       "id": "app.updater.bridge",
       "layer": "app-legacy",
       "dir": "src/js",
