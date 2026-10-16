@@ -1,7 +1,6 @@
 //! bounded deterministic native-project output.
-use super::{
-    Metadata, ProjectEnvelope, ProjectReferenceState, ProjectWireError, ProjectWireLimits, FORMAT,
-};
+use crate::object_codec::project::{Metadata, ProjectWireError, ProjectWireLimits, FORMAT};
+use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 use serde::Serialize;
 use serde_json::value::RawValue;
 
@@ -171,9 +170,8 @@ fn encode_legacy_project(
 #[cfg(feature = "project_media_codec")]
 mod catalog {
     //! deterministic catalog wire output; no resource ownership.
-    use super::{
-        bounded_json, Encoded, Metadata, ProjectWireError, ProjectWireLimits, ReferenceOutput,
-    };
+    use crate::object_codec::project::output::{bounded_json, Encoded, ReferenceOutput};
+    use crate::object_codec::project::{Metadata, ProjectWireError, ProjectWireLimits};
     use crate::object_document::{
         AssetId, AssetKind, AssetRecord, ProjectEnvelope, ProjectReferenceState,
     };
@@ -345,7 +343,7 @@ mod catalog {
         let (canvas_w, canvas_h) = envelope.project().canvas_dimensions();
         bounded_json(
             &Output {
-                format: super::FORMAT,
+                format: crate::object_codec::project::FORMAT,
                 format_version: 2,
                 project: Metadata {
                     canvas_w,

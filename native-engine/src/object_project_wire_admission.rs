@@ -1,8 +1,7 @@
 //! coherent managed project wire admission; no host activation.
-use super::{
-    object_codec, shared_image_resource_budget, validate_png_in_domain, ImageResourceBudget,
-    ObjectSnapshot,
-};
+use crate::object_codec;
+use crate::object_snapshot::validate_png_in_domain;
+use crate::revision::{shared_image_resource_budget, ImageResourceBudget, ObjectSnapshot};
 
 impl ObjectSnapshot {
     /// Private managed wire admission; no host route or attach/replace command.

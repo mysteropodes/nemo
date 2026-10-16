@@ -1,6 +1,7 @@
 //! Immutable Envelope value responsibility.
-use super::{ProjectMetadata, ProjectReferenceState};
-use crate::object_document::{AssetInventory, ObjectDocument};
+use crate::object_document::{
+    AssetInventory, ObjectDocument, ProjectMetadata, ProjectReferenceState,
+};
 use std::sync::Arc;
 
 /// Immutable composite value retained by the single revision/history owner.
