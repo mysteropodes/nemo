@@ -4178,64 +4178,9 @@
       mgraphModeValue:'valor',mgraphModeSpeed:'velocidad',mgraphFrozen:'fijado',mgraphExprLegend:'sólido = expresión, discontinuo = fotogramas clave',
     },
   };
-  var LANGS=['en','fr','ja','es'];
-  function currentLang(){
-    return (window.state&&state.language)||'fr';
-  }
-  function t(key){
-    var lang=currentLang();
-    var table=I18N[lang]||I18N.fr;
-    return table[key]!==undefined?table[key]:(I18N.en[key]!==undefined?I18N.en[key]:key);
-  }
-  function applyI18n(){
-    document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=t(el.getAttribute('data-i18n'));});
-    document.querySelectorAll('[data-i18n-title]').forEach(function(el){el.title=t(el.getAttribute('data-i18n-title'));});
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){el.placeholder=t(el.getAttribute('data-i18n-placeholder'));});
-    // data-i18n-html: like data-i18n but sets innerHTML instead of textContent —
-    // only for strings that legitimately embed inline markup (<strong>/<a>) mid-
-    // sentence; translation strings for these keys must carry the same tags.
-    document.querySelectorAll('[data-i18n-html]').forEach(function(el){el.innerHTML=t(el.getAttribute('data-i18n-html'));});
-    var langSel=document.getElementById('settings-language');
-    if(langSel&&langSel.value!==currentLang())langSel.value=currentLang();
-    // Property labels sit in a fixed-width column (style.css .pl) so every
-    // value field lines up, which means a long translation ellipsizes. Carry
-    // the full text in the tooltip so nothing becomes unreadable — done here
-    // because that's where the text is last written, and re-run per language
-    // since the same label can fit in one and not another.
-    document.querySelectorAll('.pl').forEach(function(el){
-      if(el.getAttribute('data-i18n-title'))return; // already has a real explanatory tooltip
-      var txt=(el.textContent||'').trim();
-      if(txt)el.title=txt;
-    });
-    // Labels whose text is DYNAMIC (a control that shows the current value,
-    // not a fixed string) can't live on data-i18n alone: the sweep above
-    // would overwrite the live value with the placeholder every time the
-    // language changes. Such modules register a repaint here instead.
-    var after=(window.SM&&window.SM.afterI18n)||[];
-    for(var i=0;i<after.length;i++){try{after[i]();}catch(e){}}
-  }
-  function setLanguage(lang){
-    if(LANGS.indexOf(lang)<0)return;
-    state.language=lang;
-    try{localStorage.setItem('nemo-lang',lang);}catch(e){}
-    applyI18n();
-  }
-  function initLanguage(){
-    var saved=null;
-    try{saved=localStorage.getItem('nemo-lang');}catch(e){}
-    // Default language is English (feedback 2026-07: "met l'app en anglais
-    // par default") — a saved localStorage choice (any language, French
-    // included) still always wins; this only changes what a brand-new
-    // install/browser profile sees before ever touching Réglages.
-    state.language=(saved&&LANGS.indexOf(saved)>=0)?saved:(state.language||'en');
-    applyI18n();
-    var sel=document.getElementById('settings-language');
-    if(sel)sel.addEventListener('change',function(){setLanguage(this.value);});
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initLanguage);else initLanguage();
-  window.SM=window.SM||{};
-  window.SM.afterI18n=window.SM.afterI18n||[];
-  window.SM.setLanguage=setLanguage;
-  window.SM.t=t;
-  window.SM.applyI18n=applyI18n;
+  window.NemoI18nRuntime.install({
+    root:window,document:document,
+    state:function(){return state;},
+    storage:function(){return localStorage;}
+  },I18N);
 })();
