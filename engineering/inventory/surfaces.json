@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "08663027010954fd8b5639a60c84d486515671af",
-  "describe": "v0.7.0-alpha.4-2024-g08663027-dirty"
+  "head": "860e06a8f5ae34886ef322f4566c3ee578755605",
+  "describe": "v0.7.0-alpha.4-2047-g860e06a8"
  },
- "inputsDigest": "edbd0709a9ea370f0e506245df7aaf519342b339188d346f9b25cdf50434a348",
+ "inputsDigest": "833f4680373f743fda22d908bc26926219103af95c536ba0b20b0c433934d1d1",
  "states": [
   "inventoried",
   "characterized",
@@ -9986,7 +9986,7 @@
     "functionsVisited": 23,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:200 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:202 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -12334,7 +12334,7 @@
     "functionsVisited": 22,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:79 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:81 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -16434,7 +16434,7 @@
     "functionsVisited": 140,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:191 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:193 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:220 updatePlayhead()",
      "src/js/timeline.js:2813 updateUI()"
