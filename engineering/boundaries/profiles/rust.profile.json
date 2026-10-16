@@ -196,7 +196,9 @@
         "src/native_project_settings_contract.rs",
         "src/native_project_settings_wire_tests.rs",
         "src/native_property_metadata_contract.rs",
-        "src/native_property_metadata_wire_tests.rs"
+        "src/native_property_metadata_wire_tests.rs",
+        "src/main_trace_tests.rs",
+        "src/wire_failure_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -224,7 +226,8 @@
         "stdio_rejection.rs",
         "stdio_roundtrip.rs",
         "stdio_tracing.rs",
-        "transport.rs"
+        "transport.rs",
+        "server_failure_paths.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

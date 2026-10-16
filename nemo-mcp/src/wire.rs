@@ -209,12 +209,7 @@ pub async fn call(
         }
         Ok(response)
     };
-    tokio::select! {
-        biased;
-        _ = cancel.cancelled() => Err(io::Error::new(io::ErrorKind::Interrupted, "request cancelled; query state before retrying a write")),
-        result = tokio::time::timeout(Duration::from_secs(30), round_trip) =>
-            result.map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "application timeout; query state before retrying a write"))?,
-    }
+    cancellable(round_trip, cancel).await
 }
 
 pub async fn call_native(
@@ -409,11 +404,20 @@ async fn cancellable<T>(
     round_trip: impl std::future::Future<Output = io::Result<T>>,
     cancel: CancellationToken,
 ) -> io::Result<T> {
+    cancellable_for(round_trip, cancel, Duration::from_secs(30)).await
+}
+
+// Private duration seam: all production callers retain the same 30-second bound.
+async fn cancellable_for<T>(
+    round_trip: impl std::future::Future<Output = io::Result<T>>,
+    cancel: CancellationToken,
+    timeout: Duration,
+) -> io::Result<T> {
     tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(io::Error::new(io::ErrorKind::Interrupted,
             "request cancelled; query state before retrying a write")),
-        result = tokio::time::timeout(Duration::from_secs(30), round_trip) =>
+        result = tokio::time::timeout(timeout, round_trip) =>
             result.map_err(|_| io::Error::new(io::ErrorKind::TimedOut,
                 "application timeout; query state before retrying a write"))?,
     }
@@ -430,3 +434,7 @@ mod project_settings_tests;
 #[cfg(test)]
 #[path = "native_property_metadata_wire_tests.rs"]
 mod property_metadata_tests;
+
+#[cfg(test)]
+#[path = "wire_failure_tests.rs"]
+mod failure_tests;
