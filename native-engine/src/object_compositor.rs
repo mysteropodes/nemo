@@ -12,20 +12,27 @@ const MAX_DIMENSION: u32 = 4096;
 const MAX_PIXELS: u64 = 16_777_216;
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
 
-/// The one admitted output mode avoids any unpremultiplication ambiguity.
+/// Explicit white compatibility or background from the immutable project witness.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ObjectOutputSpec {
     width: u32,
     height: u32,
+    project_background: bool,
 }
 
 impl ObjectOutputSpec {
     pub(crate) fn new(width: u32, height: u32, mode: &str) -> Result<Self, CompositorError> {
-        if mode != "white-srgb-normal-rgba8-area" {
-            return Err(CompositorError::new("unsupported object output mode"));
-        }
+        let project_background = match mode {
+            "white-srgb-normal-rgba8-area" => false,
+            "project-srgb-normal-rgba8-area" => true,
+            _ => return Err(CompositorError::new("unsupported object output mode")),
+        };
         output_budget(width, height, MAX_DIMENSION)?;
-        Ok(Self { width, height })
+        Ok(Self {
+            width,
+            height,
+            project_background,
+        })
     }
 }
 
@@ -141,7 +148,7 @@ impl Compositor {
         let prepared = live.prepared();
         check_live(live, prepared)?;
         let (width, height) = prepared.dimensions();
-        let output = ObjectOutputSpec::new(width, height, "white-srgb-normal-rgba8-area")?;
+        let output = ObjectOutputSpec::new(width, height, "project-srgb-normal-rgba8-area")?;
         Ok(ScheduledObjectCompositionResult {
             pixels: self.compose_object(prepared.composition(), output)?,
             prepared: prepared.clone(),
@@ -203,9 +210,19 @@ impl Compositor {
             self.scene.draw_image(&brush, transform);
         }
         self.emit_object_commands(plan.commands())?;
+        let background = if output.project_background {
+            Color::new(
+                prepared
+                    .canvas_background_rgba8()
+                    .map(|channel| f32::from(channel) / 255.),
+            )
+        } else {
+            Color::WHITE
+        };
         let mut target = self.make_object_target(output.width, output.height)?;
-        target
-            .render(|view| self.render_target(view, output.width, output.height, Color::WHITE))?;
+        // Pinned Vello0.9 fine shader writes straight RGBA (rgba_sep). Keep
+        // readback unchanged: a second unpremultiplication would corrupt alpha.
+        target.render(|view| self.render_target(view, output.width, output.height, background))?;
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         {
             self.last_reference_image = reference_image;
@@ -360,3 +377,7 @@ mod tests;
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_scheduled_compositor.rs"]
 pub(super) mod scheduled_tests;
+
+#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
+#[path = "../tests/object_project_background.rs"]
+mod project_background_tests;
