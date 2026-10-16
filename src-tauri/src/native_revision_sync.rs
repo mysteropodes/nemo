@@ -13,6 +13,10 @@ use std::{
 };
 use tokio::{io::AsyncReadExt, net::TcpStream, sync::oneshot};
 
+#[path = "native_font_dispatch.rs"]
+mod font_dispatch;
+use font_dispatch::{invoke_font, FontPhase};
+
 #[path = "native_revision_dispatch.rs"]
 mod dispatch_core;
 
@@ -263,10 +267,22 @@ fn invoke_dispatch(
     application: &mut dyn NativeDispatch,
     request: &NativeApplicationRequest,
 ) -> Result<NativeApplicationResponse, String> {
+    if request.operation == crate::application_mcp::font_source::IMPORT {
+        return invoke_font(application, request, FontPhase::Regular)?
+            .ok_or_else(|| "font source requires async application dispatch".into());
+    }
     let native_request: OpacityRequest =
         serde_json::from_value(serde_json::to_value(request).map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
-    let response = application.dispatch(native_request)?;
+    let response = if request.operation == crate::application_mcp::font_source::QUERY {
+        application
+            .as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
+            .ok_or("native font owner unavailable")?
+            .font_read(&native_request)?
+    } else {
+        application.dispatch(native_request)?
+    };
     serde_json::from_value(serde_json::to_value(response).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())
 }
@@ -310,7 +326,11 @@ pub(super) async fn serve_native(
         Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
         _ => return Err("native connection cancelled before dispatch".into()),
     }
-    let mut delivery = sync.dispatch(instance, native, request.clone(), true)?;
+    let mut delivery = tokio::select! {
+        biased;
+        _ = stream.read(&mut byte) => return Err("native connection cancelled before publication".into()),
+        result = sync.dispatch_async(instance, native, request.clone(), true) => result?,
+    };
     if let Some((event, receiver)) = delivery.notification {
         let acknowledged = if emit(event.clone()).is_ok() {
             tokio::select! {
