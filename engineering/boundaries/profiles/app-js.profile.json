@@ -265,6 +265,18 @@
       ]
     },
     {
+      "id": "app.i18n.runtime.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "i18n-runtime.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "i18n-runtime.js"
+      ]
+    },
+    {
       "id": "app.i18n",
       "layer": "app-legacy",
       "dir": "src/js",
