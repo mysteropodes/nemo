@@ -14,7 +14,9 @@
 //! lets a depth warning raised by an inner hop survive an outer success (a
 //! reporting detail of the shared `lastError` slot, not a value); and the
 //! toast/re-render side effects of a timeout. The `_depthTripped` behavior
-//! must be carried into the D10/D11 consumer, which owns the shared slot.
+//! must be carried into this package's C02 expression/context consumer (D15),
+//! which owns the shared slot, the recursion/budget precedence and the
+//! timeout-disable disposition (D11 only provides raw sampling).
 
 /// Most nested cross-layer evaluations allowed (`EXPR_MAX_DEPTH`).
 pub(crate) const EXPR_MAX_DEPTH: u32 = 8;
@@ -120,7 +122,10 @@ fn all_finite(items: &[GuestValue]) -> Option<Vec<f64>> {
 
 /// How one guest evaluation ended, classified by the caller. The caller
 /// must apply the JS precedence: a compile (`Syntax`) failure is checked
-/// first, then `TooDeep`, then the guest's own `Thrown`/`Timeout`.
+/// first, then `TooDeep`, then the guest's own `Thrown`/`Timeout`. That
+/// precedence belongs to this package's C02 expression/context consumer
+/// (D15). A `Timeout` only reports `disable`; a persistent disable must be
+/// committed through the existing native owner, never by the evaluator.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Outcome {
     /// The guest returned a value.
