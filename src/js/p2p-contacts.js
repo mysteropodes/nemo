@@ -29,88 +29,32 @@
 // initUserProfile/saveUserProfile): this is per-installation identity,
 // stable across every project this machine opens, not per-project data.
 (function () {
-  function randHex(bytes) {
-    var arr = new Uint8Array(bytes);
-    crypto.getRandomValues(arr);
-    return Array.from(arr).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
-  }
-  function initIdentity() {
-    try {
-      var saved = JSON.parse(localStorage.getItem('nemo-p2p-identity') || 'null');
-      if (saved && saved.publicKey) { state.p2pIdentity = saved; return; }
-    } catch (e) { }
-    // v1: a random 128-bit token stands in for a real asymmetric keypair —
-    // with no live transport yet to actually verify/encrypt against, a
-    // full Ed25519 identity would be unused cryptographic theater until
-    // phase 2 wires in the real handshake (AlterSend derives its message
-    // encryption key straight from this same identity key, see
-    // packages/core/src/worklet/chat/crypto.ts — worth mirroring exactly
-    // once there's a real channel to encrypt). Swap this for a real
-    // keypair at that point; zero migration cost for anyone with an empty
-    // contact list, since nothing depends on today's key format yet.
-    state.p2pIdentity = { publicKey: randHex(16), createdAt: Date.now() };
-    try { localStorage.setItem('nemo-p2p-identity', JSON.stringify(state.p2pIdentity)); } catch (e) { }
-  }
-  function loadContacts() {
-    try { return JSON.parse(localStorage.getItem('nemo-p2p-contacts') || '[]'); } catch (e) { return []; }
-  }
-  function saveContacts() {
-    try { localStorage.setItem('nemo-p2p-contacts', JSON.stringify(state.p2pContacts)); } catch (e) { }
-  }
-  state.p2pContacts = loadContacts();
-  initIdentity();
-
-  function myDisplayName() { return (state.userProfile && state.userProfile.name) || 'Animateur'; }
-
-  // Invite code: base64 of {k:pubkey, n:name, t:timestamp} — plain
-  // copy/paste text, no QR yet (no QR library bundled in this app; a
-  // scannable code can be layered on top of this same payload later
-  // without changing the format). Mirrors AlterSend's OWN "or paste the
-  // code" fallback alongside its QR option — text-only is a legitimate v1,
-  // not a placeholder.
-  function myInviteCode() {
-    return btoa(JSON.stringify({ k: state.p2pIdentity.publicKey, n: myDisplayName(), t: Date.now() }));
-  }
-  function parseInviteCode(code) {
-    try {
-      var payload = JSON.parse(atob(code.trim()));
-      if (!payload || !payload.k) return null;
-      return { publicKey: payload.k, displayName: payload.n || 'Contact' };
-    } catch (e) { return null; }
-  }
+  var model = window.NemoP2PContactModel.create({state: state,
+    storage: {getItem: function (key) { return localStorage.getItem(key); }, setItem: function (key, value) { return localStorage.setItem(key, value); }},
+    crypto: {getRandomValues: function (array) { return crypto.getRandomValues(array); }},
+    now: function () { return Date.now(); },
+    encodeBase64: function (value) { return btoa(value); },
+    decodeBase64: function (value) { return atob(value); }});
+  function myInviteCode() { return model.myInviteCode(); }
   function addContact(code) {
-    var parsed = parseInviteCode(code);
-    if (!parsed) return { ok: false, error: 'Code invalide' };
-    if (parsed.publicKey === state.p2pIdentity.publicKey) return { ok: false, error: 'C’est ton propre code' };
-    if (state.p2pContacts.some(function (c) { return c.publicKey === parsed.publicKey; })) return { ok: false, error: 'Déjà dans tes contacts' };
-    // status stays 'pending' forever until phase 2's real transport can
-    // actually confirm a live handshake — never silently promoted to
-    // "connected" by this file alone, so the UI never lies about a
-    // connection that doesn't exist yet.
-    var contact = { publicKey: parsed.publicKey, displayName: parsed.displayName, pairedAt: Date.now(), status: 'pending' };
-    state.p2pContacts.push(contact);
-    saveContacts();
-    render();
-    return { ok: true, contact: contact };
+    var result = model.addContact(code);
+    if (result.ok) render();
+    return result;
   }
-  function removeContact(publicKey) {
-    state.p2pContacts = state.p2pContacts.filter(function (c) { return c.publicKey !== publicKey; });
-    saveContacts();
-    render();
-  }
+  function removeContact(publicKey) { model.removeContact(publicKey); render(); }
 
   function render() {
     var list = document.getElementById('p2p-contacts-list');
     if (!list) return;
     list.innerHTML = '';
-    if (!state.p2pContacts.length) {
+    if (!model.contacts().length) {
       var empty = document.createElement('div');
       empty.style.cssText = 'font-size:9px;color:var(--text-dim);padding:4px 0;';
       empty.textContent = window.SM.t('p2pNoContacts');
       list.appendChild(empty);
       return;
     }
-    state.p2pContacts.forEach(function (c) {
+    model.contacts().forEach(function (c) {
       var row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:5px;background:var(--panel3);';
       var dot = document.createElement('div');
