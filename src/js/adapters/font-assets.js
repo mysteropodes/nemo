@@ -93,8 +93,12 @@
       cache.clear();
     }
 
+    // A renderer may await a requested weight before its catalog entry is
+    // accepted. This preserves live Bold selection without advertising it.
+    function hasLoad(key) { return active && cache.has(key); }
+
     return Object.freeze({ fonts: fonts, load: load, googleWeight: googleWeight,
-      addGoogle: addGoogle, dispose: dispose });
+      addGoogle: addGoogle, hasLoad: hasLoad, dispose: dispose });
   }
 
   return Object.freeze({ create: create });

@@ -160,13 +160,14 @@ test('disposal after a cached Regular result prevents add completion and its lat
   assert.deepEqual(f.invocations.map(x => x.args.weight), [400]);
 });
 
-function bridge() {
+function bridge(change = () => {}) {
   const reads = [], invocations = [];
   const sandbox = { Map, Uint8Array, atob, Promise,
     fetch(url) { reads.push(url); return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(bytes()) }); },
     opentype: { parse: value => ({ bytes: [...new Uint8Array(value)] }) },
     __TAURI__: { core: { invoke(command, args) { invocations.push({ command, args }); return Promise.resolve('AQID'); } } } };
   sandbox.window = sandbox;
+  change(sandbox);
   vm.runInNewContext(adapterSource, sandbox, { filename: 'font-assets.js' });
   vm.runInNewContext(bridgeSource, sandbox, { filename: 'vector-text-bridge.js' });
   return { sandbox, api: sandbox.SMVectorText, reads, invocations };
@@ -198,4 +199,21 @@ test('actual glyph caller still selects real Bold and falls back to the original
       { x: 0, y: 0 }, null, { bold: true }), value => value === stop);
   }
   assert.deepEqual(selected, ['Roboto-Bold', 'Manrope-Regular', 'Inter-Regular']);
+});
+
+test('actual live Bold caller awaits its pending weight without publishing an unparsed catalog entry', async () => {
+  const bold = deferred(), stop = Error('stop before glyph construction'), selected = [];
+  const b = bridge(s => { s.__TAURI__.core.invoke = (command, args) =>
+    args.weight === 700 ? bold.promise : Promise.resolve('AQID'); });
+  assert.equal(await b.api.addGoogleFont('Pending'), 'Google:Pending-Regular');
+  assert.equal(Object.hasOwn(b.api.VECTOR_FONTS, 'Google:Pending-Bold'), false);
+  b.sandbox.loadVectorFont = key => { selected.push(key); return Promise.reject(stop); };
+  await assert.rejects(b.api.buildVectorTextGroup('text', 'Google:Pending-Regular', 12, '#fff', 'left', null,
+    { x: 0, y: 0 }, null, { bold: true }), value => value === stop);
+  assert.deepEqual(selected, ['Google:Pending-Bold']);
+  bold.reject(Error('this family has no Bold'));
+  await settle();
+  await assert.rejects(b.api.buildVectorTextGroup('text', 'Google:Pending-Regular', 12, '#fff', 'left', null,
+    { x: 0, y: 0 }, null, { bold: true }), value => value === stop);
+  assert.deepEqual(selected, ['Google:Pending-Bold', 'Google:Pending-Regular']);
 });

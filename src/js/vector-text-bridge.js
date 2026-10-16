@@ -215,7 +215,7 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
   // "Roboto Bold" from Font both converge on the identical file.
   var baseFamily = fontKey.replace(/-(Bold|Regular)$/, '');
   var resolvedFontKey = opts.bold ? baseFamily + '-Bold' : baseFamily + '-Regular';
-  if (!VECTOR_FONTS[resolvedFontKey]) resolvedFontKey = fontKey; // unknown family — don't 404 on a guessed name
+  if (!VECTOR_FONTS[resolvedFontKey] && !_vectorFontAssets.hasLoad(resolvedFontKey)) resolvedFontKey = fontKey; // unknown family — don't 404 on a guessed name
   return loadVectorFont(resolvedFontKey).then(function (font) {
     var lineHeightMult = opts.lineHeightMult || 1.25;
     var lineHeight = size * lineHeightMult;
