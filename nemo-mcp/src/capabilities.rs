@@ -26,6 +26,9 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-object.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-layer-create.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-layer-timing.json"),
+    include_str!(
+        "../../engineering/application/capabilities-v2/native-object-property-metadata.json"
+    ),
     include_str!("../../engineering/application/capabilities-v2/native-project-settings.json"),
     include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
     include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),

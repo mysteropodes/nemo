@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.property-metadata",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.property.metadata"
+  ],
+  "input": {
+    "$ref": "../native-property-metadata-v1.schema.json#/$defs/Selector"
+  },
+  "output": {
+    "$ref": "../native-property-metadata-v1.schema.json#/$defs/ReadResult"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "Existing RevisionSync and native owner locks select the current immutable history snapshot; four provider pins bind content. UI consumers separately compare captured local lifecycle and selection generation after await. No lifecycle echo, property writes, publication or acknowledgement.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "maxProviderResponseBytes": 3072,
+    "policy": "Original bounded bytes before typed conversion; complete correlated envelope or typed unavailable, never truncation."
+  },
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "not_found",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned native fixture target page through the common application service",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "metadata-page-0",
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.metadata",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "view": {
+            "kind": "targets",
+            "offset": 0,
+            "limit": 2
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "metadata-page-0",
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "d35-fixture",
+          "documentId": "native-object-document-1",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "kind": "targets",
+          "target": null,
+          "items": [
+            {
+              "kind": "context",
+              "contextId": "scene-root"
+            },
+            {
+              "kind": "layer",
+              "target": {
+                "contextId": "scene-root",
+                "layerUid": "L0"
+              }
+            }
+          ],
+          "nextOffset": 2,
+          "unavailableCategories": [
+            {
+              "category": "conditionalMotionRows",
+              "state": "unavailable",
+              "reason": "holder-prerequisite-flags-not-admitted"
+            },
+            {
+              "category": "pathVerticesTrimStrokeBrushMesh",
+              "state": "unavailable",
+              "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+            },
+            {
+              "category": "referenceOnlyElements",
+              "state": "unavailable",
+              "reason": "no-authored-frame-independent-property-target"
+            },
+            {
+              "category": "expressionDiagnostics",
+              "state": "unavailable",
+              "reason": "authored-read-does-not-run-pinned-evaluation"
+            },
+            {
+              "category": "layerEffectMatteReveal",
+              "state": "unavailable",
+              "reason": "layer-owner-flags-not-admitted"
+            },
+            {
+              "category": "propertyWrites",
+              "state": "unavailable",
+              "reason": "read-only-provider-public-property-command-not-admitted"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

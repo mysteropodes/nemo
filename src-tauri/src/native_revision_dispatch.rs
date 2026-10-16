@@ -217,3 +217,7 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }
+
+#[cfg(test)]
+#[path = "native_property_metadata_dispatch_tests.rs"]
+mod metadata_tests;

@@ -2,7 +2,7 @@
 use crate::object_codec::{
     object_deserialize, FrameScopeKind, Presence, PropertyHolder, PropertyHolderTarget,
 };
-use crate::request_receipts::DispatchErrorCode;
+use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::revision::ObjectSnapshot;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -131,6 +131,65 @@ fn descriptor(
     Ok(value)
 }
 impl ObjectSnapshot {
+    /// The existing public dispatcher admits the common envelope and owner.
+    /// Original-byte transport admission must precede its typed payload; this
+    /// wrapper neither adds a lifecycle authority nor acquires another snapshot.
+    pub(super) fn dispatch_property_metadata(
+        &self,
+        request: &OpacityRequest,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        let fields = ["atRevision", "documentSnapshotId", "view"];
+        if request.payload.as_object().is_none_or(|payload| {
+            payload.len() != fields.len() || fields.iter().any(|key| !payload.contains_key(*key))
+        }) {
+            return Ok(self.read_failure(
+                request,
+                invalid(),
+                "Native property metadata requires only revision, snapshot and view.",
+            ));
+        }
+        let selector = json!({
+            "instanceId": request.instance_id,
+            "documentId": request.document_id,
+            "atRevision": request.payload["atRevision"],
+            "documentSnapshotId": request.payload["documentSnapshotId"],
+            "view": request.payload["view"]
+        });
+        let bytes = serde_json::to_vec(&selector).map_err(|_| invalid())?;
+        let result = match self.query_property_metadata_json(&bytes) {
+            Ok(result) => result,
+            Err(code) => {
+                return Ok(self.read_failure(
+                    request,
+                    code,
+                    "Native property metadata selector is invalid or unavailable.",
+                ))
+            }
+        };
+        let response = ResponseEnvelope {
+            api_version: request.api_version,
+            request_id: request.request_id.clone(),
+            instance_id: self.instance_id().into(),
+            document_id: self.document_id().into(),
+            content_revision: self.content_revision(),
+            ok: true,
+            result: Some(result),
+            error: None,
+        };
+        if serde_json::to_vec(&response)
+            .map_err(|_| DispatchErrorCode::Internal)?
+            .len()
+            > crate::object_snapshot::MAX_MESSAGE_BYTES
+        {
+            return Ok(self.read_failure(
+                request,
+                unavailable(),
+                "Complete native property metadata response exceeds 4096 bytes.",
+            ));
+        }
+        Ok(response)
+    }
+
     // Enumeration uses the admitted order of contexts/layers; it is not a frame's
     // animated render order. Every element identity is deduplicated over authored
     // drawings. A reference-only record never creates an element property target.
