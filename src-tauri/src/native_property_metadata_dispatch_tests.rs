@@ -1,5 +1,6 @@
 //! Metadata reads use actual common capability admission and native owner locks.
-use super::*;
+use crate::application_mcp::revision_sync::Delivery;
+use nemo_mcp::contract::NativeApplicationRequest;
 use crate::application_mcp::ApplicationMcp;
 use crate::native_object_bootstrap::{bootstrap_raw, replace_blank_without_viewport_for_test};
 use serde_json::{json, Value};
