@@ -1,0 +1,1569 @@
+# native_import_drop_route oracle (L10-C, lane 10 / #2116). Baseline fbe4b8a33e6d5a229f014154df2ba21988a9fabc.
+# Generator: tools/gen.mjs (verbatim drop-import.js / svg-import.js / reference-bridge.js / native-object-reference.js functions in Node vms).
+# source sha256: drop-import.js 8e2994d13538f24b64c3acff55cbe4267f5c3b3ccf55412d3625d7d5084560c8 svg-import.js d5c9116e61cbc58f77b895c2d0f89f1d152aa7316977fb046bc302366a2c20cc
+#   reference-bridge.js 7964dd7bb8f07cf0ff37d3759e0d629888ed18fba857647b27a1cc207773c955 adapters/native-object-reference.js db125a5cce1eca06cc8d44bb9a36e7a8b098eb36dbf62dae0fc643da76e730e9
+# Tokens: `$` is the empty string; other text is UTF-8 with %XX for bytes outside [A-Za-z0-9._+/=;-]; a file is `type|name`.
+# Rows: S file => 0|1 (isSvgFile) | D types => 0|1 (isDraggingFiles; `~` no dataTransfer, `!` no types, `_` empty list) | G files => calls toast (handleDrop; calls are label:index.list in call order, `-` none) |
+#   H importer files => calls toast (handleDrop with that window.X importer absent) | L text => 0|1 (looksLikeSvg) | W code-point ranges of /\s/ |
+#   P target items plain html => skip=editable|nodata|nosvg | file=item,read | markup=p|h,text (onPaste; `-` no target / no clipboard, `_` no items,
+#     item = type:f|s:file-or-dash joined by `,`, target = TAG with +ce when contentEditable) |
+#   R path => cancel | attach:path | reject:message (adapters/native-object-reference.js importPath; `~` is null) |
+#   O n|l files => events (reference-bridge.js importFiles with nativeReference() true|false)
+# Each control line: rows of that kind that change when the JS baseline gets the equivalent source edit (the Rust controls must reject at least as many).
+# control svg-after-image-pile G=231 H=9
+# control toast-order-swapped G=79 H=6
+# control exec-order-swapped G=79 H=4
+# control other-keeps-svg G=98 O=14
+# control svg-name-case-sensitive G=51 P=75 S=16
+# control svg-mime-only G=301 H=3 O=14 P=75 S=48
+# control svg-name-only G=51 H=3 S=8
+# control looks-case-sensitive L=3 P=15
+# control looks-space-only L=17 P=24
+# control unicode-white-space L=2 P=48
+# control extract-greedy P=36
+# control html-first P=161
+# control ignore-file-items P=329
+# control editable-case-insensitive P=6
+# control drag-always-true D=6
+# control png-case-sensitive R=4
+S $|$ => 0
+S $|a.svg => 1
+S $|a.SVG => 1
+S $|a.SvG => 1
+S $|a.svgx => 0
+S $|svg => 0
+S $|.svg => 1
+S $|a.svg%20 => 0
+S $|a.svg%0A => 0
+S $|a.%C5%BFvg => 0
+S $|a.svg.png => 0
+S $|dir/a.svg => 1
+S $|a.png => 0
+S $|%EF%BD%81.svg => 1
+S image/svg+xml|$ => 1
+S image/svg+xml|a.svg => 1
+S image/svg+xml|a.SVG => 1
+S image/svg+xml|a.SvG => 1
+S image/svg+xml|a.svgx => 1
+S image/svg+xml|svg => 1
+S image/svg+xml|.svg => 1
+S image/svg+xml|a.svg%20 => 1
+S image/svg+xml|a.svg%0A => 1
+S image/svg+xml|a.%C5%BFvg => 1
+S image/svg+xml|a.svg.png => 1
+S image/svg+xml|dir/a.svg => 1
+S image/svg+xml|a.png => 1
+S image/svg+xml|%EF%BD%81.svg => 1
+S image/SVG+XML|$ => 0
+S image/SVG+XML|a.svg => 1
+S image/SVG+XML|a.SVG => 1
+S image/SVG+XML|a.SvG => 1
+S image/SVG+XML|a.svgx => 0
+S image/SVG+XML|svg => 0
+S image/SVG+XML|.svg => 1
+S image/SVG+XML|a.svg%20 => 0
+S image/SVG+XML|a.svg%0A => 0
+S image/SVG+XML|a.%C5%BFvg => 0
+S image/SVG+XML|a.svg.png => 0
+S image/SVG+XML|dir/a.svg => 1
+S image/SVG+XML|a.png => 0
+S image/SVG+XML|%EF%BD%81.svg => 1
+S image/svg+xml;charset=utf-8|$ => 0
+S image/svg+xml;charset=utf-8|a.svg => 1
+S image/svg+xml;charset=utf-8|a.SVG => 1
+S image/svg+xml;charset=utf-8|a.SvG => 1
+S image/svg+xml;charset=utf-8|a.svgx => 0
+S image/svg+xml;charset=utf-8|svg => 0
+S image/svg+xml;charset=utf-8|.svg => 1
+S image/svg+xml;charset=utf-8|a.svg%20 => 0
+S image/svg+xml;charset=utf-8|a.svg%0A => 0
+S image/svg+xml;charset=utf-8|a.%C5%BFvg => 0
+S image/svg+xml;charset=utf-8|a.svg.png => 0
+S image/svg+xml;charset=utf-8|dir/a.svg => 1
+S image/svg+xml;charset=utf-8|a.png => 0
+S image/svg+xml;charset=utf-8|%EF%BD%81.svg => 1
+S image/svg|$ => 0
+S image/svg|a.svg => 1
+S image/svg|a.SVG => 1
+S image/svg|a.SvG => 1
+S image/svg|a.svgx => 0
+S image/svg|svg => 0
+S image/svg|.svg => 1
+S image/svg|a.svg%20 => 0
+S image/svg|a.svg%0A => 0
+S image/svg|a.%C5%BFvg => 0
+S image/svg|a.svg.png => 0
+S image/svg|dir/a.svg => 1
+S image/svg|a.png => 0
+S image/svg|%EF%BD%81.svg => 1
+S image/png|$ => 0
+S image/png|a.svg => 1
+S image/png|a.SVG => 1
+S image/png|a.SvG => 1
+S image/png|a.svgx => 0
+S image/png|svg => 0
+S image/png|.svg => 1
+S image/png|a.svg%20 => 0
+S image/png|a.svg%0A => 0
+S image/png|a.%C5%BFvg => 0
+S image/png|a.svg.png => 0
+S image/png|dir/a.svg => 1
+S image/png|a.png => 0
+S image/png|%EF%BD%81.svg => 1
+S audio/mpeg|$ => 0
+S audio/mpeg|a.svg => 1
+S audio/mpeg|a.SVG => 1
+S audio/mpeg|a.SvG => 1
+S audio/mpeg|a.svgx => 0
+S audio/mpeg|svg => 0
+S audio/mpeg|.svg => 1
+S audio/mpeg|a.svg%20 => 0
+S audio/mpeg|a.svg%0A => 0
+S audio/mpeg|a.%C5%BFvg => 0
+S audio/mpeg|a.svg.png => 0
+S audio/mpeg|dir/a.svg => 1
+S audio/mpeg|a.png => 0
+S audio/mpeg|%EF%BD%81.svg => 1
+S video/mp4|$ => 0
+S video/mp4|a.svg => 1
+S video/mp4|a.SVG => 1
+S video/mp4|a.SvG => 1
+S video/mp4|a.svgx => 0
+S video/mp4|svg => 0
+S video/mp4|.svg => 1
+S video/mp4|a.svg%20 => 0
+S video/mp4|a.svg%0A => 0
+S video/mp4|a.%C5%BFvg => 0
+S video/mp4|a.svg.png => 0
+S video/mp4|dir/a.svg => 1
+S video/mp4|a.png => 0
+S video/mp4|%EF%BD%81.svg => 1
+S text/xml|$ => 0
+S text/xml|a.svg => 1
+S text/xml|a.SVG => 1
+S text/xml|a.SvG => 1
+S text/xml|a.svgx => 0
+S text/xml|svg => 0
+S text/xml|.svg => 1
+S text/xml|a.svg%20 => 0
+S text/xml|a.svg%0A => 0
+S text/xml|a.%C5%BFvg => 0
+S text/xml|a.svg.png => 0
+S text/xml|dir/a.svg => 1
+S text/xml|a.png => 0
+S text/xml|%EF%BD%81.svg => 1
+D ~ => 0
+D ! => 0
+D _ => 0
+D Files => 1
+D text/plain => 0
+D text/plain,Files => 1
+D files => 0
+D Files%20 => 0
+D text/uri-list,text/plain,Files => 1
+D application/x-moz-file,Files => 1
+G => - -
+G audio/mpeg|a.mp3 => audio:0 Import%20%3A%201%20piste%28s%29%20audio
+G audio/|x => audio:0 Import%20%3A%201%20piste%28s%29%20audio
+G $|x.wav => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+G image/png|a.png => image:0 Import%20%3A%201%20image%28s%29
+G image/jpeg|a.jpg => image:0 Import%20%3A%201%20image%28s%29
+G image/svg+xml|a.svg => svg:0 Import%20%3A%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png => svg:0 Import%20%3A%201%20SVG%20%28vecteurs%29
+G image/png|a.svg => svg:0 Import%20%3A%201%20SVG%20%28vecteurs%29
+G image/png|A.SVG => svg:0 Import%20%3A%201%20SVG%20%28vecteurs%29
+G $|a.svg => svg:0 Import%20%3A%201%20SVG%20%28vecteurs%29
+G text/xml|b.svg => svg:0 Import%20%3A%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt => image:0 Import%20%3A%201%20image%28s%29
+G image/svg|d.svg => svg:0 Import%20%3A%201%20SVG%20%28vecteurs%29
+G video/mp4|v.mp4 => video:0 Import%20%3A%201%20vid%C3%A9o%28s%29
+G video/|v => video:0 Import%20%3A%201%20vid%C3%A9o%28s%29
+G audio/mpeg|x.svg => audio:0,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G video/mp4|y.svg => svg:0,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G application/pdf|a.pdf => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+G image/|z => image:0 Import%20%3A%201%20image%28s%29
+G IMAGE/PNG|a.png => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 audio/mpeg|a.mp3 => audio:0,audio:1 Import%20%3A%202%20piste%28s%29%20audio
+G audio/mpeg|a.mp3 audio/|x => audio:0,audio:1 Import%20%3A%202%20piste%28s%29%20audio
+G audio/mpeg|a.mp3 $|x.wav => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 Audio/mpeg|a.mp3 => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 image/png|a.png => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/mpeg|a.mp3 image/jpeg|a.jpg => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/mpeg|a.mp3 image/svg+xml|a.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 image/svg+xml|a.png => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 image/png|a.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 image/png|A.SVG => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 $|a.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 text/xml|b.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 image/svg+xml;charset=utf-8|c.txt => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/mpeg|a.mp3 image/svg|d.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 video/mp4|v.mp4 => audio:0,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G audio/mpeg|a.mp3 video/|v => audio:0,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G audio/mpeg|a.mp3 audio/mpeg|x.svg => audio:0,audio:1,svg:1 Import%20%3A%202%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 video/mp4|y.svg => audio:0,svg:1,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G audio/mpeg|a.mp3 application/pdf|a.pdf => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 application/x-photoshop|a.psd => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 text/plain|a.txt => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 $|a => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 image/|z => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/mpeg|a.mp3 IMAGE/PNG|a.png => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/|x audio/mpeg|a.mp3 => audio:0,audio:1 Import%20%3A%202%20piste%28s%29%20audio
+G audio/|x audio/|x => audio:0,audio:1 Import%20%3A%202%20piste%28s%29%20audio
+G audio/|x $|x.wav => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/|x Audio/mpeg|a.mp3 => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/|x image/png|a.png => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/|x image/jpeg|a.jpg => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/|x image/svg+xml|a.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x image/svg+xml|a.png => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x image/png|a.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x image/png|A.SVG => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x $|a.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x text/xml|b.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x image/svg+xml;charset=utf-8|c.txt => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/|x image/svg|d.svg => audio:0,svg:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x video/mp4|v.mp4 => audio:0,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G audio/|x video/|v => audio:0,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G audio/|x audio/mpeg|x.svg => audio:0,audio:1,svg:1 Import%20%3A%202%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/|x video/mp4|y.svg => audio:0,svg:1,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G audio/|x application/pdf|a.pdf => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/|x application/x-photoshop|a.psd => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/|x text/plain|a.txt => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/|x $|a => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G audio/|x image/|z => audio:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G audio/|x IMAGE/PNG|a.png => audio:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav audio/mpeg|a.mp3 => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav audio/|x => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav $|x.wav => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|x.wav Audio/mpeg|a.mp3 => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|x.wav image/png|a.png => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav image/jpeg|a.jpg => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav image/svg+xml|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav image/svg+xml|a.png => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav image/png|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav image/png|A.SVG => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav $|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav text/xml|b.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav image/svg+xml;charset=utf-8|c.txt => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav image/svg|d.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav video/mp4|v.mp4 => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav video/|v => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav audio/mpeg|x.svg => audio:1,svg:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav video/mp4|y.svg => svg:1,video:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav application/pdf|a.pdf => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|x.wav application/x-photoshop|a.psd => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|x.wav text/plain|a.txt => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|x.wav $|a => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|x.wav image/|z => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav IMAGE/PNG|a.png => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 audio/mpeg|a.mp3 => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 audio/|x => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 $|x.wav => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 Audio/mpeg|a.mp3 => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/png|a.png => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/jpeg|a.jpg => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/svg+xml|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/svg+xml|a.png => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/png|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/png|A.SVG => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 $|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 text/xml|b.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/svg+xml;charset=utf-8|c.txt => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/svg|d.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 video/mp4|v.mp4 => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 video/|v => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 audio/mpeg|x.svg => audio:1,svg:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 video/mp4|y.svg => svg:1,video:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 application/pdf|a.pdf => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 application/x-photoshop|a.psd => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 text/plain|a.txt => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 $|a => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 image/|z => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G Audio/mpeg|a.mp3 IMAGE/PNG|a.png => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G image/png|a.png audio/mpeg|a.mp3 => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/png|a.png audio/|x => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/png|a.png $|x.wav => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.png Audio/mpeg|a.mp3 => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.png image/png|a.png => image:0.1 Import%20%3A%202%20image%28s%29
+G image/png|a.png image/jpeg|a.jpg => image:0.1 Import%20%3A%202%20image%28s%29
+G image/png|a.png image/svg+xml|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png image/svg+xml|a.png => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png image/png|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png image/png|A.SVG => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png $|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png text/xml|b.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png image/svg+xml;charset=utf-8|c.txt => image:0.1 Import%20%3A%202%20image%28s%29
+G image/png|a.png image/svg|d.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png video/mp4|v.mp4 => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|a.png video/|v => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|a.png audio/mpeg|x.svg => audio:1,svg:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.png video/mp4|y.svg => svg:1,image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|a.png application/pdf|a.pdf => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.png application/x-photoshop|a.psd => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.png text/plain|a.txt => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.png $|a => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.png image/|z => image:0.1 Import%20%3A%202%20image%28s%29
+G image/png|a.png IMAGE/PNG|a.png => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/jpeg|a.jpg audio/mpeg|a.mp3 => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/jpeg|a.jpg audio/|x => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/jpeg|a.jpg $|x.wav => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/jpeg|a.jpg Audio/mpeg|a.mp3 => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/jpeg|a.jpg image/png|a.png => image:0.1 Import%20%3A%202%20image%28s%29
+G image/jpeg|a.jpg image/jpeg|a.jpg => image:0.1 Import%20%3A%202%20image%28s%29
+G image/jpeg|a.jpg image/svg+xml|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg image/svg+xml|a.png => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg image/png|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg image/png|A.SVG => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg $|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg text/xml|b.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg image/svg+xml;charset=utf-8|c.txt => image:0.1 Import%20%3A%202%20image%28s%29
+G image/jpeg|a.jpg image/svg|d.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg video/mp4|v.mp4 => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/jpeg|a.jpg video/|v => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/jpeg|a.jpg audio/mpeg|x.svg => audio:1,svg:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/jpeg|a.jpg video/mp4|y.svg => svg:1,image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/jpeg|a.jpg application/pdf|a.pdf => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/jpeg|a.jpg application/x-photoshop|a.psd => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/jpeg|a.jpg text/plain|a.txt => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/jpeg|a.jpg $|a => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/jpeg|a.jpg image/|z => image:0.1 Import%20%3A%202%20image%28s%29
+G image/jpeg|a.jpg IMAGE/PNG|a.png => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.svg audio/mpeg|a.mp3 => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg audio/|x => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg $|x.wav => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.svg Audio/mpeg|a.mp3 => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.svg image/png|a.png => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg image/jpeg|a.jpg => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg image/png|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg image/png|A.SVG => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg $|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg text/xml|b.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg image/svg+xml;charset=utf-8|c.txt => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg image/svg|d.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg video/mp4|v.mp4 => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml|a.svg video/|v => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml|a.svg audio/mpeg|x.svg => audio:1,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg video/mp4|y.svg => svg:0.1,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml|a.svg application/pdf|a.pdf => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.svg application/x-photoshop|a.psd => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.svg text/plain|a.txt => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.svg $|a => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.svg image/|z => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.svg IMAGE/PNG|a.png => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.png audio/mpeg|a.mp3 => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png audio/|x => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png $|x.wav => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.png Audio/mpeg|a.mp3 => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.png image/png|a.png => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png image/jpeg|a.jpg => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png image/png|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png image/png|A.SVG => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png $|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png text/xml|b.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png image/svg+xml;charset=utf-8|c.txt => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png image/svg|d.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png video/mp4|v.mp4 => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml|a.png video/|v => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml|a.png audio/mpeg|x.svg => audio:1,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png video/mp4|y.svg => svg:0.1,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml|a.png application/pdf|a.pdf => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.png application/x-photoshop|a.psd => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.png text/plain|a.txt => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.png $|a => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml|a.png image/|z => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml|a.png IMAGE/PNG|a.png => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.svg audio/mpeg|a.mp3 => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.svg audio/|x => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.svg $|x.wav => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.svg Audio/mpeg|a.mp3 => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.svg image/png|a.png => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.svg image/jpeg|a.jpg => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.svg image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|a.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|a.svg image/png|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|a.svg image/png|A.SVG => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|a.svg $|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|a.svg text/xml|b.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|a.svg image/svg+xml;charset=utf-8|c.txt => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.svg image/svg|d.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|a.svg video/mp4|v.mp4 => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|a.svg video/|v => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|a.svg audio/mpeg|x.svg => audio:1,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G image/png|a.svg video/mp4|y.svg => svg:0.1,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|a.svg application/pdf|a.pdf => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.svg application/x-photoshop|a.psd => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.svg text/plain|a.txt => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.svg $|a => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.svg image/|z => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|a.svg IMAGE/PNG|a.png => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|A.SVG audio/mpeg|a.mp3 => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/png|A.SVG audio/|x => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/png|A.SVG $|x.wav => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|A.SVG Audio/mpeg|a.mp3 => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|A.SVG image/png|a.png => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|A.SVG image/jpeg|a.jpg => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|A.SVG image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG image/png|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG image/png|A.SVG => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG $|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG text/xml|b.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG image/svg+xml;charset=utf-8|c.txt => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|A.SVG image/svg|d.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG video/mp4|v.mp4 => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|A.SVG video/|v => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|A.SVG audio/mpeg|x.svg => audio:1,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G image/png|A.SVG video/mp4|y.svg => svg:0.1,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|A.SVG application/pdf|a.pdf => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|A.SVG application/x-photoshop|a.psd => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|A.SVG text/plain|a.txt => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|A.SVG $|a => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|A.SVG image/|z => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/png|A.SVG IMAGE/PNG|a.png => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a.svg audio/mpeg|a.mp3 => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G $|a.svg audio/|x => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G $|a.svg $|x.wav => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a.svg Audio/mpeg|a.mp3 => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a.svg image/png|a.png => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G $|a.svg image/jpeg|a.jpg => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G $|a.svg image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G $|a.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G $|a.svg image/png|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G $|a.svg image/png|A.SVG => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G $|a.svg $|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G $|a.svg text/xml|b.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G $|a.svg image/svg+xml;charset=utf-8|c.txt => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G $|a.svg image/svg|d.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G $|a.svg video/mp4|v.mp4 => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G $|a.svg video/|v => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G $|a.svg audio/mpeg|x.svg => audio:1,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G $|a.svg video/mp4|y.svg => svg:0.1,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G $|a.svg application/pdf|a.pdf => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a.svg application/x-photoshop|a.psd => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a.svg text/plain|a.txt => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a.svg $|a => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a.svg image/|z => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G $|a.svg IMAGE/PNG|a.png => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/xml|b.svg audio/mpeg|a.mp3 => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G text/xml|b.svg audio/|x => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G text/xml|b.svg $|x.wav => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/xml|b.svg Audio/mpeg|a.mp3 => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/xml|b.svg image/png|a.png => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G text/xml|b.svg image/jpeg|a.jpg => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G text/xml|b.svg image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg image/png|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg image/png|A.SVG => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg $|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg text/xml|b.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg image/svg+xml;charset=utf-8|c.txt => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G text/xml|b.svg image/svg|d.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg video/mp4|v.mp4 => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G text/xml|b.svg video/|v => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G text/xml|b.svg audio/mpeg|x.svg => audio:1,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G text/xml|b.svg video/mp4|y.svg => svg:0.1,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G text/xml|b.svg application/pdf|a.pdf => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/xml|b.svg application/x-photoshop|a.psd => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/xml|b.svg text/plain|a.txt => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/xml|b.svg $|a => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/xml|b.svg image/|z => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G text/xml|b.svg IMAGE/PNG|a.png => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml;charset=utf-8|c.txt audio/mpeg|a.mp3 => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/svg+xml;charset=utf-8|c.txt audio/|x => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/svg+xml;charset=utf-8|c.txt $|x.wav => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml;charset=utf-8|c.txt Audio/mpeg|a.mp3 => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml;charset=utf-8|c.txt image/png|a.png => image:0.1 Import%20%3A%202%20image%28s%29
+G image/svg+xml;charset=utf-8|c.txt image/jpeg|a.jpg => image:0.1 Import%20%3A%202%20image%28s%29
+G image/svg+xml;charset=utf-8|c.txt image/svg+xml|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt image/svg+xml|a.png => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt image/png|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt image/png|A.SVG => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt $|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt text/xml|b.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt image/svg+xml;charset=utf-8|c.txt => image:0.1 Import%20%3A%202%20image%28s%29
+G image/svg+xml;charset=utf-8|c.txt image/svg|d.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt video/mp4|v.mp4 => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml;charset=utf-8|c.txt video/|v => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml;charset=utf-8|c.txt audio/mpeg|x.svg => audio:1,svg:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt video/mp4|y.svg => svg:1,image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml;charset=utf-8|c.txt application/pdf|a.pdf => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml;charset=utf-8|c.txt application/x-photoshop|a.psd => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml;charset=utf-8|c.txt text/plain|a.txt => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml;charset=utf-8|c.txt $|a => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg+xml;charset=utf-8|c.txt image/|z => image:0.1 Import%20%3A%202%20image%28s%29
+G image/svg+xml;charset=utf-8|c.txt IMAGE/PNG|a.png => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg|d.svg audio/mpeg|a.mp3 => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/svg|d.svg audio/|x => audio:1,svg:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G image/svg|d.svg $|x.wav => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg|d.svg Audio/mpeg|a.mp3 => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg|d.svg image/png|a.png => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg|d.svg image/jpeg|a.jpg => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg|d.svg image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg image/png|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg image/png|A.SVG => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg $|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg text/xml|b.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg image/svg+xml;charset=utf-8|c.txt => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg|d.svg image/svg|d.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg video/mp4|v.mp4 => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg|d.svg video/|v => svg:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg|d.svg audio/mpeg|x.svg => audio:1,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G image/svg|d.svg video/mp4|y.svg => svg:0.1,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg|d.svg application/pdf|a.pdf => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg|d.svg application/x-photoshop|a.psd => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg|d.svg text/plain|a.txt => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg|d.svg $|a => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G image/svg|d.svg image/|z => svg:0,image:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/svg|d.svg IMAGE/PNG|a.png => svg:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|v.mp4 audio/mpeg|a.mp3 => audio:1,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 audio/|x => audio:1,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 $|x.wav => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|v.mp4 Audio/mpeg|a.mp3 => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|v.mp4 image/png|a.png => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 image/jpeg|a.jpg => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 image/svg+xml|a.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 image/svg+xml|a.png => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 image/png|a.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 image/png|A.SVG => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 $|a.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 text/xml|b.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 image/svg+xml;charset=utf-8|c.txt => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 image/svg|d.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 video/mp4|v.mp4 => video:0,video:1 Import%20%3A%202%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 video/|v => video:0,video:1 Import%20%3A%202%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 audio/mpeg|x.svg => audio:1,svg:1,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 video/mp4|y.svg => svg:1,video:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%202%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 application/pdf|a.pdf => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|v.mp4 application/x-photoshop|a.psd => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|v.mp4 text/plain|a.txt => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|v.mp4 $|a => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|v.mp4 image/|z => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|v.mp4 IMAGE/PNG|a.png => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/|v audio/mpeg|a.mp3 => audio:1,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G video/|v audio/|x => audio:1,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20vid%C3%A9o%28s%29
+G video/|v $|x.wav => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/|v Audio/mpeg|a.mp3 => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/|v image/png|a.png => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v image/jpeg|a.jpg => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v image/svg+xml|a.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v image/svg+xml|a.png => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v image/png|a.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v image/png|A.SVG => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v $|a.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v text/xml|b.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v image/svg+xml;charset=utf-8|c.txt => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v image/svg|d.svg => svg:1,video:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v video/mp4|v.mp4 => video:0,video:1 Import%20%3A%202%20vid%C3%A9o%28s%29
+G video/|v video/|v => video:0,video:1 Import%20%3A%202%20vid%C3%A9o%28s%29
+G video/|v audio/mpeg|x.svg => audio:1,svg:1,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v video/mp4|y.svg => svg:1,video:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%202%20vid%C3%A9o%28s%29
+G video/|v application/pdf|a.pdf => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/|v application/x-photoshop|a.psd => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/|v text/plain|a.txt => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/|v $|a => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/|v image/|z => image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G video/|v IMAGE/PNG|a.png => video:0,other:1 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|x.svg audio/mpeg|a.mp3 => audio:0,audio:1,svg:0 Import%20%3A%202%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg audio/|x => audio:0,audio:1,svg:0 Import%20%3A%202%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg $|x.wav => audio:0,svg:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|x.svg Audio/mpeg|a.mp3 => audio:0,svg:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|x.svg image/png|a.png => audio:0,svg:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg image/jpeg|a.jpg => audio:0,svg:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg image/svg+xml|a.svg => audio:0,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg image/svg+xml|a.png => audio:0,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg image/png|a.svg => audio:0,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg image/png|A.SVG => audio:0,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg $|a.svg => audio:0,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg text/xml|b.svg => audio:0,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg image/svg+xml;charset=utf-8|c.txt => audio:0,svg:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg image/svg|d.svg => audio:0,svg:0.1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg video/mp4|v.mp4 => audio:0,svg:0,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G audio/mpeg|x.svg video/|v => audio:0,svg:0,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G audio/mpeg|x.svg audio/mpeg|x.svg => audio:0,audio:1,svg:0.1 Import%20%3A%202%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg video/mp4|y.svg => audio:0,svg:0.1,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G audio/mpeg|x.svg application/pdf|a.pdf => audio:0,svg:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|x.svg application/x-photoshop|a.psd => audio:0,svg:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|x.svg text/plain|a.txt => audio:0,svg:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|x.svg $|a => audio:0,svg:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G audio/mpeg|x.svg image/|z => audio:0,svg:0,image:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G audio/mpeg|x.svg IMAGE/PNG|a.png => audio:0,svg:0,other:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|y.svg audio/mpeg|a.mp3 => audio:1,svg:0,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg audio/|x => audio:1,svg:0,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg $|x.wav => svg:0,video:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|y.svg Audio/mpeg|a.mp3 => svg:0,video:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|y.svg image/png|a.png => svg:0,image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg image/jpeg|a.jpg => svg:0,image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg image/svg+xml|a.svg => svg:0.1,video:0 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg image/svg+xml|a.png => svg:0.1,video:0 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg image/png|a.svg => svg:0.1,video:0 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg image/png|A.SVG => svg:0.1,video:0 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg $|a.svg => svg:0.1,video:0 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg text/xml|b.svg => svg:0.1,video:0 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg image/svg+xml;charset=utf-8|c.txt => svg:0,image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg image/svg|d.svg => svg:0.1,video:0 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg video/mp4|v.mp4 => svg:0,video:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%202%20vid%C3%A9o%28s%29
+G video/mp4|y.svg video/|v => svg:0,video:0,video:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%202%20vid%C3%A9o%28s%29
+G video/mp4|y.svg audio/mpeg|x.svg => audio:1,svg:0.1,video:0 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg video/mp4|y.svg => svg:0.1,video:0,video:1 Import%20%3A%202%20SVG%20%28vecteurs%29%20+%202%20vid%C3%A9o%28s%29
+G video/mp4|y.svg application/pdf|a.pdf => svg:0,video:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|y.svg application/x-photoshop|a.psd => svg:0,video:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|y.svg text/plain|a.txt => svg:0,video:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|y.svg $|a => svg:0,video:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G video/mp4|y.svg image/|z => svg:0,image:1,video:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G video/mp4|y.svg IMAGE/PNG|a.png => svg:0,video:0,other:1 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf audio/mpeg|a.mp3 => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf audio/|x => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf $|x.wav => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf Audio/mpeg|a.mp3 => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/png|a.png => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/jpeg|a.jpg => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/svg+xml|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/svg+xml|a.png => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/png|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/png|A.SVG => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf $|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf text/xml|b.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/svg+xml;charset=utf-8|c.txt => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/svg|d.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf video/mp4|v.mp4 => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf video/|v => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf audio/mpeg|x.svg => audio:1,svg:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf video/mp4|y.svg => svg:1,video:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf application/pdf|a.pdf => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf application/x-photoshop|a.psd => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf text/plain|a.txt => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf $|a => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf image/|z => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf IMAGE/PNG|a.png => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd audio/mpeg|a.mp3 => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd audio/|x => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd $|x.wav => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd Audio/mpeg|a.mp3 => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/png|a.png => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/jpeg|a.jpg => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/svg+xml|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/svg+xml|a.png => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/png|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/png|A.SVG => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd $|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd text/xml|b.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/svg+xml;charset=utf-8|c.txt => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/svg|d.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd video/mp4|v.mp4 => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd video/|v => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd audio/mpeg|x.svg => audio:1,svg:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd video/mp4|y.svg => svg:1,video:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd application/pdf|a.pdf => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd application/x-photoshop|a.psd => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd text/plain|a.txt => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd $|a => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd image/|z => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd IMAGE/PNG|a.png => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt audio/mpeg|a.mp3 => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt audio/|x => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt $|x.wav => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt Audio/mpeg|a.mp3 => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/png|a.png => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/jpeg|a.jpg => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/svg+xml|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/svg+xml|a.png => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/png|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/png|A.SVG => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt $|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt text/xml|b.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/svg+xml;charset=utf-8|c.txt => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/svg|d.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt video/mp4|v.mp4 => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt video/|v => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt audio/mpeg|x.svg => audio:1,svg:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt video/mp4|y.svg => svg:1,video:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt application/pdf|a.pdf => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt application/x-photoshop|a.psd => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt text/plain|a.txt => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt $|a => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt image/|z => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G text/plain|a.txt IMAGE/PNG|a.png => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a audio/mpeg|a.mp3 => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G $|a audio/|x => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G $|a $|x.wav => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a Audio/mpeg|a.mp3 => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a image/png|a.png => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|a image/jpeg|a.jpg => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|a image/svg+xml|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a image/svg+xml|a.png => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a image/png|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a image/png|A.SVG => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a $|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a text/xml|b.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a image/svg+xml;charset=utf-8|c.txt => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|a image/svg|d.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a video/mp4|v.mp4 => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|a video/|v => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|a audio/mpeg|x.svg => audio:1,svg:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G $|a video/mp4|y.svg => svg:1,video:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|a application/pdf|a.pdf => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a application/x-photoshop|a.psd => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a text/plain|a.txt => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a $|a => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a image/|z => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|a IMAGE/PNG|a.png => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G image/|z audio/mpeg|a.mp3 => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/|z audio/|x => audio:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29
+G image/|z $|x.wav => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/|z Audio/mpeg|a.mp3 => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/|z image/png|a.png => image:0.1 Import%20%3A%202%20image%28s%29
+G image/|z image/jpeg|a.jpg => image:0.1 Import%20%3A%202%20image%28s%29
+G image/|z image/svg+xml|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z image/svg+xml|a.png => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z image/png|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z image/png|A.SVG => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z $|a.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z text/xml|b.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z image/svg+xml;charset=utf-8|c.txt => image:0.1 Import%20%3A%202%20image%28s%29
+G image/|z image/svg|d.svg => svg:1,image:0 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z video/mp4|v.mp4 => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/|z video/|v => image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/|z audio/mpeg|x.svg => audio:1,svg:1,image:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29
+G image/|z video/mp4|y.svg => svg:1,image:0,video:1 Import%20%3A%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/|z application/pdf|a.pdf => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/|z application/x-photoshop|a.psd => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/|z text/plain|a.txt => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/|z $|a => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/|z image/|z => image:0.1 Import%20%3A%202%20image%28s%29
+G image/|z IMAGE/PNG|a.png => image:0,other:1 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png audio/mpeg|a.mp3 => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png audio/|x => audio:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png $|x.wav => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png Audio/mpeg|a.mp3 => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/png|a.png => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/jpeg|a.jpg => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/svg+xml|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/svg+xml|a.png => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/png|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/png|A.SVG => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png $|a.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png text/xml|b.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/svg+xml;charset=utf-8|c.txt => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/svg|d.svg => svg:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png video/mp4|v.mp4 => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png video/|v => video:1,other:0 Import%20%3A%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png audio/mpeg|x.svg => audio:1,svg:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png video/mp4|y.svg => svg:1,video:1,other:0 Import%20%3A%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png application/pdf|a.pdf => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png application/x-photoshop|a.psd => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png text/plain|a.txt => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png $|a => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/|z => image:1,other:0 Import%20%3A%201%20image%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png IMAGE/PNG|a.png => other:0.1 Import%20%3A%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 image/svg+xml|a.svg image/png|a.png video/mp4|v.mp4 application/pdf|a.pdf => audio:0,svg:1,image:2,video:3,other:4 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G application/pdf|a.pdf video/mp4|v.mp4 image/png|a.png image/svg+xml|a.svg audio/mpeg|a.mp3 => audio:4,svg:3,image:2,video:1,other:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G image/png|a.png image/png|a.png image/png|a.png => image:0.1.2 Import%20%3A%203%20image%28s%29
+G image/svg+xml|a.svg image/svg+xml|a.svg => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+G audio/mpeg|a.mp3 audio/mpeg|a.mp3 video/mp4|v.mp4 video/mp4|v.mp4 => audio:0,audio:1,video:2,video:3 Import%20%3A%202%20piste%28s%29%20audio%20+%202%20vid%C3%A9o%28s%29
+G audio/mpeg|x.svg video/mp4|y.svg image/svg+xml|a.svg => audio:0,svg:0.1.2,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%203%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G audio/mpeg|x.svg image/svg+xml|a.svg video/mp4|y.svg => audio:0,svg:0.1.2,video:2 Import%20%3A%201%20piste%28s%29%20audio%20+%203%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29
+G image/png|a.png image/jpeg|a.jpg image/svg+xml|a.svg image/svg+xml|a.png image/png|a.svg image/png|A.SVG $|a.svg text/xml|b.svg => svg:2.3.4.5.6.7,image:0.1 Import%20%3A%202%20image%28s%29%20+%206%20SVG%20%28vecteurs%29
+G image/svg+xml;charset=utf-8|c.txt image/svg|d.svg image/|z IMAGE/PNG|a.png => svg:1,image:0.2,other:3 Import%20%3A%202%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%20r%C3%A9f%C3%A9rence
+G application/x-photoshop|a.psd text/plain|a.txt $|a $|x.wav Audio/mpeg|a.mp3 => other:0.1.2.3.4 Import%20%3A%20r%C3%A9f%C3%A9rence
+G audio/mpeg|a.mp3 audio/|x $|x.wav Audio/mpeg|a.mp3 image/png|a.png image/jpeg|a.jpg image/svg+xml|a.svg image/svg+xml|a.png image/png|a.svg image/png|A.SVG $|a.svg text/xml|b.svg image/svg+xml;charset=utf-8|c.txt image/svg|d.svg video/mp4|v.mp4 video/|v audio/mpeg|x.svg video/mp4|y.svg application/pdf|a.pdf application/x-photoshop|a.psd text/plain|a.txt $|a image/|z IMAGE/PNG|a.png => audio:0,audio:1,audio:16,svg:6.7.8.9.10.11.13.16.17,image:4.5.12.22,video:14,video:15,video:17,other:2.3.18.19.20.21.23 Import%20%3A%203%20piste%28s%29%20audio%20+%204%20image%28s%29%20+%209%20SVG%20%28vecteurs%29%20+%203%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G IMAGE/PNG|a.png image/|z $|a text/plain|a.txt application/x-photoshop|a.psd application/pdf|a.pdf video/mp4|y.svg audio/mpeg|x.svg video/|v video/mp4|v.mp4 image/svg|d.svg image/svg+xml;charset=utf-8|c.txt text/xml|b.svg $|a.svg image/png|A.SVG image/png|a.svg image/svg+xml|a.png image/svg+xml|a.svg image/jpeg|a.jpg image/png|a.png Audio/mpeg|a.mp3 $|x.wav audio/|x audio/mpeg|a.mp3 => audio:7,audio:22,audio:23,svg:6.7.10.12.13.14.15.16.17,image:1.11.18.19,video:6,video:8,video:9,other:0.2.3.4.5.20.21 Import%20%3A%203%20piste%28s%29%20audio%20+%204%20image%28s%29%20+%209%20SVG%20%28vecteurs%29%20+%203%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+G $|x.wav Audio/mpeg|a.mp3 text/plain|a.txt => other:0.1.2 Import%20%3A%20r%C3%A9f%C3%A9rence
+G $|a.svg text/xml|b.svg image/svg|d.svg => svg:0.1.2 Import%20%3A%203%20SVG%20%28vecteurs%29
+G audio/|x video/|v image/|z => audio:0,image:2,video:1 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+G image/svg+xml|a.svg audio/mpeg|a.mp3 application/pdf|a.pdf image/png|a.png video/mp4|v.mp4 image/svg+xml|a.svg => audio:1,svg:0.5,image:3,video:4,other:2 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%202%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+H svg audio/mpeg|a.mp3 image/svg+xml|a.svg image/png|a.png video/mp4|v.mp4 application/pdf|a.pdf => audio:0,image:1.2,video:3,other:4 Import%20%3A%201%20piste%28s%29%20audio%20+%202%20image%28s%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+H svg image/svg+xml|a.svg image/svg+xml|a.png => image:0.1 Import%20%3A%202%20image%28s%29
+H svg audio/mpeg|a.mp3 image/png|a.png video/mp4|v.mp4 => audio:0,image:1,video:2 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+H svg application/pdf|a.pdf => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+H svg image/svg+xml|a.svg image/png|a.svg image/png|a.png => image:0.1.2 Import%20%3A%203%20image%28s%29
+H audio audio/mpeg|a.mp3 image/svg+xml|a.svg image/png|a.png video/mp4|v.mp4 application/pdf|a.pdf => svg:1,image:2,video:3,other:4 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+H audio image/svg+xml|a.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+H audio audio/mpeg|a.mp3 image/png|a.png video/mp4|v.mp4 => image:1,video:2 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+H audio application/pdf|a.pdf => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+H audio image/svg+xml|a.svg image/png|a.svg image/png|a.png => svg:0.1,image:2 Import%20%3A%201%20image%28s%29%20+%202%20SVG%20%28vecteurs%29
+H sm audio/mpeg|a.mp3 image/svg+xml|a.svg image/png|a.png video/mp4|v.mp4 application/pdf|a.pdf => audio:0,svg:1,other:4 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+H sm image/svg+xml|a.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+H sm audio/mpeg|a.mp3 image/png|a.png video/mp4|v.mp4 => audio:0 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+H sm application/pdf|a.pdf => other:0 Import%20%3A%20r%C3%A9f%C3%A9rence
+H sm image/svg+xml|a.svg image/png|a.svg image/png|a.png => svg:0.1 Import%20%3A%201%20image%28s%29%20+%202%20SVG%20%28vecteurs%29
+H ref audio/mpeg|a.mp3 image/svg+xml|a.svg image/png|a.png video/mp4|v.mp4 application/pdf|a.pdf => audio:0,svg:1,image:2,video:3 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20SVG%20%28vecteurs%29%20+%201%20vid%C3%A9o%28s%29%20+%20r%C3%A9f%C3%A9rence
+H ref image/svg+xml|a.svg image/svg+xml|a.png => svg:0.1 Import%20%3A%202%20SVG%20%28vecteurs%29
+H ref audio/mpeg|a.mp3 image/png|a.png video/mp4|v.mp4 => audio:0,image:1,video:2 Import%20%3A%201%20piste%28s%29%20audio%20+%201%20image%28s%29%20+%201%20vid%C3%A9o%28s%29
+H ref application/pdf|a.pdf => - Import%20%3A%20r%C3%A9f%C3%A9rence
+H ref image/svg+xml|a.svg image/png|a.svg image/png|a.png => svg:0.1,image:2 Import%20%3A%201%20image%28s%29%20+%202%20SVG%20%28vecteurs%29
+L $ => 0
+L hello => 0
+L %3Csvg%3E => 1
+L %3Csvg%20 => 1
+L %3Csvg%09 => 1
+L %3Csvg%0A => 1
+L %3Csvg%0D => 1
+L %3Csvg%0C => 1
+L %3Csvg%0B => 1
+L %3Csvg => 0
+L %3Csvgx%3E => 0
+L %3Csvg/%3E => 0
+L x%20%3Csvg/%3E%20y => 0
+L %3CSVG%3E => 1
+L %3CSvg%20 => 1
+L %3CsVG%0A => 1
+L %3C%C5%BFvg%3E => 0
+L %3Csvg%C2%A0 => 1
+L %3Csvg%C2%85 => 0
+L %3Csvg%EF%BB%BF => 1
+L %3Csvg%E2%80%A8 => 1
+L %3Csvg%E2%80%A9 => 1
+L %3Csvg%E1%A0%8E => 0
+L %3Csvg%E2%80%8B => 0
+L %3Csvg%E3%80%80 => 1
+L %3Csvg%E1%9A%80 => 1
+L %3Csvg%E2%80%AF => 1
+L %3Csvg%E2%81%9F => 1
+L %3Csvg%E2%80%89 => 1
+L %3Csvg%E2%80%87 => 1
+L %3Csvg%0B => 1
+L %3Csvg%1C => 0
+L %3Csvg%1F => 0
+L a%3Csvg%20viewBox=%220%200%201%201%22%3Eb => 1
+L %3C%20svg%3E => 0
+L %3Csvg%00 => 0
+L %3C/svg%3E => 0
+L %3C%3Csvg%3E => 1
+L %C3%A9%3Csvg%3E => 1
+L %3Csvg%3E%C3%A9 => 1
+L %F0%9F%98%80%3Csvg%3E => 1
+L %3C%3Fxml%20version=%221.0%22%3F%3E%3Csvg%20xmlns=%22http%3A//www.w3.org/2000/svg%22%3E%3C/svg%3E => 1
+L %3Chtml%3E%3Csvg%3E%3C/svg%3E%3C/html%3E => 1
+L %3Csvgs%3E => 0
+L %3Csvg%3Ex%3C/svg%3E => 1
+L %20%3Csvg%20 => 1
+W 9-13 32 160 5760 8192-8202 8232-8233 8239 8287 12288 65279
+P - _ $ $ => skip=nosvg
+P - _ $ %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ $ %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ hello $ => skip=nosvg
+P - _ hello %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ hello %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E $ => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3CSVG%3Ex%3C/SVG%3E $ => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - _ %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - _ %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - _ %3Csvg $ => skip=nosvg
+P - _ %3Csvg %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ %3Csvg %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ %3Csvgx%3E $ => skip=nosvg
+P - _ %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ %3Csvgx%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ %3Csvg%C2%A0%3Ex%3C/svg%3E $ => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - _ %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - _ %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - _ %3Csvg%C2%85%3E $ => skip=nosvg
+P - _ %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ %3Csvg%C2%85%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - _ %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - _ %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - _ a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - _ a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - _ a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - _ %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - _ %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - _ %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - _ %3Csvg%3Ea%3C/svg%0A%3E $ => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - _ %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - _ %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - _ %3Csvg%3Eno%20close $ => markup=p,%3Csvg%3Eno%20close
+P - _ %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Eno%20close
+P - _ %3Csvg%3Eno%20close %3Csvg%3Eunclosed => markup=p,%3Csvg%3Eno%20close
+P - _ %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3E%3C/svg $ => markup=p,%3Csvg%3E%3C/svg
+P - _ %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%3C/svg
+P - _ %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%3C/svg
+P - _ %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - _ %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - _ %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - _ pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - _ pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - _ pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - _ %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - _ %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - _ %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - _ %3Csvg/%3E $ => skip=nosvg
+P - _ %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ %3Csvg/%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - _ %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - _ %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - _ %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - _ %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - _ %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%85%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - _ %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/svg+xml:f:image/svg+xml|a.svg $ $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg $ %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg $ %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3CSVG%3Ex%3C/SVG%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvgx%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvgx%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%A0%3Ex%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%85%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%85%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%0A%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Eno%20close $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Eno%20close %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%3C/svg $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg/%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg/%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:s:- $ $ => skip=nosvg
+P - image/svg+xml:s:- $ %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:s:- $ %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:s:- hello $ => skip=nosvg
+P - image/svg+xml:s:- hello %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:s:- hello %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:s:- %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%20width=%221%22%3E%3C/svg%3E $ => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/svg+xml:s:- %3CSVG%3Ex%3C/SVG%3E $ => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/svg+xml:s:- %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/svg+xml:s:- %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/svg+xml:s:- %3Csvg $ => skip=nosvg
+P - image/svg+xml:s:- %3Csvg %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:s:- %3Csvgx%3E $ => skip=nosvg
+P - image/svg+xml:s:- %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:s:- %3Csvgx%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:s:- %3Csvg%C2%A0%3Ex%3C/svg%3E $ => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%C2%85%3E $ => skip=nosvg
+P - image/svg+xml:s:- %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%C2%85%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:s:- %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/svg+xml:s:- a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/svg+xml:s:- a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/svg+xml:s:- a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%0A%3E $ => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/svg+xml:s:- %3Csvg%3Eno%20close $ => markup=p,%3Csvg%3Eno%20close
+P - image/svg+xml:s:- %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Eno%20close
+P - image/svg+xml:s:- %3Csvg%3Eno%20close %3Csvg%3Eunclosed => markup=p,%3Csvg%3Eno%20close
+P - image/svg+xml:s:- %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3E%3C/svg $ => markup=p,%3Csvg%3E%3C/svg
+P - image/svg+xml:s:- %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%3C/svg
+P - image/svg+xml:s:- %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%3C/svg
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/svg+xml:s:- pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/svg+xml:s:- pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/svg+xml:s:- pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/svg+xml:s:- %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/svg+xml:s:- %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/svg+xml:s:- %3Csvg/%3E $ => skip=nosvg
+P - image/svg+xml:s:- %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg/%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:s:- %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%85%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/svg+xml:s:- %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/png:f:image/png|a.png $ $ => skip=nosvg
+P - image/png:f:image/png|a.png $ %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/png:f:image/png|a.png $ %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/png:f:image/png|a.png hello $ => skip=nosvg
+P - image/png:f:image/png|a.png hello %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/png:f:image/png|a.png hello %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/png:f:image/png|a.png %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%20width=%221%22%3E%3C/svg%3E $ => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/png:f:image/png|a.png %3CSVG%3Ex%3C/SVG%3E $ => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/png:f:image/png|a.png %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/png:f:image/png|a.png %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/png:f:image/png|a.png %3Csvg $ => skip=nosvg
+P - image/png:f:image/png|a.png %3Csvg %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/png:f:image/png|a.png %3Csvgx%3E $ => skip=nosvg
+P - image/png:f:image/png|a.png %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvgx%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/png:f:image/png|a.png %3Csvg%C2%A0%3Ex%3C/svg%3E $ => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%C2%85%3E $ => skip=nosvg
+P - image/png:f:image/png|a.png %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%C2%85%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/png:f:image/png|a.png %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/png:f:image/png|a.png a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/png:f:image/png|a.png a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/png:f:image/png|a.png a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%0A%3E $ => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/png:f:image/png|a.png %3Csvg%3Eno%20close $ => markup=p,%3Csvg%3Eno%20close
+P - image/png:f:image/png|a.png %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Eno%20close
+P - image/png:f:image/png|a.png %3Csvg%3Eno%20close %3Csvg%3Eunclosed => markup=p,%3Csvg%3Eno%20close
+P - image/png:f:image/png|a.png %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3E%3C/svg $ => markup=p,%3Csvg%3E%3C/svg
+P - image/png:f:image/png|a.png %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%3C/svg
+P - image/png:f:image/png|a.png %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%3C/svg
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/png:f:image/png|a.png pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/png:f:image/png|a.png pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/png:f:image/png|a.png pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/png:f:image/png|a.png %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/png:f:image/png|a.png %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/png:f:image/png|a.png %3Csvg/%3E $ => skip=nosvg
+P - image/png:f:image/png|a.png %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg/%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/png:f:image/png|a.png %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%85%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/png:f:image/png|a.png %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg $ $ => skip=nosvg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg $ %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg $ %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg hello $ => skip=nosvg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg hello %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg hello %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E $ => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3CSVG%3Ex%3C/SVG%3E $ => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => markup=p,%3CSVG%3Ex%3C/SVG%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg $ => skip=nosvg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvgx%3E $ => skip=nosvg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvgx%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%A0%3Ex%3C/svg%3E $ => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%C2%A0%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%85%3E $ => skip=nosvg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%C2%85%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%EF%BB%BF%3Eq%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => markup=p,%3Csvg%20viewBox%3Eb%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%20%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%0A%3E $ => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%0A%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%A0%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Eno%20close $ => markup=p,%3Csvg%3Eno%20close
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Eno%20close
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Eno%20close %3Csvg%3Eunclosed => markup=p,%3Csvg%3Eno%20close
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%3C/svg $ => markup=p,%3Csvg%3E%3C/svg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%3C/svg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%3C/svg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => markup=p,%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%0A%3C/SvG%09%20%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg/%3E $ => skip=nosvg
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg/%3E %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => markup=p,%3Csvg%3E%C3%A9%3C/svg%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%EF%BB%BF%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3E $ => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/svg+xml:f:-,image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ea%3C/svg%C2%85%3E
+P - image/svg+xml:f:text/plain|a.txt $ $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt $ %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt $ %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt hello $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt hello %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt hello %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ex%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%20width=%221%22%3E%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3CSVG%3Ex%3C/SVG%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvgx%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvgx%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%C2%A0%3Ex%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%C2%85%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%C2%85%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%0A%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Eno%20close $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Eno%20close %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%3C/svg $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg/%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg/%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%85%3E $ => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=0,0
+P - image/svg+xml:f:text/plain|a.txt %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => file=0,0
+P - image/svg+xml:f:$|b.SVG $ $ => file=0,1
+P - image/svg+xml:f:$|b.SVG $ %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG $ %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG hello $ => file=0,1
+P - image/svg+xml:f:$|b.SVG hello %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG hello %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%20width=%221%22%3E%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3CSVG%3Ex%3C/SVG%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvgx%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvgx%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%C2%A0%3Ex%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%C2%85%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%C2%85%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => file=0,1
+P - image/svg+xml:f:$|b.SVG a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%0A%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Eno%20close $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Eno%20close %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%3C/svg $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => file=0,1
+P - image/svg+xml:f:$|b.SVG pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg/%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg/%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%85%3E $ => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:$|b.SVG %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => file=0,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg $ $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg $ %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg $ %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg hello $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg hello %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg hello %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ex%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%20width=%221%22%3E%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3CSVG%3Ex%3C/SVG%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3CSVG%3Ex%3C/SVG%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvgx%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvgx%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvgx%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%C2%A0%3Ex%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%C2%A0%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%C2%85%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%C2%85%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%EF%BB%BF%3Eq%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg a%3Csvg%20viewBox%3Eb%3C/svg%3Ec %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%20%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%0A%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%0A%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%A0%3Etail %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Eno%20close $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Eno%20close %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Eno%20close %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3C/svg%3E%3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%3C/svg $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%3C/svg %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%3C/svg %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%3E%3Csvg%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg pre%20%3Csvg%20id=%221%22%3E%3Csvg%20id=%222%22%3E%3C/svg%3E%3C/svg%3E%20post %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%85%3Eb%3C/svg%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%0A%3C/SvG%09%20%3Ez %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg/%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg/%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg/%3E %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3E%C3%A9%3C/svg%3E%C3%A9 %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%EF%BB%BF%3Eb %3Csvg%3Eunclosed => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%85%3E $ => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eh%3C/svg%3E => file=1,1
+P - text/plain:s:-,image/svg+xml:f:image/svg+xml|a.svg,image/svg+xml:f:image/svg+xml|z.svg %3Csvg%3Ea%3C/svg%C2%85%3E %3Csvg%3Eunclosed => file=1,1
+P - _ $ $ => skip=nosvg
+P - _ $ hello => skip=nosvg
+P - _ $ %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ $ %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => markup=h,%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E
+P - _ $ %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ $ %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => markup=h,%3CSVG%3EH%3C/SVG%3E
+P - _ hello $ => skip=nosvg
+P - _ hello hello => skip=nosvg
+P - _ hello %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ hello %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => markup=h,%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E
+P - _ hello %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ hello %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => markup=h,%3CSVG%3EH%3C/SVG%3E
+P - _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E hello => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E $ => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E hello => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - _ %3Csvg%20width=%221%22%3E%3C/svg%3E %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => markup=p,%3Csvg%20width=%221%22%3E%3C/svg%3E
+P - image/svg+xml:f:image/svg+xml|a.svg $ $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg $ hello => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg $ %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg $ %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg $ %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg $ %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello hello => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg hello %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E hello => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E $ => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E hello => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Csvg%3Eunclosed => file=0,1
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%20width=%221%22%3E%3C/svg%3E %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => file=0,1
+P - _ hello $ => skip=nosvg
+P - _ hello %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ hello hello => skip=nosvg
+P - _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E %3Csvg%3Eh%3C/svg%3E => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ %3Csvg%3Ex%3C/svg%3E hello => markup=p,%3Csvg%3Ex%3C/svg%3E
+P - _ no%20svg%20here $ => skip=nosvg
+P - _ no%20svg%20here hello => skip=nosvg
+P - _ no%20svg%20here %3Csvg%3Eh%3C/svg%3E => markup=h,%3Csvg%3Eh%3C/svg%3E
+P - _ no%20svg%20here %3Cmeta%20charset=%22utf-8%22%3E%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E => markup=h,%3Csvg%20viewBox=%220%200%201%201%22%3E%3Cg%3E%3C/g%3E%3C/svg%3E
+P - _ no%20svg%20here %3Csvg%3Eunclosed => markup=h,%3Csvg%3Eunclosed
+P - _ no%20svg%20here %3Cp%3E%3CSVG%3EH%3C/SVG%3E%3C/p%3E => markup=h,%3CSVG%3EH%3C/SVG%3E
+P - image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P - - - - => skip=nodata
+P - _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P DIV image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P DIV - - - => skip=nodata
+P DIV _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P INPUT image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => skip=editable
+P INPUT - - - => skip=editable
+P INPUT _ %3Csvg%3Ex%3C/svg%3E $ => skip=editable
+P TEXTAREA image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => skip=editable
+P TEXTAREA - - - => skip=editable
+P TEXTAREA _ %3Csvg%3Ex%3C/svg%3E $ => skip=editable
+P input image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P input - - - => skip=nodata
+P input _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P textarea image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P textarea - - - => skip=nodata
+P textarea _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+P DIV+ce image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => skip=editable
+P DIV+ce - - - => skip=editable
+P DIV+ce _ %3Csvg%3Ex%3C/svg%3E $ => skip=editable
+P svg image/svg+xml:f:image/svg+xml|a.svg %3Csvg%3Ex%3C/svg%3E $ => file=0,1
+P svg - - - => skip=nodata
+P svg _ %3Csvg%3Ex%3C/svg%3E $ => markup=p,%3Csvg%3Ex%3C/svg%3E
+R ~ => cancel
+R $ => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+R a.png => attach:a.png
+R A.PNG => attach:A.PNG
+R a.Png => attach:a.Png
+R a.pnG => attach:a.pnG
+R a.jpg => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+R png => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+R .png => attach:.png
+R a.png%20 => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+R a.png%0A => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+R /x/y%20z/b.PNG => attach:/x/y%20z/b.PNG
+R %C4%B0.png => attach:%C4%B0.png
+R %EF%BD%81.%EF%BC%B0%EF%BC%AE%EF%BC%A7 => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+R a.png.txt => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+R C%3A%5Cx%5Cy.png => attach:C%3A%5Cx%5Cy.png
+R %C3%A9.png => attach:%C3%A9.png
+R a.png => attach:a.png
+R a.svg => reject:This%20native%20reference%20workflow%20currently%20accepts%20one%20PNG%20image
+O n $|x.wav => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l $|x.wav => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O n Audio/mpeg|a.mp3 => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l Audio/mpeg|a.mp3 => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O n application/pdf|a.pdf => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l application/pdf|a.pdf => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O n application/x-photoshop|a.psd => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l application/x-photoshop|a.psd => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O n text/plain|a.txt => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l text/plain|a.txt => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O n $|a => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l $|a => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O n IMAGE/PNG|a.png => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l IMAGE/PNG|a.png => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O n $|x.wav Audio/mpeg|a.mp3 application/pdf|a.pdf application/x-photoshop|a.psd text/plain|a.txt $|a IMAGE/PNG|a.png => toast:Use%20Import%20Reference%20to%20choose%20a%20PNG%20file%20for%20this%20native%20project.
+O l $|x.wav Audio/mpeg|a.mp3 application/pdf|a.pdf application/x-photoshop|a.psd text/plain|a.txt $|a IMAGE/PNG|a.png => toast:KEY%3AtoastFormatNotRecognizedVideoImages
+O l image/png|a.png => read
+O l video/mp4|v.mp4 => read

@@ -7,3 +7,6 @@ pub(crate) mod scene_effect_blend_ref;
 #[path = "scene_effect_order.rs"]
 #[allow(dead_code)]
 pub(crate) mod scene_effect_order;
+#[path = "scene_effect_params.rs"]
+#[allow(dead_code)]
+pub(crate) mod scene_effect_params;
