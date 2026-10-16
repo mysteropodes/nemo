@@ -117,6 +117,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         layers: wire.layers,
         objects: wire.objects,
         property_holders: wire.property_holders,
+        layer_folders: wire.layer_folders,
         composition_order: Presence::Missing,
     };
     validate(&document)?;
@@ -131,11 +132,13 @@ struct LegacyDocument {
     layers: Vec<ObjectLayer>,
     objects: Vec<ObjectRecord>,
     property_holders: Presence<Vec<PropertyHolder>>,
+    layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
-    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>
+    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>
 });
 
 /// Explicit core storage admission; both attempts read the original raw bytes.
@@ -205,12 +208,21 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.objects,
         false,
     )?;
+    validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
         &document.property_holders,
         &document.layers,
         &document.objects,
         None,
     )
+}
+
+pub(crate) fn validate_layer_organization(
+    layers: &[ObjectLayer],
+    folders: &Presence<Option<crate::object_document::LayerFolders>>,
+) -> Result<(), ObjectCodecError> {
+    crate::object_document::validate_layer_organization(layers, folders)
+        .map_err(|message| ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message))
 }
 
 pub(crate) fn validate_property_holders(
@@ -254,15 +266,10 @@ pub(crate) fn validate_content(
     }
     let mut layers = HashSet::new();
     for layer in declared_layers {
-        // This admission preserves the default edit policy. A locked layer or
-        // transform parent needs its own command/evaluation consumer contract.
-        if layer.locked.value() == Some(&true)
-            || layer.parent_layer_uid.value().is_some_and(Option::is_some)
-        {
-            return Err(reject(
-                Unsupported,
-                "layer locking and parenting are unavailable",
-            ));
+        // Drawing Fill enforces its own lock guard. Generic Motion actions
+        // retain their permissive baseline semantics; parenting remains separate.
+        if layer.parent_layer_uid.value().is_some_and(Option::is_some) {
+            return Err(reject(Unsupported, "layer parenting is unavailable"));
         }
         if let Some(color) = layer.color.value() {
             if color.len() != 7

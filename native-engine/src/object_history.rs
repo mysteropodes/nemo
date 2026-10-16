@@ -8,6 +8,8 @@ use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use crate::transaction::StageReceipts;
 
+#[path = "object_layer_policy_history.rs"]
+mod layer_policy;
 #[path = "object_command_dispatch.rs"]
 mod object_command_dispatch;
 #[path = "object_project_settings_history.rs"]

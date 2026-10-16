@@ -221,3 +221,7 @@ mod tests {
 #[cfg(test)]
 #[path = "native_property_metadata_dispatch_tests.rs"]
 mod metadata_tests;
+
+#[cfg(test)]
+#[path = "native_layer_policy_dispatch_tests.rs"]
+mod layer_policy_tests;

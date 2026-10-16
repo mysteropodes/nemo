@@ -507,6 +507,16 @@
         "visible": { "type": "boolean" }
       }
     },
+    "ObjectLayerPolicyPayload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["command", "layerUid", "flag", "value"],
+      "properties": {
+        "command": { "const": "object.layer.policy.edit" },
+        "layerUid": { "$ref": "#/$defs/ObjectOpaqueId" },
+        "flag": { "enum": ["locked", "shy"] },
+        "value": { "type": "boolean" }
+      }
+    },
     "ObjectQueryResult": {
       "type": "object",
       "additionalProperties": false,
@@ -707,6 +717,7 @@
     "Request": {
       "oneOf": [
         { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" }, { "properties": { "operation": { "const": "command.document.object.project.settings.edit" }, "payload": { "$ref": "#/$defs/ObjectProjectSettingsPayload" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" }, { "properties": { "operation": { "const": "command.document.object.layer.policy.edit" }, "payload": { "$ref": "#/$defs/ObjectLayerPolicyPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" }, { "properties": { "operation": { "const": "query.document.object.layer.timing" }, "payload": { "$ref": "#/$defs/ObjectLayerTimingPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" }, { "properties": { "operation": { "const": "query.document.object.property.metadata" }, "payload": { "$ref": "#/$defs/ObjectPropertyMetadataPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" },

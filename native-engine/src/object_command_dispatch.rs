@@ -11,6 +11,7 @@ const OP_OBJECT_UNDO: &str = "command.document.object.undo";
 const OP_OBJECT_REDO: &str = "command.document.object.redo";
 const OP_LAYER_VISIBILITY: &str = "command.document.object.layer.visibility.set";
 const OP_LAYER_CREATE: &str = "command.document.object.layer.create";
+const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
 const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
@@ -55,6 +56,7 @@ impl NativeObjectHistory {
                 | OP_OBJECT_REDO
                 | OP_LAYER_VISIBILITY
                 | OP_LAYER_CREATE
+                | OP_LAYER_POLICY
                 | OP_PROPERTY_EDIT
                 | OP_PROPERTY_TRACK_EDIT
                 | OP_PROJECT_SETTINGS
@@ -83,6 +85,8 @@ impl NativeObjectHistory {
                 "Property edit request refused."
             } else if request.operation == OP_LAYER_CREATE {
                 "Layer creation request refused."
+            } else if request.operation == OP_LAYER_POLICY {
+                "Layer policy request refused."
             } else if request.operation == OP_LAYER_VISIBILITY {
                 "Layer visibility request refused."
             } else if request.operation == OP_OBJECT_FILL {
@@ -191,6 +195,23 @@ impl NativeObjectHistory {
                             .map_err(|code| (code, "Layer creation could not commit."))
                     }
                     Err(code) => Err((code, "Layer creation payload is invalid.")),
+                }
+            } else if request.operation == OP_LAYER_POLICY {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                match self.prepare_layer_policy_json(&payload) {
+                    Ok(candidate) => {
+                        let before = self.content_revision();
+                        self.commit_layer_policy(candidate)
+                            .map(|revision| CompactResult::Command {
+                                applied: revision != before,
+                                history_entries_added: u64::from(revision != before),
+                            })
+                            .map_err(|code| (code, "Layer policy could not commit."))
+                    }
+                    Err(code) => {
+                        Err((code, "Layer policy payload is invalid or target is absent."))
+                    }
                 }
             } else if request.operation == OP_LAYER_VISIBILITY {
                 let payload = serde_json::to_vec(&request.payload)
