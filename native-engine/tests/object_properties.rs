@@ -299,3 +299,54 @@ fn full_project_save_reopen_and_retained_reads_preserve_control_and_holder_prese
         assert_eq!(pinned.serialize_project_file().unwrap(), saved);
     }
 }
+
+#[cfg(all(feature = "history", feature = "evaluation"))]
+#[test]
+fn both_real_frame_producers_refuse_unconsumed_properties_without_affecting_old_documents() {
+    use crate::history::NativeObjectHistory;
+    use crate::object_frame_packet::{
+        prepare_object_exposure_frame, prepare_object_frame, ObjectFrameError, ObjectFrameSelector,
+    };
+    for version in [1, 2] {
+        for table in [None, Some(json!([])), Some(holders())] {
+            let mut value = source(version);
+            value["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,
+                "family":"drawing","contextId":"scene-root","keys":[{"frame":0},{"frame":4}],"samples":[]});
+            if let Some(table) = &table {
+                value["propertyHolders"] = table.clone();
+            }
+            let owner =
+                NativeObjectHistory::new("property-render-guard", admitted(&value)).unwrap();
+            let pinned = owner.acquire_snapshot(0).unwrap();
+            let selector = ObjectFrameSelector {
+                instance_id: pinned.instance_id(),
+                document_id: pinned.document_id(),
+                content_revision: 0,
+                document_snapshot_id: pinned.snapshot_id(),
+                context_id: "scene-root",
+                scope_kind: FrameScopeKind::Authored,
+                frame: 0,
+            };
+            for exposure in [false, true] {
+                let result = if exposure {
+                    prepare_object_exposure_frame(&pinned, &selector)
+                } else {
+                    prepare_object_frame(&pinned, &selector)
+                };
+                if table
+                    .as_ref()
+                    .is_some_and(|v| !v.as_array().unwrap().is_empty())
+                {
+                    assert_eq!(result.unwrap_err(), ObjectFrameError::Unavailable);
+                } else {
+                    assert_eq!(result.unwrap().records().count(), 1);
+                }
+            }
+            assert_eq!(image(pinned.document()), value);
+            assert_eq!(
+                (owner.content_revision(), owner.history_depths()),
+                (0, (0, 0))
+            );
+        }
+    }
+}
