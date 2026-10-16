@@ -1,6 +1,8 @@
 //! Pure staged fill preparation. This does not commit a revision or dispatch a
 //! transport request; raw whole-envelope admission remains a separate gate.
-use crate::object_document::{object_deserialize, ObjectDocument, ObjectTarget, SolidFill};
+use crate::object_document::{
+    object_deserialize, ObjectDocument, ObjectTarget, Presence, SolidFill,
+};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -101,10 +103,13 @@ pub fn prepare_object_fill_json(
     {
         return Err(DispatchErrorCode::Unavailable);
     }
-    let changed = !same_fill(&snapshot.document().objects[index].fill, &payload.fill);
+    let changed = match snapshot.document().objects[index].solid_fill() {
+        Some(before) => !same_fill(before, &payload.fill),
+        None => true,
+    };
     let mut document = snapshot.document().clone();
     if changed {
-        document.objects[index].fill = payload.fill;
+        document.objects[index].fill = Presence::Present(Some(payload.fill));
     }
     Ok(PreparedObjectFill {
         document,

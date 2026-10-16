@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
-const {checkSourceCoverage}=require('../scripts/nemo/lib/boundaries-coverage.cjs');
+const {checkRustSourceCoverage}=require('../scripts/nemo/lib/boundaries-rust-vendor.cjs');
 const {discoverRepositoryFiles}=require('../scripts/nemo/lib/boundaries-repository.cjs');
 const ROOT=path.resolve(__dirname,'..');
 const PROFILE='engineering/boundaries/profiles/rust.profile.json';
@@ -115,7 +115,7 @@ const read=(root,file)=>JSON.parse(fs.readFileSync(path.join(root,file),'utf8'))
 function coverage(root,profile){
   const inventory=discoverRepositoryFiles({root});assert.equal(inventory.ok,true,JSON.stringify(inventory.diagnostics));
   const sourcePaths=inventory.entries.filter(entry=>entry.path.endsWith('.rs')).map(entry=>entry.path);
-  return checkSourceCoverage(profile,{root,sourcePaths,exclusions:read(root,COVERAGE).exclusions});
+  return checkRustSourceCoverage(profile,{root,sourcePaths,exclusions:read(root,COVERAGE).exclusions});
 }
 test('F06 private children retain exact ordinary ownership and the single declared public policy operation',()=>{
   const profile=read(ROOT,PROFILE),mcp=read(ROOT,MCP);
