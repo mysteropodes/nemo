@@ -707,6 +707,404 @@ test('L10-A montage timing kernel stays a private evaluation child and fails clo
   }
 });
 
+test('G13 path-effect kernel stays a private L01 aggregator child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativePathEffectsKernelRegistration, /L01-A\/#2129/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_vector_kernels.rs'), 'utf8');
+  assert.match(aggregatorText, /#\[path = "object_path_effects_kernel\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_path_effects_kernel;/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_vector_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_vector_kernels;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_path_effects_kernel.rs'), 'utf8');
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_path_effects_kernel\.rs"\]\s*mod tests;/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_path_effects_kernel.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_path_effects_kernel.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_path_effects_kernel_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_path_effects_kernel_pins.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L02-A group hierarchy kernel stays a private document child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectGroupHierarchyRegistration, /L02-A\/#2117/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_group_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_group_kernels;/);
+  const documentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_group_kernels.rs'), 'utf8');
+  assert.match(documentText, /#\[path = "object_group_hierarchy\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_group_hierarchy;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_group_hierarchy.rs'), 'utf8');
+  assert.match(kernelText, /#\[path = "object_group_hierarchy_selection\.rs"\]\s*mod selection;/);
+  for (const name of ['object_group_hierarchy', 'object_group_hierarchy_controls', 'object_group_hierarchy_mutations']) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod `));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_group_hierarchy.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_group_hierarchy_selection.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_hierarchy.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_hierarchy_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_hierarchy_mutations.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-A image-mesh geometry kernel stays a private evaluation child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectImageMeshGeometryRegistration, /L03-A\/#2138/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_image_mesh_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_image_mesh_kernels;/);
+  const evaluationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_kernels.rs'), 'utf8');
+  assert.match(evaluationText, /#\[path = "object_image_mesh_geometry\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_image_mesh_geometry;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_geometry.rs'), 'utf8');
+  for (const child of ['object_image_mesh_geometry', 'object_image_mesh_geometry_rows', 'object_image_mesh_geometry_controls']) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${child}\\.rs"\\]\\s*mod [a-z_]+;`));
+  }
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-image-mesh-geometry/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 710, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_image_mesh_geometry.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_geometry.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_geometry_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_geometry_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-B widget geometry kernel stays a private image-mesh-family child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectWidgetGeometryRegistration, /L03-B\/#2139/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_kernels.rs'), 'utf8');
+  assert.match(aggregatorText, /#\[path = "object_widget_geometry\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_widget_geometry;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_widget_geometry.rs'), 'utf8');
+  for (const [name, mod] of [['object_widget_geometry_rows', 'oracle_rows'], ['object_widget_geometry', 'tests'], ['object_widget_geometry_controls', 'controls_tests']]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-widget-geometry/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 814, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_widget_geometry.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_geometry.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_geometry_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_geometry_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L04-A component playback kernel stays a private evaluation child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectComponentPlaybackRegistration, /L04-A\/#2120/);
+  // R4: the declaration lives in the L04 evaluation aggregator (name chosen by the lead) or, without one, in evaluation.rs.
+  const declarationText = ['native-engine/src/object_component_kernels.rs', 'native-engine/src/evaluation.rs']
+    .filter((file) => fs.existsSync(path.join(ROOT, file)))
+    .map((file) => fs.readFileSync(path.join(ROOT, file), 'utf8'))
+    .join('\n');
+  assert.match(declarationText, /#\[path = "object_component_playback\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_component_playback;/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_component_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_component_kernels;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_component_playback.rs'), 'utf8');
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_component_playback\.rs"\]\s*mod tests;/);
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_component_playback_controls\.rs"\]\s*mod controls_tests;/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_component_playback.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_playback.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_playback_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L04-B duplicator placement kernels stay private aggregator children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeDuplicatorPlacementRegistration, /L04-B\/#2121/);
+  // R4: the declarations live in the L04 evaluation aggregator or, without one, in evaluation.rs.
+  const declarationText = ['native-engine/src/object_component_kernels.rs', 'native-engine/src/evaluation.rs']
+    .filter((file) => fs.existsSync(path.join(ROOT, file)))
+    .map((file) => fs.readFileSync(path.join(ROOT, file), 'utf8'))
+    .join('\n');
+  for (const name of ['duplicator_placement_modes', 'duplicator_placement_rng']) {
+    assert.match(declarationText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  for (const [name, children] of [
+    ['duplicator_placement_modes', [['duplicator_placement_modes', 'tests'], ['duplicator_placement_modes_controls', 'controls_tests'], ['duplicator_placement_modes_pins', 'pins_tests']]],
+    ['duplicator_placement_rng', [['duplicator_placement_rng', 'tests'], ['duplicator_placement_rng_controls', 'controls_tests']]],
+  ]) {
+    const kernelText = fs.readFileSync(path.join(ROOT, `native-engine/src/${name}.rs`), 'utf8');
+    for (const [file, mod] of children) {
+      assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${file}\\.rs"\\]\\s*mod ${mod};`));
+    }
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/duplicator_placement_modes.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/duplicator_placement_rng.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_modes.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_modes_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_modes_pins.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_rng.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_rng_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L05-A sparse frame-edit kernel stays a private timing child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeFrameEditSparseRegistration, /L05-A\/#2132/);
+  const timingText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_layer_timing.rs'), 'utf8');
+  assert.match(timingText, /#\[path = "object_frame_edit_sparse\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_frame_edit_sparse;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_frame_edit_sparse.rs'), 'utf8');
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_frame_edit_sparse\.rs"\]\s*mod tests;/);
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_frame_edit_sparse_controls\.rs"\]\s*mod controls;/);
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_frame_edit_sparse_literals\.rs"\]\s*mod literals;/);
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_frame_edit_sparse.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_sparse.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_sparse_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_sparse_literals.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L06-A text layout kernel stays a private evaluation child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectTextLayoutKernelRegistration, /L06-A\/#2135/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_text_layout_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernels;/);
+  const evaluationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_text_layout_kernels.rs'), 'utf8');
+  assert.match(evaluationText, /#\[path = "object_text_layout_kernel\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernel;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_text_layout_kernel.rs'), 'utf8');
+  assert.match(kernelText, /#\[path = "object_text_layout_flow\.rs"\]\s*pub\(crate\) mod flow;/);
+  assert.match(kernelText, /#\[path = "object_text_layout_model\.rs"\]\s*pub\(crate\) mod model;/);
+  for (const [name, decl] of [
+    ['object_text_layout_kernel', 'mod tests;'],
+    ['object_text_layout_kernel_oracle', 'pub\\(crate\\) mod oracle;'],
+    ['object_text_layout_kernel_controls', 'mod controls;'],
+    ['object_text_layout_kernel_refusals', 'mod refusals;'],
+  ]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*${decl}`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_text_layout_kernel.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_text_layout_flow.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_text_layout_model.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_kernel.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_kernel_oracle.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_kernel_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_kernel_refusals.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L07-A scene paint kernel stays a private evaluation child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectSceneStylePaintRegistration, /L07-A\/#2141/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_scene_style_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_scene_style_kernels;/);
+  const evaluationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_scene_style_kernels.rs'), 'utf8');
+  assert.match(evaluationText, /#\[path = "object_scene_style_paint\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_scene_style_paint;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_scene_style_paint.rs'), 'utf8');
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_scene_style_paint\.rs"\]\s*mod tests;/);
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_scene_style_paint_controls\.rs"\]\s*mod controls;/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_scene_style_paint.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_paint.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_paint_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L07-B scene stroke kernel stays a private evaluation child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectSceneStyleStrokeRegistration, /L07-B\/#2142/);
+  const declaring = ['native-engine/src/object_scene_style_kernels.rs', 'native-engine/src/evaluation.rs']
+    .filter((file) => fs.existsSync(path.join(ROOT, file)))
+    .map((file) => fs.readFileSync(path.join(ROOT, file), 'utf8'))
+    .join('\n');
+  assert.match(declaring, /#\[path = "object_scene_style_stroke\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_scene_style_stroke;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_scene_style_stroke.rs'), 'utf8');
+  for (const [name, mod] of [['object_scene_style_stroke_controls', 'controls'], ['object_scene_style_stroke', 'tests']]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_scene_style_stroke.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_stroke.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_stroke_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L08-A scene effect order planner stays a private render-scene child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeSceneEffectOrderRegistration, /L08-A\/#2144/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_render_scene.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "scene_effect_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod scene_effect_kernels;/);
+  const sceneText = fs.readFileSync(path.join(ROOT, 'native-engine/src/scene_effect_kernels.rs'), 'utf8');
+  assert.match(sceneText, /#\[path = "scene_effect_order\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod scene_effect_order;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/scene_effect_order.rs'), 'utf8');
+  for (const name of ['scene_effect_order', 'scene_effect_order_cases', 'scene_effect_order_controls']) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod \\w+;`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.render-scene', 'native-engine/src/scene_effect_order.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_order.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_order_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_order_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L08-B blend/matte/mask CPU reference stays a private lane-8 child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeSceneEffectBlendRefRegistration, /L08-B\/#2145/);
+  const aggregator = fs.readFileSync(path.join(ROOT, 'native-engine/src/scene_effect_kernels.rs'), 'utf8');
+  assert.match(aggregator, /#\[path = "scene_effect_blend_ref\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod scene_effect_blend_ref;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/scene_effect_blend_ref.rs'), 'utf8');
+  assert.match(kernelText, /#\[path = "scene_effect_blend_ref_mask\.rs"\]\s*pub\(crate\) mod mask;/);
+  for (const name of ['scene_effect_blend_ref', 'scene_effect_blend_ref_cases', 'scene_effect_blend_ref_controls']) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod \\w+;`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.render-scene', 'native-engine/src/scene_effect_blend_ref.rs'],
+    ['rust.native.engine.render-scene', 'native-engine/src/scene_effect_blend_ref_mask.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_blend_ref.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_blend_ref_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_blend_ref_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L09-B media timing audio kernel stays a private aggregator child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectMediaTimingAudioRegistration, /L09-B\/#2127/);
+  const coreText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_media_timing_core.rs'), 'utf8');
+  assert.match(coreText, /#\[path = "object_media_timing_audio\.rs"\]\s*pub\(crate\) mod object_media_timing_audio;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_media_timing_audio.rs'), 'utf8');
+  for (const [name, mod] of [['object_media_timing_audio', 'tests'], ['object_media_timing_audio_controls', 'controls'], ['object_media_timing_audio_pins', 'pins'], ['object_media_timing_audio_scrub', 'scrub']]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_media_timing_audio.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_timing_audio.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_timing_audio_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_timing_audio_pins.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_timing_audio_scrub.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
 test('isolated negative controls fail closed and restore every touched byte', (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-n19-enforcement-'));
   const clone = path.join(temp, 'repo');
