@@ -20,6 +20,10 @@ pub use scheduled::{
 
 #[path = "object_paint_plan.rs"]
 mod paint;
+// L08-A (#2144): lane-8 scene composition/effect family aggregator.
+#[path = "scene_effect_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod scene_effect_kernels;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use paint::tests::paint_contents;
 #[cfg(test)]
