@@ -229,9 +229,10 @@ fn every_i_row_is_bit_identical() {
         let got = [o.x, o.y, o.width, o.height, o.rotation];
         let w = list(t[6]);
         assert!(all_same(&got[..4], &w[..4]), "I {i}: {got:?} != {w:?}");
-        // rotation is atan2: V8 (fdlibm) and the platform libm may differ by 1 ulp (1 row of 23 does)
+        // rotation is atan2: V8 (fdlibm) and glibc differ by 1 ulp on row 20 only; every other row is exact
+        let ulp = got[4].to_bits().abs_diff(w[4].to_bits());
         assert!(
-            same(got[4], w[4]) || got[4].to_bits().abs_diff(w[4].to_bits()) <= 1,
+            same(got[4], w[4]) || (i == 20 && ulp <= 1),
             "I {i} rot {:?} != {:?}",
             got[4],
             w[4]
@@ -405,4 +406,36 @@ fn projector_extra_and_segment_controls() {
         &lr,
     );
     assert!((rr.rotation - 50.0).abs() < 1e-12);
+}
+
+#[test]
+fn nan_extra_fields_and_rect_rotation_read_as_zero() {
+    // JS `v || 0`: NaN is falsy, so each NaN field contributes nothing
+    let id = make_projector(&base(), &B, 1920.0, 1080.0, None);
+    let n = Some(f64::NAN);
+    let all_nan = ExtraDelta {
+        dx: n,
+        dy: n,
+        drot: n,
+        dsx_pct: n,
+        dsy_pct: n,
+        dz: n,
+        drx: n,
+        dry: n,
+    };
+    assert_eq!(
+        make_projector(&base(), &B, 1920.0, 1080.0, Some(&all_nan)),
+        id
+    );
+    let rect = |rotation| Rect {
+        x: 100.0,
+        y: 50.0,
+        width: 400.0,
+        height: 200.0,
+        rotation,
+    };
+    assert_eq!(
+        project_image_rect(&rect(n), &id),
+        project_image_rect(&rect(None), &id)
+    );
 }
