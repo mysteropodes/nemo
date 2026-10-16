@@ -63,6 +63,8 @@ test_modules! {
     "test-evaluation" => motion_parent_chain_controls_tests = "../tests/motion_parent_chain_controls.rs";
     "test-evaluation" => property_expression_runtime_tests = "../tests/property_expression_runtime.rs";
     "test-evaluation" => property_expression_runtime_controls_tests = "../tests/property_expression_runtime_controls.rs";
+    "test-evaluation" => property_transform_eval_tests = "../tests/property_transform_eval.rs";
+    "test-evaluation" => property_transform_eval_controls_tests = "../tests/property_transform_eval_controls.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
     "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
