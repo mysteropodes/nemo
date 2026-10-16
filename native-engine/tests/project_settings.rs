@@ -143,7 +143,9 @@ fn immutable_updates_preserve_all_other_supplied_fields_and_refuse_atomically() 
 
 #[cfg(feature = "project_media_codec")]
 mod storage_oracles {
-    use crate::project_media_codec::{decode_project, encode_project, ProjectWireLimits};
+    use crate::object_codec::project_settings_test_codec::{
+        decode_project, encode_project, ProjectWireLimits,
+    };
     use serde_json::{json, Value};
     const DRAWING: &str = r#"{"format":"nemo.native-object-document","formatVersion":1,"totalFrames":21,"layers":[{"layerUid":"0"}],"objects":[]}"#;
     fn wire(project: &str) -> Vec<u8> {
