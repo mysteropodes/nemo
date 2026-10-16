@@ -12,12 +12,12 @@ pub(crate) mod duplicator_placement_modes;
 #[allow(dead_code)]
 pub(crate) mod duplicator_placement_rng;
 
+#[path = "duplicator_placement_clone.rs"]
+#[allow(dead_code)]
+pub(crate) mod duplicator_placement_clone;
 #[path = "object_effector_falloff.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_effector_falloff;
 #[path = "object_effector_layer.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_effector_layer;
-#[path = "duplicator_placement_clone.rs"]
-#[allow(dead_code)]
-pub(crate) mod duplicator_placement_clone;

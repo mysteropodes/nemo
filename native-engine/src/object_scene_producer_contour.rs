@@ -128,7 +128,10 @@ fn compile(source: ObjectFrameRecord<'_>) -> Result<CompiledContour, &'static st
         .collect::<Result<Vec<_>, &'static str>>()?;
     let contour = ClosedCubicPath::new(segments)?;
     let envelope = contour.transformed_envelope([1., 0., 0., 1., 0., 0.])?;
-    let solid = SceneSolid::from_fill(&record.fill).map_err(|error| error.message())?;
+    let fill = record
+        .solid_fill()
+        .ok_or("packet record carries no solid fill")?;
+    let solid = SceneSolid::from_fill(fill).map_err(|error| error.message())?;
     Ok(CompiledContour {
         contour,
         envelope,

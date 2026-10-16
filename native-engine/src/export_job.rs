@@ -6,14 +6,16 @@
 use crate::export_job_lifecycle::{
     cleanup_allows_release, release_snapshot, retry_failed_cleanup, terminalize, validate_begin,
 };
-#[path = "object_export_job.rs"]
-mod object;
-#[path = "native_vector_export_core.rs"]
-#[allow(dead_code)]
-pub(crate) mod native_vector_export;
 #[path = "native_media_export_core.rs"]
 #[allow(dead_code)]
 pub(crate) mod native_media_export;
+#[path = "native_vector_export_core.rs"]
+#[allow(dead_code)]
+pub(crate) mod native_vector_export;
+#[path = "object_export_job.rs"]
+mod object;
+#[path = "object_export_host.rs"]
+mod object_host;
 pub use crate::export_job_lifecycle::{
     CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
     ExternalEffectDisposition, JobError, JobReceipt, JobStatus, ReconciliationStage,

@@ -111,14 +111,10 @@ fn the_producer_output_carries_the_packet_pin_and_one_item_per_selected_record()
         let ProducerEntry::Item { payload, .. } = entry else {
             unreachable!("checked above")
         };
+        let fill = record.record().solid_fill().unwrap();
         assert_eq!(
             json!(payload.solid.channels()),
-            json!([
-                record.record().fill.r,
-                record.record().fill.g,
-                record.record().fill.b,
-                record.record().fill.a
-            ])
+            json!([fill.r, fill.g, fill.b, fill.a])
         );
         assert_eq!(payload.envelope, [0.0, 0.0, 10.0, 10.0]);
     }
@@ -144,7 +140,7 @@ fn typed_paint_equals_the_source_fill_and_the_straight_f32_color_for_every_comma
         // paint() still borrows the immutable source; the typed copy equals it by value.
         assert!(std::ptr::eq(
             command.paint()[3],
-            &command.source().record().fill.a
+            &command.source().record().solid_fill().unwrap().a
         ));
         assert_eq!(
             command.solid().rgba_f32(),

@@ -34,9 +34,9 @@ pub(crate) use project::{
 
 #[path = "object_layer_timing.rs"]
 mod timing;
-pub(crate) use timing::{LayerTiming, LayerTimingError};
 #[allow(unused_imports)]
 pub(crate) use timing::TimingEdit;
+pub(crate) use timing::{LayerTiming, LayerTimingError};
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;

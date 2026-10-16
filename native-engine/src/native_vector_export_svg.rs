@@ -237,7 +237,7 @@ fn emit_command(
             closed: record.geometry.closed,
             coordinate_space: &record.geometry.coordinate_space,
             handle_space: &record.geometry.handle_space,
-            fill_kind: &record.fill.kind,
+            fill_kind: record.solid_fill().map_or("", |fill| fill.kind.as_str()),
         },
     )?;
     let rgba = straight_rgba(source_object_index, command)?;

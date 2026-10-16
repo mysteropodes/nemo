@@ -1,7 +1,9 @@
 //! Faux-italic shear and the scene-join flag report of the glyph contour kernel
 //! (G38b / L06-B). See `text_glyph_contours.rs` for the baseline contract.
 
-use crate::evaluation::object_text_layout_kernels::text_glyph_contours::{GlyphContourError, GlyphSegment};
+use crate::evaluation::object_text_layout_kernels::text_glyph_contours::{
+    GlyphContourError, GlyphSegment,
+};
 
 /// Faux italic: `Matrix(1, 0, -skew, 1, skew * baselineY, 0)`.
 #[derive(Clone, Copy, Debug, PartialEq)]

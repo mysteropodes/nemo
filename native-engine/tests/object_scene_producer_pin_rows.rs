@@ -197,7 +197,14 @@ pub(crate) fn outputs(packet: &ObjectFramePacket) -> Vec<ProducerOutput<Label>> 
             let target = entry.record().target();
             let j = target.layer_uid()[1..].parse::<usize>().unwrap();
             let k = usize::from(target.stroke_id().as_bytes()[0] - b'a');
-            let bits = entry.record().fill.r.as_f64().unwrap().to_bits();
+            let bits = entry
+                .record()
+                .solid_fill()
+                .unwrap()
+                .r
+                .as_f64()
+                .unwrap()
+                .to_bits();
             (
                 j,
                 k,

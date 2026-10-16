@@ -178,7 +178,7 @@ pub(super) fn verify(
                 ));
             }
         }
-        let fill = &record.fill;
+        let fill = record.solid_fill().unwrap();
         for (slot, want) in [raw(&fill.r), raw(&fill.g), raw(&fill.b)]
             .into_iter()
             .enumerate()

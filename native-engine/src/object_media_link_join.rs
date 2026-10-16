@@ -12,7 +12,9 @@
 //! links images and videos only (audio is always embedded and fonts are another
 //! owner's), so other kinds are refused instead of given invented semantics.
 
-use crate::object_document::media_timing::object_media_link_state::{FailureReason, LinkDisposition, LinkedRef, ResolveTable};
+use crate::object_document::media_timing::object_media_link_state::{
+    FailureReason, LinkDisposition, LinkedRef, ResolveTable,
+};
 use crate::object_document::{AssetId, AssetKind, AssetPlacement, AssetRecord};
 
 /// Which persisted spelling the opaque locator stands for.

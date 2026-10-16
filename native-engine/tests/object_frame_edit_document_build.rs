@@ -165,7 +165,7 @@ pub(crate) fn document(layers: &[Vec<Cell>], build: Build) -> ObjectDocument {
 pub(crate) fn stroke_of(record: &ObjectRecord) -> Stroke {
     Stroke {
         id: record.target.stroke_id.clone(),
-        z: (record.fill.r.as_f64().unwrap() * 10.0).round() as i64,
+        z: (record.solid_fill().unwrap().r.as_f64().unwrap() * 10.0).round() as i64,
         g: record.geometry.segments[0].point.x.as_i64().unwrap(),
     }
 }
