@@ -14,19 +14,18 @@
   }
   function refreshVisibility(root,info){
     if(!projectionMatches(root,info))return false;
-    var values=info.layers.map(function(layer){
-      if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')
-        throw new Error('Native layer visibility is invalid');
-      return layer.visible!==false;
-    });
-    root.state.layers.forEach(function(row,i){row.visible=values[i];});
+    var values=layerTable(info.layers);
+    root.state.layers.forEach(function(row,i){row.visible=values[i].visible;projectFields(row,values[i]);});
     return true;
   }
   function projectionReadyForUI(root,info){
-    var pin=projections.get(root);
+    var pin=projections.get(root),next;
+    try{next=layerTable(info&&info.layers);}catch(_){return false;}
     return projectionMatches(root,info)&&['contentRevision','documentSnapshotId','canvasW','canvasH','fps','totalFrames'].every(function(k){return pin[k]===info[k];})&&
-      info.layers.every(function(layer,i){var row=root.state.layers[i];return row.visible===(layer.visible!==false)&&
-        (layer.name===undefined||row.name===layer.name);});
+      next.every(function(layer,i){var row=root.state.layers[i];return row.visible===layer.visible&&
+        (layer.name===undefined||row.name===layer.name)&&['locked','color','parentLayerUid'].every(function(k){
+          return !Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
+        });});
   }
   function layerTable(layers){
     if(!Array.isArray(layers))throw new Error('Native layer table is invalid');
@@ -35,14 +34,23 @@
       var layer=layers[i];
       if(!layer||typeof layer.layerUid!=='string'||!layer.layerUid||seen.has(layer.layerUid))
         throw new Error('Native layer identity is invalid');
-      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible'].includes(k);}))
+      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','color','parentLayerUid'].includes(k);}))
         throw new Error('Native layer metadata is unsupported');
       if(Object.prototype.hasOwnProperty.call(layer,'name')&&typeof layer.name!=='string')throw new Error('Native layer name is invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')throw new Error('Native layer visibility is invalid');
-      seen.add(layer.layerUid);next.push({layerUid:layer.layerUid,
-        name:Object.prototype.hasOwnProperty.call(layer,'name')?layer.name:undefined,visible:layer.visible!==false});
+      if(Object.prototype.hasOwnProperty.call(layer,'locked')&&layer.locked!==false)throw new Error('Native layer lock is unsupported');
+      if(Object.prototype.hasOwnProperty.call(layer,'color')&&(typeof layer.color!=='string'||!/^#[a-fA-F0-9]{6}$/.test(layer.color)))throw new Error('Native layer color is invalid');
+      if(Object.prototype.hasOwnProperty.call(layer,'parentLayerUid')&&layer.parentLayerUid!==null)throw new Error('Native layer parent is unsupported');
+      var row={layerUid:layer.layerUid,name:Object.prototype.hasOwnProperty.call(layer,'name')?layer.name:undefined,visible:layer.visible!==false};
+      ['locked','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];});
+      seen.add(layer.layerUid);next.push(row);
     }
     return next;
+  }
+  function projectFields(row,layer){
+    ['locked','color','parentLayerUid'].forEach(function(k){
+      if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];
+    });
   }
   function refreshLayerTable(root,info){
     var pin=projections.get(root),s=root.state,rows=s&&s.layers;
@@ -66,7 +74,7 @@
     if(delta>0){var added=next[next.length-1];rows.push({layerUid:added.layerUid,
       name:added.name===undefined?'Layer '+next.length:added.name,visible:added.visible});}
     else if(delta<0)rows.pop();
-    next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;});
+    next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
     if(delta<0){s.activeLayerIdx=active;root._layerSel=selection;}
     projections.set(root,Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
       contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId}));
@@ -140,13 +148,13 @@
   function projectView(root,info){
     // These rows are read-side UI projections. The native edit guard denies
     // all legacy writes, and no Paper object or serializable document is built.
-    layerTable(info.layers);
+    var layers=layerTable(info.layers);
     var s=root.state;
     s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;s.totalFrames=info.totalFrames;
     s.canvasBg='#ffffff';s.waIn=0;s.waOut=info.totalFrames-1;s.currentFrame=0;s.activeLayerIdx=0;
-    s.layers=info.layers.map(function(l,i){return {layerUid:l.layerUid,
-      name:Object.prototype.hasOwnProperty.call(l,'name')?l.name:'Layer '+(i+1),visible:l.visible!==false,locked:false,
-      frames:[],color:'#5FA875',motion:{},parentLayerUid:null};});
+    s.layers=layers.map(function(l,i){var row={layerUid:l.layerUid,
+      name:l.name===undefined?'Layer '+(i+1):l.name,visible:l.visible,locked:false,color:'#5FA875',parentLayerUid:null,frames:[],motion:{}};
+      projectFields(row,l);return row;});
     s.symbols={};s.cameraKeys=[];s.activeSymbolId=null;s.refMedia=null;
     root._curFrame=0;root._totalF=info.totalFrames;root._waIn=0;root._waOut=info.totalFrames-1;
     root._layerSel=info.layers.length?[0]:[];root.selectedPaths=[];

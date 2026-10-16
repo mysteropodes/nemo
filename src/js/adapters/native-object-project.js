@@ -18,13 +18,17 @@
       !integer(v.canvasW,1)||!integer(v.canvasH,1)||!integer(v.totalFrames,1)||!(v.fps>0)||
       !Array.isArray(v.layers)||!v.layers.every(function(l){return l&&typeof l.layerUid==='string'&&
         (!Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string')&&
-        (!Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean');}))throw new Error('Native project metadata is uncorrelated');
+        (!Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean')&&
+        (!Object.prototype.hasOwnProperty.call(l,'locked')||l.locked===false)&&
+        (!Object.prototype.hasOwnProperty.call(l,'color')||typeof l.color==='string'&&/^#[a-fA-F0-9]{6}$/.test(l.color))&&
+        (!Object.prototype.hasOwnProperty.call(l,'parentLayerUid')||l.parentLayerUid===null);}))throw new Error('Native project metadata is uncorrelated');
     // Copy only admitted UI fields; embedded files/objects never become JS state.
     var result={};['apiVersion','instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration',
       'documentDigest','byteCount','canvasW','canvasH','fps','totalFrames','undoDepth','redoDepth'].forEach(function(k){result[k]=v[k];});
     result.layers=v.layers.map(function(l){var row={layerUid:l.layerUid};
       if(Object.prototype.hasOwnProperty.call(l,'name'))row.name=l.name;
-      if(Object.prototype.hasOwnProperty.call(l,'visible'))row.visible=l.visible;return row;});
+      if(Object.prototype.hasOwnProperty.call(l,'visible'))row.visible=l.visible;
+      ['locked','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(l,k))row[k]=l[k];});return row;});
     var r=v.reference;
     if(r!==null&&(!r||!id(r.id)||typeof r.name!=='string'||typeof r.visible!=='boolean'||!Number.isFinite(r.opacity)||
       r.opacity<0||r.opacity>1||!Number.isSafeInteger(r.offsetFrames)))throw new Error('Native reference metadata is invalid');

@@ -130,8 +130,8 @@ test('native inspector reuses actual bound Reference nodes, preserves collapsed 
   assert.equal(input.listener('change'),inputBinding);assert.equal(on.listener('change'),settingBinding);
   trigger.click();assert.equal(pop.parentNode,doc.body,'restored trigger keeps its original live binding');
 });
-function desktop(){
-  let active=false,revision=0,layers=clone([A,B]),doc='document',generation=1,gate=null,pending=null,fault=null,dispatchGate=null;
+function desktop(initial=[A,B]){
+  let active=false,revision=0,layers=clone(initial),doc='document',generation=1,gate=null,pending=null,fault=null,dispatchGate=null;
   let undo=[],redo=[];const log=[],calls=[],listeners=new Map(),root=shippedEntrypoints(view());
   root.NemoNativeObjectProject=Project;root.NemoApplicationMcpTransport=Transport;root.NemoNativeApplicationAdapter=SDK;
   root.showToast=message=>log.push('toast:'+message);
@@ -140,7 +140,7 @@ function desktop(){
   async function invoke(command,args){const r=args&&(args.request||JSON.parse(args.requestJson));calls.push({command,request:r});
     if(command==='nemo_native_status'||command==='nemo_native_object_client_status')return {...meta(),available:active};
     if(command==='nemo_native_object_bootstrap'){
-      if(active){generation++;doc='replacement-'+generation;}active=true;revision=0;layers=clone([A,B]);undo=[];redo=[];
+      if(active){generation++;doc='replacement-'+generation;}active=true;revision=0;layers=clone(initial);undo=[];redo=[];
       return {...meta(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
     }
     if(command==='nemo_native_object_reference')return {...meta(),requestId:r.requestId};
@@ -381,4 +381,69 @@ test('ordinary native render refreshes stale boot metadata and actual work-area 
   assert.equal(root.document.nodes.get('tl-cf').max,2);
   assert.equal(root.document.nodes.get('frame-hdr').children[0].textContent,'Frame 1 / 2');
   assert.equal(root.state.fps,24);assert.equal(root.state.totalFrames,2);
+});
+
+test('native optional Drawing fields retain exact values and absent old metadata stays absent',async()=>{
+  for(const color of ['#B49BE6','#aBc123','#000000']){
+    const seed={...A,locked:false,color,parentLayerUid:null},h=desktop([seed,B]);await h.open();
+    const meta=h.session.info(),row=h.root.state.layers[0];
+    for(const k of ['locked','color','parentLayerUid'])assert.equal(meta.layers[0][k],seed[k]);
+    assert.equal(Object.isFrozen(meta.layers[0]),true);assert.equal(row.color,color);assert.equal(row.locked,false);assert.equal(row.parentLayerUid,null);
+    for(const k of ['locked','color','parentLayerUid'])assert.equal(Object.hasOwn(meta.layers[1],k),false);
+    assert.equal(h.root.state.layers[1].color,'#5FA875');assert.equal(Files.projectionReadyForUI(h.root,meta),true);
+    seed.color='#ffffff';assert.equal(meta.layers[0].color,color,'session metadata is detached');
+    h.root.SM.setActiveLayer(1);const selection=h.root._layerSel,frame=h.root.state.currentFrame;
+    const next={...A,locked:false,color:'#EE7C58',parentLayerUid:null};await h.external([next,B]);
+    assert.equal(h.root.state.layers[0],row);assert.equal(row.color,'#EE7C58');assert.equal(h.session.info().layers[0].color,'#EE7C58');
+    assert.equal(h.root.state.activeLayerIdx,1);assert.equal(h.root._layerSel,selection);assert.equal(h.root.state.currentFrame,frame);
+    assert.equal(Files.projectionReadyForUI(h.root,h.session.info()),true);assert.ok(h.log.includes('ACK'));
+    await h.session.historyFromUi('undo');assert.equal(row.color,color);await h.session.historyFromUi('redo');assert.equal(row.color,'#EE7C58');
+  }
+});
+test('Drawing field projection refresh preserves rows and rejects invalid tables before any publication',()=>{
+  const invalid=[{locked:true},{locked:null},{locked:0},{color:null},{color:123},{color:'#fff'},{color:'#GG0000'},
+    {color:'123456'},{parentLayerUid:'B'},{parentLayerUid:false}];
+  for(const fields of invalid){
+    const root=view(),before=JSON.stringify(root.state),rows=root.state.layers,selection=root._layerSel;
+    const info=metadata([{...A,color:'#123456'},{...B,...fields}],1);
+    assert.throws(()=>Files.refreshLayerTable(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
+    assert.equal(root.state.layers,rows);assert.equal(root._layerSel,selection);assert.equal(Files.projectionReadyForUI(root,info),false);
+    assert.throws(()=>Files.refreshVisibility(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
+    assert.throws(()=>Files.projectView(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
+  }
+  const root=view(),row=root.state.layers[0],next=metadata([{...A,locked:false,color:'#b49Be6',parentLayerUid:null},B],1);
+  assert.equal(Files.refreshLayerTable(root,next),true);assert.equal(row.color,'#b49Be6');assert.equal(Files.projectionReadyForUI(root,next),true);
+  row.color='#000000';assert.equal(Files.projectionReadyForUI(root,next),false);assert.equal(Files.refreshVisibility(root,next),true);
+  assert.equal(row.color,'#b49Be6');assert.equal(Files.projectionReadyForUI(root,next),true);
+  const old=metadata([A,B],2);assert.equal(Files.refreshLayerTable(root,old),true);assert.equal(row.color,'#b49Be6');
+  assert.equal(Files.refreshVisibility(root,old),true);assert.equal(row.color,'#b49Be6');assert.equal(Files.projectionReadyForUI(root,old),true);
+  const absent=metadata([A,B,C],3);assert.equal(Files.refreshLayerTable(root,absent),true);
+  for(const key of ['locked','color','parentLayerUid'])assert.equal(Object.hasOwn(root.state.layers[2],key),false);
+  assert.equal(Files.projectionReadyForUI(root,absent),true);
+  const added={...C,locked:false,color:'#7EA0FA',parentLayerUid:null};assert.equal(Files.refreshLayerTable(root,metadata([A,B,added],4)),true);
+  assert.equal(root.state.layers[2].color,'#7EA0FA');assert.equal(root.state.layers[2].locked,false);assert.equal(root.state.layers[2].parentLayerUid,null);
+});
+test('unsupported Drawing fields are rejected by the session before detached metadata or UI publication',async()=>{
+  for(const fields of [{locked:true},{locked:null},{locked:'false'},{color:null},{color:'#123'},{color:'#12345G'},{parentLayerUid:'B'}]){
+    const h=desktop([{...A,...fields},B]),before=JSON.stringify(h.root.state),rows=h.root.state.layers;
+    assert.equal(await h.file.openPath('/native.json'),false);assert.equal(h.session.info(),null);
+    assert.equal(JSON.stringify(h.root.state),before);assert.equal(h.root.state.layers,rows);assert.equal(h.log.includes('ACK'),false);
+  }
+});
+
+test('Drawing field refresh preserves final-presentation selection fence while ACK is pending',async()=>{
+  const h=desktop();await h.open();const root=h.root,row=root.state.layers[0],selection=root._layerSel;
+  let release;h.hold(new Promise(r=>{release=r;}));
+  const next=[{...A,locked:false,color:'#Ee7c58',parentLayerUid:null},B],change=h.external(next);
+  await new Promise(setImmediate);assert.equal(row.color,'#Ee7c58');assert.equal(h.log.includes('ACK'),false);
+  pick(root,1).click();assert.equal(root.state.activeLayerIdx,0);assert.equal(root._layerSel,selection);
+  assert.equal(h.session.readPresentedObjectSession(),null);release();await change;
+  assert.ok(h.log.indexOf('preview')<h.log.indexOf('ACK'));assert.equal(Files.projectionReadyForUI(root,h.session.info()),true);
+  pick(root,1).click();assert.equal(root.state.activeLayerIdx,1);assert.deepEqual(root._layerSel,[1]);
+  const badPins=[{...h.meta(),contentRevision:0},{...h.meta(),documentSnapshotId:'wrong'},
+    {...h.meta(),documentId:'foreign'},{...h.meta(),lifecycleGeneration:99}];
+  for(const pin of badPins){
+    const selected=root._layerSel,frame=root.state.currentFrame;assert.equal(Files.refreshLayerTable(root,pin),false);
+    assert.equal(root.state.layers[0],row);assert.equal(row.color,'#Ee7c58');assert.equal(root._layerSel,selected);assert.equal(root.state.currentFrame,frame);
+  }
 });
