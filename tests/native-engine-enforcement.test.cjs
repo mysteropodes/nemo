@@ -339,7 +339,9 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
       'expression_math_tests = "../tests/expression_math.rs"',
       'expression_time_tests = "../tests/expression_time.rs"',
       'motion_parent_chain_tests = "../tests/motion_parent_chain.rs"',
-      'motion_parent_chain_controls_tests = "../tests/motion_parent_chain_controls.rs"');
+      'motion_parent_chain_controls_tests = "../tests/motion_parent_chain_controls.rs"',
+      'property_expression_runtime_tests = "../tests/property_expression_runtime.rs"',
+      'property_expression_runtime_controls_tests = "../tests/property_expression_runtime_controls.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"',
       'object_render_scene_compositor_tests = "../tests/object_render_scene.rs"');
     if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
