@@ -127,7 +127,7 @@ async fn timing_public_wire_matches_the_fixed_oracle_without_history_or_publicat
 }
 
 #[tokio::test]
-async fn timing_new_internal_create_and_reopened_project_reach_the_same_public_reader() {
+async fn timing_new_public_create_and_reopened_project_reach_the_same_public_reader() {
     let state = ApplicationMcp::default();
     let receipt = serde_json::to_value(
         bootstrap_raw(
@@ -143,27 +143,12 @@ async fn timing_new_internal_create_and_reopened_project_reach_the_same_public_r
     let read = round_trip(&state, timing_query(&state, id, "layer-1", 119)).await;
     assert!(read.ok);
     assert_eq!(read.result.unwrap()["sourceFrame"], 0);
-    let create = json!({"apiVersion":2,"requestId":"internal-create-fixture","instanceId":state.instance_id(),
+    let create = json!({"apiVersion":2,"requestId":"public-create-fixture","instanceId":state.instance_id(),
         "documentId":id,"expectedRevision":0,"operation":"command.document.object.layer.create",
         "payload":{"command":"object.layer.create","name":"Timing fixture"}});
-    assert!(
-        state
-            .dispatch_native(serde_json::from_value(create.clone()).unwrap())
-            .is_err(),
-        "public Add stays unavailable"
-    );
-    // Fixture preparation uses the existing internal owner seam, never a public creation bypass.
-    let created = {
-        let mut authority = state.native.lock().unwrap();
-        let generation = authority.active_generation().unwrap();
-        authority
-            .active_mut(generation)
-            .unwrap()
-            .dispatch(serde_json::from_value(create).unwrap())
-            .unwrap()
-    };
-    assert!(created.is_ok());
-    let uid = created.result().unwrap()["layerUid"]
+    let created = round_trip(&state, create).await;
+    assert!(created.ok);
+    let uid = created.result.unwrap()["layerUid"]
         .as_str()
         .unwrap()
         .to_owned();
