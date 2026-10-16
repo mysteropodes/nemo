@@ -224,7 +224,8 @@ fn oracle_reaches_each_motion_distinction() {
     // frames 0 keeps 0 while duration divides by 1.
     assert!(has(",0|a:A:!"));
     // Unresolved holders, element targets and an absent name.
-    assert!(has("missing,st_1") && has(",T,") && has("x:!:^"));
+    assert!(has("missing,st_1") && has("x:!:^"));
+    assert!(has("a,st_1 position") && has("sposition,sBall,0000000000000000,T,F,-"));
     // A comp with no layers.
     assert!(has("|. "));
 }

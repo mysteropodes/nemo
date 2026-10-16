@@ -214,6 +214,9 @@ fn bind_parts(
     if target.context_id() != SUPPORTED_CONTEXT_ID {
         return Err(ViewUnavailable::ComponentContext);
     }
+    // Temporary: until the component-layer provider says which layers a
+    // component context owns, any declared component context makes the scene
+    // root's layer list unknowable, so nothing is answered.
     if let Some(plan) = document.composition_order.value() {
         if plan
             .contexts
