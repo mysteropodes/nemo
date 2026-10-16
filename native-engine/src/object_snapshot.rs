@@ -7,13 +7,13 @@ use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
 pub use crate::revision::ObjectSnapshot;
-#[path = "object_property_read.rs"]
-mod property_read;
 #[path = "object_property_metadata_read.rs"]
 mod property_metadata_read;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_read.rs"]
 mod property_metadata_tests;
+#[path = "object_property_read.rs"]
+mod property_read;
 #[path = "object_timing_snapshot.rs"]
 mod timing;
 use serde::{Deserialize, Serialize};
