@@ -39,6 +39,9 @@ pub(crate) mod property_transform_eval;
 #[path = "property_follow_path_sample.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_follow_path_sample;
+#[path = "property_expression_views.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_expression_views;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 
