@@ -35,6 +35,9 @@ mod property_edit_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_property_sampling.rs"]
 mod property_sampling_tests;
+#[cfg(test)]
+#[path = "../tests/object_property_track_edit.rs"]
+mod property_track_edit_tests;
 
 #[cfg(feature = "project_media_codec")]
 #[path = "object_project_history.rs"]
@@ -57,6 +60,12 @@ impl NativeObjectHistory {
         bytes: &[u8],
     ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         self.owner.prepare_property_edit_json(bytes)
+    }
+    pub(crate) fn prepare_property_track_edit_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
+        self.owner.prepare_property_track_edit_json(bytes)
     }
     pub(crate) fn commit_property_edit(
         &mut self,

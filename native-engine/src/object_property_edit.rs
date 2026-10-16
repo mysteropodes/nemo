@@ -9,6 +9,11 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_property_curve_edits.rs"]
+mod curves;
+#[path = "object_property_track_edit.rs"]
+mod track_edit;
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum PropertyAction {
