@@ -95,6 +95,12 @@ pub fn prepare_object_fill_json(
         .iter()
         .position(|record| record.target == payload.stable_target)
         .ok_or(DispatchErrorCode::NotFound)?;
+    if !snapshot
+        .document()
+        .layer_allows_fill_edit(payload.stable_target.layer_uid())
+    {
+        return Err(DispatchErrorCode::Unavailable);
+    }
     let changed = !same_fill(&snapshot.document().objects[index].fill, &payload.fill);
     let mut document = snapshot.document().clone();
     if changed {
