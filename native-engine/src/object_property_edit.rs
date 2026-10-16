@@ -9,6 +9,11 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_property_curve_edits.rs"]
+mod curves;
+#[path = "object_property_track_edit.rs"]
+mod track_edit;
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum PropertyAction {
@@ -41,8 +46,29 @@ object_deserialize!(PropertyPayload {
     command: String,
     target: PropertyHolderTarget,
     property: String,
+    #[serde(deserialize_with = "deserialize_action")]
     action: PropertyAction
 });
+
+// Internally tagged enum derives also admit positional sequences. Require a
+// map before the derive sees original fields, preserving duplicate rejection.
+fn deserialize_action<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct MapOnly<T>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for MapOnly<T> {
+        type Value = T;
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a property action object")
+        }
+        fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<T, A::Error> {
+            T::deserialize(serde::de::value::MapAccessDeserializer::new(map))
+        }
+    }
+    deserializer.deserialize_map(MapOnly(std::marker::PhantomData))
+}
 
 /// The origin and proposed document cannot be forged by callers.
 #[derive(Debug, Clone)]
