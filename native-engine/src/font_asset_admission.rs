@@ -103,12 +103,30 @@ pub(crate) fn validate_font(
         || glyph_count == 0
         || metrics == 0
         || metrics > glyph_count
+        || hmtx.h_metrics().len() != usize::from(metrics)
         || hmtx.left_side_bearings().len() < usize::from(glyph_count - metrics)
     {
         return Err(FontAssetError::Invalid);
     }
-    font.loca(None).map_err(|_| FontAssetError::Invalid)?;
+    let location_format = head.index_to_loc_format();
+    if !matches!(location_format, 0 | 1) {
+        return Err(FontAssetError::Invalid);
+    }
+    let locations = font
+        .loca(Some(location_format == 1))
+        .map_err(|_| FontAssetError::Invalid)?;
     font.glyf().map_err(|_| FontAssetError::Invalid)?;
+    let glyph_data = font
+        .table_data(read_fonts::types::Tag::new(b"glyf"))
+        .ok_or(FontAssetError::Invalid)?;
+    if locations.len() < usize::from(glyph_count)
+        || !locations.all_offsets_are_ascending()
+        || locations
+            .get_raw(usize::from(glyph_count))
+            .is_none_or(|last| last as usize > glyph_data.len())
+    {
+        return Err(FontAssetError::Invalid);
+    }
     Ok(FontAssetMetadata {
         units_per_em,
         glyph_count,

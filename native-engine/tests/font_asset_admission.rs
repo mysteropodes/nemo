@@ -221,3 +221,101 @@ fn proof_clones_keep_exact_bytes_until_the_last_native_pin() {
     drop(retained);
     assert!(weak.upgrade().is_none());
 }
+
+#[test]
+fn empty_horizontal_metrics_table_cannot_hide_a_declared_full_metric_count() {
+    let hhea = table_offset(ROBOTO, b"hhea");
+    let maxp = table_offset(ROBOTO, b"maxp");
+    assert_eq!(
+        u16::from_be_bytes(ROBOTO[hhea + 34..hhea + 36].try_into().unwrap()),
+        363
+    );
+    assert_eq!(
+        u16::from_be_bytes(ROBOTO[maxp + 4..maxp + 6].try_into().unwrap()),
+        363
+    );
+    let mut bytes = ROBOTO.to_vec();
+    let record = table_record(&bytes, b"hmtx");
+    bytes[record + 12..record + 16].copy_from_slice(&0u32.to_be_bytes());
+    assert!(matches!(
+        validate_font(&bytes, limits()),
+        Err(FontAssetError::Invalid)
+    ));
+    assert!(matches!(
+        admit_reserved_font(Arc::new(bytes), limits()),
+        Err(FontAssetError::Invalid)
+    ));
+}
+
+#[test]
+fn short_and_long_location_tables_require_enough_ordered_in_range_offsets() {
+    let fixtures: [(&[u8], i16); 2] = [
+        (ROBOTO, 0),
+        (include_bytes!("../../src/fonts/DejaVuSans.ttf"), 1),
+    ];
+    for (original, format) in fixtures {
+        let head = table_offset(original, b"head");
+        assert_eq!(
+            i16::from_be_bytes(original[head + 50..head + 52].try_into().unwrap()),
+            format
+        );
+        let width = if format == 0 { 2 } else { 4 };
+        let loca_record = table_record(original, b"loca");
+        let loca = table_offset(original, b"loca");
+        let maxp = table_offset(original, b"maxp");
+        let count = usize::from(u16::from_be_bytes(
+            original[maxp + 4..maxp + 6].try_into().unwrap(),
+        ));
+        let glyf_record = table_record(original, b"glyf");
+        let glyph_bytes = u32::from_be_bytes(
+            original[glyf_record + 12..glyf_record + 16]
+                .try_into()
+                .unwrap(),
+        );
+        let mut short = original.to_vec();
+        short[loca_record + 12..loca_record + 16]
+            .copy_from_slice(&((count * width) as u32).to_be_bytes());
+        assert!(matches!(
+            validate_font(&short, limits()),
+            Err(FontAssetError::Invalid)
+        ));
+        let mut descending = original.to_vec();
+        descending[loca..loca + width].fill(0xff);
+        descending[loca + width..loca + width * 2].fill(0);
+        assert!(matches!(
+            validate_font(&descending, limits()),
+            Err(FontAssetError::Invalid)
+        ));
+        let mut outside = original.to_vec();
+        // All entries stay ascending; only the final required offset is beyond
+        // the glyf table. This independently isolates the range guard.
+        let last = loca + count * width;
+        if format == 0 {
+            assert!(glyph_bytes < u32::from(u16::MAX) * 2);
+            outside[last..last + width].copy_from_slice(&u16::MAX.to_be_bytes());
+        } else {
+            outside[last..last + width].copy_from_slice(&u32::MAX.to_be_bytes());
+        }
+        assert!(matches!(
+            validate_font(&outside, limits()),
+            Err(FontAssetError::Invalid)
+        ));
+        assert_eq!(
+            validate_font(original, limits()).unwrap().glyph_count,
+            count as u16
+        );
+    }
+}
+
+#[test]
+fn invalid_location_format_is_not_interpreted_as_short_offsets() {
+    let head = table_offset(ROBOTO, b"head");
+    for format in [-1i16, 2] {
+        let mut bytes = ROBOTO.to_vec();
+        bytes[head + 50..head + 52].copy_from_slice(&format.to_be_bytes());
+        assert!(matches!(
+            validate_font(&bytes, limits()),
+            Err(FontAssetError::Invalid)
+        ));
+    }
+}
