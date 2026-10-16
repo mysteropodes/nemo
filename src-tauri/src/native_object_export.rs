@@ -7,7 +7,7 @@ use native_engine::{
         ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, ObjectHostExportRequest,
         StagedArtifactPort,
     },
-    object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
+    object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector},
     object_render_scene::{
         prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
     },
@@ -100,7 +100,7 @@ impl NativeObjectHost {
                 frame,
                 ..expected.clone()
             };
-            let packet = prepare_object_frame(&snapshot, &selector)
+            let packet = prepare_object_exposure_frame(&snapshot, &selector)
                 .map_err(|error| format!("object export selector: {error:?}"))?;
             let scene = prepare_object_render_scene(&packet, &selector)
                 .map_err(|error| format!("object export scene: {error:?}"))?;

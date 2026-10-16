@@ -44,7 +44,7 @@ fn object_document() -> Value {
         json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})));
     record["fill"] = json!({"kind":"solid","r":0,"g":0,"b":1,"a":1});
     json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,
-        "layers":[{"layerUid":"L0"}],"objects":[record],"compositionOrder":{
+        "layers":[{"layerUid":"L0","timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],"objects":[record],"compositionOrder":{
             "format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
             "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],
             "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[{"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{}}]}]}],
@@ -307,6 +307,7 @@ fn exact_application_owner_repeats_literal_png_through_real_port() {
 fn sequence_document() -> Value {
     let mut document = object_document();
     document["totalFrames"] = json!(2);
+    document["layers"][0]["timing"]["keys"] = json!([{"frame": 0}, {"frame": 1}]);
     let mut next = document["objects"][0].clone();
     next["target"]["frameScope"]["frame"] = json!(1);
     next["fill"] = json!({"kind":"solid","r":0,"g":1,"b":0,"a":1});

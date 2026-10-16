@@ -7,7 +7,7 @@ use native_engine::{
         DesktopViewportHost, ObjectViewportFrame, PresentationReceipt, SurfacePort, ViewportStatus,
     },
     export_job::ReconciliationStage,
-    object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
+    object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector},
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
         prepare_object_viewport_composition, prepare_scheduled_object_composition_from_witness,
@@ -157,7 +157,7 @@ impl NativeObjectHost {
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object preview snapshot is unavailable")?;
         // Validate the complete retained source before disturbing deferred work.
-        let packet = prepare_object_frame(&snapshot, expected)
+        let packet = prepare_object_exposure_frame(&snapshot, expected)
             .map_err(|e| format!("preview selector: {e:?}"))?;
         let scene = prepare_object_render_scene(&packet, expected)
             .map_err(|e| format!("preview scene: {e:?}"))?;

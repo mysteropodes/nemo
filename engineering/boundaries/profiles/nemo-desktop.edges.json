@@ -372,7 +372,7 @@
       "history::PreparedProjectReplacement",
       "object_document::ObjectDocument",
       "object_frame_packet::ObjectFrameSelector",
-      "object_frame_packet::prepare_object_frame",
+      "object_frame_packet::prepare_object_exposure_frame",
       "object_render_scene::prepare_object_paint_plan",
       "object_render_scene::ObjectPaintPlan",
       "object_render_scene::prepare_object_composition",
