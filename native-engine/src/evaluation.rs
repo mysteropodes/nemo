@@ -42,6 +42,9 @@ pub(crate) mod property_follow_path_sample;
 #[path = "property_expression_views.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_expression_views;
+#[path = "property_projection_3d.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_projection_3d;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 

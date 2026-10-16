@@ -562,6 +562,29 @@ test('D12 property curve children remain registered and private', () => {
   }
 });
 
+test('D31 3D projection kernel stays a private evaluation child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativePropertyProjection3dRegistration, /D31\/#2096/);
+  const evaluationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(evaluationText, /#\[path = "property_projection_3d\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod property_projection_3d;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/property_projection_3d.rs'), 'utf8');
+  assert.match(kernelText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/property_projection_3d\.rs"\]\s*mod tests;/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/property_projection_3d.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/property_projection_3d.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
 test('isolated negative controls fail closed and restore every touched byte', (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-n19-enforcement-'));
   const clone = path.join(temp, 'repo');
