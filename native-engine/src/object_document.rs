@@ -46,6 +46,10 @@ pub(crate) mod media_timing;
 #[path = "object_group_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_group_kernels;
+// L06-C (#2137): lane-6 raster asset family aggregator.
+#[path = "object_raster_asset_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_raster_asset_kernels;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]

@@ -12,6 +12,10 @@ use crate::transaction::StageReceipts;
 mod object_command_dispatch;
 #[path = "object_project_settings_history.rs"]
 mod project_settings;
+// L10-B (#2124): lane-10 shot/montage/import family aggregator.
+#[path = "object_shot_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_shot_kernels;
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_project_settings.rs"]
 mod project_settings_tests;
