@@ -3,10 +3,10 @@
   "apiVersion": 2,
   "id": "native.object.layer-create",
   "version": 1,
-  "status": "staged",
+  "status": "active",
   "availability": {
-    "state": "unavailable",
-    "reason": "Native layer creation requires accepted native timeline/selected-row readers and ordinary caller publication policy; metadata projection alone is insufficient."
+    "state": "available",
+    "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
@@ -33,7 +33,7 @@
   ],
   "examples": [
     {
-      "label": "Prepared contract only: execution unavailable until native reader acceptance",
+      "label": "Native Drawing creation through the shared revision and history owner",
       "request": {
         "apiVersion": 2,
         "requestId": "layer-create-7",

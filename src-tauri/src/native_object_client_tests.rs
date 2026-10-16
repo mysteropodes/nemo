@@ -404,7 +404,7 @@ fn common_pending_revision_barrier_blocks_raw_client_reexecution_and_other_write
 }
 
 #[test]
-fn prepared_public_creation_refuses_before_owner_history_or_revision_publication() {
+fn public_creation_uses_one_owner_receipt_history_and_preserves_existing_objects() {
     use nemo_mcp::{contract::NativeApplicationRequest, wire::decode_json_bounded};
     let state = ApplicationMcp::default();
     let receipt = install(&state);
@@ -416,40 +416,91 @@ fn prepared_public_creation_refuses_before_owner_history_or_revision_publication
         json!({"command":"object.layer.create","name":"Drawing"}),
     );
     let raw = create.to_string();
-    for _ in 0..2 {
-        let admitted: NativeApplicationRequest = decode_json_bounded(raw.as_bytes(), 4096).unwrap();
-        assert!(admitted.validate_input().is_ok());
-        assert_eq!(admitted.validate().unwrap_err().code(), "unavailable");
-        assert!(state
-            .dispatch_native(admitted)
-            .unwrap_err()
-            .contains("native timeline"));
-    }
+    let admitted: NativeApplicationRequest = decode_json_bounded(raw.as_bytes(), 4096).unwrap();
+    assert!(admitted.validate_input().is_ok());
+    assert!(admitted.validate().is_ok());
     assert!(
         crate::application_mcp::object_client::dispatch_raw(&state, &raw).is_err(),
         "private route cannot bypass operation admission"
     );
-    let after = dispatch(&state, &read(&receipt, "after-refused-create", 0, 0));
+    let public = |value: &Value| timing_tests::public(&state, value.clone());
+    let created = public(&create);
+    assert_eq!(created["ok"], true);
+    assert_eq!(created["contentRevision"], 1);
+    assert_eq!(created["result"]["applied"], true);
+    assert_eq!(created["result"]["historyEntriesAdded"], 1);
+    let uid = created["result"]["layerUid"].as_str().unwrap();
+    assert!(!uid.is_empty());
+    assert!(!document()["layers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|layer| layer["layerUid"] == uid));
+    assert_eq!(
+        public(&create),
+        created,
+        "exact replay is the same receipt, not another create"
+    );
+    let serialize = |revision| {
+        let query = json!({"apiVersion":2,"requestId":format!("create-read-{revision}"),
+            "instanceId":receipt["instanceId"],"documentId":receipt["documentId"],
+            "operation":"query.document.object.serialize","payload":{"atRevision":revision}});
+        serde_json::from_str::<Value>(
+            dispatch(&state, &query)["result"]["documentJson"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap()
+    };
+    let after_create = serialize(1);
+    assert_eq!(after_create["layers"].as_array().unwrap().len(), 3);
+    assert_eq!(after_create["layers"][2]["layerUid"], uid);
+    assert_eq!(after_create["layers"][2]["locked"], false);
+    assert_eq!(after_create["layers"][2]["color"], "#F0A585");
+    assert!(after_create["layers"][2]["parentLayerUid"].is_null());
+    assert_eq!(after_create["objects"], document()["objects"]);
+    let mut changed = create.clone();
+    changed["payload"]["name"] = json!("Different");
+    assert_eq!(public(&changed)["error"]["code"], "invalid_request");
+    let mut stale = create.clone();
+    stale["requestId"] = json!("stale-create");
+    assert_eq!(public(&stale)["error"]["code"], "stale_revision");
+    let mut cancelled = create.clone();
+    cancelled["requestId"] = json!("cancelled-create");
+    cancelled["expectedRevision"] = json!(1);
+    cancelled["cancelledBeforeDispatch"] = json!(true);
+    assert_eq!(
+        public(&cancelled)["error"]["code"],
+        "cancelled_before_dispatch"
+    );
+    assert_eq!(
+        serialize(1),
+        after_create,
+        "refusals leave the committed document unchanged"
+    );
+    let after = dispatch(&state, &read(&receipt, "after-create", 1, 0));
     assert_eq!(after["ok"], true);
-    assert_eq!(after["contentRevision"], 0);
+    assert_eq!(after["contentRevision"], 1);
     assert_eq!(after["result"]["object"], document()["objects"][0]);
-    let undo = dispatch(
-        &state,
-        &history(&receipt, "after-create-no-undo", 0, "undo"),
-    );
-    assert_eq!(undo["ok"], false);
-    assert_eq!(undo["contentRevision"], 0);
-    // Existing available operations still reach this same owner and its history.
+    let undo = dispatch(&state, &history(&receipt, "undo-create", 1, "undo"));
+    assert_eq!(undo["ok"], true);
+    assert_eq!(undo["contentRevision"], 2);
+    assert_eq!(serialize(2)["layers"], document()["layers"]);
+    let redo = dispatch(&state, &history(&receipt, "redo-create", 2, "redo"));
+    assert_eq!(redo["ok"], true);
+    assert_eq!(redo["contentRevision"], 3);
+    assert_eq!(serialize(3), after_create);
+    // Existing available object operations retain their original identity and content.
     assert_eq!(
-        dispatch(&state, &fill(&receipt, "after-create-fill", 0))["contentRevision"],
-        1
-    );
-    assert_eq!(
-        dispatch(&state, &history(&receipt, "after-fill-undo", 1, "undo"))["contentRevision"],
-        2
+        dispatch(&state, &fill(&receipt, "after-create-fill", 3))["contentRevision"],
+        4
     );
     assert_eq!(
-        dispatch(&state, &read(&receipt, "after-fill-undo-read", 2, 0))["result"]["object"],
+        dispatch(&state, &history(&receipt, "after-fill-undo", 4, "undo"))["contentRevision"],
+        5
+    );
+    assert_eq!(
+        dispatch(&state, &read(&receipt, "after-fill-undo-read", 5, 0))["result"]["object"],
         document()["objects"][0]
     );
 }

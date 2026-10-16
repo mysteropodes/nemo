@@ -1,6 +1,9 @@
 //! Immutable object revision storage. Admission and command policy live above it.
 use crate::object_document::{ObjectDocument, ProjectEnvelope, ProjectReferenceState};
 #[cfg(feature = "history")]
+#[path = "project_asset_admission.rs"]
+mod asset_admission;
+#[cfg(feature = "history")]
 #[path = "encoded_retention_budget.rs"]
 mod encoded_retention_budget;
 #[cfg(feature = "history")]
@@ -11,6 +14,9 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
 };
+#[cfg(feature = "history")]
+#[path = "object_project_settings_revision.rs"]
+mod project_settings;
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 #[path = "object_reference_revision.rs"]
 mod reference_attachment;
@@ -77,16 +83,9 @@ impl ObjectSnapshot {
         if instance_id.is_empty() {
             return Err("instanceId must be nonempty");
         }
-        let admission = match project.reference_state() {
-            ProjectReferenceState::NoMedia => None,
-            ProjectReferenceState::StillImage(data) => Some(
-                budget
-                    .admit(data.encoded_allocation())
-                    .map_err(|_| "encoded retention unavailable")?,
-            ),
-        };
+        let admissions = asset_admission::pending_charges(&project, budget)?;
         let snapshot = identity(instance_id, ProjectRevisionValue::Project(project))?;
-        if let Some(admission) = admission {
+        for admission in admissions {
             admission
                 .commit()
                 .map_err(|_| "encoded retention unavailable")?;

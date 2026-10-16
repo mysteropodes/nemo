@@ -121,8 +121,10 @@ test('production SM.t resolves catalog-only diagnostics controls in every locale
     querySelectorAll() { return []; },
     getElementById() { return null; },
   };
-  vm.runInNewContext(source, { window, state, document, localStorage: { setItem() {} } },
-    { filename: 'src/js/i18n.js' });
+  const context = vm.createContext({ window, state, document, localStorage: { setItem() {} } });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters/i18n-runtime.js'), 'utf8'), context,
+    { filename: 'src/js/adapters/i18n-runtime.js' });
+  vm.runInContext(source, context, { filename: 'src/js/i18n.js' });
   const keys = ['labsDiagnosticsTitle', 'labsDiagnosticsRefresh', 'labsDiagnosticsReport',
     'labsDiagnosticsEmpty', 'labsDescribeDiagnosticsPanel', 'labsPanelLabelDiagnostics',
     'labsDiagnosticsSyntheticSession', 'labsDiagnosticsSyntheticOpacity',

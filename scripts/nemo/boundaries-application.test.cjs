@@ -202,6 +202,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-object-project.js',
     'src/js/adapters/native-object-project-file.js',
     'src/js/adapters/native-object-ui.js',
+    'src/js/adapters/native-drawing-add.js',
+    'src/js/adapters/native-drawing-add-desktop.js',
+    'src/js/adapters/native-project-settings-intent.js',
+    'src/js/adapters/native-project-settings-desktop.js',
     'src/js/adapters/native-object-reference.js',
     'src/js/application/native-opacity-operations.js',
     'src/js/application/opacity-application.js',
@@ -224,8 +228,8 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-      130, 176, 177, 178, 179, 180, 181, 182, 183, 184]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+      135, 181, 182, 183, 184, 185, 186, 187, 188, 189]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -233,10 +237,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 127);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 128);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 129);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 131);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 132);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 133);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 134);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 136);
 });
 
 test('bootstrap numerical observations match actual HTML and retained declarations', () => {
@@ -318,4 +322,36 @@ test('application size enforcement ignores known graph debt but rejects growth a
   const expired = checkApplicationSize(profile, { root, now: new Date('2026-09-06T00:00:00Z') });
   assert.equal(expired.ok, false);
   assert.deepEqual(expired.violations.map((violation) => violation.rule).sort(), ['expired-exception', 'size']);
+});
+
+test('U03 localization runtime is parser-blocking immediately before dictionaries and preserves startup extensions', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+  const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)].map((match, index) => ({
+    attrs: match[1], src: match[1].match(/\bsrc=["']([^"']+)/)?.[1], ordinal: index + 1,
+  }));
+  const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
+  const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
+  assert.equal(runtime.length, 1); assert.equal(data.length, 1);
+  assert.equal(runtime[0].ordinal, 80); assert.equal(data[0].ordinal, 81);
+  assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
+  assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
+  assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
+  for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
+  const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
+  assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
+  assert.equal(retained.loadSites[0].scriptOrdinal, 80);
+  const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
+  scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
+    addEventListener(name, callback) {events.set(name, callback);}};
+  scope.localStorage = {getItem: () => 'es', setItem(key, value) {storage.push([key, value]);}};
+  for (const name of ['NemoNativeObjectProject', 'NemoNativeObjectProjectFile', '__TAURI__'])
+    Object.defineProperty(scope, name, {get() {throw Error('localization resolved native authority');}});
+  const context = require('node:vm').createContext(scope);
+  for (const name of [runtimePath, dataPath]) require('node:vm').runInContext(fs.readFileSync(path.join(ROOT, 'src', name), 'utf8'), context, {filename: name});
+  assert.equal(scope.SM.retained, true); assert.strictEqual(scope.SM.afterI18n, callbacks); assert.equal(events.size, 1);
+  events.get('DOMContentLoaded')(); assert.equal(scope.state.language, 'es'); assert.equal(scope.SM.t('settingsTitle'), 'Ajustes');
+  for (const [locale, title] of [['en', 'Settings'], ['fr', 'Réglages'], ['ja', '設定'], ['es', 'Ajustes']]) {
+    scope.SM.setLanguage(locale); assert.equal(scope.SM.t('settingsTitle'), title);
+  }
+  assert.deepEqual(storage.map((entry) => entry[1]), ['en', 'fr', 'ja', 'es']);
 });

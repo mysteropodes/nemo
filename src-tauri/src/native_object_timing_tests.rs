@@ -48,7 +48,7 @@ fn timing_query(state: &ApplicationMcp, id: &str, uid: &str, frame: u32) -> Valu
         "operation":"query.document.object.layer.timing","payload":{"atRevision":info["contentRevision"],
             "documentSnapshotId":info["documentSnapshotId"],"contextId":"scene-root","layerUid":uid,"frame":frame}})
 }
-fn public(state: &ApplicationMcp, request: Value) -> Value {
+pub(super) fn public(state: &ApplicationMcp, request: Value) -> Value {
     serde_json::to_value(
         state
             .dispatch_native(serde_json::from_value(request).unwrap())
@@ -57,6 +57,31 @@ fn public(state: &ApplicationMcp, request: Value) -> Value {
     .unwrap()
 }
 async fn round_trip(state: &ApplicationMcp, request: Value) -> NativeApplicationResponse {
+    round_trip_with_consumer(state, request, false).await
+}
+async fn round_trip_with_consumer(
+    state: &ApplicationMcp,
+    request: Value,
+    acknowledge: bool,
+) -> NativeApplicationResponse {
+    use crate::application_mcp::revision_sync::RevisionControl;
+    let consumer = acknowledge.then(|| {
+        let binding = state
+            .revisions
+            .control(&state.native, RevisionControl::Binding)
+            .unwrap();
+        state
+            .revisions
+            .control(
+                &state.native,
+                serde_json::from_value(json!({
+                    "action":"subscribe", "binding":binding
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+        binding
+    });
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = Endpoint {
         instance_id: state.instance_id().into(),
@@ -75,8 +100,25 @@ async fn round_trip(state: &ApplicationMcp, request: Value) -> NativeApplication
             _ => panic!("timing query did not use the existing native wire envelope"),
         };
         state
-            .serve_external_for_test(&mut stream, request, |_| {
-                panic!("read emitted a revision event")
+            .serve_external_for_test(&mut stream, request, |event| {
+                let Some(binding) = &consumer else {
+                    panic!("read or refused command emitted a revision event")
+                };
+                let observed = serde_json::to_value(&event).unwrap();
+                let info = state
+                    .native_project_info(observed["documentId"].as_str().unwrap())
+                    .unwrap();
+                assert_eq!(info["contentRevision"], observed["toRevision"]);
+                state
+                    .revisions
+                    .control(
+                        &state.native,
+                        RevisionControl::Acknowledge {
+                            subscription_id: binding["subscriptionId"].as_str().unwrap().to_owned(),
+                            event,
+                        },
+                    )
+                    .map(|_| ())
             })
             .await
             .unwrap();
@@ -91,7 +133,19 @@ async fn round_trip(state: &ApplicationMcp, request: Value) -> NativeApplication
     })
     .await
     .unwrap();
-    response.unwrap()
+    let response = response.unwrap();
+    if let Some(binding) = consumer {
+        state
+            .revisions
+            .control(
+                &state.native,
+                RevisionControl::Disconnect {
+                    subscription_id: binding["subscriptionId"].as_str().unwrap().to_owned(),
+                },
+            )
+            .unwrap();
+    }
+    response
 }
 
 #[tokio::test]
@@ -127,7 +181,7 @@ async fn timing_public_wire_matches_the_fixed_oracle_without_history_or_publicat
 }
 
 #[tokio::test]
-async fn timing_new_internal_create_and_reopened_project_reach_the_same_public_reader() {
+async fn timing_new_public_create_and_reopened_project_reach_the_same_public_reader() {
     let state = ApplicationMcp::default();
     let receipt = serde_json::to_value(
         bootstrap_raw(
@@ -143,27 +197,18 @@ async fn timing_new_internal_create_and_reopened_project_reach_the_same_public_r
     let read = round_trip(&state, timing_query(&state, id, "layer-1", 119)).await;
     assert!(read.ok);
     assert_eq!(read.result.unwrap()["sourceFrame"], 0);
-    let create = json!({"apiVersion":2,"requestId":"internal-create-fixture","instanceId":state.instance_id(),
+    let create = json!({"apiVersion":2,"requestId":"public-create-fixture","instanceId":state.instance_id(),
         "documentId":id,"expectedRevision":0,"operation":"command.document.object.layer.create",
         "payload":{"command":"object.layer.create","name":"Timing fixture"}});
-    assert!(
-        state
-            .dispatch_native(serde_json::from_value(create.clone()).unwrap())
-            .is_err(),
-        "public Add stays unavailable"
-    );
-    // Fixture preparation uses the existing internal owner seam, never a public creation bypass.
-    let created = {
-        let mut authority = state.native.lock().unwrap();
-        let generation = authority.active_generation().unwrap();
-        authority
-            .active_mut(generation)
-            .unwrap()
-            .dispatch(serde_json::from_value(create).unwrap())
-            .unwrap()
-    };
-    assert!(created.is_ok());
-    let uid = created.result().unwrap()["layerUid"]
+    let refused = round_trip(&state, create.clone()).await;
+    assert!(!refused.ok);
+    let error = refused.error.unwrap();
+    assert_eq!(error.code, "unavailable");
+    assert_eq!(error.details.unwrap()["committed"], false);
+    assert_eq!(state.native_project_info(id).unwrap()["contentRevision"], 0);
+    let created = round_trip_with_consumer(&state, create, true).await;
+    assert!(created.ok, "{created:?}");
+    let uid = created.result.unwrap()["layerUid"]
         .as_str()
         .unwrap()
         .to_owned();

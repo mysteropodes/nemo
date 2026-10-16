@@ -22,6 +22,10 @@ mod project_admission;
 pub(crate) use project_admission::PreparedReferenceAttachment;
 
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_project_wire_admission.rs"]
+mod project_wire_admission;
+
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
 use crate::revision::{
     shared_image_resource_budget, ImageResourceBudget, ImageResourceCharge, ImageResourceError,
 };
@@ -135,104 +139,6 @@ struct ObjectReadResult {
 }
 
 impl ObjectSnapshot {
-    /// Private managed wire admission; no host route or attach/replace command.
-    #[cfg(all(feature = "history", feature = "project_media_codec"))]
-    pub(crate) fn from_managed_project_wire(
-        instance: String,
-        bytes: &[u8],
-        limits: object_codec::ProjectWireLimits,
-    ) -> Result<Self, object_codec::ProjectWireError> {
-        Self::managed_project_wire(
-            instance,
-            bytes,
-            limits,
-            Self::reserve_encoded,
-            |p| p.allocate().map_err(|_| "encoded allocation unavailable"),
-            |p, a| p.bind(a).map_err(|_| "encoded binding unavailable"),
-            Self::from_admitted_project,
-        )
-    }
-    #[cfg(all(feature = "history", feature = "project_media_codec"))]
-    fn managed_project_wire<R>(
-        instance: String,
-        bytes: &[u8],
-        limits: object_codec::ProjectWireLimits,
-        reserve: impl FnMut(usize) -> Result<R, &'static str>,
-        allocate: impl FnMut(&mut R) -> Result<Vec<u8>, &'static str>,
-        bind: impl FnMut(&mut R, &std::sync::Arc<Vec<u8>>) -> Result<(), &'static str>,
-        identity: impl FnOnce(String, object_codec::ProjectEnvelope) -> Result<Self, &'static str>,
-    ) -> Result<Self, object_codec::ProjectWireError> {
-        Self::managed_project_wire_using(
-            instance,
-            bytes,
-            limits,
-            reserve,
-            allocate,
-            bind,
-            identity,
-            |source, png| validate_png_in_domain(source, png, shared_image_resource_budget()),
-        )
-    }
-    // Test-only domain selection; production entry always uses the shared domain.
-    #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
-    pub(crate) fn from_managed_project_wire_cpu_test(
-        instance: String,
-        bytes: &[u8],
-        limits: object_codec::ProjectWireLimits,
-        cpu: &ImageResourceBudget,
-    ) -> Result<Self, object_codec::ProjectWireError> {
-        Self::managed_project_wire_using(
-            instance,
-            bytes,
-            limits,
-            Self::reserve_encoded,
-            |p| p.allocate().map_err(|_| "encoded allocation unavailable"),
-            |p, a| p.bind(a).map_err(|_| "encoded binding unavailable"),
-            Self::from_admitted_project,
-            |source, png| validate_png_in_domain(source, png, cpu),
-        )
-    }
-    #[cfg(all(feature = "history", feature = "project_media_codec"))]
-    fn managed_project_wire_using<R>(
-        instance: String,
-        bytes: &[u8],
-        limits: object_codec::ProjectWireLimits,
-        mut reserve: impl FnMut(usize) -> Result<R, &'static str>,
-        mut allocate: impl FnMut(&mut R) -> Result<Vec<u8>, &'static str>,
-        mut bind: impl FnMut(&mut R, &std::sync::Arc<Vec<u8>>) -> Result<(), &'static str>,
-        identity: impl FnOnce(String, object_codec::ProjectEnvelope) -> Result<Self, &'static str>,
-        validate: impl FnOnce(
-            &[u8],
-            object_codec::ImageAssetLimits,
-        ) -> Result<(), object_codec::ProjectWireError>,
-    ) -> Result<Self, object_codec::ProjectWireError> {
-        use object_codec::{ProjectReferenceState, ProjectWireError};
-        if instance.is_empty() {
-            return Err(ProjectWireError::Invalid);
-        }
-        // Declared before project: unwinding destroys the model/Vec before token.
-        let mut token = None;
-        let project = object_codec::decode_validated_project(
-            bytes,
-            limits,
-            |n| {
-                token = Some(reserve(n).map_err(|_| ProjectWireError::Budget)?);
-                allocate(token.as_mut().unwrap()).map_err(|_| ProjectWireError::Budget)
-            },
-            validate,
-        )?;
-        if let Some(permit) = token.as_mut() {
-            let bound = match project.reference_state() {
-                ProjectReferenceState::StillImage(data) => bind(permit, data.encoded_allocation()),
-                ProjectReferenceState::NoMedia => unreachable!("allocated wire has a reference"),
-            };
-            if bound.is_err() {
-                drop(project); // Never release an unbound token before its bytes.
-                return Err(ProjectWireError::Budget);
-            }
-        }
-        identity(instance, project).map_err(|_| ProjectWireError::Invalid)
-    }
     /// Shared strict drawing admission for the private composite-owner entry.
     pub(crate) fn validate_drawing(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
         object_codec::validate_storage(document)

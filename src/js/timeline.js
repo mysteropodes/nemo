@@ -184,7 +184,7 @@ function manualBakeCache(){
     else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
   });
 }
-function stopPlay(){if(!state.playing)return;state.playing=false;
+function stopPlay(mode){if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   var nativeStop=nativePlayScheduler&&nativePlayScheduler.stop();
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
@@ -195,10 +195,10 @@ function stopPlay(){if(!state.playing)return;state.playing=false;
   if(nativeStop&&nativeStop.wasNative){
     // A same-frame request supersedes a pending playback intent and restores
     // its last committed frame. A replaced/released owner must not receive it.
-    if(nativeStop.restore)goToFrame(state.currentFrame);
-    updateUI(true);return;
+    if(mode==='native-settings-publication')return nativeStop;var restored=nativeStop.restore?goToFrame(state.currentFrame):null;
+    updateUI(true);return mode==='native-settings-intent'?Promise.resolve(restored).then(function(ok){return {presented:ok===true,token:nativeStop};}):undefined;
   }
-  renderOS();renderArcs();updateUI();
+  if(mode==='native-settings-publication')return nativeStop;renderOS();renderArcs();updateUI();
 }
 function togglePlay(){if(state.playing)stopPlay();else startPlay();}
 
@@ -877,17 +877,17 @@ window.SM={
       saveActiveLayerFrame();updateUI();
     }
   },
-  setFps:function(v){state.fps=Math.max(1,Math.min(60,v));if(state.playing){stopPlay();startPlay();}if(window.SMAudio)SMAudio.invalidateWaveforms();syncDocFields();},
+  setFps:function(v){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setFps',fps:v}):Promise.resolve({status:'unavailable'});},
   setCurve:function(points){state.easingCurve={points:points};},
   setResamplePts:function(v){state.resamplePts=v;},setTweenStep:function(v){state.tweenStep=parseInt(v);},
-  setCanvasSize:function(w,h){state.canvasW=w;state.canvasH=h;drawStage();syncDocFields();},setCanvasBg:function(c){state.canvasBg=c;drawStage();syncDocFields();},
+  setCanvasSize:function(w,h){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasSize',width:w,height:h}):Promise.resolve({status:'unavailable'});},setCanvasBg:function(c){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasBackground',color:c}):Promise.resolve({status:'unavailable'});},
   setCanvasClip:function(v){state.canvasClip=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
   setSafetyZones:function(v){state.safetyZones=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
   fitCanvas:fitCanvas,resetView:resetView,
   setOnionRange:function(inF,outF){state.onionIn=inF;state.onionOut=outF;renderOS();},
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
-  setWorkArea:function(inF,outF){state.waIn=inF;state.waOut=outF;},
+  setWorkArea:function(inF,outF){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setWorkArea',inFrame:inF,outFrame:outF}):Promise.resolve({status:'unavailable'});},
   setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;
     // waIn had no clamp beside waOut's (2026-08-16): shrinking the timeline
     // below a moved work-area start left waIn > waOut — not merely out of
@@ -900,7 +900,7 @@ window.SM={
     // array already does (see layerInPoint/layerOutPoint, app.js).
     if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
     window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
-  addLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName());activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  addLayer:function(){var caller=window.NemoNativeDrawingAddController;return caller&&typeof caller.add==='function'?caller.add():Promise.resolve({status:'unavailable'});},
   // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
   // parenting/pivot target for other layers (SMMotion's existing
   // parentLayerUid/parentChainMats — a Null is just any other layer as far
@@ -9895,14 +9895,14 @@ function onKeyDown(event){
   if((k==='b'||k==='B')&&_pointerOverTimeline){
     event.preventDefault();
     var curOut=(state.waOut!=null)?state.waOut:state.totalFrames-1;
-    state.waIn=Math.max(0,Math.min(state.currentFrame,curOut-1));
+    window.SM.setWorkArea(Math.max(0,Math.min(state.currentFrame,curOut-1)),curOut);
     if(window.updateWaBar)updateWaBar();
     return;
   }
   if((k==='n'||k==='N')&&_pointerOverTimeline){
     event.preventDefault();
     var curIn=(state.waIn!=null)?state.waIn:0;
-    state.waOut=Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1));
+    window.SM.setWorkArea(curIn,Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1)));
     if(window.updateWaBar)updateWaBar();
     return;
   }
@@ -10789,9 +10789,9 @@ document.getElementById('p-taper').addEventListener('change',function(){window.S
 document.getElementById('p-shadowmode').addEventListener('change',function(){window.SM.setShadowMode(this.checked);});
 document.getElementById('p-maskmode').addEventListener('change',function(){window.SM.setMaskMode(this.checked);});
 document.getElementById('p-maskmode-type').addEventListener('change',function(){window.SM.setMaskModeType(this.value);});
-document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),state.canvasH);});
-document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(state.canvasW,parseInt(this.value));});
-document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});
+document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio)):state.canvasH);});
+document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)*_dimsLockRatio)):state.canvasW,parseInt(this.value));});
+document.getElementById('p-cbg').addEventListener('input',function(){var c=this.dataset.hex8;window.SM.setCanvasBg(c&&c.slice(0,7).toLowerCase()===this.value.toLowerCase()?c:this.value);});
 document.getElementById('btn-clip').addEventListener('click',function(){window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
 document.getElementById('btn-safety').addEventListener('click',function(){window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
 var _btnRulers=document.getElementById('btn-rulers');
@@ -11040,7 +11040,7 @@ function matteModeLabel(mode){
 // Width/Height (p-cw/p-ch below) — the old separate proj-w/proj-h duplicate
 // pair was removed (audit 2026-07-17); syncDocFields() still keeps these
 // two ids in sync with state.
-document.getElementById('proj-fps').addEventListener('change',function(){window.SM.setFps(parseInt(this.value));});
+document.getElementById('proj-fps').addEventListener('change',function(){window.SM.setFps(parseFloat(this.value));});
 document.getElementById('proj-frames').addEventListener('change',function(){window.SM.setTotalFrames(parseInt(this.value));});
 document.getElementById('btn-fit').addEventListener('click',function(){window.SM.fitCanvas();});
 document.getElementById('btn-resetv').addEventListener('click',function(){window.SM.resetView();});
@@ -11365,7 +11365,7 @@ document.getElementById('btn-pf').addEventListener('click',function(){if(state.p
 document.getElementById('btn-play').addEventListener('click',function(){togglePlay();});
 document.getElementById('btn-nf').addEventListener('click',function(){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);});
 document.getElementById('btn-lf').addEventListener('click',function(){if(state.playing)stopPlay();goToFrame(state.waOut);});
-document.getElementById('tl-fps').addEventListener('change',function(){window.SM.setFps(parseInt(this.value));});
+document.getElementById('tl-fps').addEventListener('change',function(){window.SM.setFps(parseFloat(this.value));});
 document.getElementById('tl-total').addEventListener('change',function(){window.SM.setTotalFrames(parseInt(this.value));});
 // tl-cf drag/type-to-scrub through frames (2026-07, "rendre la frame 1/120
 // draggable") — goToFrame() itself no-ops silently on an out-of-range

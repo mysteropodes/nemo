@@ -31,10 +31,46 @@
     }
     if(root._lastPropsShow===prior.show){root._lastPropsShow=prior.previousShow;
       if(prior.rail)prior.rail.replaceChildren.apply(prior.rail,prior.railChildren);}
+    if(prior.settings){if(root.ColorPicker&&root.ColorPicker.close)root.ColorPicker.close();prior.settings.moves.forEach(function(saved){
+      saved.events.forEach(function(entry){if(saved.node.removeEventListener)saved.node.removeEventListener(entry[0],entry[1],entry[2]);});
+      if(saved.marker.parentNode===saved.parent){saved.parent.insertBefore(saved.node,saved.marker);saved.parent.removeChild(saved.marker);}
+      saved.node.hidden=saved.hidden;saved.node.style.display=saved.display;saved.node.style.pointerEvents=saved.pointer;
+    });}
     if(prior.section.parentNode===prior.panel)prior.panel.removeChild(prior.section);
     inspectors.delete(root);
   }
-  function unavailableInspector(root){
+  function settingsInspector(root,prior,ports,info){
+    var controller=ports&&typeof ports.projectSettings==='function'&&ports.projectSettings();
+    if(!controller||typeof controller.edit!=='function')return;
+    if(!prior.settings){
+      var box=createNativeObjectUiText(root,'div','');box.id='native-project-settings';
+      var heading=createNativeObjectUiText(root,'div','Document');heading.className='phdr';box.appendChild(heading);
+      prior.settings={box:box,moves:[],pin:null,bg:null};prior.section.appendChild(box);
+      [['p-cw','Width'],['p-ch','Height'],['btn-dims-lock','Proportions'],['proj-fps','FPS'],['p-cbg','Background']].forEach(function(entry){
+        var node=root.document.getElementById(entry[0]);if(!node||!node.parentNode)return;
+        var parent=node.parentNode,marker=root.document.createComment('native settings position'),row=createNativeObjectUiText(root,'div','');row.className='pr';
+        var label=createNativeObjectUiText(root,'span',entry[1]);label.className='pl';row.appendChild(label);
+        var saved={node:node,parent:parent,marker:marker,hidden:node.hidden,display:node.style.display,pointer:node.style.pointerEvents,events:[],gesture:null};
+        parent.insertBefore(marker,node);row.appendChild(node);node.hidden=false;node.style.display='';box.appendChild(row);prior.settings.moves.push(saved);
+        function begin(){saved.gesture=Object.assign({},prior.settings.pin);}
+        function guard(event){var dimension=entry[0]==='p-cw'||entry[0]==='p-ch',value=Number(node.value);
+          var invalid=dimension&&(!Number.isInteger(value)||value<1||value>4294967295||parseInt(node.value,10)!==value);
+          if(invalid||saved.gesture&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return saved.gesture[k]===prior.settings.pin[k];})){
+          if(event.preventDefault)event.preventDefault();if(event.stopImmediatePropagation)event.stopImmediatePropagation();}}
+        [['pointerdown',begin,true],['focus',begin,true],['input',guard,true],['change',guard,true]].forEach(function(args){node.addEventListener.apply(node,args);saved.events.push(args);});
+        if(entry[0]==='p-cbg'){
+          var wrap=createNativeObjectUiText(root,'div','');wrap.id='native-project-background';wrap.className='color-well';row.insertBefore(wrap,node);wrap.appendChild(node);
+          wrap.addEventListener('pointerdown',begin,true);prior.settings.bg=wrap;
+          if(root.ColorPicker&&root.ColorPicker.wireColorSwatches)root.ColorPicker.wireColorSwatches([{wrap:wrap.id,input:node.id}]);
+        }
+      });
+    }
+    var before=prior.settings.pin,changed=before&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return before[k]===info[k];});
+    prior.settings.pin={instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration};
+    if(changed){if(root.ColorPicker&&root.ColorPicker.close)root.ColorPicker.close();prior.settings.moves.forEach(function(saved){if(root.document.activeElement===saved.node&&saved.node.blur)saved.node.blur();});}
+    prior.settings.ownerChanged=!!changed;
+  }
+  function unavailableInspector(root,ports,info){
     var panel=root.document.getElementById('props-panel');if(!panel)return;
     var prior=inspectors.get(root);
     if(prior&&prior.panel!==panel){restoreInspector(root);prior=null;}
@@ -56,6 +92,7 @@
       else if(rail){var expand=createNativeObjectUiText(root,'button','Native document');expand.type='button';expand.className='rail-item';
         expand.addEventListener('click',function(){if(root.togglePropsPanelCollapse)root.togglePropsPanelCollapse(false);else panel.classList.remove('collapsed');});rail.replaceChildren(expand);}
     }
+    settingsInspector(root,prior,ports,info);
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
   }
   function nativeObjectUiPortsReady(ports){
@@ -148,7 +185,7 @@
       list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
     }
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
-    unavailableInspector(root);
+    unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
       views.set(root,{list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
         controls:rows.map(function(row){return [row.children[0],row.children[1]];}),caption:caption,unavailable:unavailable,
@@ -160,7 +197,14 @@
     // guarded and no legacy document/frame reader is called.
     var metadata={'p-cw':info.canvasW,'p-ch':info.canvasH,'tl-fps':info.fps,'tl-total':info.totalFrames,
       'proj-fps':info.fps,'proj-frames':info.totalFrames};
-    Object.keys(metadata).forEach(function(id){var el=root.document.getElementById(id);if(el)el.value=metadata[id];});
+    var settings=inspectors.get(root),ownerChanged=settings&&settings.settings&&settings.settings.ownerChanged;
+    Object.keys(metadata).forEach(function(id){var el=root.document.getElementById(id);if(el&&(ownerChanged||root.document.activeElement!==el))el.value=metadata[id];});
+    var background=root.document.getElementById('p-cbg'),raw=info.canvasBg===undefined?root.state.canvasBg:info.canvasBg;
+    if(background&&(ownerChanged||root.document.activeElement!==background)&&typeof raw==='string'){
+      var hex=raw.replace(/^#/,'');if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');
+      background.value='#'+hex.slice(0,6);background.dataset.hex8='#'+(hex.length===8?hex:hex+'ff');
+      if(settings&&settings.settings&&settings.settings.bg)settings.settings.bg.style.backgroundColor=background.dataset.hex8;
+    }
     if(root.updateWaBar&&root.document.getElementById('wa-bar'))root.updateWaBar();
     ['info-badge','info-strokes','info-sel'].forEach(function(id){var el=root.document.getElementById(id);if(el){el.textContent='Unavailable';if(id==='info-badge')el.style.display='none';}});
     requestTiming(root,info,ports);

@@ -156,6 +156,13 @@ impl ObjectFramePacket {
     pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
         &self.snapshot
     }
+    /// Renderer fallback belongs here; absent stored metadata stays absent.
+    pub(crate) fn canvas_background_rgba8(&self) -> [u8; 4] {
+        self.snapshot
+            .project()
+            .and_then(|project| project.project().canvas_background_rgba8())
+            .unwrap_or([255; 4])
+    }
     /// Explicit partial numeric composition; records() remains source provenance.
     pub fn numeric_order(&self) -> Option<&NumericOrderPlan> {
         self.numeric_order.as_ref()

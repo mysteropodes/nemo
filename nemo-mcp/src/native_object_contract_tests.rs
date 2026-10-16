@@ -274,7 +274,7 @@ fn registered_examples_keep_full_admission_for_all_available_features() {
 }
 
 #[test]
-fn creation_shape_and_result_are_exact_but_do_not_authorize_execution() {
+fn creation_shape_and_result_are_exact_through_the_available_declaration() {
     let payload = json!({"command":"object.layer.create","name":""});
     let mut request: NativeApplicationRequest = serde_json::from_value(json!({
         "apiVersion":2,"requestId":"create","instanceId":"instance","documentId":"document",
@@ -283,7 +283,7 @@ fn creation_shape_and_result_are_exact_but_do_not_authorize_execution() {
     .unwrap();
     assert!(create_request(&payload));
     assert!(request.validate_input().is_ok());
-    assert_eq!(request.validate().unwrap_err().code(), "unavailable");
+    assert!(request.validate().is_ok());
     for invalid in [
         json!({}),
         json!([]),
@@ -329,7 +329,7 @@ fn creation_shape_and_result_are_exact_but_do_not_authorize_execution() {
         crate::capabilities::native_catalog()
             .capability_for_operation("command.document.object.layer.create")
             .unwrap()["availability"]["state"],
-        "unavailable"
+        "available"
     );
     assert!(crate::capabilities::validate_native_operation("query.document.object").is_ok());
     assert!(crate::capabilities::validate_native_operation(
@@ -402,7 +402,7 @@ fn timing_contract_keeps_strict_input_and_current_head_result_correlation() {
         crate::capabilities::native_catalog()
             .capability_for_operation("command.document.object.layer.create")
             .unwrap()["availability"]["state"],
-        "unavailable"
+        "available"
     );
 }
 #[test]

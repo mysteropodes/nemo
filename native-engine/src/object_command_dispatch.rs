@@ -12,6 +12,8 @@ const OP_OBJECT_REDO: &str = "command.document.object.redo";
 const OP_LAYER_VISIBILITY: &str = "command.document.object.layer.visibility.set";
 const OP_LAYER_CREATE: &str = "command.document.object.layer.create";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
+const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
+const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
 const MAX_MESSAGE_BYTES: usize = 4096;
 const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
 
@@ -54,6 +56,8 @@ impl NativeObjectHistory {
                 | OP_LAYER_VISIBILITY
                 | OP_LAYER_CREATE
                 | OP_PROPERTY_EDIT
+                | OP_PROPERTY_TRACK_EDIT
+                | OP_PROJECT_SETTINGS
         ) {
             return Ok(None);
         }
@@ -70,7 +74,12 @@ impl NativeObjectHistory {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let message = |fill, history| {
-            if request.operation == OP_PROPERTY_EDIT {
+            if request.operation == OP_PROJECT_SETTINGS {
+                "Project settings request refused."
+            } else if matches!(
+                request.operation.as_str(),
+                OP_PROPERTY_EDIT | OP_PROPERTY_TRACK_EDIT
+            ) {
                 "Property edit request refused."
             } else if request.operation == OP_LAYER_CREATE {
                 "Layer creation request refused."
@@ -201,10 +210,36 @@ impl NativeObjectHistory {
                         "Layer visibility payload is invalid or target is absent.",
                     )),
                 }
-            } else if request.operation == OP_PROPERTY_EDIT {
+            } else if request.operation == OP_PROJECT_SETTINGS {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-                match self.prepare_property_edit_json(&payload) {
+                match self.prepare_project_settings_json(&payload) {
+                    Ok(candidate) => {
+                        let before = self.content_revision();
+                        self.commit_project_settings(candidate)
+                            .map(|revision| CompactResult::Command {
+                                applied: revision != before,
+                                history_entries_added: u64::from(revision != before),
+                            })
+                            .map_err(|code| (code, "Project settings could not commit."))
+                    }
+                    Err(code) => Err((
+                        code,
+                        "Project settings payload is invalid or project is absent.",
+                    )),
+                }
+            } else if matches!(
+                request.operation.as_str(),
+                OP_PROPERTY_EDIT | OP_PROPERTY_TRACK_EDIT
+            ) {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                let candidate = if request.operation == OP_PROPERTY_TRACK_EDIT {
+                    self.prepare_property_track_edit_json(&payload)
+                } else {
+                    self.prepare_property_edit_json(&payload)
+                };
+                match candidate {
                     Ok(candidate) => {
                         let before = self.content_revision();
                         self.commit_property_edit(candidate)

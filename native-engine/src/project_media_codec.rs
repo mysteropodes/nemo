@@ -1,9 +1,15 @@
 //! Strict private project wire; drawing admission always sees original bytes.
-use crate::object_document::{ProjectEnvelope, ProjectMetadata, ProjectReferenceState};
+use crate::object_document::{Presence, ProjectEnvelope, ProjectMetadata, ProjectReferenceState};
 #[cfg(feature = "project_media_codec")]
 use crate::reference_image_asset::{ImageAssetError, ImageAssetLimits};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+
+#[cfg(feature = "project_media_codec")]
+#[path = "project_asset_wire.rs"]
+mod asset_wire;
+#[cfg(feature = "project_media_codec")]
+pub(crate) use asset_wire::{prepare_project_wire, DecodedProjectWire, PreparedProjectWire};
 
 const FORMAT: &str = "nemo.native-project-document";
 const MAX_ENVELOPE: usize = 32 * 1024 * 1024;
@@ -88,14 +94,51 @@ struct Metadata {
     canvas_w: u32,
     canvas_h: u32,
     fps: f64,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    canvas_bg: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    wa_in: Presence<f64>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    wa_out: Presence<f64>,
 }
 // Derived decoding alone admits positional arrays; reuse the drawing's
 // object-only visitor with strict duplicate/unknown/required-member checks.
 crate::object_document::object_deserialize!(Metadata {
     canvas_w: u32,
     canvas_h: u32,
-    fps: f64
+    fps: f64,
+    #[serde(default)] canvas_bg: Presence<String>,
+    #[serde(default)] wa_in: Presence<f64>,
+    #[serde(default)] wa_out: Presence<f64>
 });
+
+impl Metadata {
+    fn into_metadata(self) -> Result<ProjectMetadata, ProjectWireError> {
+        ProjectMetadata::new(self.canvas_w, self.canvas_h, self.fps)
+            .and_then(|value| {
+                value.with_canvas_background(self.canvas_bg.value().map(String::as_str))
+            })
+            .and_then(|value| {
+                value.with_work_area(self.wa_in.value().copied(), self.wa_out.value().copied())
+            })
+            .map_err(|_| ProjectWireError::Invalid)
+    }
+    fn from_metadata(value: &ProjectMetadata) -> Self {
+        let (canvas_w, canvas_h) = value.canvas_dimensions();
+        let (wa_in, wa_out) = value.work_area();
+        Self {
+            canvas_w,
+            canvas_h,
+            fps: value.fps(),
+            canvas_bg: value
+                .canvas_background()
+                .map(|v| Presence::Present(v.to_owned()))
+                .unwrap_or(Presence::Missing),
+            wa_in: wa_in.map(Presence::Present).unwrap_or(Presence::Missing),
+            wa_out: wa_out.map(Presence::Present).unwrap_or(Presence::Missing),
+        }
+    }
+}
 
 pub(crate) fn decode_project(
     bytes: &[u8],
@@ -131,62 +174,67 @@ pub(crate) fn decode_validated_project(
     bytes: &[u8],
     limits: ProjectWireLimits,
     mut allocate: impl FnMut(usize) -> Result<Vec<u8>, ProjectWireError>,
-    #[cfg(feature = "project_media_codec")] validate: impl FnOnce(
+    #[cfg(feature = "project_media_codec")] validate: impl FnMut(
         &[u8],
         ImageAssetLimits,
     ) -> Result<(), ProjectWireError>,
 ) -> Result<ProjectEnvelope, ProjectWireError> {
-    if bytes.len() > limits.envelope_bytes {
-        return Err(ProjectWireError::Budget);
-    }
-    if bytes.iter().find(|b| !b.is_ascii_whitespace()) != Some(&b'{') {
-        return Err(ProjectWireError::Invalid);
-    }
-    let wire: Input<'_> = serde_json::from_slice(bytes).map_err(|_| ProjectWireError::Invalid)?;
-    if wire.format != FORMAT || wire.format_version != 1 {
-        return Err(ProjectWireError::Unsupported);
-    }
-    if wire.drawing.get().len() > limits.drawing_bytes {
-        return Err(ProjectWireError::Budget);
-    }
-    let asset = asset_entry(wire.assets)?;
-    if wire.viewport_reference.get() == "null" && asset.is_some() {
-        return Err(ProjectWireError::Unsupported);
+    #[cfg(feature = "project_media_codec")]
+    {
+        return prepare_project_wire(bytes, limits)?
+            .decode(allocate, validate)
+            .map(|v| v.into_project());
     }
     #[cfg(not(feature = "project_media_codec"))]
-    if wire.viewport_reference.get() != "null" {
-        return Err(ProjectWireError::Unsupported);
-    }
-    let metadata = ProjectMetadata::new(
-        wire.project.canvas_w,
-        wire.project.canvas_h,
-        wire.project.fps,
-    )
-    .map_err(|_| ProjectWireError::Invalid)?;
-    let drawing = crate::object_codec::decode_storage_project(wire.drawing.get().as_bytes())
-        .map_err(ProjectWireError::Drawing)?;
-    let reference = if wire.viewport_reference.get() == "null" {
-        if asset.is_some() {
+    {
+        if bytes.len() > limits.envelope_bytes {
+            return Err(ProjectWireError::Budget);
+        }
+        if bytes.iter().find(|b| !b.is_ascii_whitespace()) != Some(&b'{') {
+            return Err(ProjectWireError::Invalid);
+        }
+        let wire: Input<'_> =
+            serde_json::from_slice(bytes).map_err(|_| ProjectWireError::Invalid)?;
+        if wire.format != FORMAT || wire.format_version != 1 {
             return Err(ProjectWireError::Unsupported);
         }
-        ProjectReferenceState::NoMedia
-    } else {
+        if wire.drawing.get().len() > limits.drawing_bytes {
+            return Err(ProjectWireError::Budget);
+        }
+        let asset = asset_entry(wire.assets)?;
+        if wire.viewport_reference.get() == "null" && asset.is_some() {
+            return Err(ProjectWireError::Unsupported);
+        }
         #[cfg(not(feature = "project_media_codec"))]
-        {
+        if wire.viewport_reference.get() != "null" {
             return Err(ProjectWireError::Unsupported);
         }
-        #[cfg(feature = "project_media_codec")]
-        {
-            decode_reference(
-                wire.viewport_reference,
-                asset.ok_or(ProjectWireError::Invalid)?,
-                limits,
-                &mut allocate,
-                validate,
-            )?
-        }
-    };
-    Ok(ProjectEnvelope::no_media(metadata, drawing).with_reference(reference))
+        let metadata = wire.project.into_metadata()?;
+        let drawing = crate::object_codec::decode_storage_project(wire.drawing.get().as_bytes())
+            .map_err(ProjectWireError::Drawing)?;
+        let reference = if wire.viewport_reference.get() == "null" {
+            if asset.is_some() {
+                return Err(ProjectWireError::Unsupported);
+            }
+            ProjectReferenceState::NoMedia
+        } else {
+            #[cfg(not(feature = "project_media_codec"))]
+            {
+                return Err(ProjectWireError::Unsupported);
+            }
+            #[cfg(feature = "project_media_codec")]
+            {
+                decode_reference(
+                    wire.viewport_reference,
+                    asset.ok_or(ProjectWireError::Invalid)?,
+                    limits,
+                    &mut allocate,
+                    validate,
+                )?
+            }
+        };
+        Ok(ProjectEnvelope::no_media(metadata, drawing).with_reference(reference))
+    }
 }
 
 // At most one borrowed asset: a long input table never builds a large Vec.
@@ -336,168 +384,11 @@ fn decode_reference(
     .map_err(|_| ProjectWireError::Invalid)
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Output<'a, R, A> {
-    format: &'static str,
-    format_version: u32,
-    project: Metadata,
-    drawing: &'a RawValue,
-    viewport_reference: R,
-    assets: A,
-}
-
-#[cfg(feature = "project_media_codec")]
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ReferenceOutput<'a> {
-    kind: &'static str,
-    asset_id: &'a str,
-    name: &'a str,
-    visible: bool,
-    opacity: f64,
-    offset_frames: i64,
-}
-#[cfg(feature = "project_media_codec")]
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AssetOutput<'a> {
-    id: &'a str,
-    media_type: &'static str,
-    encoding: &'static str,
-    data: Encoded<'a>,
-}
-#[cfg(feature = "project_media_codec")]
-struct Encoded<'a>(&'a [u8]);
-#[cfg(feature = "project_media_codec")]
-impl Serialize for Encoded<'_> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_str(&base64::display::Base64Display::new(
-            self.0,
-            &base64::engine::general_purpose::STANDARD,
-        ))
-    }
-}
-
-// Cap logical bytes and reservation REQUESTS before copying. Allocator
-// over-provisioning/actual Vec capacity is not bounded by reserve_exact.
-struct CappedWriter {
-    bytes: Vec<u8>,
-    cap: usize,
-    refused: bool,
-}
-impl std::io::Write for CappedWriter {
-    fn write(&mut self, chunk: &[u8]) -> std::io::Result<usize> {
-        let needed = self.bytes.len().checked_add(chunk.len());
-        if needed.is_none_or(|n| n > self.cap) {
-            self.refused = true;
-            return Err(std::io::Error::other("project wire byte budget"));
-        }
-        let needed = needed.unwrap();
-        if needed > self.bytes.capacity() {
-            let capacity = needed
-                .max(self.bytes.capacity().saturating_mul(2))
-                .min(self.cap);
-            if self
-                .bytes
-                .try_reserve_exact(capacity - self.bytes.len())
-                .is_err()
-            {
-                self.refused = true;
-                return Err(std::io::Error::other("project wire reservation"));
-            }
-        }
-        self.bytes.extend_from_slice(chunk);
-        Ok(chunk.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-fn bounded_json(value: &impl Serialize, cap: usize) -> Result<Vec<u8>, ProjectWireError> {
-    let mut writer = CappedWriter {
-        bytes: Vec::new(),
-        cap,
-        refused: false,
-    };
-    serde_json::to_writer(&mut writer, value).map_err(|_| {
-        if writer.refused {
-            ProjectWireError::Budget
-        } else {
-            ProjectWireError::Invalid
-        }
-    })?;
-    Ok(writer.bytes)
-}
-
-pub(crate) fn encode_project(
-    envelope: &ProjectEnvelope,
-    limits: ProjectWireLimits,
-) -> Result<Vec<u8>, ProjectWireError> {
-    let reference = envelope.reference_state();
-    #[cfg(not(feature = "project_media_codec"))]
-    if reference != ProjectReferenceState::NoMedia {
-        return Err(ProjectWireError::Unsupported);
-    }
-    #[cfg(feature = "project_media_codec")]
-    if let ProjectReferenceState::StillImage(data) = &reference {
-        let (cap, _) = limits.png.ok_or(ProjectWireError::Budget)?;
-        if data.encoded_png().len() > cap
-            || base64::encoded_len(data.encoded_png().len(), true)
-                .ok_or(ProjectWireError::Budget)?
-                > limits.envelope_bytes
-        {
-            return Err(ProjectWireError::Budget);
-        }
-    }
-    crate::object_codec::validate_storage(envelope.drawing()).map_err(ProjectWireError::Drawing)?;
-    let drawing = bounded_json(envelope.drawing(), limits.drawing_bytes)?;
-    let raw =
-        serde_json::from_slice::<&RawValue>(&drawing).map_err(|_| ProjectWireError::Invalid)?;
-    let (canvas_w, canvas_h) = envelope.project().canvas_dimensions();
-    let project = Metadata {
-        canvas_w,
-        canvas_h,
-        fps: envelope.project().fps(),
-    };
-    #[cfg(feature = "project_media_codec")]
-    if let ProjectReferenceState::StillImage(data) = &reference {
-        let viewport_reference = ReferenceOutput {
-            kind: "still-image",
-            asset_id: data.id(),
-            name: data.name(),
-            visible: data.visible(),
-            opacity: data.opacity(),
-            offset_frames: data.offset_frames(),
-        };
-        let assets = [AssetOutput {
-            id: data.id(),
-            media_type: "image/png",
-            encoding: "base64",
-            data: Encoded(data.encoded_png()),
-        }];
-        return bounded_json(
-            &Output {
-                format: FORMAT,
-                format_version: 1,
-                project,
-                drawing: raw,
-                viewport_reference,
-                assets,
-            },
-            limits.envelope_bytes,
-        );
-    }
-    let wire = Output {
-        format: FORMAT,
-        format_version: 1,
-        project,
-        drawing: raw,
-        viewport_reference: (),
-        assets: [(); 0],
-    };
-    bounded_json(&wire, limits.envelope_bytes)
-}
+#[path = "project_media_output.rs"]
+mod output;
+pub(crate) use output::encode_project;
+#[cfg(test)]
+use output::CappedWriter;
 
 #[cfg(test)]
 #[path = "../tests/project_media_codec.rs"]

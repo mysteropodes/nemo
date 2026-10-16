@@ -51,9 +51,13 @@ impl NativeApplicationRequest {
         }
         if matches!(
             self.operation.as_str(),
-            "command.document.object.layer.visibility.set" | "command.document.object.layer.create"
+            "command.document.object.layer.visibility.set"
+                | "command.document.object.layer.create"
+                | "command.document.object.project.settings.edit"
         ) {
-            let action = if self.operation.ends_with(".create") {
+            let action = if self.operation.ends_with(".settings.edit") {
+                "project settings"
+            } else if self.operation.ends_with(".create") {
                 "creation"
             } else {
                 "visibility"

@@ -160,10 +160,7 @@ fn creation_original_bytes_are_closed_bounded_named_and_duplicate_safe() {
         decode_json_bounded::<NativeApplicationRequest>(raw.as_bytes(), NATIVE_MAX_MESSAGE_BYTES)
     };
     assert!(decode(&raw).unwrap().validate_input().is_ok());
-    assert_eq!(
-        decode(&raw).unwrap().validate().unwrap_err().code(),
-        "unavailable"
-    );
+    assert!(decode(&raw).unwrap().validate().is_ok());
     for invalid in [
         raw.replace("\"name\":", "\"name\":\"first\",\"name\":"),
         raw.replace("\"name\":", "\"na\\u006de\":\"first\",\"name\":"),
@@ -219,8 +216,8 @@ fn creation_receipt_correlates_outer_revision_and_keeps_actual_native_identity()
 }
 
 #[tokio::test]
-async fn unavailable_creation_refuses_before_an_authenticated_tcp_connection() {
-    let (request, _) = create_pair();
+async fn available_creation_uses_the_same_authenticated_tcp_receipt_route() {
+    let (request, response) = create_pair();
     let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
         .await
         .unwrap();
@@ -230,16 +227,20 @@ async fn unavailable_creation_refuses_before_an_authenticated_tcp_connection() {
         secret: "test".into(),
         build_id: "test".into(),
     };
-    let error = call_native(&endpoint, request, CancellationToken::new())
-        .await
-        .unwrap_err();
-    assert!(error.to_string().contains("native timeline"));
-    assert!(
-        tokio::time::timeout(Duration::from_millis(20), listener.accept())
-            .await
-            .is_err(),
-        "unavailable request must never connect"
-    );
+    let server = async {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let message: NativeWireRequest = read_json(&mut stream).await.unwrap();
+        assert_eq!(message.secret, endpoint.secret);
+        assert_eq!(message.native_request, request);
+        write_json(&mut stream, &response).await.unwrap();
+    };
+    let client = call_native(&endpoint, request.clone(), CancellationToken::new());
+    let (_, actual) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(server, client)
+    })
+    .await
+    .unwrap();
+    assert_eq!(actual.unwrap(), response);
 }
 
 fn timing_pair() -> (NativeApplicationRequest, NativeApplicationResponse) {
