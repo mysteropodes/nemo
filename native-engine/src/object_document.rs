@@ -20,6 +20,12 @@ pub use properties::{
 #[path = "../tests/object_properties.rs"]
 mod property_tests;
 
+#[path = "project_asset_inventory.rs"]
+mod assets;
+pub(crate) use assets::{
+    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetRecord, AssetSource, AssetTarget,
+};
+
 #[path = "project_media_envelope.rs"]
 mod project;
 pub(crate) use project::{
