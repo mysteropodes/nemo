@@ -384,6 +384,8 @@ fn timing_contract_keeps_strict_input_and_current_head_result_correlation() {
         ("sourceFrame", json!(2)),
         ("cellKind", json!("key")),
         ("manualEdit", json!(true)),
+        ("manualEdit", json!(null)),
+        ("cellKind", json!("future-cell-kind")),
         ("hasContent", json!(null)),
         ("extra", json!(true)),
     ] {

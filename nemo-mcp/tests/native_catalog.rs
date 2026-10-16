@@ -94,3 +94,28 @@ fn native_catalog_rejects_malformed_later_sources_without_partial_catalog() {
         .capability_for_operation("query.not_registered")
         .is_none());
 }
+
+#[test]
+fn public_catalog_entry_rejects_duplicate_ids_and_operation_ownership() {
+    let first = r#"{"schemaVersion":2,"apiVersion":2,"id":"first","operations":["query.first"]}"#;
+    for (second, reason) in [
+        (
+            json!({"schemaVersion":2,"apiVersion":2,"id":"first","operations":["query.second"]}),
+            "duplicate native capability id first",
+        ),
+        (
+            json!({"schemaVersion":2,"apiVersion":2,"id":"second","operations":["query.first"]}),
+            "duplicate native operation query.first",
+        ),
+        (
+            json!({"schemaVersion":2,"apiVersion":2,"id":"second","operations":["query.second","query.second"]}),
+            "duplicate native operation query.second",
+        ),
+    ] {
+        let source = second.to_string();
+        assert_eq!(
+            NativeCapabilityCatalog::from_sources(&[first, &source]).unwrap_err(),
+            reason
+        );
+    }
+}
