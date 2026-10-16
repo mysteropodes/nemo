@@ -332,6 +332,27 @@
     }
     function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
+    async function readLayerTiming(layerUid,frame,pin){
+      // Observe existing work without entering, advancing or settling its queue.
+      async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
+      function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&
+        value.presentation.frame===frame&&integer(frame,0)&&frame<pin.totalFrames&&
+        pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length===1;}
+      try{
+        await settled();if(!ready())return null;
+        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId('timing'),instanceId:pin.instanceId,documentId:pin.documentId,
+          operation:'query.document.object.layer.timing',payload:{atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,
+            contextId:'scene-root',layerUid:layerUid,frame:frame}};
+        var response=await raw('nemo_native_dispatch',request);
+        await settled();
+        if(ticket!==subscriptionTicket||!ready()||!response||response.ok!==true||response.instanceId!==pin.instanceId||
+          response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)return null;
+        var result=response.result;
+        if(!result||Object.keys(result).length!==11||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
+          ['atRevision','documentSnapshotId','contextId','layerUid','frame'].some(function(k){return result[k]!==request.payload[k];}))return null;
+        return freeze(Object.assign({},result));
+      }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
+    }
     function exportPng(destination,frames,onProgress,signal){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
@@ -352,7 +373,7 @@
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
     return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
-      info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,
+      info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
       presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,
@@ -380,7 +401,18 @@
       subscribeRevisions:async function(synchronize,disconnected,trackedInvoke){
         if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
           return null; // Private file Open remains usable; no toggle/subscriber is advertised.
-        transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(trackedInvoke||invoke);
+        var call=trackedInvoke||invoke;
+        transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(function(command,args){
+          var response=call(command,args);
+          if(command==='nemo_native_revision_sync'&&args&&args.request.action==='acknowledge')
+            return Promise.resolve(response).then(function(value){
+              // Observe the completed ACK after transport clears its in-flight flag.
+              setTimeout(function(){try{if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshTiming)
+                root.NemoNativeObjectUI.refreshTiming(root);}catch(_){}},0);
+              return value;
+            });
+          return response;
+        });
         await transport.connect();return transport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize,disconnected);
       },
       unsubscribeRevisions:function(){return transport?transport.disconnect():Promise.resolve();},
