@@ -7,3 +7,6 @@ pub(crate) mod object_image_mesh_geometry;
 #[path = "object_widget_geometry.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_widget_geometry;
+#[path = "rig_ik_solve.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_ik_solve;
