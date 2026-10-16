@@ -195,10 +195,22 @@ fn packet_owns_its_bytes_and_outlives_the_snapshot_and_later_edits() {
     }
     // an edited copy of the document gets its own snapshot; the packet does not follow it
     let mut edited = snapshot.document().clone();
-    edited.objects[0].fill.r = serde_json::Number::from_f64(0.9).unwrap();
+    match &mut edited.objects[0].fill {
+        crate::object_document::Presence::Present(Some(fill)) => {
+            fill.r = serde_json::Number::from_f64(0.9).unwrap()
+        }
+        _ => panic!("fixture record has a solid fill"),
+    }
     let moved = ObjectSnapshot::new("clip", edited).unwrap();
     let again = copy(&moved, &sel).unwrap();
-    let red = |p: &super::FrameClipboardPacket| p.cells()[0].records()[0].fill.r.as_f64().unwrap();
+    let red = |p: &super::FrameClipboardPacket| {
+        p.cells()[0].records()[0]
+            .solid_fill()
+            .unwrap()
+            .r
+            .as_f64()
+            .unwrap()
+    };
     assert_eq!((red(&packet), red(&again)), (0.25, 0.9));
     assert_ne!(packet.cells(), again.cells());
     let kept = packet.clone();
