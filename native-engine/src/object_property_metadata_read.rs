@@ -1,5 +1,5 @@
 //! Snapshot-pinned property metadata and authored facts without dispatch activation.
-use crate::object_document::{
+use crate::object_codec::{
     object_deserialize, FrameScopeKind, Presence, PropertyHolder, PropertyHolderTarget,
 };
 use crate::request_receipts::DispatchErrorCode;
