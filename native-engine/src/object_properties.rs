@@ -237,23 +237,39 @@ pub(crate) fn validate_property_holders(
     records: &[ObjectRecord],
     plan: Option<&OrderPlan>,
 ) -> Result<(), PropertyAdmissionError> {
+    let layer_ids: HashSet<_> = layers.iter().map(ObjectLayer::layer_uid).collect();
+    let contexts: HashSet<_> = plan.map_or_else(
+        || HashSet::from(["scene-root"]),
+        |p| p.contexts.iter().map(|c| c.context_id.as_str()).collect(),
+    );
+    // Element identity deliberately excludes authored frame; one holder spans
+    // every keyed drawing of the same stable element.
+    let elements: HashSet<_> = records
+        .iter()
+        .filter(|r| r.target.frame_scope.kind == FrameScopeKind::Authored)
+        .map(|r| {
+            (
+                r.target.context_id.as_str(),
+                r.target.layer_uid.as_str(),
+                r.target.stroke_id.as_str(),
+            )
+        })
+        .collect();
     let mut identities = HashSet::new();
     for holder in holders.value().into_iter().flatten() {
         let target = &holder.target;
-        let context_exists = plan.map_or(target.context_id == "scene-root", |p| {
-            p.contexts.iter().any(|c| c.context_id == target.context_id)
-        });
-        if !context_exists || !layers.iter().any(|l| l.layer_uid() == target.layer_uid) {
+        if !contexts.contains(target.context_id.as_str())
+            || !layer_ids.contains(target.layer_uid.as_str())
+        {
             return Err(invalid("unresolved property holder context or layer"));
         }
         if let Some(stroke_id) = target.stroke_id.value() {
             if stroke_id.is_empty()
-                || !records.iter().any(|r| {
-                    r.target.context_id == target.context_id
-                        && r.target.layer_uid == target.layer_uid
-                        && r.target.stroke_id == *stroke_id
-                        && r.target.frame_scope.kind == FrameScopeKind::Authored
-                })
+                || !elements.contains(&(
+                    target.context_id.as_str(),
+                    target.layer_uid.as_str(),
+                    stroke_id.as_str(),
+                ))
             {
                 return Err(invalid("unresolved property holder element"));
             }
