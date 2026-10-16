@@ -136,7 +136,9 @@
         "object_project_settings.rs",
         "object_property_curve_edits.rs",
         "object_property_track_edit.rs",
-        "object_layer_policy_edit.rs"
+        "object_layer_policy_edit.rs",
+        "object_vector_edit.rs",
+        "object_vector_edit_order.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -704,7 +706,12 @@
         "object_vector_record.rs",
         "font_asset_admission.rs",
         "font_asset_wire.rs",
-        "object_font_asset_history.rs"
+        "object_font_asset_history.rs",
+        "object_vector_edit.rs",
+        "object_vector_edit_controls.rs",
+        "object_vector_edit_limits.rs",
+        "object_vector_edit_lock.rs",
+        "object_vector_edit_support.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

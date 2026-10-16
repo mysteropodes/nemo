@@ -15,6 +15,15 @@ pub(crate) use property_edit::PreparedPropertyEdit;
 #[path = "object_project_settings.rs"]
 mod project_settings;
 pub(crate) use project_settings::PreparedProjectSettings;
+// L01-F (#2107): sealed vector create/replace/delete over the same revision owner.
+#[path = "object_vector_edit.rs"]
+mod vector_edit;
+pub(crate) use vector_edit::{PreparedVectorEdit, VectorEditResult, MAX_VECTOR_REQUEST_BYTES};
+// The single composition-order element helper, for every lane that adds or removes a record.
+#[allow(unused_imports)]
+pub(crate) use vector_edit::order::{
+    insert_element as insert_order_element, remove_element as remove_order_element, OrderEditError,
+};
 #[path = "object_layer_policy_edit.rs"]
 mod layer_policy_edit;
 pub(crate) use layer_policy_edit::PreparedLayerPolicy;
