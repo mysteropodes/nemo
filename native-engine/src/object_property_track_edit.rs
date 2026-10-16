@@ -36,7 +36,10 @@ struct Payload {
     selections: Vec<Selection>,
     action: Action,
 }
-object_deserialize!(Payload { command: String, selections: Vec<Selection>, action: Action });
+object_deserialize!(Payload {
+    command: String, selections: Vec<Selection>,
+    #[serde(deserialize_with = "super::deserialize_action")] action: Action
+});
 #[derive(Clone, Copy)]
 enum ValidAction {
     Preset(CurvePreset),

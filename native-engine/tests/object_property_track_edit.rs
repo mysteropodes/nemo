@@ -338,6 +338,9 @@ fn malformed_and_unbounded_inputs_refuse_without_history() {
         json!({"kind":"influence","side":"out","percent":"50"}),
         json!({"kind":"subdivide","values":[0]}),
         json!({"kind":"subdivide","keyIndex":0}),
+        json!(["preset", "hold"]),
+        json!(["influence", "out", 50]),
+        json!(["subdivide"]),
     ] {
         cases.push(edit(vec![sel("A", "opacity", json!(0))], action));
     }
@@ -348,9 +351,32 @@ fn malformed_and_unbounded_inputs_refuse_without_history() {
     bad["selections"][0]["keyIndex"] = json!(0);
     cases.push(bad);
     for p in cases {
-        assert!(apply(&mut o, p).is_err());
+        assert_eq!(apply(&mut o, p), Err(DispatchErrorCode::InvalidRequest));
         assert_eq!(bytes(&o), before);
     }
+    for action in [
+        json!(["setValue", 0, [42]]),
+        json!(["setKey", 0, [42], null]),
+        json!(["removeKey", 0]),
+        json!(["setAnimated", 0, false]),
+    ] {
+        let p = json!({"command":"object.property.edit","target":target("A"),
+            "property":"opacity","action":action});
+        assert_eq!(
+            o.owner
+                .prepare_property_edit_json(p.to_string().as_bytes())
+                .unwrap_err(),
+            DispatchErrorCode::InvalidRequest
+        );
+        assert_eq!(bytes(&o), before);
+    }
+    let duplicate_action = r#"{"command":"object.property.track.edit","selections":[{"target":{"contextId":"scene-root","layerUid":"A"},"property":"opacity","frame":0}],"action":{"kind":"preset","preset":"hold","preset":"ease"}}"#;
+    assert_eq!(
+        o.owner
+            .prepare_property_track_edit_json(duplicate_action.as_bytes())
+            .unwrap_err(),
+        DispatchErrorCode::InvalidRequest
+    );
     let raw = r#"{"command":"object.property.track.edit","selections":[{"target":{"contextId":"scene-root","layerUid":"A"},"property":"opacity","frame":0,"frame":4}],"action":{"kind":"preset","preset":"hold"}}"#;
     assert!(o
         .owner
