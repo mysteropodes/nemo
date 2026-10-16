@@ -54,6 +54,8 @@ function fixture(t) {
   process.env.PATH = bin + path.delimiter + previous.PATH;
   process.env.NEMO_FAKE_CARGO_MARKER = marker;
   process.env.NEMO_FAKE_EVENTS = events;
+  // Ordinary runs may inherit a Tauri target; this fixture owns its mock target.
+  delete process.env.TAURI_ENV_TARGET_TRIPLE;
   process.env.NEMO_MCP_TARGET = target;
   t.after(() => {
     for (const builderTarget of builderTargets) {

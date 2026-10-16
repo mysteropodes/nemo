@@ -1,0 +1,3012 @@
+{
+  "status": "PRIVATE literal proposal; UNRUN; not results",
+  "sourceHead": "1ecaeb7d146249d6f6b5c0aeacd7ca96c86527aa",
+  "identityBinding": "Exact literals assume first native ObjectSnapshot in an isolated process. A future harness must bind only acquired instance/document/snapshot/revision identity; all targets, order, defaults, flags, categories and errors remain literal. Never force runtime IDs or reset the owner counter.",
+  "sourceSha256": {
+    "native-engine/src/object_properties.rs": "dfbb2e0790570dfadfc390f6eac029503eaacbd8ae24e38369c1e7a13afa5ada",
+    "native-engine/src/object_property_catalog.rs": "ccb887c278dac29b363cc9467b0377d241411e7e30d541c1aa4ee435bd2eb9bc",
+    "native-engine/src/object_property_read.rs": "f488369abeeda5022d9daef34075ea4287a7587181a10084eadd907605e75fd4",
+    "native-engine/src/object_snapshot.rs": "33708493f8a47883b21602aac717dbba07855b7b8aeb1790aec2386f98ff599c",
+    "native-engine/src/object_document.rs": "189c5d3cf6985b544f3b0236f7e0f1f0971332809e310ee72c00412bdced3211",
+    "native-engine/src/object_order_codec.rs": "c8ae82ce3968829f5ffd0d64872d7e74fbac59c0bacbae67738e00ac6c745aba",
+    "src/js/motion.js": "0c478e2e1f494bd744cd1178e9d5cfa05ab4e380131efd76f56f64778fc3fb61"
+  },
+  "document": {
+    "format": "nemo.native-object-document",
+    "formatVersion": 1,
+    "totalFrames": 8,
+    "layers": [
+      {
+        "layerUid": "L0"
+      },
+      {
+        "layerUid": "L1"
+      }
+    ],
+    "objects": [
+      {
+        "schemaVersion": 1,
+        "family": "closed-solid-fill-cubic-path",
+        "target": {
+          "contextId": "scene-root",
+          "frameScope": {
+            "kind": "authored",
+            "frame": 0
+          },
+          "layerUid": "L0",
+          "strokeId": "ink"
+        },
+        "geometry": {
+          "kind": "cubic-path",
+          "closed": true,
+          "coordinateSpace": "document-world",
+          "handleSpace": "relative",
+          "segments": [
+            {
+              "point": {
+                "x": 10.125,
+                "y": 20
+              },
+              "handleIn": {
+                "x": -2,
+                "y": 0
+              },
+              "handleOut": {
+                "x": 3.25,
+                "y": -1
+              }
+            },
+            {
+              "point": {
+                "x": 40,
+                "y": 20
+              },
+              "handleIn": {
+                "x": -3,
+                "y": 2
+              },
+              "handleOut": {
+                "x": 0,
+                "y": 6
+              }
+            },
+            {
+              "point": {
+                "x": 25,
+                "y": 50
+              },
+              "handleIn": {
+                "x": 4,
+                "y": -2
+              },
+              "handleOut": {
+                "x": -5,
+                "y": -3
+              }
+            }
+          ]
+        },
+        "fill": {
+          "kind": "solid",
+          "r": 0.2,
+          "g": 0.4,
+          "b": 0.6,
+          "a": 0.75
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "family": "closed-solid-fill-cubic-path",
+        "target": {
+          "contextId": "scene-root",
+          "frameScope": {
+            "kind": "authored",
+            "frame": 4
+          },
+          "layerUid": "L0",
+          "strokeId": "ink"
+        },
+        "geometry": {
+          "kind": "cubic-path",
+          "closed": true,
+          "coordinateSpace": "document-world",
+          "handleSpace": "relative",
+          "segments": [
+            {
+              "point": {
+                "x": 10.125,
+                "y": 20
+              },
+              "handleIn": {
+                "x": -2,
+                "y": 0
+              },
+              "handleOut": {
+                "x": 3.25,
+                "y": -1
+              }
+            },
+            {
+              "point": {
+                "x": 40,
+                "y": 20
+              },
+              "handleIn": {
+                "x": -3,
+                "y": 2
+              },
+              "handleOut": {
+                "x": 0,
+                "y": 6
+              }
+            },
+            {
+              "point": {
+                "x": 25,
+                "y": 50
+              },
+              "handleIn": {
+                "x": 4,
+                "y": -2
+              },
+              "handleOut": {
+                "x": -5,
+                "y": -3
+              }
+            }
+          ]
+        },
+        "fill": {
+          "kind": "solid",
+          "r": 0.2,
+          "g": 0.4,
+          "b": 0.6,
+          "a": 0.75
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "family": "closed-solid-fill-cubic-path",
+        "target": {
+          "contextId": "scene-root",
+          "frameScope": {
+            "kind": "reference",
+            "frame": 2
+          },
+          "layerUid": "L0",
+          "strokeId": "reference-only"
+        },
+        "geometry": {
+          "kind": "cubic-path",
+          "closed": true,
+          "coordinateSpace": "document-world",
+          "handleSpace": "relative",
+          "segments": [
+            {
+              "point": {
+                "x": 10.125,
+                "y": 20
+              },
+              "handleIn": {
+                "x": -2,
+                "y": 0
+              },
+              "handleOut": {
+                "x": 3.25,
+                "y": -1
+              }
+            },
+            {
+              "point": {
+                "x": 40,
+                "y": 20
+              },
+              "handleIn": {
+                "x": -3,
+                "y": 2
+              },
+              "handleOut": {
+                "x": 0,
+                "y": 6
+              }
+            },
+            {
+              "point": {
+                "x": 25,
+                "y": 50
+              },
+              "handleIn": {
+                "x": 4,
+                "y": -2
+              },
+              "handleOut": {
+                "x": -5,
+                "y": -3
+              }
+            }
+          ]
+        },
+        "fill": {
+          "kind": "solid",
+          "r": 0.2,
+          "g": 0.4,
+          "b": 0.6,
+          "a": 0.75
+        }
+      }
+    ],
+    "propertyHolders": [
+      {
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "controls": [
+          {
+            "key": "xc_number",
+            "name": "Amount",
+            "type": "number"
+          },
+          {
+            "key": "xc_angle",
+            "name": "Angle",
+            "type": "angle"
+          },
+          {
+            "key": "xc_point",
+            "name": "Point",
+            "type": "point",
+            "default": [
+              12,
+              34
+            ]
+          },
+          {
+            "key": "xc_color",
+            "name": "Color",
+            "type": "color"
+          },
+          {
+            "key": "xc_on",
+            "name": "On",
+            "type": "checkbox",
+            "default": [
+              1
+            ]
+          }
+        ],
+        "properties": [
+          {
+            "property": "rotationX",
+            "static": [
+              25
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "documentVariants": {
+    "long-layer": {
+      "format": "nemo.native-object-document",
+      "formatVersion": 1,
+      "totalFrames": 8,
+      "layers": [
+        {
+          "layerUid": "Lxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      ],
+      "objects": []
+    },
+    "long-control-name": {
+      "format": "nemo.native-object-document",
+      "formatVersion": 1,
+      "totalFrames": 8,
+      "layers": [
+        {
+          "layerUid": "L0"
+        },
+        {
+          "layerUid": "L1"
+        }
+      ],
+      "objects": [
+        {
+          "schemaVersion": 1,
+          "family": "closed-solid-fill-cubic-path",
+          "target": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 0
+            },
+            "layerUid": "L0",
+            "strokeId": "ink"
+          },
+          "geometry": {
+            "kind": "cubic-path",
+            "closed": true,
+            "coordinateSpace": "document-world",
+            "handleSpace": "relative",
+            "segments": [
+              {
+                "point": {
+                  "x": 10.125,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -2,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 3.25,
+                  "y": -1
+                }
+              },
+              {
+                "point": {
+                  "x": 40,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -3,
+                  "y": 2
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 6
+                }
+              },
+              {
+                "point": {
+                  "x": 25,
+                  "y": 50
+                },
+                "handleIn": {
+                  "x": 4,
+                  "y": -2
+                },
+                "handleOut": {
+                  "x": -5,
+                  "y": -3
+                }
+              }
+            ]
+          },
+          "fill": {
+            "kind": "solid",
+            "r": 0.2,
+            "g": 0.4,
+            "b": 0.6,
+            "a": 0.75
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "family": "closed-solid-fill-cubic-path",
+          "target": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 4
+            },
+            "layerUid": "L0",
+            "strokeId": "ink"
+          },
+          "geometry": {
+            "kind": "cubic-path",
+            "closed": true,
+            "coordinateSpace": "document-world",
+            "handleSpace": "relative",
+            "segments": [
+              {
+                "point": {
+                  "x": 10.125,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -2,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 3.25,
+                  "y": -1
+                }
+              },
+              {
+                "point": {
+                  "x": 40,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -3,
+                  "y": 2
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 6
+                }
+              },
+              {
+                "point": {
+                  "x": 25,
+                  "y": 50
+                },
+                "handleIn": {
+                  "x": 4,
+                  "y": -2
+                },
+                "handleOut": {
+                  "x": -5,
+                  "y": -3
+                }
+              }
+            ]
+          },
+          "fill": {
+            "kind": "solid",
+            "r": 0.2,
+            "g": 0.4,
+            "b": 0.6,
+            "a": 0.75
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "family": "closed-solid-fill-cubic-path",
+          "target": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "reference",
+              "frame": 2
+            },
+            "layerUid": "L0",
+            "strokeId": "reference-only"
+          },
+          "geometry": {
+            "kind": "cubic-path",
+            "closed": true,
+            "coordinateSpace": "document-world",
+            "handleSpace": "relative",
+            "segments": [
+              {
+                "point": {
+                  "x": 10.125,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -2,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 3.25,
+                  "y": -1
+                }
+              },
+              {
+                "point": {
+                  "x": 40,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -3,
+                  "y": 2
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 6
+                }
+              },
+              {
+                "point": {
+                  "x": 25,
+                  "y": 50
+                },
+                "handleIn": {
+                  "x": 4,
+                  "y": -2
+                },
+                "handleOut": {
+                  "x": -5,
+                  "y": -3
+                }
+              }
+            ]
+          },
+          "fill": {
+            "kind": "solid",
+            "r": 0.2,
+            "g": 0.4,
+            "b": 0.6,
+            "a": 0.75
+          }
+        }
+      ],
+      "propertyHolders": [
+        {
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "controls": [
+            {
+              "key": "xc_number",
+              "name": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+              "type": "number"
+            },
+            {
+              "key": "xc_angle",
+              "name": "Angle",
+              "type": "angle"
+            },
+            {
+              "key": "xc_point",
+              "name": "Point",
+              "type": "point",
+              "default": [
+                12,
+                34
+              ]
+            },
+            {
+              "key": "xc_color",
+              "name": "Color",
+              "type": "color"
+            },
+            {
+              "key": "xc_on",
+              "name": "On",
+              "type": "checkbox",
+              "default": [
+                1
+              ]
+            }
+          ],
+          "properties": [
+            {
+              "property": "rotationX",
+              "static": [
+                25
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "authored-facts": {
+      "format": "nemo.native-object-document",
+      "formatVersion": 1,
+      "totalFrames": 8,
+      "layers": [
+        {
+          "layerUid": "L0"
+        },
+        {
+          "layerUid": "L1"
+        }
+      ],
+      "objects": [
+        {
+          "schemaVersion": 1,
+          "family": "closed-solid-fill-cubic-path",
+          "target": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 0
+            },
+            "layerUid": "L0",
+            "strokeId": "ink"
+          },
+          "geometry": {
+            "kind": "cubic-path",
+            "closed": true,
+            "coordinateSpace": "document-world",
+            "handleSpace": "relative",
+            "segments": [
+              {
+                "point": {
+                  "x": 10.125,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -2,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 3.25,
+                  "y": -1
+                }
+              },
+              {
+                "point": {
+                  "x": 40,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -3,
+                  "y": 2
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 6
+                }
+              },
+              {
+                "point": {
+                  "x": 25,
+                  "y": 50
+                },
+                "handleIn": {
+                  "x": 4,
+                  "y": -2
+                },
+                "handleOut": {
+                  "x": -5,
+                  "y": -3
+                }
+              }
+            ]
+          },
+          "fill": {
+            "kind": "solid",
+            "r": 0.2,
+            "g": 0.4,
+            "b": 0.6,
+            "a": 0.75
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "family": "closed-solid-fill-cubic-path",
+          "target": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 4
+            },
+            "layerUid": "L0",
+            "strokeId": "ink"
+          },
+          "geometry": {
+            "kind": "cubic-path",
+            "closed": true,
+            "coordinateSpace": "document-world",
+            "handleSpace": "relative",
+            "segments": [
+              {
+                "point": {
+                  "x": 10.125,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -2,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 3.25,
+                  "y": -1
+                }
+              },
+              {
+                "point": {
+                  "x": 40,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -3,
+                  "y": 2
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 6
+                }
+              },
+              {
+                "point": {
+                  "x": 25,
+                  "y": 50
+                },
+                "handleIn": {
+                  "x": 4,
+                  "y": -2
+                },
+                "handleOut": {
+                  "x": -5,
+                  "y": -3
+                }
+              }
+            ]
+          },
+          "fill": {
+            "kind": "solid",
+            "r": 0.2,
+            "g": 0.4,
+            "b": 0.6,
+            "a": 0.75
+          }
+        },
+        {
+          "schemaVersion": 1,
+          "family": "closed-solid-fill-cubic-path",
+          "target": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "reference",
+              "frame": 2
+            },
+            "layerUid": "L0",
+            "strokeId": "reference-only"
+          },
+          "geometry": {
+            "kind": "cubic-path",
+            "closed": true,
+            "coordinateSpace": "document-world",
+            "handleSpace": "relative",
+            "segments": [
+              {
+                "point": {
+                  "x": 10.125,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -2,
+                  "y": 0
+                },
+                "handleOut": {
+                  "x": 3.25,
+                  "y": -1
+                }
+              },
+              {
+                "point": {
+                  "x": 40,
+                  "y": 20
+                },
+                "handleIn": {
+                  "x": -3,
+                  "y": 2
+                },
+                "handleOut": {
+                  "x": 0,
+                  "y": 6
+                }
+              },
+              {
+                "point": {
+                  "x": 25,
+                  "y": 50
+                },
+                "handleIn": {
+                  "x": 4,
+                  "y": -2
+                },
+                "handleOut": {
+                  "x": -5,
+                  "y": -3
+                }
+              }
+            ]
+          },
+          "fill": {
+            "kind": "solid",
+            "r": 0.2,
+            "g": 0.4,
+            "b": 0.6,
+            "a": 0.75
+          }
+        }
+      ],
+      "propertyHolders": [
+        {
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "controls": [
+            {
+              "key": "xc_number",
+              "name": "Amount",
+              "type": "number"
+            },
+            {
+              "key": "xc_angle",
+              "name": "Angle",
+              "type": "angle"
+            },
+            {
+              "key": "xc_point",
+              "name": "Point",
+              "type": "point",
+              "default": [
+                12,
+                34
+              ]
+            },
+            {
+              "key": "xc_color",
+              "name": "Color",
+              "type": "color"
+            },
+            {
+              "key": "xc_on",
+              "name": "On",
+              "type": "checkbox",
+              "default": [
+                1
+              ]
+            }
+          ],
+          "properties": [
+            {
+              "property": "rotationX",
+              "static": [
+                25
+              ]
+            },
+            {
+              "property": "anchor",
+              "track": {
+                "keys": []
+              }
+            },
+            {
+              "property": "rotation",
+              "track": {
+                "keys": [
+                  {
+                    "frame": 0,
+                    "v": [
+                      10
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "property": "scale",
+              "track": {
+                "keys": [
+                  {
+                    "frame": 0,
+                    "v": [
+                      100,
+                      100
+                    ]
+                  },
+                  {
+                    "frame": 4,
+                    "v": [
+                      120,
+                      130
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "property": "opacity",
+              "static": [
+                100
+              ]
+            },
+            {
+              "property": "xc_number",
+              "expression": {
+                "enabled": true,
+                "code": ""
+              }
+            },
+            {
+              "property": "xc_angle",
+              "expression": {
+                "enabled": false,
+                "code": "throw new Error(\"must not execute\")"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "targets-small-first-page",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 0,
+          "limit": 2
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "targets",
+        "target": null,
+        "items": [
+          {
+            "kind": "context",
+            "contextId": "scene-root"
+          },
+          {
+            "kind": "layer",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0"
+            }
+          }
+        ],
+        "nextOffset": 2,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "targets-next-page-deduplicates-authored-frames-excludes-reference-only",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 2,
+          "limit": 2
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "targets",
+        "target": null,
+        "items": [
+          {
+            "kind": "element",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0",
+              "strokeId": "ink"
+            }
+          },
+          {
+            "kind": "layer",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L1"
+            }
+          }
+        ],
+        "nextOffset": null,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "exact-terminal-page",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 4,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "targets",
+        "target": null,
+        "items": [],
+        "nextOffset": null,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "base-transform-order-and-control-order-first-page",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 0,
+          "limit": 8
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "position",
+            "dimension": 2,
+            "unit": "px",
+            "defaultValue": [
+              0,
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          },
+          {
+            "property": "anchor",
+            "dimension": 2,
+            "unit": "px",
+            "defaultValue": [
+              0,
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          },
+          {
+            "property": "rotation",
+            "dimension": 1,
+            "unit": "°",
+            "defaultValue": [
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          },
+          {
+            "property": "scale",
+            "dimension": 2,
+            "unit": "%",
+            "defaultValue": [
+              100,
+              100
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          },
+          {
+            "property": "opacity",
+            "dimension": 1,
+            "unit": "%",
+            "defaultValue": [
+              100
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 5,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "control-defaults-and-explicit-overrides",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 8,
+          "limit": 3
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "xc_point",
+            "dimension": 2,
+            "unit": "px",
+            "defaultValue": [
+              12,
+              34
+            ],
+            "animatable": true,
+            "controlType": "point",
+            "controlName": "Point",
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          },
+          {
+            "property": "xc_color",
+            "dimension": 4,
+            "unit": "",
+            "defaultValue": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "animatable": true,
+            "controlType": "color",
+            "controlName": "Color",
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          },
+          {
+            "property": "xc_on",
+            "dimension": 1,
+            "unit": "",
+            "defaultValue": [
+              1
+            ],
+            "animatable": true,
+            "controlType": "checkbox",
+            "controlName": "On",
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": null,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing-holder-stays-absent-and-uses-native-base-descriptions",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L1"
+          },
+          "offset": 0,
+          "limit": 2
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L1"
+        },
+        "items": [
+          {
+            "property": "position",
+            "dimension": 2,
+            "unit": "px",
+            "defaultValue": [
+              0,
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          },
+          {
+            "property": "anchor",
+            "dimension": 2,
+            "unit": "px",
+            "defaultValue": [
+              0,
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 2,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "solid-fill-row-inherits-paint-does-not-invent-a-default-or-consumer",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0",
+            "strokeId": "ink"
+          },
+          "offset": 6,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0",
+          "strokeId": "ink"
+        },
+        "items": [
+          {
+            "property": "fillColor",
+            "dimension": 4,
+            "unit": "",
+            "defaultValue": null,
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": null,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "stored-optional-rotationX-is-described-without-activating-threeD",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "storedProperty",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "property": "rotationX"
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "storedProperty",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "rotationX",
+            "dimension": 1,
+            "unit": "°",
+            "defaultValue": [
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "unavailable",
+              "propertyWrite": "unavailable",
+              "reason": "stored-metadata-does-not-prove-applicability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": true,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": null,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown-layer",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "missing"
+          },
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "expectedError": "not_found"
+    },
+    {
+      "name": "unknown-context",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "unknown",
+            "layerUid": "L0"
+          },
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "expectedError": "not_found"
+    },
+    {
+      "name": "reference-only-stroke-is-not-a-property-holder",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0",
+            "strokeId": "reference-only"
+          },
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "expectedError": "not_found"
+    },
+    {
+      "name": "missing-stored-property",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "storedProperty",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "property": "timeRemap"
+        }
+      },
+      "expectedError": "not_found"
+    },
+    {
+      "name": "stale-snapshot",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:older:0",
+        "view": {
+          "kind": "targets",
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "expectedError": "stale_revision"
+    },
+    {
+      "name": "wrong-document",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-2",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "expectedError": "wrong_document"
+    },
+    {
+      "name": "zero-limit",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 0,
+          "limit": 0
+        }
+      },
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "over-limit",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 0,
+          "limit": 9
+        }
+      },
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "past-end-offset",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 5,
+          "limit": 1
+        }
+      },
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "frame-cannot-enter-stable-target",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0",
+            "frame": 0
+          },
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "duplicate-raw-view-limit",
+      "rawRequest": "{\"instanceId\":\"d35-fixture\",\"documentId\":\"native-object-document-1\",\"atRevision\":0,\"documentSnapshotId\":\"native-object:native-object-document-1:0\",\"view\":{\"kind\":\"targets\",\"offset\":0,\"limit\":1,\"limit\":2}}",
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "byte-budget-shrinks-a-page-without-dropping-the-next-identity",
+      "documentVariant": "long-layer",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 0,
+          "limit": 2
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "targets",
+        "target": null,
+        "items": [
+          {
+            "kind": "context",
+            "contextId": "scene-root"
+          }
+        ],
+        "nextOffset": 1,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "one-unrepresentable-target-is-typed-unavailable-no-nonadvancing-cursor",
+      "documentVariant": "long-layer",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "targets",
+          "offset": 1,
+          "limit": 1
+        }
+      },
+      "expectedError": "unavailable"
+    },
+    {
+      "name": "positional-targets-view-is-invalid",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": [
+          "targets",
+          0,
+          1
+        ]
+      },
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "positional-properties-view-is-invalid",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": [
+          "properties",
+          {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          0,
+          1
+        ]
+      },
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "positional-stored-property-view-is-invalid",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": [
+          "storedProperty",
+          {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "position"
+        ]
+      },
+      "expectedError": "invalid_request"
+    },
+    {
+      "name": "one-unrepresentable-control-name-is-typed-unavailable-without-truncation",
+      "documentVariant": "long-control-name",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 6,
+          "limit": 1
+        }
+      },
+      "expectedError": "unavailable"
+    },
+    {
+      "name": "missing-property-record-has-zero-authored-facts",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "position",
+            "dimension": 2,
+            "unit": "px",
+            "defaultValue": [
+              0,
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 1,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "explicit-empty-track-has-zero-authored-keys",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 1,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "anchor",
+            "dimension": 2,
+            "unit": "px",
+            "defaultValue": [
+              0,
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 2,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "one-authored-key-is-counted",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 2,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "rotation",
+            "dimension": 1,
+            "unit": "°",
+            "defaultValue": [
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 1,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 3,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiple-authored-keys-are-counted",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 3,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "scale",
+            "dimension": 2,
+            "unit": "%",
+            "defaultValue": [
+              100,
+              100
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 2,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 4,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "explicit-static-equal-to-builtin-default-is-authored",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 4,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "opacity",
+            "dimension": 1,
+            "unit": "%",
+            "defaultValue": [
+              100
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": true,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 5,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "enabled-empty-expression-code-is-still-enabled",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 6,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "xc_number",
+            "dimension": 1,
+            "unit": "",
+            "defaultValue": [
+              0
+            ],
+            "animatable": true,
+            "controlType": "number",
+            "controlName": "Amount",
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": true
+            }
+          }
+        ],
+        "nextOffset": 7,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disabled-nonempty-expression-code-is-not-enabled",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 7,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "xc_angle",
+            "dimension": 1,
+            "unit": "°",
+            "defaultValue": [
+              0
+            ],
+            "animatable": true,
+            "controlType": "angle",
+            "controlName": "Angle",
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "available",
+              "keyCount": 0,
+              "hasStaticOverride": false,
+              "expressionEnabled": false
+            }
+          }
+        ],
+        "nextOffset": 8,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    },
+    {
+      "name": "separate-order-owner-facts-are-unavailable-not-false",
+      "documentVariant": "authored-facts",
+      "request": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "view": {
+          "kind": "properties",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "offset": 5,
+          "limit": 1
+        }
+      },
+      "expectedResult": {
+        "instanceId": "d35-fixture",
+        "documentId": "native-object-document-1",
+        "atRevision": 0,
+        "documentSnapshotId": "native-object:native-object-document-1:0",
+        "kind": "properties",
+        "target": {
+          "contextId": "scene-root",
+          "layerUid": "L0"
+        },
+        "items": [
+          {
+            "property": "order",
+            "dimension": 1,
+            "unit": "",
+            "defaultValue": [
+              0
+            ],
+            "animatable": true,
+            "controlType": null,
+            "controlName": null,
+            "availability": {
+              "metadata": "available",
+              "applicability": "available",
+              "propertyWrite": "unavailable",
+              "reason": "read-only-description-not-command-availability"
+            },
+            "authored": {
+              "availability": "unavailable",
+              "reason": "separate-property-owner"
+            }
+          }
+        ],
+        "nextOffset": 6,
+        "unavailableCategories": [
+          {
+            "category": "conditionalMotionRows",
+            "state": "unavailable",
+            "reason": "holder-prerequisite-flags-not-admitted"
+          },
+          {
+            "category": "pathVerticesTrimStrokeBrushMesh",
+            "state": "unavailable",
+            "reason": "required-native-property-consumer-or-kind-discriminator-not-admitted"
+          },
+          {
+            "category": "referenceOnlyElements",
+            "state": "unavailable",
+            "reason": "no-authored-frame-independent-property-target"
+          },
+          {
+            "category": "expressionDiagnostics",
+            "state": "unavailable",
+            "reason": "authored-read-does-not-run-pinned-evaluation"
+          },
+          {
+            "category": "layerEffectMatteReveal",
+            "state": "unavailable",
+            "reason": "layer-owner-flags-not-admitted"
+          },
+          {
+            "category": "propertyWrites",
+            "state": "unavailable",
+            "reason": "read-only-provider-public-property-command-not-admitted"
+          }
+        ]
+      }
+    }
+  ],
+  "authoredFactProvenance": {
+    "baseline": [
+      "src/js/motion.js:634-642",
+      "src/js/motion.js:1205-1209"
+    ],
+    "predicate": "keyCount comes from explicit authored track keys; static override is authored presence even if equal to default; expressionEnabled is the authored enabled flag independent of code emptiness; order/remap facts unavailable because generic storage is not their owner. No evaluation or diagnostics."
+  },
+  "propertyPageOracle": [
+    {
+      "property": "position",
+      "dimension": 2,
+      "unit": "px",
+      "defaultValue": [
+        0,
+        0
+      ],
+      "animatable": true,
+      "controlType": null,
+      "controlName": null,
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "anchor",
+      "dimension": 2,
+      "unit": "px",
+      "defaultValue": [
+        0,
+        0
+      ],
+      "animatable": true,
+      "controlType": null,
+      "controlName": null,
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "rotation",
+      "dimension": 1,
+      "unit": "°",
+      "defaultValue": [
+        0
+      ],
+      "animatable": true,
+      "controlType": null,
+      "controlName": null,
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "scale",
+      "dimension": 2,
+      "unit": "%",
+      "defaultValue": [
+        100,
+        100
+      ],
+      "animatable": true,
+      "controlType": null,
+      "controlName": null,
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "opacity",
+      "dimension": 1,
+      "unit": "%",
+      "defaultValue": [
+        100
+      ],
+      "animatable": true,
+      "controlType": null,
+      "controlName": null,
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "order",
+      "dimension": 1,
+      "unit": "",
+      "defaultValue": [
+        0
+      ],
+      "animatable": true,
+      "controlType": null,
+      "controlName": null,
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "unavailable",
+        "reason": "separate-property-owner"
+      }
+    },
+    {
+      "property": "xc_number",
+      "dimension": 1,
+      "unit": "",
+      "defaultValue": [
+        0
+      ],
+      "animatable": true,
+      "controlType": "number",
+      "controlName": "Amount",
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "xc_angle",
+      "dimension": 1,
+      "unit": "°",
+      "defaultValue": [
+        0
+      ],
+      "animatable": true,
+      "controlType": "angle",
+      "controlName": "Angle",
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "xc_point",
+      "dimension": 2,
+      "unit": "px",
+      "defaultValue": [
+        12,
+        34
+      ],
+      "animatable": true,
+      "controlType": "point",
+      "controlName": "Point",
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "xc_color",
+      "dimension": 4,
+      "unit": "",
+      "defaultValue": [
+        255,
+        255,
+        255,
+        255
+      ],
+      "animatable": true,
+      "controlType": "color",
+      "controlName": "Color",
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    },
+    {
+      "property": "xc_on",
+      "dimension": 1,
+      "unit": "",
+      "defaultValue": [
+        1
+      ],
+      "animatable": true,
+      "controlType": "checkbox",
+      "controlName": "On",
+      "availability": {
+        "metadata": "available",
+        "applicability": "available",
+        "propertyWrite": "unavailable",
+        "reason": "read-only-description-not-command-availability"
+      },
+      "authored": {
+        "availability": "available",
+        "keyCount": 0,
+        "hasStaticOverride": false,
+        "expressionEnabled": false
+      }
+    }
+  ]
+}

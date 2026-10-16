@@ -24,6 +24,11 @@ const CANDIDATE_FILES = [
   POLICY,
   PROFILE,
   'engineering/boundaries/profiles/rust.coverage.json',
+  'engineering/boundaries/profiles/mcp-rust.profile.json',
+  'native-engine/tests/object_property_metadata_dispatch.rs',
+  'nemo-mcp/src/native_property_metadata_contract.rs',
+  'nemo-mcp/src/native_property_metadata_wire_tests.rs',
+  'src-tauri/src/native_property_metadata_dispatch_tests.rs',
   'native-engine/Cargo.toml',
   'native-engine/src/lib.rs',
   'native-engine/src/commands.rs',
@@ -57,6 +62,9 @@ const CANDIDATE_FILES = [
   'native-engine/tests/reference_image_asset.rs',
   'native-engine/tests/reference_png_scanlines.rs',
   'native-engine/src/object_snapshot.rs',
+  'native-engine/src/object_property_metadata_read.rs',
+  'native-engine/tests/object_property_metadata_read.rs',
+  'engineering/application/examples/native-property-metadata-v1/cases.json',
   'native-engine/src/object_reference_revision.rs',
   'native-engine/src/object_frame_packet.rs',
   'native-engine/src/object_expression_pin.rs',
@@ -562,6 +570,21 @@ test('D12 property curve children remain registered and private', () => {
   }
 });
 
+test('D35 snapshot metadata children remain private and registered', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.provenance.nativePropertyMetadataReadRegistration, /D35\/#2099/);
+  for (const [id, dir] of [
+    ['rust.native.engine.read-queries', 'src'], ['rust.native.engine.tests', 'tests'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    const file = 'object_property_metadata_read.rs';
+    assert.equal(owner.files.filter((name) => name === file).length, 1);
+    assert.equal(owner.publicApi.includes(file), false);
+    assert.ok(CANDIDATE_FILES.includes(`native-engine/${dir}/${file}`));
+  }
+});
+
 test('D25 camera kernel stays a private evaluation child and fails closed without registration', () => {
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
@@ -605,6 +628,25 @@ test('D31 3D projection kernel stays a private evaluation child and fails closed
     const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
     assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
       `${file} must fail when unregistered`);
+  }
+});
+
+test('D35 public metadata children keep their existing private owners', () => {
+  const profile = readJson(ROOT, PROFILE);
+  assert.match(readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json')
+    .provenance.nativePropertyMetadataPublicRegistration, /D35\/#2099/);
+  for (const [id, relative] of [["rust.native.engine.tests", "native-engine/tests/object_property_metadata_dispatch.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_contract.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_wire_tests.rs"], ["rust.desktop.native.host.release.tests", "src-tauri/src/native_property_metadata_dispatch_tests.rs"]]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    const file = relative.slice(owner.dir.length + 1);
+    assert.equal(owner.files.filter((name) => name === file).length, 1);
+    assert.equal(owner.publicApi.includes(file), false);
+    assert.ok(CANDIDATE_FILES.includes(relative));
+  }
+  const mcp = readJson(ROOT, 'engineering/boundaries/profiles/mcp-rust.profile.json');
+  const owner = mcp.modules.find((entry) => entry.id === 'mcp.transport');
+  for (const file of ['src/native_property_metadata_contract.rs', 'src/native_property_metadata_wire_tests.rs']) {
+    assert.equal(owner.files.filter((name) => name === file).length, 1);
+    assert.equal(owner.publicApi.includes(file), false);
   }
 });
 
@@ -1076,6 +1118,53 @@ test('isolated negative controls fail closed and restore every touched byte', (t
   ]))];
   const original = snapshot(clone, touched), source = snapshot(ROOT, CANDIDATE_FILES);
   try {
+    // Use the full discovered Rust inventory. A partial source list would
+    // report every other declared member as missing and hide restoration bugs.
+    const d35Profile = readJson(clone, PROFILE);
+    const d35Discovered = discoverRepositoryFiles({ root: clone });
+    assert.equal(d35Discovered.ok, true);
+    assert.deepEqual(d35Discovered.diagnostics, []);
+    const d35Sources = d35Discovered.entries.filter((entry) => entry.path.endsWith('.rs')).map((entry) => entry.path);
+    const d35Exclusions = readJson(clone, 'engineering/boundaries/profiles/rust.coverage.json').exclusions;
+    const d35Coverage = () => checkSourceCoverage(readJson(clone, PROFILE), {
+      root: clone, sourcePaths: d35Sources, exclusions: d35Exclusions,
+    });
+    assert.deepEqual(d35Coverage().violations, []);
+    for (const [id, dir] of [
+      ['rust.native.engine.read-queries', 'src'], ['rust.native.engine.tests', 'tests'],
+    ]) {
+      const file = 'object_property_metadata_read.rs';
+      const relative = `native-engine/${dir}/${file}`;
+      assert.ok(d35Sources.includes(relative));
+      const sourceBytes = fs.readFileSync(path.join(clone, relative));
+      const missing = structuredClone(d35Profile);
+      const owner = missing.modules.find((entry) => entry.id === id);
+      owner.files = owner.files.filter((name) => name !== file);
+      fs.writeFileSync(path.join(clone, PROFILE), JSON.stringify(missing));
+      assert.deepEqual(d35Coverage().violations.map((entry) => [entry.rule, entry.file]),
+        [['coverage-unprofiled-source', relative]]);
+      restore(clone, new Map([[PROFILE, original.get(PROFILE)]]));
+      assert.deepEqual(fs.readFileSync(path.join(clone, relative)), sourceBytes);
+      assert.deepEqual(fs.readFileSync(path.join(clone, PROFILE)), original.get(PROFILE));
+      assert.deepEqual(d35Coverage().violations, []);
+    }
+
+    for (const [id, relative] of [["rust.native.engine.tests", "native-engine/tests/object_property_metadata_dispatch.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_contract.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_wire_tests.rs"], ["rust.desktop.native.host.release.tests", "src-tauri/src/native_property_metadata_dispatch_tests.rs"]]) {
+      assert.ok(d35Sources.includes(relative));
+      const sourceBytes = fs.readFileSync(path.join(clone, relative));
+      const missing = structuredClone(d35Profile);
+      const owner = missing.modules.find((entry) => entry.id === id);
+      const file = relative.slice(owner.dir.length + 1);
+      owner.files = owner.files.filter((name) => name !== file);
+      fs.writeFileSync(path.join(clone, PROFILE), JSON.stringify(missing));
+      assert.deepEqual(d35Coverage().violations.map((entry) => [entry.rule, entry.file]),
+        [['coverage-unprofiled-source', relative]]);
+      restore(clone, new Map([[PROFILE, original.get(PROFILE)]]));
+      assert.deepEqual(fs.readFileSync(path.join(clone, relative)), sourceBytes);
+      assert.deepEqual(fs.readFileSync(path.join(clone, PROFILE)), original.get(PROFILE));
+      assert.deepEqual(d35Coverage().violations, []);
+    }
+
     // Remove real memberships from the cloned profile one at a time. Source
     // files remain present, so each missing registration must be detected.
     const registered = readJson(clone, PROFILE);
