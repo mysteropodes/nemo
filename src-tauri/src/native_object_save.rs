@@ -5,7 +5,12 @@ use crate::native_application_contract::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{fs, fs::File, io::Write, path::Path};
+use std::{
+    fs,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 use tauri_plugin_fs::FsExt;
 
 #[derive(Deserialize)]
@@ -59,10 +64,101 @@ fn cleanup(path: &Path, file: &File) -> bool {
     owned_regular(path, file) && fs::remove_file(path).is_ok()
 }
 
+// No exported/Clone permit and no shared scope mutation. The core always asks
+// about the explicit destination/stage pair; callback invocation order is not an API.
+trait PublicationAuthority {
+    fn allows(&self, destination: &Path, staged: &Path) -> bool;
+}
+
+struct ExistingScope<F>(F);
+impl<F: Fn(&Path) -> bool> PublicationAuthority for ExistingScope<F> {
+    fn allows(&self, destination: &Path, staged: &Path) -> bool {
+        (self.0)(destination) && (self.0)(staged)
+    }
+}
+
+struct SelectedFilePermit<F> {
+    destination: PathBuf,
+    staged: PathBuf,
+    scope: tauri::fs::Scope,
+    allowed_destination: F,
+}
+
+impl<F: Fn(&Path) -> bool> SelectedFilePermit<F> {
+    fn new<R: tauri::Runtime, M: tauri::Manager<R>>(
+        manager: &M,
+        destination: &Path,
+        staged: &Path,
+        allowed_destination: F,
+    ) -> HostResult<Self> {
+        let denied = || host_error("unavailable", "object selected-file permit refused");
+        // The core canonicalizes the parent and generates this one UUID stage.
+        // Reaffirm the exact same-directory pair before extending a fresh scope.
+        if destination == staged
+            || destination.parent() != staged.parent()
+            || !destination.is_absolute()
+            || !staged.is_absolute()
+            || !allowed_destination(destination)
+        {
+            return Err(denied());
+        }
+        let scope = tauri::fs::Scope::new(manager, &tauri::utils::config::FsScope::default())
+            .map_err(|_| denied())?;
+        scope.allow_file(destination).map_err(|_| denied())?;
+        scope.allow_file(staged).map_err(|_| denied())?;
+        let permit = Self {
+            destination: destination.to_path_buf(),
+            staged: staged.to_path_buf(),
+            scope,
+            allowed_destination,
+        };
+        if !permit.allows(destination, staged) {
+            return Err(denied());
+        }
+        Ok(permit)
+    }
+}
+
+impl<F: Fn(&Path) -> bool> PublicationAuthority for SelectedFilePermit<F> {
+    fn allows(&self, destination: &Path, staged: &Path) -> bool {
+        destination == self.destination
+            && staged == self.staged
+            && (self.allowed_destination)(&self.destination)
+            && self.scope.is_allowed(destination)
+            && self.scope.is_allowed(staged)
+    }
+}
+
 pub(super) fn save_request(
     state: &ApplicationMcp,
     raw: &str,
     allowed: impl Fn(&Path) -> bool,
+    effect: impl FnMut(&str, &Path) -> std::io::Result<()>,
+) -> HostResult<SaveReceipt> {
+    save_with_authority(state, raw, |_, _| Ok(ExistingScope(allowed)), effect)
+}
+
+pub(super) fn save_selected_request<R: tauri::Runtime, M: tauri::Manager<R>>(
+    manager: &M,
+    state: &ApplicationMcp,
+    raw: &str,
+    allowed_destination: impl Fn(&Path) -> bool,
+    effect: impl FnMut(&str, &Path) -> std::io::Result<()>,
+) -> HostResult<SaveReceipt> {
+    save_with_authority(
+        state,
+        raw,
+        |destination, staged| {
+            SelectedFilePermit::new(manager, destination, staged, allowed_destination)
+        },
+        effect,
+    )
+}
+
+fn save_with_authority<A: PublicationAuthority>(
+    state: &ApplicationMcp,
+    raw: &str,
+    authorize: impl FnOnce(&Path, &Path) -> HostResult<A>,
     mut effect: impl FnMut(&str, &Path) -> std::io::Result<()>,
 ) -> HostResult<SaveReceipt> {
     let invalid = || host_error("invalid_request", "invalid object Save As request");
@@ -112,7 +208,8 @@ pub(super) fn save_request(
     }
     let destination = parent.join(name);
     let staged = parent.join(format!("nemo-object-{}.tmp", uuid::Uuid::new_v4()));
-    if !allowed(&destination) || !allowed(&staged) {
+    let authority = authorize(&destination, &staged)?;
+    if !authority.allows(&destination, &staged) {
         return Err(host_error(
             "unavailable",
             "object destination outside existing filesystem scope",
@@ -140,6 +237,12 @@ pub(super) fn save_request(
     }
     effect("create", &staged)
         .map_err(|_| host_error("unavailable", "object staging preparation refused"))?;
+    if !authority.allows(&destination, &staged) {
+        return Err(host_error(
+            "unavailable",
+            "object publication scope revoked",
+        ));
+    }
     let mut file = options
         .open(&staged)
         .map_err(|_| host_error("unavailable", "object staging creation refused"))?;
@@ -151,6 +254,9 @@ pub(super) fn save_request(
         effect("link", &staged)?;
         if !owned_regular(&staged, &file) {
             return Err(std::io::Error::other("staging identity changed"));
+        }
+        if !authority.allows(&destination, &staged) {
+            return Err(std::io::Error::other("publication scope revoked"));
         }
         // Atomic no-replace publication. Scope/check/open/link are still separate
         // path operations: adversarial parent/staging replacement is not solved.
@@ -221,7 +327,8 @@ pub(crate) fn nemo_native_object_save_as(
     request_json: String,
 ) -> HostResult<SaveReceipt> {
     require_main(&window)?;
-    save_request(
+    save_selected_request(
+        &window,
         &state,
         &request_json,
         |path| {
@@ -231,4 +338,52 @@ pub(crate) fn nemo_native_object_save_as(
         },
         |_, _| Ok(()),
     )
+}
+
+#[cfg(test)]
+mod selected_permit_tests {
+    use super::*;
+
+    #[test]
+    fn selected_file_permit_requires_the_exact_ordered_pair() {
+        let app = tauri::test::mock_app();
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        let destination = parent.join(format!("selected-{}.nemo", uuid::Uuid::new_v4()));
+        let staged = parent.join(format!("nemo-object-{}.tmp", uuid::Uuid::new_v4()));
+        let other = parent.join(format!("other-{}.tmp", uuid::Uuid::new_v4()));
+        let permit =
+            SelectedFilePermit::new(&app, &destination, &staged, |p| p == destination).unwrap();
+        assert!(permit.allows(&destination, &staged));
+        assert!(!permit.allows(&staged, &destination));
+        assert!(!permit.allows(&other, &staged));
+        assert!(!permit.allows(&destination, &other));
+        assert!(!permit.scope.is_allowed(&other));
+        assert!(!permit.scope.is_allowed(&parent));
+    }
+
+    #[test]
+    fn selected_file_permit_uses_a_fresh_scope_without_global_or_sibling_grants() {
+        let app = tauri::test::mock_app();
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        let destination = parent.join(format!("selected-{}.nemo", uuid::Uuid::new_v4()));
+        let staged = parent.join(format!("nemo-object-{}.tmp", uuid::Uuid::new_v4()));
+        let other = parent.join(format!("nemo-object-{}.tmp", uuid::Uuid::new_v4()));
+        let runtime =
+            tauri::fs::Scope::new(&app, &tauri::utils::config::FsScope::default()).unwrap();
+        runtime.allow_file(&destination).unwrap();
+        let permit =
+            SelectedFilePermit::new(&app, &destination, &staged, |p| runtime.is_allowed(p))
+                .unwrap();
+        assert!(permit.allows(&destination, &staged));
+        assert!(!runtime.is_allowed(&staged));
+        assert!(!runtime.is_allowed(&other));
+        let sibling =
+            SelectedFilePermit::new(&app, &destination, &other, |p| runtime.is_allowed(p)).unwrap();
+        assert!(!permit.scope.is_allowed(&other));
+        assert!(!sibling.scope.is_allowed(&staged));
+        drop(permit);
+        assert!(!runtime.is_allowed(&staged));
+        runtime.forbid_file(&destination).unwrap();
+        assert!(!sibling.allows(&destination, &other));
+    }
 }
