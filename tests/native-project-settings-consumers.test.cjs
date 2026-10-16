@@ -130,8 +130,25 @@ test('F04 delayed native width/height input then change preserves locked and unl
   root.SM={setCanvasSize(w,height){const request=intent.edit({kind:'setCanvasSize',width:w,height});requests.push(request);return request;}};
   const start=h.timeline.indexOf('var _dimsLockRatio=null;'),end=h.timeline.indexOf('// Paint the panel',start),change=h.timeline.split('\n').find(line=>line.startsWith("document.getElementById('"+id+"').addEventListener('change'"));
   vm.runInNewContext(h.timeline.slice(start,end)+'\n'+change,{window:root,state:root.state,document:root.document});if(locked)root.document.nodes.get('btn-dims-lock').click();
-  const field=root.document.nodes.get(id);field.dispatch('focus');field.value=id==='p-cw'?'640':'360';field.dispatch('input');field.dispatch('change');
+  const field=root.document.nodes.get(id);field.dispatch('focus');field.value='';field.dispatch('input');
+  assert.equal(calls.length,0,'clearing a dimension must not publish a coerced 1');assert.equal(requests.length,0);
+  field.value=id==='p-cw'?'640':'360';field.dispatch('input');field.dispatch('change');
   assert.equal(calls.length,1);assert.equal(requests.length,2);assert.equal(root.state.canvasW,320);assert.equal(root.state.canvasH,180);release();await Promise.all(requests);
   assert.deepEqual([info.canvasW,info.canvasH],locked?[640,360]:id==='p-cw'?[640,180]:[320,360],id+' ratio='+locked);assert.equal(publications,1);assert.equal(calls.length,2);assert.equal((await requests[1]).status,'unchanged');
+ }
+});
+
+test('F04 native dimension draft guard rejects invalid input/change but preserves authored one and live ratios',()=>{
+ for(const id of['p-cw','p-ch'])for(const locked of[true,false]){
+  const p=h.panel(),root=p.root,calls=[];root.SM={setCanvasSize:(w,height)=>calls.push([w,height])};h.nativeRender(p);
+  const start=h.timeline.indexOf('var _dimsLockRatio=null;'),end=h.timeline.indexOf('// Paint the panel',start);
+  const changes=['p-cw','p-ch'].map(key=>h.timeline.split('\n').find(line=>line.startsWith("document.getElementById('"+key+"').addEventListener('change'"))).join('\n');
+  vm.runInNewContext(h.timeline.slice(start,end)+'\n'+changes,{window:root,state:root.state,document:root.document});
+  if(locked)root.document.nodes.get('btn-dims-lock').click();const field=root.document.nodes.get(id);field.dispatch('focus');
+  for(const value of['',' ','0','-','-1','1.5','Infinity','NaN','4294967296','1e3'])for(const event of['input','change']){field.value=value;field.dispatch(event);assert.equal(calls.length,0,id+' '+event+' '+JSON.stringify(value));}
+  field.value='1';field.dispatch('input');field.dispatch('change');assert.equal(calls.length,2);assert.equal(calls[0][id==='p-cw'?0:1],1);
+  field.value=id==='p-cw'?'640':'360';field.dispatch('input');field.dispatch('change');
+  assert.deepEqual(calls.slice(2),[locked?[640,360]:id==='p-cw'?[640,180]:[320,360],locked?[640,360]:id==='p-cw'?[640,180]:[320,360]]);
+  assert.deepEqual([root.state.canvasW,root.state.canvasH],[320,180],'UI must not become the document writer');
  }
 });
