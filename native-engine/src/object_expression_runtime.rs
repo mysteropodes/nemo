@@ -9,7 +9,8 @@ use crate::object_frame_packet::{
     ObjectFrameError, ObjectFramePacket, ObjectFrameSelector,
 };
 use crate::revision::ObjectSnapshot;
-use rquickjs::{context::intrinsic, Context, Ctx, Error, Function, Runtime, Value};
+use rquickjs::{context::intrinsic, qjs, Context, Ctx, Error, FromJs, Function, Runtime, Value};
+use std::ffi::{c_char, CString};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -268,19 +269,50 @@ fn with_context<T>(
     result
 }
 
-/// The expression form first, then a statement body on a SyntaxError.
+// #2088: from the vendored patch (third_party/rquickjs-sys-0.14.0.PROVENANCE.md);
+// without it linking fails, so a whole-script evaluation is never a fallback.
+extern "C" {
+    fn JS_EvalSingleFunction(
+        ctx: *mut qjs::JSContext,
+        input: *const c_char,
+        input_len: usize,
+        filename: *const c_char,
+    ) -> qjs::JSValue;
+}
+
+/// Exactly one function expression, then EOF; only its closure is created.
+/// Kind and parameters come from `source` (`function *` is a generator), so
+/// `compile` fixes both with its prefix. Unlike `ctx.eval`, a stored callback
+/// panic is not resumed; the only callback is the non-panicking interrupt.
+fn eval_single_function<'js>(ctx: &Ctx<'js>, source: &str) -> rquickjs::Result<Function<'js>> {
+    let src = CString::new(source)?;
+    // Safety: `src` is NUL-terminated and outlives the call, which returns an
+    // owned value of this context or the exception sentinel.
+    unsafe {
+        let raw = JS_EvalSingleFunction(ctx.as_raw().as_ptr(), src.as_ptr(), source.len(), FILE);
+        if qjs::JS_VALUE_GET_NORM_TAG(raw) == qjs::JS_TAG_EXCEPTION {
+            return Err(Error::Exception);
+        }
+        Function::from_js(ctx, Value::from_raw(ctx.clone(), raw))
+    }
+}
+
+const FILE: *const c_char = c"eval_script".as_ptr(); // rquickjs's default name
+
+/// The expression form first, then a statement body on a SyntaxError. Guest
+/// text follows the fixed prefix; ending the function early is a SyntaxError.
 fn compile<'js>(
     ctx: &Ctx<'js>,
     code: &str,
     fail: &Fail,
 ) -> Result<Function<'js>, (ExpressionRefusal, String)> {
-    let expression = format!("(function(value,frame){{'use strict';return ({code}\n);}})");
-    match ctx.eval(expression) {
+    let expression = format!("function(value,frame){{'use strict';return ({code}\n);}}");
+    match eval_single_function(ctx, &expression) {
         Ok(function) => Ok(function),
         Err(error) => match fail.of(ctx, error) {
             (ExpressionRefusal::Syntax, _) => {
-                let body = format!("(function(value,frame){{'use strict';{code}\n}})");
-                ctx.eval(body).map_err(|error| fail.of(ctx, error))
+                let body = format!("function(value,frame){{'use strict';{code}\n}}");
+                eval_single_function(ctx, &body).map_err(|error| fail.of(ctx, error))
             }
             other => Err(other),
         },

@@ -295,7 +295,6 @@ fn a_candidate_from_an_old_revision_is_never_published() {
 }
 
 #[test]
-#[ignore = "pending Lead decision on #2088: the shared compile wrapper can be closed"]
 fn code_cannot_close_the_compiled_wrapper() {
     // Motion parses the body alone with Function(), where this is a syntax
     // error: the guest never runs, even past the depth cap.
@@ -313,6 +312,27 @@ fn code_cannot_close_the_compiled_wrapper() {
             );
             assert!(r.disable.is_none());
         }
+    }
+}
+
+// The defect #2088 repairs, kept as a control: the previous `compile`
+// evaluated this concatenated wrapper as a whole script (`ctx.eval`, i.e.
+// `JS_Eval`), so the breakout statement ran at compile time.
+#[test]
+fn concatenated_wrapper_ran_breakouts_as_a_script() {
+    use rquickjs::{Context, Function, Runtime};
+    let breakout = "1);})(), (ran = ran + 1), (function(){return (1";
+    let rt = Runtime::new().unwrap();
+    let context = Context::full(&rt).unwrap();
+    context.with(|ctx| {
+        ctx.globals().set("ran", 0).unwrap();
+        let old = format!("(function(value,frame){{'use strict';return ({breakout}\n);}})");
+        assert!(ctx.eval::<Function, _>(old).is_ok());
+        assert_eq!(ctx.globals().get::<_, i32>("ran").unwrap(), 1);
+    });
+    for depth in [0, 8] {
+        let r = run("opacity", breakout, 0., depth);
+        assert_eq!((r.value, kind(&r.diagnostic)), (vec![50.], Kind::Syntax));
     }
 }
 
