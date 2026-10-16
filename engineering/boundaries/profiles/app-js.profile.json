@@ -2142,12 +2142,12 @@
     },
     {
       "id": "app.native.object.project-metadata.adapter",
-      "layer": "adapters",
+      "layer": "domain",
       "dir": "src/js/adapters",
       "files": [
         "native-object-project-metadata.js"
       ],
-      "sizeProfile": "Platform/engine adapter",
+      "sizeProfile": "Domain/application",
       "publicApi": [
         "native-object-project-metadata.js"
       ]

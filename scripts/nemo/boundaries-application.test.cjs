@@ -428,8 +428,8 @@ test('F06 project metadata parser has ordinary membership with real missing and 
   const profile = read('app-js.profile.json'), id = 'app.native.object.project-metadata.adapter';
   const members = profile.modules.filter((module) => module.id === id);
   assert.equal(members.length, 1);
-  assert.deepEqual(members[0], {id, layer: 'adapters', dir: 'src/js/adapters',
-    files: ['native-object-project-metadata.js'], sizeProfile: 'Platform/engine adapter',
+  assert.deepEqual(members[0], {id, layer: 'domain', dir: 'src/js/adapters',
+    files: ['native-object-project-metadata.js'], sizeProfile: 'Domain/application',
     publicApi: ['native-object-project-metadata.js']});
   const {checkSourceCoverage} = require('./lib/boundaries-coverage.cjs');
   const options = {root: ROOT, sourcePaths: ['src/js/adapters/native-object-project-metadata.js'], exclusions: []};
