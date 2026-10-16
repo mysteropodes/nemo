@@ -3,7 +3,7 @@ use super::{
     object_deserialize, FrameScopeKind, ObjectLayer, ObjectRecord, OrderExpression, OrderPlan,
     OrderTrack, Presence,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use std::collections::HashSet;
 
