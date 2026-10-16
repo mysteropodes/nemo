@@ -423,14 +423,7 @@ fn public_creation_uses_one_owner_receipt_history_and_preserves_existing_objects
         crate::application_mcp::object_client::dispatch_raw(&state, &raw).is_err(),
         "private route cannot bypass operation admission"
     );
-    let public = |value: &Value| {
-        serde_json::to_value(
-            state
-                .dispatch_native(serde_json::from_value(value.clone()).unwrap())
-                .unwrap(),
-        )
-        .unwrap()
-    };
+    let public = |value: &Value| timing_tests::public(&state, value.clone());
     let created = public(&create);
     assert_eq!(created["ok"], true);
     assert_eq!(created["contentRevision"], 1);
