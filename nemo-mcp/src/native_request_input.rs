@@ -54,8 +54,11 @@ impl NativeApplicationRequest {
             "command.document.object.layer.visibility.set"
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
+                | crate::native_contract::font::IMPORT
         ) {
-            let action = if self.operation.ends_with(".settings.edit") {
+            let action = if self.operation == crate::native_contract::font::IMPORT {
+                "font import"
+            } else if self.operation.ends_with(".settings.edit") {
                 "project settings"
             } else if self.operation.ends_with(".create") {
                 "creation"

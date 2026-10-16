@@ -16,6 +16,9 @@ use std::collections::BTreeMap;
 mod inactive_requests;
 use inactive_requests::InactiveRequest;
 
+#[path = "native_object_font.rs"]
+mod font_assets;
+
 #[path = "native_object_export.rs"]
 mod export;
 #[path = "native_object_preview.rs"]
@@ -212,6 +215,18 @@ impl NativeObjectHost {
         self.inactive_requests.clear();
         self.object_export = None;
         self.released = None;
+        Ok(())
+    }
+
+    pub(crate) fn require_project_output(&self, dimensions: (u32, u32)) -> Result<(), String> {
+        let expected = self
+            .history
+            .project_canvas_dimensions()
+            .map_err(|_| "native project dimensions unavailable")?
+            .unwrap_or((320, 180)); // Preserve the bare-object compatibility contract.
+        if dimensions != expected {
+            return Err("object output extent differs from the owned project".into());
+        }
         Ok(())
     }
 

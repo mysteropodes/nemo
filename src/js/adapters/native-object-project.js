@@ -301,6 +301,10 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
+    function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
+      var submitted=epoch(info);return enqueue(async function(){guardEpoch(submitted);return action({dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
+        reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
+          changed();await present(ports.frame?ports.frame():0,next);return next;}});});}
     function reference(action){return mutation(function(pin){return {apiVersion:2,requestId:requestId('reference'),instanceId:pin.instanceId,
       documentId:pin.documentId,lifecycleGeneration:pin.lifecycleGeneration,expectedRevision:pin.contentRevision,
       documentSnapshotId:pin.documentSnapshotId,action:typeof action==='function'?action(pin.reference):action};},'nemo_native_object_reference');}
@@ -391,7 +395,7 @@
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
     return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
-      info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
       get editProjectSettings(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editProjectSettings:undefined;},
       get createLayer(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&

@@ -20,6 +20,28 @@
     var fonts = options.fonts;
     var cache = new Map();
     var active = true;
+    var nativeResources = null;
+    function native(){if(!nativeResources)nativeResources=options.nativeResources();return nativeResources;}
+    var nativeOwner=null,nativePending=new Map();
+    function nativeLoad(source,key,spec,signal){
+      return Promise.resolve().then(function(){
+        requireActive();if(signal&&signal.aborted)throw new Error('Native font selection cancelled');var resources=native(),pin=resources.ownerKey();
+        if(pin!==nativeOwner){nativePending.clear();nativeOwner=pin;}
+        var token=JSON.stringify(source);
+        if(nativePending.has(token))return nativeReuse(nativePending.get(token),pin,signal);
+        var pending=resources.importSource(source,signal).then(function(value){
+          requireActive();if(resources.ownerKey()!==pin||signal&&signal.aborted)throw new Error('Native font selection changed');
+          if(spec)fonts[key]=spec;return value;
+        }).catch(function(error){if(error.code!=='font_import_indeterminate'&&nativePending.get(token)===pending)nativePending.delete(token);throw error;});
+        nativePending.set(token,pending);return pending.then(function(value){return value.font;});
+      });
+    }
+    function nativeReuse(pending,pin,signal){
+      function selection(){requireActive();if(signal&&signal.aborted)throw new Error('Native font selection cancelled');}selection();
+      return pending.then(function(value){selection();return native().loadAsset(value.assetId);}).then(function(font){
+        requireActive();if(native().ownerKey()!==pin||signal&&signal.aborted)throw new Error('Native font selection changed');return font;
+      });
+    }
     var decode = options.decodeBase64 || decodeBase64;
 
     function requireActive() {
@@ -49,7 +71,17 @@
       return pending;
     }
 
-    function load(key) {
+    function load(key, signal) {
+      if(options.nativeResources){
+        if(!active)return Promise.reject(new Error('font assets disposed'));
+        if(key.indexOf('Google:')===0){
+          return Promise.resolve().then(function(){var pin=native().ownerKey();if(pin!==nativeOwner)throw new Error('Native Google font binding requires rediscovery');
+            var entries=Array.from(nativePending.entries()).filter(function(entry){var source=JSON.parse(entry[0]);return source.kind==='google'&&'Google:'+source.family+'-'+(source.weight>=600?'Bold':'Regular')===key;});
+            if(entries.length!==1)throw new Error('Native Google font binding is ambiguous or unavailable');return nativeReuse(entries[0][1],pin,signal);});
+        }
+        if(!Object.prototype.hasOwnProperty.call(fonts,key))return Promise.reject(new Error('unknown vector font '+key));
+        return nativeLoad({kind:'bundled',fontKey:key},key,null,signal);
+      }
       if (!active) return Promise.reject(new Error('font assets disposed'));
       if (cache.has(key)) return cache.get(key);
       var spec = Object.prototype.hasOwnProperty.call(fonts, key) && fonts[key];
@@ -63,7 +95,12 @@
 
     // Same desktop command and web Worker as the retained bridge. Desktop
     // failure is reported; it must not silently retry through another route.
-    function googleWeight(family, weight, italic) {
+    function googleWeight(family, weight, italic, signal) {
+      if(options.nativeResources){
+        if(!active)return Promise.reject(new Error('font assets disposed'));
+        return nativeLoad({kind:'google',family:family,weight:weight,italic:!!italic},
+          'Google:'+family+'-'+(weight>=600?'Bold':'Regular'),{url:null,label:family+(weight>=600?' Bold':'')},signal);
+      }
       var key = 'Google:' + family + '-' + (weight >= 600 ? 'Bold' : 'Regular');
       return request(key, function () {
         if (options.isDesktop()) {
@@ -79,11 +116,11 @@
     }
 
     function addGoogle(family) {
-      family = (family || '').trim();
+      family = options.nativeResources ? (family || '') : (family || '').trim();
       if (!family) return Promise.reject(new Error('empty family name'));
       return googleWeight(family, 400, false).then(function () {
         requireActive();
-        googleWeight(family, 700, false).catch(function () {});
+        if(!options.nativeResources)googleWeight(family, 700, false).catch(function () {});
         return 'Google:' + family + '-Regular';
       });
     }
@@ -91,14 +128,23 @@
     function dispose() {
       active = false;
       cache.clear();
+      nativePending.clear();
+      if(nativeResources)nativeResources.dispose();
     }
 
     // A renderer may await a requested weight before its catalog entry is
     // accepted. This preserves live Bold selection without advertising it.
-    function hasLoad(key) { return active && cache.has(key); }
+    function hasLoad(key) {
+      if(options.nativeResources){try{return active&&native().ownerKey()===nativeOwner&&Array.from(nativePending.keys()).some(function(token){
+        var source=JSON.parse(token);return (source.kind==='bundled'?source.fontKey:'Google:'+source.family+'-'+(source.weight>=600?'Bold':'Regular'))===key;
+      });}catch(_){return false;}}
+      return active && cache.has(key);
+    }
 
     return Object.freeze({ fonts: fonts, load: load, googleWeight: googleWeight,
-      addGoogle: addGoogle, hasLoad: hasLoad, dispose: dispose });
+      addGoogle: addGoogle, hasLoad: hasLoad,
+      discoverNative: function(){return native().discover();},
+      loadNativeAsset: function(assetId){return native().loadAsset(assetId);}, dispose: dispose });
   }
 
   return Object.freeze({ create: create });

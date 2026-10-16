@@ -152,13 +152,13 @@ pub fn nemo_native_status(
 }
 
 #[tauri::command]
-pub fn nemo_native_dispatch(
+pub async fn nemo_native_dispatch(
     window: tauri::Window,
     state: tauri::State<ApplicationMcp>,
     request: NativeApplicationRequest,
 ) -> Result<NativeApplicationResponse, String> {
     require_main(&window)?;
-    state.dispatch_native(request)
+    state.dispatch_native_async(request).await
 }
 
 #[tauri::command]

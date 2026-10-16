@@ -51,6 +51,11 @@ var VECTOR_FONTS = {
 };
 var _vectorFontAssets = window.NemoFontAssets.create({
   fonts: VECTOR_FONTS,
+  // PRIVATE proposal: script registration remains a separate activation gate.
+  nativeResources: window.__TAURI__ ? function(){
+    if(!window.NemoNativeFontResources)throw new Error('Native font resources unavailable');
+    return window.NemoNativeFontResources.desktop(window,function(bytes){return opentype.parse(bytes);});
+  } : null,
   fetch: function (url) { return fetch(url); },
   parse: function (bytes) { return opentype.parse(bytes); },
   isDesktop: function () { return typeof window.__TAURI__ !== 'undefined'; },
@@ -59,14 +64,17 @@ var _vectorFontAssets = window.NemoFontAssets.create({
 function loadVectorFont(key) {
   return _vectorFontAssets.load(key);
 }
+// Web pre-warm only; desktop imports happen on an explicit font request.
 // Pre-warm the Regular weight of every bundled family on script load — the
 // common case for a first placement, so it doesn't stall on a network
 // fetch. Bold weights load lazily (on first actual use, via the Bold
 // toggle or picking a "* Bold" option) rather than up front.
-loadVectorFont('Roboto-Regular');
-loadVectorFont('Roboto-Bold');
-loadVectorFont('DejaVuSans-Regular');
-loadVectorFont('DejaVuSerif-Regular');
+if(!window.__TAURI__){
+  loadVectorFont('Roboto-Regular');
+  loadVectorFont('Roboto-Bold');
+  loadVectorFont('DejaVuSans-Regular');
+  loadVectorFont('DejaVuSerif-Regular');
+}
 
 // opentype.js glyph paths carry command types M/L/Q/C/Z with coordinates
 // ALREADY in final pixel space (glyph.getPath(x,y,fontSize) applies
@@ -215,8 +223,11 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
   // "Roboto Bold" from Font both converge on the identical file.
   var baseFamily = fontKey.replace(/-(Bold|Regular)$/, '');
   var resolvedFontKey = opts.bold ? baseFamily + '-Bold' : baseFamily + '-Regular';
-  if (!VECTOR_FONTS[resolvedFontKey] && !_vectorFontAssets.hasLoad(resolvedFontKey)) resolvedFontKey = fontKey; // unknown family — don't 404 on a guessed name
-  return loadVectorFont(resolvedFontKey).then(function (font) {
+  // An explicit desktop Google Bold request loads that weight without a warmup.
+  var requestedFont = window.__TAURI__ && opts.bold && baseFamily.indexOf('Google:') === 0 && VECTOR_FONTS[fontKey]
+    ? fetchGoogleFontWeight(baseFamily.slice(7), 700, false) : null;
+  if (!requestedFont && !VECTOR_FONTS[resolvedFontKey] && !_vectorFontAssets.hasLoad(resolvedFontKey)) resolvedFontKey = fontKey; // unknown family — don't 404 on a guessed name
+  return (requestedFont || loadVectorFont(resolvedFontKey)).then(function (font) {
     var lineHeightMult = opts.lineHeightMult || 1.25;
     var lineHeight = size * lineHeightMult;
     var letterSpacing = opts.letterSpacing || 0;
@@ -406,6 +417,9 @@ function addGoogleFont(family) {
 window.SMVectorText = {
   VECTOR_FONTS: VECTOR_FONTS,
   loadVectorFont: loadVectorFont,
+  // Reopen callers supply the persisted native ID unchanged; no name matching.
+  listNativeFontAssets: function(){return _vectorFontAssets.discoverNative();},
+  loadNativeFontAsset: function(assetId){return _vectorFontAssets.loadNativeAsset(assetId);},
   buildVectorTextGroup: buildVectorTextGroup,
   vectorTextGroupMembers: vectorTextGroupMembers,
   addGoogleFont: addGoogleFont,

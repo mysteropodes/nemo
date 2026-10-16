@@ -52,6 +52,9 @@ mod reservations;
 
 type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>;
 
+#[path = "native_font_source.rs"]
+mod font_source;
+
 #[path = "native_revision_sync.rs"]
 mod revision_sync;
 #[cfg(test)]
@@ -134,6 +137,16 @@ impl ApplicationMcp {
     ) -> Result<NativeApplicationResponse, String> {
         self.revisions
             .dispatch(&self.instance_id, &self.native, request, false)
+            .map(|delivery| delivery.response)
+    }
+
+    pub(crate) async fn dispatch_native_async(
+        &self,
+        request: NativeApplicationRequest,
+    ) -> Result<NativeApplicationResponse, String> {
+        self.revisions
+            .dispatch_async(&self.instance_id, &self.native, request, false)
+            .await
             .map(|delivery| delivery.response)
     }
 
