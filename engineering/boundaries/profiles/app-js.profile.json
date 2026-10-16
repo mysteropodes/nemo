@@ -2121,6 +2121,14 @@
       "publicApi": ["native-project-settings-desktop.js"]
     },
     {
+      "id": "app.native.viewport.underlay.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": ["native-viewport-underlay.js"],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": ["native-viewport-underlay.js"]
+    },
+    {
       "id": "app.native.object.project.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

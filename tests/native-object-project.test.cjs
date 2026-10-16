@@ -235,6 +235,11 @@ function ordinary(h,deferFrames=false){
     documentSource:fs.readFileSync('src/js/project-document.js','utf8'),entrySource:fs.readFileSync('src/js/project-entry.js','utf8')});
   vm.runInContext(code+'\nthis.makeHarness=harness;',context);
   return context.makeHarness({dirtyDot:true,deferFrames,configureWindow(root){
+    const classes=new Set(),styles=new Map();
+    root.document.documentElement={clientWidth:1280,clientHeight:900,
+      classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
+      style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}};
+    root.NemoNativeViewportUnderlay=require('../src/js/adapters/native-viewport-underlay.js');
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
     root.NemoNativeObjectInactiveProjectTabs=require('../src/js/adapters/native-object-inactive-project-tabs.js');
     let id=0;root.crypto={randomUUID:()=>`inactive-ui-${++id}`};
@@ -243,6 +248,7 @@ function ordinary(h,deferFrames=false){
 }
 test('complete production Project Open/Save As updates tab, recents and dirty state through native adapters',async()=>{
   const h=host(),app=ordinary(h);assert.equal(await app.project.openPath('/ordinary.json'),true);
+  assert.equal(app.window.document.documentElement.classList.contains('nemo-native-underlay'),true);
   assert.equal(app.project.getCurrentLabel(),'ordinary — /ordinary.json');assert.equal(app.project.isDirty(),false);
   assert.equal(app.element('project-tabs-list').children.length,1);assert.equal(app.startScreen.classList.contains('hid'),true);
   const s=Project.desktop(app.window);await s.reference({kind:'remove'});assert.equal(app.project.isDirty(),true);
@@ -365,10 +371,12 @@ test('replacement publishes B only after both current frame-0 receipts and post-
   assert.equal(s.info().documentId,'document-2');assert.equal(s.readPresentedObjectSession().presentation.workId,'b-final');
 });
 
-test('dirty cancellation sends no native request; typed invalid replacement preserves A',async()=>{
+test('dirty cancellation only verifies native ownership; typed invalid replacement preserves A',async()=>{
   const h=replacementHost(),s=session(h),f=files(s,{confirmReplace:async()=>false});
   assert.equal(await f.ui.openPath('/a.json'),true);await s.reference({kind:'remove'});
-  const count=h.calls.length;assert.equal(await f.ui.openPath('/b.json'),false);assert.equal(h.calls.length,count);
+  const count=h.calls.length;assert.equal(await f.ui.openPath('/b.json'),false);
+  assert.deepEqual(h.calls.slice(count).map(c=>c.command),['nemo_native_object_client_status','nemo_native_object_reference']);
+  assert.equal(h.calls.at(-1).r.action.kind,'inspect');
   assert.equal(s.info().documentId,'document-1');assert.equal(f.ui.isDirty(),true);
   const previews=h.previews.length,g=files(s);assert.equal(await g.ui.openPath('/bad.json'),false);
   assert.equal(s.isActive(),true);assert.equal(s.info().documentId,'document-1');
