@@ -15,12 +15,14 @@
 #[path = "../tests/object_expression_property.rs"]
 mod tests;
 
-use super::{compile, in_runtime, with_context, ExpressionLimits, ExpressionRefusal};
 use crate::evaluation::property_expression_runtime::{Dim, GuestValue, Outcome, EXPR_MAX_DEPTH};
 use crate::history::NativeObjectHistory;
 use crate::object_document::PropertyHolderTarget;
 use crate::object_expression_pin::{
     prepare_property_expression_request, PropertyEvaluation, PropertyExpressionRequest,
+};
+use crate::object_expression_runtime::{
+    compile, in_runtime, with_context, ExpressionLimits, ExpressionRefusal,
 };
 use crate::revision::ObjectSnapshot;
 use rquickjs::{Function, Runtime, Value};
