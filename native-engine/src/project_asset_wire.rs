@@ -4,7 +4,7 @@ use crate::object_codec::project::{
     FORMAT,
 };
 use crate::object_document::{
-    AssetId, AssetInventory, AssetKind, AssetRecord, AssetSource, ProjectEnvelope, ProjectMetadata,
+    AssetId, AssetInventory, AssetKind, AssetRecord, AssetSource, ProjectEnvelope,
     ProjectReferenceState,
 };
 use crate::reference_image_asset::ImageAssetLimits;
@@ -215,8 +215,7 @@ fn base(
     if drawing.get().len() > limits.drawing_bytes {
         return Err(ProjectWireError::Budget);
     }
-    let metadata = ProjectMetadata::new(metadata.canvas_w, metadata.canvas_h, metadata.fps)
-        .map_err(|_| ProjectWireError::Invalid)?;
+    let metadata = metadata.into_metadata()?;
     let drawing = crate::object_codec::decode_storage_project(drawing.get().as_bytes())
         .map_err(ProjectWireError::Drawing)?;
     Ok(ProjectEnvelope::no_media(metadata, drawing))
