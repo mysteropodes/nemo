@@ -212,7 +212,7 @@ fn oracle_covers_the_families_and_edges() {
 fn mutations_are_detected() {
     for (m, at_least) in [
         (Mutation::Blend, 172),
-        (Mutation::Index, 64),
+        (Mutation::Index, 65),
         (Mutation::Align, 86),
         (Mutation::Axis, 160),
         (Mutation::Percent, 82),

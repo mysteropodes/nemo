@@ -26,7 +26,7 @@
 //!   `pathPercent` and `pathInfluence`, and the `followPath.targetLayerUid`
 //!   precondition (without it the caller passes no sample).
 
-use super::motion_parent_chain::{
+use crate::evaluation::motion_parent_chain::{
     apply_chain_to_segments, blend_two, blend_weighted, parent_weights, transform_segments,
     ChainEntry, MotionMat, Pose, Segment,
 };
@@ -83,8 +83,8 @@ pub(crate) fn weighted_parents_of<'a>(
 /// `blendedAncestorMat`: `None` unless both A and B are set (non-empty).
 /// With any `parentsMore` entry the weighted blend runs, otherwise the
 /// two-parent blend (an identity pose stands in for one missing parent).
-/// `compose` is `composeChainTransform(uid)`; it must be pure, as it is
-/// asked for every part even though JavaScript skips zero-weight ones.
+/// `compose` is `composeChainTransform(uid)`, called exactly where
+/// JavaScript calls it (two-parent: A then B; weighted: nonzero parts).
 pub(crate) fn blended_ancestor_mat(
     uid_a: Option<&str>,
     uid_b: Option<&str>,
@@ -99,9 +99,28 @@ pub(crate) fn blended_ancestor_mat(
     );
     if let Some(parts) = weighted_parents_of(Some(a), Some(b), parent_blend, extras, weight_samples)
     {
+        // `blendWeighted` asks for a pose only where the normalized weight is
+        // truthy, and only for the first part once the sum falls back.
+        let mut sum = 0.0;
+        for p in &parts {
+            sum += p.weight;
+        }
+        let fallback = sum.is_nan() || sum <= 1e-9;
         let parts: Vec<(f64, Option<Pose>)> = parts
             .into_iter()
-            .map(|p| (p.weight, compose(p.uid.unwrap_or(""))))
+            .enumerate()
+            .map(|(i, p)| {
+                let wanted = if fallback {
+                    i == 0
+                } else {
+                    let w = p.weight / sum;
+                    w != 0.0 && !w.is_nan()
+                };
+                (
+                    p.weight,
+                    wanted.then(|| compose(p.uid.unwrap_or(""))).flatten(),
+                )
+            })
             .collect();
         return blend_weighted(&parts);
     }
