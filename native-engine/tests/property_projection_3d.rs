@@ -18,6 +18,8 @@
 //! units of roundoff of their group's largest entry; an angle's floor is a
 //! half turn, as atan2 error is absolute. P rows and unrotated rows stay exact.
 
+use std::f64::consts::PI;
+
 use crate::evaluation::property_projection_3d::{
     make_projector, project_image_rect, project_segments, project_to_screen, rotate_3d, Bounds,
     ExtraDelta, Pose3D, Projector3D, Rect, Seg,
@@ -525,5 +527,34 @@ fn hypot_is_v8_math_hypot_bit_for_bit() {
     ] {
         let v: Vec<f64> = row.split(' ').map(hex).collect();
         assert_eq!(super::hypot2(v[0], v[1]).to_bits(), v[2].to_bits(), "{row}");
+    }
+}
+
+#[test]
+fn image_rect_size_uses_the_v8_hypot() {
+    // recompute the half axes with the kernel's own projector; size must be 2 * hypot2
+    for t in rows("I") {
+        let q: Vec<Option<f64>> = t[5]
+            .split(',')
+            .map(|s| (s != "!").then(|| hex(s)))
+            .collect();
+        let r: Vec<f64> = q[..4].iter().map(|v| v.unwrap()).collect();
+        let rect = Rect {
+            x: r[0],
+            y: r[1],
+            width: r[2],
+            height: r[3],
+            rotation: q[4],
+        };
+        let (p, o) = (proj(&t), project_image_rect(&rect, &proj(&t)));
+        let rot = q[4].filter(|v| truthy(*v)).unwrap_or(0.0) * PI / 180.0;
+        let (c, s) = (rot.cos(), rot.sin());
+        let (cx, cy, hw, hh) = (r[0] + r[2] / 2.0, r[1] + r[3] / 2.0, r[2] / 2.0, r[3] / 2.0);
+        let half = |dx: f64, dy: f64| {
+            let (a, b) = (p.project(cx + dx, cy + dy), p.project(cx - dx, cy - dy));
+            super::hypot2((a[0] - b[0]) / 2.0, (a[1] - b[1]) / 2.0) * 2.0
+        };
+        assert!(same(o.width, half(hw * c, hw * s)), "{t:?}");
+        assert!(same(o.height, half(hh * -s, hh * c)), "{t:?}");
     }
 }
