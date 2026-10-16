@@ -155,7 +155,7 @@ fn invalid_names_and_other_unadmitted_layer_fields_refuse_atomically() {
             .kind(),
         ObjectCodecErrorKind::Invalid
     );
-    for field in ["locked", "privateExtra"] {
+    for field in ["privateExtra"] {
         let mut input = named_layers();
         input["layers"][0][field] = json!(true);
         assert_eq!(

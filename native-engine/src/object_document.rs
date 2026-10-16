@@ -47,6 +47,16 @@ pub(crate) mod media_timing;
 #[allow(dead_code)]
 pub(crate) mod object_group_kernels;
 
+#[path = "object_layer_organization.rs"]
+mod organization;
+pub(crate) use organization::validate_layer_organization;
+pub use organization::{LayerFolder, LayerFolders};
+#[cfg(all(test, feature = "codec"))]
+#[path = "../tests/object_layer_organization.rs"]
+mod layer_organization_tests;
+#[path = "object_layer_policy.rs"]
+mod layer_policy;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectDocument {
@@ -57,6 +67,8 @@ pub struct ObjectDocument {
     pub(crate) objects: Vec<ObjectRecord>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) composition_order: Presence<OrderPlan>,
 }
@@ -75,6 +87,10 @@ pub struct ObjectLayer {
     pub(crate) color: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) parent_layer_uid: Presence<Option<String>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) folder_id: Presence<Option<String>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) shy: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) timing: Presence<LayerTiming>,
 }
@@ -193,11 +209,14 @@ pub(crate) use object_deserialize;
 object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>,
     #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
     #[serde(default)] color: Presence<String>,
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
+    #[serde(default)] folder_id: Presence<Option<String>>,
+    #[serde(default)] shy: Presence<bool>,
     #[serde(default)] timing: Presence<LayerTiming> });
 object_deserialize!(ObjectTarget {
     context_id: String,
@@ -236,6 +255,10 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectDocument {
+    /// Organizational folder metadata, not structural folder layers.
+    pub fn layer_folders(&self) -> Option<&LayerFolders> {
+        self.layer_folders.value().and_then(Option::as_ref)
+    }
     /// Immutable authored holder metadata; absence is not an empty authored table.
     pub fn property_holders(&self) -> Option<&[PropertyHolder]> {
         self.property_holders.value().map(Vec::as_slice)
@@ -280,6 +303,17 @@ impl SolidFill {
     }
 }
 impl ObjectLayer {
+    /// UI row filtering only: shy never changes visibility or content ownership.
+    pub fn shy(&self) -> bool {
+        self.shy.value().copied().unwrap_or(false)
+    }
+    /// Legacy falsy memberships have no active folder, but retain wire presence.
+    pub fn folder_id(&self) -> Option<&str> {
+        self.folder_id
+            .value()
+            .and_then(Option::as_deref)
+            .filter(|id| !id.is_empty())
+    }
     /// Native New and Add share the existing desktop creation defaults. The
     /// palette is selected by the number of layers before insertion, not revision.
     pub(crate) fn blank_drawing(layer_uid: String, name: String, existing_layers: usize) -> Self {
@@ -293,6 +327,8 @@ impl ObjectLayer {
             locked: Presence::Present(false),
             color: Presence::Present(COLORS[existing_layers % COLORS.len()].into()),
             parent_layer_uid: Presence::Present(None),
+            folder_id: Presence::Missing,
+            shy: Presence::Missing,
             timing: Presence::Present(LayerTiming::blank_drawing()),
         }
     }
@@ -305,6 +341,8 @@ impl ObjectLayer {
             locked: Presence::Missing,
             color: Presence::Missing,
             parent_layer_uid: Presence::Missing,
+            folder_id: Presence::Missing,
+            shy: Presence::Missing,
             timing: Presence::Missing,
         }
     }
