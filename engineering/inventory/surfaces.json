@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "08663027010954fd8b5639a60c84d486515671af",
-  "describe": "v0.7.0-alpha.4-2024-g08663027-dirty"
+  "head": "376376c186d368a801f543d1634ac7879d7c5e3d",
+  "describe": "v0.7.0-alpha.4-2048-g376376c1"
  },
- "inputsDigest": "edbd0709a9ea370f0e506245df7aaf519342b339188d346f9b25cdf50434a348",
+ "inputsDigest": "2a2865fa7a2812a39707b5e1c63bc762db2d6b3bbb2f69c1e2b1974a8f899efc",
  "states": [
   "inventoried",
   "characterized",
@@ -386,7 +386,7 @@
   },
   "SMVectorText": {
    "file": "src/js/vector-text-bridge.js",
-   "line": 433,
+   "line": 406,
    "members": 0
   }
  },
@@ -3459,7 +3459,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 79,
+    "functionsVisited": 86,
     "via": "chain",
     "references": []
    },
@@ -5017,7 +5017,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 60,
+    "functionsVisited": 67,
     "via": "variable trigger",
     "references": []
    },
@@ -9811,7 +9811,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 47,
+    "functionsVisited": 54,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3338 updatePropsContext()"
@@ -11401,7 +11401,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 47,
+    "functionsVisited": 54,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3344 updatePropsContext()",
@@ -11994,7 +11994,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 12,
+    "functionsVisited": 22,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6319 paintFillSwatches()"
@@ -16179,7 +16179,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 556,
+    "functionsVisited": 557,
     "via": "variable save",
     "references": []
    },
@@ -16657,7 +16657,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8729 updateTextPropsPanel()",
@@ -16706,7 +16706,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "variable contentEl",
     "references": [
      "src/js/timeline.js:8718 updateTextPropsPanel()",
@@ -16757,7 +16757,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8742 updateTextPropsPanel()",
@@ -16807,7 +16807,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8725 updateTextPropsPanel()",
@@ -16896,7 +16896,7 @@
     "container": "tp-font-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 129,
+    "functionsVisited": 128,
     "via": "variable fontAddConfirm",
     "references": []
    },
@@ -16940,7 +16940,7 @@
     "container": "tp-font-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 39,
     "via": "variable fontAddInput",
     "references": []
    },
@@ -16988,7 +16988,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8734 updateTextPropsPanel()",
@@ -17039,7 +17039,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8736 updateTextPropsPanel()",
@@ -17090,7 +17090,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8727 updateTextPropsPanel()",
@@ -17141,7 +17141,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 479,
+    "functionsVisited": 478,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8738 updateTextPropsPanel()",
@@ -20153,7 +20153,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20200,7 +20200,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20247,7 +20247,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20294,7 +20294,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 118,
+    "functionsVisited": 119,
     "via": "callback b",
     "references": []
    },
@@ -20341,7 +20341,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 118,
+    "functionsVisited": 119,
     "via": "callback b",
     "references": []
    },
@@ -20388,7 +20388,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 118,
+    "functionsVisited": 119,
     "via": "callback b",
     "references": []
    },
@@ -20435,7 +20435,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 118,
+    "functionsVisited": 119,
     "via": "callback b",
     "references": []
    },
@@ -20482,7 +20482,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20529,7 +20529,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20576,7 +20576,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20623,7 +20623,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20670,7 +20670,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -20717,7 +20717,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 119,
+    "functionsVisited": 120,
     "via": "callback b",
     "references": []
    },
@@ -23097,7 +23097,7 @@
    "source": "src/js/labs/command-palette.js:35",
    "meta": {
     "i18n": "labsCmdUndo",
-    "functionsVisited": 3
+    "functionsVisited": 13
    },
    "fixtures": []
   },
@@ -23127,7 +23127,7 @@
    "source": "src/js/labs/command-palette.js:36",
    "meta": {
     "i18n": "labsCmdRedo",
-    "functionsVisited": 3
+    "functionsVisited": 13
    },
    "fixtures": []
   },
