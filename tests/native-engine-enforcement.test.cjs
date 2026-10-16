@@ -70,6 +70,10 @@ const CANDIDATE_FILES = [
   'native-engine/tests/object_compositor.rs',
   'native-engine/src/object_fill.rs',
   'native-engine/src/object_fill_owner.rs',
+  'native-engine/src/object_property_curve_edits.rs',
+  'native-engine/src/object_property_track_edit.rs',
+  'native-engine/tests/object_property_curve_edits.rs',
+  'native-engine/tests/object_property_track_edit.rs',
   'native-engine/src/object_revision.rs',
   'native-engine/src/encoded_retention_budget.rs',
   'native-engine/src/image_resource_budget.rs',
@@ -500,6 +504,22 @@ test('P37C1-DESKTOP host and reference dispatch children remain private and regi
   }
 });
 
+test('D12 property curve children remain registered and private', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.provenance.nativePropertyTrackEditRegistration, /D12\/#2094/);
+  for (const [id, dir] of [
+    ['rust.native.engine.commands', 'src'], ['rust.native.engine.tests', 'tests'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    for (const file of ['object_property_curve_edits.rs', 'object_property_track_edit.rs']) {
+      assert.equal(owner.files.filter((name) => name === file).length, 1);
+      assert.equal(owner.publicApi.includes(file), false);
+      assert.ok(CANDIDATE_FILES.includes(`native-engine/${dir}/${file}`));
+    }
+  }
+});
+
 test('isolated negative controls fail closed and restore every touched byte', (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-n19-enforcement-'));
   const clone = path.join(temp, 'repo');
@@ -513,6 +533,24 @@ test('isolated negative controls fail closed and restore every touched byte', (t
   ]))];
   const original = snapshot(clone, touched), source = snapshot(ROOT, CANDIDATE_FILES);
   try {
+    // Remove real memberships from the cloned profile one at a time. Source
+    // files remain present, so each missing registration must be detected.
+    const registered = readJson(clone, PROFILE);
+    for (const [id, dir] of [
+      ['rust.native.engine.commands', 'src'], ['rust.native.engine.tests', 'tests'],
+    ]) {
+      for (const file of ['object_property_curve_edits.rs', 'object_property_track_edit.rs']) {
+        const missing = structuredClone(registered);
+        const owner = missing.modules.find((entry) => entry.id === id);
+        owner.files = owner.files.filter((name) => name !== file);
+        fs.writeFileSync(path.join(clone, PROFILE), JSON.stringify(missing));
+        const relative = `native-engine/${dir}/${file}`;
+        const result = checkSourceCoverage(readJson(clone, PROFILE), { root: clone, sourcePaths: [relative] });
+        assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === relative));
+        restore(clone, new Map([[PROFILE, original.get(PROFILE)]]));
+      }
+    }
+
     const rustExtra = 'native-engine/src/n19_unregistered.rs';
     fs.writeFileSync(path.join(clone, rustExtra), 'pub fn unregistered() {}\n');
     const repo = discoverRepositoryFiles({ root: clone });
