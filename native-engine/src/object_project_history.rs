@@ -255,6 +255,17 @@ impl NativeObjectHistory {
         Ok(value)
     }
 
+    /// Current immutable project extent without serializing media or file bytes.
+    /// Bare drawing snapshots intentionally have no project dimensions.
+    pub fn project_canvas_dimensions(&self) -> Result<Option<(u32, u32)>, DispatchErrorCode> {
+        let snapshot = self
+            .acquire_snapshot(self.content_revision())
+            .ok_or(DispatchErrorCode::Unavailable)?;
+        Ok(snapshot
+            .project()
+            .map(|project| project.project().canvas_dimensions()))
+    }
+
     pub fn is_project_file(&self) -> bool {
         self.acquire_snapshot(self.content_revision())
             .is_some_and(|s| s.project().is_some())

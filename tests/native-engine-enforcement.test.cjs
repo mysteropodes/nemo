@@ -103,6 +103,8 @@ const CANDIDATE_FILES = [
   'native-engine/tests/reproduction_decode.rs',
   'native-engine/tests/reproduction_replay.rs',
   'native-engine/tests/reproduction_catalog.rs',
+  'src-tauri/src/native_object_desktop_preview_extent_tests.rs',
+  'src-tauri/src/native_object_desktop_export_extent_tests.rs',
   'src-tauri/src/native_object_reference.rs',
   'src-tauri/src/native_object_project_route.rs',
   'src-tauri/src/native_object_project_tests.rs',
@@ -267,6 +269,46 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');
   assert.deepEqual(result.edges.map((edge) => `${short(edge.from)}->${short(edge.to)}`).sort(), EXPECTED_EDGES);
+});
+
+
+test('desktop extent test children stay private and missing membership fails closed', (t) => {
+  const files = ['native_object_desktop_preview_extent_tests.rs', 'native_object_desktop_export_extent_tests.rs'];
+  const id = 'rust.desktop.native.host.release.tests';
+  const profile = readJson(ROOT, PROFILE);
+  const owner = profile.modules.find((entry) => entry.id === id);
+  assert.match(readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json').provenance.nativeObjectDesktopExtentRegistration, /F04\/#2080/);
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-extent-membership-'));
+  const clone = path.join(temp, 'repo');
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const cloned = spawnSync('git', ['clone', '--quiet', '--local', ROOT, clone], { encoding: 'utf8' });
+  assert.equal(cloned.status, 0, cloned.stderr);
+  copyCandidate(clone);
+  const original = fs.readFileSync(path.join(clone, PROFILE));
+  const discovered = discoverRepositoryFiles({ root: clone });
+  assert.equal(discovered.ok, true);
+  assert.deepEqual(discovered.diagnostics, []);
+  const selected = discovered.entries
+    .filter((entry) => entry.path.endsWith('.rs')).map((entry) => entry.path);
+  const exclusions = readJson(clone, 'engineering/boundaries/profiles/rust.coverage.json').exclusions;
+  const coverage = (candidate) => checkSourceCoverage(candidate, { root: clone, sourcePaths: selected, exclusions });
+  assert.deepEqual(coverage(profile).violations, []);
+  for (const file of files) {
+    assert.equal(owner.files.filter((entry) => entry === file).length, 1);
+    assert.equal(owner.publicApi.includes(file), false);
+    const relative = `src-tauri/src/${file}`;
+    assert.ok(CANDIDATE_FILES.includes(relative));
+    const source = fs.readFileSync(path.join(clone, relative));
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((entry) => entry !== file);
+    fs.writeFileSync(path.join(clone, PROFILE), JSON.stringify(missing));
+    const result = coverage(readJson(clone, PROFILE));
+    assert.deepEqual(result.violations.map((entry) => [entry.rule, entry.file]), [['coverage-unprofiled-source', relative]]);
+    fs.writeFileSync(path.join(clone, PROFILE), original);
+    assert.deepEqual(fs.readFileSync(path.join(clone, relative)), source);
+    assert.deepEqual(coverage(readJson(clone, PROFILE)).violations, []);
+  }
+  assert.deepEqual(fs.readFileSync(path.join(clone, PROFILE)), original);
 });
 
 test('Cargo features, targets and declaration macros are one exact contract', () => {

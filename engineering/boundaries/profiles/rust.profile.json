@@ -405,6 +405,7 @@
         "native_object_desktop_preview_tests.rs", "native_object_desktop_preview_test_support.rs",
         "native_object_export_tests.rs",
         "native_object_desktop_export_tests.rs",
+        "native_object_desktop_preview_extent_tests.rs", "native_object_desktop_export_extent_tests.rs",
         "native_object_project_tests.rs",
         "native_object_project_timing_tests.rs",
         "native_object_reference_tests.rs",
