@@ -38,6 +38,10 @@ pub(crate) use timing::{LayerTiming, LayerTimingError};
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;
+// L09-A (#2126): private lane-9 media timing aggregator; its kernels are private children there.
+#[path = "object_media_timing_core.rs"]
+#[allow(dead_code)]
+pub(crate) mod media_timing;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
