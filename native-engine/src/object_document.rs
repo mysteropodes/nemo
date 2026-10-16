@@ -12,7 +12,7 @@ pub(crate) use order::*;
 
 #[path = "object_properties.rs"]
 mod properties;
-pub(crate) use properties::validate_property_holders;
+pub(crate) use properties::{validate_property_holders, PropertyAdmissionError};
 pub use properties::{
     ExpressionControl, PropertyHolder, PropertyHolderTarget, PropertyMetadata, PropertyRecord,
 };

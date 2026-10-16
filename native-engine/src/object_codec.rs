@@ -2,11 +2,10 @@
 #[cfg(feature = "commands")]
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
-use crate::object_document::{
-    validate_property_holders, ObjectLayer, Presence, PropertyHolder, OBJECT_DOCUMENT_FORMAT,
-    OBJECT_DOCUMENT_FORMAT_VERSION,
-};
 pub use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget};
+use crate::object_document::{
+    ObjectLayer, Presence, PropertyHolder, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+};
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -204,6 +203,31 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.layers,
         &document.objects,
         None,
+    )
+}
+
+pub(crate) fn validate_property_holders(
+    holders: &Presence<Vec<PropertyHolder>>,
+    layers: &[ObjectLayer],
+    records: &[ObjectRecord],
+    plan: Option<&crate::object_document::OrderPlan>,
+) -> Result<(), ObjectCodecError> {
+    use crate::object_document::PropertyAdmissionError;
+    crate::object_document::validate_property_holders(holders, layers, records, plan).map_err(
+        |error| {
+            let (kind, message) = match error {
+                PropertyAdmissionError::Invalid(message) => {
+                    (ObjectCodecErrorKind::Invalid, message)
+                }
+                PropertyAdmissionError::Unsupported(message) => {
+                    (ObjectCodecErrorKind::Unsupported, message)
+                }
+                PropertyAdmissionError::DuplicateId(message) => {
+                    (ObjectCodecErrorKind::DuplicateId, message)
+                }
+            };
+            ObjectCodecError::new(kind, message)
+        },
     )
 }
 

@@ -3,7 +3,6 @@ use super::{
     object_deserialize, FrameScopeKind, ObjectLayer, ObjectRecord, OrderExpression, OrderPlan,
     OrderTrack, Presence,
 };
-use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use serde::Serialize;
 use serde_json::Number;
 use std::collections::HashSet;
@@ -126,22 +125,28 @@ impl PropertyRecord {
     }
 }
 
-fn invalid(message: &str) -> ObjectCodecError {
-    ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PropertyAdmissionError {
+    Invalid(&'static str),
+    Unsupported(&'static str),
+    DuplicateId(&'static str),
 }
-fn unsupported(message: &str) -> ObjectCodecError {
-    ObjectCodecError::new(ObjectCodecErrorKind::Unsupported, message)
+fn invalid(message: &'static str) -> PropertyAdmissionError {
+    PropertyAdmissionError::Invalid(message)
 }
-fn duplicate(message: &str) -> ObjectCodecError {
-    ObjectCodecError::new(ObjectCodecErrorKind::DuplicateId, message)
+fn unsupported(message: &'static str) -> PropertyAdmissionError {
+    PropertyAdmissionError::Unsupported(message)
 }
-fn finite(value: &Number) -> Result<f64, ObjectCodecError> {
+fn duplicate(message: &'static str) -> PropertyAdmissionError {
+    PropertyAdmissionError::DuplicateId(message)
+}
+fn finite(value: &Number) -> Result<f64, PropertyAdmissionError> {
     value
         .as_f64()
         .filter(|n| n.is_finite())
         .ok_or_else(|| invalid("nonfinite property number"))
 }
-fn vector(values: &[Number], dimension: usize) -> Result<(), ObjectCodecError> {
+fn vector(values: &[Number], dimension: usize) -> Result<(), PropertyAdmissionError> {
     if values.len() != dimension {
         return Err(invalid("property dimension mismatch"));
     }
@@ -159,7 +164,7 @@ fn control_name(name: &str) -> String {
     })
     .to_lowercase()
 }
-fn controls(holder: &PropertyHolder) -> Result<(), ObjectCodecError> {
+fn controls(holder: &PropertyHolder) -> Result<(), PropertyAdmissionError> {
     let mut keys = HashSet::new();
     let mut names = HashSet::new();
     for control in holder.controls.value().into_iter().flatten() {
@@ -180,7 +185,10 @@ fn controls(holder: &PropertyHolder) -> Result<(), ObjectCodecError> {
     }
     Ok(())
 }
-fn property(record: &PropertyRecord, meta: &PropertyMetadata) -> Result<(), ObjectCodecError> {
+fn property(
+    record: &PropertyRecord,
+    meta: &PropertyMetadata,
+) -> Result<(), PropertyAdmissionError> {
     if let Some(value) = record.static_value.value() {
         vector(value, meta.dimension)?;
     }
@@ -228,7 +236,7 @@ pub(crate) fn validate_property_holders(
     layers: &[ObjectLayer],
     records: &[ObjectRecord],
     plan: Option<&OrderPlan>,
-) -> Result<(), ObjectCodecError> {
+) -> Result<(), PropertyAdmissionError> {
     let mut identities = HashSet::new();
     for holder in holders.value().into_iter().flatten() {
         let target = &holder.target;

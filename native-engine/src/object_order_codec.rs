@@ -1,10 +1,11 @@
 //! Explicit v2 admission/migration core; existing v1 host codecs do not opt in.
 use crate::object_codec::{
-    parse, validate, validate_content, ObjectCodecError, ObjectCodecErrorKind, ObjectDocument,
+    parse, validate, validate_content, validate_property_holders, ObjectCodecError,
+    ObjectCodecErrorKind, ObjectDocument,
 };
 use crate::object_document::{
-    validate_property_holders, AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord,
-    OrderContext, OrderCurvePoint, OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
+    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, OrderContext, OrderCurvePoint,
+    OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
 };
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
