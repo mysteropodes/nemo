@@ -215,6 +215,29 @@ impl ObjectFillOwner {
         self.revisions = ObjectRevisionOwner::from_admitted(snapshot);
     }
 
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn commit_font_asset(
+        &mut self,
+        origin: &ObjectSnapshot,
+        record: std::sync::Arc<crate::object_document::AssetRecord>,
+    ) -> Result<u64, DispatchErrorCode> {
+        let current = self.current_snapshot();
+        if origin.instance_id() != current.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if origin.document_id() != current.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if origin.snapshot_id() != current.snapshot_id()
+            || origin.content_revision() != current.content_revision()
+        {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        self.revisions
+            .publish_admitted_font(record)
+            .map_err(|_| DispatchErrorCode::Unavailable)
+    }
+
     #[cfg(feature = "project_media_codec")]
     pub(crate) fn from_project_file(
         instance: String,

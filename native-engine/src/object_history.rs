@@ -8,6 +8,9 @@ use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use crate::transaction::StageReceipts;
 
+#[cfg(feature = "font_asset_wire")]
+#[path = "object_font_asset_history.rs"]
+mod font_assets;
 #[path = "object_command_dispatch.rs"]
 mod object_command_dispatch;
 #[path = "object_project_settings_history.rs"]
