@@ -206,7 +206,7 @@ fn range_length(v: &Values, a: f64, b: f64) -> f64 {
 }
 
 /// `Curve.getLength(v)` (and the cached `curve.getLength()`).
-pub(crate) fn curve_length(v: &Values) -> f64 {
+fn curve_length(v: &Values) -> f64 {
     range_length(v, 0.0, 1.0)
 }
 
@@ -250,7 +250,7 @@ fn find_root(
 
 /// `Curve.getTimeAt(v, offset)` (no explicit start): `None` when the offset
 /// lies beyond the curve by more than 1e-12.
-pub(crate) fn time_at(v: &Values, offset: f64) -> Option<f64> {
+fn time_at(v: &Values, offset: f64) -> Option<f64> {
     let first = if offset < 0.0 { 1.0 } else { 0.0 };
     if offset == 0.0 {
         return Some(first);

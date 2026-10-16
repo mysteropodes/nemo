@@ -52,8 +52,8 @@ impl Mutation {
 fn oracle_covers_the_families_and_edges() {
     let rows: Vec<Vec<&str>> = ORACLE.lines().map(|l| l.split(' ').collect()).collect();
     let pth = rows.iter().filter(|t| t[0] == "pth");
-    assert_eq!(pth.clone().count(), 75);
-    assert_eq!(rows.iter().filter(|t| t[0] == "sel").count(), 139);
+    assert_eq!(pth.clone().count(), 135);
+    assert_eq!(rows.iter().filter(|t| t[0] == "sel").count(), 199);
     assert!(pth.clone().any(|t| t[3] == "1"), "closed paths");
     assert!(pth.clone().any(|t| hex(t[4]) == 0.0), "zero length");
     assert!(pth.clone().any(|t| hex(t[4]) > 1e8), "huge coordinates");
@@ -87,10 +87,10 @@ fn oracle_covers_the_families_and_edges() {
 #[test]
 fn mutations_are_detected() {
     for (m, at_least) in [
-        (Mutation::HandleSign, 66),
-        (Mutation::NoClosing, 50),
-        (Mutation::TimeFromLength, 159),
-        (Mutation::TangentScale, 73),
+        (Mutation::HandleSign, 112),
+        (Mutation::NoClosing, 65),
+        (Mutation::TimeFromLength, 260),
+        (Mutation::TangentScale, 133),
     ] {
         let failed = run(m).bad.len();
         println!("{m:?}: {failed} rows rejected");

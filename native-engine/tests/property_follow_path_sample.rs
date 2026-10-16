@@ -1,6 +1,6 @@
 //! Follow-path path sampler (D30/#2075): oracle against Paper.js itself.
 //!
-//! Rows come from `gen.mjs` (sha256 1c3aac86a3451e3ef0ccc3a5ed4c4353ee73de71198bd4c368680d29f5e90789; its
+//! Rows come from `gen.mjs` (sha256 0aee2efd3453511ea797d227eaa5fab9184191336bc9dc0bb7d92d368a42b53f; its
 //! stub-window loader `load.cjs` is 28a8aa2e9ff8496ba98807983020ab9905df1a769993ce7a6a41f32178feb93e), which runs the SHIPPED
 //! `src/paper-full.min.js` (Paper.js 0.12.18, sha256
 //! 13526b252be3856db63b096ca282270454a3bb4567943e137875d9ced54ce9ba) in a Node v22.22.0 vm. The same rows were
@@ -12,7 +12,7 @@
 //!
 //! Values are IEEE 754 bit patterns in hex; `-` is null/undefined, `!` a
 //! stroke without `segments`, `z` an empty sample. Rows: `pth` (segments,
-//! closed, `path.length`, then `getPointAt`/`getTangentAt` at 4 + 15 + 4 per
+//! closed, `path.length`, then `getPointAt`/`getTangentAt` at 4 + 15 + 11 per
 //! curve offsets, including 0, -0, the length, past it, NaN, infinity,
 //! negative, and every curve boundary +-1e-9) and `sel` (stroke selection,
 //! zero length, the offset read by `getPointAt`, and `{x, y, angle}`).
@@ -194,5 +194,5 @@ fn generated_oracle_matches_paper() {
         r.bad.len(),
         r.bad.join("\n")
     );
-    assert_eq!(r.rows, 214, "oracle row count");
+    assert_eq!(r.rows, 334, "oracle row count");
 }
