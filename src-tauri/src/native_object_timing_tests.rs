@@ -48,7 +48,7 @@ fn timing_query(state: &ApplicationMcp, id: &str, uid: &str, frame: u32) -> Valu
         "operation":"query.document.object.layer.timing","payload":{"atRevision":info["contentRevision"],
             "documentSnapshotId":info["documentSnapshotId"],"contextId":"scene-root","layerUid":uid,"frame":frame}})
 }
-fn public(state: &ApplicationMcp, request: Value) -> Value {
+pub(super) fn public(state: &ApplicationMcp, request: Value) -> Value {
     serde_json::to_value(
         state
             .dispatch_native(serde_json::from_value(request).unwrap())
