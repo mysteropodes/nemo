@@ -1,6 +1,10 @@
 //! PRIVATE: source I/O outside the existing authority/barrier locks.
-use super::*;
 use crate::application_mcp::font_source::{self, FontBytes, FontSource};
+use crate::application_mcp::revision_sync::{unavailable, Delivery, RevisionSync};
+use crate::native_dispatch::{NativeDispatch, NativeState};
+use native_engine::commands::OpacityRequest;
+use nemo_mcp::contract::{NativeApplicationRequest, NativeApplicationResponse};
+use std::time::Duration;
 
 pub(super) enum FontPhase<'a> {
     Regular,
@@ -12,9 +16,7 @@ fn native_request(request: &NativeApplicationRequest) -> Result<OpacityRequest, 
     serde_json::from_value(serde_json::to_value(request).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())
 }
-fn response(
-    response: native_engine::protocol::ResponseEnvelope,
-) -> Result<NativeApplicationResponse, String> {
+fn response(response: impl serde::Serialize) -> Result<NativeApplicationResponse, String> {
     serde_json::from_value(serde_json::to_value(response).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())
 }

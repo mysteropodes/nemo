@@ -1,5 +1,6 @@
 //! PRIVATE: ports into the existing history owner, never another authority.
-use super::*;
+use crate::native_dispatch::object_host::NativeObjectHost;
+use native_engine::commands::{OpacityRequest, ResponseEnvelope};
 
 impl NativeObjectHost {
     pub(crate) fn font_status(

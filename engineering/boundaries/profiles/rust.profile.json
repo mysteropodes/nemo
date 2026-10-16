@@ -822,9 +822,7 @@
         "native_revision_dispatch.rs",
         "native_object_client.rs",
         "native_font_dispatch.rs",
-        "native_font_dispatch_tests.rs",
-        "native_font_source.rs",
-        "native_font_source_tests.rs"
+        "native_font_source.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -839,7 +837,9 @@
         "application_mcp_tests.rs",
         "application_mcp_diagnostics_tests.rs",
         "application_mcp_reproduction_tests.rs",
-        "native_revision_sync_tests.rs"
+        "native_revision_sync_tests.rs",
+        "native_font_dispatch_tests.rs",
+        "native_font_source_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

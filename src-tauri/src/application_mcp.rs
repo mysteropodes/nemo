@@ -54,6 +54,7 @@ type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>
 
 #[path = "native_font_source.rs"]
 mod font_source;
+pub(crate) use font_source::fetch_google_font;
 
 #[path = "native_revision_sync.rs"]
 mod revision_sync;

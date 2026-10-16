@@ -1,5 +1,8 @@
 //! PRIVATE real authority/history with injected source I/O. All tests UNRUN.
-use super::*;
+use crate::application_mcp::font_source::{self, FontBytes};
+use crate::application_mcp::revision_sync::{
+    Delivery, NativeApplicationRequest, OpacityRequest, RevisionControl,
+};
 use crate::application_mcp::ApplicationMcp;
 use base64::Engine;
 use serde_json::{json, Value};

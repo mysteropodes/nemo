@@ -1,5 +1,6 @@
 //! PRIVATE actual source adapter tests, authored UNRUN; no network.
-use super::*;
+use crate::application_mcp::font_source::{decoded, resolve_using, FontBytes, FontSource, MAX};
+use base64::Engine;
 use std::cell::Cell;
 const FONT: &[u8] = include_bytes!("../../src/fonts/Roboto-Regular.ttf");
 #[tokio::test]
