@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "08663027010954fd8b5639a60c84d486515671af",
-  "describe": "v0.7.0-alpha.4-2024-g08663027-dirty"
+  "head": "41c1f3f228e8796bfd76962c2aacc5695c956071",
+  "describe": "v0.7.0-alpha.4-2052-g41c1f3f2"
  },
- "inputsDigest": "edbd0709a9ea370f0e506245df7aaf519342b339188d346f9b25cdf50434a348",
+ "inputsDigest": "f7d053efab7b95c1b9a063b0c2cba5d45b67c7b7ae4680a049139e92ce1b4973",
  "states": [
   "inventoried",
   "characterized",
