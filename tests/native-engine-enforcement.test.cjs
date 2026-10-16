@@ -13,6 +13,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { checkRustCrate } = require('../scripts/nemo/lib/boundaries-rust.cjs');
 const { checkSourceCoverage } = require('../scripts/nemo/lib/boundaries-coverage.cjs');
+const { checkRustSourceCoverage } = require('../scripts/nemo/lib/boundaries-rust-vendor.cjs');
 const { discoverRepositoryFiles } = require('../scripts/nemo/lib/boundaries-repository.cjs');
 const { JOBS, PROFILES } = require('../scripts/nemo/lib/jobs.cjs');
 const ci = require('../scripts/nemo/ci.cjs');
@@ -24,6 +25,7 @@ const CANDIDATE_FILES = [
   POLICY,
   PROFILE,
   'engineering/boundaries/profiles/rust.coverage.json',
+  'engineering/boundaries/profiles/rust.vendor.json',
   'native-engine/Cargo.toml',
   'native-engine/src/lib.rs',
   'native-engine/src/commands.rs',
@@ -288,7 +290,7 @@ test('desktop extent test children stay private and missing membership fails clo
   const selected = discovered.entries
     .filter((entry) => entry.path.endsWith('.rs')).map((entry) => entry.path);
   const exclusions = readJson(clone, 'engineering/boundaries/profiles/rust.coverage.json').exclusions;
-  const coverage = (candidate) => checkSourceCoverage(candidate, { root: clone, sourcePaths: selected, exclusions });
+  const coverage = (candidate) => checkRustSourceCoverage(candidate, { root: clone, sourcePaths: selected, exclusions });
   assert.deepEqual(coverage(profile).violations, []);
   for (const file of files) {
     assert.equal(owner.files.filter((entry) => entry === file).length, 1);
@@ -1098,7 +1100,7 @@ test('isolated negative controls fail closed and restore every touched byte', (t
     fs.writeFileSync(path.join(clone, rustExtra), 'pub fn unregistered() {}\n');
     const repo = discoverRepositoryFiles({ root: clone });
     const selected = repo.entries.filter((entry) => entry.path.endsWith('.rs')).map((entry) => entry.path);
-    const rustCoverage = checkSourceCoverage(readJson(clone, PROFILE), {
+    const rustCoverage = checkRustSourceCoverage(readJson(clone, PROFILE), {
       root: clone, sourcePaths: selected, exclusions: readJson(clone, 'engineering/boundaries/profiles/rust.coverage.json').exclusions,
     });
     assert.equal(rustCoverage.ok, false);
