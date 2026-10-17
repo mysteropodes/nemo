@@ -39,6 +39,10 @@ impl InactiveProject {
 
 #[path = "object_reference_dispatch.rs"]
 mod reference_dispatch;
+// L06-H (lane #2112): asset attach / remove commands.
+#[path = "object_raster_asset_dispatch.rs"]
+#[allow(dead_code)]
+mod asset_dispatch;
 
 // Both initial New and replacement admit this same fully specified blank value.
 // It has no external resources and cannot carry an unchecked drawing from a caller.

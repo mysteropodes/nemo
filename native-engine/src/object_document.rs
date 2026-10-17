@@ -37,6 +37,8 @@ mod timing;
 #[allow(unused_imports)]
 pub(crate) use timing::TimingEdit;
 pub(crate) use timing::{LayerTiming, LayerTimingError};
+#[allow(unused_imports)]
+pub(crate) use timing::{RetimeEdit, RetimePair, RetimePlan};
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;
@@ -48,6 +50,8 @@ pub(crate) mod media_timing;
 #[path = "object_group_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_group_kernels;
+// L02-G (#2108): the per-layer group table stored on `ObjectLayer`.
+pub(crate) use object_group_kernels::object_group_record::GroupTable;
 // L06-C (#2137): lane-6 raster asset family aggregator.
 #[path = "object_raster_asset_kernels.rs"]
 #[allow(dead_code)]
@@ -143,6 +147,9 @@ pub struct ObjectLayer {
     /// Present exactly for a widget (rig control) layer; its presence is the baseline `isWidgetLayer`.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) widget: Presence<WidgetRecord>,
+    /// Absent: the layer never had a group table. Present: an authored table (possibly empty).
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) groups: Presence<GroupTable>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -277,7 +284,8 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] shy: Presence<bool>,
     #[serde(default)] timing: Presence<LayerTiming>,
     #[serde(default)] path_fx: Presence<Vec<PathFxRecord>>,
-    #[serde(default)] widget: Presence<WidgetRecord> });
+    #[serde(default)] widget: Presence<WidgetRecord>,
+    #[serde(default)] groups: Presence<GroupTable> });
 object_deserialize!(ObjectTarget {
     context_id: String,
     frame_scope: FrameScope,
@@ -403,6 +411,7 @@ impl ObjectLayer {
             timing: Presence::Present(LayerTiming::blank_drawing()),
             path_fx: Presence::Missing,
             widget: Presence::Missing,
+            groups: Presence::Missing,
         }
     }
     /// Identified, unnamed layer with earlier native-file visibility semantics.
@@ -419,6 +428,7 @@ impl ObjectLayer {
             timing: Presence::Missing,
             path_fx: Presence::Missing,
             widget: Presence::Missing,
+            groups: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {

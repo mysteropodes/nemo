@@ -20,3 +20,11 @@ pub(crate) mod object_boolean_topology;
 #[path = "object_layer_lifecycle_plan.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_layer_lifecycle_plan;
+
+// L02-G (#2108): stored group table and the detached plan of one group edit.
+#[path = "object_group_plan.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_group_plan;
+#[path = "object_group_record.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_group_record;

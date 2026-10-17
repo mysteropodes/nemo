@@ -4,7 +4,7 @@ use crate::object_codec::project::{
     FORMAT,
 };
 use crate::object_document::{
-    AssetId, AssetInventory, AssetKind, AssetRecord, AssetSource, ProjectEnvelope,
+    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetRecord, AssetSource, ProjectEnvelope,
     ProjectReferenceState,
 };
 use crate::reference_image_asset::ImageAssetLimits;
@@ -18,6 +18,10 @@ use std::{
 
 const MAX_ASSETS: usize = 1024;
 const MAX_LOCATOR: usize = 4096;
+
+// L09-H (#2115): the placement table of the catalog wire (G42, I16b).
+#[path = "object_media_link_track.rs"]
+pub(crate) mod object_media_link_track;
 #[path = "project_asset_payload.rs"]
 mod payload;
 
@@ -153,6 +157,7 @@ pub(crate) struct PreparedProjectWire {
     records: Vec<Record>,
     lengths: Vec<usize>,
     catalog: Option<Vec<usize>>,
+    placements: Vec<AssetPlacement>,
     viewport: Option<Viewport>,
     png: Option<(usize, ImageAssetLimits)>,
     #[cfg(feature = "font_asset_wire")]
@@ -294,6 +299,7 @@ fn prepare_legacy(
             .collect(),
         records,
         catalog: None,
+        placements: Vec::new(),
         viewport,
         png: limits.png,
         #[cfg(feature = "font_asset_wire")]
@@ -310,9 +316,10 @@ fn prepare_catalog(
         return Err(ProjectWireError::Unsupported);
     }
     let catalog: Catalog<'_> = object(wire.asset_inventory)?;
-    if !array::<&RawValue>(catalog.placements, MAX_ASSETS)?.is_empty() {
-        return Err(ProjectWireError::Unsupported);
-    }
+    let placements = object_media_link_track::read(array::<&RawValue>(
+        catalog.placements,
+        object_media_link_track::MAX_PLACEMENTS,
+    )?)?;
     let mut records = Vec::new();
     let mut ids = HashMap::new();
     for raw in array::<&RawValue>(wire.assets, MAX_ASSETS)? {
@@ -376,6 +383,9 @@ fn prepare_catalog(
         }
         order.push(index);
     }
+    // Cross-check placements against the file's own records BEFORE any binary
+    // allocation (the catalog constructor repeats these checks at decode).
+    object_media_link_track::validate(&placements, |id| ids.get(id).map(|i| records[*i].kind))?;
     let viewport = viewport(wire.viewport_reference, &ids, &records)?;
     if let Some(v) = &viewport {
         used.insert(v.index);
@@ -391,6 +401,7 @@ fn prepare_catalog(
             .collect(),
         records,
         catalog: Some(order),
+        placements,
         viewport,
         png: limits.png,
         #[cfg(feature = "font_asset_wire")]
@@ -471,8 +482,13 @@ impl PreparedProjectWire {
                 .map_err(|_| ProjectWireError::Invalid)?;
                 entries.push(Arc::new(value));
             }
-            let inventory = AssetInventory::new(entries, Vec::new(), MAX_ASSETS, 0)
-                .map_err(|_| ProjectWireError::Invalid)?;
+            let inventory = AssetInventory::new(
+                entries,
+                self.placements,
+                MAX_ASSETS,
+                object_media_link_track::MAX_PLACEMENTS,
+            )
+            .map_err(|_| ProjectWireError::Invalid)?;
             project = project.with_asset_inventory(Some(inventory));
         }
         Ok(DecodedProjectWire {

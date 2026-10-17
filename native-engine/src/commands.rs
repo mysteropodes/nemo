@@ -11,10 +11,18 @@ mod object_fill_owner;
 pub(crate) use object_fill_owner::{insert_order_element, remove_order_element, OrderEditError};
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::{
-    ObjectFillOwner, PreparedLayerCreate, PreparedLayerPolicy, PreparedLayerVisibility,
-    PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit,
+    ObjectFillOwner, PreparedGroupEdit, PreparedLayerCreate, PreparedLayerLifecycle,
+    PreparedLayerPolicy, PreparedLayerVisibility, PreparedPlacementEdit, PreparedProjectSettings,
+    PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit, PreparedWidgetEdit,
     ReferenceEdit, VectorEditResult, MAX_VECTOR_REQUEST_BYTES,
 };
+
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedExposureKey;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedExposureRetime;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedFrameStructure;
 
 use crate::document::OpacityDocument;
 use crate::request_receipts::{
