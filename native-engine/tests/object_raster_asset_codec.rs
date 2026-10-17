@@ -100,10 +100,8 @@ fn structural_refusals_are_typed() {
         Invalid,
     ));
     let mut dup = both();
-    dup["raster"]
-        .as_array_mut()
-        .unwrap()
-        .push(dup["raster"][0].clone());
+    let first_raster = dup["raster"][0].clone();
+    dup["raster"].as_array_mut().unwrap().push(first_raster);
     cases.push(("duplicate raster target", base(dup), DuplicateId));
     let mut shared = both();
     shared["text"][0]["target"] = target("L0", "r0");

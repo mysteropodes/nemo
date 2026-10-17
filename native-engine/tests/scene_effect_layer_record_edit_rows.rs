@@ -474,7 +474,8 @@ fn authored_compositing_fields_survive_exact_project_save_reopen_and_old_snapsho
     assert_eq!(head(&reopened).document(), current.document());
     assert_eq!(zero.document().layers().len(), 1);
     assert_eq!(zero.document().layers()[0].blend_mode(), None);
-    let reopened_base = &head(&reopened).document().layers()[0];
+    let reopened_head = head(&reopened);
+    let reopened_base = &reopened_head.document().layers()[0];
     assert_eq!(reopened_base.blend_mode(), Some("softLight"));
     assert_eq!(reopened_base.matte_source_uid(), Some(folder.as_str()));
     assert!(head(&reopened).document().layers()[2].folder_collapsed());

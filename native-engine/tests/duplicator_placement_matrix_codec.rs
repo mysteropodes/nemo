@@ -182,14 +182,16 @@ pub(crate) fn byte_of(n: &Number) -> u32 {
 /// Whether the record's fill is the baseline hex color: its bytes equal the
 /// token's and its alpha is the token's alpha byte (or exactly 1 for `#rrggbb`).
 pub(crate) fn fill_matches(rec: &ObjectRecord, want_hex: &str) -> bool {
+    let Some(fill) = rec.solid_fill() else {
+        return false;
+    };
     let byte = |at: usize| u32::from_str_radix(&want_hex[at..at + 2], 16).expect("hex");
-    let rgb = byte_of(&rec.fill.r) == byte(1)
-        && byte_of(&rec.fill.g) == byte(3)
-        && byte_of(&rec.fill.b) == byte(5);
+    let rgb =
+        byte_of(&fill.r) == byte(1) && byte_of(&fill.g) == byte(3) && byte_of(&fill.b) == byte(5);
     let alpha = if want_hex.len() == 9 {
-        byte_of(&rec.fill.a) == byte(7)
+        byte_of(&fill.a) == byte(7)
     } else {
-        rec.fill.a.as_f64() == Some(1.0)
+        fill.a.as_f64() == Some(1.0)
     };
     rgb && alpha
 }

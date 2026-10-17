@@ -13,10 +13,11 @@
 //! stable identity (the baseline lets every clone inherit the seed shape's
 //! `strokeId`, so selection and grouping resolve back to the source), while
 //! the copy's own identity is `clone_id` + `dup_index`. It never enters
-//! persisted frame data and the source record is only read. The record format
-//! has no stroke paint and no opacity, so what the baseline would do to them
-//! is NOT defaulted: it is reported in `unavailable` (typed), and the join
-//! that owns those fields (L01 G14) must supply it.
+//! persisted frame data and the source record is only read. The stroke paint
+//! and the opacity live in the vector body, which a copy carries VERBATIM:
+//! what the baseline would do to them (hue rotation, opacity factor) is NOT
+//! defaulted or silently dropped, it is reported in `unavailable` (typed), and
+//! the join that owns those fields (L01 G14) must supply it.
 
 use crate::evaluation::object_component_kernels::duplicator_placement_color::{
     rotate_fill_hue, FillHueError,
@@ -28,7 +29,7 @@ use crate::evaluation::object_component_kernels::duplicator_placement_matrix::{
     matrix_from_descriptor, transform_geometry, Descriptor, MatrixError, Pivot,
 };
 use crate::evaluation::object_component_kernels::duplicator_placement_modes::JsNumber;
-use crate::object_document::ObjectRecord;
+use crate::object_document::{ObjectRecord, Presence};
 
 /// `place.dup3D`: the per-clone 3D delta, only present when an axis moved.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -92,7 +93,14 @@ pub(crate) fn apply_placement(
 ) -> Result<DuplicatorCopy, ApplyError> {
     let matrix = matrix_from_descriptor(&place.matrix, pivot);
     let geometry = transform_geometry(&matrix, &source.geometry).map_err(ApplyError::Geometry)?;
-    let fill = rotate_fill_hue(&source.fill, place.hue_deg).map_err(ApplyError::Fill)?;
+    // Only a solid fill is rotated; an explicit null (no fill) or an absent slot passes through
+    // exactly as the source holds it (the baseline's `hexHueRotate` leaves null/undefined alone).
+    let fill = match source.solid_fill() {
+        Some(solid) => Presence::Present(Some(
+            rotate_fill_hue(solid, place.hue_deg).map_err(ApplyError::Fill)?,
+        )),
+        None => source.fill.clone(),
+    };
     let mut unavailable = Vec::new();
     if place.opacity_factor != 1.0 {
         unavailable.push(UnavailableField::Opacity);
@@ -109,6 +117,12 @@ pub(crate) fn apply_placement(
             target: source.target.clone(),
             geometry,
             fill,
+            // The vector body and its extension ride along verbatim, so a copy of an
+            // `editable-vector-path` source stays a valid record of that family; for the legacy
+            // family both are absent on the source and so on the copy. Applying the baseline's
+            // stroke-paint hue and opacity factor to them is still reported in `unavailable`.
+            vector: source.vector.clone(),
+            vector_ext: source.vector_ext.clone(),
         },
         dup_3d: place.dup_3d,
         unavailable,

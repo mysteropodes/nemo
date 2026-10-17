@@ -33,7 +33,8 @@ fn scene_of(value: &Value, frame: u32) -> Result<usize, ObjectSceneError> {
     let snap = snapshot(&value.to_string());
     let packet = prepare_object_frame(&snap, &selector(&snap, frame)).expect("packet");
     let scene = prepare_object_render_scene(&packet, &selector(&snap, frame))?;
-    Ok(scene.entries().len())
+    let entries = scene.entries().len();
+    Ok(entries)
 }
 
 #[test]

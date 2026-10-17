@@ -23,6 +23,7 @@ use crate::evaluation::object_component_kernels::duplicator_placement_temporal::
     mismatch, run, scenarios,
 };
 use crate::evaluation::object_component_kernels::duplicator_placement_temporal::BASELINE_RULES;
+use crate::object_document::Presence;
 
 pub(crate) const ORACLE: &str = include_str!("fixtures/duplicator-placement-apply/oracle.txt");
 
@@ -209,16 +210,17 @@ fn the_hue_rotates_the_fill_and_keeps_its_alpha() {
         ..shift(0.0, 0.0)
     };
     let copy = apply_placement(&red, 0, JsNumber::Undefined, &place, PIVOT).expect("copy");
+    let fill = copy.record.solid_fill().expect("a solid fill");
     assert_eq!(
         (
-            byte_of(&copy.record.fill.r),
-            byte_of(&copy.record.fill.g),
-            byte_of(&copy.record.fill.b),
-            byte_of(&copy.record.fill.a)
+            byte_of(&fill.r),
+            byte_of(&fill.g),
+            byte_of(&fill.b),
+            byte_of(&fill.a)
         ),
         (0, 255, 0, 128)
     );
-    assert_eq!(copy.record.fill.a, red.fill.a);
+    assert_eq!(fill.a, red.solid_fill().expect("a solid fill").a);
 }
 
 #[test]
@@ -255,7 +257,9 @@ fn unrepresentable_results_and_fills_are_typed_errors() {
         Some(ApplyError::Geometry(MatrixError::ResultNotFinite))
     );
     let mut bad_fill = parse_record(SQUARE);
-    bad_fill.fill.r = num(2.0);
+    let mut bad_solid = bad_fill.solid_fill().expect("a solid fill").clone();
+    bad_solid.r = num(2.0);
+    bad_fill.fill = Presence::Present(Some(bad_solid));
     let hue = PlacementApply {
         hue_deg: 30.0,
         ..shift(0.0, 0.0)
