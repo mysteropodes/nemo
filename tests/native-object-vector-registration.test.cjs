@@ -52,7 +52,9 @@ test('the descriptor is embedded exactly once and declares the three operations,
   assert.deepEqual(vector.operations, OPERATIONS);
   assert.equal(vector.availability.state, 'available');
   assert.equal(vector.authority.fallback, 'none'); assert.equal(vector.authority.adapterOwnsWritableMirror, false);
-  assert.equal(vector.resourceBoundary.maxRequestBytes, 4096);
+  assert.equal(vector.resourceBoundary.maxRequestBytes, 65536);
+  assert.deepEqual(vector.resourceBoundary.requestBytesByOperation, { [OPERATIONS[0]]: 65536, [OPERATIONS[1]]: 4096, [OPERATIONS[2]]: 4096 });
+  assert.equal(vector.resourceBoundary.maxReadResponseBytes, 4096);
   assert.equal(vector.examples.length, 7);
   assert.deepEqual(descriptors.find((entry) => entry.id === 'native.layer-policy').operations, ['command.document.object.layer.policy.edit'], 'the F06 declaration is untouched');
 });

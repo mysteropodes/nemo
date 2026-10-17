@@ -249,7 +249,8 @@
     validatePayload(value.operation, value.payload, value);
     const encoded = JSON.stringify(value);
     const encodedBytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
-    if (typeof encoded !== 'string' || encodedBytes > 4096) throw new TypeError('request exceeds 4096 encoded bytes');
+    const limit = vectorContract ? vectorContract.requestByteLimit(value.operation) : 4096;
+    if (typeof encoded !== 'string' || encodedBytes > limit) throw new TypeError(`request exceeds ${limit} encoded bytes`);
     return value;
   }
   function validateError(value) {

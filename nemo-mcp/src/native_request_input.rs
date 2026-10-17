@@ -1,7 +1,7 @@
 //! Pure registered-input checks; success does not authorize execution.
 use super::{
     bounded_identifier, NativeApplicationRequest, RequestError, MAX_SAFE_REVISION,
-    NATIVE_API_VERSION, NATIVE_MAX_MESSAGE_BYTES,
+    NATIVE_API_VERSION,
 };
 
 impl NativeApplicationRequest {
@@ -168,13 +168,11 @@ impl NativeApplicationRequest {
                 "native pinned-read payload does not match its declared contract".into(),
             ));
         }
-        if !matches!(
-            serde_json::to_vec(self).map(|bytes| bytes.len()),
-            Ok(0..=NATIVE_MAX_MESSAGE_BYTES)
-        ) {
-            return Err(RequestError::InvalidRequest(
-                "native requests are limited to 4096 encoded bytes".into(),
-            ));
+        let request_limit = crate::wire::native_request_byte_limit(&self.operation);
+        if !serde_json::to_vec(self).is_ok_and(|bytes| bytes.len() <= request_limit) {
+            return Err(RequestError::InvalidRequest(format!(
+                "native requests are limited to {request_limit} encoded bytes"
+            )));
         }
         crate::capabilities::validate_native_operation_registration(&self.operation)
     }

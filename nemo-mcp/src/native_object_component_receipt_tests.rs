@@ -165,3 +165,32 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
     }
     assert_eq!(seen, 6, "one copyable example per declared operation");
 }
+
+#[test]
+fn convert_receipt_kind_and_applied_disposition_match_requested_layer_count() {
+    let compact = json!({"applied":true,"historyEntriesAdded":1});
+    let created = json!({"applied":true,"historyEntriesAdded":1,"layerUid":"native-layer:8:0"});
+    let noop = json!({"applied":false,"historyEntriesAdded":0});
+    for (layers, merged) in [
+        (json!(["a"]), false),
+        (json!(["a", "a"]), false),
+        (json!(["a", "b"]), true),
+        (json!(["a", "b", "a"]), true),
+    ] {
+        let q = envelope(
+            "component.convert",
+            json!({"command":"object.component.convert","contextId":"scene-root","layerUids":layers}),
+        );
+        for value in [&compact, &created, &noop] {
+            let r = response(
+                json!({"apiVersion":2,"requestId":"component-1","instanceId":"instance-A","documentId":"document-A","contentRevision":if value["applied"] == true {8}else{7},"ok":true,"result":value}),
+            );
+            let expected = if merged {
+                value == &created
+            } else {
+                value == &compact
+            };
+            assert_eq!(response_matches(&q, &r), expected);
+        }
+    }
+}

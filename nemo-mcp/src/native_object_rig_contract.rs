@@ -18,13 +18,24 @@ const SPEC: &str = r####"{
 "rig.pose": {"command":"object.rig.pose","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1,"max":128},"action":{"t":"union","by":"kind","cases":{"reset":{"req":{}},"commit":{"req":{"frame":{"t":"int","min":0,"max":4294967295}}}}}}}}
 }"####;
 
-fn table() -> &'static Map<String, Value> {
-    static TABLE: OnceLock<Map<String, Value>> = OnceLock::new();
-    // An unparsable table admits nothing (fail closed); the tests pin its six entries.
-    TABLE.get_or_init(|| match serde_json::from_str::<Value>(SPEC) {
+const DECLARED: [&str; 6] = [
+    "image.mesh.edit",
+    "widget.create",
+    "widget.write",
+    "widget.settings",
+    "rig.edit",
+    "rig.pose",
+];
+fn parse_table(source: &str) -> Map<String, Value> {
+    match serde_json::from_str::<Value>(source) {
         Ok(Value::Object(map)) => map,
         _ => Map::new(),
-    })
+    }
+}
+fn table() -> &'static Map<String, Value> {
+    static TABLE: OnceLock<Map<String, Value>> = OnceLock::new();
+    // Known operations retain their closed validator even if the table is malformed.
+    TABLE.get_or_init(|| parse_table(SPEC))
 }
 
 fn entry(operation: &str) -> Option<&'static Value> {
@@ -32,7 +43,9 @@ fn entry(operation: &str) -> Option<&'static Value> {
 }
 
 pub(crate) fn admitted(operation: &str) -> bool {
-    entry(operation).is_some()
+    operation
+        .strip_prefix(PREFIX)
+        .is_some_and(|suffix| DECLARED.contains(&suffix))
 }
 
 fn number_ok(node: &Value, value: &Value) -> bool {
@@ -190,7 +203,13 @@ fn check(node: &Value, value: &Value) -> bool {
 }
 
 pub(super) fn request(operation: &str, payload: &Value) -> bool {
-    let (Some(entry), Some(members)) = (entry(operation), payload.as_object()) else {
+    request_with_table(table(), operation, payload)
+}
+fn request_with_table(spec: &Map<String, Value>, operation: &str, payload: &Value) -> bool {
+    let found = operation
+        .strip_prefix(PREFIX)
+        .and_then(|suffix| spec.get(suffix));
+    let (Some(entry), Some(members)) = (found, payload.as_object()) else {
         return false;
     };
     if members.get("command").and_then(Value::as_str)

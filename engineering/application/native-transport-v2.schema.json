@@ -872,7 +872,7 @@
           "$ref": "#/$defs/ObjectVectorDeletePayload"
         }
       ],
-      "description": "Vector create, replace or delete. Requests above 4096 encoded bytes are refused by the public transport, never split."
+      "description": "Vector create, replace or delete. The complete original UTF-8 request envelope is bounded at 65536 bytes, never split or truncated. Other operations and all replies retain their 4096-byte bounds."
     },
     "ObjectParametricSetPayload": {
       "type": "object",

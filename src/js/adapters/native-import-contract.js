@@ -129,12 +129,28 @@
     receiptArrays(value);
     if (bytes(JSON.stringify(value)) > MAX_RECEIPT_BYTES) fail('import receipt exceeds its bound');
   }
+  function correlateBatch(request, value) {
+    payload(OP, request.payload); result(OP, value);
+    const input = request.payload, skipped = input.skipped || [];
+    function mapped(wanted, actual, key) {
+      return wanted.length === actual.length && new Set(actual.map(r => r.sourceId)).size === actual.length &&
+        new Set(actual.map(r => r[key])).size === actual.length && wanted.every(r => actual.some(m => m.sourceId === r.sourceId));
+    }
+    const layerIds = input.layers.map(r => r.sourceId).concat(skipped.filter(r => r.kind === 'layer').map(r => r.sourceId));
+    if ((input.unavailable || []).length || new Set(layerIds).size !== layerIds.length ||
+        value.applied !== !!(input.layers.length || input.records.length) ||
+        !mapped(input.layers, value.layers, 'layerUid') || !mapped(input.records, value.objects, 'strokeId') ||
+        skipped.length !== value.skipped.length || skipped.some((r,i) => ['kind','sourceId','reason'].some(k => r[k] !== value.skipped[i][k]))) {
+      fail('import receipt does not match declared batch');
+    }
+  }
   function correlate(request, response) {
     if (response.instanceId !== request.instanceId) fail('import response owner mismatch');
     const replaced = response.ok === false && response.error && response.error.code === 'wrong_document';
     if (response.documentId !== request.documentId && !replaced) fail('import response document mismatch');
     if (!response.ok) return;
     if (response.contentRevision !== request.expectedRevision + (response.result.applied ? 1 : 0)) fail('import receipt revision mismatch');
+    correlateBatch(request, response.result);
   }
   // Source ids, names and layer references are opaque authored strings that may legitimately start with data: or blob:.
   const OPAQUE = Object.freeze({ has: (at) => /^(payload|result)\./.test(at) });

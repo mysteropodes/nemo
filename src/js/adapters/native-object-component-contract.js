@@ -108,6 +108,11 @@
     if (response.documentId !== request.documentId && !replaced) fail('component response document mismatch');
     if (!response.ok) return;
     if (response.contentRevision !== request.expectedRevision + (response.result.applied ? 1 : 0)) fail('component receipt revision mismatch');
+    if (request.operation === PREFIX + 'component.convert') {
+      payload(request.operation, request.payload);
+      const merged = new Set(request.payload.layerUids).size > 1;
+      if (response.result.applied !== true || has(response.result, 'layerUid') !== merged) fail('convert receipt does not match selected layer count');
+    }
   }
   // Every opaque authored string may legitimately start with data: or blob:; the SDK only inspects it as text.
   const OPAQUE = Object.freeze({ has: (at) => /^payload\./.test(at) || at === 'result.layerUid' });

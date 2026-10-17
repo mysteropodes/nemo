@@ -17,13 +17,13 @@ function make(options, hooks) {
 }
 
 test('convert sends one literal request in document order, de-duplicated, with the active context', async () => {
-  const h = make({ step: () => ({ applied: true }) });
+  const h = make({ step: () => ({ result: created('native-layer:8:0') }) });
   const out = await h.intent.convert(['layer-c', 'layer-a', 'layer-c']);
   assert.equal(h.state.sent.length, 1);
   assert.deepEqual(h.state.sent[0], { apiVersion: 2, requestId: 'component-convert-1', instanceId: 'instance-A', documentId: 'document-A', operation: P + 'component.convert',
     expectedRevision: 7, payload: { command: 'object.component.convert', contextId: 'scene-root', layerUids: ['layer-a', 'layer-c'] } });
   assert.equal(out.ok, true); assert.equal(out.applied, true); assert.equal(out.revision, 8); assert.equal(out.synchronized, true);
-  assert.equal(out.merged, true); assert.equal(out.instanceLayerUid, 'layer-a', 'a compact receipt means the first layer became the instance in place');
+  assert.equal(out.merged, true); assert.equal(out.instanceLayerUid, 'native-layer:8:0', 'a merge reports the native minted instance, never the first selected layer');
 });
 
 test('a single-layer convert reports the layer itself, a merge reports the instance it minted', async () => {

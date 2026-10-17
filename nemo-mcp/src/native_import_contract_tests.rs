@@ -43,7 +43,9 @@ fn response(value: Value) -> NativeApplicationResponse {
 fn receipt() -> Value {
     json!({"applied":true,"historyEntriesAdded":1,
         "layers":[{"sourceId":"w","layerUid":"native-layer:8:0"}],
-        "objects":[{"sourceId":"w:0","strokeId":"native-stroke:8:0"}],
+        "objects":[{"sourceId":"w:0","strokeId":"native-stroke:8:0"},
+            {"sourceId":"w:1","strokeId":"native-stroke:8:1"},
+            {"sourceId":"e:0","strokeId":"native-stroke:8:2"}],
         "skipped":[{"kind":"element","sourceId":"svg:9","reason":"unsupported-element:Raster"}]})
 }
 
@@ -414,4 +416,48 @@ fn the_shared_parity_table_is_judged_as_declared() {
             row["label"]
         );
     }
+}
+
+#[test]
+fn import_success_maps_every_declared_source_once_and_preserves_skips() {
+    let p = valid();
+    assert!(receipt_matches(&p, &receipt()));
+    for mutate in [
+        |v: &mut Value| {
+            v["layers"] = json!([]);
+        },
+        |v: &mut Value| {
+            v["objects"].as_array_mut().unwrap().pop();
+        },
+        |v: &mut Value| {
+            v["layers"][0]["sourceId"] = json!("foreign");
+        },
+        |v: &mut Value| {
+            v["objects"][1]["sourceId"] = json!("w:0");
+        },
+        |v: &mut Value| {
+            v["objects"][1]["strokeId"] = json!("native-stroke:8:0");
+        },
+        |v: &mut Value| {
+            v["skipped"][0]["reason"] = json!("changed");
+        },
+    ] {
+        let mut r = receipt();
+        mutate(&mut r);
+        assert!(result(&r));
+        assert!(!receipt_matches(&p, &r));
+        let q = envelope(p.clone());
+        let reply = response(
+            json!({"apiVersion":2,"requestId":"import-1","instanceId":"instance-A","documentId":"document-A","contentRevision":8,"ok":true,"result":r}),
+        );
+        assert!(!response_matches(&q, &reply));
+    }
+    let noop = json!({"applied":false,"historyEntriesAdded":0,"layers":[],"objects":[],"skipped":p["skipped"]});
+    assert!(!receipt_matches(&p, &noop));
+    let empty =
+        json!({"command":"object.import.batch","layers":[],"records":[],"skipped":p["skipped"]});
+    assert!(receipt_matches(&empty, &noop));
+    let mut unavailable = p;
+    unavailable["unavailable"] = json!([{"sourceId":"raster","need":"raster-asset"}]);
+    assert!(!receipt_matches(&unavailable, &receipt()));
 }

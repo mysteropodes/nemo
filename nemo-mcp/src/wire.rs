@@ -1,4 +1,6 @@
 //! Bounded local IPC; no shell, eval, document mirror, or public network listener.
+#[path = "native_request_bytes.rs"]
+mod native_request_bytes;
 #[path = "raw_envelope.rs"]
 mod raw_envelope;
 #[path = "stdio_transport.rs"]
@@ -180,7 +182,22 @@ pub fn decode_json_bounded<T: serde::de::DeserializeOwned>(
         }
         raw_envelope::RawEnvelopeError::Malformed(error) => io::Error::from(error),
     })?;
+    native_request_bytes::check(bytes)?;
     Ok(serde_json::from_slice(bytes)?)
+}
+
+/// Full original/typed vector request limit; every reply and other request stays4096.
+pub fn native_request_byte_limit(operation: &str) -> usize {
+    native_request_bytes::request_limit(operation)
+}
+/// Original-byte, duplicate-first, map-only admission; not execution availability.
+pub fn decode_native_request(bytes: &[u8]) -> io::Result<NativeApplicationRequest> {
+    let request: NativeApplicationRequest = decode_json_bounded(bytes, MAX_MESSAGE_BYTES - 2)?;
+    if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
+        return Err(io::Error::other("native request must be an object"));
+    }
+    request.validate_input().map_err(io::Error::other)?;
+    Ok(request)
 }
 
 pub async fn call(

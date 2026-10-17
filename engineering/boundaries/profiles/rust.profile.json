@@ -1523,7 +1523,12 @@
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
         "src/native_vector_contract.rs",
-        "src/native_vector_contract_tests.rs"
+        "src/native_vector_contract_tests.rs",
+        "src/native_request_bytes.rs",
+        "src/native_request_spans.rs",
+        "src/native_request_bytes_tests.rs",
+        "src/native_request_framing_tests.rs",
+        "src/native_request_limit_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

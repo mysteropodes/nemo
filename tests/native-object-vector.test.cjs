@@ -171,17 +171,20 @@ test('a stroke the record cannot carry, or the owner could not store, is named a
   assert.equal(a.events.runs, 2, 'only the requests that reached the validator entered the route');
 });
 
-test('a request above the public 4096-byte bound is refused locally, never split or truncated', async () => {
+test('the complete 256-anchor vector is sent once and an envelope above 65536 bytes is never split or truncated', async () => {
   const a = adapter();
   const big = dict('open-line');
   big.segments = Array.from({ length: 256 }, (_, i) => ({ point: [i, i * 2], handleIn: [0, 0], handleOut: [0, 0] }));
   const result = await a.vector.createStroke('L1', 3, big);
-  assert.equal(result.status, 'too_large'); assert.equal(result.limit, 4096); assert.ok(result.bytes > 4096);
-  assert.deepEqual(a.owner.log.received, []);
-  const fits = dict('open-line');
-  fits.segments = Array.from({ length: 24 }, (_, i) => ({ point: [i, i * 2], handleIn: [0, 0], handleOut: [0, 0] }));
-  assert.equal((await a.vector.createStroke('L1', 3, fits)).status, 'applied', 'a path within the bound is sent');
-  assert.ok(Buffer.byteLength(JSON.stringify(a.owner.log.received[0])) <= 4096);
+  assert.equal(result.status, 'applied');
+  assert.equal(a.owner.log.received.length, 1);
+  const sent = a.owner.log.received[0];
+  assert.ok(Buffer.byteLength(JSON.stringify(sent)) > 4096);
+  assert.ok(Buffer.byteLength(JSON.stringify(sent)) <= 65536);
+  assert.deepEqual(sent.payload.record.geometry.segments.map(s => [s.point.x, s.point.y]), big.segments.map(s => s.point));
+  const excessive = await a.vector.createStroke('L'.repeat(65536), 3, big);
+  assert.equal(excessive.status, 'too_large'); assert.equal(excessive.limit, 65536); assert.ok(excessive.bytes > 65536);
+  assert.equal(a.owner.log.received.length, 1, 'over-budget request adds no dispatch and leaves the complete earlier path intact');
 });
 
 test('the origin the caller read must still be the presented one; a stale origin sends nothing', async () => {
