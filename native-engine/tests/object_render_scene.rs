@@ -66,7 +66,10 @@ fn paint_plan_borrows_real_triangle_straight_rgba_and_retains_old_v2_history() {
             .find(|e| e.source().source_object_index() == command.source().source_object_index())
             .unwrap();
         assert!(std::ptr::eq(command.contour(), entry.contour()));
-        assert!(std::ptr::eq(command.paint()[3], &source.fill.a));
+        assert!(std::ptr::eq(
+            command.paint()[3],
+            &source.solid_fill().unwrap().a
+        ));
         assert_eq!(
             command.contour().commands(),
             [
@@ -123,7 +126,8 @@ fn paint_plan_borrows_real_triangle_straight_rgba_and_retains_old_v2_history() {
                     .unwrap()
                     .source()
                     .record()
-                    .fill
+                    .solid_fill()
+                    .unwrap()
                     .clone()
             )
             .unwrap(),

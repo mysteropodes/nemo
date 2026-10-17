@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.boolean",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.boolean.apply",
+    "command.document.object.boolean.erase",
+    "command.document.object.boolean.flatten"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectBooleanApplyPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectBooleanErasePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectBooleanFlattenPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Boolean the operands of one frame (unite, subtract, intersect, exclude), bite a shape with an eraser footprint, or flatten a combined group, as one sealed one-frame transaction. Straight-edged filled operands only; curved, unfilled, locked or Motion-driven operands are typed refusals, never approximations. One revision and one undo entry per applied edit. No JS/Paper/WASM writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native boolean.apply command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "boolean-boolean-apply-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.boolean.apply",
+        "payload": {
+          "command": "object.boolean.apply",
+          "mode": "unite",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "frame": 0,
+          "strokeIds": [
+            "stroke-1",
+            "stroke-2"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "boolean-boolean-apply-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native boolean.erase command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "boolean-boolean-erase-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.boolean.erase",
+        "payload": {
+          "command": "object.boolean.erase",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "frame": 0,
+          "strokeId": "stroke-1",
+          "footprint": [
+            [
+              0,
+              0
+            ],
+            [
+              10,
+              0
+            ],
+            [
+              10,
+              10
+            ]
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "boolean-boolean-erase-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native boolean.flatten command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "boolean-boolean-flatten-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.boolean.flatten",
+        "payload": {
+          "command": "object.boolean.flatten",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "frame": 0,
+          "groupId": "group-1"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "boolean-boolean-flatten-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

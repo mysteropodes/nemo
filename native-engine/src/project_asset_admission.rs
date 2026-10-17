@@ -1,4 +1,8 @@
+//! PHASE TWO PRIVATE ONLY: do not relax owner guard before working font wire.
 //! pending tickets from the SAME existing owner ledger.
+use crate::object_document::media_timing::object_media_link_edit::{
+    check_inventory, PlacementRefusal,
+};
 use crate::object_document::{AssetKind, ProjectEnvelope, ProjectReferenceState};
 use crate::revision::object_revision::encoded_retention_budget::{
     Admission, EncodedRetentionBudget,
@@ -10,17 +14,26 @@ pub(super) fn pending_charges(
 ) -> Result<Vec<Admission>, &'static str> {
     if project
         .asset_inventory()
-        .is_some_and(|assets| !assets.placements().is_empty() || assets.records().len() > 1024)
+        .is_some_and(|assets| assets.records().len() > 1024)
     {
         return Err("asset placement or catalog unavailable");
+    }
+    // Placements enter only against the document that owns their targets, and
+    // BEFORE any retention ticket exists, so a refusal charges nothing.
+    if let Some(assets) = project.asset_inventory() {
+        check_inventory(project.drawing(), assets).map_err(PlacementRefusal::message)?;
     }
     // A source's codec precondition does not establish its record's kind.
     // Keep typed entry as strict as wire admission BEFORE charging/identity.
     if project.asset_inventory().is_some_and(|assets| {
         assets.records().iter().any(|record| {
             record.source().encoded_allocation().is_some()
-                && (record.kind() != AssetKind::Image
-                    || record.source().media_type() != Some("image/png"))
+                && !((record.kind() == AssetKind::Image
+                    && record.source().media_type() == Some("image/png")
+                    && !record.source().has_font_admission())
+                    || (record.kind() == AssetKind::Font
+                        && record.source().has_font_admission()
+                        && record.source().media_type() == Some("font/ttf")))
         })
     }) {
         return Err("asset media codec unavailable");

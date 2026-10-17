@@ -368,3 +368,39 @@ async fn malformed_timing_selector_refuses_before_the_mcp_wire_connects() {
             .is_err()
     );
 }
+
+#[test]
+fn an_object_edit_receipt_is_correlated_and_a_flawed_one_is_refused_as_an_invalid_response() {
+    let request: NativeApplicationRequest = serde_json::from_value(json!({
+        "apiVersion":2,"requestId":"edit-1","instanceId":"instance-A","documentId":"document-A",
+        "expectedRevision":7,"operation":"command.document.object.layer.rename",
+        "payload":{"command":"object.layer.rename","layerUid":"layer-b","name":"Ink"}}))
+    .unwrap();
+    let reply = |revision: u64, result: Value| -> NativeApplicationResponse {
+        serde_json::from_value(
+            json!({"apiVersion":2,"requestId":"edit-1","instanceId":"instance-A",
+            "documentId":"document-A","contentRevision":revision,"ok":true,"result":result}),
+        )
+        .unwrap()
+    };
+    let applied = json!({"applied":true,"historyEntriesAdded":1});
+    let noop = json!({"applied":false,"historyEntriesAdded":0});
+    assert!(validate_native_response(&reply(8, applied.clone()), &request).is_ok());
+    assert!(validate_native_response(&reply(7, noop.clone()), &request).is_ok());
+    for refused in [
+        // Not the compact command result of a rename.
+        reply(
+            8,
+            json!({"applied":true,"historyEntriesAdded":1,"layerUid":"native-layer:8:0"}),
+        ),
+        reply(8, json!({"applied":true,"historyEntriesAdded":0})),
+        // The revision does not advance by exactly the applied edit.
+        reply(7, applied.clone()),
+        reply(9, applied),
+        reply(8, noop),
+    ] {
+        let error = validate_native_response(&refused, &request).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert_eq!(error.to_string(), "invalid native application response");
+    }
+}

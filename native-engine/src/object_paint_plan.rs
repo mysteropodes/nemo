@@ -1,5 +1,10 @@
 //! Pinned CPU commands join existing numeric order to retained real contours.
+use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
+    style_of_record, SceneItemStyle, StyleUnavailable,
+};
+use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
+use crate::object_render_scene::object_scene_producer_contour;
 use crate::object_render_scene::{
     validate_pins, ObjectRenderEntry, ObjectRenderScene, ObjectSceneError,
 };
@@ -7,6 +12,7 @@ use crate::render_geometry::ClosedCubicPath;
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use vello::kurbo::BezPath;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectPaintPlanError {
@@ -27,9 +33,32 @@ impl<'a> ObjectPaintCommand<'a> {
     pub fn contour(&self) -> &'a ClosedCubicPath {
         self.entry.contour()
     }
+    /// The geometry to draw: the vector record's open or closed path, otherwise the closed contour's path (L01-I).
+    pub(crate) fn path(&self) -> &'a BezPath {
+        self.entry.path()
+    }
     pub fn paint(&self) -> [&'a Number; 4] {
-        let paint = &self.entry.source().record().fill;
-        [&paint.r, &paint.g, &paint.b, &paint.a]
+        // The fill of the source record when it has one (the legacy family always does), otherwise the retained primary solid
+        // of the entry (L01-I): an unfilled vector retains its stroke paint, an item without any paint a transparent solid.
+        match self.entry.source().record().solid_fill() {
+            Some(paint) => [&paint.r, &paint.g, &paint.b, &paint.a],
+            None => self.entry.solid().channels(),
+        }
+    }
+    /// Typed straight-RGBA paint (L07-A `SceneSolid`) retained with the contour;
+    /// equal by value to `paint()`, which keeps borrowing the immutable source fill.
+    pub(crate) fn solid(&self) -> &'a SceneSolid {
+        self.entry.solid()
+    }
+    /// Typed item style (L07-I): the retained L07-A solid for the legacy family, otherwise the one
+    /// record-to-style function (stroke, paint order, opacity). The scene admits legacy contours only
+    /// today; the second arm is the join point for the vector family.
+    pub(crate) fn style(&self) -> Result<SceneItemStyle, StyleUnavailable> {
+        let record = self.entry.source().record();
+        if record.vector().is_none() {
+            return Ok(SceneItemStyle::solid_fill(self.solid().clone()));
+        }
+        style_of_record(record)
     }
 }
 
@@ -63,30 +92,9 @@ pub fn prepare_object_paint_plan(
     validate_pins(scene.packet(), expected).map_err(ObjectPaintPlanError::Pins)?;
     // The admitted F1 producer offers numeric_order ONLY for scene-root
     // Authored v2. v1/no-plan and all Reference/nonroot inputs are unavailable.
-    let order = scene
-        .packet()
-        .numeric_order()
-        .ok_or(ObjectPaintPlanError::Unavailable)?;
-    let sequence = order
-        .layers()
-        .iter()
-        .map(|layer| {
-            let visible = scene
-                .packet()
-                .source_layers()
-                .get(layer.source_layer_index())
-                .is_some_and(|source| source.visible());
-            (
-                layer.source_layer_index(),
-                layer
-                    .elements()
-                    .iter()
-                    .filter(|_| visible)
-                    .map(|e| e.source_object_index())
-                    .collect(),
-            )
-        })
-        .collect();
+    // L07-F: the retained scene is reported as the contour producer output and joined
+    // through the pinned registry (pin check once, NumericOrderPlan order).
+    let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
     let indices = join(scene, &sequence)?;
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),

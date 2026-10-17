@@ -39,6 +39,10 @@ impl InactiveProject {
 
 #[path = "object_reference_dispatch.rs"]
 mod reference_dispatch;
+// L06-H (lane #2112): asset attach / remove commands.
+#[path = "object_raster_asset_dispatch.rs"]
+#[allow(dead_code)]
+mod asset_dispatch;
 
 // Both initial New and replacement admit this same fully specified blank value.
 // It has no external resources and cannot carry an unchecked drawing from a caller.
@@ -73,6 +77,7 @@ fn blank_project(
         )],
         objects: vec![],
         property_holders: Presence::Missing,
+        layer_folders: Presence::Missing,
         // Native painting consumes the explicit v2 order plan even when empty.
         composition_order: Presence::Present(OrderPlan {
             format: "nemo.native-object-order-plan".into(),
@@ -100,6 +105,9 @@ fn blank_project(
             migration: "explicit-plan-required".into(),
             reference_policy: "unresolved".into(),
         }),
+        image_meshes: Presence::Missing,
+        items: Presence::Missing,
+        component_tables: Presence::Missing,
     };
     Ok(ProjectEnvelope::no_media(metadata, drawing))
 }
@@ -321,6 +329,9 @@ fn project_snapshot_info(
             }
             if let Some(visible) = layer.visible.value() {
                 info["visible"] = serde_json::json!(visible);
+            }
+            if let Some(shy) = layer.shy.value() {
+                info["shy"] = serde_json::json!(shy);
             }
             if let Some(locked) = layer.locked.value() {
                 info["locked"] = serde_json::json!(locked);

@@ -101,7 +101,11 @@ pub(crate) fn document(
         layers,
         objects: vec![],
         property_holders: Presence::Present(holders),
+        layer_folders: Presence::Missing,
         composition_order: Presence::Missing,
+        image_meshes: Presence::Missing,
+        items: Presence::Missing,
+        component_tables: Presence::Missing,
     }
 }
 

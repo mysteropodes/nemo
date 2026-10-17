@@ -8,6 +8,16 @@ use serde::{Deserialize, Serialize};
 mod object_frame_edit_sparse;
 #[allow(unused_imports)]
 pub(crate) use object_frame_edit_sparse::TimingEdit;
+// L05-E (lane #2111): private sparse key-retime plan (moveKeyframe, F10) over the private LayerTiming fields.
+#[path = "object_exposure_edit_retime_timing.rs"]
+#[allow(dead_code)]
+mod object_exposure_edit_retime_timing;
+#[allow(unused_imports)]
+pub(crate) use object_exposure_edit_retime_timing::{RetimeEdit, RetimePair, RetimePlan};
+// L05-J1 (lane #2111): private sparse Repeat Selection plan (repeatSelection, F13) over the private LayerTiming fields.
+#[path = "object_frame_clipboard_repeat_timing.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_repeat_timing;
 
 const MAX_ENTRIES: usize = 4096;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

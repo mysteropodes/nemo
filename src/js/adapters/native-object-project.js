@@ -2,42 +2,17 @@
  * Composition supplies stable, narrow UI callbacks; the presenter never resolves
  * this provider or the file adapter. Callback reads retain current native authority. */
 (function(root,factory){
-  var api=factory();
+  var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
   function freeze(v){if(v&&typeof v==='object'){Object.keys(v).forEach(function(k){freeze(v[k]);});Object.freeze(v);}return v;}
   function same(a,b){return !!a&&!!b&&['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration'].every(function(k){return a[k]===b[k];});}
-  function metadata(v,request){
-    if(!v||v.apiVersion!==2||v.requestId!==request.requestId||v.instanceId!==request.instanceId||v.documentId!==request.documentId||
-      !id(v.documentSnapshotId)||!integer(v.contentRevision,0)||!integer(v.lifecycleGeneration,1)||
-      !/^[a-f0-9]{64}$/.test(v.documentDigest)||!integer(v.byteCount,1)||v.byteCount>32*1024*1024||
-      !integer(v.canvasW,1)||!integer(v.canvasH,1)||!integer(v.totalFrames,1)||!Number.isFinite(v.fps)||!(v.fps>0)||
-      (Object.prototype.hasOwnProperty.call(v,'canvasBg')&&(typeof v.canvasBg!=='string'||!/^#?(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(v.canvasBg)))||
-      ['waIn','waOut'].some(function(k){return Object.prototype.hasOwnProperty.call(v,k)&&!Number.isFinite(v[k]);})||
-      !Array.isArray(v.layers)||!v.layers.every(function(l){return l&&typeof l.layerUid==='string'&&
-        (!Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string')&&
-        (!Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean')&&
-        (!Object.prototype.hasOwnProperty.call(l,'locked')||l.locked===false)&&
-        (!Object.prototype.hasOwnProperty.call(l,'color')||typeof l.color==='string'&&/^#[a-fA-F0-9]{6}$/.test(l.color))&&
-        (!Object.prototype.hasOwnProperty.call(l,'parentLayerUid')||l.parentLayerUid===null);}))throw new Error('Native project metadata is uncorrelated');
-    // Copy only admitted UI fields; embedded files/objects never become JS state.
-    var result={};['apiVersion','instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration',
-      'documentDigest','byteCount','canvasW','canvasH','fps','totalFrames','undoDepth','redoDepth'].forEach(function(k){result[k]=v[k];});
-    ['canvasBg','waIn','waOut'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(v,k))result[k]=v[k];});
-    result.layers=v.layers.map(function(l){var row={layerUid:l.layerUid};
-      if(Object.prototype.hasOwnProperty.call(l,'name'))row.name=l.name;
-      if(Object.prototype.hasOwnProperty.call(l,'visible'))row.visible=l.visible;
-      ['locked','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(l,k))row[k]=l[k];});return row;});
-    var r=v.reference;
-    if(r!==null&&(!r||!id(r.id)||typeof r.name!=='string'||typeof r.visible!=='boolean'||!Number.isFinite(r.opacity)||
-      r.opacity<0||r.opacity>1||!Number.isSafeInteger(r.offsetFrames)))throw new Error('Native reference metadata is invalid');
-    result.reference=r===null?null:{id:r.id,name:r.name,visible:r.visible,opacity:r.opacity,offsetFrames:r.offsetFrames};
-    return freeze(result);
-  }
+  var metadata=Metadata&&Metadata.decode;if(typeof metadata!=='function')throw new Error('Native project metadata parser is unavailable');
   function create(ports){
     var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null;
@@ -309,6 +284,10 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
+    function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
+      var submitted=epoch(info);return enqueue(async function(){guardEpoch(submitted);return action({dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
+        reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
+          changed();await present(ports.frame?ports.frame():0,next);return next;}});});}
     function reference(action){return mutation(function(pin){return {apiVersion:2,requestId:requestId('reference'),instanceId:pin.instanceId,
       documentId:pin.documentId,lifecycleGeneration:pin.lifecycleGeneration,expectedRevision:pin.contentRevision,
       documentSnapshotId:pin.documentSnapshotId,action:typeof action==='function'?action(pin.reference):action};},'nemo_native_object_reference');}
@@ -331,6 +310,12 @@
       if(!same(pin,expected)||typeof name!=='string'||!name)throw new Error('Native Drawing create intent is stale or invalid');
       return {apiVersion:2,requestId:requestId('layer-create'),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.layer.create',expectedRevision:pin.contentRevision,payload:{command:'object.layer.create',name:name}};
+    },'nemo_native_dispatch');}
+    function editLayerPolicy(payload,expected){return mutation(function(pin){
+      if(!same(pin,expected)||!payload||Array.isArray(payload)||Object.keys(payload).length!==4||!['command','layerUid','flag','value'].every(function(k){return Object.prototype.hasOwnProperty.call(payload,k);})||payload.command!=='object.layer.policy.edit'||!['locked','shy'].includes(payload.flag)||typeof payload.value!=='boolean'||typeof payload.layerUid!=='string'||!payload.layerUid||pin.layers.filter(function(l){return l.layerUid===payload.layerUid;}).length!==1)throw new Error('Native layer policy intent is stale or invalid');
+      return {apiVersion:2,requestId:requestId('layer-policy'),instanceId:pin.instanceId,documentId:pin.documentId,
+        operation:'command.document.object.layer.policy.edit',expectedRevision:pin.contentRevision,
+        payload:{command:'object.layer.policy.edit',layerUid:payload.layerUid,flag:payload.flag,value:payload.value}};
     },'nemo_native_dispatch');}
     function editProjectSettings(action,expected){return mutation(function(pin){
       if(!same(pin,expected))throw new Error('Native project settings intent is stale');
@@ -379,6 +364,38 @@
         return freeze(Object.assign({},result));
       }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
     }
+    async function readPropertyMetadata(selector){
+      var fields=['instanceId','documentId','atRevision','documentSnapshotId','view'];
+      if(!selector||typeof selector!=='object'||Array.isArray(selector)||
+        Object.keys(selector).length!==fields.length||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(selector,k);}))
+        throw new TypeError('Invalid native metadata selector');
+      var pin=info,ticket=subscriptionTicket,shown=presentation;
+      function ready(){
+        return active()&&!openingRequested&&pending===0&&!synchronizing&&subscription&&
+          ticket===subscriptionTicket&&presentation===shown&&same(info,pin)&&presentedSession()&&
+          typeof ports.dispatchApplication==='function'&&typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true&&
+          typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;
+      }
+      if(!ready()||selector.instanceId!==pin.instanceId||selector.documentId!==pin.documentId||
+        selector.atRevision!==pin.contentRevision||selector.documentSnapshotId!==pin.documentSnapshotId)
+        throw new Error('Native metadata owner or presentation is unavailable');
+      var request={apiVersion:2,requestId:requestId('metadata'),instanceId:selector.instanceId,documentId:selector.documentId,
+        operation:'query.document.object.property.metadata',payload:{atRevision:selector.atRevision,
+          documentSnapshotId:selector.documentSnapshotId,view:selector.view}};
+      // The same subscribed desktop port calls the real SDK before transport.
+      var response=await ports.dispatchApplication(request);
+      if(!ready())throw new Error('Native metadata owner or presentation changed');
+      if(!response||response.apiVersion!==2||response.requestId!==request.requestId||response.instanceId!==pin.instanceId||
+        response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)
+        throw new Error('Native metadata response is uncorrelated');
+      if(response.ok!==true){var error=new Error('Native metadata read unavailable');
+        error.code=response.error&&response.error.code||'unavailable';throw error;}
+      var result=response.result;
+      if(!result||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
+        result.atRevision!==pin.contentRevision||result.documentSnapshotId!==pin.documentSnapshotId)
+        throw new Error('Native metadata result is uncorrelated');
+      return freeze(result);
+    }
     function exportPng(destination,frames,onProgress,signal){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
@@ -399,7 +416,11 @@
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
     return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
-      info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      readSubscriptionGeneration:function(){return subscriptionTicket;},
+      readPropertyMetadata:readPropertyMetadata,
+      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
       get editProjectSettings(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editProjectSettings:undefined;},
       get createLayer(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
@@ -416,62 +437,28 @@
   function desktop(root){
     if(!root.__TAURI__||!root.__TAURI__.core)return null;
     if(desktops.has(root))return desktops.get(root);
-    var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
-    function settingsNotice(kind,info){var c=root.NemoNativeProjectSettingsController;if(c&&typeof c[kind]==='function')c[kind](info);}
-    function publishRevision(info){
-      settingsNotice('willProject',info);
-      if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
-        throw new Error('Native object row projection is uncorrelated');
-      if(typeof root.updateUI!=='function')throw new Error('Native document UI publication is unavailable');
-      root.updateUI();
-      if(root.SMReference)root.SMReference.refreshNative();
-      if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();
-      return true;
-    }
-    var session=create(Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
-      subscribeRevisions:async function(synchronize,disconnected,trackedInvoke){
-        if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
-          return null; // Private file Open remains usable; no toggle/subscriber is advertised.
-        var call=trackedInvoke||invoke;
-        transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(function(command,args){
-          var response=call(command,args);
-          if(command==='nemo_native_revision_sync'&&args&&args.request.action==='acknowledge')
-            return Promise.resolve(response).then(function(value){
-              // Observe the completed ACK after transport clears its in-flight flag.
-              setTimeout(function(){try{if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshTiming)
-                root.NemoNativeObjectUI.refreshTiming(root);settingsNotice('presented');}catch(_){}},0);
-              return value;
-            });
-          return response;
-        });
-        await transport.connect();return transport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize,disconnected);
-      },
-      unsubscribeRevisions:function(){return transport?transport.disconnect():Promise.resolve();},
-      subscriptionActive:function(){return !!transport&&!!transport.status()&&!transport.isSynchronizing();},
-      dispatchMutation:function(command,request){return transport.dispatchObject(command,request);},
-      dispatchApplication:function(request){
-        if(!transport||!root.NemoNativeApplicationAdapter||typeof root.NemoNativeApplicationAdapter.createNativeApplicationAdapter!=='function')
-          throw new Error('Native public application client is unavailable');
-        return root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui',transport).dispatch(request);
-      },
-      openDiagnostic:typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function'?function(event,code){try{root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){} }:null,
-      presented:function(info){settingsNotice('presented',info);},
-      changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);
-        else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
-      notice:function(message){if(root.showToast)root.showToast(message);},
-      failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}}));
+    if(!Desktop||typeof Desktop.createPorts!=='function')throw new Error('Native desktop ports factory is unavailable');
+    var session=create(Desktop.createPorts(root));
     desktops.set(root,session);return session;
   }
   function uiSession(root){var session=desktop(root);return session&&session.blocksLegacy()?session:null;}
   function nativeObjectUiPorts(root){
     var ports=uiBindings.get(root);if(ports)return ports;
-    ports=Object.freeze({
+    ports={
       projectionReady:function(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true;},
       currentSession:function(){return uiSession(root);},
+      readPropertyMetadata:function(selector){
+        var session=uiSession(root);
+        if(!session)return Promise.reject(new Error('Native metadata session is unavailable'));
+        return session.readPropertyMetadata(selector);
+      },
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
       projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},
       repaint:function(frameOnly){return paintUI(root,frameOnly);}
-    });uiBindings.set(root,ports);return ports;
+    };
+    if(root.NemoNativeObjectUI&&typeof root.NemoNativeObjectUI.createPolicyPorts==='function')
+      Object.assign(ports,root.NemoNativeObjectUI.createPolicyPorts(root,ports));
+    Object.freeze(ports);uiBindings.set(root,ports);return ports;
   }
   function uiFailure(root,error){
     var start=root.document&&root.document.getElementById('start-screen');if(start)start.classList.remove('hid');
@@ -479,12 +466,16 @@
   }
   function paintUI(root,frameOnly){
     var session=uiSession(root);if(!session){
+      var old=uiBindings.get(root);
+      if(old&&old.disposePolicyEntries)old.disposePolicyEntries();
       uiBindings.delete(root);
       if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.restoreInspector)root.NemoNativeObjectUI.restoreInspector(root);
       return false;
     }
-    try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,nativeObjectUiPorts(root))!==true)
-      throw new Error('Native document UI presentation is unavailable');}
+    var ports=nativeObjectUiPorts(root);
+    try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
+      throw new Error('Native document UI presentation is unavailable');
+      if(ports.bindPolicyEntries)ports.bindPolicyEntries();}
     catch(error){return uiFailure(root,error);}
     return true;
   }

@@ -38,6 +38,45 @@
     "functions": 96.55
   },
   "files": {
+    "nemo-mcp/src/native_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 6a290388264490b272667540c03c778633abae2d, MCP tree 1d2ba80df9155d540fc1dca73f86c37d3a009bdf; standard cargo-llvm-cov 0.9.1 report SHA256 a44152d569c8cc400b79f72d6acc65af9510a346f3d2502bf59cf66ebd72cca7, 172 tests/0 failed across 20 binaries, booking1062/6228171993. Floors/noRegions/reason above are derived by existing pure buildBaseline. Exact complete measured MCP source must match the adoption candidate. Only this new entry is added; all prior entries, floors, aggregate totals, exclusions and metadata are preserved. Whole measured MCP ratchet passes with these seven new entries; no installed/native-host acceptance is implied."
+    },
+    "nemo-mcp/src/native_diagnostics_contract.rs": {
+      "lines": 97.4,
+      "regions": 98.27,
+      "functions": 100,
+      "note": "Measured clean 6a290388264490b272667540c03c778633abae2d, MCP tree 1d2ba80df9155d540fc1dca73f86c37d3a009bdf; standard cargo-llvm-cov 0.9.1 report SHA256 a44152d569c8cc400b79f72d6acc65af9510a346f3d2502bf59cf66ebd72cca7, 172 tests/0 failed across 20 binaries, booking1062/6228171993. Floors/noRegions/reason above are derived by existing pure buildBaseline. Exact complete measured MCP source must match the adoption candidate. Only this new entry is added; all prior entries, floors, aggregate totals, exclusions and metadata are preserved. Whole measured MCP ratchet passes with these seven new entries; no installed/native-host acceptance is implied."
+    },
+    "nemo-mcp/src/native_font_contract.rs": {
+      "lines": 81.26,
+      "regions": 83.9,
+      "functions": 90.32,
+      "note": "Measured clean 6a290388264490b272667540c03c778633abae2d, MCP tree 1d2ba80df9155d540fc1dca73f86c37d3a009bdf; standard cargo-llvm-cov 0.9.1 report SHA256 a44152d569c8cc400b79f72d6acc65af9510a346f3d2502bf59cf66ebd72cca7, 172 tests/0 failed across 20 binaries, booking1062/6228171993. Floors/noRegions/reason above are derived by existing pure buildBaseline. Exact complete measured MCP source must match the adoption candidate. Only this new entry is added; all prior entries, floors, aggregate totals, exclusions and metadata are preserved. Whole measured MCP ratchet passes with these seven new entries; no installed/native-host acceptance is implied."
+    },
+    "nemo-mcp/src/native_font_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 6a290388264490b272667540c03c778633abae2d, MCP tree 1d2ba80df9155d540fc1dca73f86c37d3a009bdf; standard cargo-llvm-cov 0.9.1 report SHA256 a44152d569c8cc400b79f72d6acc65af9510a346f3d2502bf59cf66ebd72cca7, 172 tests/0 failed across 20 binaries, booking1062/6228171993. Floors/noRegions/reason above are derived by existing pure buildBaseline. Exact complete measured MCP source must match the adoption candidate. Only this new entry is added; all prior entries, floors, aggregate totals, exclusions and metadata are preserved. Whole measured MCP ratchet passes with these seven new entries; no installed/native-host acceptance is implied."
+    },
+    "nemo-mcp/src/native_layer_policy_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "Measured clean 6a290388264490b272667540c03c778633abae2d, MCP tree 1d2ba80df9155d540fc1dca73f86c37d3a009bdf; standard cargo-llvm-cov 0.9.1 report SHA256 a44152d569c8cc400b79f72d6acc65af9510a346f3d2502bf59cf66ebd72cca7, 172 tests/0 failed across 20 binaries, booking1062/6228171993. Floors/noRegions/reason above are derived by existing pure buildBaseline. Exact complete measured MCP source must match the adoption candidate. Only this new entry is added; all prior entries, floors, aggregate totals, exclusions and metadata are preserved. Whole measured MCP ratchet passes with these seven new entries; no installed/native-host acceptance is implied."
+    },
+    "nemo-mcp/src/native_layer_policy_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 6a290388264490b272667540c03c778633abae2d, MCP tree 1d2ba80df9155d540fc1dca73f86c37d3a009bdf; standard cargo-llvm-cov 0.9.1 report SHA256 a44152d569c8cc400b79f72d6acc65af9510a346f3d2502bf59cf66ebd72cca7, 172 tests/0 failed across 20 binaries, booking1062/6228171993. Floors/noRegions/reason above are derived by existing pure buildBaseline. Exact complete measured MCP source must match the adoption candidate. Only this new entry is added; all prior entries, floors, aggregate totals, exclusions and metadata are preserved. Whole measured MCP ratchet passes with these seven new entries; no installed/native-host acceptance is implied."
+    },
+    "nemo-mcp/src/server_command_projection.rs": {
+      "lines": 96.66,
+      "regions": 98.66,
+      "functions": 100,
+      "note": "Measured clean 6a290388264490b272667540c03c778633abae2d, MCP tree 1d2ba80df9155d540fc1dca73f86c37d3a009bdf; standard cargo-llvm-cov 0.9.1 report SHA256 a44152d569c8cc400b79f72d6acc65af9510a346f3d2502bf59cf66ebd72cca7, 172 tests/0 failed across 20 binaries, booking1062/6228171993. Floors/noRegions/reason above are derived by existing pure buildBaseline. Exact complete measured MCP source must match the adoption candidate. Only this new entry is added; all prior entries, floors, aggregate totals, exclusions and metadata are preserved. Whole measured MCP ratchet passes with these seven new entries; no installed/native-host acceptance is implied."
+    },
     "nemo-mcp/src/main_trace_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
@@ -183,6 +222,33 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "F04/#2080: pinned cargo-llvm-cov 0.9.1 measured clean source aa258dedbf5688a53c2f618388f53eb27d195c01; 16 binaries, 119 tests passed, none failed. Artifact: reports/f04-coverage-20261016T144640Z/coverage.json SHA256 c4bb28830ca4f9cc0f350d67e8ad32daee7b43ac26f1bf5f591c619cf8fce99e. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged. Whole-crate ratchet remains RED18; additive registration is not coverage acceptance. This cfg(test) child is absent from the real LLVM export; explicitly listed, not excluded or assigned a guessed zero floor."
+    },
+    "nemo-mcp/src/native_item_contract.rs": {
+      "lines": 97.81,
+      "regions": 98.67,
+      "functions": 100,
+      "note": "#2106 (L06-M, L02-J): pinned cargo-llvm-cov 0.9.1 measured clean source c302f80bc836535fddaa8df87070ba6fe4aa1488, MCP tree 78994c66b94278d675320248abf36d3d11e03efc; 20 binaries, 195 tests passed, none failed. Artifact: reports/b7-coverage-rust/coverage.json SHA256 e40e555285c392e00754e41dc623b04db0f0c9549df7d63f4661b98c6600a871. Floors derived by the existing baseline builder (floorPct of the measurement). Measured 224/229 lines, 371/376 regions and 32/32 functions. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged; this additive registration is not whole-crate coverage acceptance."
+    },
+    "nemo-mcp/src/native_item_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2106 (L06-M, L02-J): pinned cargo-llvm-cov 0.9.1 measured clean source c302f80bc836535fddaa8df87070ba6fe4aa1488, MCP tree 78994c66b94278d675320248abf36d3d11e03efc; 20 binaries, 195 tests passed, none failed. Artifact: reports/b7-coverage-rust/coverage.json SHA256 e40e555285c392e00754e41dc623b04db0f0c9549df7d63f4661b98c6600a871. The real LLVM export holds no file record or executable regions for this cfg(test) child; explicitly listed, not excluded or assigned a guessed zero floor. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged."
+    },
+    "nemo-mcp/src/native_object_edit_contract.rs": {
+      "lines": 90.98,
+      "regions": 91.47,
+      "functions": 90.19,
+      "note": "#2106 (L06-M, L02-J): pinned cargo-llvm-cov 0.9.1 measured clean source c302f80bc836535fddaa8df87070ba6fe4aa1488, MCP tree 78994c66b94278d675320248abf36d3d11e03efc; 20 binaries, 195 tests passed, none failed. Artifact: reports/b7-coverage-rust/coverage.json SHA256 e40e555285c392e00754e41dc623b04db0f0c9549df7d63f4661b98c6600a871. Floors derived by the existing baseline builder (floorPct of the measurement). Measured 212/233 lines, 365/399 regions and 46/51 functions. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged; this additive registration is not whole-crate coverage acceptance."
+    },
+    "nemo-mcp/src/native_object_edit_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2106 (L06-M, L02-J): pinned cargo-llvm-cov 0.9.1 measured clean source c302f80bc836535fddaa8df87070ba6fe4aa1488, MCP tree 78994c66b94278d675320248abf36d3d11e03efc; 20 binaries, 195 tests passed, none failed. Artifact: reports/b7-coverage-rust/coverage.json SHA256 e40e555285c392e00754e41dc623b04db0f0c9549df7d63f4661b98c6600a871. The real LLVM export holds no file record or executable regions for this cfg(test) child; explicitly listed, not excluded or assigned a guessed zero floor. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged."
+    },
+    "nemo-mcp/src/native_object_edit_receipt_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2106 (L06-M, L02-J): pinned cargo-llvm-cov 0.9.1 measured clean source c302f80bc836535fddaa8df87070ba6fe4aa1488, MCP tree 78994c66b94278d675320248abf36d3d11e03efc; 20 binaries, 195 tests passed, none failed. Artifact: reports/b7-coverage-rust/coverage.json SHA256 e40e555285c392e00754e41dc623b04db0f0c9549df7d63f4661b98c6600a871. The real LLVM export holds no file record or executable regions for this cfg(test) child; explicitly listed, not excluded or assigned a guessed zero floor. Every prior file/aggregate floor, exclusion, tool and recorded provenance remains unchanged."
     }
   },
   "nativeObjectContractRegistration": {
@@ -226,5 +292,22 @@
       "failed": 0
     },
     "scope": "Only two new measured per-file entries and this provenance; every prior file/aggregate floor, exclusion, initial recorded snapshot and tool pin preserved. Whole-crate ratchet remains RED18; source registration is not whole coverage acceptance."
+  },
+  "nativeObjectEditPublicContractRegistration": {
+    "issue": "#2106 (L06-M, L02-J)",
+    "sourceSha": "c302f80bc836535fddaa8df87070ba6fe4aa1488",
+    "treeDirty": false,
+    "crateDirty": false,
+    "report": "reports/b7-coverage-rust/coverage.json",
+    "reportSha256": "e40e555285c392e00754e41dc623b04db0f0c9549df7d63f4661b98c6600a871",
+    "lcov": "reports/b7-coverage-rust/lcov.info",
+    "lcovSha256": "bd8ade760df92d48a44e2ca3bc251a462df4de07361e6d6a5e3ba7b529cb89ef",
+    "tool": "cargo-llvm-cov 0.9.1",
+    "tests": {
+      "binaries": 20,
+      "passed": 195,
+      "failed": 0
+    },
+    "scope": "Only five new per-file entries (two measured production sources, three cfg(test) children with no executable regions) and this provenance; every pre-existing file/aggregate floor, exclusion, initial recorded snapshot and tool pin preserved. Measured at the clean commit that adds the object-edit and item result-validation tests; the batch-7 public contract sources are native_item_contract.rs and native_object_edit_contract.rs. Registration only: not installed/native-host acceptance."
   }
 }

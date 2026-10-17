@@ -1,4 +1,11 @@
 //! A bounded pinned object frame sequence. The host must reconcile before releasing this job.
+use crate::export_job::native_media_export::native_media_export_job::declared_resources;
+use crate::export_job::native_media_export::native_media_export_plan::{
+    frame_file_name, FrameFormat,
+};
+use crate::export_job::native_vector_export::native_vector_export_job::{
+    ObjectSvgEncoder, ScheduledObjectFrame,
+};
 use crate::export_job::{
     CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
     ExternalEffectDisposition, JobError, JobReceipt, JobStatus, StagedArtifactPort,
@@ -10,7 +17,8 @@ use crate::export_job_lifecycle::{
 };
 use crate::history::NativeObjectHistory;
 use crate::object_render_scene::{
-    prepare_scheduled_object_composition_from_witness as prepare, ObjectCompositionWitness,
+    prepare_scheduled_object_composition_from_witness as prepare, LiveObjectComposition,
+    ObjectCompositionWitness,
 };
 use crate::png_output::{ObjectPngEncoder, ScheduledObjectPng};
 use crate::revision::ObjectSnapshot;
@@ -32,7 +40,7 @@ pub(crate) struct ObjectExportBegin {
 pub(crate) struct PendingObjectFrame {
     job_id: String,
     work: ScheduledFrame,
-    png: ScheduledObjectPng,
+    frame: ScheduledObjectFrame,
 }
 struct Record {
     request: ObjectExportBegin,
@@ -54,17 +62,28 @@ pub(crate) struct ObjectExportJob<'a, P: StagedArtifactPort> {
     scheduler: &'a mut FrameScheduler,
     record: Option<Record>,
     released: bool,
+    format: FrameFormat,
 }
 fn invalid(message: impl Into<String>) -> ExportJobError {
     ExportJobError::new(ExportJobErrorKind::InvalidRequest, message)
 }
 impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
     pub(crate) fn new(port: &'a mut P, scheduler: &'a mut FrameScheduler) -> Self {
+        Self::with_format(port, scheduler, FrameFormat::Png)
+    }
+    /// The artifact format is a session property: every staged name and the publish
+    /// manifest derive from it, and only the matching encoder may start frames.
+    pub(crate) fn with_format(
+        port: &'a mut P,
+        scheduler: &'a mut FrameScheduler,
+        format: FrameFormat,
+    ) -> Self {
         Self {
             port,
             scheduler,
             record: None,
             released: false,
+            format,
         }
     }
     pub(crate) fn begin(
@@ -121,7 +140,7 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
             pins.frame,
             "final",
             request.output.clone(),
-            [],
+            declared_resources(&witness),
         )
         .map_err(|e| invalid(e.to_string()))?;
         let work = self
@@ -189,6 +208,32 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         &mut self,
         encoder: &mut impl ObjectPngEncoder,
     ) -> Result<Option<PendingObjectFrame>, ExportJobError> {
+        self.start_with(FrameFormat::Png, |live, limit| {
+            // The &live borrow is kept verbatim: the L08-E one-door guard in tests/native-engine-enforcement.test.cjs
+            // requires the literal encoder.encode_object_png(&live.
+            #[allow(clippy::needless_borrow)]
+            let png: ScheduledObjectPng = encoder.encode_object_png(&live, limit)?;
+            Ok(ScheduledObjectFrame::Png(png))
+        })
+    }
+    pub(crate) fn start_svg_frame(
+        &mut self,
+        encoder: &mut impl ObjectSvgEncoder,
+    ) -> Result<Option<PendingObjectFrame>, ExportJobError> {
+        self.start_with(FrameFormat::Svg, |live, limit| {
+            Ok(ScheduledObjectFrame::Svg(
+                encoder.encode_object_svg(live, limit)?,
+            ))
+        })
+    }
+    fn start_with(
+        &mut self,
+        format: FrameFormat,
+        encode: impl FnOnce(&LiveObjectComposition<'_>, usize) -> Result<ScheduledObjectFrame, String>,
+    ) -> Result<Option<PendingObjectFrame>, ExportJobError> {
+        if format != self.format {
+            return Err(invalid("encoder format differs from the export job format"));
+        }
         let job = self
             .record
             .as_mut()
@@ -203,17 +248,17 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         let result = (|| {
             let live =
                 prepare(self.scheduler, &job.work, &job.witness).map_err(|e| format!("{e:?}"))?;
-            let png =
-                invoke(|| encoder.encode_object_png(&live, job.request.maximum_encoded_bytes))?;
-            if png.bytes(&live).map_err(|e| e.to_string())?.len()
-                > job.request.maximum_encoded_bytes
-            {
-                return Err("PNG encoded byte budget exceeded".into());
+            let frame = invoke(|| encode(&live, job.request.maximum_encoded_bytes))?;
+            if frame.bytes(&live)?.len() > job.request.maximum_encoded_bytes {
+                return Err(format!(
+                    "{} encoded byte budget exceeded",
+                    format.extension().to_uppercase()
+                ));
             }
             Ok(PendingObjectFrame {
                 job_id: job.receipt.job_id.clone(),
                 work: job.work.clone(),
-                png,
+                frame,
             })
         })();
         match result {
@@ -238,25 +283,30 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         if !job.in_flight
             || pending.job_id != job.receipt.job_id
             || !pending.work.same_work_as(&job.work)
+            || pending.frame.format() != self.format
         {
-            return Err(invalid("pending PNG is not the original job work"));
+            return Err(invalid(format!(
+                "pending {} is not the original job work",
+                self.format.extension().to_uppercase()
+            )));
         }
         let work = job.work.clone();
         let witness = job.witness.clone();
         let job_id = job.receipt.job_id.clone();
         let target = job.request.target.clone();
-        let name = format!("frame_{:04}.png", job.cursor + 1);
+        let format = self.format;
+        let name = frame_file_name(job.cursor as u64 + 1, format);
         let final_frame = job.cursor + 1 == job.frames.len();
-        let files: Vec<_> = (1..=job.frames.len())
-            .map(|i| format!("frame_{i:04}.png"))
+        let files: Vec<_> = (1..=job.frames.len() as u64)
+            .map(|i| frame_file_name(i, format))
             .collect();
         let result = (|| {
             let live = prepare(self.scheduler, &work, &witness)
                 .map_err(|e| ("frame_failed", format!("{e:?}")))?;
             let bytes = pending
-                .png
+                .frame
                 .bytes(&live)
-                .map_err(|e| ("frame_failed", e.to_string()))?;
+                .map_err(|e| ("frame_failed", e))?;
             invoke(|| self.port.write_frame(&job_id, &name, bytes))
                 .map_err(|e| ("write_failed", e))?;
             if !final_frame {
@@ -321,7 +371,7 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
                 pins.frame,
                 "final",
                 job.request.output.clone(),
-                [],
+                declared_resources(&witness),
             )
             .map_err(|error| error.to_string())?;
             job.work = self

@@ -243,10 +243,13 @@ async fn compiled_mcp_shares_application_revision_retries_and_history() {
             .unwrap();
         assert_eq!(discovery["instances"].as_array().unwrap().len(), 1);
         assert_eq!(discovery["nativeApiVersion"], 2);
-        assert_eq!(
-            discovery["registeredNativeCapabilities"][0]["id"],
-            "native.opacity"
-        );
+        let mut opacity_capabilities = discovery["registeredNativeCapabilities"]
+            .as_array()
+            .expect("native capability catalog must be an array")
+            .iter()
+            .filter(|capability| capability["id"] == "native.opacity");
+        let opacity_capability = opacity_capabilities.next().expect("native.opacity is advertised");
+        assert!(opacity_capabilities.next().is_none(), "native.opacity is unique");
         assert_eq!(discovery["instances"][0]["instanceId"], instance);
         assert_eq!(
             discovery["instances"][0]["documentId"],
@@ -283,7 +286,7 @@ async fn compiled_mcp_shares_application_revision_retries_and_history() {
                 "layers": [{"layerUid": "layer-a", "value": 50}]
             })),
         ] {
-            assert!(discovery["registeredNativeCapabilities"][0]["operations"].as_array().unwrap().contains(&json!(operation)));
+            assert!(opacity_capability["operations"].as_array().unwrap().contains(&json!(operation)));
             let read = json!({"apiVersion": 2, "requestId": operation,
                 "instanceId": instance, "documentId": "native-document-1", "operation": operation, "payload": payload});
             let direct = app.send(json!({"action": "native", "request": read})).await;

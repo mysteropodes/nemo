@@ -1,0 +1,54 @@
+# Oracle for L08-I bounds (items_bbox_px / document_bbox_px of geometry-wasm/src/engine.rs). GENERATED - do not edit.
+# generator tools/gen_scene_effect_gpu_fx_oracle.js (leaf dir); reads baseline text only.
+# baseline commit fbe4b8a33e6d5a229f014154df2ba21988a9fabc
+# sha256 geometry-wasm/src/engine.rs (whole) = 1a5e3729dc57922e9c91aa8d4782572f920bc291de331332f4b03b2a27f1cc64
+# model: plain f64 with the exact kurbo 0.13 Affine formulas, the box narrowed to f32 at the end.
+items single-path-identity-view canvas 1920 1080 view 1 0 0 1 0 0
+item path 10 20 40 60 none
+expect 10 20 30 40
+items two-paths-union canvas 1920 1080 view 1 0 0 1 0 0
+item path 10 20 40 60 none
+item path 100 5 130.5 30.25 none
+expect 10 5 120.5 55
+items path-under-zoom-and-pan canvas 1920 1080 view 2 0 0 2 30 -10
+item path 10 20 40 60 none
+expect 50 30 60 80
+items path-with-its-own-transform canvas 1920 1080 view 2 0 0 2 30 -10
+item path 10 20 40 60 transform 1 0 0 1 100 50
+expect 250 130 60 80
+items path-with-a-mirroring-transform-keeps-a-positive-box canvas 800 600 view 1 0 0 1 0 0
+item path 10 20 40 60 transform -1 0 0 1 200 0
+expect 160 20 30 40
+items image-without-rotation canvas 1920 1080 view 0.5 0 0 0.5 0 0
+item image 100 200 300 150 0
+expect 50 100 150 75
+items image-rotated-ninety-degrees-about-its-centre canvas 1920 1080 view 1 0 0 1 0 0
+item image 100 200 300 150 90
+expect 175 125 150 300
+items image-and-path-union canvas 1920 1080 view 1 0 0 1 0 0
+item image 100 200 300 150 0
+item path 0 0 50 50 none
+expect 0 0 400 350
+items no-items-fall-back-to-the-canvas canvas 1400 900 view 1 0 0 1 0 0
+expect 0 0 1400 900
+items sub-pixel-union-falls-back-to-the-canvas canvas 1400 900 view 1 0 0 1 0 0
+item path 10 10 10.4 40 none
+expect 0 0 1400 900
+items half-pixel-width-is-not-enough canvas 1400 900 view 1 0 0 1 0 0
+item path 10 10 10.5 40 none
+expect 0 0 1400 900
+items just-over-half-a-pixel-is-kept canvas 1400 900 view 1 0 0 1 0 0
+item path 10 10 10.5625 40.5625 none
+expect 10 10 0.5625 30.5625
+document default-viewport-keeps-the-full-target canvas 1400 900 viewport 0 0 1 0 0 0
+expect 0 0 1400 900
+document zero-pivot-y-keeps-the-full-target canvas 1400 900 viewport 5 5 2 0 960 0
+expect 0 0 1400 900
+document identity-zoom-document-box canvas 1400 900 viewport 0 0 1 0 960 540
+expect 0 0 1920 1080
+document zoomed-and-panned-document-box canvas 1400 900 viewport -462.20000000000005 -301.8 0.48 0 960 540
+expect 37 -21 921.6 518.4
+document zoom-1.01-document-box canvas 1400 900 viewport -73.39999999999999 51.400000000000006 1.01 0 960 540
+expect -83 46 1939.2 1090.8
+document rotated-document-box canvas 1400 900 viewport 10 20 1.5 0.5235987755982988 960 540
+expect -682.0766 -861.4806 3304.153 2842.9612

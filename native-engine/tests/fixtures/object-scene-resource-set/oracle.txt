@@ -1,0 +1,80 @@
+# object-scene-resource-set oracle (leaf L08-D). Whitespace separated rows; `#` lines are comments.
+# baseline commit: fbe4b8a33e6d5a229f014154df2ba21988a9fabc
+# baseline source: src/js/application/render/image-budget.js sha256 c93eb2d0ef588abd31d7c2ca2d4d04d255351447e1c16e1ceb2465c22060966f
+# generator: L08/leaves/L08-D/tools/gen_object_scene_resource_set_oracle.js sha256 8c4a3751c9b1c5ab37ee2ac06e9aa2d720ee6c21aa424eef4dc4e00659d0dc70
+# command: node tools/gen_object_scene_resource_set_oracle.js
+# px <w> <h> <bytes>: NemoImageBudget.create().noteRegistered("x",w,h); totalBytes()
+# op <scenario> <step> <id> <w> <h> <total_bytes> <count>: totals after each noteRegistered (same id replaces)
+px 1 1 4
+px 1 4 16
+px 3 5 60
+px 64 64 16384
+px 100 50 20000
+px 640 360 921600
+px 1920 1080 8294400
+px 3840 2160 33177600
+px 4096 4096 67108864
+px 8192 8192 268435456
+px 16384 16384 1073741824
+px 65535 65535 17179344900
+px 100000 100000 40000000000
+px 0 500 0
+px 500 0 0
+px 0 0 0
+px 4294967295 1 17179869180
+px 65536 65536 17179869184
+op single 0 a 64 64 16384 1
+op three 0 a 64 64 16384 1
+op three 1 b 100 50 36384 2
+op three 2 c 1920 1080 8330784 3
+op replace 0 a 64 64 16384 1
+op replace 1 b 10 10 16784 2
+op replace 2 a 128 128 65936 2
+op replace 3 b 0 0 65536 2
+op replace 4 a 1 1 4 2
+op scale 0 hero 8192 8192 268435456 1
+op scale 1 plate 4096 2160 303824896 2
+op scale 2 uhd 3840 2160 337002496 3
+op zero 0 z 0 500 0 1
+op zero 1 y 500 0 0 2
+op zero 2 w 7 9 252 3
+op many 0 img-00 16 9 576 1
+op many 1 img-01 53 62 13720 2
+op many 2 img-02 90 115 55120 3
+op many 3 img-03 127 168 140464 4
+op many 4 img-04 164 21 154240 5
+op many 5 img-05 201 74 213736 6
+op many 6 img-06 238 127 334640 7
+op many 7 img-07 275 180 532640 8
+op many 8 img-08 312 33 573824 9
+op many 9 img-09 49 86 590680 10
+op many 10 img-10 86 139 638496 11
+op many 11 img-11 123 192 732960 12
+op many 12 img-12 160 45 761760 13
+op many 13 img-13 197 98 838984 14
+op many 14 img-14 234 151 980320 15
+op many 15 img-15 271 204 1201456 16
+op many 16 img-16 308 57 1271680 17
+op many 17 img-17 45 110 1291480 18
+op many 18 img-18 82 163 1344944 19
+op many 19 img-19 119 16 1352560 20
+op many 20 img-20 156 69 1395616 21
+op many 21 img-21 193 122 1489800 22
+op many 22 img-22 230 175 1650800 23
+op many 23 img-23 267 28 1680704 24
+op many 24 img-24 304 81 1779200 25
+op many 25 img-25 41 134 1801176 26
+op many 26 img-26 78 187 1859520 27
+op many 27 img-27 115 40 1877920 28
+op many 28 img-28 152 93 1934464 29
+op many 29 img-29 189 146 2044840 30
+op many 30 img-30 226 199 2224736 31
+op many 31 img-31 263 52 2279440 32
+op many 32 img-32 300 105 2405440 33
+op many 33 img-00 37 158 2428248 33
+op many 34 img-01 74 11 2418360 33
+op many 35 img-02 111 64 2405376 33
+op many 36 img-03 148 117 2389296 33
+op many 37 img-04 185 170 2501320 33
+op many 38 img-05 222 23 2462248 33
+op many 39 img-06 259 76 2420080 33

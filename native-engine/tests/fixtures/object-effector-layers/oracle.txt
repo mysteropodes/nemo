@@ -1,0 +1,304 @@
+# effector layer lookup oracle (L04-L, I09)
+# baseline fbe4b8a33e6d5a229f014154df2ba21988a9fabc
+# sources (blob ids): src/js/app.js 816979f85fd8bfe583c52e889bd1f0733cb5db2a ; src/js/tools.js 75ed9642e21fad64bf00c920e29dfd25425287bb ; src/js/effector-layer.js 6783cc96d2df991ba0ab88d3edbc0bb2512c5c12 ; src/paper-full.min.js 11a760c45796d402a191f1a9cf8c650130699fcb (Paper.js 0.12.18) ; tests/fixtures/lib/corpus.cjs f8d97553921b18c0a667c3c48ccce24ebef57540
+# generator: tools/gen_oracle.cjs (+ scenarios.cjs, scenarios_more.cjs) of the L04-L leaf (never shipped to the repo); node vm over the verbatim baseline functions
+# JS values: u=undefined, n=null, else 16 hex digits of the IEEE-754 bits (NaN canonical 7ff8000000000000)
+# scn NAME ; cfg entry=rendered|direct|effectors host= edit= three_d= frame= cw= ch= can_resample= span=START/LEN|- big= ;
+#   rendered = getEffectiveStrokesRendered(hostIdx, frame) (span = layerInPoint / layerOutPoint - in + 1), direct = applyLayerDuplicator(ld, base, frame, null, opts),
+#   effectors = window.SMEffectorLayer.resolvedEffectorsFor(hostLd, frame)
+# dupj JSON|- = the host ld.duplicator as handed in (every number is "@" + bit pattern) ; - means the host has no duplicator
+# lay UID dup=0|1 eff=0|1 vis=u|0|1 tgt=UID|- pos=X,Y|- fall=LABEL|-   : state.layers in order (an effector layer has eff=1 and its ld.effector)
+# mv UID KEY V0/V1.. | null : what SMMotion.valueAtFrame(ld, KEY) returned (e = empty array) ; mm UID DX DY | - : what layerMotionAt returned (- = null)
+# st UID FRAME LIST : getEffectiveStrokes(layer, frame) answers ; base LIST = the host content at the frame ; pl M UID | V UID KEY | S UID FRAME | H UID : distinct port calls, first-call order
+# stroke token ID/FILL/C/SEGS ; SEGS = seg;seg or - ; seg = point.x:point.y:handleIn.x:handleIn.y:handleOut.x:handleOut.y (bits) ; output token = stroke token + /OPACITY/DUPINDEX/CLONEID/DUP3D
+# log K PIVOTX PIVOTY DX DY ROT SX SY OPACITYFACTOR HUEDEG DUP3D|- : the placement descriptor the verbatim _duplicatorClonePlacement returned for clone K
+# out same (the base came back) | out LIST | out big N FIRST LAST (capped counts) | out throws (the baseline raised a TypeError) ; effs = resolvedEffectorsFor list: X/Y,KIND,RADIUS,STRENGTH,ANGLE,CHANNELS
+scn ef_none
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+base -
+effs e
+end
+scn ef_one_layer
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=host pos=4024000000000000,4034000000000000 fall=-
+mm e1 -
+mv e1 effOffPosition 4014000000000000/4018000000000000
+mv e1 effOffRotation null
+mv e1 effOffScale null
+mv e1 effOffOpacity null
+mv e1 effOffPositionZ null
+mv e1 effOffRotationX null
+mv e1 effOffRotationY null
+mv e1 effRadius 4062c00000000000
+mv e1 effStrength 4059000000000000
+mv e1 effAngle null
+base -
+pl M e1
+pl V e1 effOffPosition
+pl V e1 effOffRotation
+pl V e1 effOffScale
+pl V e1 effOffOpacity
+pl V e1 effOffPositionZ
+pl V e1 effOffRotationX
+pl V e1 effOffRotationY
+pl V e1 effRadius
+pl V e1 effStrength
+pl V e1 effAngle
+effs 4024000000000000/4034000000000000,radial,4062c00000000000,4059000000000000,0000000000000000,position=4014000000000000/4018000000000000
+end
+scn ef_two_layers_and_a_hidden_one
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=host pos=4024000000000000,4034000000000000 fall=-
+lay e2 dup=0 eff=1 vis=0 tgt=host pos=3ff0000000000000,4000000000000000 fall=-
+lay e3 dup=0 eff=1 vis=u tgt=host pos=4008000000000000,4010000000000000 fall=-
+mm e1 -
+mv e1 effOffPosition 4014000000000000/4018000000000000
+mv e1 effOffRotation null
+mv e1 effOffScale null
+mv e1 effOffOpacity null
+mv e1 effOffPositionZ null
+mv e1 effOffRotationX null
+mv e1 effOffRotationY null
+mv e1 effRadius 4062c00000000000
+mv e1 effStrength 4059000000000000
+mv e1 effAngle null
+mm e3 -
+mv e3 effOffPosition null
+mv e3 effOffRotation 4022000000000000
+mv e3 effOffScale null
+mv e3 effOffOpacity null
+mv e3 effOffPositionZ null
+mv e3 effOffRotationX null
+mv e3 effOffRotationY null
+mv e3 effRadius 4062c00000000000
+mv e3 effStrength 4059000000000000
+mv e3 effAngle null
+base -
+pl M e1
+pl V e1 effOffPosition
+pl V e1 effOffRotation
+pl V e1 effOffScale
+pl V e1 effOffOpacity
+pl V e1 effOffPositionZ
+pl V e1 effOffRotationX
+pl V e1 effOffRotationY
+pl V e1 effRadius
+pl V e1 effStrength
+pl V e1 effAngle
+pl M e3
+pl V e3 effOffPosition
+pl V e3 effOffRotation
+pl V e3 effOffScale
+pl V e3 effOffOpacity
+pl V e3 effOffPositionZ
+pl V e3 effOffRotationX
+pl V e3 effOffRotationY
+pl V e3 effRadius
+pl V e3 effStrength
+pl V e3 effAngle
+effs 4024000000000000/4034000000000000,radial,4062c00000000000,4059000000000000,0000000000000000,position=4014000000000000/4018000000000000;4008000000000000/4010000000000000,radial,4062c00000000000,4059000000000000,0000000000000000,rotation=4022000000000000
+end
+scn ef_other_target
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=x pos=4024000000000000,4034000000000000 fall=-
+base -
+effs e
+end
+scn ef_motion_and_defaults
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=408f400000000000 ch=407f400000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=host pos=- fall=-
+mm e1 4029000000000000 c00a000000000000
+mv e1 effOffPosition null
+mv e1 effOffRotation null
+mv e1 effOffScale null
+mv e1 effOffOpacity c014000000000000
+mv e1 effOffPositionZ null
+mv e1 effOffRotationX null
+mv e1 effOffRotationY null
+mv e1 effRadius null
+mv e1 effStrength null
+mv e1 effAngle null
+base -
+pl M e1
+pl V e1 effOffPosition
+pl V e1 effOffRotation
+pl V e1 effOffScale
+pl V e1 effOffOpacity
+pl V e1 effOffPositionZ
+pl V e1 effOffRotationX
+pl V e1 effOffRotationY
+pl V e1 effRadius
+pl V e1 effStrength
+pl V e1 effAngle
+effs 4080040000000000/406ed80000000000,radial,4069000000000000,4059000000000000,0000000000000000,opacity=c014000000000000
+end
+scn ef_no_channel
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=host pos=4024000000000000,4034000000000000 fall=-
+mm e1 -
+mv e1 effOffPosition null
+mv e1 effOffRotation null
+mv e1 effOffScale null
+mv e1 effOffOpacity null
+mv e1 effOffPositionZ null
+mv e1 effOffRotationX null
+mv e1 effOffRotationY null
+base -
+pl M e1
+pl V e1 effOffPosition
+pl V e1 effOffRotation
+pl V e1 effOffScale
+pl V e1 effOffOpacity
+pl V e1 effOffPositionZ
+pl V e1 effOffRotationX
+pl V e1 effOffRotationY
+effs e
+end
+scn ef_labels
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=host pos=- fall=linear
+lay e2 dup=0 eff=1 vis=u tgt=host pos=- fall=step
+lay e3 dup=0 eff=1 vis=u tgt=host pos=- fall=bogus
+mm e1 -
+mv e1 effOffPosition null
+mv e1 effOffRotation 3ff0000000000000
+mv e1 effOffScale null
+mv e1 effOffOpacity null
+mv e1 effOffPositionZ null
+mv e1 effOffRotationX null
+mv e1 effOffRotationY null
+mv e1 effRadius 4062c00000000000
+mv e1 effStrength 4059000000000000
+mv e1 effAngle null
+mm e2 -
+mv e2 effOffPosition null
+mv e2 effOffRotation 4000000000000000
+mv e2 effOffScale null
+mv e2 effOffOpacity null
+mv e2 effOffPositionZ null
+mv e2 effOffRotationX null
+mv e2 effOffRotationY null
+mv e2 effRadius 4062c00000000000
+mv e2 effStrength 4059000000000000
+mv e2 effAngle null
+mm e3 -
+mv e3 effOffPosition null
+mv e3 effOffRotation 4008000000000000
+mv e3 effOffScale null
+mv e3 effOffOpacity null
+mv e3 effOffPositionZ null
+mv e3 effOffRotationX null
+mv e3 effOffRotationY null
+mv e3 effRadius 4062c00000000000
+mv e3 effStrength 4059000000000000
+mv e3 effAngle null
+base -
+pl M e1
+pl V e1 effOffPosition
+pl V e1 effOffRotation
+pl V e1 effOffScale
+pl V e1 effOffOpacity
+pl V e1 effOffPositionZ
+pl V e1 effOffRotationX
+pl V e1 effOffRotationY
+pl V e1 effRadius
+pl V e1 effStrength
+pl V e1 effAngle
+pl M e2
+pl V e2 effOffPosition
+pl V e2 effOffRotation
+pl V e2 effOffScale
+pl V e2 effOffOpacity
+pl V e2 effOffPositionZ
+pl V e2 effOffRotationX
+pl V e2 effOffRotationY
+pl V e2 effRadius
+pl V e2 effStrength
+pl V e2 effAngle
+pl M e3
+pl V e3 effOffPosition
+pl V e3 effOffRotation
+pl V e3 effOffScale
+pl V e3 effOffOpacity
+pl V e3 effOffPositionZ
+pl V e3 effOffRotationX
+pl V e3 effOffRotationY
+pl V e3 effRadius
+pl V e3 effStrength
+pl V e3 effAngle
+effs 408e000000000000/4080e00000000000,linear,4062c00000000000,4059000000000000,0000000000000000,rotation=3ff0000000000000;408e000000000000/4080e00000000000,step,4062c00000000000,4059000000000000,0000000000000000,rotation=4000000000000000;408e000000000000/4080e00000000000,radial,4062c00000000000,4059000000000000,0000000000000000,rotation=4008000000000000
+end
+scn ef_zero_samples_are_kept
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=host pos=4024000000000000,4034000000000000 fall=-
+mm e1 -
+mv e1 effOffPosition null
+mv e1 effOffRotation 4010000000000000
+mv e1 effOffScale null
+mv e1 effOffOpacity null
+mv e1 effOffPositionZ null
+mv e1 effOffRotationX null
+mv e1 effOffRotationY null
+mv e1 effRadius 0000000000000000
+mv e1 effStrength 0000000000000000
+mv e1 effAngle 0000000000000000
+base -
+pl M e1
+pl V e1 effOffPosition
+pl V e1 effOffRotation
+pl V e1 effOffScale
+pl V e1 effOffOpacity
+pl V e1 effOffPositionZ
+pl V e1 effOffRotationX
+pl V e1 effOffRotationY
+pl V e1 effRadius
+pl V e1 effStrength
+pl V e1 effAngle
+effs 4024000000000000/4034000000000000,radial,0000000000000000,0000000000000000,0000000000000000,rotation=4010000000000000
+end
+scn ef_odd_elements
+cfg entry=effectors host=host edit=0 three_d=0 frame=401c000000000000 cw=409e000000000000 ch=4090e00000000000 can_resample=0 span=- big=0
+dupj {}
+lay host dup=1 eff=0 vis=u tgt=- pos=- fall=-
+lay e1 dup=0 eff=1 vis=u tgt=host pos=4024000000000000,4034000000000000 fall=-
+mm e1 -
+mv e1 effOffPosition n/u
+mv e1 effOffRotation null
+mv e1 effOffScale u/4022000000000000
+mv e1 effOffOpacity null
+mv e1 effOffPositionZ null
+mv e1 effOffRotationX 7ff8000000000000
+mv e1 effOffRotationY null
+mv e1 effRadius n
+mv e1 effStrength u
+mv e1 effAngle null
+base -
+pl M e1
+pl V e1 effOffPosition
+pl V e1 effOffRotation
+pl V e1 effOffScale
+pl V e1 effOffOpacity
+pl V e1 effOffPositionZ
+pl V e1 effOffRotationX
+pl V e1 effOffRotationY
+pl V e1 effRadius
+pl V e1 effStrength
+pl V e1 effAngle
+effs 4024000000000000/4034000000000000,radial,4069000000000000,4059000000000000,0000000000000000,scale=0000000000000000/4022000000000000
+end

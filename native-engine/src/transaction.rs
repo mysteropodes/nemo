@@ -212,6 +212,12 @@ pub(crate) struct CompactFailure {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum CompactResult {
+    #[cfg(feature = "font_asset_wire")]
+    FontImported {
+        asset_id: String,
+        encoded_bytes: usize,
+        encoded_sha256: String,
+    },
     Command {
         applied: bool,
         history_entries_added: u64,
@@ -219,6 +225,9 @@ pub(crate) enum CompactResult {
     LayerCreated {
         layer_uid: String,
     },
+    VectorEdit(crate::commands::VectorEditResult),
+    ItemEdit(crate::commands::ItemEditResult),
+    ImportBatch(crate::commands::ImportBatchResult),
     Transaction(TransactionRecord),
 }
 
@@ -239,6 +248,15 @@ impl RetainedDisposition {
         let (ok, result, error) = match outcome {
             Ok(result) => {
                 let result = match result {
+                    #[cfg(feature = "font_asset_wire")]
+                    CompactResult::FontImported {
+                        asset_id,
+                        encoded_bytes,
+                        encoded_sha256,
+                    } => json!({
+                        "applied":true,"historyEntriesAdded":1,"assetId":asset_id,
+                        "mediaType":"font/ttf","encodedBytes":encoded_bytes,"encodedSha256":encoded_sha256
+                    }),
                     CompactResult::Command {
                         applied,
                         history_entries_added,
@@ -249,6 +267,9 @@ impl RetainedDisposition {
                     CompactResult::LayerCreated { layer_uid } => json!({
                         "applied": true, "historyEntriesAdded": 1, "layerUid": layer_uid
                     }),
+                    CompactResult::VectorEdit(vector) => vector.result(),
+                    CompactResult::ItemEdit(item) => item.result(),
+                    CompactResult::ImportBatch(batch) => batch.result(),
                     CompactResult::Transaction(record) => record.result(),
                 };
                 (true, Some(result), None)
@@ -277,7 +298,7 @@ impl RetainedDisposition {
 }
 
 #[derive(Debug)]
-struct RetainedEntry(RequestFingerprint, RetainedDisposition);
+struct RetainedEntry(RequestFingerprint, RetainedDisposition, Option<String>);
 
 #[derive(Debug, Default)]
 pub(crate) struct StageReceipts {
@@ -310,7 +331,25 @@ impl StageReceipts {
         disposition: RetainedDisposition,
     ) {
         self.entries
-            .insert(request_id, RetainedEntry(fingerprint, disposition));
+            .insert(request_id, RetainedEntry(fingerprint, disposition, None));
+    }
+
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn retain_font(
+        &mut self,
+        id: String,
+        fingerprint: RequestFingerprint,
+        result: RetainedDisposition,
+        digest: String,
+    ) {
+        self.entries
+            .insert(id, RetainedEntry(fingerprint, result, Some(digest)));
+    }
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn font_receipt(&self, id: &str) -> Option<(&RetainedDisposition, &str)> {
+        self.entries
+            .get(id)
+            .and_then(|entry| entry.2.as_deref().map(|digest| (&entry.1, digest)))
     }
 
     pub(crate) fn clear(&mut self) {

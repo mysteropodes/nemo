@@ -165,6 +165,9 @@ fn encode_legacy_project(
 #[cfg(feature = "project_media_codec")]
 mod catalog {
     //! deterministic catalog wire output; no resource ownership.
+    use crate::object_codec::project::asset_wire::object_media_link_track::{
+        outputs, PlacementOutput,
+    };
     use crate::object_codec::project::output::{bounded_json, Encoded, ReferenceOutput};
     use crate::object_codec::project::{Metadata, ProjectWireError, ProjectWireLimits};
     use crate::object_document::{
@@ -189,7 +192,7 @@ mod catalog {
     #[serde(rename_all = "camelCase")]
     struct Catalog<'a> {
         asset_ids: Vec<&'a str>,
-        placements: [(); 0],
+        placements: Vec<PlacementOutput<'a>>,
     }
     #[derive(Serialize)]
     struct CatalogAsset<'a> {
@@ -253,18 +256,38 @@ mod catalog {
                 locator,
             }
         } else {
-            if record.kind() != AssetKind::Image
-                || record.source().media_type() != Some("image/png")
-            {
-                return Err(ProjectWireError::Unsupported);
+            let bytes = record
+                .source()
+                .encoded_allocation()
+                .ok_or(ProjectWireError::Invalid)?;
+            match (
+                record.kind(),
+                record.source().media_type(),
+                record.source().has_font_admission(),
+            ) {
+                (AssetKind::Image, Some("image/png"), false) => embedded(bytes, limits)?,
+                #[cfg(feature = "font_asset_wire")]
+                (AssetKind::Font, Some("font/ttf"), true) => {
+                    let cap = limits
+                        .font
+                        .ok_or(ProjectWireError::Unsupported)?
+                        .encoded_byte_limit();
+                    if bytes.is_empty()
+                        || bytes.len() > cap
+                        || base64::encoded_len(bytes.len(), true).ok_or(ProjectWireError::Budget)?
+                            > limits.envelope_bytes
+                    {
+                        return Err(ProjectWireError::Budget);
+                    }
+                    Source::Embedded {
+                        kind: "embedded",
+                        media_type: "font/ttf",
+                        encoding: "base64",
+                        data: Encoded(bytes),
+                    }
+                }
+                _ => return Err(ProjectWireError::Unsupported),
             }
-            embedded(
-                record
-                    .source()
-                    .encoded_allocation()
-                    .ok_or(ProjectWireError::Invalid)?,
-                limits,
-            )?
         };
         Ok(CatalogAsset {
             id: record.id().as_str(),
@@ -280,9 +303,7 @@ mod catalog {
         let inventory = envelope
             .asset_inventory()
             .ok_or(ProjectWireError::Invalid)?;
-        if !inventory.placements().is_empty() {
-            return Err(ProjectWireError::Unsupported);
-        }
+        let placements = outputs(inventory)?;
         if inventory.records().len() > 1024 {
             return Err(ProjectWireError::Budget);
         }
@@ -345,7 +366,7 @@ mod catalog {
                 assets,
                 asset_inventory: Catalog {
                     asset_ids,
-                    placements: [],
+                    placements,
                 },
             },
             limits.envelope_bytes,
