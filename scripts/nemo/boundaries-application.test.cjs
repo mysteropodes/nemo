@@ -85,7 +85,7 @@ test('N20 activates the N15 native application adapter without weakening discove
     && entry.executionClass === 'document-classic'));
   const dropped = structuredClone(profile);
   dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.application.adapter');
-  const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
+  const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.moduleId !== 'app.native.application.adapter') };
   assert.throws(() => checkApplicationPolicy(dropped, droppedPolicy, { root: ROOT }),
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });

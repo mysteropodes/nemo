@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1aef9c0f67701dbeec7fc7728ddac1c1440632da",
-  "describe": "v0.7.0-alpha.4-2195-g1aef9c0f"
+  "head": "6b3721fcd59d99c3c32cb05f04235747a518fe56",
+  "describe": "v0.7.0-alpha.4-2204-g6b3721fc"
  },
- "inputsDigest": "492dfa735057ffaecbfa4da9214f3e5e3566be7f35e500bbd7aa5c21d253f8ef",
+ "inputsDigest": "039be1ed5d16509354814a43ae9071a8ded331b74817d8c7551bff5d94ed8e99",
  "states": [
   "inventoried",
   "characterized",
@@ -387,7 +387,7 @@
   "SMVectorText": {
    "file": "src/js/vector-text-bridge.js",
    "line": 417,
-   "members": 2
+   "members": 3
   }
  },
  "rows": [
@@ -1698,7 +1698,7 @@
     "container": "media-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 113,
+    "functionsVisited": 122,
     "via": "variable convertBtn",
     "references": [
      "src/js/linked-media.js:660 onConvertMediaClick()",
@@ -2316,7 +2316,7 @@
     "container": "footage-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 143,
+    "functionsVisited": 152,
     "via": "chain",
     "references": [
      "src/js/images.js:759",
@@ -4844,7 +4844,7 @@
     "functionsVisited": 124,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:287 setShyMode()",
+     "src/js/adapters/native-object-ui.js:292 setShyMode()",
      "src/js/motion.js:13145 setAppMode()",
      "src/js/timeline.js:1226 toggleLayerShy()"
     ]
@@ -9974,7 +9974,7 @@
     "functionsVisited": 23,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:239 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:244 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -11902,7 +11902,7 @@
     "container": "onion-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 234,
+    "functionsVisited": 241,
     "via": "variable tr",
     "references": []
    },
@@ -12322,7 +12322,7 @@
     "functionsVisited": 37,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:109 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:110 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -14728,7 +14728,7 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 179,
+    "functionsVisited": 187,
     "via": "chain",
     "references": [
      "src/js/project.js:633",
@@ -16157,7 +16157,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 563,
+    "functionsVisited": 564,
     "via": "variable save",
     "references": []
    },
@@ -16412,7 +16412,7 @@
     "functionsVisited": 140,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:230 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:235 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:220 updatePlayhead()",
      "src/js/timeline.js:2813 updateUI()"
@@ -18858,7 +18858,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -18897,7 +18897,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -18936,7 +18936,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -18975,7 +18975,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -19014,7 +19014,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -19053,7 +19053,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -19092,7 +19092,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -19131,7 +19131,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 69,
     "via": "callback tab",
     "references": []
    },
@@ -19170,7 +19170,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 71,
     "via": "callback btn",
     "references": []
    },
@@ -19212,7 +19212,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 71,
     "via": "callback btn",
     "references": []
    },
@@ -19254,7 +19254,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 71,
     "via": "callback btn",
     "references": []
    },
@@ -19296,7 +19296,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 71,
     "via": "callback btn",
     "references": []
    },
@@ -24020,7 +24020,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 100
+    "functionsVisited": 110
    },
    "fixtures": [
     "mesh",
@@ -24056,7 +24056,7 @@
    "source": "src/js/media-library.js:553",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 58
+    "functionsVisited": 69
    },
    "fixtures": [
     "mesh",
@@ -32645,7 +32645,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 420
+    "functionsVisited": 422
    },
    "fixtures": [
     "media",
