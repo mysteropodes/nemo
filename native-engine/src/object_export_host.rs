@@ -1,9 +1,11 @@
 //! Synchronous host bridge for one original-owner object PNG publication.
 //! The private job retains its complete lifecycle until reconciliation returns.
 use crate::compositor::Compositor;
+use crate::export_job::native_media_export::native_media_export_plan::FrameFormat;
+use crate::export_job::native_vector_export::native_vector_export_job::NativeSvgEncoder;
 use crate::export_job::{
     ExportJobError, ExportReleaseReconciliation, JobReceipt, JobStatus, ObjectExportBegin,
-    ObjectExportJob, StagedArtifactPort,
+    ObjectExportJob, PendingObjectFrame, StagedArtifactPort,
 };
 use crate::export_job_lifecycle::invoke;
 use crate::history::NativeObjectHistory;
@@ -62,9 +64,54 @@ pub fn export_object_frames<P: StagedArtifactPort>(
     compositor: &mut Compositor,
     request: ObjectHostExportRequest,
     frames: &[u32],
+    witness_for: impl FnMut(u32) -> Result<ObjectCompositionWitness, String>,
+) -> ObjectHostExportOutcome {
+    let encoder = FrameEncoder::Png(compositor);
+    drive_object_frames(
+        history,
+        scheduler,
+        port,
+        encoder,
+        request,
+        frames,
+        witness_for,
+    )
+}
+
+/// The encoder a host drives; the job's artifact format follows from it.
+pub(crate) enum FrameEncoder<'c> {
+    Png(&'c mut Compositor),
+    Svg,
+}
+impl FrameEncoder<'_> {
+    fn format(&self) -> FrameFormat {
+        match self {
+            FrameEncoder::Png(_) => FrameFormat::Png,
+            FrameEncoder::Svg => FrameFormat::Svg,
+        }
+    }
+    fn start<P: StagedArtifactPort>(
+        &mut self,
+        job: &mut ObjectExportJob<'_, P>,
+    ) -> Result<Option<PendingObjectFrame>, ExportJobError> {
+        match self {
+            FrameEncoder::Png(compositor) => job.start_frame(&mut **compositor),
+            FrameEncoder::Svg => job.start_svg_frame(&mut NativeSvgEncoder),
+        }
+    }
+}
+
+/// One host lifecycle for every artifact format.
+pub(crate) fn drive_object_frames<P: StagedArtifactPort>(
+    history: &NativeObjectHistory,
+    scheduler: &mut FrameScheduler,
+    port: &mut P,
+    mut encoder: FrameEncoder<'_>,
+    request: ObjectHostExportRequest,
+    frames: &[u32],
     mut witness_for: impl FnMut(u32) -> Result<ObjectCompositionWitness, String>,
 ) -> ObjectHostExportOutcome {
-    let mut job = ObjectExportJob::new(port, scheduler);
+    let mut job = ObjectExportJob::with_format(port, scheduler, encoder.format());
     let result = (|| {
         if frames.is_empty() || frames.len() > MAX_OBJECT_EXPORT_FRAMES {
             return Err(ExportJobError::new(
@@ -97,7 +144,7 @@ pub fn export_object_frames<P: StagedArtifactPort>(
             {
                 break;
             }
-            match job.start_frame(compositor)? {
+            match encoder.start(&mut job)? {
                 Some(pending) => {
                     if job.finish_frame(pending)?.status != JobStatus::Running {
                         break;

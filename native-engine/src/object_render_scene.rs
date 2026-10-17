@@ -36,6 +36,10 @@ use object_scene_producer_contour::CompiledContour;
 #[path = "scene_effect_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod scene_effect_kernels;
+// L06-K (#2112): lane-6 text/raster scene join family aggregator.
+#[path = "text_glyph_scene_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod text_glyph_scene_kernels;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use paint::tests::paint_contents;
 #[cfg(test)]

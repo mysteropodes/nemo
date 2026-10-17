@@ -7,6 +7,10 @@ pub(crate) mod object_parametric_geometry;
 #[path = "object_path_effects_kernel.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_path_effects_kernel;
+// G22/G13 L01-H: evaluation join (path effects first, parametric rebuild after) at a pinned snapshot and frame.
+#[path = "render_vector_eval.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_vector_eval;
 
 // G14/G22/G13 L01-C: characterization oracle of the baseline serP/desP stroke normalization (tests only, no production code).
 #[cfg(test)]

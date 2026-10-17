@@ -30,8 +30,8 @@ impl<'a> ObjectPaintCommand<'a> {
         self.entry.contour()
     }
     pub fn paint(&self) -> [&'a Number; 4] {
-        // Paint commands exist only for closed-solid-fill-cubic-path records: the scene compiler refuses every
-        // other family and the codec requires a solid fill for that one.
+        // Paint commands exist only for records the scene compiler admits (closed-solid-fill-cubic-path and, with
+        // L01-H, a solid-filled editable-vector-path); it refuses every other family and both require a solid fill.
         let paint = self
             .entry
             .source()

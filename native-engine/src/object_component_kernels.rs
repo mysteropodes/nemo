@@ -31,3 +31,7 @@ pub(crate) mod object_component_exposed_apply;
 #[path = "object_component_exposed_key.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_component_exposed_key;
+
+#[path = "object_storyboard_chain.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_storyboard_chain;

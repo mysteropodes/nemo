@@ -1,6 +1,6 @@
 //! Contour scene producer joined through the pinned registry (L07-F; F16, D32, G03a).
 //!
-//! The one admitted record family (`closed-solid-fill-cubic-path`) is produced as a
+//! The admitted record families (`closed-solid-fill-cubic-path`, and with L01-H `editable-vector-path`) are produced as a
 //! typed `ProducerOutput` of the L07-C registry and consumed by the paint plan:
 //! * `produce` compiles every selected record of one `ObjectFramePacket` into a
 //!   `CompiledContour` (admitted contour, envelope and the L07-A `SceneSolid` paint).
@@ -24,6 +24,9 @@ use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, PinField, ProducerEntry, ProducerOutput, SceneJoinError, ScenePin,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
+use crate::evaluation::object_vector_kernels::render_vector_eval::{
+    evaluate_record, is_vector_record, record_layer_has_active_path_fx,
+};
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
 use crate::object_render_scene::{ObjectPaintPlanError, ObjectRenderScene, ObjectSceneError};
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
@@ -54,7 +57,7 @@ pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
     let mut rejections = Vec::new();
     for record in packet.records() {
         let index = record.source_object_index();
-        output = match compile(record) {
+        output = match compile(packet, record) {
             Ok(compiled) => output.with_item(index, compiled),
             Err(reason) => {
                 rejections.push((index, reason));
@@ -93,7 +96,18 @@ impl ContourProduction {
     }
 }
 
-fn compile(source: ObjectFrameRecord<'_>) -> Result<CompiledContour, &'static str> {
+fn compile(
+    packet: &ObjectFramePacket,
+    source: ObjectFrameRecord<'_>,
+) -> Result<CompiledContour, &'static str> {
+    if is_vector_record(source.record()) {
+        return compile_vector(packet, source);
+    }
+    // The baseline applies a layer's path effects to every stroke of the layer (app.js:1813); the legacy family
+    // does not go through the join, so an active stack must refuse rather than draw the stored geometry.
+    if record_layer_has_active_path_fx(packet, source.record()) {
+        return Err("layer path effects on a legacy record await the vector join");
+    }
     // Field access is confined to the original record returned by the admitted
     // evaluation port. No document lookup or second source authority exists.
     let record = source.record();
@@ -126,6 +140,51 @@ fn compile(source: ObjectFrameRecord<'_>) -> Result<CompiledContour, &'static st
             })
         })
         .collect::<Result<Vec<_>, &'static str>>()?;
+    let contour = ClosedCubicPath::new(segments)?;
+    let envelope = contour.transformed_envelope([1., 0., 0., 1., 0., 0.])?;
+    let fill = record
+        .solid_fill()
+        .ok_or("packet record carries no solid fill")?;
+    let solid = SceneSolid::from_fill(fill).map_err(|error| error.message())?;
+    Ok(CompiledContour {
+        contour,
+        envelope,
+        solid,
+    })
+}
+
+/// L01-H (G22/G13): an `editable-vector-path` record reaches the existing fill-only compositor through the one evaluation
+/// join (path effects, then the parametric rebuild, at the packet's pinned frame), so scene, preview and export draw the same
+/// geometry. Only what that compositor draws exactly is admitted: a closed contour with a solid fill, no authored stroke and
+/// opacity 1. Stroke, dash, paint order, opacity and open paths wait for the render/export vector join (L01-I) and stay a
+/// typed refusal, never a silent fill-only drawing.
+fn compile_vector(
+    packet: &ObjectFramePacket,
+    source: ObjectFrameRecord<'_>,
+) -> Result<CompiledContour, &'static str> {
+    let record = source.record();
+    let body = record
+        .vector()
+        .ok_or("vector record carries no vector body")?;
+    if body.has_real_stroke() {
+        return Err("vector stroke paint awaits the render/export vector join (L01-I)");
+    }
+    if body.opacity.as_f64() != Some(1.0) {
+        return Err("vector opacity awaits the render/export vector join (L01-I)");
+    }
+    let evaluated = evaluate_record(packet, source).map_err(|error| error.message())?;
+    if !evaluated.closed {
+        return Err("open vector paths await the render/export vector join (L01-I)");
+    }
+    let segments = evaluated
+        .segments
+        .iter()
+        .map(|segment| CubicSegment {
+            point: segment.point,
+            handle_in: segment.handle_in,
+            handle_out: segment.handle_out,
+        })
+        .collect::<Vec<_>>();
     let contour = ClosedCubicPath::new(segments)?;
     let envelope = contour.transformed_envelope([1., 0., 0., 1., 0., 0.])?;
     let fill = record
@@ -219,6 +278,9 @@ fn plan_error(error: SceneJoinError) -> ObjectPaintPlanError {
 #[cfg(test)]
 #[path = "../tests/object_scene_producer_contour_controls.rs"]
 mod controls;
+#[cfg(test)]
+#[path = "../tests/render_vector_eval_scene.rs"]
+mod render_vector_eval_scene;
 #[cfg(test)]
 #[path = "../tests/object_scene_producer_contour_rows.rs"]
 mod rows;
