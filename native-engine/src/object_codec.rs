@@ -5,6 +5,21 @@ pub(crate) use crate::object_document::object_deserialize;
 pub use crate::object_document::{
     FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
 };
+#[cfg(feature = "font_asset_admission")]
+#[path = "font_asset_admission.rs"]
+mod font_assets;
+#[cfg(feature = "font_asset_wire")]
+pub(crate) use font_assets::admitted_font_source;
+#[cfg(feature = "font_asset_admission")]
+pub(crate) use font_assets::{
+    admit_reserved_font, validate_font, AdmittedFont, FontAssetError, FontAssetLimits,
+    FontAssetMetadata,
+};
+
+#[cfg(feature = "font_asset_wire")]
+pub(crate) use crate::object_document::AssetRecord;
+#[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
+pub(crate) use crate::object_document::{AssetId, AssetKind};
 use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 pub(crate) use crate::object_document::{Presence, PropertyHolder};
 use serde::Deserialize;
@@ -27,6 +42,9 @@ pub(crate) mod project_settings_test_codec {
 }
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
+// L06-E (lane #2112): the asset value types the read-queries pixel handle names; read-queries may not import object_document.
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::{AssetId, AssetInventory, AssetKind};
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use project::{
     decode_allocated_project, decode_validated_project, encode_project as encode_project_envelope,
@@ -69,6 +87,14 @@ pub(crate) mod encoded_wire_test {
 
 #[path = "object_order_codec.rs"]
 mod order;
+// L01-D (#2107): admission of the editable-vector-path family.
+#[path = "object_vector_codec.rs"]
+#[allow(dead_code)]
+mod object_vector_codec;
+// L01-E (#2107): admission of the vector extension slot and of the per-layer pathFx stack.
+#[path = "object_vector_ext_codec.rs"]
+#[allow(dead_code)]
+mod object_vector_ext_codec;
 pub use crate::object_document::OrderedObjectDocument;
 pub use order::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
 
@@ -117,6 +143,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         layers: wire.layers,
         objects: wire.objects,
         property_holders: wire.property_holders,
+        layer_folders: wire.layer_folders,
         composition_order: Presence::Missing,
     };
     validate(&document)?;
@@ -131,11 +158,13 @@ struct LegacyDocument {
     layers: Vec<ObjectLayer>,
     objects: Vec<ObjectRecord>,
     property_holders: Presence<Vec<PropertyHolder>>,
+    layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
-    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>
+    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>
 });
 
 /// Explicit core storage admission; both attempts read the original raw bytes.
@@ -205,12 +234,21 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.objects,
         false,
     )?;
+    validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
         &document.property_holders,
         &document.layers,
         &document.objects,
         None,
     )
+}
+
+pub(crate) fn validate_layer_organization(
+    layers: &[ObjectLayer],
+    folders: &Presence<Option<crate::object_document::LayerFolders>>,
+) -> Result<(), ObjectCodecError> {
+    crate::object_document::validate_layer_organization(layers, folders)
+        .map_err(|message| ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message))
 }
 
 pub(crate) fn validate_property_holders(
@@ -254,15 +292,10 @@ pub(crate) fn validate_content(
     }
     let mut layers = HashSet::new();
     for layer in declared_layers {
-        // This admission preserves the default edit policy. A locked layer or
-        // transform parent needs its own command/evaluation consumer contract.
-        if layer.locked.value() == Some(&true)
-            || layer.parent_layer_uid.value().is_some_and(Option::is_some)
-        {
-            return Err(reject(
-                Unsupported,
-                "layer locking and parenting are unavailable",
-            ));
+        // Drawing Fill enforces its own lock guard. Generic Motion actions
+        // retain their permissive baseline semantics; parenting remains separate.
+        if layer.parent_layer_uid.value().is_some_and(Option::is_some) {
+            return Err(reject(Unsupported, "layer parenting is unavailable"));
         }
         if let Some(color) = layer.color.value() {
             if color.len() != 7
@@ -289,6 +322,7 @@ pub(crate) fn validate_content(
                 reject(kind, message)
             })?;
         }
+        object_vector_ext_codec::validate_layer_path_fx(layer)?;
         if layer.layer_uid.is_empty() {
             return Err(reject(Invalid, "empty layerUid"));
         }
@@ -296,9 +330,14 @@ pub(crate) fn validate_content(
             return Err(reject(DuplicateId, "duplicate layerUid"));
         }
     }
+    crate::object_document::validate_widget_layers(declared_layers, objects)
+        .map_err(|error| reject(Invalid, error.message()))?;
     let mut targets = HashSet::new();
     for record in objects {
-        if record.schema_version != 1 || record.family != "closed-solid-fill-cubic-path" {
+        let vector_family = record.family == crate::object_document::VECTOR_FAMILY;
+        if record.schema_version != 1
+            || (record.family != "closed-solid-fill-cubic-path" && !vector_family)
+        {
             return Err(reject(Unsupported, "unsupported object schema or family"));
         }
         let valid_target = if complete_contexts {
@@ -316,6 +355,11 @@ pub(crate) fn validate_content(
         }
         if !targets.insert(&record.target) {
             return Err(reject(DuplicateId, "duplicate scoped object key"));
+        }
+        object_vector_ext_codec::validate_vector_ext(record)?;
+        if vector_family {
+            object_vector_codec::validate_vector_record(record)?;
+            continue;
         }
         let geometry = &record.geometry;
         if geometry.kind != "cubic-path"
@@ -341,7 +385,16 @@ pub(crate) fn validate_content(
                 }
             }
         }
-        let fill = &record.fill;
+        if !record.vector.missing() {
+            return Err(reject(
+                Unsupported,
+                "vector body requires the editable-vector-path family",
+            ));
+        }
+        let fill = match record.solid_fill() {
+            Some(fill) => fill,
+            None => return Err(reject(Invalid, "legacy family requires a solid fill")),
+        };
         if fill.kind != "solid" {
             return Err(reject(Unsupported, "only solid fill is supported"));
         }

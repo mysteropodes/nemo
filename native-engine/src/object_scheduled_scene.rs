@@ -2,6 +2,7 @@
 use crate::object_frame_packet::ObjectFrameSelector;
 use crate::object_render_scene::{
     prepare_object_composition, ObjectCompositionWitness, ObjectPaintPlan, ObjectSceneError,
+    SceneResourceMismatchKind,
 };
 use crate::render_scene::ScheduledFrameIdentity;
 use crate::scheduler::{FrameScheduler, ScheduledFrame};
@@ -12,6 +13,7 @@ pub enum ScheduledObjectSceneError {
     Pins(ObjectSceneError),
     RetainedSourceMismatch,
     UnsupportedOutput,
+    ResourceDeclaration(SceneResourceMismatchKind),
     ForeignResult,
 }
 
@@ -122,10 +124,14 @@ fn prepare_with<'a>(
         || output.format() != "rgba8"
         || output.color_interpretation() != "srgb"
         || output.alpha_mode() != "straight"
-        || !key.declared_resource_versions().is_empty()
     {
         return Err(ScheduledObjectSceneError::UnsupportedOutput);
     }
+    // The witness's declared set must equal the key's declaration exactly (an
+    // absent set is empty); nothing is acquired or released here.
+    composition
+        .verify_scene_resources(key.declared_resource_versions())
+        .map_err(|mismatch| ScheduledObjectSceneError::ResourceDeclaration(mismatch.kind))?;
     // D2 alone checks device/target/padded-readback budgets before allocation.
     Ok(LiveObjectComposition {
         scheduler,

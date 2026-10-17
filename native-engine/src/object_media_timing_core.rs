@@ -8,3 +8,15 @@ pub(crate) mod object_media_timing_video;
 
 #[path = "object_media_timing_audio.rs"]
 pub(crate) mod object_media_timing_audio;
+
+#[path = "object_media_link_state.rs"]
+pub(crate) mod object_media_link_state;
+
+#[path = "object_media_link_reopen.rs"]
+pub(crate) mod object_media_link_reopen;
+
+#[path = "object_media_link_join.rs"]
+pub(crate) mod object_media_link_join;
+
+#[path = "object_media_link_plan.rs"]
+pub(crate) mod object_media_link_plan;

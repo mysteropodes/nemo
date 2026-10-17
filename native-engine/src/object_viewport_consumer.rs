@@ -45,3 +45,15 @@ impl ObjectViewportFrame {
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_viewport_consumer.rs"]
 mod tests;
+#[cfg(all(test, feature = "history", feature = "export_job"))]
+#[path = "../tests/viewport_scene_controls.rs"]
+mod viewport_scene_controls;
+#[cfg(all(test, feature = "history", feature = "export_job"))]
+#[path = "../tests/viewport_scene_packet_parity.rs"]
+mod viewport_scene_packet_parity;
+#[cfg(all(test, feature = "history", feature = "export_job"))]
+#[path = "../tests/viewport_scene_stale_matrix.rs"]
+mod viewport_scene_stale_matrix;
+#[cfg(all(test, feature = "history", feature = "export_job"))]
+#[path = "../tests/viewport_scene_support.rs"]
+mod viewport_scene_support;

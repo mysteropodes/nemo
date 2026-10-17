@@ -93,10 +93,11 @@ fn frozen_scopes_keep_complete_relative_geometry_straight_numbers_and_all_pins()
     }
     let authored = packet(&snapshot, FrameScopeKind::Authored, 7);
     let record = authored.records().next().unwrap().record();
-    assert_eq!(record.fill.r, json!(0.2).as_number().unwrap().clone());
-    assert_eq!(record.fill.g, json!(0.4).as_number().unwrap().clone());
-    assert_eq!(record.fill.b, json!(0.6).as_number().unwrap().clone());
-    assert_eq!(record.fill.a, json!(0.75).as_number().unwrap().clone());
+    let fill = record.solid_fill().unwrap();
+    assert_eq!(fill.r, json!(0.2).as_number().unwrap().clone());
+    assert_eq!(fill.g, json!(0.4).as_number().unwrap().clone());
+    assert_eq!(fill.b, json!(0.6).as_number().unwrap().clone());
+    assert_eq!(fill.a, json!(0.75).as_number().unwrap().clone());
     assert_eq!(record.geometry.handle_space, "relative");
     assert_eq!(record.geometry.segments[0].point.x.as_f64(), Some(10.125));
     assert_eq!(
