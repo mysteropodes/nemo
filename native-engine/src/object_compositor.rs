@@ -65,16 +65,12 @@ fn output_budget(width: u32, height: u32, device_max: u32) -> Result<(), Composi
 }
 
 fn color(command: ObjectPaintCommand<'_>) -> Result<Color, CompositorError> {
-    let source = command.paint();
-    let mut rgba = [0.0f32; 4];
-    for (target, source) in rgba.iter_mut().zip(source) {
-        let value = source
-            .as_f64()
-            .filter(|n| n.is_finite() && (0.0..=1.0).contains(n))
-            .ok_or_else(|| CompositorError::new("unrepresentable object straight RGBA"))?;
-        *target = value as f32;
-    }
     // AlphaColor<Srgb> holds straight float channels; do not quantize to RGB8.
+    // The channel rule lives once, in the L07-A SceneSolid kernel.
+    let rgba = command
+        .solid()
+        .rgba_f32()
+        .map_err(|error| CompositorError::new(error.message()))?;
     Ok(Color::new(rgba))
 }
 

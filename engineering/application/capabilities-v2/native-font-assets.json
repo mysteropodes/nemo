@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.font-assets",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.asset.font.import",
+    "query.document.object.asset.font"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-font-assets-v1.schema.json#/$defs/Import"
+      },
+      {
+        "$ref": "../native-font-assets-v1.schema.json#/$defs/Query"
+      }
+    ]
+  },
+  "output": {
+    "$ref": "../native-font-assets-v1.schema.json#/$defs/Output"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "maxEncodedBytes": 16777216,
+    "maxChunkBytes": 1536,
+    "policy": "Original native owner/shared capacity ledger; positive bounded reads. Never substitute transport bytes for native ID/digest."
+  },
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": []
+}

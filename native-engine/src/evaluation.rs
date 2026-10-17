@@ -73,6 +73,10 @@ pub(crate) mod object_text_layout_kernels;
 #[path = "object_scene_style_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_scene_style_kernels;
+// L05-F/L05-H (#2133, #2134): lane-5 frame/exposure/clipboard family aggregator.
+#[path = "object_frame_edit_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_frame_edit_kernels;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 

@@ -12,6 +12,9 @@ use std::collections::BTreeMap;
 
 #[path = "object_viewport_consumer.rs"]
 mod object_consumer;
+#[path = "viewport_scene_overlay.rs"]
+#[allow(dead_code)]
+mod viewport_scene_overlay;
 pub use object_consumer::ObjectViewportFrame;
 
 #[rustfmt::skip]

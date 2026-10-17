@@ -95,7 +95,15 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         "../../engineering/application/native-property-metadata-v1.schema.json"
     ))
     .unwrap();
-    assert_eq!(command_schema["$defs"]["nativePropertyMetadata"], native_metadata);
+    assert_eq!(
+        command_schema["$defs"]["nativePropertyMetadata"],
+        native_metadata
+    );
+    let native_fonts: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-font-assets-v1.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(command_schema["$defs"]["nativeFontAssets"], native_fonts);
     assert_eq!(command_schema["type"], "object");
     for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
         assert!(
@@ -147,10 +155,16 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     let mut revision_on_query = metadata_query.clone();
     revision_on_query["expectedRevision"] = json!(0);
     assert!(!validator.is_valid(&revision_on_query));
-    for view in [json!({"kind": "targets", "offset": 0}), json!({"kind": "unsupported"})] {
+    for view in [
+        json!({"kind": "targets", "offset": 0}),
+        json!({"kind": "unsupported"}),
+    ] {
         let mut invalid = metadata_query.clone();
         invalid["payload"]["view"] = view;
-        assert!(!validator.is_valid(&invalid), "metadata selector rejects {invalid}");
+        assert!(
+            !validator.is_valid(&invalid),
+            "metadata selector rejects {invalid}"
+        );
     }
     for example in command_schema["examples"].as_array().unwrap() {
         assert!(
@@ -411,7 +425,6 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     }
     client.cancel().await.unwrap();
 }
-
 
 #[test]
 fn schema_binary_rejects_unsupported_arguments_without_partial_contract_output() {

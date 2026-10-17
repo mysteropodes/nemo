@@ -33,6 +33,12 @@ pub(crate) use project_admission::PreparedReferenceAttachment;
 #[path = "object_project_wire_admission.rs"]
 mod project_wire_admission;
 
+// L06-E (lane #2112): immutable per-asset decoded-pixel handle (reads only; no owner authority).
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_raster_asset_resources.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_raster_asset_resources;
+
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 use crate::revision::{
     shared_image_resource_budget, ImageResourceBudget, ImageResourceCharge, ImageResourceError,
