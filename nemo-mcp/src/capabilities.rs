@@ -40,8 +40,21 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-object-boolean.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-item.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-asset.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-vector.json"),
     include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
     include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-image-mesh.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-widget.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-rig.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-component.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-duplicator.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-frame-edit.json"),
+    include_str!(
+        "../../engineering/application/capabilities-v2/native-bitmap-brush-resources.json"
+    ),
+    include_str!("../../engineering/application/capabilities-v2/native-vector-export.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-media-export.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-import.json"),
 ];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

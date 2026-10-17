@@ -1,0 +1,613 @@
+{
+ "baseline": "fbe4b8a33e6d5a229f014154df2ba21988a9fabc",
+ "generator": "L03/leaves/L03-T/tools/gen_rules.js",
+ "lines": {
+  "colsLine": "var cols = Math.max(1, Math.min(32, parseInt(el('p-imagemesh-cols').value, 10) || 4));",
+  "kindLine": "if (kind !== 'joystick' && kind !== 'slider') kind = 'joystick';",
+  "nameLine": "(typeof nextLayerName === 'function' ? nextLayerName() : 'Layer')",
+  "replaceLine": ".replace(/^Layer/, kind === 'slider' ? 'Slider' : 'Joystick');",
+  "radiusLine": "var radius=parseFloat(document.getElementById('rig-weight-radius').value)||200;",
+  "rotateLine": "var rotate=document.getElementById('rig-rotate-mode').checked;",
+  "softLine": "var softness=(parseFloat(document.getElementById('rig-falloff-softness').value)||0)/100;",
+  "shapesLine": "var driveShapes=document.getElementById('rig-drive-shapes');",
+  "meshesLine": "var driveMeshes=document.getElementById('rig-drive-meshes');",
+  "argsLine": "{paths:!driveShapes||driveShapes.checked,meshes:!driveMeshes||driveMeshes.checked}",
+  "ikLine": "rig.ikChains[endRef.boneId+':'+endRef.vi]={root:rootRef,joint:jointRef,end:endRef,l1:l1,l2:l2,flip:!!flip};",
+  "dragLine": "SMImageMesh.setOffset(t.meshId, dragIdx, uv[0] - rest[0], uv[1] - rest[1]);"
+ },
+ "density": [
+  {
+   "raw": "",
+   "value": 4
+  },
+  {
+   "raw": "0",
+   "value": 4
+  },
+  {
+   "raw": "1",
+   "value": 1
+  },
+  {
+   "raw": "4",
+   "value": 4
+  },
+  {
+   "raw": "7",
+   "value": 7
+  },
+  {
+   "raw": "32",
+   "value": 32
+  },
+  {
+   "raw": "33",
+   "value": 32
+  },
+  {
+   "raw": "99",
+   "value": 32
+  },
+  {
+   "raw": "abc",
+   "value": 4
+  },
+  {
+   "raw": "3.9",
+   "value": 3
+  },
+  {
+   "raw": "-5",
+   "value": 1
+  },
+  {
+   "raw": " 12 ",
+   "value": 12
+  },
+  {
+   "raw": "1e2",
+   "value": 1
+  },
+  {
+   "raw": "0x10",
+   "value": 4
+  }
+ ],
+ "widget": [
+  {
+   "kindIn": "joystick",
+   "nextName": "Layer 3",
+   "kind": "joystick",
+   "name": "Joystick 3"
+  },
+  {
+   "kindIn": "joystick",
+   "nextName": "Layer",
+   "kind": "joystick",
+   "name": "Joystick"
+  },
+  {
+   "kindIn": "joystick",
+   "nextName": "Slider 2",
+   "kind": "joystick",
+   "name": "Slider 2"
+  },
+  {
+   "kindIn": "joystick",
+   "nextName": "My Layer",
+   "kind": "joystick",
+   "name": "My Layer"
+  },
+  {
+   "kindIn": "joystick",
+   "nextName": "Layer Layer 1",
+   "kind": "joystick",
+   "name": "Joystick Layer 1"
+  },
+  {
+   "kindIn": "slider",
+   "nextName": "Layer 3",
+   "kind": "slider",
+   "name": "Slider 3"
+  },
+  {
+   "kindIn": "slider",
+   "nextName": "Layer",
+   "kind": "slider",
+   "name": "Slider"
+  },
+  {
+   "kindIn": "slider",
+   "nextName": "Slider 2",
+   "kind": "slider",
+   "name": "Slider 2"
+  },
+  {
+   "kindIn": "slider",
+   "nextName": "My Layer",
+   "kind": "slider",
+   "name": "My Layer"
+  },
+  {
+   "kindIn": "slider",
+   "nextName": "Layer Layer 1",
+   "kind": "slider",
+   "name": "Slider Layer 1"
+  },
+  {
+   "kindIn": "",
+   "nextName": "Layer 3",
+   "kind": "joystick",
+   "name": "Joystick 3"
+  },
+  {
+   "kindIn": "",
+   "nextName": "Layer",
+   "kind": "joystick",
+   "name": "Joystick"
+  },
+  {
+   "kindIn": "",
+   "nextName": "Slider 2",
+   "kind": "joystick",
+   "name": "Slider 2"
+  },
+  {
+   "kindIn": "",
+   "nextName": "My Layer",
+   "kind": "joystick",
+   "name": "My Layer"
+  },
+  {
+   "kindIn": "",
+   "nextName": "Layer Layer 1",
+   "kind": "joystick",
+   "name": "Joystick Layer 1"
+  },
+  {
+   "kindIn": "Slider",
+   "nextName": "Layer 3",
+   "kind": "joystick",
+   "name": "Joystick 3"
+  },
+  {
+   "kindIn": "Slider",
+   "nextName": "Layer",
+   "kind": "joystick",
+   "name": "Joystick"
+  },
+  {
+   "kindIn": "Slider",
+   "nextName": "Slider 2",
+   "kind": "joystick",
+   "name": "Slider 2"
+  },
+  {
+   "kindIn": "Slider",
+   "nextName": "My Layer",
+   "kind": "joystick",
+   "name": "My Layer"
+  },
+  {
+   "kindIn": "Slider",
+   "nextName": "Layer Layer 1",
+   "kind": "joystick",
+   "name": "Joystick Layer 1"
+  },
+  {
+   "kindIn": "pad",
+   "nextName": "Layer 3",
+   "kind": "joystick",
+   "name": "Joystick 3"
+  },
+  {
+   "kindIn": "pad",
+   "nextName": "Layer",
+   "kind": "joystick",
+   "name": "Joystick"
+  },
+  {
+   "kindIn": "pad",
+   "nextName": "Slider 2",
+   "kind": "joystick",
+   "name": "Slider 2"
+  },
+  {
+   "kindIn": "pad",
+   "nextName": "My Layer",
+   "kind": "joystick",
+   "name": "My Layer"
+  },
+  {
+   "kindIn": "pad",
+   "nextName": "Layer Layer 1",
+   "kind": "joystick",
+   "name": "Joystick Layer 1"
+  },
+  {
+   "kindIn": null,
+   "nextName": "Layer 3",
+   "kind": "joystick",
+   "name": "Joystick 3"
+  },
+  {
+   "kindIn": null,
+   "nextName": "Layer",
+   "kind": "joystick",
+   "name": "Joystick"
+  },
+  {
+   "kindIn": null,
+   "nextName": "Slider 2",
+   "kind": "joystick",
+   "name": "Slider 2"
+  },
+  {
+   "kindIn": null,
+   "nextName": "My Layer",
+   "kind": "joystick",
+   "name": "My Layer"
+  },
+  {
+   "kindIn": null,
+   "nextName": "Layer Layer 1",
+   "kind": "joystick",
+   "name": "Joystick Layer 1"
+  }
+ ],
+ "autoAssign": [
+  {
+   "form": {
+    "radius": "",
+    "rotate": false,
+    "softness": "",
+    "shapes": null,
+    "meshes": null
+   },
+   "args": {
+    "radius": 200,
+    "rotate": false,
+    "softness": 0,
+    "paths": true,
+    "meshes": true
+   }
+  },
+  {
+   "form": {
+    "radius": "150",
+    "rotate": true,
+    "softness": "40",
+    "shapes": {
+     "checked": true
+    },
+    "meshes": {
+     "checked": false
+    }
+   },
+   "args": {
+    "radius": 150,
+    "rotate": true,
+    "softness": 0.4,
+    "paths": true,
+    "meshes": false
+   }
+  },
+  {
+   "form": {
+    "radius": "abc",
+    "rotate": false,
+    "softness": "100",
+    "shapes": {
+     "checked": false
+    },
+    "meshes": {
+     "checked": true
+    }
+   },
+   "args": {
+    "radius": 200,
+    "rotate": false,
+    "softness": 1,
+    "paths": false,
+    "meshes": true
+   }
+  },
+  {
+   "form": {
+    "radius": "0",
+    "rotate": true,
+    "softness": "0",
+    "shapes": null,
+    "meshes": {
+     "checked": false
+    }
+   },
+   "args": {
+    "radius": 200,
+    "rotate": true,
+    "softness": 0,
+    "paths": true,
+    "meshes": false
+   }
+  },
+  {
+   "form": {
+    "radius": "-20",
+    "rotate": false,
+    "softness": "-30",
+    "shapes": {
+     "checked": false
+    },
+    "meshes": null
+   },
+   "args": {
+    "radius": -20,
+    "rotate": false,
+    "softness": -0.3,
+    "paths": false,
+    "meshes": true
+   }
+  },
+  {
+   "form": {
+    "radius": "12.5",
+    "rotate": false,
+    "softness": "33.3",
+    "shapes": {
+     "checked": true
+    },
+    "meshes": {
+     "checked": true
+    }
+   },
+   "args": {
+    "radius": 12.5,
+    "rotate": false,
+    "softness": 0.33299999999999996,
+    "paths": true,
+    "meshes": true
+   }
+  }
+ ],
+ "ik": [
+  {
+   "end": {
+    "boneId": "bone2",
+    "vi": 1
+   },
+   "flip": "undefined",
+   "key": "bone2:1",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "bone2",
+    "vi": 1
+   },
+   "flip": 0,
+   "key": "bone2:1",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "bone2",
+    "vi": 1
+   },
+   "flip": 1,
+   "key": "bone2:1",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "bone2",
+    "vi": 1
+   },
+   "flip": true,
+   "key": "bone2:1",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "bone2",
+    "vi": 1
+   },
+   "flip": false,
+   "key": "bone2:1",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "bone2",
+    "vi": 1
+   },
+   "flip": "x",
+   "key": "bone2:1",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "bone2",
+    "vi": 1
+   },
+   "flip": null,
+   "key": "bone2:1",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "bone10",
+    "vi": 0
+   },
+   "flip": "undefined",
+   "key": "bone10:0",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "bone10",
+    "vi": 0
+   },
+   "flip": 0,
+   "key": "bone10:0",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "bone10",
+    "vi": 0
+   },
+   "flip": 1,
+   "key": "bone10:0",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "bone10",
+    "vi": 0
+   },
+   "flip": true,
+   "key": "bone10:0",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "bone10",
+    "vi": 0
+   },
+   "flip": false,
+   "key": "bone10:0",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "bone10",
+    "vi": 0
+   },
+   "flip": "x",
+   "key": "bone10:0",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "bone10",
+    "vi": 0
+   },
+   "flip": null,
+   "key": "bone10:0",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "b",
+    "vi": 12
+   },
+   "flip": "undefined",
+   "key": "b:12",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "b",
+    "vi": 12
+   },
+   "flip": 0,
+   "key": "b:12",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "b",
+    "vi": 12
+   },
+   "flip": 1,
+   "key": "b:12",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "b",
+    "vi": 12
+   },
+   "flip": true,
+   "key": "b:12",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "b",
+    "vi": 12
+   },
+   "flip": false,
+   "key": "b:12",
+   "storedFlip": false
+  },
+  {
+   "end": {
+    "boneId": "b",
+    "vi": 12
+   },
+   "flip": "x",
+   "key": "b:12",
+   "storedFlip": true
+  },
+  {
+   "end": {
+    "boneId": "b",
+    "vi": 12
+   },
+   "flip": null,
+   "key": "b:12",
+   "storedFlip": false
+  }
+ ],
+ "drag": [
+  {
+   "uv": [
+    0.6,
+    0.5
+   ],
+   "rest": [
+    0.5,
+    0.5
+   ],
+   "du": 0.09999999999999998,
+   "dv": 0
+  },
+  {
+   "uv": [
+    0,
+    0
+   ],
+   "rest": [
+    0.25,
+    0.75
+   ],
+   "du": -0.25,
+   "dv": -0.75
+  },
+  {
+   "uv": [
+    1.25,
+    -0.5
+   ],
+   "rest": [
+    1,
+    0
+   ],
+   "du": 0.25,
+   "dv": -0.5
+  },
+  {
+   "uv": [
+    0.30000000000000004,
+    0.3
+   ],
+   "rest": [
+    0.3,
+    0.30000000000000004
+   ],
+   "du": 5.551115123125783e-17,
+   "dv": -5.551115123125783e-17
+  }
+ ]
+}

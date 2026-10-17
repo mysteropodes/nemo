@@ -101,6 +101,8 @@ test('the JS contract, core, seam and two intents have ordinary, layered, size-b
   // Composition with L06-M: its item contract composes in front of the seam on the same SDK line (a profiled domain module).
   const itemContract = profile.modules.find((module) => module.id === 'app.native.object.item.contract');
   if (itemContract) layers.set(itemContract.files[0], itemContract.layer);
+  // Composition (batch 8): the shared SDK also requires the contracts of the other lanes; admit every profiled module reachable from it.
+  for (const queue = ['native-application.js']; queue.length;) for (const match of read('src/js/adapters/' + queue.pop()).matchAll(/require\('\.\/([^']+)'\)/g)) { const owner = profile.modules.find((module) => module.dir === 'src/js/adapters' && module.files.includes(match[1])); if (owner && !layers.has(match[1])) { layers.set(match[1], owner.layer); queue.push(match[1]); } }
   assert.equal(layers.get('native-object-edit-seam.js'), 'domain', 'the seam stays below the adapters-layer SDK');
   for (const [file, layer] of layers) {
     const text = read('src/js/adapters/' + file);

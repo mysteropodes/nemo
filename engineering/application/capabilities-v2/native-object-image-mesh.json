@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.image-mesh",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.image.mesh.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectImageMeshEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Edit the normalized rest data of one native image mesh as one sealed transaction: write one vertex offset, reset every offset, or retopologize from a new outline or density (the outline stays the stable vertex prefix and the sculpt is carried). Retopology needs the evaluation kernel of the engine build and is a typed unavailable otherwise. A no-op preserves bytes, revision and history. Attach, detach and animated per-vertex rows have no operation and are unavailable. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native image.mesh.edit command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "mesh-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.image.mesh.edit",
+        "payload": {
+          "command": "object.image.mesh.edit",
+          "meshId": "im_1",
+          "action": {
+            "kind": "setOffset",
+            "index": 8,
+            "du": 0.1,
+            "dv": 0
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "mesh-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

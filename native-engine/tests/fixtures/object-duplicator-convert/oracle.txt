@@ -1,0 +1,31 @@
+# L04-M oracle, baseline fbe4b8a33e6d5a229f014154df2ba21988a9fabc
+# generator tools/gen_oracle.cjs
+# blob src/js/app.js 816979f85fd8bfe583c52e889bd1f0733cb5db2a
+# blob src/js/motion.js 90503c3955b6860ebc5d7ba5708bd277c8c5acc2
+# D1/D2: toggleLayerDuplicator, executed verbatim (Math.random pinned to 0.123456)
+D1.locked|true
+D1.descriptor|{"mode":"grid","rows":2,"cols":3,"spacingX":150,"spacingY":150,"count":8,"radius":200,"startAngle":0,"endAngle":null,"radialOrient":false,"pathLayerUid":null,"pathAlignTangent":true,"seed":123456,"staggerRandom":{"position":false,"rotation":false,"scale":false,"opacity":false,"hue":false},"timeOffset":{"enabled":false,"offsetFrames":1,"direction":"forward"}}
+D1.keys|["mode","rows","cols","spacingX","spacingY","count","radius","startAngle","endAngle","radialOrient","pathLayerUid","pathAlignTangent","seed","staggerRandom","timeOffset"]
+D2.duplicator|null
+D2.locked|false
+D2.dupEditSource|false
+# D3/D4: convertSelectionToObjectDuplicator, executed verbatim
+D3.return|5
+D3.layerCount|6
+D3.host.name|"Duplicator 2"
+D3.host.locked|true
+D3.host.visible|true
+D3.host.strokeTotal|0
+D3.host.keyFrames|[0]
+D3.descriptor|{"mode":"grid","rows":1,"cols":3,"spacingX":150,"spacingY":150,"count":3,"radius":200,"startAngle":0,"endAngle":null,"radialOrient":false,"pathLayerUid":null,"pathAlignTangent":true,"seed":654321,"staggerRandom":{"position":false,"rotation":false,"scale":false,"opacity":false,"hue":false},"timeOffset":{"enabled":false,"offsetFrames":1,"direction":"forward"},"sourceMode":"objects","sourceLayerUids":["ly_a","ly_b","ly_d"]}
+D3.poolVisible|[false,false,true,false,true]
+D3.poolUids|["ly_a","ly_b","ly_d"]
+D4.return|-1
+D4.layerCount|2
+D4.visible|[true,true]
+# D5: _resolveDuplicatorPath, executed verbatim (Paper.js Path/Segment/Point stubbed minimally)
+D5.pathOnDuplicator|null
+D5.pathOnHost|null
+D5.pathOnPlain|{"length":10,"closed":false}
+D5.pathOnUnknown|null
+D5.pathNull|null

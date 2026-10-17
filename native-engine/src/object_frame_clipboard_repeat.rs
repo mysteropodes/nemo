@@ -13,7 +13,9 @@
 //! key stays a key, an in-between stays an in-between without its manual-edit flag, a hold stays a hold, a blank key stays
 //! a blank key; the copies keep the original stroke ids, geometry, fill and (in an ordered document) natural positions and
 //! authored order, because the same drawing returns and tween matching depends on it. Reference-scope records, other
-//! contexts, the property holder table and every layer field other than the timing are never touched.
+//! contexts, the element holders, the tables of layers outside the bounds and every layer field other than the timing are never
+//! touched. The layer-level Motion tracks of the cycled layers (and their `order` tracks in the composition-order plan) are cloned at
+//! `frame + round * span` by `object_frame_clipboard_tracks.rs` inside the same candidate.
 //!
 //! Atomic: the candidate is detached, non-Clone and sealed to the retained snapshot; it holds the complete after-document
 //! (`None` for a semantic no-op, which publishes nothing and keeps redo) validated by the shared strict drawing admission.
@@ -23,6 +25,7 @@ use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     finish, layer_position, scene_authored, timing_refusal,
 };
 use crate::commands::object_fill_owner::object_frame_clipboard_repeat_wire::parse_repeat_payload;
+use crate::commands::object_fill_owner::object_frame_clipboard_tracks::repeat_motion_tracks;
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     clone_cell, drop_cells, DocumentEdit,
 };
@@ -205,6 +208,13 @@ pub(crate) fn repeat_cells(
             }
         }
     }
+    // The Motion tracks of the cycled layers (ld.motion keys cloned at k.frame + r * span, L05-J2) join the same candidate; a track
+    // that cannot be admitted (a clone on an existing key) refuses the whole cycle, cells included.
+    let cycled: Vec<String> = document.layers[first_layer..=last_layer]
+        .iter()
+        .map(|layer| layer.layer_uid.clone())
+        .collect();
+    repeat_motion_tracks(&mut next, &cycled, first, last, times)?;
     if next == *document {
         return Ok(DocumentEdit::NoChange);
     }

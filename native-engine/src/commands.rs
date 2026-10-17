@@ -21,6 +21,11 @@ pub(crate) use object_fill_owner::{
 };
 
 #[cfg(feature = "history")]
+#[allow(unused_imports)]
+pub(crate) use object_fill_owner::component_owner::{
+    PreparedComponentSetup, SetupError, SetupKind, SetupRefusal, SourceRefusal,
+};
+#[cfg(feature = "history")]
 pub(crate) use object_fill_owner::scene_effect_layer_edit::PreparedLayerCompositing;
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::PreparedExposureKey;
@@ -28,7 +33,14 @@ pub(crate) use object_fill_owner::PreparedExposureKey;
 pub(crate) use object_fill_owner::PreparedExposureRetime;
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::PreparedFrameStructure;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedRigEdit;
 
+#[cfg(feature = "history")]
+#[allow(unused_imports)]
+pub(crate) use object_fill_owner::ClipboardContexts;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedRigPose;
 #[cfg(feature = "history")]
 #[allow(unused_imports)]
 pub(crate) use object_fill_owner::{

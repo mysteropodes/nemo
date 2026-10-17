@@ -314,6 +314,747 @@
         }
       }
     },
+    "ObjectFiniteNumber": {
+      "type": "number",
+      "minimum": -1.7976931348623157e+308,
+      "maximum": 1.7976931348623157e+308
+    },
+    "ObjectVectorPair": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ObjectFiniteNumber"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "A finite [x, y] pair."
+    },
+    "ObjectVectorGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "closed",
+        "coordinateSpace",
+        "handleSpace",
+        "segments"
+      ],
+      "properties": {
+        "kind": {
+          "const": "cubic-path"
+        },
+        "closed": {
+          "type": "boolean"
+        },
+        "coordinateSpace": {
+          "const": "document-world"
+        },
+        "handleSpace": {
+          "const": "relative"
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectSegment"
+          },
+          "minItems": 2,
+          "maxItems": 256
+        }
+      },
+      "description": "Open or closed cubic anchors with ordered relative handles; closure is independent of the anchors."
+    },
+    "ObjectVectorFill": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectSolidFill"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Explicit null is no fill; absent is refused."
+    },
+    "ObjectVectorBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stroke",
+        "hasRealStroke",
+        "strokeWidth",
+        "strokeCap",
+        "strokeJoin",
+        "opacity"
+      ],
+      "properties": {
+        "stroke": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectSolidFill"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasRealStroke": {
+          "type": "boolean"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        },
+        "strokeCap": {
+          "enum": [
+            "butt",
+            "round",
+            "square"
+          ]
+        },
+        "strokeJoin": {
+          "enum": [
+            "miter",
+            "round",
+            "bevel"
+          ]
+        },
+        "miterLimit": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dashArray": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 1
+        },
+        "dashOffset": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "paintOrder": {
+          "enum": [
+            "fillFirst",
+            "strokeFirst"
+          ]
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "hasRealStroke is authoritative and true exactly when stroke is not null; a fallback colour is never an authored stroke. The owner also requires a positive finite dash length. miterLimit, dashArray, dashOffset and paintOrder keep absent distinct from explicit values."
+    },
+    "ObjectPressureAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point",
+        "handleIn",
+        "handleOut",
+        "width"
+      ],
+      "properties": {
+        "point": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "handleIn": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "handleOut": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "width": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      }
+    },
+    "ObjectWidthStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t",
+        "width"
+      ],
+      "properties": {
+        "t": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      },
+      "description": "t must not decrease along the profile."
+    },
+    "ObjectVectorPressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "centerSegments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectPressureAnchor"
+          }
+        },
+        "widthProfile": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectWidthStop"
+          }
+        },
+        "strokeProfile": {
+          "enum": [
+            "taper-in",
+            "taper-out",
+            "taper-both",
+            "bulge",
+            "even"
+          ]
+        },
+        "profileBase": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "description": "Presence is the vector-brush flag. There is no pressure scalar; the visible ribbon is the record geometry and a ribbon has no real stroke."
+    },
+    "ObjectParamBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+      ],
+      "properties": {
+        "x1": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "y1": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "x2": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "y2": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      }
+    },
+    "ObjectParamShape": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rect"
+            },
+            "tl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "tr": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "br": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "bl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "box": {
+              "$ref": "#/$defs/ObjectParamBox"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "ellipse"
+            },
+            "startAngle": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "sweep": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "box": {
+              "$ref": "#/$defs/ObjectParamBox"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "star"
+            },
+            "pointCount": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRatio": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "cornerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "box": {
+              "$ref": "#/$defs/ObjectParamBox"
+            }
+          }
+        }
+      ],
+      "description": "Stored parametric intent of a dynamic rect, ellipse or star; box is the stored frame the anchors were built from."
+    },
+    "ObjectParamShapeSet": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rect"
+            },
+            "tl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "tr": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "br": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "bl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "ellipse"
+            },
+            "startAngle": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "sweep": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "star"
+            },
+            "pointCount": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRatio": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "cornerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        }
+      ],
+      "description": "The declared parameters of a parameter set: the same kind the record holds, no box."
+    },
+    "ObjectVectorExt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "pressure": {
+          "$ref": "#/$defs/ObjectVectorPressure"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShape"
+        },
+        "boxAngle": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      },
+      "minProperties": 1,
+      "description": "Omitted when empty."
+    },
+    "ObjectVectorRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry",
+        "fill",
+        "vector"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "editable-vector-path"
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "geometry": {
+          "$ref": "#/$defs/ObjectVectorGeometry"
+        },
+        "fill": {
+          "$ref": "#/$defs/ObjectVectorFill"
+        },
+        "vector": {
+          "$ref": "#/$defs/ObjectVectorBody"
+        },
+        "vectorExt": {
+          "$ref": "#/$defs/ObjectVectorExt"
+        }
+      },
+      "description": "An editable open or closed vector path as the object read returns it."
+    },
+    "ObjectVectorCreateTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeId": {
+          "const": ""
+        }
+      },
+      "description": "A created record names no stroke id: the owner allocates native-stroke:{revision}:{n}."
+    },
+    "ObjectVectorCreateRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry",
+        "fill",
+        "vector"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "editable-vector-path"
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectVectorCreateTarget"
+        },
+        "geometry": {
+          "$ref": "#/$defs/ObjectVectorGeometry"
+        },
+        "fill": {
+          "$ref": "#/$defs/ObjectVectorFill"
+        },
+        "vector": {
+          "$ref": "#/$defs/ObjectVectorBody"
+        },
+        "vectorExt": {
+          "$ref": "#/$defs/ObjectVectorExt"
+        }
+      },
+      "description": "The record of a vector create."
+    },
+    "ObjectVectorCreatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "record"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.create"
+        },
+        "record": {
+          "$ref": "#/$defs/ObjectVectorCreateRecord"
+        }
+      }
+    },
+    "ObjectVectorReplacePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "record"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.replace"
+        },
+        "record": {
+          "$ref": "#/$defs/ObjectVectorRecord"
+        }
+      },
+      "description": "Replaces the record with the same full target in place; an authored frame only."
+    },
+    "ObjectVectorDeletePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.delete"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        }
+      }
+    },
+    "ObjectVectorEditPayload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectVectorCreatePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorReplacePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorDeletePayload"
+        }
+      ],
+      "description": "Vector create, replace or delete. Requests above 4096 encoded bytes are refused by the public transport, never split."
+    },
+    "ObjectParametricSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "paramShape"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.parametric.set"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShapeSet"
+        }
+      }
+    },
+    "ObjectParametricTranslatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "delta"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.parametric.translate"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "delta": {
+          "$ref": "#/$defs/ObjectVectorPair"
+        }
+      }
+    },
+    "ObjectParametricScalePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "scale",
+        "anchor"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.parametric.scale"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "scale": {
+          "$ref": "#/$defs/ObjectVectorPair"
+        },
+        "anchor": {
+          "$ref": "#/$defs/ObjectVectorPair"
+        }
+      }
+    },
+    "ObjectParametricPayload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectParametricSetPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectParametricTranslatePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectParametricScalePayload"
+        }
+      ]
+    },
+    "ObjectPathFxEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "zigzag",
+            "roughen"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "p1": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "p2": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "p3": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "enabled is absent, true or false; p1..p3 are absent, null or numbers, all kept as sent."
+    },
+    "ObjectPathEffectsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "stack"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.path.effects.set"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "stack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectPathFxEntry"
+          }
+        }
+      },
+      "description": "The COMPLETE new ordered effect stack of one layer. Storage order is evaluation order; an empty stack is an authored empty stack."
+    },
+    "ObjectVectorEditResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "operation",
+        "strokeId"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "operation": {
+          "enum": [
+            "create",
+            "replace",
+            "delete"
+          ]
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      },
+      "description": "Compact vector edit receipt: the stroke an owner allocated (create) or the stable target named (replace, delete). Parameter and path-effect edits answer with the compact CommandResult."
+    },
     "ObjectPropertyMetadataPayload": {
       "$ref": "./native-property-metadata-v1.schema.json#/$defs/Selector"
     },
@@ -577,6 +1318,880 @@
       },
       "description": "Prepared success contract only: outer contentRevision equals expectedRevision + 1. Retained replay proves historical creation identity, not current presence after undo. Public execution remains unavailable until native readers and caller policy are accepted."
     },
+    "ObjectRigId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Authored stable native identity. The owner enforces at most 128 UTF-8 bytes; the string syntax cannot establish provenance or uniqueness."
+    },
+    "ObjectImageMeshAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "index",
+            "du",
+            "dv"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setOffset"
+            },
+            "index": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "du": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "dv": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "resetOffsets"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "outline"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setOutline"
+            },
+            "outline": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": -4,
+                  "maximum": 4
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 3,
+              "maxItems": 512,
+              "description": "The closed perimeter is at most 16 normalized units; the owner enforces it, the schema cannot."
+            },
+            "cols": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cols",
+            "rows"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setDensity"
+            },
+            "cols": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            }
+          }
+        }
+      ]
+    },
+    "ObjectWidgetWriteTo": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "point"
+          ],
+          "properties": {
+            "kind": {
+              "const": "local"
+            },
+            "point": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "point",
+            "anchor",
+            "angleDegrees"
+          ],
+          "properties": {
+            "kind": {
+              "const": "world"
+            },
+            "point": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "anchor": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "angleDegrees": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rest"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectWidgetAxisSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "number",
+          "minimum": -1000000000,
+          "maximum": 1000000000
+        },
+        "max": {
+          "type": "number",
+          "minimum": -1000000000,
+          "maximum": 1000000000
+        },
+        "rest": {
+          "type": "number",
+          "minimum": -1000000000,
+          "maximum": 1000000000
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "minProperties": 1
+    },
+    "ObjectWidgetSettingsSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pos": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "size": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "x": {
+          "$ref": "#/$defs/ObjectWidgetAxisSet"
+        },
+        "y": {
+          "$ref": "#/$defs/ObjectWidgetAxisSet"
+        }
+      },
+      "minProperties": 1
+    },
+    "ObjectRigSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point",
+        "handleIn",
+        "handleOut"
+      ],
+      "properties": {
+        "point": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "handleIn": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "handleOut": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "ObjectRigTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strokeId": {
+          "$ref": "#/$defs/ObjectRigId"
+        },
+        "meshId": {
+          "$ref": "#/$defs/ObjectRigId"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "strokeId"
+          ]
+        },
+        {
+          "required": [
+            "meshId"
+          ]
+        }
+      ]
+    },
+    "ObjectRigRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boneId",
+        "vi"
+      ],
+      "properties": {
+        "boneId": {
+          "$ref": "#/$defs/ObjectRigId"
+        },
+        "vi": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectRigAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "segments",
+            "closed"
+          ],
+          "properties": {
+            "kind": {
+              "const": "drawBone"
+            },
+            "segments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ObjectRigSegment"
+              },
+              "minItems": 2,
+              "maxItems": 256
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "boneId": {
+              "$ref": "#/$defs/ObjectRigId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "boneId",
+            "vi",
+            "part",
+            "to"
+          ],
+          "properties": {
+            "kind": {
+              "const": "moveSegment"
+            },
+            "boneId": {
+              "$ref": "#/$defs/ObjectRigId"
+            },
+            "vi": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "part": {
+              "enum": [
+                "point",
+                "handleIn",
+                "handleOut"
+              ]
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": -1000000000,
+                "maximum": 1000000000
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "breakTangent": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "boneId",
+            "radius"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setBoneRadius"
+            },
+            "boneId": {
+              "$ref": "#/$defs/ObjectRigId"
+            },
+            "radius": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "strokeId",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bindStroke"
+            },
+            "strokeId": {
+              "$ref": "#/$defs/ObjectRigId"
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "boneIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ObjectRigId"
+              }
+            },
+            "radius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "rotate": {
+              "type": "boolean"
+            },
+            "softness": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "meshId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bindMesh"
+            },
+            "meshId": {
+              "$ref": "#/$defs/ObjectRigId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "autoAssign"
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "defaultRadius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "rotate": {
+              "type": "boolean"
+            },
+            "softness": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "paths": {
+              "type": "boolean"
+            },
+            "meshes": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "vertex",
+            "entry",
+            "percent"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setWeight"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectRigTarget"
+            },
+            "vertex": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "entry": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "percent": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "vertex",
+            "boneId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "addWeight"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectRigTarget"
+            },
+            "vertex": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "boneId": {
+              "$ref": "#/$defs/ObjectRigId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "vertex",
+            "entry"
+          ],
+          "properties": {
+            "kind": {
+              "const": "removeWeight"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectRigTarget"
+            },
+            "vertex": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "entry": {
+              "$ref": "#/$defs/ObjectFrame"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "vertex"
+          ],
+          "properties": {
+            "kind": {
+              "const": "resetWeights"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectRigTarget"
+            },
+            "vertex": {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            "radius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "softness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "root",
+            "joint",
+            "end"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setIk"
+            },
+            "root": {
+              "$ref": "#/$defs/ObjectRigRef"
+            },
+            "joint": {
+              "$ref": "#/$defs/ObjectRigRef"
+            },
+            "end": {
+              "$ref": "#/$defs/ObjectRigRef"
+            },
+            "flip": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "endKey"
+          ],
+          "properties": {
+            "kind": {
+              "const": "removeIk"
+            },
+            "endKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "boneId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "removeBone"
+            },
+            "boneId": {
+              "$ref": "#/$defs/ObjectRigId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target"
+          ],
+          "properties": {
+            "kind": {
+              "const": "removeBind"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectRigTarget"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectRigPoseAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "reset"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "commit"
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFrame"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectImageMeshEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "meshId",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.image.mesh.edit"
+        },
+        "meshId": {
+          "$ref": "#/$defs/ObjectRigId"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectImageMeshAction"
+        }
+      }
+    },
+    "ObjectWidgetCreatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "kind",
+        "name",
+        "pos"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.widget.create"
+        },
+        "kind": {
+          "enum": [
+            "joystick",
+            "slider"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "pos": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": -1000000000,
+            "maximum": 1000000000
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "ObjectWidgetWritePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "frame",
+        "to"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.widget.write"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "type": "number"
+        },
+        "to": {
+          "$ref": "#/$defs/ObjectWidgetWriteTo"
+        }
+      }
+    },
+    "ObjectWidgetSettingsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "set"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.widget.settings"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "set": {
+          "$ref": "#/$defs/ObjectWidgetSettingsSet"
+        }
+      }
+    },
+    "ObjectRigEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.rig.edit"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectRigId"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectRigAction"
+        }
+      }
+    },
+    "ObjectRigPosePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.rig.pose"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectRigId"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectRigPoseAction"
+        }
+      }
+    },
     "ObjectLayerVisibilityPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -621,6 +2236,175 @@
         },
         "value": {
           "type": "boolean"
+        }
+      }
+    },
+    "ObjectComponentId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Authored stable native identity. The owner enforces at most 128 UTF-8 bytes and no NUL; the string syntax cannot establish provenance or uniqueness."
+    },
+    "ObjectComponentConvertPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUids"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.convert"
+        },
+        "contextId": {
+          "type": "string"
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/ObjectComponentId"
+          }
+        }
+      }
+    },
+    "ObjectComponentExposePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "symbolId",
+        "key",
+        "targetStrokeId",
+        "targetField",
+        "label"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.expose"
+        },
+        "symbolId": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 128,
+          "pattern": "^ep_"
+        },
+        "targetStrokeId": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "targetField": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "label": {
+          "type": "string"
+        },
+        "default": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectComponentPlacePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "symbolId",
+        "name"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.component.place"
+        },
+        "symbolId": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "ObjectDuplicatorSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "enabled"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.duplicator.set"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectDuplicatorObjectsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUids",
+        "seed"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.duplicator.objects"
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/ObjectComponentId"
+          }
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ObjectDuplicatorPathPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "pathLayerUid"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.duplicator.path"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectComponentId"
+        },
+        "pathLayerUid": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -1246,6 +3030,713 @@
         }
       }
     },
+    "ObjectFrameEditCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectFramesInsertPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cell"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.insert"
+        },
+        "cell": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
+        }
+      }
+    },
+    "ObjectFramesExtendPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cell",
+        "count"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.extend"
+        },
+        "cell": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999
+        }
+      }
+    },
+    "ObjectFramesDuplicatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "cell"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.duplicate"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "cell": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectFramesRemovePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.remove"
+        },
+        "from": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "to": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectLayerKeyPromotePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "cells"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.key.promote"
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
+        }
+      }
+    },
+    "ObjectLayerKeyClearPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "cell"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.key.clear"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "cell": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectLayerKeyClearCellsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "targets"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.key.clear_cells"
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameEditCell"
+          }
+        }
+      }
+    },
+    "ObjectLayerTweenRemovePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.tween.remove"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "from": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "to": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectLayerKeyMovePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.key.move"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "from": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "to": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectFramesClipboardDuplicatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "selection"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.clipboard.duplicate"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "selection": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameEditCell"
+          }
+        }
+      }
+    },
+    "ObjectFramesRepeatPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "fromLayerUid",
+        "toLayerUid",
+        "fromFrame",
+        "toFrame",
+        "times"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.repeat"
+        },
+        "fromLayerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "toLayerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "fromFrame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "toFrame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "times": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "ObjectImportSourceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "Importer-chosen handle: at most 255 UTF-8 bytes, no NUL, not blank, unique per kind inside one batch. maxLength counts code points and is only a coarse character bound; the byte bound is enforced by the Rust and JS validators. The owner maps it to a minted native id and never persists it."
+    },
+    "ObjectImportPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectImportSolid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "r",
+        "g",
+        "b",
+        "a"
+      ],
+      "properties": {
+        "kind": {
+          "const": "solid"
+        },
+        "r": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "g": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "b": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "a": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "ObjectImportSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point",
+        "handleIn",
+        "handleOut"
+      ],
+      "properties": {
+        "point": {
+          "$ref": "#/$defs/ObjectImportPoint"
+        },
+        "handleIn": {
+          "$ref": "#/$defs/ObjectImportPoint"
+        },
+        "handleOut": {
+          "$ref": "#/$defs/ObjectImportPoint"
+        }
+      }
+    },
+    "ObjectImportVectorRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "editable-vector-path"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contextId",
+            "frameScope",
+            "layerUid",
+            "strokeId"
+          ],
+          "properties": {
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frameScope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "authored"
+                },
+                "frame": {
+                  "$ref": "#/$defs/ObjectFrame"
+                }
+              }
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The source id of a layer in this batch, or the uid of an existing layer."
+            },
+            "strokeId": {
+              "const": "",
+              "description": "The owner mints every stroke id."
+            }
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "closed",
+            "coordinateSpace",
+            "handleSpace",
+            "segments"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cubic-path"
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "coordinateSpace": {
+              "const": "document-world"
+            },
+            "handleSpace": {
+              "const": "relative"
+            },
+            "segments": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 256,
+              "items": {
+                "$ref": "#/$defs/ObjectImportSegment"
+              }
+            }
+          }
+        },
+        "fill": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectImportSolid"
+            }
+          ]
+        },
+        "vector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stroke",
+            "hasRealStroke",
+            "strokeWidth",
+            "strokeCap",
+            "strokeJoin",
+            "opacity"
+          ],
+          "properties": {
+            "stroke": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/ObjectImportSolid"
+                }
+              ]
+            },
+            "hasRealStroke": {
+              "type": "boolean",
+              "description": "True exactly when stroke is not null."
+            },
+            "strokeWidth": {
+              "type": "number"
+            },
+            "strokeCap": {
+              "enum": [
+                "butt",
+                "round",
+                "square"
+              ]
+            },
+            "strokeJoin": {
+              "enum": [
+                "miter",
+                "round",
+                "bevel"
+              ]
+            },
+            "miterLimit": {
+              "type": "number"
+            },
+            "dashArray": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "dashOffset": {
+              "type": "number"
+            },
+            "opacity": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "ObjectImportLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "name"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ObjectImportRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "record"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "record": {
+          "$ref": "#/$defs/ObjectImportVectorRecord"
+        }
+      }
+    },
+    "ObjectImportSkip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sourceId",
+        "reason"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "layer",
+            "element",
+            "asset"
+          ]
+        },
+        "sourceId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ObjectImportUnavailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "need"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "need": {
+          "enum": [
+            "raster-asset",
+            "text",
+            "font"
+          ]
+        }
+      }
+    },
+    "ObjectImportBatchPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layers",
+        "records"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.import.batch"
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportLayer"
+          }
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportRecord"
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportSkip"
+          }
+        },
+        "unavailable": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportUnavailable"
+          }
+        }
+      },
+      "description": "One atomic import batch. An unavailable row (raster-asset, text, font) refuses the whole batch. The complete request is limited to 4096 bytes."
+    },
+    "ObjectImportBatchResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "layers",
+        "objects",
+        "skipped"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "layerUid"
+            ],
+            "properties": {
+              "sourceId": {
+                "$ref": "#/$defs/ObjectImportSourceId"
+              },
+              "layerUid": {
+                "$ref": "#/$defs/ObjectOpaqueId"
+              }
+            }
+          }
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "strokeId"
+            ],
+            "properties": {
+              "sourceId": {
+                "$ref": "#/$defs/ObjectImportSourceId"
+              },
+              "strokeId": {
+                "$ref": "#/$defs/ObjectOpaqueId"
+              }
+            }
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportSkip"
+          }
+        }
+      },
+      "description": "Compact receipt: outer contentRevision equals expectedRevision plus one iff applied. Created plus skipped equals the declared source entries. The serialized result is limited to 3072 bytes."
+    },
     "ObjectQueryResult": {
       "type": "object",
       "additionalProperties": false,
@@ -1262,7 +3753,14 @@
           "$ref": "#/$defs/ObjectOpaqueId"
         },
         "object": {
-          "$ref": "#/$defs/ObjectRecord"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectRecord"
+            },
+            {
+              "$ref": "#/$defs/ObjectVectorRecord"
+            }
+          ]
         }
       },
       "description": "Staged immutable common-envelope result: atRevision equals outer contentRevision; snapshot token is native-object:<documentId>:<atRevision>. Complete envelope is limited to 4096 bytes."
@@ -1688,6 +4186,227 @@
         }
       }
     },
+    "ExportSvgBeginPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "contextId",
+        "outputHandle",
+        "frames"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "outputHandle": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ExportMediaRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "end": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ExportMediaOutputSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "format",
+        "width",
+        "height",
+        "colorInterpretation",
+        "alphaMode"
+      ],
+      "properties": {
+        "kind": {
+          "const": "frame"
+        },
+        "format": {
+          "const": "rgba8"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "colorInterpretation": {
+          "const": "srgb"
+        },
+        "alphaMode": {
+          "const": "straight"
+        }
+      }
+    },
+    "ExportMediaVideo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fps": {
+          "type": "number",
+          "minimum": 0
+        },
+        "quality": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{0,32}$"
+        }
+      }
+    },
+    "ExportMediaBeginPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "contextId",
+        "outputHandle",
+        "output",
+        "range"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "outputHandle": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "frameFormat"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "still",
+                "sequence",
+                "video"
+              ]
+            },
+            "frameFormat": {
+              "enum": [
+                "png",
+                "svg"
+              ]
+            }
+          }
+        },
+        "range": {
+          "$ref": "#/$defs/ExportMediaRange"
+        },
+        "outputSpec": {
+          "$ref": "#/$defs/ExportMediaOutputSpec"
+        },
+        "video": {
+          "$ref": "#/$defs/ExportMediaVideo"
+        }
+      },
+      "description": "Three exclusive shapes: PNG still or sequence (outputSpec, no video), SVG still or sequence (neither outputSpec nor video), video of PNG frames (outputSpec, video optional). A still names its frame (start === end), range.end never precedes range.start, a sequence receipt lists at most 120 frames, absent range members mean the project work area: contract rules the JSON Schema cannot express.",
+      "oneOf": [
+        {
+          "properties": {
+            "output": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "still",
+                    "sequence"
+                  ]
+                },
+                "frameFormat": {
+                  "const": "png"
+                }
+              }
+            }
+          },
+          "required": [
+            "outputSpec"
+          ],
+          "not": {
+            "required": [
+              "video"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "output": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "still",
+                    "sequence"
+                  ]
+                },
+                "frameFormat": {
+                  "const": "svg"
+                }
+              }
+            }
+          },
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "outputSpec"
+                ]
+              },
+              {
+                "required": [
+                  "video"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "output": {
+              "properties": {
+                "kind": {
+                  "const": "video"
+                },
+                "frameFormat": {
+                  "const": "png"
+                }
+              }
+            }
+          },
+          "required": [
+            "outputSpec"
+          ]
+        }
+      ]
+    },
     "RequestBase": {
       "type": "object",
       "additionalProperties": false,
@@ -1783,6 +4502,295 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectLayerPolicyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.insert"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesInsertPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.extend"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesExtendPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.duplicate"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesDuplicatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.remove"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesRemovePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.key.promote"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerKeyPromotePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.key.clear"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerKeyClearPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.key.clear_cells"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerKeyClearCellsPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.tween.remove"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerTweenRemovePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.key.move"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerKeyMovePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.clipboard.duplicate"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesClipboardDuplicatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.repeat"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesRepeatPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.convert"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentConvertPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.expose"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentExposePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.component.place"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectComponentPlacePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.duplicator.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectDuplicatorSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.duplicator.objects"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectDuplicatorObjectsPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.duplicator.path"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectDuplicatorPathPayload"
                 }
               }
             }
@@ -2123,6 +5131,125 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectLayerCreatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.import.batch"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectImportBatchPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.image.mesh.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectImageMeshEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.widget.create"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectWidgetCreatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.widget.write"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectWidgetWritePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.widget.settings"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectWidgetSettingsPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.rig.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectRigEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.rig.pose"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectRigPosePayload"
                 }
               }
             }
@@ -2486,6 +5613,114 @@
             {
               "properties": {
                 "operation": {
+                  "const": "job.export.svg.begin"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ExportSvgBeginPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "enum": [
+                    "job.export.svg.status",
+                    "job.export.svg.cancel"
+                  ]
+                },
+                "payload": {
+                  "$ref": "#/$defs/JobIdPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "job.export.media.begin"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ExportMediaBeginPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "enum": [
+                    "job.export.media.status",
+                    "job.export.media.cancel"
+                  ]
+                },
+                "payload": {
+                  "$ref": "#/$defs/JobIdPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.brush.bitmap.publish"
+                },
+                "payload": {
+                  "$ref": "native-bitmap-brush-resources-v1.schema.json#/$defs/Publish"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.brush.bitmap"
+                },
+                "payload": {
+                  "$ref": "native-bitmap-brush-resources-v1.schema.json#/$defs/Query"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.asset.font.import"
                 },
                 "payload": {
@@ -2558,6 +5793,57 @@
                 },
                 "payload": {
                   "$ref": "native-object-item-v1.schema.json#/$defs/AssetRemove"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.vector.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectVectorEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.parametric.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectParametricPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.path.effects.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPathEffectsPayload"
                 }
               }
             }
@@ -3336,10 +6622,22 @@
               "$ref": "#/$defs/ObjectLayerCreateResult"
             },
             {
+              "$ref": "#/$defs/ObjectImportBatchResult"
+            },
+            {
               "$ref": "#/$defs/ObjectLayerTimingResult"
             },
             {
               "$ref": "#/$defs/ObjectPropertyMetadataResult"
+            },
+            {
+              "$ref": "native-bitmap-brush-resources-v1.schema.json#/$defs/PublishResult"
+            },
+            {
+              "$ref": "native-bitmap-brush-resources-v1.schema.json#/$defs/InspectResult"
+            },
+            {
+              "$ref": "native-bitmap-brush-resources-v1.schema.json#/$defs/SceneResult"
             },
             {
               "$ref": "#/$defs/CommandResult"
@@ -3367,6 +6665,9 @@
             },
             {
               "$ref": "native-object-item-v1.schema.json#/$defs/ItemEditResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectVectorEditResult"
             }
           ]
         },

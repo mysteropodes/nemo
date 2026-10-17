@@ -37,6 +37,15 @@ use serde_json::{json, Number};
 #[path = "object_image_mesh_edit.rs"]
 mod object_image_mesh_edit;
 pub(crate) use object_image_mesh_edit::PreparedImageMeshEdit;
+// L03-O (#2109): rig edit transactions (I12), a sibling of the settings edit under the same private owner.
+#[path = "object_rig_edit.rs"]
+mod object_rig_edit;
+pub(crate) use object_rig_edit::PreparedRigEdit;
+// L03-Q (#2109): reset / commit pose (I13), a sibling of the settings edit under the same private owner.
+#[path = "object_rig_pose_commit.rs"]
+#[allow(dead_code)]
+mod object_rig_pose_commit;
+pub(crate) use object_rig_pose_commit::PreparedRigPose;
 #[path = "object_widget_settings.rs"]
 mod settings;
 

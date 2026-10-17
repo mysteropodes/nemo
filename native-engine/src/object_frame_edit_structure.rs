@@ -25,6 +25,12 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use std::collections::HashSet;
 
+// L05-G (#2111): layer range records follow the frame-structure edits (F5 and single-frame removal shift them).
+#[path = "object_frame_edit_range_join.rs"]
+#[allow(dead_code)]
+mod object_frame_edit_range_join;
+use object_frame_edit_range_join::{join_document_ranges, StructureEdit};
+
 const MAX_PAYLOAD_BYTES: usize = 4096;
 /// The baseline frame-count field (`#tl-total`) tops out at 999; one extend request never adds more.
 const MAX_EXTEND: u32 = 999;
@@ -229,12 +235,12 @@ fn pad_all(document: &ObjectDocument) -> Result<DocumentEdit, DispatchErrorCode>
     finish(next)
 }
 
-fn insert(
-    document: &ObjectDocument,
-    cell: u32,
-    selected: Option<&[String]>,
-) -> Result<DocumentEdit, DispatchErrorCode> {
-    check_cell(document, cell)?;
+/// The layers an F5 really splices: the selected (or every) layer once all named layers are known, minus the
+/// locked ones. The splice and the range join both use this one list.
+fn insert_targets<'a>(
+    document: &'a ObjectDocument,
+    selected: Option<&'a [String]>,
+) -> Result<Vec<&'a str>, DispatchErrorCode> {
     let mut targets: Vec<&str> = match selected {
         Some(list) => list.iter().map(String::as_str).collect(),
         None => all_uids(document),
@@ -254,6 +260,16 @@ fn insert(
             .iter()
             .any(|layer| layer.layer_uid.as_str() == *uid && !is_locked(layer))
     });
+    Ok(targets)
+}
+
+fn insert(
+    document: &ObjectDocument,
+    cell: u32,
+    selected: Option<&[String]>,
+) -> Result<DocumentEdit, DispatchErrorCode> {
+    check_cell(document, cell)?;
+    let targets = insert_targets(document, selected)?;
     if targets.is_empty() {
         return if selected.is_some() {
             Err(DispatchErrorCode::Unavailable)
@@ -352,6 +368,43 @@ fn plan(
     }
 }
 
+/// F11 (L05-G): the layer range records ride along with a changed edit. `before` is the document the edit was
+/// planned on, `after` its result; a layer without a `range` is left without one.
+fn with_ranges(
+    before: &ObjectDocument,
+    after: ObjectDocument,
+    operation: &FrameOperation,
+) -> Result<ObjectDocument, DispatchErrorCode> {
+    let total = before.total_frames;
+    match operation {
+        FrameOperation::Insert { cell, layers } => {
+            let targeted = insert_targets(before, layers.as_deref())?;
+            let edit = StructureEdit::Insert {
+                cell: *cell,
+                targeted: &targeted,
+            };
+            join_document_ranges(after, total, &edit)
+        }
+        FrameOperation::Extend { cell, count } => {
+            let edit = StructureEdit::Extend {
+                cell: *cell,
+                count: *count,
+            };
+            join_document_ranges(after, total, &edit)
+        }
+        FrameOperation::Duplicate { cell, .. } => {
+            join_document_ranges(after, total, &StructureEdit::Duplicate { cell: *cell })
+        }
+        FrameOperation::Remove { from, to } => {
+            let edit = StructureEdit::Remove {
+                from: *from,
+                to: *to,
+            };
+            join_document_ranges(after, total, &edit)
+        }
+    }
+}
+
 /// Detached, non-Clone candidate sealed to the snapshot it was prepared from; only this file can build one.
 /// `document` is `None` for a semantic no-op, which publishes nothing and keeps redo.
 #[derive(Debug)]
@@ -380,7 +433,7 @@ impl ObjectFillOwner {
         let operation = payload.operation()?;
         let origin = self.current_snapshot();
         let document = match plan(origin.document(), &operation)? {
-            DocumentEdit::Changed(next) => Some(next),
+            DocumentEdit::Changed(next) => Some(with_ranges(origin.document(), next, &operation)?),
             DocumentEdit::NoChange => None,
         };
         Ok(PreparedFrameStructure {

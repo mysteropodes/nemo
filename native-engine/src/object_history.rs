@@ -40,6 +40,9 @@ mod layer_lifecycle;
 // L02-G (#2108): group / ungroup / combine / mode / rename as owner transactions.
 #[path = "object_group_history.rs"]
 mod group_history;
+// L04-M (#2110): lane-4 setup / convert operations as one history transaction.
+#[path = "object_component_convert_history.rs"]
+mod object_component_convert_history;
 // L08-J (#2114): layer compositing edits and kind-layer creation as owner transactions.
 #[path = "scene_effect_layer_history.rs"]
 mod scene_effect_layer_history;
@@ -55,13 +58,25 @@ mod object_exposure_edit_key;
 // L05-E (lane #2111): key retime (moveKeyframe) transaction.
 #[path = "object_exposure_edit_retime_history.rs"]
 mod object_exposure_edit_retime;
+// L03-Q (#2109): reset / commit rig pose (I13) as owner transactions.
+#[path = "object_rig_pose_history.rs"]
+mod object_rig_pose_history;
+// L03-O (#2109): rig bone / bind / weight / IK edits (I12) as owner transactions.
+#[path = "object_rig_edit_history.rs"]
+mod object_rig_edit_history;
 // L05-J1 (lane #2111): Repeat Selection transaction (repeatSelection).
 #[path = "object_frame_clipboard_repeat_history.rs"]
 mod object_frame_clipboard_repeat;
+// L05-J2 (lane #2111): cross-context frame clipboard entry point; its tests also carry the Motion-track join with L05-J1.
+#[path = "object_frame_clipboard_tracks_history.rs"]
+mod object_frame_clipboard_tracks;
 // L09-H (#2115): placement edits as one history transaction (G42, I16b).
 #[path = "object_media_link_history.rs"]
 #[allow(dead_code)]
 mod object_media_link_history;
+// L01-G (#2107): parameter edit and path-effect stack edit as history transactions (G22, G13).
+#[path = "object_parametric_edit_history.rs"]
+mod object_parametric_edit_history;
 // L10-B (#2124): lane-10 shot/montage/import family aggregator.
 #[path = "object_shot_kernels.rs"]
 #[allow(dead_code)]

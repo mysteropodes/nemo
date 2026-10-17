@@ -109,6 +109,14 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     ))
     .unwrap();
     assert_eq!(command_schema["$defs"]["nativeObjectItem"], native_items);
+    let native_brush: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-bitmap-brush-resources-v1.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        command_schema["$defs"]["nativeBitmapBrushResources"],
+        native_brush
+    );
     assert_eq!(command_schema["type"], "object");
     for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
         assert!(

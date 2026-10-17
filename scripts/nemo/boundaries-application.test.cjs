@@ -234,7 +234,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 108, 109, 110, 154, 201, 205, 206, 207, 208, 209, 210, 211, 212]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 118, 119, 120, 163, 213, 231, 232, 233, 234, 237, 238, 239, 240]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -242,10 +242,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 151);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 152);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 153);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 155);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 160);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 161);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 162);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 164);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
@@ -352,14 +352,14 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
   const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
   assert.equal(runtime.length, 1); assert.equal(data.length, 1);
-  assert.equal(runtime[0].ordinal, 96); assert.equal(data[0].ordinal, 97);
+  assert.equal(runtime[0].ordinal, 107); assert.equal(data[0].ordinal, 108);
   assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 96);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 107);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};

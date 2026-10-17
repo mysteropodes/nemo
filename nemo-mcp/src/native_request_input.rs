@@ -61,23 +61,55 @@ impl NativeApplicationRequest {
                 ));
             }
         }
+        if crate::native_contract::object_rig::admitted(&self.operation) {
+            if self.expected_revision.is_none() {
+                return Err(RequestError::InvalidRequest(
+                    "native object rig command requires expectedRevision".into(),
+                ));
+            }
+            if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+                return Err(RequestError::InvalidRequest(
+                    "native object rig command does not match its declared contract".into(),
+                ));
+            }
+        }
+        if crate::native_contract::object_component::admitted(&self.operation) {
+            if self.expected_revision.is_none() {
+                return Err(RequestError::InvalidRequest(
+                    "native component command requires expectedRevision".into(),
+                ));
+            }
+            if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+                return Err(RequestError::InvalidRequest(
+                    "native component command does not match its declared contract".into(),
+                ));
+            }
+        }
         if matches!(
             self.operation.as_str(),
             "command.document.object.layer.visibility.set"
                 | crate::native_contract::layer_policy::OP
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
+                | crate::native_contract::brush::PUBLISH
                 | crate::native_contract::font::IMPORT
                 | crate::native_contract::item::ITEM
                 | crate::native_contract::item::ATTACH
                 | crate::native_contract::item::REMOVE
+                | crate::native_contract::vector::VECTOR
+                | crate::native_contract::vector::PARAMETRIC
+                | crate::native_contract::vector::EFFECTS
         ) {
             let action = if self.operation == crate::native_contract::font::IMPORT {
                 "font import"
             } else if crate::native_contract::item::owns(&self.operation) {
                 "item or asset"
+            } else if crate::native_contract::vector::owns(&self.operation) {
+                "vector"
             } else if self.operation == crate::native_contract::layer_policy::OP {
                 "layer policy"
+            } else if self.operation == crate::native_contract::brush::PUBLISH {
+                "brush publication"
             } else if self.operation.ends_with(".settings.edit") {
                 "project settings"
             } else if self.operation.ends_with(".create") {
@@ -94,6 +126,30 @@ impl NativeApplicationRequest {
                 return Err(RequestError::InvalidRequest(format!(
                     "native object {action} command does not match its declared contract"
                 )));
+            }
+        }
+        if crate::native_contract::frame_edit::declares(&self.operation) {
+            if self.expected_revision.is_none() {
+                return Err(RequestError::InvalidRequest(
+                    "native object frame edit command requires expectedRevision".into(),
+                ));
+            }
+            if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+                return Err(RequestError::InvalidRequest(
+                    "native object frame edit command does not match its declared contract".into(),
+                ));
+            }
+        }
+        if crate::native_contract::import::admitted(&self.operation) {
+            if self.expected_revision.is_none() {
+                return Err(RequestError::InvalidRequest(
+                    "native object import command requires expectedRevision".into(),
+                ));
+            }
+            if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+                return Err(RequestError::InvalidRequest(
+                    "native object import command does not match its declared contract".into(),
+                ));
             }
         }
         if !self.payload.is_object() {

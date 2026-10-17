@@ -64,6 +64,15 @@ pub(crate) use object_exposure_edit_key::PreparedExposureKey;
 #[path = "object_exposure_edit_retime.rs"]
 mod object_exposure_edit_retime;
 pub(crate) use object_exposure_edit_retime::PreparedExposureRetime;
+// L05-J2 (lane #2111): Motion-track half of Repeat Selection and the cross-context frame clipboard port (F13).
+#[path = "object_frame_clipboard_tracks.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_tracks;
+#[path = "object_frame_clipboard_tracks_context.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_tracks_context;
+#[allow(unused_imports)]
+pub(crate) use object_frame_clipboard_tracks_context::ClipboardContexts;
 // L05-J1 (lane #2111): sealed Repeat Selection transaction (repeatSelection). Imports L05-I's helpers and L05-B's kernel.
 #[path = "object_frame_clipboard_repeat.rs"]
 #[allow(dead_code)]
@@ -80,7 +89,9 @@ pub(crate) use object_frame_clipboard_repeat_wire::repeat_payload;
 // L03-M (#2109): widget (rig control) transactions; the settings edit is a child of this module.
 #[path = "object_widget_edit.rs"]
 mod widget_edit;
-pub(crate) use widget_edit::{PreparedImageMeshEdit, PreparedWidgetEdit};
+pub(crate) use widget_edit::{
+    PreparedImageMeshEdit, PreparedRigEdit, PreparedRigPose, PreparedWidgetEdit,
+};
 // L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_asset_owner.rs"]
@@ -103,6 +114,14 @@ pub(crate) use vector_edit::order::{
 #[path = "object_layer_policy_edit.rs"]
 mod layer_policy_edit;
 pub(crate) use layer_policy_edit::PreparedLayerPolicy;
+#[path = "object_component_owner_kernels.rs"]
+pub(crate) mod component_owner;
+// L01-G (#2107): sealed parameter edit of a dynamic shape (rect/ellipse/star set, translate, scale) and sealed
+// replacement of a layer's ordered path-effect stack. Both read the vector edit's guards (`vector_edit::check_*`).
+#[path = "object_parametric_edit.rs"]
+mod parametric_edit;
+#[path = "object_path_effects_edit.rs"]
+mod path_effects_edit;
 #[path = "scene_effect_layer_edit.rs"]
 pub(crate) mod scene_effect_layer_edit;
 #[path = "object_selection_edit_ops.rs"]

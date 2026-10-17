@@ -43,6 +43,17 @@ pub(crate) mod object_scene_producer_component;
 #[allow(dead_code)]
 pub(crate) mod object_scene_producer_component_shape;
 
+// L07-J (#2113): bitmap-brush scene producer (anchor camouflage, trim re-bake slot, producer join).
+#[path = "object_scene_producer_brush.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_brush;
+#[path = "object_scene_producer_brush_anchor.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_brush_anchor;
+#[path = "object_scene_producer_brush_slot.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_brush_slot;
+
 // L07-L (#2113): rig-posed stroke and image-mesh producer (I16a, G03a) joined through the L07-C registry.
 #[path = "object_scene_producer_rig.rs"]
 #[allow(dead_code)]

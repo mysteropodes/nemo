@@ -146,6 +146,16 @@ impl ObjectRecord {
     pub(crate) fn vector(&self) -> Option<&VectorBody> {
         self.vector.value()
     }
+    /// A pressure ribbon (the baseline `isVectorBrush`): its `vectorExt` carries the pressure fields. The
+    /// centreline and width profile are stored beside the outline in `geometry.segments`, so an edit that
+    /// moves only the outline leaves them stale; L01-G (`object_parametric_edit.rs`) refuses it by the same
+    /// test (`vectorExt.pressure` present), and so do the rig writers.
+    #[allow(dead_code)]
+    pub(crate) fn is_pressure_ribbon(&self) -> bool {
+        self.vector_ext
+            .value()
+            .is_some_and(|ext| ext.pressure.value().is_some())
+    }
 }
 impl SolidFill {
     pub(crate) fn valid_channels(&self) -> bool {

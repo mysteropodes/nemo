@@ -1,0 +1,174 @@
+/* L04-N component intents over the single native application client: convert, place and expose are each ONE closed
+ * typed request (command.document.object.component.*) pinned to the presented revision; the read model, the
+ * StoryBoard chain and entering a component go through injected native ports and the real workspace tab. There is no
+ * JS fallback writer: convertLayerToComponent, convertLayersToComponent, placeComponentInstance,
+ * exposeSymbolProperty, enterSymbol, exitToScene and the storyboard.js state are never called or read here, and
+ * animating a flat layer never converts it (conversion is only ever an explicit request). */
+(function (root, factory) {
+  const commonjs = typeof module === 'object' && module.exports;
+  const contract = commonjs ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract;
+  const core = commonjs ? require('./native-object-component-intent.js') : root.NemoNativeObjectComponentIntent;
+  const api = factory(contract, core);
+  if (commonjs) module.exports = api;
+  else root.NemoNativeObjectComponent = api;
+}(typeof globalThis === 'object' ? globalThis : this, function (contract, core) {
+  'use strict';
+
+  const SCENE = 'scene-root';
+  const OP = (suffix) => contract.PREFIX + suffix;
+  const fail = core.failure;
+  const has = (value, key) => !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
+
+  // `expose()` of src/js/domain/component/exposed-properties.js at the baseline, key line verbatim:
+  // 'ep_' + clock().toString(36) + '_' + random().toString(36).slice(2, 6). The clock and the random source are injected.
+  function exposedKey(clock, random) {
+    return 'ep_' + clock().toString(36) + '_' + random().toString(36).slice(2, 6);
+  }
+  // A detached, frozen copy: a caller can never mutate what a native reader returned.
+  function detach(value) {
+    const copy = JSON.parse(JSON.stringify(value));
+    (function freeze(node) {
+      if (node && typeof node === 'object' && !Object.isFrozen(node)) { Object.freeze(node); Object.values(node).forEach(freeze); }
+    }(copy));
+    return copy;
+  }
+
+  // ports: pin(), declared(operation), submit(request, pin), requestId(label).
+  // hooks (all optional, each absent one is typed unavailability, never a legacy path):
+  //   clock() -> ms, random() -> [0, 1)      key material of a new exposed property (default Date.now / Math.random)
+  //   activeContext() -> context id          the context the user is working in (default 'scene-root', the only context presented today)
+  //   model.read() -> promise of the native component read model ({contexts: [{contextId}], storyboard?})
+  //   tabs {active(), enter(contextId), exit()}   the real workspace tab strip
+  //   splitPlan(contextId) -> promise of an array, one entry per layer the entry would split (empty = already idempotent)
+  function createComponentIntent(ports, hooks) {
+    hooks = hooks || {};
+    const runner = core.createIntentRunner(ports);
+    const clock = typeof hooks.clock === 'function' ? hooks.clock : () => Date.now();
+    const random = typeof hooks.random === 'function' ? hooks.random : () => Math.random();
+
+    function currentIds() { try { return core.layerIds(ports.pin()); } catch (_) { return null; } }
+    function contextNow() {
+      let value = SCENE;
+      try { if (typeof hooks.activeContext === 'function') value = hooks.activeContext(); } catch (_) { value = SCENE; }
+      return typeof value === 'string' ? value : SCENE;
+    }
+
+    // convertLayerToComponent (one layer, in place) / convertLayersToComponent (several, merged at the first slot).
+    // The native plan sorts and de-duplicates by document order; the adapter sends the document order itself.
+    function convert(layerUids) {
+      return runner.exclusive(async (exec) => {
+        const operation = OP('component.convert');
+        if (!Array.isArray(layerUids) || !layerUids.length || !layerUids.every((uid) => typeof uid === 'string' && uid.length)) {
+          return fail(operation, 'invalid_request', { reason: 'layerUids must name at least one layer' });
+        }
+        const wanted = layerUids.filter((uid, at) => layerUids.indexOf(uid) === at);
+        const ids = currentIds();
+        if (ids) {
+          const gone = core.stale(wanted, ids);
+          if (gone.length) return fail(operation, 'stale_selection', { ids: gone });
+          wanted.sort((a, b) => ids.indexOf(a) - ids.indexOf(b));
+        }
+        const outcome = await exec(operation, { contextId: contextNow(), layerUids: wanted }, 'component-convert');
+        // A merge reports the instance it minted; a single layer becomes the instance in place.
+        return outcome.ok ? Object.freeze(Object.assign({}, outcome, { instanceLayerUid: outcome.layerUid || wanted[0], merged: wanted.length > 1 })) : outcome;
+      });
+    }
+
+    // placeComponentInstance(symId, layerName): a new locked layer that instantiates an existing component.
+    function place(symbolId, name) {
+      return runner.run(OP('component.place'), { symbolId, name }, 'component-place');
+    }
+
+    // exposeSymbolProperty(symId, targetStrokeId, targetField, label, defaultVal). `defaultValue` undefined stays absent.
+    function expose(symbolId, targetStrokeId, targetField, label, defaultValue) {
+      let key;
+      try { key = exposedKey(clock, random); } catch (error) {
+        return Promise.resolve(fail(OP('component.expose'), 'invalid_request', { reason: String(error && error.message || error) }));
+      }
+      const input = { symbolId, key, targetStrokeId, targetField, label };
+      if (defaultValue !== undefined) input.default = defaultValue;
+      return runner.run(OP('component.expose'), input, 'component-expose');
+    }
+
+    // The same typed refusal, reported under the operation the caller asked for.
+    function refail(operation, failed) { return fail(operation, failed.code, { reason: failed.reason, message: failed.message }); }
+    async function readModel() {
+      const operation = 'component.model';
+      if (!hooks.model || typeof hooks.model.read !== 'function') return fail(operation, 'unavailable', { reason: 'component_read_unavailable' });
+      let model;
+      try { model = await hooks.model.read(); } catch (error) { return fail(operation, 'unavailable', { reason: 'component_read_failed', message: String(error && error.message || error) }); }
+      if (!model || typeof model !== 'object' || Array.isArray(model)) return fail(operation, 'unavailable', { reason: 'component_read_invalid' });
+      return Object.freeze({ ok: true, operation, model: detach(model) });
+    }
+    // StoryBoard thumbnails and montage read the native chain mapping, never the storyboard.js state.
+    async function storyboard() {
+      const read = await readModel();
+      if (!read.ok) return refail('component.storyboard', read);
+      if (!has(read.model, 'storyboard') || read.model.storyboard === null || typeof read.model.storyboard !== 'object') {
+        return fail('component.storyboard', 'unavailable', { reason: 'storyboard_read_unavailable' });
+      }
+      return Object.freeze({ ok: true, operation: 'component.storyboard', storyboard: read.model.storyboard });
+    }
+
+    function tabsOk() {
+      const tabs = hooks.tabs;
+      return !!tabs && typeof tabs.active === 'function' && typeof tabs.enter === 'function' && typeof tabs.exit === 'function';
+    }
+    // The idempotent element split of the entry. A plan with no entry changes nothing; applying a non-empty plan needs a
+    // component-scope split transaction that does not exist yet, so it is reported, never faked.
+    async function splitOnEntry(contextId) {
+      if (typeof hooks.splitPlan !== 'function') return Object.freeze({ state: 'unavailable', reason: 'split_plan_unavailable' });
+      let plan;
+      try { plan = await hooks.splitPlan(contextId); } catch (_) { return Object.freeze({ state: 'unavailable', reason: 'split_plan_failed' }); }
+      if (!Array.isArray(plan)) return Object.freeze({ state: 'unavailable', reason: 'split_plan_invalid' });
+      if (!plan.length) return Object.freeze({ state: 'none', planned: 0 });
+      return Object.freeze({ state: 'unavailable', reason: 'component_split_transaction_absent', planned: plan.length });
+    }
+    // enterComponentLayer / enterSymbol: the component opens as a real context in the real tab strip of the single document.
+    async function enter(contextId) {
+      const operation = 'workspace.enter';
+      if (typeof contextId !== 'string' || !contextId.length) return fail(operation, 'invalid_request', { reason: 'contextId must be a non-empty string' });
+      if (!tabsOk()) return fail(operation, 'unavailable', { reason: 'workspace_tab_unavailable' });
+      const read = await readModel();
+      if (!read.ok) return refail(operation, read);
+      const contexts = read.model.contexts;
+      if (!Array.isArray(contexts)) return fail(operation, 'unavailable', { reason: 'component_contexts_unavailable' });
+      if (contextId === SCENE || !contexts.some((entry) => entry && entry.contextId === contextId)) return fail(operation, 'not_found', { reason: 'unknown_context' });
+      let active;
+      try { active = hooks.tabs.active(); } catch (_) { return fail(operation, 'unavailable', { reason: 'workspace_tab_unavailable' }); }
+      if (active === contextId) return Object.freeze({ ok: true, operation, entered: false, reason: 'already_active', contextId });
+      // Nested components are refused, as the baseline (and the native owner) refuse them: close the open one first.
+      if (active !== SCENE) return fail(operation, 'unavailable', { reason: 'nested_context', message: 'Close the component first.' });
+      try { await hooks.tabs.enter(contextId); } catch (error) { return fail(operation, 'workspace_failed', { message: String(error && error.message || error) }); }
+      return Object.freeze({ ok: true, operation, entered: true, contextId, split: await splitOnEntry(contextId) });
+    }
+    // exitToScene: back to the scene root through the same tab strip.
+    async function exit() {
+      const operation = 'workspace.exit';
+      if (!tabsOk()) return fail(operation, 'unavailable', { reason: 'workspace_tab_unavailable' });
+      let active;
+      try { active = hooks.tabs.active(); } catch (_) { return fail(operation, 'unavailable', { reason: 'workspace_tab_unavailable' }); }
+      if (active === SCENE) return Object.freeze({ ok: true, operation, exited: false, reason: 'already_scene' });
+      try { await hooks.tabs.exit(); } catch (error) { return fail(operation, 'workspace_failed', { message: String(error && error.message || error) }); }
+      return Object.freeze({ ok: true, operation, exited: true, contextId: SCENE });
+    }
+    return Object.freeze({
+      convert, convertLayer: (layerUid) => convert([layerUid]), place, expose,
+      readModel, storyboard, enter, exit,
+    });
+  }
+
+  const bindings = new WeakMap();
+  // The presented desktop Project session -> intents. Null while the native Project session does not own the document.
+  function desktop(host, hooks) {
+    const project = host && host.NemoNativeObjectProject;
+    const session = project && typeof project.desktop === 'function' ? project.desktop(host) : null;
+    if (!session || typeof session.blocksLegacy !== 'function' || !session.blocksLegacy()) return null;
+    if (!bindings.has(host)) bindings.set(host, createComponentIntent(core.portsFromSession(session), hooks));
+    return bindings.get(host);
+  }
+  return Object.freeze({
+    createComponentIntent, desktop, exposedKey,
+    OPERATIONS: Object.freeze(['component.convert', 'component.place', 'component.expose'].map(OP)),
+  });
+}));

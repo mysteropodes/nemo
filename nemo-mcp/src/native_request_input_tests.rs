@@ -315,3 +315,35 @@ fn typed_deserialization_stays_closed_and_does_not_replace_raw_ingress() {
     );
     assert!(serde_json::from_value::<NativeApplicationRequest>(json!([])).is_err());
 }
+
+#[test]
+fn import_input_requires_a_revision_and_its_declared_payload_before_availability() {
+    let operation = "command.document.object.import.batch";
+    let example = &crate::capabilities::native_catalog()
+        .capability_for_operation(operation)
+        .expect("declared")["examples"][0];
+    let base: NativeApplicationRequest =
+        serde_json::from_value(example["request"].clone()).unwrap();
+    assert_eq!(base.operation, operation);
+    assert!(base.validate_input().is_ok());
+    assert!(base.validate().is_ok());
+
+    let mut missing_revision = base.clone();
+    missing_revision.expected_revision = None;
+    same_failure(
+        &missing_revision,
+        "invalid_request",
+        "native object import command requires expectedRevision",
+    );
+    let mut open = base.clone();
+    open.payload["unexpected"] = json!(true);
+    let mut foreign_command = base;
+    foreign_command.payload["command"] = json!("object.import.other");
+    for request in [&open, &foreign_command] {
+        same_failure(
+            request,
+            "invalid_request",
+            "native object import command does not match its declared contract",
+        );
+    }
+}

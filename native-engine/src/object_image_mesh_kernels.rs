@@ -36,6 +36,26 @@ pub(crate) mod rig_pose_deform;
 #[path = "rig_pose_deform_anchor.rs"]
 #[allow(dead_code)]
 pub(crate) mod rig_pose_deform_anchor;
+// L03-S (#2109, F17/F18/F19): document-facing halves of the image-mesh scene and export join
+// (geometry from the stored mesh, export routing, meshId truthiness, widget slots).
+#[path = "render_image_mesh_scene_policy.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_image_mesh_scene_policy;
+#[path = "render_image_mesh_scene_source.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_image_mesh_scene_source;
+// L03-R (#2109, F17/F18): image-mesh / raster binding kernel (propagate, attach, detach, refcount release,
+// duplicate-layer remap, video-layer mesh id behind the typed VideoFamily port).
+#[path = "object_image_mesh_binding.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_image_mesh_binding;
+#[path = "object_image_mesh_binding_ops.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_image_mesh_binding_ops;
+// L03-P (#2109): pinned rig pose evaluation join (stored rig + snapshot -> detached posed geometry).
+#[path = "rig_pose_eval.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_pose_eval;
 #[path = "rig_pose_nearest.rs"]
 #[allow(dead_code)]
 pub(crate) mod rig_pose_nearest;

@@ -1,6 +1,7 @@
 //! D2 headless object pixels on the existing compositor; never presentation.
 use crate::compositor::object_target::ObjectTarget;
 use crate::compositor::scene_effect_gpu_blend::GpuLayerStack;
+use crate::compositor::scene_effect_scene_join_stack::{select_composition_path, PathSelection};
 use crate::compositor::{align_to, Compositor, CompositorError};
 use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
 use crate::object_render_scene::{
@@ -146,8 +147,28 @@ impl Compositor {
         check_live(live, prepared)?;
         let (width, height) = prepared.dimensions();
         let output = ObjectOutputSpec::new(width, height, "project-srgb-normal-rgba8-area")?;
+        // L08-K: a witness that carries its joined scene-effect plan paints through the layered entry when that
+        // plan is layered; an incomplete plan is refused here, a flat plan and a witness with no plan keep the
+        // accepted fast path unchanged.
+        let pixels = match prepared.composition().scene_effects() {
+            Some(effects) => {
+                let selected = select_composition_path(effects, prepared.composition().plan())
+                    .map_err(|error| {
+                        CompositorError::new(format!(
+                            "scene composition path unavailable: {error:?}"
+                        ))
+                    })?;
+                match selected {
+                    PathSelection::Layered(stack) => {
+                        self.compose_object_layered(prepared.composition(), output, &stack)?
+                    }
+                    PathSelection::Flat => self.compose_object(prepared.composition(), output)?,
+                }
+            }
+            None => self.compose_object(prepared.composition(), output)?,
+        };
         Ok(ScheduledObjectCompositionResult {
-            pixels: self.compose_object(prepared.composition(), output)?,
+            pixels,
             prepared: prepared.clone(),
         })
     }
@@ -448,6 +469,11 @@ pub(super) mod scheduled_tests;
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_project_background.rs"]
 mod project_background_tests;
+
+// L07-J (#2113): Metal readback of the brush producer's pinned scene (inside the compositor tree for the private scene/target).
+#[cfg(test)]
+#[path = "../tests/object_scene_producer_brush_ink.rs"]
+mod object_scene_producer_brush_ink_tests;
 
 // L07-I: Metal readback of the typed scene style through this module's private scene and target.
 #[cfg(test)]
