@@ -312,3 +312,136 @@ fn serde_native_request_encoding_matches_shared_fingerprint_vectors() {
         );
     }
 }
+
+// Linked records are deliberately unavailable resources, not transport failures.
+fn linked_state() -> ApplicationMcp {
+    let source = state();
+    let mut project: Value = serde_json::from_slice(&save(&source)).unwrap();
+    project["formatVersion"] = json!(2);
+    project["assets"] = json!([{"id":" legacy font / 雪 #1 ","name":"  Linked Font 雪  ",
+        "kind":"font","source":{"kind":"linked","locator":"opaque://must-not-resolve/font/雪?literal=%2F#asset "}}]);
+    project["assetInventory"] = json!({"assetIds":[" legacy font / 雪 #1 "],"placements":[]});
+    let linked = ApplicationMcp::default();
+    linked
+        .install_native_project_file(&serde_json::to_vec(&project).unwrap())
+        .unwrap();
+    linked
+}
+fn linked_read(state: &ApplicationMcp, action: &str, asset: &str) -> NativeApplicationRequest {
+    let pin = info(state);
+    let mut payload = json!({"action":action,"atRevision":pin["contentRevision"],
+        "documentSnapshotId":pin["documentSnapshotId"],"assetId":asset});
+    if action == "read" {
+        payload["offset"] = json!(0);
+        payload["length"] = json!(1);
+    }
+    let mut request = query(state, payload);
+    request.request_id = format!("linked-{action}");
+    request
+}
+fn assert_linked_refusal(
+    state: &ApplicationMcp,
+    request: &NativeApplicationRequest,
+    response: &nemo_mcp::contract::NativeApplicationResponse,
+    code: &str,
+) {
+    assert_eq!(response.api_version, 2);
+    assert_eq!(response.request_id, request.request_id);
+    assert_eq!(response.instance_id, state.instance_id());
+    assert_eq!(response.document_id, request.document_id);
+    assert_eq!(response.content_revision, 0);
+    assert!(!response.ok);
+    assert!(response.result.is_none());
+    assert_eq!(response.error.as_ref().unwrap().code, code);
+    assert_eq!(
+        response.error.as_ref().unwrap().message,
+        "native font read refused"
+    );
+    assert!(serde_json::to_value(response)
+        .unwrap()
+        .get("result")
+        .is_none());
+    assert!(serde_json::to_vec(response).unwrap().len() <= 4096);
+}
+#[tokio::test]
+async fn linked_read_refusal_is_typed_correlated_and_does_not_resolve_or_mutate() {
+    let state = linked_state();
+    let original = save(&state);
+    let pin = info(&state);
+    for (action, asset, code) in [
+        ("read", " legacy font / 雪 #1 ", "unavailable"),
+        ("inspect", "missing-font", "not_found"),
+    ] {
+        let request = linked_read(&state, action, asset);
+        let native = state.native_state();
+        let delivery = state
+            .revisions
+            .dispatch_font_using(
+                state.instance_id(),
+                &native,
+                request.clone(),
+                false,
+                |_| async {
+                    panic!("immutable linked query must never invoke source resolver");
+                    #[allow(unreachable_code)]
+                    Ok(FontBytes::Bundled(FONT))
+                },
+            )
+            .await
+            .expect("typed owner refusal must not escape as transport error");
+        assert!(delivery.notification.is_none());
+        assert_linked_refusal(&state, &request, &delivery.response, code);
+        assert_eq!(info(&state), pin);
+        assert_eq!(save(&state), original);
+    }
+    let response = state
+        .dispatch_native_async(linked_read(&state, "inspect", " legacy font / 雪 #1 "))
+        .await
+        .unwrap();
+    assert!(response.ok);
+    let font = &response.result.as_ref().unwrap()["font"];
+    assert_eq!(font["assetId"], " legacy font / 雪 #1 ");
+    assert_eq!(font["name"], "  Linked Font 雪  ");
+    assert_eq!(font["available"], false);
+    assert_eq!(font["reason"], "linked_font_unavailable");
+    assert_eq!(info(&state), pin);
+    assert_eq!(save(&state), original);
+}
+#[tokio::test]
+async fn linked_read_refusal_reaches_public_native_socket_without_revision_publication() {
+    use std::time::Duration;
+    use tokio::net::{TcpListener, TcpStream};
+    let state = linked_state();
+    let request = linked_read(&state, "read", " legacy font / 雪 #1 ");
+    let original = save(&state);
+    let pin = info(&state);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let mut client = TcpStream::connect(listener.local_addr().unwrap())
+        .await
+        .unwrap();
+    let (mut server, _) = listener.accept().await.unwrap();
+    let native = state.native_state();
+    let serve = crate::application_mcp::revision_sync::serve_native(
+        &mut server,
+        state.instance_id(),
+        &native,
+        &state.revisions,
+        request.clone(),
+        |_| -> Result<(), String> { panic!("immutable refusal must not publish revision event") },
+        Duration::from_secs(2),
+    );
+    let receive = async {
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            nemo_mcp::wire::read_json::<nemo_mcp::contract::NativeApplicationResponse>(&mut client),
+        )
+        .await
+        .expect("correlated refusal must be written promptly")
+        .expect("transport closure/malformed response is not an accepted refusal")
+    };
+    let (served, response) = tokio::join!(serve, receive);
+    served.expect("public native serve must write typed linked refusal");
+    assert_linked_refusal(&state, &request, &response, "unavailable");
+    assert_eq!(info(&state), pin);
+    assert_eq!(save(&state), original);
+}

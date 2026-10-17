@@ -274,15 +274,14 @@ fn invoke_dispatch(
     let native_request: OpacityRequest =
         serde_json::from_value(serde_json::to_value(request).map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
-    let response = if request.operation == crate::application_mcp::font_source::QUERY {
-        application
+    if request.operation == crate::application_mcp::font_source::QUERY {
+        return application
             .as_any_mut()
             .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
             .ok_or("native font owner unavailable")?
-            .font_read(&native_request)?
-    } else {
-        application.dispatch(native_request)?
-    };
+            .font_read(&native_request);
+    }
+    let response = application.dispatch(native_request)?;
     serde_json::from_value(serde_json::to_value(response).map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())
 }
