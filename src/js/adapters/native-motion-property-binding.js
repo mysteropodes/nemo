@@ -44,7 +44,7 @@
       else{selected=base.indices.map(function(i){return Object.freeze({contextId:contextId,layerUid:base.info.layers[i].layerUid});});primary=base.info.layers.length?Object.freeze({contextId:contextId,layerUid:base.info.layers[base.active].layerUid}):null;}
       var seen=new Set();if(primary&&primary.contextId!==contextId)return null;
       for(var t of selected){if(t.contextId!==contextId||seen.has(key(t)))return null;seen.add(key(t));}
-      return Object.freeze({session:base.session,info:base.info,identity:base.identity,context:base.context,contextId:contextId,selected:Object.freeze(selected),primary:primary});
+      return Object.freeze({session:base.session,info:base.info,identity:base.identity,context:base.context,token:base.token,contextId:contextId,selected:Object.freeze(selected),primary:primary});
     }
     function clearWait(){if(waiting){waiting.button.removeEventListener('click',cancel);if(waiting.node.parentNode===options.container)options.container.removeChild(waiting.node);waiting=null;}}
     function showWait(message,cancellable){if(waiting&&waiting.node.parentNode===options.container&&waiting.cancellable===cancellable){waiting.label.textContent=message;return;}clearWait();var node=root.document.createElement('div'),label=root.document.createElement('span'),button=root.document.createElement('button');node.className='native-motion-context-read';label.setAttribute('role','status');label.textContent=message;node.appendChild(label);
@@ -73,6 +73,65 @@
     function readContextId(){var v=scope();return v?v.contextId:null;}
     async function query(selector){var before=scope();if(!before||!selector||selector.instanceId!==before.identity.instanceId||selector.documentId!==before.identity.documentId||selector.atRevision!==before.identity.contentRevision||selector.documentSnapshotId!==before.identity.documentSnapshotId)throw new Error('Native metadata read unavailable');
       var value=await reader(selector),after=scope();if(!after||before.session!==after.session||!same(before.identity,after.identity)||before.context.viewGeneration!==after.context.viewGeneration||before.context.frame!==after.context.frame)throw new Error('Native metadata read became stale');return value;}
+    async function readProperty(selector){
+      var before=scope();
+      if(!before||typeof ui.readProperty!=='function'||!selector||
+        selector.instanceId!==before.identity.instanceId||selector.documentId!==before.identity.documentId||
+        selector.atRevision!==before.identity.contentRevision||selector.documentSnapshotId!==before.identity.documentSnapshotId)
+        throw new Error('Native property read is unavailable');
+      var value=await ui.readProperty(selector),after=scope();
+      if(!sameBase(before,after))throw new Error('Native property read became stale');
+      return value;
+    }
+    async function editPropertyTrack(payload,pin,isCurrent){
+      var before=scope(),edit=ui.editPropertyTrack;
+      if(!before||!same(before.identity,pin)||typeof edit!=='function'||typeof isCurrent!=='function')
+        throw new Error('Native property editing is unavailable');
+      // Queue entry temporarily hides readPresentedObjectSession(). The owner
+      // checks its real presentation/readiness; this closure fences UI intent
+      // without treating that intentional busy state as a changed selection.
+      function intentSignature(){
+        return JSON.stringify([root.state.currentFrame,root._layerSel===undefined?[]:root._layerSel,
+          root.state.activeLayerIdx,root.state.activeSymbolId,
+          options.readTargetSelection?options.readTargetSelection(before.identity):null,
+          options.readContextId?options.readContextId(before.session.info(),before.context.presented):null,
+          options.readTransportGeneration?options.readTransportGeneration():null,
+          typeof before.session.readSubscriptionGeneration==='function'?before.session.readSubscriptionGeneration():null]);
+      }
+      var submittedSignature=intentSignature();
+      function current(){
+        try{return !retired&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
+          before.session.isActive()&&same(before.identity,before.session.info())&&
+          ui.projectionReady(before.session.info())===true&&intentSignature()===submittedSignature&&isCurrent()===true;
+        }catch(_){return false;}
+      }
+      if(!current())throw new Error('Native property edit became stale');
+      var response,failure;
+      try{
+        response=await edit(payload,pin,current);
+        if(!response||response.ok!==true||!response.result||typeof response.result.applied!=='boolean'||
+          response.result.historyEntriesAdded!==(response.result.applied?1:0))
+          throw new Error('Native property edit was not confirmed');
+        return response.result;
+      }catch(error){failure=error;throw error;}
+      finally{
+        // Publication can repaint while the queue deliberately hides its busy
+        // presentation, retiring the editor. Refresh from the settled owner here
+        // rather than relying on that retired editor's completion callback.
+        try{
+          function sameOwner(){
+            var info=before.session.info();
+            return !retired&&root.state.appMode==='motion'&&ui.currentSession()===before.session&&
+              before.session.isActive()&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return info[k]===before.identity[k];});
+          }
+          if(sameOwner()){
+            var refreshed=await update(true);
+            if(sameOwner())caller.notice(failure?'Key edit could not be confirmed.':
+              (response.result.applied?'Keys updated.':'No key changes.')+(refreshed?'':' Native properties are unavailable.'));
+          }
+        }catch(_){} // Preserve the native receipt/error if presentation is unavailable.
+      }
+    }
     async function selectTarget(target,pin,choice){var before=scope(),t=View.normalizeTarget(target);if(!before||!t||!same(before.identity,pin)||t.contextId!==before.contextId)return false;
       var preserve=!!(choice&&choice.preserveSelection),result;
       if(t.strokeId!==undefined){if(!options.selectElementTarget||!options.readTargetSelection)return false;result=await options.selectElementTarget(t,pin,Object.freeze({preserveSelection:preserve}));}
@@ -83,7 +142,9 @@
     function labelTarget(t,pin){var v=scope();if(!v||!same(v.identity,pin)||t.contextId!==v.contextId)throw new Error('Stale native label');if(t.strokeId!==undefined)return t.strokeId;var matches=v.info.layers.filter(function(l){return l.layerUid===t.layerUid;});return matches.length===1&&typeof matches[0].name==='string'?matches[0].name:t.layerUid;}
     var caller=Panel.createCaller({document:root.document,container:options.container,pageBudget:options.pageBudget,yieldControl:options.yieldControl,
       isMotion:function(){return !retired&&root.state.appMode==='motion';},readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,
-      query:query,selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
+      query:query,readProperty:readProperty,
+      get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?editPropertyTrack:undefined;},
+      selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
       if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial)return false;clearWait();return caller.update(force);}
     function cancel(){var wasPending=!!pending;updateSerial++;resolveSerial++;pending=null;clearWait();var stopped=caller.cancel();if(wasPending&&!retired)showWait('Property read cancelled.',false);return wasPending||stopped;}

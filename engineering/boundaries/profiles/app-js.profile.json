@@ -2215,7 +2215,8 @@
       "dir": "src/js/adapters",
       "files": [
         "native-object-project.js",
-        "native-object-project-desktop.js"
+        "native-object-project-desktop.js",
+        "native-object-project-properties.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -2541,7 +2542,8 @@
       "files": [
         "native-motion-property-view.js",
         "native-motion-property-panel.js",
-        "native-motion-property-binding.js"
+        "native-motion-property-binding.js",
+        "native-motion-property-keys.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [

@@ -202,6 +202,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-font-panel.js',
     'src/js/adapters/native-viewport-underlay.js',
     'src/js/adapters/native-object-project-metadata.js',
+    'src/js/adapters/native-object-project-properties.js',
     'src/js/adapters/native-object-project-desktop.js',
     'src/js/adapters/native-object-project.js',
     'src/js/adapters/native-object-project-file.js',
@@ -216,6 +217,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-opacity-legacy-surface.js',
     'src/js/adapters/native-opacity-motion-surface.js',
     'src/js/adapters/native-motion-property-view.js',
+    'src/js/adapters/native-motion-property-keys.js',
     'src/js/adapters/native-motion-property-panel.js',
     'src/js/adapters/native-motion-property-binding.js',
     'src/js/adapters/native-object-inactive-project-tabs.js',
@@ -251,9 +253,11 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
+  assert.ok(order('js/adapters/native-object-project-properties.js') < order('js/adapters/native-object-project.js'));
+  assert.ok(order('js/adapters/native-motion-property-view.js') < order('js/adapters/native-motion-property-keys.js') && order('js/adapters/native-motion-property-keys.js') < order('js/adapters/native-motion-property-panel.js'));
   assert.ok(order('js/adapters/native-motion-property-binding.js') < order('js/motion.js'));
   assert.equal(policy.retainedSources.find(record => record.path === 'src/js/adapters/native-object-project-desktop.js').moduleId, 'app.native.object.project.adapter');
-  for (const name of ['view', 'panel', 'binding']) assert.equal(policy.retainedSources.find(record => record.path === 'src/js/adapters/native-motion-property-' + name + '.js').moduleId, 'app.native.motion.properties.adapter');
+  for (const name of ['view', 'keys', 'panel', 'binding']) assert.equal(policy.retainedSources.find(record => record.path === 'src/js/adapters/native-motion-property-' + name + '.js').moduleId, 'app.native.motion.properties.adapter');
   const updaterPath = 'src/js/adapters/updater-platform.js';
   const updater = policy.retainedSources.find((record) => record.path === updaterPath);
   assert.equal(updater.moduleId, 'app.updater.platform.adapter');
@@ -384,7 +388,7 @@ function assertF06Bootstrap(html) {
     tag: match[0], src: match[1].match(/\bsrc=["']([^"']+)/)?.[1],
   }));
   const sources = ['native-font-panel', 'native-viewport-underlay', 'native-object-project-metadata',
-    'native-object-project-desktop', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+    'native-object-project-properties', 'native-object-project-desktop', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const positions = sources.map((name) => {
     const source = 'js/adapters/' + name + '.js';
     const selected = scripts.filter((entry) => entry.src === source);
@@ -393,7 +397,7 @@ function assertF06Bootstrap(html) {
     return scripts.indexOf(selected[0]);
   });
   assert.deepEqual(positions, positions.map((_, index) => positions[0] + index),
-    'underlay → parser → desktop → Project → ProjectFile → UI must remain in that order');
+    'underlay → parser → properties → desktop → Project → ProjectFile → UI must remain in that order');
   const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
     const selected = scripts.filter((entry) => entry.src === source);
     assert.equal(selected.length, 1, source + ' must remain unique');
@@ -412,6 +416,7 @@ test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFi
   const project = '<script src="js/adapters/native-object-project.js"></script>';
   for (const broken of [
     html.replace(fonts, ''),
+    html.replace('<script src="js/adapters/native-object-project-properties.js"></script>', ''),
     html.replace(fonts, fonts.replace('<script ', '<script defer ')),
     html.replace(parser, ''),
     html.replace(parser, parser + '\n' + parser),
@@ -424,7 +429,7 @@ test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFi
 
 test('F06 real browser exports initialize in declared order and missing parser refuses before Project export', () => {
   const vm = require('node:vm'), html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
-  const names = ['native-object-project-metadata', 'native-object-project-desktop', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+  const names = ['native-object-project-metadata', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const load = (context, name) => vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters', name + '.js'), 'utf8'), context, {filename: name});
   const context = vm.createContext({});
   const actual = [...html.matchAll(/<script src="js\/adapters\/([^"/]+)\.js"><\/script>/g)]

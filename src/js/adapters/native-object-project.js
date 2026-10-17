@@ -3,10 +3,11 @@
  * this provider or the file adapter. Callback reads retain current native authority. */
 (function(root,factory){
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding);
+  var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -364,38 +365,14 @@
         return freeze(Object.assign({},result));
       }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
     }
-    async function readPropertyMetadata(selector){
-      var fields=['instanceId','documentId','atRevision','documentSnapshotId','view'];
-      if(!selector||typeof selector!=='object'||Array.isArray(selector)||
-        Object.keys(selector).length!==fields.length||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(selector,k);}))
-        throw new TypeError('Invalid native metadata selector');
-      var pin=info,ticket=subscriptionTicket,shown=presentation;
-      function ready(){
-        return active()&&!openingRequested&&pending===0&&!synchronizing&&subscription&&
-          ticket===subscriptionTicket&&presentation===shown&&same(info,pin)&&presentedSession()&&
-          typeof ports.dispatchApplication==='function'&&typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true&&
-          typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;
-      }
-      if(!ready()||selector.instanceId!==pin.instanceId||selector.documentId!==pin.documentId||
-        selector.atRevision!==pin.contentRevision||selector.documentSnapshotId!==pin.documentSnapshotId)
-        throw new Error('Native metadata owner or presentation is unavailable');
-      var request={apiVersion:2,requestId:requestId('metadata'),instanceId:selector.instanceId,documentId:selector.documentId,
-        operation:'query.document.object.property.metadata',payload:{atRevision:selector.atRevision,
-          documentSnapshotId:selector.documentSnapshotId,view:selector.view}};
-      // The same subscribed desktop port calls the real SDK before transport.
-      var response=await ports.dispatchApplication(request);
-      if(!ready())throw new Error('Native metadata owner or presentation changed');
-      if(!response||response.apiVersion!==2||response.requestId!==request.requestId||response.instanceId!==pin.instanceId||
-        response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)
-        throw new Error('Native metadata response is uncorrelated');
-      if(response.ok!==true){var error=new Error('Native metadata read unavailable');
-        error.code=response.error&&response.error.code||'unavailable';throw error;}
-      var result=response.result;
-      if(!result||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
-        result.atRevision!==pin.contentRevision||result.documentSnapshotId!==pin.documentSnapshotId)
-        throw new Error('Native metadata result is uncorrelated');
-      return freeze(result);
-    }
+    if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
+    var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
+      dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
+      state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
+        synchronizing:synchronizing,subscribed:!!subscription,presentationCurrent:active()&&!synchronizing&&presentation&&same(info,presentation),
+        get presented(){return presentedSession();},dispatchAvailable:typeof ports.dispatchApplication==='function',
+        get projectionReady(){return typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;},
+        get subscriptionActive(){return typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;}};}});
     function exportPng(destination,frames,onProgress,signal){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
@@ -417,7 +394,8 @@
     });}
     return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
-      readPropertyMetadata:readPropertyMetadata,
+      readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
+      get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
       info:function(){return info;},requestId:requestId,runFontResource:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
@@ -453,6 +431,8 @@
         if(!session)return Promise.reject(new Error('Native metadata session is unavailable'));
         return session.readPropertyMetadata(selector);
       },
+      readProperty:function(selector){var session=uiSession(root);if(!session)return Promise.reject(new Error('Native property session is unavailable'));return session.readProperty(selector);},
+      get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
       projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},
       repaint:function(frameOnly){return paintUI(root,frameOnly);}
