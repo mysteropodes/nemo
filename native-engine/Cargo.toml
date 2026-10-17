@@ -12,6 +12,8 @@ default = []
 codec = ["dep:serde", "dep:serde_json"]
 reference_image_asset = ["dep:png", "dep:flate2", "dep:miniz_oxide"]
 project_media_codec = ["codec", "reference_image_asset", "dep:base64"]
+font_asset_admission = ["project_media_codec", "dep:read-fonts"]
+font_asset_wire = ["font_asset_admission"]
 commands = ["codec"]
 history = ["commands"]
 evaluation = ["commands"]
@@ -47,6 +49,7 @@ png = { version = "0.18", optional = true }
 flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"], optional = true }
 miniz_oxide = { version = "=0.9.1", default-features = false, optional = true }
 base64 = { version = "=0.22.1", optional = true }
+read-fonts = { version = "=0.39.2", optional = true }
 rquickjs = { version = "=0.14.0", default-features = false, features = ["std"], optional = true }
 
 [[test]]
@@ -103,3 +106,9 @@ required-features = ["test-object_expression_pin"]
 name = "object_expression_runtime"
 path = "src/lib.rs"
 required-features = ["test-object_expression_runtime"]
+
+# E2 (#2088): unmodified upstream rquickjs-sys 0.14.0 plus the two-file
+# QuickJS single-function parser patch; see
+# third_party/rquickjs-sys-0.14.0.PROVENANCE.md. Same version, no bump.
+[patch.crates-io]
+rquickjs-sys = { path = "third_party/rquickjs-sys-0.14.0" }

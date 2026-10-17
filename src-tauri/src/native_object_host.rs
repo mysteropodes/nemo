@@ -16,6 +16,9 @@ use std::collections::BTreeMap;
 mod inactive_requests;
 use inactive_requests::InactiveRequest;
 
+#[path = "native_object_font.rs"]
+mod font_assets;
+
 #[path = "native_object_export.rs"]
 mod export;
 #[path = "native_object_preview.rs"]

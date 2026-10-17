@@ -1,0 +1,16 @@
+# L04-G object_storyboard_records oracle. Baseline commit fbe4b8a33e6d5a229f014154df2ba21988a9fabc.
+# Sources (git blob ids): src/js/app.js 816979f85fd8bfe583c52e889bd1f0733cb5db2a; src/js/motion.js 90503c3955b6860ebc5d7ba5708bd277c8c5acc2; src/js/storyboard.js 6e78255395aadbbf84e403f95ecdc9965ca08d03; src/js/effector-layer.js 6783cc96d2df991ba0ab88d3edbc0bb2512c5c12; src/js/timeline.js 6ba3d735211ec3cb707644d8fe35761cd79caa50; src/js/domain/component/exposed-properties.js dfd93e88afad3d158d62c851f3bfe8238753d542; tests/fixtures/components/project.json 4c88792332922083c6ae207b06c8b87a0c768cc1; tests/fixtures/components/expected.json a8fbfed24cefc2e02588063d97eb2e651d82091e; tests/fixtures/migration/project.json 278f5b1bca2e02e8641e5c03b712bd2022fa053e.
+# Fields are TAB separated; JSON columns are compact. Native record JSON is the legacy wire value transcribed 1:1 in the Rust struct order.
+# S storyboardJson     (legacy v1 storyboard -> verbatim migrateLegacy/addInstanceAuto/addMontage/ensureRetime/join statements)
+# M id type symbolId trimIn trimOut duration chain(,) audio(moduleId@offset,) x y   (`-` absent, chain/audio `-` absent, `=` empty list)
+# N nextId activeMontageId(`null` or id) moduleCount
+# R sym_comp totalFrames      (symbolDuration of the stub symbol, the retime default source)
+S	{"format":"nemo.native-storyboard","formatVersion":1,"pan":{"x":40,"y":40},"zoom":1,"nextId":15,"activeMontageId":"sbm14","modules":[{"id":"sbm9","type":"montage","name":"Old montage","x":10,"y":20,"playhead":0,"chain":["sbm10","sbm11"],"audio":[{"moduleId":"sbm12","offsetFrames":3}]},{"id":"sbm10","type":"instance","symbolId":"sym_comp","x":10,"y":20,"trimIn":2,"trimOut":9,"duration":16},{"id":"sbm11","type":"instance","symbolId":"sym_comp","x":10,"y":20},{"id":"sbm12","type":"sound","name":"Beat","x":10,"y":160,"assetId":"asset-audio-sbm12","inSec":0,"outSec":1.5,"cursorSec":null},{"id":"sbm13","type":"instance","symbolId":"sym_comp","x":320,"y":40,"trimIn":0,"trimOut":11,"duration":12},{"id":"sbm14","type":"montage","name":"Montage 2","x":100,"y":201,"playhead":0,"chain":["sbm13"],"audio":[]}]}
+M	sbm9	montage	-	-	-	-	sbm10,sbm11	sbm12@3	10	20
+M	sbm10	instance	sym_comp	2	9	16	-	-	10	20
+M	sbm11	instance	sym_comp	-	-	-	-	-	10	20
+M	sbm12	sound	-	-	-	-	-	-	10	160
+M	sbm13	instance	sym_comp	0	11	12	-	-	320	40
+M	sbm14	montage	-	-	-	-	sbm13	=	100	201
+N	15	sbm14	6
+R	sym_comp	12

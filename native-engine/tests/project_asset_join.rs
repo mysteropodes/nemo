@@ -4,6 +4,75 @@ use crate::object_document::{AssetId, AssetInventory, AssetKind, AssetRecord, As
 use crate::revision::ObjectSnapshot;
 use std::sync::Arc;
 
+#[cfg(feature = "font_asset_wire")]
+#[test]
+fn validated_font_aliases_share_reserved_capacity_through_last_snapshot_pin() {
+    const FONT: &[u8] = include_bytes!("../../src/fonts/Roboto-Regular.ttf");
+    let budget = EncodedRetentionBudget::new(FONT.len()).unwrap();
+    let mut permit = budget.reserve(FONT.len()).unwrap();
+    let mut bytes = permit.allocate().unwrap();
+    bytes.copy_from_slice(FONT);
+    let bytes = Arc::new(bytes);
+    let weak = Arc::downgrade(&bytes);
+    let source = crate::object_codec::admitted_font_source(
+        Arc::clone(&bytes),
+        crate::object_codec::FontAssetLimits::new(FONT.len(), 256).unwrap(),
+    )
+    .unwrap();
+    assert!(source.has_font_admission());
+    assert!(Arc::ptr_eq(source.encoded_allocation().unwrap(), &bytes));
+    permit.bind(&bytes).unwrap();
+    let records = ["font-first", "font-alias"]
+        .into_iter()
+        .map(|id| {
+            Arc::new(
+                AssetRecord::new(
+                    AssetId::new(id.into()).unwrap(),
+                    id.into(),
+                    AssetKind::Font,
+                    source.clone(),
+                )
+                .unwrap(),
+            )
+        })
+        .collect();
+    let inventory = AssetInventory::new(records, Vec::new(), 2, 0).unwrap();
+    let retained = project()
+        .with_reference(ProjectReferenceState::NoMedia)
+        .with_asset_inventory(Some(inventory));
+    // The sole budget is already full. Owner admission can only succeed by
+    // recognizing both validated sources as aliases of this exact allocation.
+    assert_eq!(budget.used(), Ok(FONT.len()));
+    let snapshot = ObjectSnapshot::project_entry(
+        "font-alias".into(),
+        retained,
+        &budget,
+        ObjectSnapshot::from_value,
+    )
+    .unwrap();
+    let old_pin = snapshot.clone();
+    drop((snapshot, source, bytes, permit));
+    assert!(weak.upgrade().is_some());
+    assert_eq!(budget.used(), Ok(FONT.len()));
+    let records = old_pin
+        .project()
+        .unwrap()
+        .asset_inventory()
+        .unwrap()
+        .records();
+    assert!(Arc::ptr_eq(
+        records[0].source().encoded_allocation().unwrap(),
+        records[1].source().encoded_allocation().unwrap()
+    ));
+    assert_eq!(
+        records[0].source().encoded_allocation().unwrap().as_slice(),
+        FONT
+    );
+    drop(old_pin);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(budget.used(), Ok(0));
+}
+
 fn project() -> ProjectEnvelope {
     use crate::object_codec::encoded_wire_test::{limits, wire};
     crate::object_codec::decode_allocated_project(
@@ -114,7 +183,7 @@ fn failed_identity_releases_pending_charge_and_existing_pin_stays_unmodified() {
 }
 
 #[test]
-fn nonempty_placement_cannot_enter_owner_before_its_real_consumer_exists() {
+fn image_placement_stays_refused_until_its_raster_owner_exists() {
     use crate::object_document::{AssetPlacement, AssetTarget};
     let base = project();
     let records = inventory(&base, true).records().to_vec();
@@ -132,7 +201,46 @@ fn nonempty_placement_cannot_enter_owner_before_its_real_consumer_exists() {
     let inventory = AssetInventory::new(records, vec![placement], 2, 1).unwrap();
     let value = base.with_asset_inventory(Some(inventory));
     let budget = EncodedRetentionBudget::new(1024).unwrap();
-    assert!(pending_charges(&value, &budget).is_err());
+    assert_eq!(
+        pending_charges(&value, &budget).err(),
+        Some("asset image placement unavailable")
+    );
+    assert_eq!(budget.used(), Ok(0));
+}
+
+#[test]
+fn video_placement_on_an_existing_layer_is_admitted_and_an_unresolved_one_charges_nothing() {
+    use crate::object_document::{AssetPlacement, AssetTarget};
+    let base = project();
+    let mut records = inventory(&base, true).records().to_vec();
+    let clip = AssetId::new("clip".into()).unwrap();
+    let source = AssetSource::linked("clips/take-1.mov".into(), 4096).unwrap();
+    records.push(Arc::new(
+        AssetRecord::new(clip.clone(), "take-1".into(), AssetKind::Video, source).unwrap(),
+    ));
+    // The fixture drawing has exactly one layer, `L`, in the implicit scene root.
+    let place = |layer: &str| {
+        let target = AssetTarget::Drawing {
+            context_id: "scene-root".into(),
+            layer_uid: layer.into(),
+            stroke_id: None,
+        };
+        AssetPlacement::new("p".into(), clip.clone(), target, -3).unwrap()
+    };
+    let budget = EncodedRetentionBudget::new(1024).unwrap();
+    let admitted = AssetInventory::new(records.clone(), vec![place("L")], 3, 1).unwrap();
+    let admitted = base.with_asset_inventory(Some(admitted));
+    // Reference + the two embedded PNG records; the linked video has no bytes.
+    let tickets = pending_charges(&admitted, &budget).unwrap();
+    assert_eq!(tickets.len(), 3);
+    drop(tickets);
+    assert_eq!(budget.used(), Ok(0));
+    let missing = AssetInventory::new(records, vec![place("nope")], 3, 1).unwrap();
+    let missing = base.with_asset_inventory(Some(missing));
+    assert_eq!(
+        pending_charges(&missing, &budget).err(),
+        Some("asset placement layer unresolved")
+    );
     assert_eq!(budget.used(), Ok(0));
 }
 

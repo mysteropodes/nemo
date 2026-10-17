@@ -4,3 +4,11 @@
 #[path = "object_text_layout_kernel.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_text_layout_kernel;
+
+#[path = "text_glyph_contours.rs"]
+#[allow(dead_code)]
+pub(crate) mod text_glyph_contours;
+
+#[path = "object_text_layout_record.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_text_layout_record;

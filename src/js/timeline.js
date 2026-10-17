@@ -8972,81 +8972,31 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // pas faire des onglets en haut avec différentes sections ?") — 6 stacked
 // sections regrouped under 5 tabs; every pane keeps its original ids
 // unchanged, so every existing listener in this file still resolves them.
-function initSettingsTabs(){
-  var bar=document.getElementById('settings-tabs');if(!bar)return;
-  bar.querySelectorAll('.settings-tab').forEach(function(tab){
-    tab.addEventListener('click',function(){
-      bar.querySelectorAll('.settings-tab').forEach(function(t){t.classList.remove('active');});
-      tab.classList.add('active');
-      document.querySelectorAll('#settings-modal .settings-pane').forEach(function(p){
-        p.style.display=(p.dataset.pane===tab.dataset.tab)?'':'none';
-      });
-    });
+var settingsPreferencesUi=null;
+function settingsPreferencesUiInstance(){
+  if(!settingsPreferencesUi)settingsPreferencesUi=window.NemoSettingsPreferencesUI.create({
+    document:document,readProfile:function(){return state.userProfile;},
+    setProfileField:function(key,value){state.userProfile[key]=value;},saveProfile:function(){return saveUserProfile();},
+    setHex8Input:function(input,value){return setHex8Input(input,value);},
+    renderShortcuts:function(){return renderShortcutsList();},resetShortcuts:function(){return shortcutRegistry.reset();},
+    refreshFeedback:function(){return refreshFeedbackList();},
+    renderLabs:function(){var render=window.renderLabsPanel;if(render)return render();},
+    showToast:function(text){return showToast(text);},translate:function(key){return SM.t(key);},
+    producerToolAllowed:function(){return PRODUCER_ALLOWED_TOOLS.indexOf(state.tool)>=0;},
+    setTool:function(tool){return window.SM.setTool(tool);},
+    wireColorSwatches:function(fields){if(window.ColorPicker)return window.ColorPicker.wireColorSwatches(fields);},
+    getSyncFolder:function(){return window.SMProject&&window.SMProject.getSyncFolder();},
+    chooseSyncFolder:function(){return window.SMProject.chooseSyncFolder();},
+    publishToShared:function(){return window.SMProject.publishToShared();},
+    checkSharedUpdates:function(){return window.SMProject.checkSharedUpdates();},
+    pullAndMerge:function(entry){return window.SMProject.pullAndMerge(entry);},now:function(){return Date.now();}
   });
+  return settingsPreferencesUi;
 }
-function initSettingsModal(){
-  var btn=document.getElementById('btn-settings'),modal=document.getElementById('settings-modal');
-  if(!btn||!modal)return;
-  initSettingsTabs();
-  btn.addEventListener('click',function(){renderShortcutsList();syncProfileFields();syncFolderFields();refreshFeedbackList();if(window.renderLabsPanel)renderLabsPanel();modal.style.display='flex';});
-  var topBtn=document.getElementById('project-tabs-settings');
-  if(topBtn)topBtn.addEventListener('click',function(){btn.click();});
-  var closeBtn=document.getElementById('settings-close');
-  if(closeBtn)closeBtn.addEventListener('click',function(){modal.style.display='none';});
-  modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
-  var resetBtn=document.getElementById('shortcuts-reset');
-  if(resetBtn)resetBtn.addEventListener('click',function(){
-    shortcutRegistry.reset();
-    renderShortcutsList();showToast(SM.t('toastShortcutsReset'));
-  });
-}
-var ROLE_HINTS={
-  animator:'Édite ses propres traits. Éditer le trait d\'un autre profil crée une correction à Accepter/Rejeter.',
-  supervisor:'Édite n\'importe quel calque directement, sans créer de correction — autorité de révision.',
-  producer:'Lecture seule + commentaires. Les outils de dessin/édition sont désactivés.'
-};
-function syncProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),wellEl=document.getElementById('profile-color-well'),roleEl=document.getElementById('profile-role'),hintEl=document.getElementById('profile-role-hint'),emailEl=document.getElementById('profile-email');
-  if(!nameEl||!state.userProfile)return;
-  nameEl.value=state.userProfile.name;
-  if(emailEl)emailEl.value=state.userProfile.email||'';
-  var c=state.userProfile.color;
-  setHex8Input(colorEl,c);
-  if(wellEl)wellEl.style.background=c;
-  var role=state.userProfile.role||'animator';
-  if(roleEl)roleEl.value=role;
-  if(hintEl)hintEl.textContent=ROLE_HINTS[role]||'';
-}
-function initProfileFields(){
-  var nameEl=document.getElementById('profile-name'),colorEl=document.getElementById('profile-color'),roleEl=document.getElementById('profile-role'),emailEl=document.getElementById('profile-email');
-  if(!nameEl||!colorEl)return;
-  syncProfileFields();
-  nameEl.addEventListener('input',function(){
-    state.userProfile.name=this.value||'Animateur';
-    saveUserProfile();
-  });
-  if(emailEl)emailEl.addEventListener('input',function(){
-    state.userProfile.email=this.value||'';
-    saveUserProfile();
-  });
-  colorEl.addEventListener('input',function(){
-    var v=this.dataset.hex8||this.value;
-    state.userProfile.color=v;
-    document.getElementById('profile-color-well').style.background=v;
-    saveUserProfile();
-  });
-  if(roleEl)roleEl.addEventListener('change',function(){
-    state.userProfile.role=this.value;
-    saveUserProfile();
-    var hintEl=document.getElementById('profile-role-hint');
-    if(hintEl)hintEl.textContent=ROLE_HINTS[this.value]||'';
-    // Switching TO producer while mid-edit with a non-view tool active would
-    // leave a blocked tool selected — force back to a safe one immediately,
-    // same as the boot-time role check.
-    if(this.value==='producer'&&PRODUCER_ALLOWED_TOOLS.indexOf(state.tool)<0)window.SM.setTool('hand');
-  });
-  if(window.ColorPicker)window.ColorPicker.wireColorSwatches([{wrap:'profile-color-well',input:'profile-color'}]);
-}
+function initSettingsTabs(){return settingsPreferencesUiInstance().initSettingsTabs();}
+function initSettingsModal(){return settingsPreferencesUiInstance().initSettingsModal();}
+function syncProfileFields(){return settingsPreferencesUiInstance().syncProfileFields();}
+function initProfileFields(){return settingsPreferencesUiInstance().initProfileFields();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initProfileFields);else initProfileFields();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSettingsModal);else initSettingsModal();
 
@@ -9191,61 +9141,10 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();
 
 // ---- Team sync UI (v16, Phase 2) ----
-function syncRelTime(ts){
-  var s=Math.max(0,Math.round((Date.now()-ts)/1000));
-  if(s<60)return 'il y a '+s+'s';
-  var m=Math.round(s/60);
-  if(m<60)return 'il y a '+m+' min';
-  var h=Math.round(m/60);
-  return 'il y a '+h+'h'+(m%60?Math.round(m%60)+'min':'');
-}
-function syncFolderFields(){
-  var pathEl=document.getElementById('sync-folder-path');
-  if(!pathEl)return;
-  pathEl.value=(window.SMProject&&window.SMProject.getSyncFolder())||'';
-  var listEl=document.getElementById('sync-updates-list');
-  if(listEl)listEl.innerHTML='';
-}
-function renderSyncUpdates(entries){
-  var listEl=document.getElementById('sync-updates-list');if(!listEl)return;
-  listEl.innerHTML='';
-  if(!entries||!entries.length){
-    listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Aucune mise à jour d\'un autre profil.</div>';
-    return;
-  }
-  entries.forEach(function(entry){
-    var row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 6px;border-radius:4px;background:var(--panel3);font-size:10px';
-    var label=document.createElement('span');
-    var dot=document.createElement('span');dot.style.cssText='display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:'+(entry.profileColor||'#888');
-    label.appendChild(dot);
-    label.appendChild(document.createTextNode(entry.profileName+' — '+syncRelTime(entry.ts)));
-    var btn=document.createElement('button');
-    btn.className='pbtn';btn.textContent=SM.t('syncMergeBtn');btn.style.cssText='font-size:10px;padding:3px 8px';
-    btn.addEventListener('click',function(){
-      window.SMProject.pullAndMerge(entry).then(function(){
-        btn.disabled=true;btn.textContent=SM.t('syncMergedBtn');
-      });
-    });
-    row.appendChild(label);row.appendChild(btn);
-    listEl.appendChild(row);
-  });
-}
-function initSyncUI(){
-  var chooseBtn=document.getElementById('sync-choose-folder');
-  var publishBtn=document.getElementById('sync-publish');
-  var checkBtn=document.getElementById('sync-check');
-  if(!chooseBtn||!publishBtn||!checkBtn)return;
-  chooseBtn.addEventListener('click',function(){
-    window.SMProject.chooseSyncFolder().then(function(){syncFolderFields();});
-  });
-  publishBtn.addEventListener('click',function(){window.SMProject.publishToShared();});
-  checkBtn.addEventListener('click',function(){
-    var listEl=document.getElementById('sync-updates-list');
-    if(listEl)listEl.innerHTML='<div style="font-size:10px;color:var(--text-dim)">Recherche…</div>';
-    window.SMProject.checkSharedUpdates().then(renderSyncUpdates);
-  });
-}
+function syncRelTime(ts){return settingsPreferencesUiInstance().syncRelTime(ts);}
+function syncFolderFields(){return settingsPreferencesUiInstance().syncFolderFields();}
+function renderSyncUpdates(entries){return settingsPreferencesUiInstance().renderSyncUpdates(entries);}
+function initSyncUI(){return settingsPreferencesUiInstance().initSyncUI();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSyncUI);else initSyncUI();
 
 // ---- Feedback inbox (feedback-bridge.js) ----

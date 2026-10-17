@@ -113,8 +113,10 @@ test('pinned read schemas declare strict selectors and exact native result ident
   assert.equal(nativeSchema.$defs.OpacityKey.additionalProperties, false);
   assert.deepEqual(nativeSchema.$defs.EvaluateQueryResult.required,
     ['documentSnapshotId', 'documentId', 'contentRevision', 'contextId', 'frame', 'layers']);
-  assert.equal(nativeDescriptors[0].resourceBoundary.maxReadResponseBytes, 4096);
-  assert.deepEqual(nativeDescriptors[0].availability, { state: 'available', reason: null });
+  const opacityDescriptors = nativeDescriptors.filter((entry) => entry.id === 'native.opacity');
+  assert.equal(opacityDescriptors.length, 1);
+  assert.equal(opacityDescriptors[0].resourceBoundary.maxReadResponseBytes, 4096);
+  assert.deepEqual(opacityDescriptors[0].availability, { state: 'available', reason: null });
 });
 
 // D35 is one feature-owned query, not a new transport-v1 operation variant.

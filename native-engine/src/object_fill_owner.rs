@@ -15,6 +15,54 @@ pub(crate) use property_edit::PreparedPropertyEdit;
 #[path = "object_project_settings.rs"]
 mod project_settings;
 pub(crate) use project_settings::PreparedProjectSettings;
+#[path = "object_layer_lifecycle_ops.rs"]
+mod layer_lifecycle;
+pub(crate) use layer_lifecycle::PreparedLayerLifecycle;
+#[path = "object_group_ops.rs"]
+mod group_edit;
+pub(crate) use group_edit::PreparedGroupEdit;
+// L05-B (#2160), re-homed from the evaluation aggregator: pure document-level frame remap kernel.
+#[path = "object_frame_edit_document.rs"]
+#[allow(dead_code)]
+mod object_frame_edit_document;
+// L05-C (lane #2111): sealed insert / extend / duplicate / remove frame transactions.
+#[path = "object_frame_edit_structure.rs"]
+mod object_frame_edit_structure;
+pub(crate) use object_frame_edit_structure::PreparedFrameStructure;
+// L05-D (lane #2111): sealed F6 / Clear Keyframe / Delete Frames / Remove Tween transactions.
+#[path = "object_exposure_edit_key.rs"]
+mod object_exposure_edit_key;
+pub(crate) use object_exposure_edit_key::PreparedExposureKey;
+// L05-E (lane #2111): sealed key-retime (moveKeyframe) transaction.
+#[path = "object_exposure_edit_retime.rs"]
+mod object_exposure_edit_retime;
+pub(crate) use object_exposure_edit_retime::PreparedExposureRetime;
+// L03-M (#2109): widget (rig control) transactions; the settings edit is a child of this module.
+#[path = "object_widget_edit.rs"]
+mod widget_edit;
+pub(crate) use widget_edit::PreparedWidgetEdit;
+// L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
+#[cfg(feature = "project_media_codec")]
+#[path = "object_raster_asset_owner.rs"]
+#[allow(dead_code)]
+mod object_raster_asset_owner;
+// L09-H (#2115): sealed placement edits (G42, I16b).
+#[path = "object_media_link_owner.rs"]
+#[allow(dead_code)]
+mod object_media_link_owner;
+pub(crate) use object_media_link_owner::PreparedPlacementEdit;
+// L01-F (#2107): sealed vector create/replace/delete over the same revision owner.
+#[path = "object_vector_edit.rs"]
+mod vector_edit;
+pub(crate) use vector_edit::{PreparedVectorEdit, VectorEditResult, MAX_VECTOR_REQUEST_BYTES};
+// The single composition-order element helper, for every lane that adds or removes a record.
+#[allow(unused_imports)]
+pub(crate) use vector_edit::order::{
+    insert_element as insert_order_element, remove_element as remove_order_element, OrderEditError,
+};
+#[path = "object_layer_policy_edit.rs"]
+mod layer_policy_edit;
+pub(crate) use layer_policy_edit::PreparedLayerPolicy;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ReferenceEdit {
@@ -213,6 +261,29 @@ impl ObjectFillOwner {
     #[cfg(feature = "project_media_codec")]
     pub(crate) fn replace_admitted_snapshot(&mut self, snapshot: ObjectSnapshot) {
         self.revisions = ObjectRevisionOwner::from_admitted(snapshot);
+    }
+
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn commit_font_asset(
+        &mut self,
+        origin: &ObjectSnapshot,
+        record: std::sync::Arc<crate::object_document::AssetRecord>,
+    ) -> Result<u64, DispatchErrorCode> {
+        let current = self.current_snapshot();
+        if origin.instance_id() != current.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if origin.document_id() != current.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if origin.snapshot_id() != current.snapshot_id()
+            || origin.content_revision() != current.content_revision()
+        {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        self.revisions
+            .publish_admitted_font(record)
+            .map_err(|_| DispatchErrorCode::Unavailable)
     }
 
     #[cfg(feature = "project_media_codec")]

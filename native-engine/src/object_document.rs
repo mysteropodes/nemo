@@ -34,7 +34,11 @@ pub(crate) use project::{
 
 #[path = "object_layer_timing.rs"]
 mod timing;
+#[allow(unused_imports)]
+pub(crate) use timing::TimingEdit;
 pub(crate) use timing::{LayerTiming, LayerTimingError};
+#[allow(unused_imports)]
+pub(crate) use timing::{RetimeEdit, RetimePair, RetimePlan};
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;
@@ -46,6 +50,60 @@ pub(crate) mod media_timing;
 #[path = "object_group_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_group_kernels;
+// L02-G (#2108): the per-layer group table stored on `ObjectLayer`.
+pub(crate) use object_group_kernels::object_group_record::GroupTable;
+// L06-C (#2137): lane-6 raster asset family aggregator.
+#[path = "object_raster_asset_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_raster_asset_kernels;
+// L04-G (#2110): lane-4 component/StoryBoard/duplicator record family aggregator.
+#[path = "object_component_record_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_component_record_kernels;
+
+// L01-D (#2107): editable-vector-path record body (storage DTO; admission is object_vector_codec.rs).
+#[path = "object_vector_record.rs"]
+#[allow(dead_code)]
+mod vector_record;
+pub(crate) use vector_record::{VectorBody, VECTOR_FAMILY};
+
+// L03-K (#2109): widget (rig control) layer record, F19; a private child like the other document members.
+#[path = "object_widget_record.rs"]
+#[allow(dead_code)]
+mod object_widget_record;
+#[allow(unused_imports)]
+pub(crate) use object_widget_record::{
+    validate_widget_layers, AxisBinding, AxisUnresolved, WidgetAdmissionError, WidgetAxis,
+    WidgetBindings, WidgetLayerKind, WidgetRecord, WidgetRest,
+};
+// L01-E (#2107): pressure fields, paramShape record, per-layer pathFx stack record, vector extension slot
+// (storage DTOs only; their admission is object_vector_ext_codec.rs under the codec).
+#[path = "object_vector_pressure.rs"]
+#[allow(dead_code)]
+mod vector_pressure;
+pub(crate) use vector_pressure::{PressureFields, STROKE_PROFILE_KINDS};
+#[path = "object_parametric_record.rs"]
+#[allow(dead_code)]
+mod parametric_record;
+pub(crate) use parametric_record::{ParamShape, PARAM_SHAPE_KINDS};
+#[path = "object_path_effects_record.rs"]
+#[allow(dead_code)]
+mod path_effects_record;
+pub(crate) use path_effects_record::{PathFxRecord, PATH_FX_TYPE_IDS};
+#[path = "object_vector_ext.rs"]
+#[allow(dead_code)]
+mod vector_ext;
+pub(crate) use vector_ext::VectorExt;
+
+#[path = "object_layer_organization.rs"]
+mod organization;
+pub(crate) use organization::validate_layer_organization;
+pub use organization::{LayerFolder, LayerFolders};
+#[cfg(all(test, feature = "codec"))]
+#[path = "../tests/object_layer_organization.rs"]
+mod layer_organization_tests;
+#[path = "object_layer_policy.rs"]
+mod layer_policy;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -57,6 +115,8 @@ pub struct ObjectDocument {
     pub(crate) objects: Vec<ObjectRecord>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) composition_order: Presence<OrderPlan>,
 }
@@ -76,7 +136,20 @@ pub struct ObjectLayer {
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) parent_layer_uid: Presence<Option<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) folder_id: Presence<Option<String>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) shy: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) timing: Presence<LayerTiming>,
+    /// Ordered non-destructive path effects (baseline `ld.pathFx`); absent differs from an empty stack.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) path_fx: Presence<Vec<PathFxRecord>>,
+    /// Present exactly for a widget (rig control) layer; its presence is the baseline `isWidgetLayer`.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) widget: Presence<WidgetRecord>,
+    /// Absent: the layer never had a group table. Present: an authored table (possibly empty).
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) groups: Presence<GroupTable>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -124,7 +197,15 @@ pub struct ObjectRecord {
     pub(crate) family: String,
     pub(crate) target: ObjectTarget,
     pub(crate) geometry: ObjectGeometry,
-    pub(crate) fill: SolidFill,
+    /// Legacy family: a required solid fill. Vector family: explicit null (no fill) or solid.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) fill: Presence<Option<SolidFill>>,
+    /// Present exactly for the `editable-vector-path` family.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) vector: Presence<VectorBody>,
+    /// Pressure fields, paramShape and boxAngle of the `editable-vector-path` family (L01-E).
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) vector_ext: Presence<VectorExt>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -193,12 +274,18 @@ pub(crate) use object_deserialize;
 object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>,
     #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
     #[serde(default)] color: Presence<String>,
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
-    #[serde(default)] timing: Presence<LayerTiming> });
+    #[serde(default)] folder_id: Presence<Option<String>>,
+    #[serde(default)] shy: Presence<bool>,
+    #[serde(default)] timing: Presence<LayerTiming>,
+    #[serde(default)] path_fx: Presence<Vec<PathFxRecord>>,
+    #[serde(default)] widget: Presence<WidgetRecord>,
+    #[serde(default)] groups: Presence<GroupTable> });
 object_deserialize!(ObjectTarget {
     context_id: String,
     frame_scope: FrameScope,
@@ -214,7 +301,9 @@ object_deserialize!(ObjectRecord {
     family: String,
     target: ObjectTarget,
     geometry: ObjectGeometry,
-    fill: SolidFill
+    #[serde(default)] fill: Presence<Option<SolidFill>>,
+    #[serde(default)] vector: Presence<VectorBody>,
+    #[serde(default)] vector_ext: Presence<VectorExt>
 });
 object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
     handle_space: String, segments: Vec<ObjectSegment> });
@@ -236,6 +325,10 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectDocument {
+    /// Organizational folder metadata, not structural folder layers.
+    pub fn layer_folders(&self) -> Option<&LayerFolders> {
+        self.layer_folders.value().and_then(Option::as_ref)
+    }
     /// Immutable authored holder metadata; absence is not an empty authored table.
     pub fn property_holders(&self) -> Option<&[PropertyHolder]> {
         self.property_holders.value().map(Vec::as_slice)
@@ -270,6 +363,15 @@ impl ObjectRecord {
     pub fn target(&self) -> &ObjectTarget {
         &self.target
     }
+    /// The solid fill; `None` for an explicit null (no fill) or an absent slot.
+    pub(crate) fn solid_fill(&self) -> Option<&SolidFill> {
+        self.fill.value().and_then(Option::as_ref)
+    }
+    /// The vector body of an `editable-vector-path` record.
+    #[allow(dead_code)]
+    pub(crate) fn vector(&self) -> Option<&VectorBody> {
+        self.vector.value()
+    }
 }
 impl SolidFill {
     pub(crate) fn valid_channels(&self) -> bool {
@@ -280,6 +382,17 @@ impl SolidFill {
     }
 }
 impl ObjectLayer {
+    /// UI row filtering only: shy never changes visibility or content ownership.
+    pub fn shy(&self) -> bool {
+        self.shy.value().copied().unwrap_or(false)
+    }
+    /// Legacy falsy memberships have no active folder, but retain wire presence.
+    pub fn folder_id(&self) -> Option<&str> {
+        self.folder_id
+            .value()
+            .and_then(Option::as_deref)
+            .filter(|id| !id.is_empty())
+    }
     /// Native New and Add share the existing desktop creation defaults. The
     /// palette is selected by the number of layers before insertion, not revision.
     pub(crate) fn blank_drawing(layer_uid: String, name: String, existing_layers: usize) -> Self {
@@ -293,7 +406,12 @@ impl ObjectLayer {
             locked: Presence::Present(false),
             color: Presence::Present(COLORS[existing_layers % COLORS.len()].into()),
             parent_layer_uid: Presence::Present(None),
+            folder_id: Presence::Missing,
+            shy: Presence::Missing,
             timing: Presence::Present(LayerTiming::blank_drawing()),
+            path_fx: Presence::Missing,
+            widget: Presence::Missing,
+            groups: Presence::Missing,
         }
     }
     /// Identified, unnamed layer with earlier native-file visibility semantics.
@@ -305,7 +423,12 @@ impl ObjectLayer {
             locked: Presence::Missing,
             color: Presence::Missing,
             parent_layer_uid: Presence::Missing,
+            folder_id: Presence::Missing,
+            shy: Presence::Missing,
             timing: Presence::Missing,
+            path_fx: Presence::Missing,
+            widget: Presence::Missing,
+            groups: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {
@@ -317,6 +440,10 @@ impl ObjectLayer {
     }
     pub fn visible(&self) -> bool {
         self.visible.value().copied().unwrap_or(true)
+    }
+    /// The stored ordered path-effect stack; `None` when the layer has none (an empty stack is `Some(&[])`).
+    pub(crate) fn path_fx(&self) -> Option<&[PathFxRecord]> {
+        self.path_fx.value().map(Vec::as_slice)
     }
 }
 impl ObjectTarget {
