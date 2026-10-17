@@ -2261,7 +2261,9 @@ test('L05-B document frame-edit kernel stays a private lane-5 aggregator child a
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
   assert.match(coverage.nativeFrameEditDocumentRegistration, /L05-B\/#2160/);
   const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_frame_edit_kernels.rs'), 'utf8');
-  assert.match(aggregatorText, /#\[path = "object_frame_edit_document\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_frame_edit_document;/);
+  assert.doesNotMatch(aggregatorText, /object_frame_edit_document/);
+  const ownerText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_fill_owner.rs'), 'utf8');
+  assert.match(ownerText, /#\[path = "object_frame_edit_document\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_frame_edit_document;/);
   const documentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
   assert.match(documentText, /pub\(crate\) use timing::TimingEdit;/);
   const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_frame_edit_document.rs'), 'utf8');
@@ -2272,7 +2274,7 @@ test('L05-B document frame-edit kernel stays a private lane-5 aggregator child a
     assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
   }
   for (const [id, file] of [
-    ['rust.native.engine.evaluation', 'native-engine/src/object_frame_edit_document.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_edit_document.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_document.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_document_build.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_document_reach.rs'],
@@ -3178,6 +3180,423 @@ test('L03-F Delaunator port and adaptive orient2d stay private image-mesh-family
     ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_delaunay.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_delaunay_rows.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_delaunay_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L02-F layer lifecycle transactions stay private owner/history children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectLayerLifecycleRegistration, /L02-F\/#2169/);
+  const source = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
+  assert.match(source('object_fill_owner.rs'), /#\[path = "object_layer_lifecycle_ops\.rs"\]\s*mod layer_lifecycle;\s*pub\(crate\) use layer_lifecycle::PreparedLayerLifecycle;/);
+  assert.match(source('commands.rs'), /pub\(crate\) use object_fill_owner::\{[^}]*\bPreparedLayerLifecycle\b[^}]*\};/);
+  assert.match(source('object_layer_lifecycle_ops.rs'),
+    /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_layer_lifecycle_refusals\.rs"\]\s*mod object_layer_lifecycle_refusals;/);
+  const historyText = source('object_history.rs');
+  assert.match(historyText, /#\[path = "object_layer_lifecycle_history\.rs"\]\s*mod layer_lifecycle;/);
+  for (const [name, mod] of [
+    ['object_layer_lifecycle', 'object_layer_lifecycle_tests'], ['object_layer_lifecycle_chain', 'object_layer_lifecycle_chain'],
+    ['object_layer_lifecycle_controls', 'object_layer_lifecycle_controls'], ['object_layer_lifecycle_payloads', 'object_layer_lifecycle_payloads'],
+    ['object_layer_lifecycle_scenario', 'object_layer_lifecycle_scenario'], ['object_layer_lifecycle_topology', 'object_layer_lifecycle_topology'],
+  ]) {
+    assert.match(historyText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const dispatchText = source('object_command_dispatch.rs');
+  assert.match(dispatchText, /!Self::layer_lifecycle_operation\(&request\.operation\)/);
+  assert.match(dispatchText, /self\.dispatch_layer_lifecycle\(&request\.operation, &request\.payload\)/);
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-layer-lifecycle/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 35, 'the lifecycle oracle keeps its 35 scenarios');
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/object_layer_lifecycle_ops.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_layer_lifecycle_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_layer_lifecycle.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_layer_lifecycle_chain.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_layer_lifecycle_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_layer_lifecycle_payloads.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_layer_lifecycle_refusals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_layer_lifecycle_scenario.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_layer_lifecycle_topology.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L02-G group record and transactions stay private kernel/codec/owner/history children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectGroupOpsRegistration, /L02-G\/#2208/);
+  const source = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
+  assert.match(source('object_group_kernels.rs'),
+    /#\[path = "object_group_plan\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_group_plan;\s*#\[path = "object_group_record\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_group_record;/);
+  assert.match(source('object_document.rs'), /pub\(crate\) use object_group_kernels::object_group_record::GroupTable;/);
+  assert.match(source('object_document.rs'), /pub\(crate\) groups: Presence<GroupTable>,/);
+  assert.match(source('object_document.rs'), /#\[serde\(default\)\] groups: Presence<GroupTable> \}\);/);
+  assert.match(source('object_codec.rs'), /#\[path = "object_group_codec\.rs"\]\s*mod object_group_codec;/);
+  assert.match(source('object_codec.rs'), /object_group_codec::validate_group_table\(/);
+  assert.match(source('object_group_codec.rs'),
+    /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_group_ops_admission\.rs"\]\s*mod object_group_ops_admission;\s*#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_group_ops_admission_limits\.rs"\]\s*mod object_group_ops_admission_limits;/);
+  assert.match(source('object_fill_owner.rs'), /#\[path = "object_group_ops\.rs"\]\s*mod group_edit;\s*pub\(crate\) use group_edit::PreparedGroupEdit;/);
+  assert.match(source('commands.rs'), /ObjectFillOwner, PreparedGroupEdit, /);
+  assert.match(source('object_group_ops.rs'), /#\[path = "object_group_payload\.rs"\]\s*mod wire;/);
+  assert.match(source('object_group_ops.rs'),
+    /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_group_ops_refusals\.rs"\]\s*mod object_group_ops_refusals;/);
+  const historyText = source('object_history.rs');
+  assert.match(historyText, /#\[path = "object_group_history\.rs"\]\s*mod group_history;/);
+  for (const [name, mod] of [
+    ['object_group_ops', 'object_group_ops_tests'], ['object_group_ops_chain', 'object_group_ops_chain'],
+    ['object_group_ops_controls', 'object_group_ops_controls'], ['object_group_ops_join', 'object_group_ops_join'],
+    ['object_group_ops_payloads', 'object_group_ops_payloads'], ['object_group_ops_topology', 'object_group_ops_topology'],
+  ]) {
+    assert.match(historyText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const dispatchText = source('object_command_dispatch.rs');
+  assert.match(dispatchText, /!Self::group_operation\(&request\.operation\)/);
+  assert.match(dispatchText, /self\.dispatch_group\(&request\.operation, &request\.payload\)/);
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-group-ops/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 21, 'the group oracle keeps its 21 scenarios');
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_group_record.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_group_plan.rs'],
+    ['rust.native.engine.codec', 'native-engine/src/object_group_codec.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_group_ops.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_group_payload.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_group_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_admission.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_admission_limits.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_chain.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_join.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_payloads.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_refusals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_group_ops_topology.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L05-C frame-structure transactions stay sealed children of the fill owner and the history owner and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeFrameEditStructureRegistration, /L05-C\/#2190/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_frame_edit_structure\.rs"\]\s*mod object_frame_edit_structure;\s*pub\(crate\) use object_frame_edit_structure::PreparedFrameStructure;/);
+  assert.match(read('native-engine/src/commands.rs'), /#\[cfg\(feature = "history"\)\]\s*pub\(crate\) use object_fill_owner::PreparedFrameStructure;/);
+  assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_frame_edit_structure_history\.rs"\]\s*mod object_frame_edit_structure;/);
+  const dispatch = read('native-engine/src/object_command_dispatch.rs');
+  assert.match(dispatch, /is_frame_structure_operation\(request\.operation\.as_str\(\)\)/);
+  assert.match(dispatch, /self\.dispatch_frame_structure\(request\.operation\.as_str\(\), &request\.payload\)/);
+  for (const [file, tests] of [['native-engine/src/object_frame_edit_structure.rs', 'object_frame_edit_structure'],
+    ['native-engine/src/object_frame_edit_structure_history.rs', 'object_frame_edit_structure_history']]) {
+    const text = read(file);
+    assert.doesNotMatch(text.split('#[cfg(test)]')[0], /super::/);
+    assert.match(text, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${tests}\\.rs"\\]\\s*mod tests;`));
+  }
+  const historyTests = read('native-engine/tests/object_frame_edit_structure_history.rs');
+  for (const [name, mod] of [['object_frame_edit_document_build', 'build'], ['object_frame_edit_structure_rows', 'rows'],
+    ['object_frame_edit_structure_controls', 'controls'], ['object_frame_edit_structure_exposure', 'exposure']]) {
+    assert.match(historyTests, new RegExp(`#\\[path = "${name}\\.rs"\\]`));
+    assert.match(historyTests, new RegExp(`mod ${mod};`));
+  }
+  assert.match(historyTests, /#\[cfg\(feature = "evaluation"\)\]\s*#\[path = "object_frame_edit_structure_exposure\.rs"\]/);
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_edit_structure.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_frame_edit_structure_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_structure.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_structure_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_structure_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_structure_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_structure_exposure.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L05-D key-exposure transactions stay sealed children of the fill owner and the history owner and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeExposureEditKeyRegistration, /L05-D\/#2197/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_exposure_edit_key\.rs"\]\s*mod object_exposure_edit_key;\s*pub\(crate\) use object_exposure_edit_key::PreparedExposureKey;/);
+  assert.match(read('native-engine/src/commands.rs'), /#\[cfg\(feature = "history"\)\]\s*pub\(crate\) use object_fill_owner::PreparedExposureKey;/);
+  assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_exposure_edit_key_history\.rs"\]\s*mod object_exposure_edit_key;/);
+  const dispatch = read('native-engine/src/object_command_dispatch.rs');
+  assert.match(dispatch, /is_exposure_key_operation\(request\.operation\.as_str\(\)\)/);
+  assert.match(dispatch, /self\.dispatch_exposure_key\(request\.operation\.as_str\(\), &request\.payload\)/);
+  for (const [file, tests] of [['native-engine/src/object_exposure_edit_key.rs', 'object_exposure_edit_key'],
+    ['native-engine/src/object_exposure_edit_key_history.rs', 'object_exposure_edit_key_history']]) {
+    const text = read(file);
+    assert.doesNotMatch(text.split('#[cfg(test)]')[0], /super::/);
+    assert.match(text, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${tests}\\.rs"\\]\\s*mod tests;`));
+  }
+  const historyTests = read('native-engine/tests/object_exposure_edit_key_history.rs');
+  for (const [name, mod] of [['object_frame_edit_document_build', 'build'], ['object_exposure_edit_key_rows', 'rows'],
+    ['object_exposure_edit_key_reach', 'reach'], ['object_exposure_edit_key_controls', 'controls'],
+    ['object_exposure_edit_key_exposure', 'exposure']]) {
+    assert.match(historyTests, new RegExp(`#\\[path = "${name}\\.rs"\\]`));
+    assert.match(historyTests, new RegExp(`mod ${mod};`));
+  }
+  assert.match(historyTests, /#\[cfg\(feature = "evaluation"\)\]\s*#\[path = "object_exposure_edit_key_exposure\.rs"\]/);
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/object_exposure_edit_key.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_exposure_edit_key_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_key.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_key_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_key_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_key_reach.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_key_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_key_exposure.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L05-E key-retime transaction stays sealed children of the timing owner, the document kernel, the fill owner and the history owner and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeExposureEditRetimeRegistration, /L05-E\/#2202/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_layer_timing.rs'), /#\[path = "object_exposure_edit_retime_timing\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_exposure_edit_retime_timing;/);
+  assert.match(read('native-engine/src/object_document.rs'), /pub\(crate\) use timing::\{RetimeEdit, RetimePair, RetimePlan\};/);
+  assert.match(read('native-engine/src/object_frame_edit_document.rs'), /#\[path = "object_exposure_edit_retime_document\.rs"\]\s*mod object_exposure_edit_retime_document;\s*pub\(crate\) use object_exposure_edit_retime_document::\{retime_key, RetimeOutcome\};/);
+  assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_exposure_edit_retime\.rs"\]\s*mod object_exposure_edit_retime;\s*pub\(crate\) use object_exposure_edit_retime::PreparedExposureRetime;/);
+  assert.match(read('native-engine/src/commands.rs'), /#\[cfg\(feature = "history"\)\]\s*pub\(crate\) use object_fill_owner::PreparedExposureRetime;/);
+  assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_exposure_edit_retime_history\.rs"\]\s*mod object_exposure_edit_retime;/);
+  const dispatch = read('native-engine/src/object_command_dispatch.rs');
+  assert.match(dispatch, /is_exposure_retime_operation\(request\.operation\.as_str\(\)\)/);
+  assert.match(dispatch, /self\.dispatch_exposure_retime\(&request\.payload\)/);
+  for (const [file, tests] of [['native-engine/src/object_exposure_edit_retime_timing.rs', 'object_exposure_edit_retime_timing'],
+    ['native-engine/src/object_exposure_edit_retime.rs', 'object_exposure_edit_retime'],
+    ['native-engine/src/object_exposure_edit_retime_history.rs', 'object_exposure_edit_retime_history']]) {
+    const text = read(file);
+    assert.doesNotMatch(text.split('#[cfg(test)]')[0], /super::/);
+    assert.match(text, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${tests}\\.rs"\\]\\s*mod tests;`));
+  }
+  assert.doesNotMatch(read('native-engine/src/object_exposure_edit_retime_document.rs'), /super::/);
+  const historyTests = read('native-engine/tests/object_exposure_edit_retime_history.rs');
+  for (const [name, mod] of [['object_frame_edit_document_build', 'build'], ['object_exposure_edit_retime_rows', 'rows'],
+    ['object_exposure_edit_retime_reach', 'reach'], ['object_exposure_edit_retime_controls', 'controls'],
+    ['object_exposure_edit_retime_exposure', 'exposure']]) {
+    assert.match(historyTests, new RegExp(`#\\[path = "${name}\\.rs"\\]`));
+    assert.match(historyTests, new RegExp(`mod ${mod};`));
+  }
+  assert.match(historyTests, /#\[cfg\(feature = "evaluation"\)\]\s*#\[path = "object_exposure_edit_retime_exposure\.rs"\]/);
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_exposure_edit_retime_timing.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_exposure_edit_retime_document.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_exposure_edit_retime.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_exposure_edit_retime_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_retime.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_retime_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_retime_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_retime_reach.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_retime_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_retime_exposure.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_exposure_edit_retime_timing.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-M widget transactions stay private command children behind the shared dispatch and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectWidgetEditRegistration, /L03-M\/#2209/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_widget_edit\.rs"\]\s*mod widget_edit;\s*pub\(crate\) use widget_edit::PreparedWidgetEdit;/);
+  assert.match(read('native-engine/src/object_snapshot.rs'), /#\[path = "object_widget_read\.rs"\]\s*pub\(crate\) mod widget_read;/);
+  const editText = read('native-engine/src/object_widget_edit.rs');
+  assert.match(editText, /#\[path = "object_widget_settings\.rs"\]\s*mod settings;/);
+  for (const file of ['object_widget_edit.rs', 'object_widget_settings.rs', 'object_widget_read.rs']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}`), /super::/, `${file} imports without super::`);
+  }
+  for (const file of ['object_widget_edit.rs', 'object_widget_settings.rs']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}`), /crate::evaluation::/, `${file} reaches the kernel only through the facade`);
+  }
+  assert.match(read('native-engine/src/object_widget_read.rs'), /crate::evaluation::object_image_mesh_kernels::object_widget_geometry::/);
+  const propertyEdit = read('native-engine/src/object_property_edit.rs');
+  assert.equal((propertyEdit.match(/fn apply_property_edit_json\(/g) || []).length, 1, 'one strict edit body');
+  assert.match(propertyEdit, /Self::apply_property_edit_json\(origin, document, bytes\)/);
+  const dispatchText = read('native-engine/src/object_command_dispatch.rs');
+  assert.equal((dispatchText.match(/fn dispatch_widget_command\(/g) || []).length, 1, 'one widget dispatch body');
+  assert.match(dispatchText, /OP_WIDGET_CREATE \| OP_WIDGET_WRITE \| OP_WIDGET_SETTINGS/);
+  const historyText = read('native-engine/src/object_history.rs');
+  for (const [name, mod, gate] of [
+    ['object_widget_edit_rows', 'object_widget_edit_rows', 'test'], ['object_widget_edit', 'object_widget_edit_tests', 'test'],
+    ['object_widget_edit_controls', 'object_widget_edit_controls_tests', 'test'], ['object_widget_edit_guards', 'object_widget_edit_guards_tests', 'test'],
+    ['object_widget_edit_writes', 'object_widget_edit_writes_tests', 'all\\(test, feature = "evaluation"\\)'],
+  ]) {
+    assert.match(historyText, new RegExp(`#\\[cfg\\(${gate}\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-widget-edit/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 308, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/object_widget_edit.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_widget_settings.rs'],
+    ['rust.native.engine.read-queries', 'native-engine/src/object_widget_read.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_edit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_edit_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_edit_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_edit_guards.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_widget_edit_writes.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L06-H asset attach / remove transaction stays five private layer children and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectRasterAssetAttachRegistration, /L06-H/);
+  const src = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
+  assert.match(src('object_reference_revision.rs'), /#\[path = "object_raster_asset_attach\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_raster_asset_attach;/);
+  assert.match(src('object_snapshot.rs'), /#\[cfg\(all\(feature = "history", feature = "project_media_codec"\)\)\]\s*#\[path = "object_raster_asset_prepare\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_raster_asset_prepare;/);
+  assert.match(src('object_snapshot.rs'), /pub\(crate\) use object_raster_asset_prepare::\{AssetEdit, PreparedAssetEdit\};/);
+  assert.match(src('object_fill_owner.rs'), /#\[cfg\(feature = "project_media_codec"\)\]\s*#\[path = "object_raster_asset_owner\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_raster_asset_owner;/);
+  assert.match(src('object_project_history.rs'), /#\[path = "object_raster_asset_dispatch\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod asset_dispatch;/);
+  assert.match(src('object_raster_asset_kernels.rs'), /#\[path = "object_raster_asset_use\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_raster_asset_use;/);
+  assert.match(src('object_project_admission.rs'), /pub\(crate\) fn check_candidate_saveable\(\s*candidate: &crate::object_codec::ProjectEnvelope,\s*\) -> Result<\(\), DispatchErrorCode> \{\s*encode_project_envelope\(candidate, wire_limits\(\)\)/);
+  assert.match(src('object_raster_asset_prepare.rs'), /check_candidate_saveable/);
+  const codec = src('object_codec.rs');
+  for (const alias of ['object_raster_asset_admission as raster_asset_admission', 'object_raster_asset_use as raster_asset_use', 'object_raster_asset_admission::png_port as raster_asset_png_port']) {
+    assert.ok(codec.includes(`object_raster_asset_kernels::${alias};`), alias);
+  }
+  const gated = 'cfg\\(all\\(test, feature = "history", feature = "project_media_codec"\\)\\)';
+  for (const [file, cfg, names] of [
+    ['object_raster_asset_attach.rs', gated, ['object_raster_asset_attach', 'object_raster_asset_attach_controls']],
+    ['object_raster_asset_prepare.rs', gated, ['object_raster_asset_attach_prepare', 'object_raster_asset_attach_prepare_refusals']],
+    ['object_raster_asset_owner.rs', gated, ['object_raster_asset_attach_owner']],
+    ['object_raster_asset_dispatch.rs', 'cfg\\(test\\)', ['object_raster_asset_attach_dispatch', 'object_raster_asset_attach_dispatch_replay', 'object_raster_asset_attach_dispatch_reopen', 'object_raster_asset_attach_dispatch_saveable']],
+  ]) {
+    const text = src(file);
+    for (const name of names) {
+      assert.match(text, new RegExp(`#\\[${cfg}\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${name};`), `${file} declares ${name}`);
+    }
+    // R5: no production super:: (the test declarations come last in each file).
+    assert.doesNotMatch(text.split('#[path = "../tests/')[0], /super::/, `${file} production`);
+  }
+  // Layer discipline of the existing edge gate, restated per file.
+  assert.doesNotMatch(src('object_raster_asset_prepare.rs'), /crate::object_document/);
+  assert.doesNotMatch(src('object_raster_asset_attach.rs'), /crate::object_codec|crate::object_snapshot|crate::commands/);
+  assert.doesNotMatch(src('object_raster_asset_dispatch.rs'), /crate::object_codec|crate::object_snapshot|crate::object_document/);
+  assert.doesNotMatch(src('object_raster_asset_use.rs'), /crate::(?!object_document::)/);
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_raster_asset_use.rs'],
+    ['rust.native.engine.revision', 'native-engine/src/object_raster_asset_attach.rs'],
+    ['rust.native.engine.read-queries', 'native-engine/src/object_raster_asset_prepare.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_raster_asset_owner.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_raster_asset_dispatch.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_prepare.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_prepare_refusals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_owner.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_dispatch.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_dispatch_replay.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_dispatch_reopen.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_dispatch_saveable.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_attach_support.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L09-H placement persistence stays private document, codec, owner, history and revision children and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectMediaLinkTrackRegistration, /L09-H\/#2207/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_media_timing_core.rs'),
+    /#\[path = "object_media_link_edit\.rs"\]\s*pub\(crate\) mod object_media_link_edit;/);
+  assert.match(read('native-engine/src/project_asset_wire.rs'),
+    /#\[path = "object_media_link_track\.rs"\]\s*pub\(crate\) mod object_media_link_track;/);
+  assert.match(read('native-engine/src/object_fill_owner.rs'),
+    /#\[path = "object_media_link_owner\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_media_link_owner;/);
+  assert.match(read('native-engine/src/object_history.rs'),
+    /#\[path = "object_media_link_history\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_media_link_history;/);
+  assert.match(read('native-engine/src/object_project_settings_revision.rs'),
+    /#\[path = "object_media_link_revision\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_media_link_revision;/);
+  for (const [src, children] of [
+    ['native-engine/src/object_media_link_edit.rs', [['object_media_link_edit', 'tests'], ['object_media_link_edit_check', 'check_tests']]],
+    ['native-engine/src/object_media_link_track.rs', [['object_media_link_track', 'tests'], ['object_media_link_track_controls', 'controls']]],
+    ['native-engine/src/object_media_link_history.rs', [['object_media_link_history', 'tests']]],
+  ]) {
+    const text = read(src);
+    for (const [name, mod] of children) {
+      assert.match(text, new RegExp(`#\\[cfg\\(.*test.*\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+    }
+    assert.doesNotMatch(text, /\buse super::/, `${src} imports through the absolute module chain`);
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_media_link_edit.rs'],
+    ['rust.native.engine.codec', 'native-engine/src/object_media_link_track.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_media_link_owner.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_media_link_history.rs'],
+    ['rust.native.engine.revision', 'native-engine/src/object_media_link_revision.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_link_edit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_link_edit_check.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_link_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_link_history_refusals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_link_track.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_link_track_controls.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);

@@ -7,10 +7,22 @@ pub use object_fill::{prepare_object_fill_json, PreparedObjectFill};
 #[cfg(feature = "history")]
 mod object_fill_owner;
 #[cfg(feature = "history")]
+#[allow(unused_imports)]
+pub(crate) use object_fill_owner::{insert_order_element, remove_order_element, OrderEditError};
+#[cfg(feature = "history")]
 pub(crate) use object_fill_owner::{
-    ObjectFillOwner, PreparedLayerCreate, PreparedLayerPolicy, PreparedLayerVisibility,
-    PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit, ReferenceEdit,
+    ObjectFillOwner, PreparedGroupEdit, PreparedLayerCreate, PreparedLayerLifecycle,
+    PreparedLayerPolicy, PreparedLayerVisibility, PreparedPlacementEdit, PreparedProjectSettings,
+    PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit, PreparedWidgetEdit,
+    ReferenceEdit, VectorEditResult, MAX_VECTOR_REQUEST_BYTES,
 };
+
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedExposureKey;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedExposureRetime;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedFrameStructure;
 
 use crate::document::OpacityDocument;
 use crate::request_receipts::{

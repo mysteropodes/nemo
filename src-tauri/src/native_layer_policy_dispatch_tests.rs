@@ -236,9 +236,9 @@ fn policy_bounded_raw_client_reaches_same_owner_and_rejects_original_duplicate_m
     );
     assert_ne!(duplicate, raw);
     let before = saved(&state, &id);
-    assert!(crate::native_object_client::admit_raw(&duplicate).is_err());
+    assert!(crate::application_mcp::object_client::admit_raw(&duplicate).is_err());
     assert_eq!(saved(&state, &id), before);
-    let reply = crate::native_object_client::dispatch_raw(&state, &raw).unwrap();
+    let reply = crate::application_mcp::object_client::dispatch_raw(&state, &raw).unwrap();
     assert!(reply.ok);
     assert_eq!(reply.content_revision, 1);
     assert_eq!(
@@ -250,7 +250,7 @@ fn policy_bounded_raw_client_reaches_same_owner_and_rejects_original_duplicate_m
         true
     );
     assert_eq!(
-        crate::native_object_client::dispatch_raw(&state, &raw).unwrap(),
+        crate::application_mcp::object_client::dispatch_raw(&state, &raw).unwrap(),
         reply
     );
     let after = saved(&state, &id);
@@ -387,7 +387,7 @@ async fn policy_public_wire_ack_and_bounded_history_preserve_noop_redo_and_autho
             "instanceId":state.instance_id(),"documentId":id,"expectedRevision":revision,
             "operation":if redo {"command.document.object.redo"} else {"command.document.object.undo"},
             "payload":{"command":if redo {"object.redo"} else {"object.undo"}}}).to_string();
-        crate::native_object_client::dispatch_raw(&state, &raw).unwrap()
+        crate::application_mcp::object_client::dispatch_raw(&state, &raw).unwrap()
     };
     let undo = history("bounded-undo-lock", 1, false);
     assert!(undo.ok);

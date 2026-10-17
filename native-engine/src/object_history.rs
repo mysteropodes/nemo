@@ -1,7 +1,8 @@
 //! Staged object edits/history authority; no transport, retries or replacement port.
 use crate::commands::{
     ObjectFillOwner, PreparedLayerCreate, PreparedLayerVisibility, PreparedObjectFill,
-    PreparedPropertyEdit, PreparedReferenceEdit, ReferenceEdit,
+    PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit, PreparedWidgetEdit,
+    ReferenceEdit,
 };
 use crate::object_document::{ObjectDocument, ProjectEnvelope};
 use crate::request_receipts::DispatchErrorCode;
@@ -17,6 +18,25 @@ mod layer_policy;
 mod object_command_dispatch;
 #[path = "object_project_settings_history.rs"]
 mod project_settings;
+// L02-F (#2108): layer delete/duplicate/rename/reorder as owner transactions.
+#[path = "object_layer_lifecycle_history.rs"]
+mod layer_lifecycle;
+// L02-G (#2108): group / ungroup / combine / mode / rename as owner transactions.
+#[path = "object_group_history.rs"]
+mod group_history;
+// L05-C (lane #2111): frame-structure transactions (insert / extend / duplicate / remove frames).
+#[path = "object_frame_edit_structure_history.rs"]
+mod object_frame_edit_structure;
+// L05-D (lane #2111): F6 / Clear Keyframe / Delete Frames / Remove Tween transactions.
+#[path = "object_exposure_edit_key_history.rs"]
+mod object_exposure_edit_key;
+// L05-E (lane #2111): key retime (moveKeyframe) transaction.
+#[path = "object_exposure_edit_retime_history.rs"]
+mod object_exposure_edit_retime;
+// L09-H (#2115): placement edits as one history transaction (G42, I16b).
+#[path = "object_media_link_history.rs"]
+#[allow(dead_code)]
+mod object_media_link_history;
 // L10-B (#2124): lane-10 shot/montage/import family aggregator.
 #[path = "object_shot_kernels.rs"]
 #[allow(dead_code)]
@@ -39,8 +59,60 @@ mod project_tests;
 #[path = "../tests/object_layer_create.rs"]
 mod layer_create_tests;
 #[cfg(test)]
+#[path = "../tests/object_group_ops_chain.rs"]
+mod object_group_ops_chain;
+#[cfg(test)]
+#[path = "../tests/object_group_ops_controls.rs"]
+mod object_group_ops_controls;
+#[cfg(test)]
+#[path = "../tests/object_group_ops_join.rs"]
+mod object_group_ops_join;
+#[cfg(test)]
+#[path = "../tests/object_group_ops_payloads.rs"]
+mod object_group_ops_payloads;
+#[cfg(test)]
+#[path = "../tests/object_group_ops.rs"]
+mod object_group_ops_tests;
+#[cfg(test)]
+#[path = "../tests/object_group_ops_topology.rs"]
+mod object_group_ops_topology;
+#[cfg(test)]
+#[path = "../tests/object_layer_lifecycle_chain.rs"]
+mod object_layer_lifecycle_chain;
+#[cfg(test)]
+#[path = "../tests/object_layer_lifecycle_controls.rs"]
+mod object_layer_lifecycle_controls;
+#[cfg(test)]
+#[path = "../tests/object_layer_lifecycle_payloads.rs"]
+mod object_layer_lifecycle_payloads;
+#[cfg(test)]
+#[path = "../tests/object_layer_lifecycle_scenario.rs"]
+mod object_layer_lifecycle_scenario;
+#[cfg(test)]
+#[path = "../tests/object_layer_lifecycle.rs"]
+mod object_layer_lifecycle_tests;
+#[cfg(test)]
+#[path = "../tests/object_layer_lifecycle_topology.rs"]
+mod object_layer_lifecycle_topology;
+#[cfg(test)]
 #[path = "../tests/object_property_edit.rs"]
 mod property_edit_tests;
+// L03-M (#2109): widget transaction tests (the write tests need the evaluation kernel).
+#[cfg(test)]
+#[path = "../tests/object_widget_edit_controls.rs"]
+mod object_widget_edit_controls_tests;
+#[cfg(test)]
+#[path = "../tests/object_widget_edit_guards.rs"]
+mod object_widget_edit_guards_tests;
+#[cfg(test)]
+#[path = "../tests/object_widget_edit_rows.rs"]
+mod object_widget_edit_rows;
+#[cfg(test)]
+#[path = "../tests/object_widget_edit.rs"]
+mod object_widget_edit_tests;
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_widget_edit_writes.rs"]
+mod object_widget_edit_writes_tests;
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_property_sampling.rs"]
 mod property_sampling_tests;
@@ -82,6 +154,62 @@ impl NativeObjectHistory {
     ) -> Result<u64, DispatchErrorCode> {
         let before = self.content_revision();
         let after = self.owner.commit_property_edit(candidate)?;
+        if before != after {
+            self.undo.push(ObjectHistoryEntry {
+                before_revision: before,
+                after_revision: after,
+            });
+            self.redo.clear();
+        }
+        Ok(after)
+    }
+    pub(crate) fn prepare_vector_edit_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedVectorEdit, DispatchErrorCode> {
+        self.owner.prepare_vector_edit_json(bytes)
+    }
+    /// History entry only when the revision changed: an exact no-op keeps both stacks.
+    pub(crate) fn commit_vector_edit(
+        &mut self,
+        candidate: PreparedVectorEdit,
+    ) -> Result<u64, DispatchErrorCode> {
+        let before = self.content_revision();
+        let after = self.owner.commit_vector_edit(candidate)?;
+        if before != after {
+            self.undo.push(ObjectHistoryEntry {
+                before_revision: before,
+                after_revision: after,
+            });
+            self.redo.clear();
+        }
+        Ok(after)
+    }
+    /// Widget creation is the layer-create candidate with the widget, controls and holder added.
+    pub(crate) fn prepare_widget_create_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerCreate, DispatchErrorCode> {
+        self.owner.prepare_widget_create_json(bytes)
+    }
+    pub(crate) fn prepare_widget_write_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedWidgetEdit, DispatchErrorCode> {
+        self.owner.prepare_widget_write_json(bytes)
+    }
+    pub(crate) fn prepare_widget_settings_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedWidgetEdit, DispatchErrorCode> {
+        self.owner.prepare_widget_settings_json(bytes)
+    }
+    pub(crate) fn commit_widget_edit(
+        &mut self,
+        candidate: PreparedWidgetEdit,
+    ) -> Result<u64, DispatchErrorCode> {
+        let before = self.content_revision();
+        let after = self.owner.commit_widget_edit(candidate)?;
         if before != after {
             self.undo.push(ObjectHistoryEntry {
                 before_revision: before,

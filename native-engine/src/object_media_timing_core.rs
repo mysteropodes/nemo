@@ -20,3 +20,6 @@ pub(crate) mod object_media_link_join;
 
 #[path = "object_media_link_plan.rs"]
 pub(crate) mod object_media_link_plan;
+
+#[path = "object_media_link_edit.rs"]
+pub(crate) mod object_media_link_edit;

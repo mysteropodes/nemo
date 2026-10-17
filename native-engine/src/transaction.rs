@@ -225,6 +225,7 @@ pub(crate) enum CompactResult {
     LayerCreated {
         layer_uid: String,
     },
+    VectorEdit(crate::commands::VectorEditResult),
     Transaction(TransactionRecord),
 }
 
@@ -264,6 +265,7 @@ impl RetainedDisposition {
                     CompactResult::LayerCreated { layer_uid } => json!({
                         "applied": true, "historyEntriesAdded": 1, "layerUid": layer_uid
                     }),
+                    CompactResult::VectorEdit(vector) => vector.result(),
                     CompactResult::Transaction(record) => record.result(),
                 };
                 (true, Some(result), None)

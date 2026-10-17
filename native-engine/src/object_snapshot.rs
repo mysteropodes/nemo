@@ -19,6 +19,9 @@ mod property_metadata_tests;
 mod property_read;
 #[path = "object_timing_snapshot.rs"]
 mod timing;
+// L03-M (#2109): widget write planning through the evaluation kernel (commands may not import it).
+#[path = "object_widget_read.rs"]
+pub(crate) mod widget_read;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;
@@ -28,6 +31,14 @@ const MAX_MESSAGE_BYTES: usize = 4096;
 mod project_admission;
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use project_admission::PreparedReferenceAttachment;
+
+// L06-H (lane #2112): typed preparation of an asset attach / remove from one snapshot.
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_raster_asset_prepare.rs"]
+#[allow(dead_code)]
+mod object_raster_asset_prepare;
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use object_raster_asset_prepare::{AssetEdit, PreparedAssetEdit};
 
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 #[path = "object_project_wire_admission.rs"]

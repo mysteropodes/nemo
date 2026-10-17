@@ -28,7 +28,9 @@ test('strict delivered matching remains false for append until the complete read
   assert.equal(Files.refreshLayerTable(root,info([A,B,C],1)),true);
   assert.equal(root.state.layers,rows);assert.equal(rows[0],first);assert.equal(rows[1],second);
   assert.equal(first.frames,frames);assert.equal(first.motion,motion);assert.deepEqual(first.uiOnly,{expanded:true});
-  assert.deepEqual(Object.keys(rows[2]).sort(),['layerUid','name','visible']);
+  assert.deepEqual(Object.keys(rows[2]).sort(),['layerUid','locked','name','shy','visible']);
+  assert.equal(rows[2].locked,false);assert.equal(rows[2].shy,false);
+  assert.equal(Object.hasOwn(C,'locked'),false);assert.equal(Object.hasOwn(C,'shy'),false);
   assert.equal(rows[2].name,'');assert.equal(Files.projectionMatches(root,info([A,B,C])),true);
   assert.equal(root.state.currentFrame,7);assert.equal(root._curFrame,7);assert.equal(root.state.waIn,3);assert.equal(root.state.waOut,19);
   assert.equal(root._waIn,3);assert.equal(root._waOut,19);assert.equal(root.state.activeLayerIdx,1);

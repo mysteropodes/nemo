@@ -42,6 +42,13 @@ pub(crate) mod project_settings_test_codec {
 }
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
+// L06-H (lane #2112): the lane-6 document kernels the read-queries preparation consumes.
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_admission as raster_asset_admission;
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_admission::png_port as raster_asset_png_port;
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_use as raster_asset_use;
 // L06-E (lane #2112): the asset value types the read-queries pixel handle names; read-queries may not import object_document.
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use crate::object_document::{AssetId, AssetInventory, AssetKind};
@@ -91,6 +98,9 @@ mod order;
 #[path = "object_vector_codec.rs"]
 #[allow(dead_code)]
 mod object_vector_codec;
+// L02-G (#2108): admission of the per-layer group table.
+#[path = "object_group_codec.rs"]
+mod object_group_codec;
 // L01-E (#2107): admission of the vector extension slot and of the per-layer pathFx stack.
 #[path = "object_vector_ext_codec.rs"]
 #[allow(dead_code)]
@@ -328,6 +338,14 @@ pub(crate) fn validate_content(
         }
         if !layers.insert(layer.layer_uid.as_str()) {
             return Err(reject(DuplicateId, "duplicate layerUid"));
+        }
+        if let Some(table) = layer.groups.value() {
+            object_group_codec::validate_group_table(
+                &layer.layer_uid,
+                table,
+                objects,
+                complete_contexts,
+            )?;
         }
     }
     crate::object_document::validate_widget_layers(declared_layers, objects)

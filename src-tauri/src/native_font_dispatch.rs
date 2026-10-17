@@ -39,7 +39,7 @@ pub(super) fn invoke_font(
 }
 
 impl RevisionSync {
-    pub(super) async fn dispatch_async(
+    pub(in crate::application_mcp) async fn dispatch_async(
         &self,
         instance: &str,
         native: &NativeState,
