@@ -125,9 +125,13 @@ fn an_insert_that_ignores_the_selection_is_caught_where_a_padded_layer_has_cells
 #[test]
 fn a_duplicate_copied_from_the_key_instead_of_the_shown_sample_is_caught_on_sample_sources() {
     fn copy_from_key(row: &Row, _: Build, out: &mut ObjectDocument) {
+        // Only a `dup` row carries a bare cell index in `args` (other ops carry
+        // ranges or counts), so test the op before parsing.
         let sample = |row: &Row| {
-            let cell: usize = row.args.parse().unwrap();
-            row.op == "dup" && row.chg && matches!(row.input[0][cell].flag, 'I' | 'M' | 'N')
+            row.op == "dup" && row.chg && {
+                let cell: usize = row.args.parse().unwrap();
+                matches!(row.input[0][cell].flag, 'I' | 'M' | 'N')
+            }
         };
         if !sample(row) {
             return;

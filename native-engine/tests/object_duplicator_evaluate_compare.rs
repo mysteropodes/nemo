@@ -7,13 +7,16 @@
 use super::test_codec::{document_of, LogRow, Out, Scenario, World};
 use super::{Entry, EvaluateError, Evaluation, Ports, Request, UnchangedReason};
 use crate::evaluation::object_component_kernels::duplicator_placement_apply::{
-    DuplicatorCopy, UnavailableField,
+    ApplyError, DuplicatorCopy, UnavailableField,
 };
 use crate::evaluation::object_component_kernels::duplicator_placement_jsnum::truthy;
 use crate::evaluation::object_component_kernels::duplicator_placement_matrix::test_codec::{
     close, fill_matches, same, segments_of, Want,
 };
-use crate::evaluation::object_component_kernels::duplicator_placement_temporal::SpanBounds;
+use crate::evaluation::object_component_kernels::duplicator_placement_matrix::MatrixError;
+use crate::evaluation::object_component_kernels::duplicator_placement_temporal::{
+    BuildError, SpanBounds,
+};
 use crate::object_document::object_component_record_kernels::object_duplicator_records::DuplicatorSet;
 use crate::object_document::ObjectLayer;
 
@@ -176,6 +179,14 @@ fn placement_mismatch(sc: &Scenario, set: &super::CopySet) -> Option<String> {
     None
 }
 
+/// The `dupIndex` of the first baseline copy with a non-finite coordinate.
+fn first_non_finite(wants: &[Want]) -> Option<u32> {
+    wants
+        .iter()
+        .find(|w| w.segs.iter().flatten().any(|v| !v.is_finite()))
+        .map(|w| w.dup_index)
+}
+
 /// The first difference between what the join produced and the baseline.
 pub(crate) fn mismatch(sc: &Scenario, run: &Run) -> Option<String> {
     let fail = |what: &str| Some(format!("{}: {what}", sc.name));
@@ -193,6 +204,24 @@ pub(crate) fn mismatch(sc: &Scenario, run: &Run) -> Option<String> {
             }
             copy_mismatch(sc, first, &set.copies[0], None)
                 .or_else(|| copy_mismatch(sc, last, &set.copies[*n - 1], None))
+        }
+        // The baseline hands back copies whose coordinates are NaN (an `undefined`
+        // or empty host sample poisons the placement). A native `ObjectRecord`
+        // number is a JSON number and cannot hold NaN; the L04-D contract makes a
+        // non-finite transformed geometry the typed `ResultNotFinite` error, so
+        // the first such copy is the one that fails.
+        (result, Out::List(wants)) if first_non_finite(wants).is_some() => {
+            let index = first_non_finite(wants).expect("checked");
+            match result {
+                Err(EvaluateError::Build(BuildError::CopyFailed {
+                    index: got,
+                    error: ApplyError::Geometry(MatrixError::ResultNotFinite),
+                })) if *got == index => None,
+                other => fail(&format!(
+                    "expected CopyFailed {{ index: {index}, ResultNotFinite }}, got {:?}",
+                    other.as_ref().map(|_| ())
+                )),
+            }
         }
         (Ok(Evaluation::Copies(set)), Out::List(wants)) => {
             if set.copies.len() != wants.len() {

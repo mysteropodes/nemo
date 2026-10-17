@@ -1,8 +1,8 @@
 //! Token codec shared by the L04-D oracle tests (reading and printing only).
 //!
 //! A stroke token is `ID/FILL/C/SEGS` (see the header of
-//! `fixtures/duplicator-placement-matrix/oracle.txt`): `FILL` is `#rrggbb` or
-//! `#rrggbbaa`, `C` is `1` for a closed path, `SEGS` is `-` or segments
+//! `fixtures/duplicator-placement-matrix/oracle.txt`): `FILL` is `#rrggbb`,
+//! `#rrggbbaa` or `undefined` (an absent fill), `C` is `1` for a closed path, `SEGS` is `-` or segments
 //! joined by `;`, each segment six IEEE bit patterns joined by `:` (point,
 //! handleIn, handleOut). An output token appends `/OPACITY/DUPINDEX/CLONEID/
 //! DUP3D`. Strokes are built as real native [`ObjectRecord`]s through the
@@ -79,7 +79,7 @@ pub(crate) fn record(id: &str, fill: &str, closed: bool, segs: &[[f64; 6]]) -> O
             })
         })
         .collect();
-    let value = json!({
+    let mut value = json!({
         "schemaVersion": 1,
         "family": "vector",
         "target": {
@@ -95,8 +95,12 @@ pub(crate) fn record(id: &str, fill: &str, closed: bool, segs: &[[f64; 6]]) -> O
             "handleSpace": "relative",
             "segments": segments,
         },
-        "fill": fill_json(fill),
     });
+    // The baseline's `undefined` fill is an ABSENT member (`Presence::Missing`);
+    // a JSON null would be a present "no fill" and is a different state.
+    if fill != "undefined" {
+        value["fill"] = fill_json(fill);
+    }
     serde_json::from_value(value).expect("a decodable object record")
 }
 
@@ -182,6 +186,9 @@ pub(crate) fn byte_of(n: &Number) -> u32 {
 /// Whether the record's fill is the baseline hex color: its bytes equal the
 /// token's and its alpha is the token's alpha byte (or exactly 1 for `#rrggbb`).
 pub(crate) fn fill_matches(rec: &ObjectRecord, want_hex: &str) -> bool {
+    if want_hex == "undefined" {
+        return rec.fill.missing();
+    }
     let Some(fill) = rec.solid_fill() else {
         return false;
     };
