@@ -3041,7 +3041,7 @@ test('G22/G13 evaluation join stays a private L01 aggregator child and fails clo
   assert.match(joinText, /#\[path = "render_vector_eval_params\.rs"\]\s*pub\(crate\) mod params;/);
   assert.match(joinText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/render_vector_eval\.rs"\]\s*pub\(crate\) mod tests;/);
   const funnelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_scene_producer_contour.rs'), 'utf8');
-  assert.match(funnelText, /render_vector_eval::evaluate_record/);
+  assert.match(funnelText, /render_vector_eval::\{\s*evaluate_record/);
   assert.match(funnelText, /#\[path = "\.\.\/tests\/render_vector_eval_scene\.rs"\]\s*mod render_vector_eval_scene;/);
   for (const [id, file] of [
     ['rust.native.engine.evaluation', 'native-engine/src/render_vector_eval.rs'],
@@ -3158,7 +3158,7 @@ test('L09-I native vector export job join stays a private export-job child and f
 test('L03-F Delaunator port and adaptive orient2d stay private image-mesh-family children and fail closed without registration', () => {
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
-  assert.match(coverage.nativeObjectImageMeshDelaunayRegistration, /L03-F \(lane #2109/);
+  assert.match(coverage.nativeObjectImageMeshDelaunayRegistration, /L03-F\/#2199 \(lane #2109/);
   const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_kernels.rs'), 'utf8');
   for (const name of ['object_image_mesh_orient', 'object_image_mesh_delaunay_geom', 'object_image_mesh_delaunay']) {
     assert.match(aggregatorText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
