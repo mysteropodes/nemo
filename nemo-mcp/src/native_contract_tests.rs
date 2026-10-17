@@ -183,3 +183,34 @@ fn common_result_dispatch_preserves_opaque_linked_font_identity_without_locator(
         &leaked
     ));
 }
+
+#[test]
+fn numeric_selectors_preserve_zero_and_refuse_missing_or_unsafe_values() {
+    for value in [
+        None,
+        Some(json!(null)),
+        Some(json!(true)),
+        Some(json!("0")),
+        Some(json!(-1)),
+        Some(json!(0.5)),
+    ] {
+        assert_eq!(revision(value.as_ref()), None);
+        assert_eq!(frame(value.as_ref()), None);
+    }
+    for (value, expected_revision, expected_frame) in [
+        (0_u64, Some(0), Some(0)),
+        (4_294_967_295, Some(4_294_967_295), Some(4_294_967_295)),
+        (4_294_967_296, Some(4_294_967_296), None),
+        (9_007_199_254_740_991, Some(9_007_199_254_740_991), None),
+        (9_007_199_254_740_992, None, None),
+        (u64::MAX, None, None),
+    ] {
+        let encoded = json!(value);
+        assert_eq!(
+            revision(Some(&encoded)),
+            expected_revision,
+            "revision {value}"
+        );
+        assert_eq!(frame(Some(&encoded)), expected_frame, "frame {value}");
+    }
+}
