@@ -31,9 +31,7 @@
   }
   function refreshVisibility(root,info){
     if(!projectionMatches(root,info))return false;
-    var values=layerTable(info.layers);
-    root.state.layers.forEach(function(row,i){row.visible=values[i].visible;projectFields(row,values[i]);});
-    return true;
+    return refreshLayerTable(root,info);
   }
   function projectionReadyForUI(root,info){
     var pin=projections.get(root),next;
@@ -42,8 +40,8 @@
       ['canvasW','canvasH','fps','totalFrames'].every(function(k){return root.state[k]===info[k];})&&
       ['canvasBg','waIn','waOut'].every(function(k){return !has(info,k)||root.state[k]===info[k];})&&
       next.every(function(layer,i){var row=root.state.layers[i];return row.visible===layer.visible&&
-        (layer.name===undefined||row.name===layer.name)&&['locked','color','parentLayerUid'].every(function(k){
-          return !Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
+        (layer.name===undefined||row.name===layer.name)&&['locked','shy','color','parentLayerUid'].every(function(k){
+          return ['locked','shy'].includes(k)?row[k]===(layer[k]===true):!Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
         });});
   }
   function layerTable(layers){
@@ -53,22 +51,22 @@
       var layer=layers[i];
       if(!layer||typeof layer.layerUid!=='string'||!layer.layerUid||seen.has(layer.layerUid))
         throw new Error('Native layer identity is invalid');
-      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','color','parentLayerUid'].includes(k);}))
+      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible','locked','shy','color','parentLayerUid'].includes(k);}))
         throw new Error('Native layer metadata is unsupported');
       if(Object.prototype.hasOwnProperty.call(layer,'name')&&typeof layer.name!=='string')throw new Error('Native layer name is invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')throw new Error('Native layer visibility is invalid');
-      if(Object.prototype.hasOwnProperty.call(layer,'locked')&&layer.locked!==false)throw new Error('Native layer lock is unsupported');
+      if(['locked','shy'].some(function(k){return Object.prototype.hasOwnProperty.call(layer,k)&&typeof layer[k]!=='boolean';}))throw new Error('Native layer policy flags are invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'color')&&(typeof layer.color!=='string'||!/^#[a-fA-F0-9]{6}$/.test(layer.color)))throw new Error('Native layer color is invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'parentLayerUid')&&layer.parentLayerUid!==null)throw new Error('Native layer parent is unsupported');
       var row={layerUid:layer.layerUid,name:Object.prototype.hasOwnProperty.call(layer,'name')?layer.name:undefined,visible:layer.visible!==false};
-      ['locked','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];});
+      ['locked','shy','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];});
       seen.add(layer.layerUid);next.push(row);
     }
     return next;
   }
   function projectFields(row,layer){
-    ['locked','color','parentLayerUid'].forEach(function(k){
-      if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];
+    ['locked','shy','color','parentLayerUid'].forEach(function(k){
+      if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];else if(['locked','shy'].includes(k))row[k]=false;
     });
   }
   function refreshLayerTable(root,info){
@@ -80,6 +78,7 @@
       typeof info.documentSnapshotId!=='string'||!info.documentSnapshotId||
       info.contentRevision===pin.contentRevision&&(info.documentSnapshotId!==pin.documentSnapshotId||!settingsMatch(pin,info)))return false;
     var next=layerTable(info.layers),delta=next.length-rows.length;
+    if(info.contentRevision===pin.contentRevision&&next.some(function(l,i){return rows[i]&&['locked','shy'].some(function(k){return rows[i][k]!== (l[k]===true);});}))return false;
     if(Math.abs(delta)>1||delta!==0&&info.contentRevision===pin.contentRevision||
       !next.slice(0,Math.min(next.length,rows.length)).every(function(row,i){return row.layerUid===pin.layerUids[i];}))return false;
     // Prepare all metadata and selection before changing this read-side table.

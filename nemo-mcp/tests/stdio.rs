@@ -95,7 +95,15 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         "../../engineering/application/native-property-metadata-v1.schema.json"
     ))
     .unwrap();
-    assert_eq!(command_schema["$defs"]["nativePropertyMetadata"], native_metadata);
+    assert_eq!(
+        command_schema["$defs"]["nativePropertyMetadata"],
+        native_metadata
+    );
+    let native_fonts: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-font-assets-v1.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(command_schema["$defs"]["nativeFontAssets"], native_fonts);
     assert_eq!(command_schema["type"], "object");
     for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
         assert!(
@@ -147,10 +155,16 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     let mut revision_on_query = metadata_query.clone();
     revision_on_query["expectedRevision"] = json!(0);
     assert!(!validator.is_valid(&revision_on_query));
-    for view in [json!({"kind": "targets", "offset": 0}), json!({"kind": "unsupported"})] {
+    for view in [
+        json!({"kind": "targets", "offset": 0}),
+        json!({"kind": "unsupported"}),
+    ] {
         let mut invalid = metadata_query.clone();
         invalid["payload"]["view"] = view;
-        assert!(!validator.is_valid(&invalid), "metadata selector rejects {invalid}");
+        assert!(
+            !validator.is_valid(&invalid),
+            "metadata selector rejects {invalid}"
+        );
     }
     for example in command_schema["examples"].as_array().unwrap() {
         assert!(
@@ -170,6 +184,23 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         unsupported["operation"] = json!("command.not_registered");
         assert!(!validator.is_valid(&unsupported));
     }
+    // Root projection must not reimpose legacy numeric value on native booleans.
+    let mut policy: Value = serde_json::from_str::<Value>(include_str!(
+        "../../engineering/application/capabilities-v2/native-layer-policy.json"
+    ))
+    .unwrap()["examples"][0]["request"]
+        .clone();
+    for flag in ["locked", "shy"] {
+        policy["payload"]["flag"] = json!(flag);
+        for value in [true, false] {
+            policy["payload"]["value"] = json!(value);
+            assert!(validator.is_valid(&policy));
+        }
+        for invalid in [json!(0), json!(1), json!(null), json!("true")] {
+            policy["payload"]["value"] = invalid;
+            assert!(!validator.is_valid(&policy));
+        }
+    }
     let legacy_request = json!({
         "apiVersion": 1,
         "requestId": "fixture-v1",
@@ -180,6 +211,9 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         "payload": {"layerId": "layer-a", "property": "opacity", "value": 25}
     });
     assert!(validator.is_valid(&legacy_request));
+    let mut legacy_boolean = legacy_request.clone();
+    legacy_boolean["payload"]["value"] = json!(true);
+    assert!(!validator.is_valid(&legacy_boolean));
     for (field, value) in [
         ("operation", json!("property.not_registered")),
         ("payload", json!("{}")),
@@ -411,7 +445,6 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     }
     client.cancel().await.unwrap();
 }
-
 
 #[test]
 fn schema_binary_rejects_unsupported_arguments_without_partial_contract_output() {

@@ -379,11 +379,14 @@ fn a_corrupted_oracle_row_is_detected_in_every_section() {
 
 #[test]
 fn scene_solid_range_rule_is_the_compositor_color_rule() {
-    assert!(COMPOSITOR.contains(".filter(|n| n.is_finite() && (0.0..=1.0).contains(n))"));
-    assert!(COMPOSITOR.contains("*target = value as f32;"));
+    // L07-F: the compositor no longer carries a second copy of the rule; it converts
+    // through SceneSolid::rgba_f32 and reports the kernel's own message.
+    assert!(COMPOSITOR.contains(".solid()"));
+    assert!(COMPOSITOR.contains(".rgba_f32()"));
+    assert!(COMPOSITOR.contains("CompositorError::new(error.message())"));
+    assert!(!COMPOSITOR.contains("(0.0..=1.0).contains"));
     let message = ScenePaintError::UnrepresentableStraightRgba.message();
     assert_eq!(message, "unrepresentable object straight RGBA");
-    assert!(COMPOSITOR.contains(message));
 }
 
 #[test]

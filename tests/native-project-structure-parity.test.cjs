@@ -60,7 +60,9 @@ test('N23A production Rust API matches the same fixed corpus and production JS',
   assert.ifError(result.error);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   const marker = 'N23A_RESULTS=';
-  const lines = result.stdout.split(/\r?\n/).filter(line => line.startsWith(marker));
+  const lines = result.stdout.split(/\r?\n/)
+    .map(line => line.replace(/^test project_structure_tests::emit_parity_corpus \.\.\. /, ''))
+    .filter(line => line.startsWith(marker));
   assert.equal(lines.length, 1, `Rust parity harness must execute exactly once:\n${result.stdout}`);
   const actual = JSON.parse(lines[0].slice(marker.length));
   assert.deepEqual(actual.map(entry => entry.id), corpus.cases.map(entry => entry.id));

@@ -688,9 +688,15 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     if (_layerSel.length) return _layerSel.slice();
     return state.layers.map(function (_l, i) { return i; });
   }
+  function routeNativeMotionRead(key,shift){
+    if(n20AllowLegacyWrite('motion.metadata.read')===true)return false;
+    var ui=window.NemoNativeObjectUI;if(ui&&typeof ui.routeMotionShortcut==='function')ui.routeMotionShortcut(window,key,!!shift);
+    return true; // Consumed even when unavailable; never inspect a legacy holder.
+  }
   function handlePropShortcut(key, shiftKey) {
     var prop = PROP_SHORTCUT[(key || '').toLowerCase()];
     if (!prop) return false;
+    if(routeNativeMotionRead(key,shiftKey))return true;
     // Filtering to a property is only half of AE's gesture — the layers have
     // to be OPEN for that row to exist at all. Since selecting no longer
     // expands anything, P on a fresh timeline used to filter a set of rows
@@ -802,6 +808,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   }
   function handleRevealAnimatedShortcut() {
     if (state.appMode !== 'motion') return false;
+    if(routeNativeMotionRead('u',false))return true;
     // U is a TOGGLE (2026-09, feedback #762: "si je révèle les keyframes
     // avec u je dois aussi pouvoir refermer la révélation avec u") — same
     // press-again-to-fold contract handlePropShortcut already has. "Already
@@ -908,11 +915,13 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     return true;
   }
   function handleRevealEffectsShortcut() {
+    if(routeNativeMotionRead('e',false))return true;
     return revealByLayerPredicate(
       function (ld) { return (ld.effects && ld.effects.length) || ld.effectsFrom || ld.isEffectLayer; },
       'Aucun calque ne porte d\u2019effet');
   }
   function handleRevealMattesShortcut() {
+    if(routeNativeMotionRead('m',false))return true;
     return revealByLayerPredicate(
       function (ld) { return ld.matteMode && ld.matteMode !== 'none'; },
       'Aucun calque n\u2019utilise de matte');
@@ -7427,9 +7436,66 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // holder), including the stopwatch and the add-key diamond, so both
   // locations can add/remove keyframes and neither can drift from the
   // other's behavior.
+  // The accepted opacity owner has a separate native projection from the
+  // Object Project inspector. Only its two admitted properties are presented;
+  // no generic holder renderer, expression writer or release route is entered.
+  function renderNativeOpacityPropsPanel(body) {
+    var owner = window.NemoNativeOpacityCutover, surface = window.NemoNativeOpacityMotionSurface;
+    try {
+      if (!owner || !surface || typeof owner.isActive !== 'function' || owner.isActive() !== true) return false;
+      var prepared = owner.prepared(), selected = state.layers && state.layers[state.activeLayerIdx];
+      if (!prepared || !selected || selected.layerUid !== prepared.layerUid ||
+          _motionCanvasEmptyClick || (typeof _layerSel !== 'undefined' && !_layerSel.length)) return false;
+      var holder = Object.freeze({ layerUid: prepared.layerUid }), frame = state.currentFrame;
+      var plan = surface.opacityReadModel(owner, holder, frame);
+      var position = surface.read(owner, holder, 'position', frame), opacity = surface.read(owner, holder, 'opacity', frame);
+      if (!plan.handled || !position.handled || !opacity.handled) return false;
+      body.innerHTML = '';
+      var heading = document.createElement('div'); heading.className = 'motion-props-layername';
+      heading.textContent = 'Native properties'; body.appendChild(heading);
+      [['position', position.value], ['opacity', opacity.value]].forEach(function (entry) {
+        var prop = entry[0], values = entry[1], row = document.createElement('div');
+        row.className = 'lrow motion-prop-row'; row._smHolder = holder; row._smProp = prop;
+        var label = document.createElement('span'); label.textContent = PROP_LABEL[prop]; row.appendChild(label);
+        var fields = document.createElement('div'); fields.className = 'motion-fields'; row.appendChild(fields);
+        values.forEach(function (value) {
+          var input;
+          if (prop === 'opacity' && plan.opacityMode === 'static' && window.NemoOpacityApplication &&
+              typeof window.NemoOpacityApplication.legacy === 'function') {
+            input = scrubField(value, function (next) {
+              var current = state.layers && state.layers[state.activeLayerIdx];
+              if (window.NemoNativeOpacityCutover !== owner || state.currentFrame !== frame ||
+                  !current || current.layerUid !== plan.layerUid ||
+                  (typeof _layerSel !== 'undefined' && !_layerSel.length)) return;
+              surface.routeDimension(plan, window.NemoOpacityApplication, values, 0, next, frame);
+            }, false, plan);
+          } else {
+            input = document.createElement('input'); input.type = 'number'; input.className = 'motion-val';
+            input.value = fmtVal(value); input.readOnly = true; input.disabled = true;
+          }
+          fields.appendChild(input);
+        });
+        body.appendChild(row);
+        var opened = window._exprEditorOpen;
+        if (opened && opened.holder && opened.holder.layerUid === plan.layerUid && opened.prop === prop) {
+          var expression = document.createElement('div'); expression.className = 'lrow motion-expr-editor';
+          var raw = document.createElement('span'); raw.className = 'motion-expr-raw';
+          raw.textContent = SM.t('exprRawValuePrefix') + values.map(fmtVal).join(', ') + ' ' + PROP_UNIT[prop];
+          expression.appendChild(raw); body.appendChild(expression);
+        }
+      });
+      return true;
+    } catch (_) { return false; }
+  }
   function renderMotionPropsPanel() {
     var body = document.getElementById('motion-props-body');
     if (!body) return;
+    if(n20AllowLegacyWrite('motion.metadata.read')!==true){
+      var nativeUi=window.NemoNativeObjectUI;
+      if(nativeUi&&typeof nativeUi.paintMotionInspector==='function'&&nativeUi.paintMotionInspector(window)===true)return;
+      if(renderNativeOpacityPropsPanel(body))return;
+      body.textContent='Native Motion property metadata is unavailable.';return;
+    }
     body.innerHTML = '';
     var motionDeselected = _motionCanvasEmptyClick || (window._motionExpandedLayer == null && typeof _layerSel !== 'undefined' && _layerSel.length === 0);
     var ld = motionDeselected ? null : state.layers[state.activeLayerIdx];
@@ -13816,6 +13882,29 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     hasKeyClipboard: hasKeyClipboard,
   };
   if (window.NemoNativeOpacityMotionSurface) window.SMMotion = window.NemoNativeOpacityMotionSurface.publishWriters(window.SMMotion, function (kind) { return n20AllowLegacyWrite(kind); });
+  // Native Motion reads share Project's cached UI ports and final receipt.
+  // The document presenter owns entry/retirement; no legacy holder is queried.
+  (function installNativeMotionMetadata(){
+    var ui=window.NemoNativeObjectUI,binding=window.NemoNativeMotionBinding;
+    if(!ui||typeof ui.bindMotion!=='function'||!binding||typeof binding.createOrdinary!=='function')return;
+    var modes=['all','animated','modified','expressions','errors','effects','mattes'];
+    ui.bindMotion(window,binding.createOrdinary(window,{
+      labelProperty:function(property){return PROP_LABEL[property]||property;},
+      readPreference:function(key){return key==='nemo-motion-filter'?_motionFilterMode:null;},
+      writePreference:function(key,value){if(key!=='nemo-motion-filter'||modes.indexOf(value)<0)return;_motionFilterMode=value;try{localStorage.setItem(key,value);}catch(_){}},
+      acceptsTarget:function(event){
+        var node=event.target;if(node===document.body||node===document.documentElement)return true;
+        for(;node;node=node.parentNode)if(['drawing-canvas','canvas-area','canvas-col','layer-list','frame-grid','timeline-area','props-panel'].indexOf(node.id)>=0)return true;
+        return false;
+      },
+      modalOpen:function(){return !!document.querySelector('.modal:not(.hid),dialog[open],[aria-modal="true"]');},
+      unavailable:function(){if(window.showToast)window.showToast('Native Motion properties are unavailable.');},
+      openFilterMenu:function(event,select){
+        if(typeof window.showContextMenu!=='function')return;
+        window.showContextMenu(event.clientX,event.clientY,modes.map(function(mode){return {label:mode,checked:_motionFilterMode===mode,action:function(){select(mode);}};}));
+      }
+    }));
+  })();
   // Workspace continuity, restore half (2026-08) — runs once at startup,
   // after timeline.js's own nemo-auto project restore (script tag order:
   // timeline.js, then this file) so layers/timeline already exist by the

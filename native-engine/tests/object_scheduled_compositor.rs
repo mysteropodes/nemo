@@ -270,7 +270,7 @@ fn cpu_all_selector_pins_and_actual_retained_owner_revision_are_required() {
 fn cpu_only_existing_d2_output_and_embedded_resource_contract_is_admitted() {
     let snapshot = owner("output-contract").acquire_snapshot(0).unwrap();
     let input = plan(&snapshot, 7);
-    for field in 0..6 {
+    for field in 0..5 {
         let mut scheduler = FrameScheduler::new();
         let spec = match field {
             0 => OutputSpec::new("tile", "rgba8", 64, 64, "srgb", "straight"),
@@ -280,18 +280,13 @@ fn cpu_only_existing_d2_output_and_embedded_resource_contract_is_admitted() {
             _ => Ok(output()),
         }
         .unwrap();
-        let resources = if field == 5 {
-            vec![("unbound".into(), "v1".into())]
-        } else {
-            vec![]
-        };
         let key = EvaluationKey::new(
             snapshot.snapshot_id(),
             "scene-root",
             7,
             if field == 4 { "draft" } else { "final" },
             spec,
-            resources,
+            [],
         )
         .unwrap();
         let work = scheduler

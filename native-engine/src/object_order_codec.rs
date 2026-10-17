@@ -207,6 +207,7 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.layers,
         &document.objects,
     )?;
+    crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
         &document.property_holders,
         &document.layers,
@@ -234,6 +235,7 @@ pub(crate) fn validate_storage_order(
         &document.layers,
         &document.objects,
     )?;
+    crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
         &document.property_holders,
         &document.layers,
@@ -267,6 +269,7 @@ pub fn migrate_ordered_project(
         layers: document.layers.clone(),
         objects: document.objects.clone(),
         property_holders: document.property_holders.clone(),
+        layer_folders: document.layer_folders.clone(),
         composition_order: plan,
     };
     ordered(&migrated)?;

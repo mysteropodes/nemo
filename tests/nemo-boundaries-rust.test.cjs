@@ -19,12 +19,13 @@ const { spawnSync } = require('node:child_process');
 const { countNonBlankLines, validateProfile } = require('../scripts/nemo/lib/boundaries.cjs');
 const { discoverRepositoryFiles } = require('../scripts/nemo/lib/boundaries-repository.cjs');
 const { checkSourceCoverage } = require('../scripts/nemo/lib/boundaries-coverage.cjs');
+const { checkRustSourceCoverage } = require('../scripts/nemo/lib/boundaries-rust-vendor.cjs');
 const { checkSourceSizes } = require('../scripts/nemo/lib/boundaries-size.cjs');
 const { compareSizeBaseline } = require('../scripts/nemo/lib/boundaries-ratchet.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const PROFILES = path.join(ROOT, 'engineering/boundaries/profiles');
-const POLICY_FILES = ['rust.profile.json', 'rust.baseline.json', 'rust.coverage.json'];
+const POLICY_FILES = ['rust.profile.json', 'rust.baseline.json', 'rust.coverage.json', 'rust.vendor.json'];
 
 // Read the committed bytes once. Every negative case below works on a deep clone;
 // the final test proves that by re-reading these files and comparing.
@@ -86,16 +87,19 @@ test('committed Rust policy is a valid profile and its recorded budget matches t
   assert.equal(coverage.layerEnforcement.claimed, false);
 });
 
-test('every tracked Rust source is discovered independently and adopted or exactly excluded', () => {
+test('every tracked Rust source is independently accounted as handwritten or integrity-pinned vendor', () => {
   const { report, rust } = discoverRust();
   const declared = declaredPaths();
   const exclusions = coverage.exclusions.map((entry) => entry.path);
 
-  const result = checkSourceCoverage(profile, { sourcePaths: rust, exclusions, root: ROOT });
+  const result = checkRustSourceCoverage(profile, { sourcePaths: rust, exclusions, root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.sourcePathCount, rust.length);
   assert.equal(result.declaredPathCount, declared.length);
-  assert.equal(result.excludedPathCount, exclusions.length);
+  assert.equal(result.excludedPathCount, 0);
+  assert.equal(result.handwrittenSourcePathCount, declared.length);
+  assert.equal(result.vendorSourcePathCount, result.vendorSourcePaths.length);
+  assert.equal(result.vendorIntegrity.preservedFileCount, 306);
 
   // Guard against a discovery regression that silently returns one crate: the
   // packet names native, geometry, MCP, feasibility and the staged engine.
@@ -118,8 +122,8 @@ test('every tracked Rust source is discovered independently and adopted or exact
   // carried anything is the identity: every discovered source is either
   // declared or excluded. State that instead.
   assert.equal(coverage.snapshotCounts, undefined, 'the coverage policy stores no counts (#1316)');
-  assert.equal(rust.length, declared.length + exclusions.length,
-    `every discovered .rs is declared or excluded (${rust.length} found, ${declared.length} declared + ${exclusions.length} excluded)`);
+  assert.equal(rust.length, declared.length + result.vendorSourcePathCount,
+    `every discovered .rs is declared or pinned vendor (${rust.length} found, ${declared.length} handwritten + ${result.vendorSourcePathCount} vendor)`);
   assert.ok(rust.length > 0, 'discovery found Rust sources at all');
 
   // Check 3, first half: emit the discovered count and the classified/excluded list.
@@ -132,9 +136,11 @@ test('every tracked Rust source is discovered independently and adopted or exact
       + `${areas['vectorize-core/'] + areas['vectorize-wasm/']} vectorize / `
       + `${areas['native-feasibility/n03-headless-evaluator/'] + areas['native-feasibility/n04-native-viewport/']} feasibility / `
       + `${areas['native-engine/']} staged engine`,
-    `  Classified into ${profile.modules.length} module(s):`,
+    `  Handwritten: ${declared.length} source(s) in ${profile.modules.length} module(s):`,
     ...byModule,
-    `  Excluded (${exclusions.length}): ${exclusions.length ? exclusions.join(', ') : '(none — every discovered path is adopted)'}`,
+    `  Vendor (${result.vendorSourcePathCount}): ${result.vendorSourcePaths.join(', ')}`,
+    `  Vendor integrity: ${result.vendorIntegrity.preservedFileCount} preserved files, manifest ${result.vendorIntegrity.manifestSha256}`,
+    `  Excluded (${exclusions.length}): (none)`,
   ].join('\n'));
 });
 
@@ -429,7 +435,7 @@ test('an undeclared .rs file fails, both as a new source and as a dropped declar
   const dropped = incomplete.modules.find((module) => module.id === 'rust.geometry.engine');
   incomplete.modules = incomplete.modules.filter((module) => module.id !== dropped.id);
   incomplete.exceptions = incomplete.exceptions.filter((exception) => exception.path !== 'geometry-wasm/src/engine.rs');
-  const result = checkSourceCoverage(incomplete, { sourcePaths: rust, root: ROOT });
+  const result = checkRustSourceCoverage(incomplete, { sourcePaths: rust, root: ROOT });
   assert.equal(result.ok, false);
   assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source'
     && entry.file === 'geometry-wasm/src/engine.rs'), JSON.stringify(result.violations));
@@ -485,7 +491,7 @@ test('newly registered feasibility debt cannot grow or disappear from source cov
       module.publicApi = module.publicApi.filter((entry) => path.posix.join(module.dir, entry) !== file);
     }
     dropped.exceptions = dropped.exceptions.filter((entry) => entry.path !== file);
-    const result = checkSourceCoverage(dropped, { sourcePaths: discoverRust().rust, exclusions: [], root: ROOT });
+    const result = checkRustSourceCoverage(dropped, { sourcePaths: discoverRust().rust, exclusions: [], root: ROOT });
     assert.equal(result.ok, false);
     assert.ok(result.violations.some((entry) => entry.file === file && entry.rule === 'coverage-unprofiled-source'));
   }

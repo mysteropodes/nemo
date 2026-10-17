@@ -1,4 +1,6 @@
 //! Small MCP tool family over the running application's versioned API.
+#[path = "server_command_projection.rs"]
+mod command_projection;
 use crate::{
     capabilities,
     contract::{
@@ -101,6 +103,10 @@ impl JsonSchema for CommandRequest {
             "../../engineering/application/native-property-metadata-v1.schema.json"
         ))
         .expect("native property metadata schema is valid JSON");
+        let native_fonts: Value = serde_json::from_str(include_str!(
+            "../../engineering/application/native-font-assets-v1.schema.json"
+        ))
+        .expect("native font assets schema is valid JSON");
         let mut native = native_transport.clone();
         let native_object = native
             .as_object_mut()
@@ -116,37 +122,7 @@ impl JsonSchema for CommandRequest {
         properties["apiVersion"] = json!({"type": "integer", "enum": [1, 2]});
         properties["operation"] = json!({"type": "string", "description": "Native v2 operation shapes are selected by the versioned native request schema. Legacy v1 operations use their payload templates below."});
         properties["cancelledBeforeDispatch"] = json!({"type": "boolean"});
-        let mut payload = legacy["properties"]["payload"].clone();
-        let payload_object = payload
-            .as_object_mut()
-            .expect("payload schema is an object");
-        payload_object.remove("anyOf");
-        let mut payload_properties = serde_json::Map::new();
-        for branch in legacy["properties"]["payload"]["anyOf"].as_array().unwrap() {
-            if let Some(fields) = branch["properties"].as_object() {
-                for (key, field) in fields {
-                    payload_properties
-                        .entry(key.clone())
-                        .or_insert_with(|| field.clone());
-                }
-            }
-        }
-        // This root is a transport-friendly projection. The selected native
-        // branch, not a second root-level feature switch, constrains commands.
-        payload_properties.insert("command".into(), json!({"type": "string"}));
-        payload_properties.insert(
-            "stableTarget".into(),
-            json!({
-                "type": "object", "required": ["layerUid"],
-                "properties": {"layerUid": {"type": "string", "minLength": 1}},
-                "anyOf": [
-                    {"$ref": format!("{}#/$defs/StableTarget", native_transport["$id"].as_str().unwrap())},
-                    {"$ref": format!("{}#/$defs/ObjectTarget", native_transport["$id"].as_str().unwrap())}
-                ]
-            }),
-        );
-        payload_object.insert("properties".into(), payload_properties.into());
-        properties["payload"] = payload;
+        properties["payload"] = command_projection::payload(&legacy, &native_transport);
         let examples = ["command.document.apply", "history.undo", "history.redo"].map(|operation| json!({
             "apiVersion": 2, "requestId": "unique-request-id", "instanceId": "discovered-instance-id",
             "documentId": "snapshot-document-id", "expectedRevision": 0, "operation": operation,
@@ -162,7 +138,7 @@ impl JsonSchema for CommandRequest {
             "required": ["apiVersion", "requestId", "operation", "payload"],
             "description": "Use apiVersion 2 for native operations. The versioned native request schema and registered feature declarations constrain each operation; a declared staged capability can still refuse execution. Copy a root example, replace instanceId from discovery and documentId, expectedRevision and layerUid from the native snapshot when that operation requires them. command.document.apply changes static base opacity (0..100), not evaluated keyed frame opacity. Undo/redo require payload {} and the latest revision. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
             "examples": examples,
-            "$defs": {"legacy": legacy, "native": native, "nativePropertyMetadata": native_metadata},
+            "$defs": {"legacy": legacy, "native": native, "nativePropertyMetadata": native_metadata, "nativeFontAssets": native_fonts},
             "if": {"required": ["apiVersion"], "properties": {"apiVersion": {"const": 1}}},
             "then": {"$ref": "#/$defs/legacy"},
             "else": {"$ref": "#/$defs/native"},

@@ -1,0 +1,418 @@
+# L07-D bitmap_brush_resources_store oracle (baseline fbe4b8a33e6d5a229f014154df2ba21988a9fabc)
+# src/js/application/render/image-budget.js sha256 c93eb2d0ef588abd31d7c2ca2d4d04d255351447e1c16e1ceb2465c22060966f (verbatim, executed in a Node vm; NemoImageBudget.create/noteRegistered/touch/beginBuild/endBuild/setBudgetBytes/stats/has/building)
+# Q <name> <ops> => <results>. ops: S:<n> setBudgetBytes, B beginBuild, R:<id>:<w>:<h> noteRegistered, T:<id> touch, E:<mode> endBuild (t retire true, f retire false, x retire throws, n no port).
+# results: one E:<dropped|->/<ids the retire port saw|-> per E, then F:<jsBytes>:<budget|max|nan>:<evictions>:<count>:<building 0|1>:<sorted resident ids|->.
+# G <number text> <budgetBytes after setBudgetBytes on a fresh 384MiB budget> (max: not finite or > 2^63; nan: NaN).
+# C <w> <h> <bytes> = totalBytes after noteRegistered(w,h) = w*h*4.
+# counts {"Q":321,"G":20,"C":70} total 411
+Q t1-bytes-counters S:10485760;R:a:10:10;R:b:20:5;R:a:3:3 => F:436:10485760:0:2:0:a,b
+Q t2-current-build-protected S:1000;B;R:old:10:10;R:mid:10:10;R:cur:10:10;E:t;B;T:cur;E:t => E:-/-;E:old/old;F:800:1000:1:2:0:cur,mid
+Q t3-oldest-first-until-fit S:1000;R:a:10:10;R:b:10:10;R:c:10:10;R:d:10:10;T:a;B;T:d;E:t => E:b,c/b,c;F:800:1000:2:2:0:a,d
+Q t4-under-budget-and-no-port S:10000;B;R:a:10:10;E:t;B;E:n => E:-/-;E:-/-;F:400:10000:0:1:0:a
+Q t5-retire-false S:100;R:a:10:10;R:b:10:10;B;T:b;E:f;B;T:b;E:t => E:-/a;E:a/a;F:400:100:1:1:0:b
+Q t5-retire-throw S:100;R:a:10:10;R:b:10:10;B;T:b;E:x;B;T:b;E:t => E:-/a;E:a/a;F:400:100:1:1:0:b
+Q t6-copy-of-ids S:100;R:a:10:10;R:b:10:10;B;T:b;E:t => E:a/a;F:400:100:1:1:0:b
+Q e1-end-without-begin S:500;R:a:10:10;R:b:10:10;R:c:10:10;E:t => E:a,b/a,b;F:400:500:2:1:0:c
+Q e2-touch-unknown-then-register S:500;B;T:x;R:a:10:10;R:b:10:10;R:c:10:10;R:x:10:10;E:t => E:-/-;F:1600:500:0:4:0:a,b,c,x
+Q e3-second-begin-resets-pins S:300;B;R:a:10:10;B;R:b:10:10;E:t => E:a/a;F:400:300:1:1:0:b
+Q e4-reregister-overwrites-and-ages S:700;R:a:10:10;R:b:10:10;R:a:10:10;B;T:b;E:t => E:a/a;F:400:700:1:1:0:b
+Q e5-exactly-at-budget S:800;R:a:10:10;R:b:10:10;B;E:t => E:-/-;F:800:800:0:2:0:a,b
+Q e6-one-byte-over S:799;R:a:10:10;R:b:10:10;B;E:t => E:a/a;F:400:799:1:1:0:b
+Q e7-all-pinned-over-budget S:1;B;R:a:10:10;R:b:10:10;R:c:10:10;E:t => E:-/-;F:1200:1:0:3:0:a,b,c
+Q e8-nan-budget-never-evicts S:NaN;R:a:10:10;R:b:10:10;R:c:10:10;B;E:t => E:-/-;F:1200:nan:0:3:0:a,b,c
+Q e9-infinite-budget S:Infinity;R:a:10:10;R:b:10:10;B;E:t => E:-/-;F:800:max:0:2:0:a,b
+Q e10-negative-infinite-budget-floors-to-one S:-Infinity;R:a:10:10;R:b:10:10;B;T:b;E:t => E:a/a;F:400:1:1:1:0:b
+Q e11-budget-floor-fraction S:1234.7;R:a:20:20;R:b:20:20;B;T:b;E:t => E:a/a;F:1600:1234:1:1:0:b
+Q e12-retire-then-reuse S:400;R:a:10:10;R:b:10:10;B;T:b;E:t;R:a:10:10;B;T:a;E:t => E:a/a;E:b/b;F:400:400:2:1:0:a
+Q e13-two-failures-then-success S:400;R:a:10:10;R:b:10:10;R:c:10:10;B;T:c;E:f;B;T:c;E:x;B;T:c;E:t => E:-/a,b;E:-/a,b;E:a,b/a,b;F:400:400:2:1:0:c
+Q e14-big-budget-4gib S:4294967296;R:a:10:10;R:b:10:10;B;T:b;E:t => E:-/-;F:800:4294967296:0:2:0:a,b
+Q r000 S:1000;B;E:n;R:e:6:12;R:d:1:10;S:1000;R:f:1:11;R:h:8:9;E:t;E:x;B;T:d;T:f;E:t;T:g;E:n;E:t;E:t;R:b:1:5;R:a:8:4;E:f;B;E:n;R:b:6:6;R:d:4:6;R:a:4:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:e/e;F:716:1000:1:5:0:a,b,d,f,h
+Q r001 S:1600;E:t;T:h;R:b:4:3;B;B;B;R:b:6:2;B;R:d:10:7;E:t;T:e;R:e:2:4;E:n;B;T:a;R:d:2:10;R:h:10:11;R:g:2:11;T:g;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:688:1600:0:5:0:b,d,e,g,h
+Q r002 S:100000;T:e;B;T:f;T:h;R:g:5:8;T:d;T:g;E:t;B;B;E:t;B;R:a:3:1;R:d:11:7;R:d:7:1;R:a:7:12;R:g:11:3;R:d:6:11;R:f:11:12;S:1600;R:d:4:11;R:g:7:2;R:h:5:2;E:t => E:-/-;E:-/-;E:-/-;F:1136:1600:0:5:0:a,d,f,g,h
+Q r003 S:1000;B;R:g:2:4;E:x;S:1000;R:b:9:11;E:t;R:h:7:7;R:c:10:8;T:g;T:c;B;E:t;R:c:4:10;B;S:100000;R:f:8:11;T:c;B;R:a:6:10;E:f;E:t;S:1600;R:c:5:3;R:d:6:8;B;T:h;E:t;R:h:11:10;R:e:11:12;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:b,g,f/b,g,f;F:1460:1600:3:5:0:a,c,d,e,h
+Q r004 S:1000;R:b:8:2;R:f:10:11;R:a:10:2;R:f:3:4;R:a:9:10;B;B;R:c:2:5;T:b;B;T:e;R:b:5:3;R:a:8:1;T:g;S:1600;R:f:11:5;R:f:12:5;R:d:8:7;E:t;E:t => E:-/-;E:-/-;F:596:1600:0:5:0:a,b,c,d,f
+Q r005 S:200;R:b:1:10;B;R:f:2:7;R:b:3:10;T:h;R:b:3:8;R:d:1:1;R:h:8:5;R:c:8:10;R:d:9:10;E:t;E:t;E:t => E:-/-;E:f,b,h,c,d/f,b,h,c,d;E:-/-;F:0:200:5:0:0:-
+Q r006 S:1600;R:d:10:2;R:c:5:1;R:e:8:8;R:d:10:8;R:g:10:11;R:h:7:6;E:t;R:a:3:6;B;T:b;E:t;R:f:4:11;R:a:6:3;E:x;R:d:2:1;T:a;R:a:8:7;B;E:t;R:e:7:2;B;R:d:4:8;E:t;T:e;R:g:7:12;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1108:1600:0:7:0:a,c,d,e,f,g,h
+Q r007 S:1000;B;T:c;T:c;T:a;T:a;T:h;R:d:10:5;T:d;T:h;B;E:t => E:-/-;F:200:1000:0:1:0:d
+Q r008 S:500;E:f;S:1600;R:e:1:4;R:h:8:5;R:g:2:12;R:a:6:9;T:f;B;T:f;R:f:10:4;B;E:t;E:t;B;T:b;R:c:11:12;T:b;S:64;S:1600;R:h:11:9;E:f;R:b:3:7;R:h:5:7;R:h:8:7;R:g:12:3;R:e:5:12;T:d;E:x;E:n;R:a:12:5;R:e:4:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1396:1600:0:7:0:a,b,c,e,f,g,h
+Q r009 S:1600;R:e:4:1;E:t;B;B;B;E:t;R:d:12:12;R:f:1:6;R:f:10:4;E:n;R:d:6:11;R:g:4:4;E:t;R:c:9:11;R:e:12:12;E:t;R:c:8:12;R:a:9:7;R:h:10:8;S:100000;E:t;E:n;B;R:a:3:2;E:n;R:c:6:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1432:100000:0:7:0:a,c,d,e,f,g,h
+Q r010 S:1000;T:d;R:h:6:9;B;E:t;T:g;E:t;R:b:12:12;S:200;E:t => E:-/-;E:-/-;E:h,b/h,b;F:0:200:2:0:0:-
+Q r011 S:200;T:d;R:e:9:4;S:64;R:a:1:5;T:e;E:t;E:x;T:b;T:d;R:e:6:4;T:b;R:e:1:4;R:b:7:6;E:n;R:d:10:3;R:h:4:7;E:x;R:c:7:10;R:h:1:2;B;E:t;E:t;E:t => E:a,e/a,e;E:-/-;E:-/-;E:-/e,b,d,h;E:e,b,d,c/e,b,d,c;E:-/-;E:-/-;F:8:64:6:1:0:h
+Q r012 S:1000;T:e;E:f;E:t;T:f;R:h:11:8;T:e;T:f;E:t;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:352:1000:0:1:0:h
+Q r013 S:3000;R:e:10:5;T:d;E:t;B;E:x;R:a:8:11;E:f;R:b:10:8;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:872:3000:0:3:0:a,b,e
+Q r014 S:500;R:d:12:1;E:t;R:f:1:7;E:n;R:f:7:12;R:a:11:5;E:t;R:a:1:5;E:n;R:a:6:9;T:a;R:b:11:8;E:t;T:c;R:e:8:2;R:e:3:7;E:t;E:x;S:64;B;S:100000;E:t;E:t;E:t;T:f;R:c:9:2;E:t => E:-/-;E:-/-;E:d,f/d,f;E:-/-;E:a/a;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:508:100000:3:3:0:b,c,e
+Q r015 S:500;S:100000;B;S:500;R:g:9:6;R:h:2:6;S:3000;T:c;E:f;R:c:1:4;E:x;R:h:1:10;E:t;S:200;R:h:3:4;E:t;S:3000;B;B;E:x;E:t;E:t => E:-/-;E:-/-;E:-/-;E:g/g;E:-/-;E:-/-;E:-/-;F:64:3000:1:2:0:c,h
+Q r016 S:200;T:b;E:t;R:c:2:8;T:c;B;T:a;R:a:3:3;T:d;T:e;T:g;E:t;E:t => E:-/-;E:-/-;E:-/-;F:100:200:0:2:0:a,c
+Q r017 S:1000;R:g:9:11;E:n;B;R:c:6:11;R:h:6:8;R:a:8:6;B;S:1600;E:t;T:b;R:e:2:2;R:g:7:3;T:h;R:g:12:4;R:b:8:11;T:a;T:c;B;E:t => E:-/-;E:-/-;E:-/-;F:1208:1600:0:6:0:a,b,c,e,g,h
+Q r018 S:100000;T:b;S:3000;R:h:11:11;T:a;E:t;B;T:f;S:3000;R:f:10:1;T:c;R:a:2:8;E:t;R:e:10:5;S:100000;E:n;B;E:t;T:e;B;T:c;R:a:6:11;R:h:10:11;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:944:100000:0:4:0:a,e,f,h
+Q r019 S:500;E:n;E:t;T:h;B;R:b:6:4;E:t;B;E:t;B;R:c:8:8;T:a;R:b:3:3;E:t;R:g:4:12;S:3000;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:484:3000:0:3:0:b,c,g
+Q r020 S:1000;E:t;E:n;E:f;T:e;R:f:1:3;T:c;B;R:f:7:10;R:f:4:5;T:b;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:80:1000:0:1:0:f
+Q r021 S:1600;R:f:5:6;R:f:10:3;R:h:1:3;R:e:6:2;R:a:10:9;E:t;E:t;R:d:1:5;R:a:11:5;E:t;S:1000;T:b;R:b:12:6;T:f;R:c:2:1;R:g:11:10;E:t;B;R:f:1:4;E:t;E:t;T:c;B;R:g:9:10;R:a:9:12;R:c:10:7;R:f:10:8;B;R:b:12:4;E:t => E:-/-;E:-/-;E:-/-;E:h,e,d,a/h,e,d,a;E:-/-;E:-/-;E:g,a/g,a;F:792:1000:6:3:0:b,c,f
+Q r022 S:500;B;R:f:1:10;E:x;E:t;E:x;T:a;R:e:12:7;T:g;B;R:h:5:4;R:h:10:11;B;E:t;R:d:10:12;E:x;E:t => E:-/-;E:-/-;E:-/-;E:f,e/f,e;E:-/h;E:h/h;F:480:500:3:1:0:d
+Q r023 S:500;E:t;T:d;R:d:4:3;B;R:a:4:3;T:c;R:h:12:2;R:c:12:12;E:t;E:n;E:t => E:-/-;E:d/d;E:-/-;E:a,h,c/a,h,c;F:0:500:4:0:0:-
+Q r024 S:500;B;S:64;T:c;T:c;T:d;E:t;R:g:2:1;T:f;B;E:t;E:t;R:h:6:11;E:t;S:1000;R:a:4:5;E:f;R:h:5:10;R:d:8:1;R:f:9:1;B;T:d;R:a:11:11;E:t => E:-/-;E:-/-;E:-/-;E:g,h/g,h;E:-/-;E:-/-;F:752:1000:2:4:0:a,d,f,h
+Q r025 S:3000;E:t;T:h;T:a;T:f;B;E:t;B;E:n;R:f:2:2;T:h;T:c;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:16:3000:0:1:0:f
+Q r026 S:1600;E:f;B;E:f;R:f:6:11;R:e:6:8;E:t;E:t;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:456:1600:0:2:0:e,f
+Q r027 S:3000;R:h:8:11;R:d:7:9;R:d:2:3;E:t;R:g:8:6;B;E:n;R:d:3:10;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:664:3000:0:3:0:d,g,h
+Q r028 S:64;R:c:11:11;T:c;R:c:10:3;R:h:2:4;T:h;R:c:11:8;R:c:7:7;E:x;R:e:2:4;E:n;T:g;B;R:g:2:11;R:b:6:12;E:t;R:a:4:12;E:t => E:-/h,c;E:-/-;E:h,c,e/h,c,e;E:g,b,a/g,b,a;F:0:64:6:0:0:-
+Q r029 S:1000;E:x;E:x;R:f:11:5;E:f;B;E:f;R:d:7:6;E:t;R:d:1:10;T:f;R:f:2:3;E:x;B;E:t;T:g;S:1600;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:64:1600:0:2:0:d,f
+Q r030 S:100000;R:d:6:12;B;R:c:1:11;R:h:2:9;R:d:7:5;R:f:2:5;R:e:9:12;R:d:1:1;B;T:h;R:e:3:2;B;R:c:7:8;E:t => E:-/-;F:364:100000:0:5:0:c,d,e,f,h
+Q r031 S:100000;E:x;R:e:4:12;T:c;R:c:7:12;E:n;R:h:5:3;E:t;B;R:f:12:12;R:b:1:1;E:n;E:x;R:g:5:2;B;B;R:f:12:1;R:h:9:6;T:d;R:b:12:9;B;R:c:9:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1252:100000:0:6:0:b,c,e,f,g,h
+Q r032 S:3000;E:f;R:g:12:6;E:f;E:f;T:b;R:a:5:12;S:200;R:c:6:3;R:d:6:5;R:a:5:6;T:c;E:t;E:f;R:b:12:7;R:c:4:4;T:h;E:t;R:a:7:7;E:f;R:c:3:6;E:t;R:f:12:1;E:x;R:c:3:2;B;R:f:7:10;T:g;R:c:5:10;S:3000;E:t => E:-/-;E:-/-;E:-/-;E:g,d/g,d;E:-/-;E:a,b/a,b;E:-/c;E:a/a;E:-/-;E:-/-;F:480:3000:5:2:0:c,f
+Q r033 S:3000;E:t;T:a;B;R:g:9:3;B;S:500;T:a;E:x;E:t;T:f;R:b:1:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:112:500:0:2:0:b,g
+Q r034 S:100000;R:c:3:9;R:g:9:12;R:f:10:12;R:b:6:6;B;E:t;R:d:7:11;T:f;R:g:3:10;E:t;T:h;B;E:t;R:e:11:10;R:h:10:4;R:h:4:8;R:d:3:12;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:1564:100000:0:7:0:b,c,d,e,f,g,h
+Q r035 S:1000;E:f;T:h;R:g:7:11;T:f;B;B;R:b:10:2;T:a;B;E:t;T:g;E:t;E:t;R:a:10:1;R:a:1:11;S:100000;R:a:8:2;T:g;E:t;R:h:4:3;B;R:h:5:10;R:b:8:8;B;R:e:5:10;R:d:6:11;R:d:11:10;T:a;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1468:100000:0:6:0:a,b,d,e,g,h
+Q r036 S:64;R:e:12:12;T:h;R:c:5:3;B;R:h:4:7;R:c:11:8;R:a:5:5;E:x;R:h:6:4;E:t;T:d;R:a:4:5;R:f:6:3;T:g;R:f:8:2;T:a;T:a;E:t;B;T:a;S:64;B;T:h;R:d:8:10;E:t => E:-/e;E:e,c,a,h/e,c,a,h;E:f,a/f,a;E:-/-;F:320:64:6:1:0:d
+Q r037 S:64;T:f;S:100000;R:e:6:8;B;B;B;T:c;R:a:4:11;E:n;S:1600;T:c;R:e:6:11;E:t;S:500;T:b;E:t;E:t;R:a:4:3;T:c;R:d:2:5;R:e:3:10;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:208:500:0:3:0:a,d,e
+Q r038 S:1600;R:a:1:10;S:1600;R:f:9:4;T:e;R:d:6:7;R:g:12:6;E:f;E:t;R:b:3:5;E:t;R:c:10:6;E:t;T:c;R:b:7:8;R:a:6:8;R:b:11:11;T:f;R:c:8:6;B;T:g;R:g:4:11;R:c:7:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1416:1600:0:6:0:a,b,c,d,f,g
+Q r039 S:1000;R:f:1:2;R:f:3:7;E:t;T:f;R:e:7:6;T:b;E:f;E:t;R:d:8:6;T:h;E:n;R:g:5:10;B;E:f;E:t;T:h;R:f:6:8;E:n;R:b:11:4;R:g:3:2;R:f:8:2;R:d:7:7;R:b:9:8;T:d;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:740:1000:0:5:0:b,d,e,f,g
+Q r040 S:200;S:200;E:t;R:b:2:5;R:e:4:6;T:g;R:g:8:7;R:c:7:10;R:a:4:1;R:a:4:10;R:h:2:12;E:f;E:t => E:-/-;E:-/b,e,g,c,a;E:b,e,g,c,a/b,e,g,c,a;F:96:200:5:1:0:h
+Q r041 S:500;R:a:2:9;R:g:3:5;T:b;T:g;T:f;S:500;R:d:9:9;E:t;T:b;E:t => E:-/-;E:-/-;F:456:500:0:3:0:a,d,g
+Q r042 S:500;E:x;R:c:11:11;T:d;R:c:7:5;R:d:11:2;R:f:3:5;T:e;R:g:9:12;E:t;E:x;R:d:9:12;B;E:t => E:-/-;E:c,d/c,d;E:-/-;E:f,g/f,g;F:432:500:4:1:0:d
+Q r043 S:64;R:g:8:6;E:t;B;R:d:1:5;B;R:g:5:10;T:e;E:t;T:e;R:c:8:8;R:c:8:6;B;R:e:3:3;E:t => E:g/g;E:d/d;E:g,c/g,c;F:36:64:4:1:0:e
+Q r044 S:200;R:f:1:2;T:g;R:g:10:2;R:g:5:4;R:f:8:8;R:e:10:4;T:c;T:d;R:c:1:4;R:g:3:8;R:e:4:1;E:t => E:f/f;F:128:200:1:3:0:c,e,g
+Q r045 S:500;T:c;R:b:12:2;R:e:1:9;S:1600;S:64;R:e:4:12;E:x;T:e;R:c:4:1;R:d:10:12;T:c;B;B;B;T:e;R:a:5:12;R:d:6:2;S:500;S:100000;R:d:11:3;R:b:4:9;E:t;T:a;T:f;R:c:5:3;S:1600;T:h;T:h;T:h;E:t;E:t;E:t => E:-/b,e;E:-/-;E:-/-;E:-/-;E:-/-;F:768:1600:0:5:0:a,b,c,d,e
+Q r046 S:500;E:f;E:t;E:x;R:d:1:12;R:g:6:4;T:g;S:1000;B;E:t;R:a:12:7;R:h:2:1;R:g:2:8;T:f;T:d;T:h;R:h:1:6;R:f:8:4;T:d;R:d:6:8;E:t;R:h:10:6;R:d:1:2;E:t;T:a;R:h:9:8;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:824:1000:0:5:0:a,d,f,g,h
+Q r047 S:100000;S:64;R:a:6:3;T:h;T:f;R:b:11:3;R:g:4:8;T:e;T:h;B;R:a:10:10;T:b;E:x;E:t;T:b;T:g;R:e:8:11;R:b:9:8;E:n;E:f;T:d;B;R:c:12:4;R:c:3:11;T:h;R:e:4:11;R:h:7:2;B;E:t => E:-/g;E:g,a,b/g,a,b;E:-/-;E:-/e,b;E:b,c,e/b,c,e;F:56:64:6:1:0:h
+Q r048 S:64;R:f:3:4;T:d;R:g:7:1;T:d;B;R:g:1:4;E:t;R:c:4:10;S:500;T:c;R:c:6:4;R:h:1:7;E:f;R:e:8:6;R:h:8:8;T:f;E:t;B;R:a:8:1;E:t => E:-/-;E:-/-;E:g,c/g,c;E:e/e;F:336:500:3:3:0:a,f,h
+Q r049 S:3000;T:f;T:a;T:h;R:e:7:10;S:64;R:e:6:11;S:1600;E:t;E:f;E:x;E:t;R:h:9:2;T:h;T:h;T:h;E:f;R:c:11:6;R:a:3:5;E:t;R:a:10:3;T:d;R:f:12:11;R:a:6:3;R:c:12:12;T:g;B;R:h:8:10;E:x;E:t;B;R:d:5:4;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/e;E:e/e;E:-/-;F:1576:1600:1:5:0:a,c,d,f,h
+Q r050 S:3000;R:h:10:8;R:e:7:11;S:3000;B;R:d:5:3;T:c;E:t;R:b:2:3;R:b:8:11;E:t => E:-/-;E:-/-;F:1040:3000:0:4:0:b,d,e,h
+Q r051 S:200;R:c:6:10;T:a;T:f;T:e;E:t;B;E:f;R:h:8:11;B;E:t;R:e:8:11;T:b;R:f:12:6;E:t;R:f:2:3;R:c:5:12;E:t;R:d:5:2;E:t => E:c/c;E:-/-;E:h/h;E:e,f/e,f;E:f,c/f,c;E:-/-;F:40:200:6:1:0:d
+Q r052 S:200;B;T:b;R:f:6:12;E:t;R:d:7:4;B;R:f:8:3;R:d:1:9;R:d:10:7;B;E:n;S:200;R:f:8:7;T:b;R:b:2:10;T:h;B;E:t;R:a:6:5;E:t;R:d:11:5;E:t;R:h:5:3;E:t;S:3000;T:c;R:f:2:11;E:n;B;R:h:3:11;R:f:9:4;E:t => E:-/-;E:-/-;E:d,f/d,f;E:-/-;E:b,a,d/b,a,d;E:-/-;E:-/-;E:-/-;F:276:3000:5:2:0:f,h
+Q r053 S:1600;R:e:9:8;R:f:1:1;T:c;R:g:12:9;R:c:5:2;R:f:8:1;E:n;E:f;B;R:c:8:8;S:200;R:g:5:2;T:c;S:1000;R:f:9:1;S:1600;R:f:1:7;R:e:2:4;R:b:4:5;T:h;R:e:2:9;R:f:2:2;E:t => E:-/-;E:-/-;E:-/-;F:464:1600:0:5:0:b,c,e,f,g
+Q r054 S:64;R:b:3:1;B;R:c:3:7;T:e;E:t;R:a:2:7;E:t;R:h:4:8;B;R:b:8:7;E:t;R:d:1:11;R:g:9:2;E:t;B;E:t;B;T:c;T:h;T:e;E:t;E:t;S:64;T:c;R:e:9:3;R:d:3:11;E:n;T:g;E:t => E:b/b;E:c/c;E:a,h/a,h;E:b,d,g/b,d,g;E:-/-;E:-/-;E:-/-;E:-/-;E:e,d/e,d;F:0:64:9:0:0:-
+Q r055 S:1600;E:t;T:g;B;R:b:10:9;E:t;R:h:8:7;T:b;R:h:1:1;B;T:c;E:x;R:g:8:9;E:n;E:n;R:a:11:12;R:e:3:4;R:d:7:10;B;R:f:2:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1580:1600:0:7:0:a,b,d,e,f,g,h
+Q r056 S:64;T:h;S:1600;S:64;R:e:11:6;R:b:11:2;R:f:5:6;B;R:a:4:8;T:g;R:h:5:4;E:n;B;R:e:5:7;E:x;E:f;E:x;T:f;T:e;R:f:2:3;E:f;R:a:9:9;R:g:1:10;E:t => E:-/-;E:-/b,f,a,h;E:-/b,f,a,h,e;E:-/b,f,a,h,e;E:-/b,a,h,e;E:b,h,e,f,a/b,h,e,f,a;F:40:64:5:1:0:g
+Q r057 S:1000;E:f;T:e;S:500;R:h:7:9;S:1000;R:a:7:9;T:f;R:f:9:8;R:d:9:5;T:b;R:a:3:6;R:c:2:3;R:h:8:6;E:t => E:-/-;E:-/-;F:756:1000:0:5:0:a,c,d,f,h
+Q r058 S:1000;S:1600;E:t;E:n;T:c;B;T:h;R:c:7:7;R:f:3:10;T:h;T:d;T:a;R:b:11:8;E:t;E:t;E:n;R:g:6:7;T:a;R:c:4:9;R:b:10:2;R:e:9:1;R:d:3:10;R:g:11:4;R:e:6:7;R:b:7:4;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:840:1600:0:6:0:b,c,d,e,f,g
+Q r059 S:100000;E:t;R:c:9:7;S:3000;E:t;R:d:8:7;E:x;E:f;S:1600;T:b;T:a;B;S:3000;T:e;R:f:3:9;T:e;R:d:6:9;B;E:t;E:n;R:f:10:10;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:868:3000:0:3:0:c,d,f
+Q r060 S:1600;T:b;R:b:10:1;T:c;B;R:d:3:6;T:c;E:t;E:t;B;E:t;T:f;B;R:h:4:10;T:g;E:t;T:b;R:h:7:9;T:a;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:364:1600:0:3:0:b,d,h
+Q r061 S:1000;R:g:4:12;R:d:6:7;T:h;T:f;S:64;T:d;R:g:12:8;R:c:11:3;E:t;B;E:t;E:t;E:t;E:t;E:t => E:d,g,c/d,g,c;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:0:64:3:0:0:-
+Q r062 S:500;R:c:6:10;R:f:5:2;R:h:3:8;R:h:1:7;B;T:g;B;B;E:t;R:e:2:9;E:n;E:n;R:g:9:7;T:d;S:1600;T:e;T:f;E:f;B;T:b;R:c:8:10;T:d;E:t;S:1000;R:c:4:5;B;R:h:12:5;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:684:1000:0:5:0:c,e,f,g,h
+Q r063 S:200;R:b:6:12;S:200;R:c:9:7;E:n;R:g:10:5;E:n;T:b;R:d:4:10;E:t;E:t => E:-/-;E:-/-;E:c,g,b/c,g,b;E:-/-;F:160:200:3:1:0:d
+Q r064 S:1600;E:t;T:h;B;T:d;T:b;R:d:8:5;E:f;E:t;T:c;E:f;E:n;R:d:4:11;T:d;E:t;E:t;T:h;T:c;R:f:9:5;R:g:5:4;R:c:5:9;R:a:6:2;R:b:6:11;T:a;E:n;R:a:6:11;E:f;R:h:2:6;E:x;R:e:3:4;T:e;R:d:5:10;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1264:1600:0:8:0:a,b,c,d,e,f,g,h
+Q r065 S:64;R:g:2:2;B;E:x;R:c:2:5;T:g;E:f;R:e:3:1;R:e:9:12;R:c:5:8;B;T:a;R:h:3:1;E:t;R:g:9:8;R:h:1:2;E:t;E:f;T:c;R:g:5:4;R:e:6:7;E:f;R:e:12:2;T:f;R:g:12:11;S:100000;E:t => E:-/-;E:-/-;E:g,e,c/g,e,c;E:g/g;E:-/-;E:-/h,g,e;E:-/-;F:632:100000:4:3:0:e,g,h
+Q r066 S:1000;E:t;R:g:9:1;R:f:5:5;T:b;T:g;T:c;R:h:4:6;S:3000;E:t;R:a:11:7;B;E:t;T:f;R:f:7:10;E:t;E:t;T:g;R:b:2:1;E:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:728:3000:0:5:0:a,b,f,g,h
+Q r067 S:1600;R:b:4:11;E:t;R:c:3:7;S:200;R:f:5:11;R:b:12:12;E:f;R:e:11:9;T:d;E:x;R:g:5:11;R:b:5:11;B;B;R:h:12:3;E:t;E:t;R:b:11:11;E:f;R:b:12:1;R:f:6:6;R:b:7:12;E:t;B;E:t;R:b:2:1;R:g:12:3;E:t;E:t => E:-/-;E:-/c,f,b;E:-/c,f,b,e;E:c,f,e,g,b/c,f,e,g,b;E:-/-;E:-/h,b;E:h,f,b/h,f,b;E:-/-;E:-/-;E:-/-;F:152:200:8:2:0:b,g
+Q r068 S:200;R:h:10:11;R:f:8:4;B;T:f;R:f:10:9;B;R:h:11:2;E:x;T:b;R:d:4:1;E:t;E:n;R:d:6:8;R:f:7:7;R:c:2:12;R:a:5:1;B;E:t;E:t;R:f:7:10;T:g;E:t;B;T:f;R:b:1:6;R:g:6:5;E:t => E:-/f;E:f/f;E:-/-;E:h,d,f/h,d,f;E:-/-;E:c,a,f/c,a,f;E:-/-;F:144:200:7:2:0:b,g
+Q r069 S:3000;E:t;T:b;R:e:9:1;S:1600;B;R:h:3:5;B;T:c;S:500;E:t;E:t;T:b;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:96:500:0:2:0:e,h
+Q r070 S:3000;T:e;R:e:7:10;R:f:12:12;E:t;R:g:8:4;T:d;S:1600;T:e;R:h:10:12;E:t;B;R:a:8:9;T:b;T:h;R:e:3:11;B;E:f;S:200;T:d;R:a:4:7;E:t => E:-/-;E:-/-;E:-/f;E:f,g,h,e/f,g,h,e;F:112:200:4:1:0:a
+Q r071 S:1000;T:b;E:t;E:f;R:e:3:1;R:d:5:11;B;R:e:2:7;R:f:1:10;T:g;E:t => E:-/-;E:-/-;E:-/-;F:316:1000:0:3:0:d,e,f
+Q r072 S:500;T:g;E:n;R:c:6:3;R:d:5:8;T:e;T:a;R:d:9:9;E:n;E:x;R:d:6:1;R:g:9:2;E:x;R:c:3:12;E:f;T:f;T:e;T:h;B;E:t;R:h:5:9;R:d:2:7;R:c:4:3;R:g:7:4;E:x;E:x;R:h:1:5;T:b;T:h;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:236:500:0:4:0:c,d,g,h
+Q r073 S:1600;T:c;R:b:2:1;T:h;E:n;R:e:9:11;R:h:8:6;R:f:1:5;E:t;T:h;T:c;E:t;R:f:4:11;R:g:11:10;B;E:t;S:3000;T:f;R:d:3:6;E:t;R:h:6:12;R:h:2:7;T:b;R:e:7:1;T:f;R:h:6:5;R:a:1:10;T:d;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:884:3000:0:7:0:a,b,d,e,f,g,h
+Q r074 S:1600;B;R:a:7:12;T:f;E:t;T:a;B;B;T:f;E:t;E:n;T:b;T:h;T:f;E:t;R:c:9:4;T:a;T:h;R:d:8:12;E:t;R:h:10:2;R:e:5:7;T:a;E:t;R:f:2:10;B;B;B;R:e:12:4;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1216:1600:0:6:0:a,c,d,e,f,h
+Q r075 S:200;E:x;R:d:10:2;R:a:8:1;T:f;B;R:b:7:7;B;R:c:6:11;R:a:1:11;B;E:t => E:-/-;E:d,b,c/d,b,c;F:44:200:3:1:0:a
+Q r076 S:1000;E:t;T:b;R:f:9:11;R:d:6:7;R:b:12:2;E:x;B;R:c:5:9;T:c;B;R:c:2:7;T:h;T:e;E:t => E:-/-;E:-/-;E:-/-;F:716:1000:0:4:0:b,c,d,f
+Q r077 S:100000;R:a:9:5;R:b:10:9;B;R:e:6:5;T:h;T:h;R:f:7:8;T:b;R:g:8:2;R:c:3:7;E:t;E:x;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:1032:100000:0:6:0:a,b,c,e,f,g
+Q r078 S:64;E:x;E:t;E:x;E:x;E:x;T:d;R:e:11:5;T:d;R:c:12:4;R:f:7:12;E:t;B;T:e;T:e;E:n;E:x;R:g:10:2;B;R:a:6:4;T:b;E:t;R:d:2:3;R:b:6:5;T:a;T:c;R:h:7:10;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:e,c,f/e,c,f;E:-/-;E:-/-;E:g/g;E:d,b,a,h/d,b,a,h;F:0:64:8:0:0:-
+Q r079 S:3000;T:a;S:1000;B;T:d;R:f:6:3;T:f;R:b:12:11;R:f:7:2;R:f:12:10;E:t;T:h;R:e:6:6;E:t;R:e:2:8;T:c;R:h:5:12;R:a:6:10;B;R:h:4:11;T:c;E:f;T:h;E:t;E:f;E:t;T:b;E:t;T:e;S:200;E:t => E:-/-;E:b/b;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:f,a,h/f,a,h;F:64:200:4:1:0:e
+Q r080 S:1000;T:h;T:f;B;T:c;B;E:t;E:t;T:c;B;T:a;R:a:10:4;R:c:8:10;B;R:a:7:8;E:t;E:t;S:500;R:e:4:6;E:f;E:t;R:d:10:1;T:h;T:g;B;R:c:8:9;E:t;R:g:9:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/c;E:c/c;E:a/a;E:-/-;F:460:500:2:4:0:c,d,e,g
+Q r081 S:1000;R:h:5:11;B;T:e;R:e:3:2;E:x;E:t;R:g:8:8;S:100000;E:t;R:e:6:7;E:t;E:f;E:f;T:c;T:a;R:b:8:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:932:100000:0:4:0:b,e,g,h
+Q r082 S:500;T:g;E:n;R:c:10:2;R:d:6:11;R:b:9:5;E:n;B;R:b:1:6;T:g;R:a:4:6;T:h;T:b;R:h:9:2;E:t => E:-/-;E:-/-;E:c/c;F:456:500:1:4:0:a,b,d,h
+Q r083 S:1600;B;R:h:9:6;E:n;T:e;T:g;R:f:5:11;R:f:6:1;E:x;R:c:3:12;E:f;R:a:1:10;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:424:1600:0:4:0:a,c,f,h
+Q r084 S:64;S:100000;R:a:8:7;S:3000;E:n;E:t;E:n;R:g:3:2;R:a:8:12;E:x;B;E:t;T:g;R:e:3:10;S:3000;R:e:8:3;T:c;B;E:f;S:3000;R:c:2:5;E:t;T:h;E:t;T:d;T:g;R:g:11:5;R:e:12:5;T:d;S:500;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:a/a;F:500:500:1:3:0:c,e,g
+Q r085 S:100000;E:f;B;T:d;R:h:2:11;E:n;B;T:f;E:t;R:h:5:4;B;T:h;R:d:8:10;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:400:100000:0:2:0:d,h
+Q r086 S:64;R:g:4:8;E:t;E:t;R:a:2:9;R:f:3:3;R:g:7:4;R:c:2:3;R:c:5:11;E:t;R:a:11:8;R:a:9:1;B;B;E:t;E:t;T:e;E:t;E:t;T:h;T:c;T:b;R:g:8:4;E:n;R:b:12:12;R:c:11:6;R:e:4:10;E:t => E:g/g;E:-/-;E:a,f,g,c/a,f,g,c;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:a,g,b,c,e/a,g,b,c,e;F:0:64:10:0:0:-
+Q r087 S:1600;T:c;B;R:g:2:11;R:f:8:9;B;R:f:10:6;E:x;E:t;T:e;R:e:2:1;R:g:3:1;R:f:3:2;R:b:10:4;R:f:1:2;R:e:9:4;B;B;R:a:4:7;T:b;S:1000;E:t => E:-/-;E:-/-;E:-/-;F:436:1000:0:5:0:a,b,e,f,g
+Q r088 S:1000;T:f;R:d:4:1;T:e;E:t;B;E:f;R:a:9:10;E:n;E:t;R:h:6:8;R:a:9:11;T:g;E:t;B;B;R:c:4:3;R:e:1:10;B;T:h;T:g;T:c;T:a;S:3000;B;S:1000;R:a:12:10;B;E:n;E:t;T:a;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:776:1000:0:5:0:a,c,d,e,h
+Q r089 S:64;E:f;B;R:a:12:3;R:a:11:1;R:c:11:7;R:a:7:6;T:a;E:n;R:g:10:1;R:c:12:7;R:b:5:7;S:64;E:t;E:t => E:-/-;E:-/-;E:a,g,c,b/a,g,c,b;E:-/-;F:0:64:4:0:0:-
+Q r090 S:200;R:e:4:5;R:g:2:3;T:a;E:t;R:d:11:10;R:a:12:2;E:x;R:f:7:1;R:f:8:10;B;T:e;T:a;T:e;T:h;T:a;B;R:a:11:4;R:e:8:7;E:f;R:b:3:1;T:g;E:t => E:-/-;E:-/e,g,d;E:-/g,d,f;E:d,f,a,e/d,f,a,e;F:36:200:4:2:0:b,g
+Q r091 S:3000;R:f:7:9;R:g:7:5;E:x;R:b:7:9;R:d:12:1;T:c;R:f:10:3;R:d:8:1;R:a:3:1;R:d:8:2;E:t => E:-/-;E:-/-;F:588:3000:0:5:0:a,b,d,f,g
+Q r092 S:100000;B;B;E:f;R:a:6:10;T:d;T:f;R:c:10:5;T:d;E:t;S:200;R:a:12:12;E:f;R:a:3:11;R:h:4:6;E:x;R:d:5:5;B;R:e:4:7;E:x;R:c:10:6;B;S:64;T:f;B;T:c;B;R:g:7:8;E:t => E:-/-;E:-/-;E:-/c,a;E:-/c,a;E:-/c,a,h,d;E:a,h,d,e,c/a,h,d,e,c;F:224:64:5:1:0:g
+Q r093 S:64;E:t;E:t;T:h;R:f:8:6;R:g:12:2;B;R:d:8:10;B;R:a:12:4;R:c:10:8;R:f:11:10;T:a;R:e:11:7;E:x;E:t;T:d;T:g;R:e:8:1;R:b:11:9;R:b:10:12;E:t;E:n;R:b:11:3;E:f;S:3000;R:e:10:2;R:b:12:7;R:a:8:3;R:d:8:8;R:g:12:10;E:t => E:-/-;E:-/-;E:-/g,d;E:g,d,c,f,a,e/g,d,c,f,a,e;E:e,b/e,b;E:-/-;E:-/b;E:-/-;F:1248:3000:8:5:0:a,b,d,e,g
+Q r094 S:1000;R:h:5:3;T:c;S:1600;R:e:7:2;S:500;R:c:5:11;E:t;R:f:8:12;B;E:x;B;E:f;R:g:9:8;E:t;S:1000;E:t;E:t;E:t => E:-/-;E:-/h,e,c;E:-/h,e,c;E:h,e,c,f/h,e,c,f;E:-/-;E:-/-;E:-/-;F:288:1000:4:1:0:g
+Q r095 S:1000;B;R:a:3:11;E:t;S:1600;R:c:6:10;T:f;E:n;E:t;T:d;E:t;R:c:3:6;E:t;R:c:1:3;R:b:12:6;R:f:8:10;E:t;B;E:f;B;T:e;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:752:1600:0:4:0:a,b,c,f
+Q r096 S:64;S:3000;E:f;E:t;B;R:c:12:6;R:c:3:3;E:x;B;R:c:10:1;R:c:5:9;T:g;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:180:3000:0:1:0:c
+Q r097 S:1600;B;R:h:10:4;E:x;E:t;E:t;R:e:12:3;T:f;T:g;R:g:1:10;E:x;S:500;R:f:3:6;R:d:2:10;R:f:7:8;R:e:4:10;R:g:4:7;R:e:9:2;R:c:7:9;T:g;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:h,d,f/h,d,f;F:436:500:3:3:0:c,e,g
+Q r098 S:3000;R:c:2:12;R:e:8:6;T:h;T:f;R:b:6:10;R:c:10:8;E:n;B;E:t;E:n;R:h:9:7;B;B;E:f;R:h:6:10;B;E:f;R:g:2:5;R:f:12:6;T:f;B;R:c:8:4;E:f;R:h:2:5;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:928:3000:0:6:0:b,c,e,f,g,h
+Q r099 S:200;E:n;R:g:5:12;R:b:11:2;R:f:8:12;T:c;T:c;R:f:12:3;T:d;E:t;E:t;R:e:10:12;E:t;E:t => E:-/-;E:g,b/g,b;E:-/-;E:f,e/f,e;E:-/-;F:0:200:4:0:0:-
+Q r100 S:100000;E:n;T:g;R:b:1:3;T:h;R:c:1:2;T:d;R:e:12:7;S:100000;R:f:6:10;R:c:11:2;T:b;E:t;R:d:8:2;T:c;R:b:6:1;R:c:2:6;R:g:1:10;B;R:a:9:6;E:t;R:e:2:12;E:f;R:c:2:4;R:f:5:6;R:g:3:2;R:c:10:1;R:a:4:11;T:g;B;R:b:11:9;T:d;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:916:100000:0:7:0:a,b,c,d,e,f,g
+Q r101 S:500;E:t;T:c;E:t;E:t;R:b:6:11;E:n;R:h:3:1;R:h:11:8;E:t;R:g:12:3;R:h:10:8;B;T:g;S:64;T:a;E:t;E:t;R:d:12:4;R:b:12:12;R:b:8:12;E:t;E:x;R:a:2:11;E:n;R:d:3:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:b/b;E:h/h;E:g/g;E:d,b/d,b;E:-/-;E:-/-;E:a/a;F:12:64:6:1:0:d
+Q r102 S:1000;S:1600;T:h;R:f:2:5;R:f:5:4;R:c:2:4;E:t;E:t;T:f;S:200;R:g:10:7;E:f;T:h;E:n;E:t;R:d:11:12;E:t => E:-/-;E:-/-;E:-/c,f,g;E:-/-;E:c,f,g/c,f,g;E:d/d;F:0:200:4:0:0:-
+Q r103 S:3000;E:t;T:f;T:b;S:500;R:f:3:11;E:f;R:e:9:4;R:f:7:5;E:t;T:f;R:e:9:2;E:t;R:a:7:11;E:t;T:f;R:c:9:1;T:b;R:e:10:6;S:1000;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:f/f;E:-/-;F:584:1000:1:3:0:a,c,e
+Q r104 S:1600;R:b:3:10;T:b;S:500;E:t;B;T:c;R:a:4:9;S:200;E:t;T:h;R:a:2:1;R:h:12:8;R:g:3:8;R:e:7:3;E:t => E:-/-;E:b/b;E:a,h/a,h;F:180:200:3:2:0:e,g
+Q r105 S:64;R:b:11:6;B;E:t;E:x;T:a;R:g:10:2;B;R:f:8:8;T:h;R:h:4:10;R:h:8:1;R:d:4:6;E:n;T:a;R:d:8:12;R:d:2:7;T:d;R:b:6:7;T:d;R:f:12:5;R:g:10:11;B;R:d:9:3;E:n;B;S:200;T:f;E:t => E:b/b;E:-/-;E:-/-;E:-/-;E:h,b,g,d/h,b,g,d;F:240:200:5:1:0:f
+Q r106 S:1600;R:e:6:10;R:e:6:11;R:b:1:12;T:g;R:e:6:4;R:b:9:3;B;B;E:t;T:a;S:1600;B;R:h:12:11;E:f;T:e;E:t => E:-/-;E:-/-;E:-/-;F:732:1600:0:3:0:b,e,h
+Q r107 S:1600;R:d:11:9;R:g:3:12;E:n;T:d;R:a:5:9;S:64;T:e;E:t;T:e;R:h:4:5;E:t;B;R:c:9:9;B;E:f;B;E:t;R:c:3:1;E:t => E:-/-;E:g,d,a/g,d,a;E:h/h;E:-/c;E:c/c;E:-/-;F:12:64:5:1:0:c
+Q r108 S:3000;R:b:5:4;B;S:1000;R:b:8:5;S:3000;E:n;E:t;E:f;E:x;R:d:9:9;T:a;T:h;B;R:c:8:9;E:t;R:b:6:10;T:d;E:t;S:500;T:f;S:500;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:c,b/c,b;F:324:500:2:1:0:d
+Q r109 S:1000;E:t;R:a:7:3;E:f;E:n;R:d:7:6;R:e:1:5;E:t;E:n;S:1600;B;T:b;E:x;R:f:11:4;R:b:12:10;E:f;R:b:11:7;E:t;E:t;R:g:4:9;E:n;E:t;B;E:n;R:e:1:5;E:t;R:f:4:1;R:f:2:2;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:740:1600:0:6:0:a,b,d,e,f,g
+Q r110 S:3000;T:e;B;S:3000;E:x;R:e:5:4;B;E:t;T:b;R:f:6:8;R:d:5:6;T:h;E:t;T:g;R:f:5:5;E:f;R:d:5:1;T:h;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:200:3000:0:3:0:d,e,f
+Q r111 S:200;T:b;T:f;E:f;R:c:12:2;E:t;E:t;B;T:d;E:t;T:g;R:c:8:8;T:d;T:h;E:f;T:b;S:1000;T:c;R:g:8:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/c;E:-/-;F:544:1000:0:2:0:c,g
+Q r112 S:64;T:c;E:t;R:g:6:8;R:b:7:7;R:c:1:4;B;E:t;R:f:6:2;T:c;E:t => E:-/-;E:g,b/g,b;E:-/-;F:64:64:2:2:0:c,f
+Q r113 S:100000;T:a;R:c:5:4;R:b:5:3;E:n;B;E:f;R:f:5:10;E:f;E:t;T:d;R:d:4:2;T:f;S:500;B;R:f:1:5;R:b:1:9;E:t;B;R:d:3:11;T:a;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:268:500:0:4:0:b,c,d,f
+Q r114 S:3000;T:c;R:e:8:6;T:b;R:g:5:11;E:t;B;R:d:12:10;R:e:6:10;B;R:g:4:5;B;E:n;E:x;R:e:9:3;S:100000;T:e;R:f:5:2;R:h:9:8;E:t;T:f;E:f;E:x;R:b:6:12;R:g:10:9;R:f:1:9;T:d;E:t;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1560:100000:0:6:0:b,d,e,f,g,h
+Q r115 S:64;T:h;B;T:f;B;R:h:8:1;R:d:1:12;B;B;R:g:5:4;S:200;R:g:10:8;T:h;T:f;T:h;R:e:8:6;R:e:8:11;R:e:1:4;E:t;T:e;R:g:12:3;B;B;B;B;T:a;E:x;E:t => E:d/d;E:-/-;E:-/-;F:192:200:1:3:0:e,g,h
+Q r116 S:100000;R:e:11:3;T:b;R:g:3:9;R:a:12:5;E:t;R:d:6:8;R:d:8:2;E:x;R:b:8:2;E:t;E:t;E:f;E:t;R:g:1:12;R:a:2:1;E:t;E:x;R:b:5:12;B;R:h:4:7;T:b;E:t;E:f;E:t;B;R:e:6:2;B;R:d:1:8;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:488:100000:0:6:0:a,b,d,e,g,h
+Q r117 S:1000;E:x;T:e;E:x;E:t;T:b;T:c;E:x;T:b;S:200;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:0:200:0:0:0:-
+Q r118 S:200;T:h;R:h:10:4;T:c;R:d:3:5;T:g;E:f;R:b:2:9;R:e:8:3;R:e:8:11;R:e:4:9;E:t => E:-/h;E:h,d,b/h,d,b;F:144:200:3:1:0:e
+Q r119 S:200;B;T:c;B;T:d;T:a;R:a:12:11;R:f:4:3;S:500;R:f:10:12;T:f;S:3000;R:d:4:9;E:t => E:-/-;F:1152:3000:0:3:0:a,d,f
+Q r120 S:3000;R:d:4:7;S:1600;R:b:2:4;T:c;E:n;R:b:3:12;R:f:7:9;E:t;S:200;E:t;R:g:7:7;E:t;R:h:10:4;R:c:10:8;R:e:5:5;E:t;E:t => E:-/-;E:-/-;E:d,b,f/d,b,f;E:-/-;E:g,h,c/g,h,c;E:-/-;F:100:200:6:1:0:e
+Q r121 S:500;R:f:10:6;R:g:10:10;R:a:3:9;E:n;E:n;T:g;R:e:6:4;B;E:t;E:t;E:f;E:t => E:-/-;E:-/-;E:f,a/f,a;E:-/-;E:-/-;E:-/-;F:496:500:2:2:0:e,g
+Q r122 S:1000;T:b;B;T:f;B;T:a;R:g:8:2;B;R:e:1:8;R:g:5:10;R:f:3:10;R:f:7:6;S:3000;R:b:2:8;T:c;E:t => E:-/-;F:464:3000:0:4:0:b,e,f,g
+Q r123 S:200;R:h:2:12;R:d:12:1;R:e:6:3;R:h:2:9;S:1600;R:b:8:11;S:64;E:t;T:c;R:e:3:5;E:t => E:d,e,h,b/d,e,h,b;E:-/-;F:60:64:4:1:0:e
+Q r124 S:3000;E:n;T:c;E:t;E:t;T:d;E:t;E:t;T:a;R:h:7:12;R:g:9:10;E:f;E:f;T:e;R:e:9:6;T:d;R:e:6:6;R:c:10:9;R:a:10:3;E:t;E:t;E:x;R:g:7:3;R:d:2:5;R:f:8:1;R:a:7:9;R:h:2:11;S:1000;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1000:1000:0:7:0:a,c,d,e,f,g,h
+Q r125 S:3000;E:t;S:100000;R:f:1:12;E:x;S:64;R:h:3:6;R:c:8:3;R:g:8:6;E:t;E:x;R:c:9:1;E:f;R:c:8:10;E:t;R:g:1:8;E:t;T:f;E:t;S:64;R:g:9:9;E:x;E:t => E:-/-;E:-/-;E:f,h,c,g/f,h,c,g;E:-/-;E:-/-;E:c/c;E:-/-;E:-/-;E:-/g;E:g/g;F:0:64:6:0:0:-
+Q r126 S:100000;E:t;E:t;E:t;R:g:6:3;B;R:f:11:6;T:c;E:t;T:e;E:n;E:t;T:d;B;T:a;T:e;B;R:e:5:8;T:e;B;R:c:8:10;R:e:6:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:680:100000:0:4:0:c,e,f,g
+Q r127 S:1600;E:t;R:e:2:7;E:t;E:t;E:t;E:t;T:h;R:b:10:2;T:e;E:n;R:c:6:6;E:t;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:280:1600:0:3:0:b,c,e
+Q r128 S:1600;T:a;R:h:9:3;B;R:h:12:6;S:100000;T:b;E:t;B;B;E:n;R:b:7:5;T:a;R:g:6:3;S:3000;B;T:d;B;T:b;R:b:7:9;B;R:a:10:10;T:g;E:t;R:f:9:1;R:g:9:1;S:64;R:e:9:7;E:t => E:-/-;E:-/-;E:-/-;E:h,b,a,f,g,e/h,b,a,f,g,e;F:0:64:6:0:0:-
+Q r129 S:100000;E:t;E:f;T:d;R:h:4:7;R:e:8:1;B;E:t;B;E:n;B;E:t;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:144:100000:0:2:0:e,h
+Q r130 S:64;E:n;T:b;R:e:12:3;R:c:9:2;B;B;E:t;S:100000;E:t => E:-/-;E:e,c/e,c;E:-/-;F:0:100000:2:0:0:-
+Q r131 S:64;E:x;S:1600;E:f;R:c:11:4;R:e:2:5;R:c:5:1;E:t;E:t;T:e;R:e:9:10;B;T:h;S:500;E:x;E:t;R:c:6:8;R:c:9:5;E:t;T:b;R:a:9:3;R:c:8:5;B;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:e/e;E:-/-;E:-/-;F:268:500:1:2:0:a,c
+Q r132 S:1000;B;S:1000;B;E:t;S:1600;E:t;T:h;T:g;T:b;B;R:e:12:4;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:192:1600:0:1:0:e
+Q r133 S:500;R:f:6:5;R:g:2:5;R:c:12:9;B;T:d;T:a;R:a:6:7;T:d;R:c:11:8;R:d:12:3;R:d:2:10;R:d:11:2;R:g:7:8;R:e:12:5;T:g;E:x;T:b;R:g:3:1;S:1600;B;R:a:3:3;R:b:5:11;T:h;T:h;R:e:3:1;E:f;R:h:12:9;B;E:t => E:-/f;E:-/-;E:-/-;F:1272:1600:0:8:0:a,b,c,d,e,f,g,h
+Q r134 S:100000;E:t;S:100000;E:t;B;R:d:1:5;R:c:12:2;R:b:6:11;E:t;T:b;S:3000;R:c:2:3;E:x;S:500;T:h;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:308:500:0:3:0:b,c,d
+Q r135 S:1600;R:c:7:3;E:t;T:h;T:b;R:h:10:12;R:e:10:3;R:g:2:5;S:1600;E:n;T:c;R:e:5:3;E:t;R:g:11:6;E:n;R:f:4:11;T:b;B;R:c:11:5;R:h:9:9;B;T:a;E:t;E:n;R:b:9:2;R:e:11:3;R:c:10:12;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1448:1600:0:6:0:b,c,e,f,g,h
+Q r136 S:64;R:h:1:4;R:f:8:2;E:t;E:t;B;T:f;T:f;B;E:t;R:d:8:9;R:c:9:8;B;E:n;T:b;T:e;R:h:1:3;S:200;T:h;T:g;B;B;E:t => E:h/h;E:-/-;E:-/-;E:-/-;E:f,d,c/f,d,c;F:12:200:4:1:0:h
+Q r137 S:200;R:d:7:7;T:b;T:a;B;E:t;T:h;E:t;B;R:f:5:9;E:f;S:3000;T:f;R:d:2:3;R:e:8:3;R:f:8:12;R:a:8:3;T:a;E:t => E:-/-;E:-/-;E:-/d;E:-/-;F:600:3000:0:4:0:a,d,e,f
+Q r138 S:64;B;E:f;B;B;R:c:3:2;B;R:e:6:8;E:t;E:t;T:b;R:c:4:3;B;R:g:11:5;E:n;R:h:5:7;R:b:10:12;R:e:6:2;R:a:9:9;T:f;T:d;R:d:10:8;R:e:8:10;R:c:8:8;E:x;B;T:c;E:f;E:x;E:t => E:-/-;E:c/c;E:e/e;E:-/-;E:-/g,h,b,a,d,e,c;E:-/g,h,b,a,d,e;E:-/g,h,b,a,d,e,c;E:g,h,b,a,d,e,c/g,h,b,a,d,e,c;F:0:64:9:0:0:-
+Q r139 S:500;E:f;R:b:8:5;T:h;R:h:8:7;B;R:h:3:8;E:t;E:x;T:f;R:h:1:6;R:b:12:8;B;B;T:b;T:a;R:e:8:5;E:t;E:t;R:e:11:1;T:e;R:e:3:4;T:e;E:f;T:a;T:d;R:a:7:4;B;R:h:6:10;B;B;E:t => E:-/-;E:-/-;E:-/-;E:h/h;E:b/b;E:-/-;E:-/-;F:400:500:2:3:0:a,e,h
+Q r140 S:100000;E:x;E:x;R:a:3:4;R:h:9:12;E:t;B;E:t;T:h;E:t;R:g:2:2;E:t;S:64;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:a,h/a,h;F:16:64:2:1:0:g
+Q r141 S:64;T:b;B;B;E:t;E:t;R:d:12:9;T:h;E:t;T:g;T:b;R:a:1:3;S:200;T:a;T:a;T:a;R:b:8:8;E:t;B;B;R:c:6:7;R:f:6:5;R:b:11:6;R:e:2:2;E:n;E:t => E:-/-;E:-/-;E:d/d;E:a,b/a,b;E:-/-;E:c,f,b/c,f,b;F:16:200:6:1:0:e
+Q r142 S:64;S:100000;T:c;T:c;B;B;S:64;E:t;T:g;T:h;S:1600;B;R:b:12:2;E:t;R:h:7:11;R:a:1:9;T:e;R:e:5:5;E:t;R:f:2:2;R:b:1:12;T:g;T:g;E:f;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:508:1600:0:5:0:a,b,e,f,h
+Q r143 S:200;T:b;E:t;R:d:3:12;R:a:7:3;R:g:1:12;R:e:8:4;E:t;R:g:1:4;E:t;B;S:3000;E:t => E:-/-;E:d,a/d,a;E:-/-;E:-/-;F:144:3000:2:2:0:e,g
+Q r144 S:1000;E:x;R:d:3:1;B;E:t;R:g:9:7;E:f;E:t;R:f:4:3;R:a:8:1;T:a;R:h:4:5;E:t;E:t;T:a;T:b;E:t;T:h;E:t;R:e:10:12;R:g:5:9;R:b:6:1;E:t;R:e:5:2;E:x;S:200;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:d,f,a,h,g/d,f,a,h,g;F:64:200:5:2:0:b,e
+Q r145 S:1000;R:h:11:6;E:n;R:h:11:7;R:h:1:7;R:c:5:1;R:e:12:6;T:b;T:g;E:f;R:e:8:4;E:t;T:b;E:n;R:a:8:12;R:f:11:7;R:g:6:10;T:e;E:t;T:f;R:d:9:12;T:h;T:a;R:h:10:3;T:a;R:c:4:4;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:h,c,a/h,c,a;E:g,e/g,e;F:924:1000:5:4:0:c,d,f,h
+Q r146 S:1600;T:f;R:h:5:10;E:t;B;R:c:11:12;T:a;R:e:3:2;R:d:1:11;R:f:12:3;E:t;T:e;E:t;E:t;S:100000;R:g:9:6;R:a:9:1;R:h:8:12;T:g;R:d:12:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1380:100000:0:7:0:a,c,d,e,f,g,h
+Q r147 S:100000;E:t;R:h:4:4;E:x;R:c:12:1;E:f;T:g;R:c:8:8;T:f;R:a:9:12;R:d:11:4;R:f:3:3;R:e:9:9;B;E:n;T:f;E:t;T:a;R:a:5:12;R:h:12:11;T:a;T:e;B;T:b;R:e:10:8;T:c;E:x;R:e:12:9;R:e:9:5;E:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1416:100000:0:6:0:a,c,d,e,f,h
+Q r148 S:64;R:f:4:7;R:d:8:4;T:f;E:t;R:f:3:12;R:g:1:8;T:h;R:c:8:7;E:x;E:x;T:a;B;R:g:8:4;R:h:8:7;B;R:b:3:8;B;B;E:t => E:d,f/d,f;E:-/f,g,c;E:-/f,g,c;E:f,c,g,h,b/f,c,g,h,b;F:0:64:7:0:0:-
+Q r149 S:500;E:n;T:c;B;E:n;R:c:1:7;R:e:6:10;B;E:f;T:e;S:500;T:a;S:500;S:64;R:d:7:4;B;R:h:9:12;R:h:5:1;T:a;T:a;B;E:t;R:b:7:10;T:b;R:d:7:12;E:t;E:t => E:-/-;E:-/-;E:-/-;E:c,e,d/c,e,d;E:h,b,d/h,b,d;E:-/-;F:0:64:6:0:0:-
+Q r150 S:100000;R:b:1:3;T:d;E:t;E:f;E:x;E:t;R:c:12:4;T:b;E:t;B;E:x;T:h;R:b:2:10;T:f;S:500;R:f:7:11;T:f;R:e:12:9;T:e;T:f;R:g:10:9;E:t;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:c,b,e,f/c,b,e,f;E:-/-;F:360:500:4:1:0:g
+Q r151 S:500;E:t;R:d:12:9;T:f;E:x;B;E:t;T:a;E:f;B;B;T:b;T:h;E:t;T:e;T:c;T:g;E:t;S:3000;T:e;E:t;R:g:2:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:504:3000:0:2:0:d,g
+Q r152 S:1000;E:t;T:d;E:t;B;T:c;E:t;R:a:11:5;T:c;T:g;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:220:1000:0:1:0:a
+Q r153 S:1000;T:d;E:f;R:e:8:6;R:g:8:2;E:t;R:e:5:3;R:e:8:9;E:t;E:x;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:352:1000:0:2:0:e,g
+Q r154 S:1000;E:t;S:100000;R:b:1:11;R:a:5:3;R:e:7:1;B;R:a:9:5;R:a:9:11;R:g:12:8;T:b;S:200;B;E:x;R:e:8:4;E:t;R:h:12:5;S:64;T:a;E:t;T:c;R:c:4:1;R:a:6:8;T:e;T:h;R:a:9:5;E:t => E:-/-;E:-/e,a,g;E:a,g/a,g;E:b,e,h/b,e,h;E:c,a/c,a;F:0:64:7:0:0:-
+Q r155 S:100000;R:e:8:10;E:t;T:a;T:d;E:n;E:f;T:g;E:n;R:e:9:5;E:f;B;R:h:7:12;B;T:f;S:3000;R:f:2:3;S:3000;E:t;B;R:g:11:3;E:t;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:672:3000:0:4:0:e,f,g,h
+Q r156 S:500;B;R:g:11:10;B;T:g;R:c:1:3;R:e:12:2;S:3000;E:t;E:x;T:e;R:e:9:10;E:t;S:64;S:100000;B;R:c:9:8;R:e:6:2;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:776:100000:0:3:0:c,e,g
+Q r157 S:100000;B;T:g;T:b;E:t;R:a:8:1;S:100000;R:d:2:6;E:t;R:d:9:4;B;E:t;T:g;E:f;E:t;R:d:9:6;R:a:11:11;R:b:6:6;R:f:2:3;E:t;R:g:10:3;R:b:12:4;R:h:7:3;E:t;R:c:2:1;R:b:8:4;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1064:100000:0:7:0:a,b,c,d,f,g,h
+Q r158 S:200;R:f:10:3;T:a;B;R:f:7:4;E:t;R:h:1:4;T:g;E:f;T:g;E:t;E:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:128:200:0:2:0:f,h
+Q r159 S:500;B;R:a:3:10;R:b:7:9;R:e:10:7;E:f;T:c;E:f;B;E:t;E:n;B;R:a:7:1;E:t;S:200;R:d:1:8;R:f:5:8;R:a:3:5;B;T:e;B;R:d:10:4;R:f:12:2;R:h:4:2;E:x;R:d:3:7;E:t;E:t => E:-/-;E:-/a,b;E:a,b/a,b;E:-/-;E:-/-;E:-/a,e;E:a,e,f/a,e,f;E:-/-;F:116:200:5:2:0:d,h
+Q r160 S:3000;E:t;R:f:11:1;E:x;R:d:2:4;T:e;R:a:5:11;T:h;B;B;T:e;E:t;E:f;R:f:10:4;T:c;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:412:3000:0:3:0:a,d,f
+Q r161 S:100000;S:64;E:x;R:b:4:3;R:d:11:11;R:b:3:12;T:d;T:b;T:d;T:e;E:x;E:t => E:-/-;E:-/b,d;E:b,d/b,d;F:0:64:2:0:0:-
+Q r162 S:200;R:h:8:12;E:t;R:f:12:8;R:d:6:5;T:e;R:e:6:3;R:h:2:11;R:b:8:2;E:t;E:f;E:t;E:t => E:h/h;E:f,d,e/f,d,e;E:-/-;E:-/-;E:-/-;F:152:200:4:2:0:b,h
+Q r163 S:100000;R:a:9:2;R:g:12:10;R:a:2:7;E:t;R:h:9:2;R:c:3:6;T:h;E:n;E:t;E:t;S:500;R:c:6:6;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:g/g;F:272:500:1:3:0:a,c,h
+Q r164 S:100000;E:t;R:a:5:3;R:d:1:3;E:f;T:f;R:d:10:7;E:t;E:n;T:f;R:a:2:5;T:c;R:e:3:5;E:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:380:100000:0:3:0:a,d,e
+Q r165 S:100000;R:e:5:12;T:h;T:a;R:b:3:1;R:g:5:4;R:d:4:4;R:h:4:4;R:g:9:7;E:t;T:h;E:t => E:-/-;E:-/-;F:632:100000:0:5:0:b,d,e,g,h
+Q r166 S:200;B;E:f;T:d;E:x;R:f:9:7;R:a:6:8;T:h;T:b;B;R:c:1:10;E:t;R:d:6:3;R:g:7:4;R:g:2:11;T:f;B;R:e:9:5;R:c:1:11;T:c;T:g;S:1600;B;T:h;R:c:5:11;E:x;R:g:8:3;R:h:9:12;E:n;R:e:8:10;B;E:t => E:-/-;E:-/-;E:f,a/f,a;E:-/-;E:-/-;E:-/-;F:1140:1600:2:5:0:c,d,e,g,h
+Q r167 S:200;R:g:6:3;R:a:12:11;R:g:5:3;E:f;T:f;T:g;E:x;R:d:3:12;E:n;R:h:4:10;E:t;B;R:c:2:4;T:b;B;T:h;E:t => E:-/a;E:-/a;E:-/-;E:a,g,d/a,g,d;E:-/-;F:192:200:3:2:0:c,h
+Q r168 S:1600;E:x;E:t;T:d;R:d:6:9;E:t;R:a:7:6;E:t;R:a:7:7;R:c:1:3;T:h;T:b;R:g:10:3;R:g:10:12;R:c:12:11;R:f:12:10;R:b:11:3;R:a:10:8;R:h:6:2;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:d,g/d,g;F:1508:1600:2:5:0:a,b,c,f,h
+Q r169 S:1000;E:f;E:t;R:b:8:5;T:f;E:t;T:g;R:e:9:12;T:a;E:f;R:h:3:12;B;R:h:6:11;T:b;R:g:2:11;E:x;T:g;T:d;S:64;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:e,h,b,g/e,h,b,g;F:0:64:4:0:0:-
+Q r170 S:64;R:d:2:2;T:g;R:h:4:5;R:d:10:9;T:d;T:h;B;T:f;R:a:4:4;R:c:5:8;R:d:4:7;S:3000;R:g:8:4;E:t;R:a:4:4;R:c:9:9;B;E:t => E:-/-;E:-/-;F:708:3000:0:5:0:a,c,d,g,h
+Q r171 S:500;R:e:3:3;R:a:5:7;R:h:7:11;E:x;S:3000;B;E:t;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:484:3000:0:3:0:a,e,h
+Q r172 S:500;E:x;T:c;E:t;R:d:3:2;R:c:8:1;R:c:3:5;R:a:11:9;R:f:2:10;R:a:12:12;B;R:a:3:11;R:g:6:11;R:h:1:10;T:h;R:b:12:1;T:b;E:x;R:d:8:10;R:d:10:4;R:f:5:12;R:b:2:11;R:d:1:2;T:f;R:f:10:3;R:b:7:11;T:g;E:f;R:f:1:4;R:b:2:3;T:b;E:t => E:-/-;E:-/-;E:-/d,c,f;E:-/c,a,h,d,f,b;E:c/c;F:484:500:1:6:0:a,b,d,f,g,h
+Q r173 S:1000;R:e:4:2;B;R:e:9:7;T:f;B;T:c;R:d:11:10;R:f:8:1;E:x;E:t;T:d;B;E:f;T:h;E:n;E:f;E:f;R:d:7:10;E:x;R:c:5:10;R:h:2:11;E:n;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:852:1000:0:5:0:c,d,e,f,h
+Q r174 S:3000;R:c:3:6;E:t;E:t;E:x;S:100000;B;T:d;E:f;E:t;B;R:g:11:6;T:f;E:x;E:n;T:h;T:a;E:n;T:h;R:a:11:4;S:500;R:c:8:10;T:f;T:b;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:g/g;F:496:500:1:2:0:a,c
+Q r175 S:3000;R:d:7:6;E:n;E:f;R:e:2:6;E:x;R:c:6:8;E:t;R:g:9:4;R:a:2:7;B;R:d:8:4;E:n;E:t;R:c:6:7;E:n;R:f:1:6;B;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:568:3000:0:6:0:a,c,d,e,f,g
+Q r176 S:1600;R:c:11:2;T:f;R:g:10:3;B;E:t;R:b:2:10;B;R:h:9:8;R:d:12:11;E:t;E:t => E:-/-;E:-/-;E:-/-;F:1104:1600:0:5:0:b,c,d,g,h
+Q r177 S:1600;R:e:6:2;S:3000;R:b:4:11;B;B;E:n;R:g:4:9;B;R:g:1:10;T:b;E:t;R:a:2:10;T:d;B;E:t => E:-/-;E:-/-;E:-/-;F:344:3000:0:4:0:a,b,e,g
+Q r178 S:500;T:d;B;B;T:h;R:g:9:1;R:g:2:6;R:a:9:3;R:d:2:11;R:f:1:3;R:a:5:6;T:a;R:a:6:8;R:b:3:11;T:h;S:200;R:b:4:3;T:c;R:b:6:2;R:f:5:4;R:e:11:2;R:d:4:1;R:b:2:11;B;B;R:e:1:12;T:g;B;T:h;E:t => E:a,f/a,f;F:200:200:2:4:0:b,d,e,g
+Q r179 S:100000;B;T:e;R:h:4:12;R:a:4:2;T:h;B;R:e:2:11;R:a:4:10;T:d;E:t => E:-/-;F:440:100000:0:3:0:a,e,h
+Q r180 S:3000;R:g:3:5;T:h;R:c:12:9;R:c:8:7;R:e:2:11;T:g;B;R:g:6:4;R:g:12:10;R:h:10:4;T:e;T:g;E:t;E:t => E:-/-;E:-/-;F:952:3000:0:4:0:c,e,g,h
+Q r181 S:200;R:f:8:8;R:d:4:7;R:e:10:11;R:f:2:5;S:500;T:c;S:64;T:g;B;R:g:10:4;R:e:5:10;E:f;R:f:3:2;B;E:n;R:g:3:1;R:b:7:5;R:b:7:4;R:f:1:3;T:e;E:t => E:-/d,f;E:-/-;E:d,g,b,f,e/d,g,b,f,e;F:0:64:5:0:0:-
+Q r182 S:1600;R:a:2:3;R:d:10:10;E:x;R:b:3:2;B;R:c:10:7;R:b:1:3;R:c:4:11;T:b;T:g;R:c:12:6;E:t;R:b:1:9;R:e:6:12;T:g;B;R:c:7:2;R:e:8:10;R:f:11:11;R:d:11:5;B;E:t;E:t;T:b;R:g:2:8;R:d:8:6;T:b;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1176:1600:0:7:0:a,b,c,d,e,f,g
+Q r183 S:1000;E:t;S:64;B;T:b;E:f;R:h:10:3;R:h:9:11;R:d:11:8;R:h:11:9;T:h;R:b:2:11;T:h;B;B;T:g;R:g:4:10;E:t;T:a;E:t;R:d:1:5;T:a;R:f:1:9;E:t => E:-/-;E:-/-;E:d,b,h/d,b,h;E:g/g;E:-/-;F:56:64:4:2:0:d,f
+Q r184 S:500;B;T:d;R:b:5:11;R:h:6:2;R:e:11:8;R:a:9:10;T:d;R:b:9:11;T:h;E:t;E:t => E:-/-;E:e,a/e,a;F:444:500:2:2:0:b,h
+Q r185 S:500;R:g:12:4;R:g:5:1;T:g;B;R:e:5:2;B;R:d:9:11;R:e:5:4;B;R:e:7:1;B;T:e;T:d;R:f:10:1;T:f;R:f:8:4;E:t;R:h:10:12;E:t => E:g/g;E:e,d,f/e,d,f;F:480:500:4:1:0:h
+Q r186 S:3000;B;R:f:10:8;T:a;B;E:t;S:1600;R:d:8:5;E:n;R:h:1:2;E:x;R:c:2:4;R:h:9:8;E:t;E:x;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:800:1600:0:4:0:c,d,f,h
+Q r187 S:3000;E:t;S:1000;T:d;E:t;B;E:n;R:g:8:12;E:x;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:384:1000:0:1:0:g
+Q r188 S:1600;E:n;T:g;T:e;R:c:3:11;R:h:8:6;B;R:g:1:10;T:d;B;T:g;R:c:8:8;R:f:11:6;E:t => E:-/-;E:-/-;F:752:1600:0:4:0:c,f,g,h
+Q r189 S:1600;R:e:5:8;T:g;S:200;T:g;T:g;E:t;R:h:12:1;T:b;E:t;E:t;T:f;R:c:5:9;R:a:6:8;R:d:11:7;B;B;R:h:1:11;R:d:3:1;T:g;R:c:4:6;T:e;R:g:6:1;T:e;E:t;S:3000;R:f:8:8;R:e:8:1;R:b:2:9;T:h;E:t;B;E:t => E:-/-;E:e/e;E:-/-;E:a/a;E:-/-;E:-/-;F:536:3000:2:7:0:b,c,d,e,f,g,h
+Q r190 S:1600;R:c:8:11;E:t;B;T:e;E:t;R:a:5:2;E:t;T:g;E:x;B;S:100000;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:392:100000:0:2:0:a,c
+Q r191 S:1600;B;B;E:x;R:h:8:9;R:a:3:10;R:a:9:2;R:d:6:10;S:3000;R:f:12:9;R:a:3:4;T:g;E:t;E:x;R:f:2:6;S:100000;R:d:12:9;R:b:1:7;R:a:6:2;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:844:100000:0:5:0:a,b,d,f,h
+Q r192 S:1600;E:f;R:c:6:7;E:f;B;R:c:12:2;R:b:10:3;T:g;E:f;R:g:6:7;T:b;T:a;T:e;T:f;E:n;S:200;T:d;R:g:7:2;E:t;R:d:11:5;R:h:2:5;T:c;R:f:5:11;S:1600;E:n;T:a;E:t;R:e:8:3;B;T:d;R:a:3:6;T:c;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:c/c;E:-/-;E:-/-;E:-/-;F:824:1600:1:7:0:a,b,d,e,f,g,h
+Q r193 S:64;T:e;T:f;R:c:12:10;T:d;E:f;T:c;R:e:6:8;B;R:g:3:7;T:d;R:h:11:12;S:200;S:1000;R:f:12:1;T:g;B;E:t;B;B;R:g:11:2;T:a;R:f:11:6;B;E:t;E:f;E:t;E:t => E:-/c;E:c/c;E:e/e;E:-/-;E:-/-;E:-/-;F:880:1000:2:3:0:f,g,h
+Q r194 S:100000;T:d;E:x;T:g;T:h;B;R:d:4:8;R:g:10:6;R:b:8:10;E:t;R:b:1:6;B;R:g:7:4;R:a:3:9;R:f:3:8;B;E:t;R:c:6:8;T:c;B;S:1600;R:e:9:8;R:d:7:11;E:t;R:e:6:7;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1008:1600:0:7:0:a,b,c,d,e,f,g
+Q r195 S:64;R:c:11:3;R:g:10:8;E:t;E:t;R:a:1:1;R:c:2:11;R:f:9:5;E:t;T:d;T:g;R:c:10:7;R:b:12:9;B;R:e:7:3;S:200;S:500;B;B;S:3000;R:f:6:8;T:c;E:t;R:g:2:9;R:d:11:8;E:t;R:d:6:8;T:g;E:t => E:c,g/c,g;E:-/-;E:a,c,f/a,c,f;E:-/-;E:-/-;E:-/-;F:1252:3000:5:6:0:b,c,d,e,f,g
+Q r196 S:3000;T:f;E:t;B;R:f:11:4;R:c:9:6;R:g:6:6;R:h:5:7;T:c;E:f;R:c:6:8;E:t;R:c:2:9;T:b;R:c:3:11;R:g:4:2;R:d:7:3;T:h;E:x;R:h:11:7;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:732:3000:0:5:0:c,d,f,g,h
+Q r197 S:1600;T:b;E:t;R:c:3:6;T:f;T:a;B;S:1000;R:h:8:9;E:t;T:h;B;E:f;R:f:11:2;T:f;T:h;B;B;S:64;B;S:3000;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:448:3000:0:3:0:c,f,h
+Q r198 S:1600;T:e;R:h:10:3;B;E:t;E:t;E:t;R:g:3:11;E:t;B;E:t;B;R:f:12:1;T:a;B;R:g:12:1;B;R:d:2:1;B;R:d:7:6;R:e:1:9;R:f:10:6;B;R:h:9:5;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:672:1600:0:5:0:d,e,f,g,h
+Q r199 S:64;T:c;R:g:11:11;B;B;R:h:6:4;R:h:10:2;T:g;T:g;E:t;R:d:6:8;T:c;R:g:11:11;B;E:f;T:h;B;E:t;R:f:9:2;R:h:3:5;R:f:12:5;R:h:10:10;E:t;R:b:12:11;R:a:1:8;R:e:12:4;E:t;T:h;E:t => E:-/-;E:-/h,d,g;E:d,g,h/d,g,h;E:f,h/f,h;E:b,a,e/b,a,e;E:-/-;F:0:64:8:0:0:-
+Q r200 S:100000;S:64;B;R:e:2:12;E:n;T:d;R:a:7:2;B;E:t;B;E:t;R:c:4:12;R:h:8:7;R:g:5:5;B;E:x;R:d:9:3;B;T:c;R:g:7:3;T:b;R:d:7:3;E:f;E:t;R:d:2:12;E:x;E:t;R:e:7:6;E:t => E:-/-;E:e/e;E:-/-;E:-/a,c,h,g;E:-/a,h;E:a,h,c,g,d/a,h,c,g,d;E:-/d;E:d/d;E:e/e;F:0:64:8:0:0:-
+Q r201 S:1600;R:a:8:5;R:a:5:11;S:3000;R:g:9:5;E:x;R:f:3:1;S:3000;R:e:9:3;E:t;R:b:3:10;E:x;R:d:6:2;R:a:6:10;R:e:8:2;R:c:2:11;R:f:10:11;T:a;E:t;R:c:11:4;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1268:3000:0:7:0:a,b,c,d,e,f,g
+Q r202 S:1000;E:t;E:t;R:a:12:8;E:t;B;E:t;R:d:5:3;E:t;B;E:t;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:444:1000:0:2:0:a,d
+Q r203 S:200;R:b:7:2;T:c;B;R:d:8:4;R:b:9:1;E:t;T:d;S:100000;E:n;B;T:f;R:b:1:7;R:a:4:8;B;R:b:4:5;E:n;S:3000;E:x;R:e:2:8;E:x;R:e:3:6;R:d:12:2;R:e:12:4;R:b:5:4;T:e;E:x;R:h:8:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:784:3000:0:5:0:a,b,d,e,h
+Q r204 S:500;R:h:4:5;R:f:4:12;R:h:3:2;T:e;E:x;S:3000;R:f:1:12;R:b:6:1;E:t => E:-/-;E:-/-;F:96:3000:0:3:0:b,f,h
+Q r205 S:500;B;B;T:c;E:t;T:d;R:c:12:6;R:d:3:11;R:c:10:6;R:d:8:9;E:t;R:e:3:8;E:t;R:h:6:1;T:c;T:b;T:c;T:g;R:d:9:2;S:500;R:e:5:12;T:g;R:h:2:6;T:a;R:h:11:7;T:b;R:b:1:10;R:a:4:10;R:f:4:11;S:3000;E:t => E:-/-;E:c/c;E:-/-;E:-/-;F:996:3000:1:6:0:a,b,d,e,f,h
+Q r206 S:64;R:e:8:2;T:c;R:h:2:8;E:x;R:c:1:9;S:200;R:f:4:5;R:f:11:8;R:d:9:8;T:h;B;T:b;B;E:t;R:a:8:4;E:t => E:-/e;E:e,c,f,d/e,c,f,d;E:-/-;F:192:200:4:2:0:a,h
+Q r207 S:64;T:d;T:f;T:d;R:g:5:10;R:e:5:5;R:f:8:12;S:100000;E:f;S:500;E:t;R:d:12:12;B;R:e:7:11;R:f:11:1;T:e;R:b:2:12;B;R:g:9:1;B;R:e:2:2;E:t => E:-/-;E:g/g;E:d/d;F:192:500:2:4:0:b,e,f,g
+Q r208 S:1000;T:g;R:a:6:1;R:h:2:1;E:t;R:c:8:10;R:f:11:11;T:a;T:d;R:b:6:2;R:g:2:10;E:t;B;R:b:12:12;B;E:n;R:g:3:3;R:b:6:1;S:1600;T:e;R:d:1:6;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:920:1600:0:7:0:a,b,c,d,f,g,h
+Q r209 S:100000;E:t;T:b;B;T:b;R:f:1:4;T:b;R:c:2:1;R:d:6:3;T:c;E:f;S:3000;E:x;B;B;R:h:3:8;R:b:7:2;R:a:9:7;E:t;R:f:1:12;B;B;R:h:7:4;B;R:a:9:3;R:a:5:9;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:476:3000:0:6:0:a,b,c,d,f,h
+Q r210 S:500;T:g;R:d:6:8;T:g;R:f:11:2;R:f:11:10;T:a;R:d:6:7;E:t;E:x;T:g;R:h:5:4;R:a:2:7;T:g;E:x;E:t;T:h;R:b:12:12;E:t;R:h:5:7;R:h:3:5;T:e;E:t => E:f/f;E:-/-;E:-/-;E:-/-;E:d,a,h,b/d,a,h,b;E:-/-;F:60:500:5:1:0:h
+Q r211 S:1000;E:x;E:t;T:d;R:d:11:12;E:f;T:b;T:c;E:t;T:b;B;T:g;R:d:5:4;B;T:f;E:f;B;B;R:b:9:1;B;R:g:11:1;R:g:7:11;R:d:6:6;R:g:11:7;E:t;E:t;R:h:2:10;R:a:1:5;T:e;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:588:1000:0:5:0:a,b,d,g,h
+Q r212 S:1000;T:e;T:g;B;T:b;B;E:t;R:g:5:8;R:h:8:9;T:c;E:t;E:t;R:d:11:4;R:h:2:12;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:432:1000:0:3:0:d,g,h
+Q r213 S:3000;T:c;R:c:2:1;E:t;E:t;T:d;S:1000;B;B;E:t;T:d;S:500;R:g:2:1;B;B;R:c:1:10;T:h;R:e:9:2;S:100000;R:f:3:6;R:c:6:8;T:d;R:b:12:2;R:g:7:12;E:t;E:n;S:3000;E:t;R:b:2:11;E:x;T:e;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:760:3000:0:5:0:b,c,e,f,g
+Q r214 S:3000;T:d;T:g;E:f;T:g;R:g:6:11;T:a;T:f;E:x;R:e:12:2;B;R:b:4:10;E:t => E:-/-;E:-/-;E:-/-;F:520:3000:0:3:0:b,e,g
+Q r215 S:64;E:t;R:a:9:6;B;R:a:9:8;R:e:3:6;E:t;E:t;T:b;R:a:11:9;R:h:5:7;B;E:n;R:a:6:1;E:t => E:-/-;E:-/-;E:a,e/a,e;E:-/-;E:h/h;F:24:64:3:1:0:a
+Q r216 S:1600;E:t;E:t;R:c:3:4;R:g:12:1;T:h;R:b:8:2;R:d:8:9;R:b:9:5;T:d;E:f;E:t;R:h:6:10;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:804:1600:0:5:0:b,c,d,g,h
+Q r217 S:1000;E:f;R:c:8:8;B;B;E:f;E:t;E:t;B;E:t;R:g:11:6;T:g;R:f:7:3;R:d:7:5;T:e;T:b;E:t;E:t;R:a:6:6;T:a;B;S:200;B;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:c,g,f,d/c,g,f,d;F:144:200:4:1:0:a
+Q r218 S:100000;R:d:9:8;R:h:4:4;R:d:1:4;R:g:12:3;B;T:g;T:c;E:f;E:f;S:1000;E:n;R:f:4:12;E:t;R:c:11:11;T:f;B;E:t;E:n;R:c:3:9;R:h:12:5;B;R:f:2:11;B;B;T:h;T:b;E:n;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:596:1000:0:5:0:c,d,f,g,h
+Q r219 S:200;T:b;T:d;E:t;R:e:12:10;B;E:t;E:n;T:e;E:t;R:f:6:7;R:h:4:7;E:t;R:c:7:6;R:b:4:12;T:f;B;R:b:3:7;R:f:3:4;R:e:8:2;E:t;S:3000;R:e:1:9;E:t;E:x;B;R:d:2:2;R:g:5:6;R:a:9:8;E:t => E:-/-;E:e/e;E:-/-;E:-/-;E:f/f;E:h,c/h,c;E:-/-;E:-/-;E:-/-;F:592:3000:4:6:0:a,b,d,e,f,g
+Q r220 S:100000;R:b:6:12;E:n;R:a:10:8;S:100000;E:x;T:g;E:t;B;B;E:x;E:x;E:t;R:d:12:7;R:h:10:3;T:e;T:h;T:g;E:t;R:h:6:6;E:n;E:x;E:x;T:b;T:c;B;R:g:5:10;E:t;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1288:100000:0:5:0:a,b,d,g,h
+Q r221 S:1000;R:e:3:11;R:e:2:3;R:d:9:11;E:x;T:b;R:e:2:3;E:n;R:d:4:1;E:f;T:c;E:x;T:b;B;T:f;T:g;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:40:1000:0:2:0:d,e
+Q r222 S:1000;E:x;R:h:3:11;T:h;R:d:10:6;T:c;R:d:9:1;T:e;E:t;B;T:g;R:c:8:8;S:1000;E:x;S:64;E:f;B;R:b:2:10;R:c:6:6;E:x;R:f:2:2;S:64;T:c;E:x;B;R:a:7:2;E:t;R:d:9:4;B;R:c:10:3;R:b:8:9;E:t => E:-/-;E:-/-;E:-/-;E:-/h,d,c;E:-/h,d;E:-/h,d,b,f,c;E:h,d,b,f,c/h,d,b,f,c;E:a,d/a,d;F:408:64:7:2:0:b,c
+Q r223 S:64;E:t;B;T:g;T:f;R:c:9:11;R:c:10:8;E:t;E:x;T:h;S:200;B;E:f;B;R:a:10:5;R:b:2:5;E:t;T:g;R:a:1:11;E:x;E:x;R:d:11:2;T:b;S:200;S:1600;T:b;E:t;R:e:5:3;E:x;R:g:6:10;B;E:t => E:-/-;E:-/-;E:-/c;E:-/c;E:c/c;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:472:1600:1:5:0:a,b,d,e,g
+Q r224 S:100000;T:a;R:d:12:11;E:n;R:c:8:11;T:d;R:e:9:7;R:b:2:12;R:g:10:9;T:g;T:b;R:a:11:4;E:t;R:b:11:4;R:c:12:8;R:c:9:4;E:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:1636:100000:0:6:0:a,b,c,d,e,g
+Q r225 S:1000;S:3000;E:t;E:x;E:t;R:a:2:2;E:t;T:f;S:64;E:x;R:g:9:9;T:a;R:c:2:7;T:a;E:t;R:c:4:6;R:b:8:1;T:a;S:64;R:d:5:11;E:t;E:n;R:a:10:5;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:g,c/g,c;E:c,b,a,d/c,b,a,d;E:-/-;E:a/a;F:0:64:7:0:0:-
+Q r226 S:3000;R:a:11:8;E:t;S:64;T:e;T:g;T:h;R:b:10:5;R:b:10:4;T:b;R:b:10:7;E:t;T:b;T:d;B;R:c:5:3;B;R:c:9:3;E:f;T:e;E:t => E:-/-;E:a,b/a,b;E:-/-;E:c/c;F:0:64:3:0:0:-
+Q r227 S:500;E:f;B;E:t;T:e;E:x;E:t;B;B;T:h;S:3000;B;S:500;E:n;R:c:4:11;T:d;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:176:500:0:1:0:c
+Q r228 S:500;R:g:1:7;E:t;E:t;R:e:10:11;R:a:6:1;B;R:h:9:3;E:t;R:h:12:4;R:b:4:11;B;T:g;B;R:f:5:2;E:n;T:c;T:c;R:d:5:7;E:t;S:200;B;E:t => E:-/-;E:-/-;E:g,e/g,e;E:-/-;E:a,h/a,h;E:b/b;F:180:200:5:2:0:d,f
+Q r229 S:64;R:g:2:10;E:t;S:200;R:a:1:1;R:g:9:4;E:t;R:d:6:3;R:b:7:10;E:f;R:d:4:9;E:t;R:h:4:6;B;R:e:7:10;R:f:7:1;B;T:h;E:t;R:e:1:7;E:t => E:g/g;E:-/-;E:-/a,g,d,b;E:a,g,b/a,g,b;E:d,e/d,e;E:-/-;F:152:200:6:3:0:e,f,h
+Q r230 S:1000;E:t;T:e;B;B;T:d;T:c;E:f;R:d:4:9;B;R:d:8:1;R:e:8:6;B;R:a:6:6;E:t => E:-/-;E:-/-;E:-/-;F:368:1000:0:3:0:a,d,e
+Q r231 S:64;E:x;E:x;B;R:g:12:10;T:b;R:b:7:2;T:f;R:d:7:9;S:3000;R:c:11:11;B;E:f;R:b:5:1;E:t;B;B;R:c:2:5;T:g;R:a:11:6;R:d:8:8;S:64;R:c:7:4;R:d:1:10;E:x;E:x;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/b;E:-/b,g,a,c;E:b,g,a,c/b,g,a,c;F:40:64:4:1:0:d
+Q r232 S:500;E:n;R:h:1:8;E:x;T:f;T:c;R:a:8:10;R:c:6:7;R:h:6:12;T:b;T:f;B;S:500;R:g:5:5;B;B;R:c:10:10;E:t;R:g:10:7;E:x;S:64;E:t => E:-/-;E:-/-;E:a,h/a,h;E:-/c;E:c,g/c,g;F:0:64:4:0:0:-
+Q r233 S:100000;T:b;R:g:4:1;E:t;B;T:c;E:t;T:h;R:a:9:5;B;T:c;E:t => E:-/-;E:-/-;E:-/-;F:196:100000:0:2:0:a,g
+Q r234 S:500;T:a;E:t;T:c;T:a;E:t;B;T:a;R:c:7:3;R:e:4:11;T:e;R:b:6:2;R:h:10:7;R:c:5:4;E:t;B;R:h:6:7;T:c;T:e;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:472:500:0:4:0:b,c,e,h
+Q r235 S:1600;E:t;E:n;R:b:2:10;R:a:4:11;B;T:b;E:n;E:x;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:256:1600:0:2:0:a,b
+Q r236 S:3000;T:a;T:h;S:200;R:c:9:3;E:t;E:x;E:t;E:x;B;E:t;B;E:f;R:c:4:2;E:t;R:g:9:1;R:c:11:12;R:b:6:12;R:h:5:2;T:f;R:h:5:6;R:d:7:11;E:t;E:t;E:t;R:e:4:2;R:e:12:2;R:c:9:5;S:1000;B;E:n;R:a:9:11;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:g,c,b,h,d/g,c,b,h,d;E:-/-;E:-/-;E:-/-;E:-/-;F:672:1000:5:3:0:a,c,e
+Q r237 S:64;B;R:h:12:1;T:d;R:d:12:6;E:x;B;R:a:8:5;B;T:h;E:n;R:e:5:9;T:e;R:b:3:11;E:t => E:-/-;E:-/-;E:d,a,h,e,b/d,a,h,e,b;F:0:64:5:0:0:-
+Q r238 S:64;S:100000;E:t;R:b:1:4;R:g:9:12;R:c:12:11;T:g;R:b:9:10;E:t;B;R:g:8:2;E:x;R:h:8:9;B;T:b;T:e;B;T:d;R:a:4:3;T:e;R:f:4:10;E:n;E:t;R:b:12:2;R:f:9:3;R:a:9:10;R:c:8:8;E:x;E:f;E:f;R:f:7:9;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1316:100000:0:6:0:a,b,c,f,g,h
+Q r239 S:500;E:t;E:f;E:t;E:t;R:a:3:8;T:a;E:t;E:t;T:f;R:b:12:12;R:a:8:1;R:d:3:5;E:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/b;E:b/b;F:92:500:1:2:0:a,d
+Q r240 S:1600;R:e:4:9;R:e:11:7;R:e:3:6;R:f:4:8;E:t;T:g;R:f:10:10;T:a;R:c:5:11;B;T:g;E:f;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:692:1600:0:3:0:c,e,f
+Q r241 S:200;T:h;E:t;T:c;R:d:11:1;R:f:5:5;E:x;T:a;E:n;T:c;R:c:8:4;R:h:6:6;R:d:1:11;B;R:c:4:7;R:g:3:5;R:g:3:5;E:f;R:f:12:11;E:t => E:-/-;E:-/-;E:-/-;E:-/f,h,d;E:h,d,c,g,f/h,d,c,g,f;F:0:200:5:0:0:-
+Q r242 S:1600;R:f:10:10;E:n;E:n;R:d:4:10;R:d:7:2;R:f:12:2;R:g:1:6;R:e:4:7;E:t => E:-/-;E:-/-;E:-/-;F:288:1600:0:4:0:d,e,f,g
+Q r243 S:64;T:d;E:t;B;R:a:9:10;T:f;B;E:t;E:n;R:b:2:10;R:c:12:1;T:d;E:t => E:-/-;E:a/a;E:-/-;E:b/b;F:48:64:2:1:0:c
+Q r244 S:64;E:t;T:c;R:d:7:2;E:t;T:c;E:t;E:t;B;T:c;E:f;R:e:6:9;B;R:d:6:1;E:n;E:n;R:g:6:3;T:d;E:t;S:500;S:3000;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:e,g/e,g;E:-/-;F:24:3000:2:1:0:d
+Q r245 S:64;T:h;R:h:1:6;B;E:n;R:a:2:9;R:h:11:11;T:g;B;T:a;R:g:3:4;R:a:1:12;T:c;E:f;E:t => E:-/-;E:-/h;E:h,g/h,g;F:48:64:2:1:0:a
+Q r246 S:100000;R:e:10:11;B;E:x;R:h:2:10;T:d;R:g:10:3;R:f:7:8;R:c:6:11;E:t;R:a:4:5;R:g:2:10;E:x;R:b:11:10;E:t;R:d:8:11;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1960:100000:0:8:0:a,b,c,d,e,f,g,h
+Q r247 S:500;S:500;B;E:n;B;E:n;E:t;B;R:c:6:2;E:x;S:1600;E:t;R:e:1:12;E:t;E:t;B;R:e:4:5;E:x;R:f:4:12;T:g;R:h:1:8;T:d;E:t;R:c:5:9;E:x;T:b;T:b;T:c;T:g;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:484:1600:0:4:0:c,e,f,h
+Q r248 S:3000;R:h:11:6;R:d:12:7;R:c:7:11;S:3000;R:g:10:3;R:f:2:11;T:c;R:h:4:7;T:f;T:g;R:d:2:10;S:3000;R:c:3:9;E:f;B;R:h:4:4;T:h;R:g:3:4;E:t;R:g:2:8;T:h;B;R:a:1:8;E:x;R:f:11:5;R:g:1:3;R:a:7:6;R:g:2:9;B;E:n;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:712:3000:0:6:0:a,c,d,f,g,h
+Q r249 S:1600;R:f:2:7;E:t;E:t;R:b:8:5;T:b;R:c:7:9;B;R:b:3:9;E:x;R:a:4:8;E:f;R:h:2:11;T:e;E:t;E:t;R:d:4:8;T:h;E:t;T:f;E:n;T:f;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:760:1600:0:6:0:a,b,c,d,f,h
+Q r250 S:64;T:h;T:e;R:h:5:1;T:f;R:h:5:9;E:n;T:f;T:a;R:d:5:3;R:d:11:12;R:a:6:12;R:g:9:3;R:d:6:6;E:x;R:f:6:2;B;R:c:2:2;B;B;E:x;R:d:9:5;R:h:8:1;E:t => E:-/-;E:-/h,a,g,d;E:-/h,a,g,d;E:a,g,f,c,d/a,g,f,c,d;F:32:64:5:1:0:h
+Q r251 S:1000;E:x;T:h;R:f:4:10;B;E:t;E:f;R:f:11:12;R:f:2:5;T:h;R:f:8:5;R:f:3:8;R:a:4:3;R:h:3:5;E:x;T:g;R:c:1:2;R:a:7:9;B;E:n;B;E:t;S:3000;R:g:8:3;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:512:3000:0:5:0:a,c,f,g,h
+Q r252 S:1600;T:f;B;B;R:d:8:4;T:b;T:c;R:g:11:8;B;T:d;E:t;T:c;E:f;T:f;R:b:8:12;T:a;B;T:f;T:c;T:h;E:t => E:-/-;E:-/-;E:-/-;F:864:1600:0:3:0:b,d,g
+Q r253 S:1000;T:c;T:f;B;E:t;R:b:9:7;E:t;R:g:2:12;E:t;T:e;R:h:1:8;R:g:9:2;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:356:1000:0:3:0:b,g,h
+Q r254 S:200;E:t;R:c:12:11;S:100000;R:d:4:4;R:h:1:1;T:d;B;R:d:11:2;E:t;S:3000;R:b:6:8;E:t;T:b;R:c:10:6;B;T:b;R:a:5:9;R:e:7:2;B;T:f;R:d:10:8;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:992:3000:0:6:0:a,b,c,d,e,h
+Q r255 S:1600;S:1000;E:x;T:a;R:h:11:12;R:h:12:9;E:x;R:c:4:9;T:g;T:f;E:f;S:100000;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:576:100000:0:2:0:c,h
+Q r256 S:3000;E:t;E:t;E:t;E:f;E:t;S:1000;R:e:5:8;T:e;R:e:12:7;E:t;R:d:9:10;R:g:9:10;R:a:7:6;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:e/e;F:888:1000:1:3:0:a,d,g
+Q r257 S:1000;R:d:10:11;E:t;R:d:2:4;T:g;R:d:6:5;T:a;E:t;R:g:2:5;R:c:5:6;R:f:8:12;R:a:9:10;E:t;T:h;T:e;E:n;R:e:2:9;T:d;E:t;R:g:4:12;E:t => E:-/-;E:-/-;E:d/d;E:-/-;E:-/-;E:c,f/c,f;F:624:1000:3:3:0:a,e,g
+Q r258 S:200;R:g:8:11;E:t;E:f;E:f;R:c:6:2;S:200;E:x;R:g:3:4;R:e:9:4;R:a:5:4;E:t;S:1000;R:g:2:8;T:b;E:t;R:g:7:8;R:c:9:8;R:g:8:6;B;R:c:8:6;R:a:6:10;R:a:3:3;R:e:4:7;T:h;E:t => E:g/g;E:-/-;E:-/-;E:-/-;E:c,g,e/c,g,e;E:-/-;E:-/-;F:532:1000:4:4:0:a,c,e,g
+Q r259 S:1600;B;E:f;E:t;T:c;R:h:2:10;R:d:6:1;T:f;R:d:2:12;R:d:11:6;T:c;R:f:2:6;R:f:5:3;R:d:11:5;R:f:10:8;E:x;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:620:1600:0:3:0:d,f,h
+Q r260 S:1000;E:t;R:c:8:12;R:d:8:9;B;B;T:d;T:e;R:d:4:6;E:t;T:b;R:h:7:7;R:a:2:2;R:f:4:12;E:t;B;R:d:1:6;E:n;T:h;E:t;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:812:1000:0:5:0:a,c,d,f,h
+Q r261 S:64;E:x;S:3000;R:f:12:7;E:t;R:h:12:2;E:t;R:e:5:7;E:t;T:a;E:n;R:a:5:8;T:b;E:t;T:b;S:200;R:a:2:1;R:d:11:5;R:a:9:3;T:a;R:h:10:9;R:g:12:11;R:f:9:12;B;R:e:2:7;R:e:11:7;R:g:2:6;R:c:9:12;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:d,a,h,f/d,a,h,f;F:788:200:4:3:0:c,e,g
+Q r262 S:200;E:t;B;E:f;T:b;R:b:12:3;E:n;E:f;R:d:5:11;T:c;R:g:6:6;T:a;R:a:1:9;R:c:6:3;T:h;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:b,d,g/b,d,g;F:108:200:3:2:0:a,c
+Q r263 S:64;T:a;R:e:10:9;E:t;T:f;R:g:6:9;E:n;E:t;R:e:9:6;E:f;T:a;R:b:12:1;B;S:100000;B;T:d;E:t;T:f;T:f;E:x;T:g;R:c:8:7;B;R:e:5:3;T:e;B;R:f:11:3;E:t;B;E:t => E:e/e;E:-/-;E:g/g;E:-/e;E:-/-;E:-/-;E:-/-;E:-/-;F:464:100000:2:4:0:b,c,e,f
+Q r264 S:200;R:c:4:7;R:d:2:4;R:d:5:3;E:x;E:t;E:t;R:f:5:11;R:a:8:10;R:a:1:10;T:h;R:a:8:1;R:e:5:2;R:f:6:3;T:e;R:b:3:6;E:t;R:d:6:11;B;R:a:8:12;R:e:7:5;R:d:12:11;E:t => E:-/-;E:-/-;E:-/-;E:c,d,a/c,d,a;E:f,b/f,b;F:1052:200:5:3:0:a,d,e
+Q r265 S:200;T:c;B;R:a:5:8;R:e:11:11;B;B;R:b:5:6;E:t;T:h;R:h:2:11;R:f:7:12;T:e;S:1600;E:t => E:a,e/a,e;E:-/-;F:544:1600:2:3:0:b,f,h
+Q r266 S:64;R:g:1:8;B;E:n;R:a:2:10;E:f;R:b:4:4;R:b:6:1;R:c:10:9;B;E:t => E:-/-;E:-/g,a;E:g,a,b,c/g,a,b,c;F:0:64:4:0:0:-
+Q r267 S:1600;R:d:9:6;R:b:10:7;B;E:t;R:g:7:7;E:t;R:c:1:8;E:t;T:f;T:a;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:724:1600:0:4:0:b,c,d,g
+Q r268 S:200;R:b:7:3;T:a;E:f;E:t;E:t;R:a:1:7;B;R:a:6:2;T:f;R:h:8:10;T:d;B;B;R:b:12:4;R:c:3:11;E:t => E:-/-;E:-/-;E:-/-;E:a,h/a,h;F:324:200:2:2:0:b,c
+Q r269 S:100000;R:h:4:6;R:f:10:12;T:g;B;R:a:9:2;T:e;R:a:3:12;T:f;E:f;R:b:10:4;R:b:9:12;E:t;T:d;R:g:3:9;E:t;R:c:9:4;E:t;B;R:a:9:3;T:g;E:t;T:a;T:g;S:64;B;R:c:3:6;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:h,f,b,a,g/h,f,b,a,g;F:72:64:5:1:0:c
+Q r270 S:1000;R:h:4:4;R:h:12:1;B;T:g;B;T:g;B;T:h;E:t;S:200;R:a:10:9;R:c:2:1;B;R:f:10:3;E:n;S:500;S:100000;R:h:11:2;B;R:d:3:10;B;T:d;E:x;B;T:d;R:h:4:7;R:c:8:2;T:a;E:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:776:100000:0:5:0:a,c,d,f,h
+Q r271 S:500;T:a;T:g;E:x;R:g:2:7;R:h:4:10;R:b:5:8;E:t;E:t;R:e:12:2;R:a:1:5;T:e;R:b:12:6;R:d:2:4;T:a;R:e:4:8;B;E:t => E:-/-;E:-/-;E:-/-;E:g,h/g,h;F:468:500:2:4:0:a,b,d,e
+Q r272 S:1000;B;R:f:12:12;B;T:e;E:t;R:b:4:1;R:e:4:11;E:t;T:c;T:g;E:t;B;E:t;B;E:t;R:a:4:7;R:e:9:1;R:a:12:6;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:916:1000:0:4:0:a,b,e,f
+Q r273 S:200;T:b;R:c:2:11;R:e:7:3;B;E:n;R:c:1:8;T:f;R:h:11:5;R:c:8:4;R:c:1:4;T:f;T:b;E:t;B;R:g:1:4;R:h:6:6;E:n;E:t => E:-/-;E:e,h/e,h;E:-/-;E:-/-;F:176:200:2:3:0:c,g,h
+Q r274 S:64;S:1600;T:f;E:x;T:c;T:h;B;S:100000;E:x;R:b:4:6;R:e:9:2;R:a:9:6;T:d;R:g:5:9;E:t;R:g:4:5;E:t => E:-/-;E:-/-;E:-/-;E:-/-;F:464:100000:0:4:0:a,b,e,g
+Q r275 S:3000;R:g:7:1;R:d:8:9;T:d;B;B;T:d;T:c;S:1600;T:f;T:g;R:a:11:3;B;E:t;T:e;E:f;R:f:10:1;R:d:1:2;R:g:9:2;R:a:12:8;E:t;R:c:12:2;E:n;R:c:6:1;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:528:1600:0:5:0:a,c,d,f,g
+Q r276 S:64;R:e:12:6;B;R:c:1:12;E:n;E:t;T:a;E:t;R:g:10:2;E:n;E:t;B;E:t;R:e:12:11;R:d:4:11;T:f;T:a;S:1000;E:t;E:t;R:f:10:6;B;R:g:11:11;T:e;E:t => E:-/-;E:e/e;E:-/-;E:-/-;E:c,g/c,g;E:-/-;E:-/-;E:-/-;E:d,f/d,f;F:1012:1000:5:2:0:e,g
+Q r277 S:1600;T:a;T:h;T:d;R:g:11:3;R:c:5:3;E:f;T:d;R:f:4:7;R:a:10:5;R:e:12:6;E:t;R:f:12:5;R:f:2:11;R:d:2:10;T:e;R:d:8:1;E:t => E:-/-;E:-/-;E:-/-;F:800:1600:0:6:0:a,c,d,e,f,g
+Q r278 S:64;B;E:t;E:f;E:x;S:1000;R:c:2:1;R:d:11:10;R:g:10:10;T:c;E:t;R:d:1:11;E:t;S:100000;R:g:2:6;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:100:100000:0:3:0:c,d,g
+Q r279 S:200;B;E:x;E:t;T:d;E:x;T:h;E:t;R:d:9:2;T:d;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:72:200:0:1:0:d
+Q r280 S:64;R:h:9:1;T:e;R:d:11:2;T:f;T:h;R:c:6:8;T:g;B;B;T:e;E:x;B;R:h:10:3;S:1600;E:x;R:d:10:9;R:b:5:10;B;R:g:5:5;E:t => E:-/d,h,c;E:-/-;E:-/-;F:972:1600:0:5:0:b,c,d,g,h
+Q r281 S:200;T:c;R:c:8:9;T:a;R:d:4:8;E:n;R:c:7:9;E:n;S:100000;S:1600;R:h:10:5;S:1600;R:h:1:2;E:x;E:t;R:a:1:11;T:h;R:c:2:6;B;T:b;B;R:c:7:3;B;R:g:3:10;R:a:5:3;T:d;R:a:10:1;B;T:e;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:380:1600:0:5:0:a,c,d,g,h
+Q r282 S:3000;R:h:10:2;B;E:t;T:d;T:a;T:e;T:b;R:g:8:1;E:f;R:h:1:4;T:g;R:g:5:8;R:g:4:6;B;T:f;T:b;T:f;B;E:t => E:-/-;E:-/-;E:-/-;F:112:3000:0:2:0:g,h
+Q r283 S:64;R:d:10:7;R:c:10:5;B;R:d:1:1;R:c:12:12;R:c:4:10;T:f;R:c:7:3;T:d;T:f;T:h;T:g;E:t;T:c;R:c:1:10;T:d;R:a:3:3;S:200;R:d:5:9;R:f:2:8;E:t;B;T:h;R:f:10:9;E:t;E:t => E:-/-;E:c,a,d/c,a,d;E:-/-;E:f/f;F:0:200:4:0:0:-
+Q r284 S:100000;T:c;E:t;S:1000;R:h:11:5;B;R:a:1:7;B;B;T:b;T:d;R:f:2:6;B;R:e:7:9;R:h:12:4;R:c:6:9;R:d:11:9;T:h;R:f:4:8;R:a:12:6;E:t;T:a;T:d;T:b;B;R:h:11:8;R:f:6:6;R:b:2:1;R:e:4:9;T:c;B;E:t => E:-/-;E:-/-;E:a,d/a,d;F:864:1000:2:5:0:b,c,e,f,h
+Q r285 S:64;R:c:4:10;R:c:1:6;B;T:b;B;R:g:8:2;R:d:6:5;R:f:4:12;E:t;E:t => E:c/c;E:g,d,f/g,d,f;F:0:64:4:0:0:-
+Q r286 S:64;T:a;R:c:2:2;R:a:7:11;T:h;B;R:e:3:6;T:d;R:d:9:7;R:h:7:6;R:b:3:9;E:t;E:t;E:t;R:b:5:6;R:e:2:12;B;R:h:11:1;S:200;B;E:t => E:c,a/c,a;E:e,d,h,b/e,d,h,b;E:-/-;E:b/b;F:140:200:7:2:0:e,h
+Q r287 S:3000;B;T:e;T:c;S:3000;E:t;T:a;E:t;R:h:11:7;T:a;R:d:11:11;E:x;B;R:f:9:10;E:t;E:t;R:c:4:4;B;R:g:2:2;E:f;E:t;R:d:3:10;R:c:4:2;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:836:3000:0:5:0:c,d,f,g,h
+Q r288 S:1600;T:g;T:b;B;B;R:h:11:11;E:t;E:t;R:c:1:12;B;S:3000;E:t;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:532:3000:0:2:0:c,h
+Q r289 S:100000;R:d:7:5;T:g;R:c:8:9;R:g:1:11;S:64;E:x;E:t;E:n;B;R:b:3:5;T:e;T:d;B;B;B;R:e:11:9;R:g:6:7;E:f;R:f:10:12;E:t;E:f;E:t;T:a;E:t => E:-/d,c;E:d,c/d,c;E:-/-;E:-/b;E:b,e,g,f/b,e,g,f;E:-/-;E:-/-;E:-/-;F:0:64:6:0:0:-
+Q r290 S:64;T:g;R:a:11:11;S:100000;T:a;E:f;R:e:12:6;T:e;E:x;R:d:6:6;E:f;R:b:2:5;E:t;B;E:x;R:b:4:10;B;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:1076:100000:0:4:0:a,b,d,e
+Q r291 S:200;R:e:9:8;R:f:10:1;R:d:7:7;B;B;R:c:9:3;S:200;E:x;R:h:6:9;R:e:1:4;R:f:10:4;E:f;E:t;T:e;R:h:12:5;R:f:1:1;S:64;E:n;T:b;S:100000;B;B;T:a;R:a:10:1;B;T:d;E:t;R:b:12:4;R:g:10:2;E:t;E:t => E:-/e,f,d;E:-/d,c,h;E:d,c,h/d,c,h;E:-/-;E:-/-;E:-/-;E:-/-;F:572:100000:3:6:0:a,b,e,f,g,h
+Q r292 S:500;B;R:h:8:5;E:x;S:1600;T:h;E:t;E:x;R:c:2:7;R:d:4:2;T:b;R:h:1:12;B;R:g:10:2;E:t;B;B;R:g:1:10;T:f;E:t => E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:176:1600:0:4:0:c,d,g,h
+Q r293 S:100000;R:g:10:11;B;R:g:6:9;E:x;R:h:9:6;E:t;T:a;S:500;R:d:6:9;E:t;R:d:3:3;E:x;R:e:4:12;B;R:c:1:12;E:t;E:t;S:200;R:b:9:1;E:t => E:-/-;E:-/-;E:g/g;E:-/-;E:-/-;E:-/-;E:h,d,e/h,d,e;F:84:200:4:2:0:b,c
+Q r294 S:1000;R:f:1:9;R:g:8:1;R:e:4:9;B;R:d:4:9;R:a:5:11;R:f:11:7;T:h;E:t;E:t;R:e:4:8;T:c;E:t => E:-/-;E:-/-;E:-/-;F:832:1000:0:5:0:a,d,e,f,g
+Q r295 S:500;E:t;E:t;B;R:b:1:9;R:b:11:10;R:g:8:4;E:n;E:t;E:n;T:a;B;T:d;T:g;T:f;E:t;E:n;S:100000;E:t;S:200;R:a:7:11;B;E:x;E:t => E:-/-;E:-/-;E:-/-;E:b/b;E:-/-;E:-/-;E:-/-;E:-/-;E:-/g,a;E:g,a/g,a;F:0:200:3:0:0:-
+Q r296 S:64;B;T:h;S:1000;T:f;R:d:5:4;B;R:h:8:5;S:1000;R:c:5:4;E:t;E:t;T:b;R:c:7:10;R:b:10:7;T:e;B;R:h:10:10;R:h:8:1;R:d:3:9;E:t => E:-/-;E:-/-;E:-/-;F:700:1000:0:4:0:b,c,d,h
+Q r297 S:100000;E:x;E:f;R:f:2:4;B;E:x;S:64;T:d;R:a:1:7;R:b:9:5;E:f;T:a;R:h:11:12;T:a;E:t;R:a:5:9;S:1000;E:x;R:f:3:7;B;E:f;E:x;R:g:10:8;T:d;R:b:3:5;S:1000;T:e;B;R:h:6:3;T:d;E:t;E:t => E:-/-;E:-/-;E:-/-;E:-/f,a,b;E:f,b,h/f,b,h;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:716:1000:3:5:0:a,b,f,g,h
+Q r298 S:64;T:g;R:e:12:1;B;E:t;T:e;T:g;E:t;E:n;R:d:7:12;R:e:1:12;E:t;T:c;E:t;S:1000;R:b:4:4;S:1600;R:f:7:3;S:100000;E:x;B;B;R:g:9:4;E:t;T:d;T:b;E:t;R:c:10:7;E:t;E:t => E:-/-;E:-/-;E:-/-;E:d/d;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;E:-/-;F:620:100000:1:5:0:b,c,e,f,g
+Q r299 S:100000;S:64;E:n;E:t;E:t;R:e:8:12;E:t;R:f:8:9;B;E:t;E:t => E:-/-;E:-/-;E:-/-;E:e/e;E:f/f;E:-/-;F:0:64:2:0:0:-
+G 0 1
+G 0.9 1
+G 1 1
+G 1.5 1
+G -5 1
+G -0 1
+G 1234.7 1234
+G 1048576 1048576
+G 402653184 402653184
+G 4294967296 4294967296
+G 9007199254740992 9007199254740992
+G 1e300 max
+G NaN nan
+G Infinity max
+G -Infinity 1
+G 5e-324 1
+G 2147483648 2147483648
+G 4294967295.9 4294967295
+G default 402653184
+G default-null-opts 402653184
+C 1 1 4
+C 1 3 12
+C 1 10 40
+C 1 4096 16384
+C 1 65535 262140
+C 2 1 8
+C 2 3 24
+C 2 10 80
+C 2 4096 32768
+C 2 65535 524280
+C 3 1 12
+C 3 3 36
+C 3 10 120
+C 3 4096 49152
+C 3 65535 786420
+C 7 1 28
+C 7 3 84
+C 7 10 280
+C 7 4096 114688
+C 7 65535 1834980
+C 10 1 40
+C 10 3 120
+C 10 10 400
+C 10 4096 163840
+C 10 65535 2621400
+C 16 1 64
+C 16 3 192
+C 16 10 640
+C 16 4096 262144
+C 16 65535 4194240
+C 100 1 400
+C 100 3 1200
+C 100 10 4000
+C 100 4096 1638400
+C 100 65535 26214000
+C 255 1 1020
+C 255 3 3060
+C 255 10 10200
+C 255 4096 4177920
+C 255 65535 66845700
+C 256 1 1024
+C 256 3 3072
+C 256 10 10240
+C 256 4096 4194304
+C 256 65535 67107840
+C 1000 1 4000
+C 1000 3 12000
+C 1000 10 40000
+C 1000 4096 16384000
+C 1000 65535 262140000
+C 1024 1 4096
+C 1024 3 12288
+C 1024 10 40960
+C 1024 4096 16777216
+C 1024 65535 268431360
+C 4095 1 16380
+C 4095 3 49140
+C 4095 10 163800
+C 4095 4096 67092480
+C 4095 65535 1073463300
+C 4096 1 16384
+C 4096 3 49152
+C 4096 10 163840
+C 4096 4096 67108864
+C 4096 65535 1073725440
+C 65535 1 262140
+C 65535 3 786420
+C 65535 10 2621400
+C 65535 4096 1073725440
+C 65535 65535 17179344900

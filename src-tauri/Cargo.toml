@@ -33,7 +33,7 @@ test-p38-fixture-open-probe = []
 
 [dependencies]
 nemo-mcp = { path = "../nemo-mcp" }
-native-engine = { package = "nemo-native-engine", path = "../native-engine", default-features = false, features = ["application", "viewport", "project_media_codec"] }
+native-engine = { package = "nemo-native-engine", path = "../native-engine", default-features = false, features = ["application", "viewport", "project_media_codec", "font_asset_wire"] }
 tokio = { version = "1", features = ["net", "time", "sync", "io-util"] }
 uuid = { version = "1", features = ["v4"] }
 tauri = { version = "2", features = ["devtools", "macos-private-api"] }

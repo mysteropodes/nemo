@@ -18,6 +18,8 @@ use std::{
 
 const MAX_ASSETS: usize = 1024;
 const MAX_LOCATOR: usize = 4096;
+#[path = "project_asset_payload.rs"]
+mod payload;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,8 +114,26 @@ fn array<'a, T: Deserialize<'a>>(
 }
 
 enum Source {
-    Png { data: String, length: usize },
+    Png {
+        data: String,
+        length: usize,
+    },
+    #[cfg(feature = "font_asset_wire")]
+    Font {
+        data: String,
+        length: usize,
+    },
     Linked(String),
+}
+impl Source {
+    fn encoded_length(&self) -> Option<usize> {
+        match self {
+            Self::Png { length, .. } => Some(*length),
+            #[cfg(feature = "font_asset_wire")]
+            Self::Font { length, .. } => Some(*length),
+            Self::Linked(_) => None,
+        }
+    }
 }
 struct Record {
     id: String,
@@ -135,6 +155,8 @@ pub(crate) struct PreparedProjectWire {
     catalog: Option<Vec<usize>>,
     viewport: Option<Viewport>,
     png: Option<(usize, ImageAssetLimits)>,
+    #[cfg(feature = "font_asset_wire")]
+    font: Option<crate::object_codec::FontAssetLimits>,
 }
 pub(crate) struct DecodedProjectWire {
     project: ProjectEnvelope,
@@ -150,23 +172,7 @@ impl DecodedProjectWire {
 }
 
 fn png_data(raw: &RawValue, cap: usize) -> Result<(String, usize), ProjectWireError> {
-    let chars = base64::encoded_len(cap, true).ok_or(ProjectWireError::Budget)?;
-    let data = text(raw, chars)?;
-    if data.is_empty() || data.len() % 4 != 0 {
-        return Err(ProjectWireError::Invalid);
-    }
-    let padding = data.bytes().rev().take_while(|b| *b == b'=').count();
-    if padding > 2 {
-        return Err(ProjectWireError::Invalid);
-    }
-    let length = (data.len() / 4)
-        .checked_mul(3)
-        .and_then(|n| n.checked_sub(padding))
-        .ok_or(ProjectWireError::Budget)?;
-    if length == 0 || length > cap {
-        return Err(ProjectWireError::Budget);
-    }
-    Ok((data, length))
+    payload::prepare(raw, cap)
 }
 fn viewport(
     raw: &RawValue,
@@ -284,15 +290,14 @@ fn prepare_legacy(
         base,
         lengths: records
             .iter()
-            .filter_map(|r| match &r.source {
-                Source::Png { length, .. } => Some(*length),
-                _ => None,
-            })
+            .filter_map(|r| r.source.encoded_length())
             .collect(),
         records,
         catalog: None,
         viewport,
         png: limits.png,
+        #[cfg(feature = "font_asset_wire")]
+        font: limits.font,
     })
 }
 fn prepare_catalog(
@@ -331,16 +336,25 @@ fn prepare_catalog(
             Source::Linked(locator)
         } else {
             let source: Embedded<'_> = object(e.source)?;
-            if text(source.kind, 8)? != "embedded"
-                || kind != AssetKind::Image
-                || text(source.media_type, 9)? != "image/png"
-                || text(source.encoding, 6)? != "base64"
-            {
+            if text(source.kind, 8)? != "embedded" || text(source.encoding, 6)? != "base64" {
                 return Err(ProjectWireError::Unsupported);
             }
-            let (data, length) =
-                png_data(source.data, limits.png.ok_or(ProjectWireError::Budget)?.0)?;
-            Source::Png { data, length }
+            match (kind, text(source.media_type, 9)?.as_str()) {
+                (AssetKind::Image, "image/png") => {
+                    let (data, length) = payload::prepare(
+                        source.data,
+                        limits.png.ok_or(ProjectWireError::Budget)?.0,
+                    )?;
+                    Source::Png { data, length }
+                }
+                #[cfg(feature = "font_asset_wire")]
+                (AssetKind::Font, "font/ttf") => {
+                    let font = limits.font.ok_or(ProjectWireError::Unsupported)?;
+                    let (data, length) = payload::prepare(source.data, font.encoded_byte_limit())?;
+                    Source::Font { data, length }
+                }
+                _ => return Err(ProjectWireError::Unsupported),
+            }
         };
         if ids.insert(id.clone(), records.len()).is_some() {
             return Err(ProjectWireError::Invalid);
@@ -373,15 +387,14 @@ fn prepare_catalog(
         base: base(wire.project, wire.drawing, limits)?,
         lengths: records
             .iter()
-            .filter_map(|r| match &r.source {
-                Source::Png { length, .. } => Some(*length),
-                _ => None,
-            })
+            .filter_map(|r| r.source.encoded_length())
             .collect(),
         records,
         catalog: Some(order),
         viewport,
         png: limits.png,
+        #[cfg(feature = "font_asset_wire")]
+        font: limits.font,
     })
 }
 
@@ -402,22 +415,7 @@ impl PreparedProjectWire {
                     .map_err(|_| ProjectWireError::Invalid)?,
                 Source::Png { data, length } => {
                     let (cap, png) = self.png.ok_or(ProjectWireError::Budget)?;
-                    let mut encoded = allocate(*length)?;
-                    if encoded.len() != *length || encoded.capacity() != *length {
-                        return Err(ProjectWireError::Budget);
-                    }
-                    let mut reader = base64::read::DecoderReader::new(
-                        data.as_bytes(),
-                        &base64::engine::general_purpose::STANDARD,
-                    );
-                    std::io::Read::read_exact(&mut reader, &mut encoded)
-                        .map_err(|_| ProjectWireError::Invalid)?;
-                    if std::io::Read::read(&mut reader, &mut [0])
-                        .map_err(|_| ProjectWireError::Invalid)?
-                        != 0
-                    {
-                        return Err(ProjectWireError::Invalid);
-                    }
+                    let encoded = payload::decode(data, *length, &mut allocate)?;
                     validate(&encoded, png)?;
                     let allocation = Arc::new(encoded);
                     let source = AssetSource::admitted_embedded(
@@ -426,6 +424,16 @@ impl PreparedProjectWire {
                         cap,
                     )
                     .map_err(|_| ProjectWireError::Invalid)?;
+                    allocations.push(allocation);
+                    source
+                }
+                #[cfg(feature = "font_asset_wire")]
+                Source::Font { data, length } => {
+                    let font = self.font.ok_or(ProjectWireError::Unsupported)?;
+                    let allocation = Arc::new(payload::decode(data, *length, &mut allocate)?);
+                    let source =
+                        crate::object_codec::admitted_font_source(Arc::clone(&allocation), font)
+                            .map_err(ProjectWireError::from)?;
                     allocations.push(allocation);
                     source
                 }
