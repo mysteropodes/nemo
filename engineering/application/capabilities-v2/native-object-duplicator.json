@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.duplicator",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.duplicator.set",
+    "command.document.object.duplicator.objects",
+    "command.document.object.duplicator.path"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectDuplicatorSetPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectDuplicatorObjectsPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectDuplicatorPathPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Enable or disable a layer duplicator (enabling writes the baseline default descriptor with the supplied seed 0..999999 and locks the layer, disabling removes it and unlocks the layer), convert a selection of layers into an object duplicator host (the pooled layers are hidden, the host is a new locked layer), and set or clear the path layer of a duplicator, as sealed transactions through the single native owner. One revision and one undo entry per applied edit; asking for the state a layer already has publishes nothing. Placement, count, modes and effectors are evaluated by the native engine, never by the caller. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native duplicator.set command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-set-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.duplicator.set",
+        "payload": {
+          "command": "object.duplicator.set",
+          "layerUid": "layer-a",
+          "enabled": true,
+          "seed": 482913
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-set-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native duplicator.objects command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-objects-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.duplicator.objects",
+        "payload": {
+          "command": "object.duplicator.objects",
+          "layerUids": [
+            "layer-a",
+            "layer-b"
+          ],
+          "seed": 17
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-objects-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    },
+    {
+      "label": "Shared native duplicator.path command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-path-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.duplicator.path",
+        "payload": {
+          "command": "object.duplicator.path",
+          "layerUid": "layer-a",
+          "pathLayerUid": "layer-b"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "duplicator-duplicator-path-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

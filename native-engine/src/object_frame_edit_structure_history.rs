@@ -89,3 +89,7 @@ impl NativeObjectHistory {
 #[cfg(test)]
 #[path = "../tests/object_frame_edit_structure_history.rs"]
 mod tests;
+// L05-G (#2111): the layer range records through dispatch, undo, redo, replay and reopen.
+#[cfg(test)]
+#[path = "../tests/object_frame_edit_range_records_history.rs"]
+mod object_frame_edit_range_records_history;

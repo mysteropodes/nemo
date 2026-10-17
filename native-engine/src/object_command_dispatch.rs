@@ -5,6 +5,8 @@ use crate::history::object_history::object_exposure_edit_retime::is_exposure_ret
 use crate::history::object_history::object_frame_clipboard_paste::is_frame_clipboard_operation;
 use crate::history::object_history::object_frame_clipboard_repeat::is_frame_repeat_operation;
 use crate::history::object_history::object_frame_edit_structure::is_frame_structure_operation;
+use crate::history::object_history::object_rig_edit_history::is_rig_edit_operation;
+use crate::history::object_history::object_rig_pose_history::is_rig_pose_operation;
 use crate::history::NativeObjectHistory;
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,
@@ -77,6 +79,7 @@ impl NativeObjectHistory {
     ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
         if !Self::layer_lifecycle_operation(&request.operation)
             && !Self::group_operation(&request.operation)
+            && !Self::component_setup_operation(&request.operation)
             && !Self::compositing_operation(&request.operation)
             && !Self::boolean_operation(&request.operation)
             && !Self::selection_edit_operation(&request.operation)
@@ -103,6 +106,8 @@ impl NativeObjectHistory {
             && !is_frame_clipboard_operation(request.operation.as_str())
             && !is_exposure_key_operation(request.operation.as_str())
             && !is_exposure_retime_operation(request.operation.as_str())
+            && !is_rig_edit_operation(request.operation.as_str())
+            && !is_rig_pose_operation(request.operation.as_str())
             && !is_frame_repeat_operation(request.operation.as_str())
         {
             return Ok(None);
@@ -144,6 +149,8 @@ impl NativeObjectHistory {
                 "Property edit request refused."
             } else if Self::layer_lifecycle_operation(&request.operation) {
                 "Layer lifecycle request refused."
+            } else if Self::component_setup_operation(&request.operation) {
+                "Component setup request refused."
             } else if Self::group_operation(&request.operation) {
                 "Group request refused."
             } else if Self::compositing_operation(&request.operation) {
@@ -270,6 +277,8 @@ impl NativeObjectHistory {
                 self.dispatch_vector_edit_command(request, &payload)
             } else if Self::layer_lifecycle_operation(&request.operation) {
                 self.dispatch_layer_lifecycle(&request.operation, &request.payload)
+            } else if Self::component_setup_operation(&request.operation) {
+                self.dispatch_component_setup(&request.operation, &request.payload)
             } else if Self::group_operation(&request.operation) {
                 self.dispatch_group(&request.operation, &request.payload)
             } else if Self::compositing_operation(&request.operation) {
@@ -296,6 +305,10 @@ impl NativeObjectHistory {
                 self.dispatch_exposure_key(request.operation.as_str(), &request.payload)
             } else if is_exposure_retime_operation(request.operation.as_str()) {
                 self.dispatch_exposure_retime(&request.payload)
+            } else if is_rig_pose_operation(request.operation.as_str()) {
+                self.dispatch_rig_pose(&request.payload)
+            } else if is_rig_edit_operation(request.operation.as_str()) {
+                self.dispatch_rig_edit(&request.payload)
             } else if is_frame_repeat_operation(request.operation.as_str()) {
                 self.dispatch_frame_repeat(request.operation.as_str(), &request.payload)
             } else if request.operation == OP_LAYER_VISIBILITY {

@@ -106,6 +106,10 @@ pub(crate) use object_widget_record::{
     validate_widget_layers, AxisBinding, AxisUnresolved, WidgetAdmissionError, WidgetAxis,
     WidgetBindings, WidgetLayerKind, WidgetRecord, WidgetRest,
 };
+// L03-N (#2109): native rig record (I11, the stored `ld.rig`); its admission and link-report files are private children of it.
+#[path = "object_rig_record.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_rig_record;
 // L01-E (#2107): pressure fields, paramShape record, per-layer pathFx stack record, vector extension slot
 // (storage DTOs only; their admission is object_vector_ext_codec.rs under the codec).
 #[path = "object_vector_pressure.rs"]
@@ -144,6 +148,16 @@ pub use organization::{LayerFolder, LayerFolders};
 mod layer_organization_tests;
 #[path = "object_layer_policy.rs"]
 mod layer_policy;
+// L05-G (#2111): the stored layer range (inPoint, outPoint, timeLink, markers) and the private range kernel it owns.
+#[path = "object_frame_edit_range_records.rs"]
+#[allow(dead_code)]
+mod range_records;
+#[allow(unused_imports)]
+pub(crate) use range_records::{
+    marker_bounds, markers_with_bounds, split_layer_range, FrameBound, FrameEditKind, LayerRange,
+    LayerRole, MarkerRecord, RangeEdit, RangeEditError, RangeRecordError, RangeSplit,
+    TimeLinkRecord,
+};
 // #2106 size split: the object record DTOs (target, frame scope, geometry, solid fill), moved verbatim.
 #[path = "object_record.rs"]
 mod object_record;
@@ -222,6 +236,12 @@ pub struct ObjectLayer {
     pub(crate) effects: Presence<Vec<LayerEffect>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) effects_from: Presence<String>,
+    /// Present once a layer is rigged (baseline `ld.rig`); an empty rig is present, absent never had one.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) rig: Presence<object_rig_record::RigRecord>,
+    /// F11 (L05-G): the stored inPoint / outPoint / timeLink / markers. Absent: the layer never had any of them.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) range: Presence<LayerRange>,
 }
 
 // Serde's derived struct decoder also accepts positional sequences. These
@@ -274,7 +294,9 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] matte_source_layer_uid: Presence<String>, #[serde(default)] mattes_more: Presence<Vec<MatteRef>>,
     #[serde(default)] is_effect_layer: Presence<bool>, #[serde(default)] is_folder_layer: Presence<bool>,
     #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,
-    #[serde(default)] effects_from: Presence<String> });
+    #[serde(default)] effects_from: Presence<String>,
+    #[serde(default)] rig: Presence<object_rig_record::RigRecord>,
+    #[serde(default)] range: Presence<LayerRange> });
 
 impl ObjectDocument {
     /// Organizational folder metadata, not structural folder layers.
@@ -371,6 +393,8 @@ impl ObjectLayer {
             folder_collapsed: Presence::Missing,
             effects: Presence::Missing,
             effects_from: Presence::Missing,
+            rig: Presence::Missing,
+            range: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {

@@ -7,6 +7,14 @@ use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
 pub use crate::revision::ObjectSnapshot;
+// L03-O (#2109): rig weight / nearest-location / IK kernels for the rig edit transaction (same layering reason).
+#[path = "object_rig_edit_read.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_rig_edit_read;
+// L03-Q (#2109): the pinned rig pose evaluation for the commit-pose transaction (commands may not import evaluation).
+#[path = "object_rig_pose_read.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_rig_pose_read;
 // L03-L (#2109): image-mesh retopology through the evaluation kernel (commands may not import it).
 #[path = "object_image_mesh_edit_read.rs"]
 #[allow(dead_code)]

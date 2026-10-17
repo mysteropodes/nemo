@@ -87,3 +87,8 @@ pub(crate) mod object_context_workspace;
 #[path = "object_storyboard_chain.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_storyboard_chain;
+
+// L04-K: component evaluation join (admission -> frame packet -> component producer join, entered-component records).
+#[path = "object_component_evaluate.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_component_evaluate;

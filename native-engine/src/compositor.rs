@@ -18,6 +18,9 @@ mod scene_effect_gpu_fx;
 #[path = "scene_effect_gpu_pass.rs"]
 #[allow(dead_code)]
 mod scene_effect_gpu_pass;
+#[path = "scene_effect_scene_join_stack.rs"]
+#[allow(dead_code)]
+mod scene_effect_scene_join_stack;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use object_compositor::scheduled_tests::{
     owner as object_test_owner, plan as object_test_plan, schedule as schedule_test_object,

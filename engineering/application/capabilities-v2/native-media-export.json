@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.media.export",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "unavailable",
+    "reason": "host export route and media decoder port for native media jobs are not registered"
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "job.export.media.begin",
+    "job.export.media.status",
+    "job.export.media.cancel"
+  ],
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "domainErrorCodes": [
+    "staging_failed",
+    "frame_failed",
+    "write_failed",
+    "publish_failed",
+    "cleanup_failed",
+    "document_replaced"
+  ],
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "exportJobs": "native-engine::export_job::native_media_export::native_media_export_job",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxReadResponseBytes": 4096,
+    "accepted": [
+      "pinned document snapshot id",
+      "opaque output handle",
+      "bounded frame range",
+      "pinned output spec",
+      "video quality word"
+    ],
+    "forbidden": [
+      "raw pixels",
+      "binary payload",
+      "canvas",
+      "SVG text",
+      "geometry JSON",
+      "file paths"
+    ]
+  },
+  "semantics": "Export a still, an image sequence or an H.264 video of the pinned snapshot through the one bounded native export job, binding the placed video and linked-media frames of each exported frame. A missing or permission-gated link, an unavailable media fact or decoder, a refused placement and an undecodable source frame are typed refusals before anything is staged (details.reason, details.frame), never a blank frame. Exports are silent (baseline); there is no audio member. A sequence receipt lists at most 120 frames; absent range members mean the project work area. The receipt is the shared JobReceipt. Unavailable until the host registers the export route and the decoder port; until then every caller receives typed unavailability and no legacy writer exists.",
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Media begin: a PNG sequence of a pinned range",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fixture-media",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "expectedRevision": 0,
+        "operation": "job.export.media.begin",
+        "payload": {
+          "documentSnapshotId": "native-object:native-document-1:0",
+          "contextId": "scene-root",
+          "outputHandle": "output/fixture",
+          "output": {
+            "kind": "sequence",
+            "frameFormat": "png"
+          },
+          "range": {
+            "start": 0,
+            "end": 3
+          },
+          "outputSpec": {
+            "kind": "frame",
+            "format": "rgba8",
+            "width": 64,
+            "height": 36,
+            "colorInterpretation": "srgb",
+            "alphaMode": "straight"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fixture-media",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "jobId": "native-export-job-1",
+          "status": "running",
+          "pinnedRevision": 0,
+          "documentSnapshotId": "native-object:native-document-1:0",
+          "progress": 0,
+          "artifact": null,
+          "cleanup": {
+            "status": "pending"
+          },
+          "externalEffectDisposition": "none"
+        }
+      }
+    },
+    {
+      "label": "Media status names only the job",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fixture-media-status",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "operation": "job.export.media.status",
+        "payload": {
+          "jobId": "native-export-job-1"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fixture-media-status",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "jobId": "native-export-job-1",
+          "status": "running",
+          "pinnedRevision": 0,
+          "documentSnapshotId": "native-object:native-document-1:0",
+          "progress": 0,
+          "artifact": null,
+          "cleanup": {
+            "status": "pending"
+          },
+          "externalEffectDisposition": "none"
+        }
+      }
+    }
+  ]
+}

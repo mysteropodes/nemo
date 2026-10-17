@@ -1,0 +1,218 @@
+# L04-M oracle, baseline fbe4b8a33e6d5a229f014154df2ba21988a9fabc
+# generator tools/gen_oracle.cjs
+# blob src/js/app.js 816979f85fd8bfe583c52e889bd1f0733cb5db2a
+# blob src/js/storyboard.js 6e78255395aadbbf84e403f95ecdc9965ca08d03
+# blob src/js/domain/component/exposed-properties.js dfd93e88afad3d158d62c851f3bfe8238753d542
+# R: badComponentSourceReason, executed verbatim
+R.symbolId|"un composant"
+R.lfsGroup|"un groupe Ligne/Plein/Ombre"
+R.montageId|"un calque de montage StoryBoard"
+R.nativeVideo|"un calque vidéo"
+R.isNullLayer|"un calque Null"
+R.isEffectLayer|"un calque d'effet"
+R.isGuideLayer|"un calque Guide"
+R.isWidgetLayer|"un calque Widget"
+R.plain|null
+R.isFolderLayer|null
+R.isEffectorLayer|null
+R.duplicator|null
+R.precedence.componentFirst|"un composant"
+R.precedence.nullBeforeGuide|"un calque Null"
+R.precedence.guideBeforeWidget|"un calque Guide"
+# S1: convertLayerToComponent(0) on a rigged, grouped, animated layer
+S1.symbolCount|1
+S1.symbolIdPrefix|"sym_"
+S1.sym.name|"Hand (Comp)"
+S1.sym.totalFrames|24
+S1.sym.fps|24
+S1.sym.layerCount|1
+S1.sym.l0.name|"Layer 1"
+S1.sym.l0.visible|true
+S1.sym.l0.locked|false
+S1.sym.l0.frameCount|24
+S1.sym.l0.keyFrames|[0,12]
+S1.sym.l0.strokeIds|{"0":["sa","sb","sc"],"12":["sa","sb"]}
+S1.sym.l0.groupCount|1
+S1.sym.l0.groupModes|["unite"]
+S1.sym.l0.groupOrderLens|[2]
+S1.sym.l0.rigPresent|true
+S1.sym.l0.rigBindStrokes|["sa"]
+S1.sym.l0.rigHasLive|false
+S1.sym.l0.motionPresent|false
+S1.sym.l0.motionStaticPresent|false
+S1.sym.l0.elementMotionKeys|[]
+S1.sym.l0.exprControlsPresent|false
+S1.sym.l0.shy|null
+S1.sym.l0.color|null
+S1.inst.name|"Hand"
+S1.inst.hasSymbolId|true
+S1.inst.locked|true
+S1.inst.visible|true
+S1.inst.symPlayMode|"once"
+S1.inst.symSpeed|1
+S1.inst.symPlacedAt|0
+S1.inst.symSingleFrame|0
+S1.inst.hasComponentFrame|false
+S1.inst.frameCount|24
+S1.inst.keyFrames|[0]
+S1.inst.strokeTotal|0
+S1.inst.rigPresent|false
+S1.inst.motionPresent|true
+S1.inst.motionStaticPresent|true
+S1.inst.elementMotionKeys|["sa"]
+S1.inst.exprControlsPresent|true
+S1.inst.groupsPresent|true
+S1.inst.groupCount|1
+S1.inst.duplicatorPresent|false
+S1.inst.folderId|null
+S1.layerCount|2
+S1.layerNames|["Hand","Other"]
+S1.instIndex|0
+S1.otherUntouched|1
+S1.sb.nextId|2
+S1.sb.pan|{"x":40,"y":40}
+S1.sb.zoom|1
+S1.sb.activeMontageId|null
+S1.sb.modules|[{"id":"sbm1","type":"instance","x":40,"y":40}]
+S1.sb.lastModule|{"id":"sbm1","type":"instance","x":40,"y":40}
+S1.sb.moduleCount|1
+S1.sb.lastModuleSymbolIsInstanceSymbol|true
+S1.symbolInstanceModuleSymbol|true
+# S2: convertLayersToComponent([1,2,3]) with an existing 7-instance StoryBoard
+S2.sym.name|"Composant"
+S2.sym.totalFrames|24
+S2.sym.layerCount|3
+S2.sym.l0.name|"A"
+S2.sym.l0.visible|true
+S2.sym.l0.locked|false
+S2.sym.l0.frameCount|24
+S2.sym.l0.keyFrames|[0,6]
+S2.sym.l0.strokeIds|{"0":["aa","ab"],"6":["aa"]}
+S2.sym.l0.groupCount|2
+S2.sym.l0.groupModes|["unite","subtract"]
+S2.sym.l0.groupOrderLens|[2,3]
+S2.sym.l0.rigPresent|true
+S2.sym.l0.rigBindStrokes|["aa"]
+S2.sym.l0.rigHasLive|false
+S2.sym.l0.motionPresent|true
+S2.sym.l0.motionStaticPresent|true
+S2.sym.l0.elementMotionKeys|["aa"]
+S2.sym.l0.exprControlsPresent|false
+S2.sym.l0.shy|true
+S2.sym.l0.color|"#5FA875"
+S2.sym.l0.layerUid|"ly_a"
+S2.sym.l0.hasPathFx|true
+S2.sym.l0.hasDuplicator|false
+S2.sym.l1.name|"B"
+S2.sym.l1.visible|false
+S2.sym.l1.locked|false
+S2.sym.l1.frameCount|24
+S2.sym.l1.keyFrames|[0]
+S2.sym.l1.strokeIds|{"0":["ba","bb"]}
+S2.sym.l1.groupCount|1
+S2.sym.l1.groupModes|["unite"]
+S2.sym.l1.groupOrderLens|[2]
+S2.sym.l1.rigPresent|false
+S2.sym.l1.rigBindStrokes|[]
+S2.sym.l1.rigHasLive|false
+S2.sym.l1.motionPresent|false
+S2.sym.l1.motionStaticPresent|false
+S2.sym.l1.elementMotionKeys|[]
+S2.sym.l1.exprControlsPresent|false
+S2.sym.l1.shy|null
+S2.sym.l1.color|"#5FA875"
+S2.sym.l1.layerUid|"ly_b"
+S2.sym.l1.hasPathFx|false
+S2.sym.l1.hasDuplicator|false
+S2.sym.l2.name|"C"
+S2.sym.l2.visible|true
+S2.sym.l2.locked|false
+S2.sym.l2.frameCount|24
+S2.sym.l2.keyFrames|[0]
+S2.sym.l2.strokeIds|{"0":["ca","cb"]}
+S2.sym.l2.groupCount|0
+S2.sym.l2.groupModes|[]
+S2.sym.l2.groupOrderLens|[]
+S2.sym.l2.rigPresent|false
+S2.sym.l2.rigBindStrokes|[]
+S2.sym.l2.rigHasLive|false
+S2.sym.l2.motionPresent|false
+S2.sym.l2.motionStaticPresent|false
+S2.sym.l2.elementMotionKeys|[]
+S2.sym.l2.exprControlsPresent|false
+S2.sym.l2.shy|null
+S2.sym.l2.color|"#B49BE6"
+S2.sym.l2.layerUid|"ly_c"
+S2.sym.l2.hasPathFx|false
+S2.sym.l2.hasDuplicator|false
+S2.sym.groupGidsDistinctAcrossLayers|3
+S2.layerCount|3
+S2.layerNames|["X","Composant","Y"]
+S2.instIndex|1
+S2.inst.name|"Composant"
+S2.inst.hasSymbolId|true
+S2.inst.locked|true
+S2.inst.visible|true
+S2.inst.symPlayMode|"once"
+S2.inst.symSpeed|1
+S2.inst.symPlacedAt|0
+S2.inst.symSingleFrame|0
+S2.inst.hasComponentFrame|false
+S2.inst.frameCount|24
+S2.inst.keyFrames|[0]
+S2.inst.strokeTotal|0
+S2.inst.rigPresent|false
+S2.inst.motionPresent|false
+S2.inst.motionStaticPresent|false
+S2.inst.elementMotionKeys|[]
+S2.inst.exprControlsPresent|true
+S2.inst.groupsPresent|true
+S2.inst.groupCount|3
+S2.inst.duplicatorPresent|true
+S2.inst.folderId|null
+S2.inst.uniteGroupCount|3
+S2.sb.nextId|9
+S2.sb.pan|{"x":40,"y":40}
+S2.sb.zoom|1
+S2.sb.activeMontageId|null
+S2.sb.modules|[{"id":"sbm1","type":"instance","x":40,"y":40},{"id":"sbm2","type":"instance","x":40,"y":40},{"id":"sbm3","type":"instance","x":40,"y":40},{"id":"sbm4","type":"instance","x":40,"y":40},{"id":"sbm5","type":"instance","x":40,"y":40},{"id":"sbm6","type":"instance","x":40,"y":40},{"id":"sbm7","type":"instance","x":40,"y":40},{"id":"sbm8","type":"instance","x":180,"y":200}]
+S2.sb.lastModule|{"id":"sbm8","type":"instance","x":180,"y":200}
+S2.sb.moduleCount|8
+S2.sb.lastModuleSymbolIsInstanceSymbol|true
+# P: placeComponentInstance(symId, name) on a document with 3 layers
+P.index|3
+P.layerCount|4
+P.name|"Foreign"
+P.symbolId|"sym_x"
+P.locked|true
+P.visible|true
+P.symPlayMode|"once"
+P.symSpeed|1
+P.symPlacedAt|0
+P.symSingleFrame|0
+P.frameCount|24
+P.keyFrames|[0]
+P.hasComponentFrame|false
+# E: expose() executed verbatim with fixed clock and random ports
+E.0.key|"ep_mte91adt_hb2e"
+E.0.label|"Fill"
+E.0.targetStrokeId|"sa"
+E.0.targetField|"fillColor"
+E.0.defaultPresent|false
+E.0.default|null
+E.1.key|"ep_mte91b4y_weee"
+E.1.label|"Alpha"
+E.1.targetStrokeId|"sb"
+E.1.targetField|"opacity"
+E.1.defaultPresent|true
+E.1.default|100
+E.2.key|"ep_mte91bw3_4feo"
+E.2.label|"Show"
+E.2.targetStrokeId|"sa"
+E.2.targetField|"__visible"
+E.2.defaultPresent|true
+E.2.default|0
+E.none|null
+E.symA.count|2
+E.symAInitialisedLazily|true
+E.portsConsumedByMissingSymbol|3

@@ -111,6 +111,10 @@ mod object_group_codec;
 #[path = "object_vector_ext_codec.rs"]
 #[allow(dead_code)]
 mod object_vector_ext_codec;
+// L05-G (#2111): admission of the per-layer range record (inPoint, outPoint, timeLink, markers).
+#[path = "object_frame_edit_range_codec.rs"]
+#[allow(dead_code)]
+mod object_frame_edit_range_codec;
 // L06-L (#2112): admission of the lane-6 `items` document member (raster items and text blocks).
 #[path = "object_raster_asset_codec.rs"]
 #[allow(dead_code)]
@@ -373,6 +377,7 @@ pub(crate) fn validate_content(
             })?;
         }
         object_vector_ext_codec::validate_layer_path_fx(layer)?;
+        object_frame_edit_range_codec::validate_layer_range(layer)?;
         if layer.layer_uid.is_empty() {
             return Err(reject(Invalid, "empty layerUid"));
         }
@@ -390,6 +395,17 @@ pub(crate) fn validate_content(
     }
     crate::object_document::validate_widget_layers(declared_layers, objects)
         .map_err(|error| reject(Invalid, error.message()))?;
+    crate::object_document::object_rig_record::validate_rig_layers(declared_layers, objects)
+        .map_err(|error| {
+            let kind = if error.is_duplicate() {
+                DuplicateId
+            } else if error.is_unsupported() {
+                Unsupported
+            } else {
+                Invalid
+            };
+            reject(kind, error.message())
+        })?;
     // L08-J (#2114): layer compositing fields (blend, mattes, effects stack, kind flags).
     crate::object_document::validate_layer_compositing(declared_layers, objects)
         .map_err(|error| reject(Invalid, error.message()))?;

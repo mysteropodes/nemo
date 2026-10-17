@@ -325,6 +325,15 @@ where
     if !holders_fully_consumed(document) {
         return Err(ObjectFrameError::Unavailable.into());
     }
+    // F11 (L05-G): a stored in/out point or live time link decides which frames a layer shows; until the D27
+    // evaluator consumes them, never paint every frame of such a layer.
+    if document
+        .layers()
+        .iter()
+        .any(ObjectLayer::range_gates_frames)
+    {
+        return Err(ObjectFrameError::Unavailable.into());
+    }
     let source_frames: Vec<_> = document
         .layers()
         .iter()

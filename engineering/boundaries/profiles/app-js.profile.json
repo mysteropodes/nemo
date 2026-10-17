@@ -2101,6 +2101,54 @@
       ]
     },
     {
+      "id": "app.native.object.component.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-component-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-component-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.component.intent",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-component-intent.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-component-intent.js"
+      ]
+    },
+    {
+      "id": "app.native.object.component.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-component.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-component.js"
+      ]
+    },
+    {
+      "id": "app.native.object.duplicator.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-duplicator.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-duplicator.js"
+      ]
+    },
+    {
       "id": "app.native.object.edit.contract",
       "layer": "domain",
       "dir": "src/js/adapters",
@@ -2158,6 +2206,30 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-object-layer-lifecycle-intent.js"
+      ]
+    },
+    {
+      "id": "app.native.bitmap.brush.resources.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-bitmap-brush-resources-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-bitmap-brush-resources-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.bitmap.brush.resources.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-bitmap-brush-resources.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-bitmap-brush-resources.js"
       ]
     },
     {
@@ -2221,6 +2293,114 @@
       ]
     },
     {
+      "id": "app.native.import.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.import.seam",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-seam.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-seam.js"
+      ]
+    },
+    {
+      "id": "app.native.import.core",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-core.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-core.js"
+      ]
+    },
+    {
+      "id": "app.native.import.svg",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-svg.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-svg.js"
+      ]
+    },
+    {
+      "id": "app.native.import.figma.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-figma.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-figma.js"
+      ]
+    },
+    {
+      "id": "app.native.import.drop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-drop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-drop.js"
+      ]
+    },
+    {
+      "id": "app.native.import.psd.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-psd.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-psd.js"
+      ]
+    },
+    {
+      "id": "app.native.import.montage.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-montage.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-montage.js"
+      ]
+    },
+    {
+      "id": "app.native.import.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-desktop.js"
+      ]
+    },
+    {
       "id": "app.native.project-settings.intent.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2242,6 +2422,30 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-project-settings-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.frame-edit.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-frame-edit-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-frame-edit-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.frame-edit.intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-frame-edit-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-frame-edit-intent.js"
       ]
     },
     {
@@ -2387,6 +2591,30 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-opacity-export.js"
+      ]
+    },
+    {
+      "id": "app.native.vector.export.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-vector-export-adapter.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-vector-export-adapter.js"
+      ]
+    },
+    {
+      "id": "app.native.media.export.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-media-export-adapter.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-media-export-adapter.js"
       ]
     },
     {
@@ -2632,6 +2860,20 @@
       ]
     },
     {
+      "id": "app.native.media.export.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-media-export-core.js",
+        "native-media-export-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-media-export-core.js",
+        "native-media-export-contract.js"
+      ]
+    },
+    {
       "id": "app.native.font.resources.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2641,6 +2883,78 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-font-resources.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-rig-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.seam",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-seam.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-rig-seam.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.command",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-command.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-rig-command.js"
+      ]
+    },
+    {
+      "id": "app.native.object.image.mesh.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-image-mesh.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-image-mesh.js"
+      ]
+    },
+    {
+      "id": "app.native.object.widget.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-widget.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-widget.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-rig.js"
       ]
     },
     {

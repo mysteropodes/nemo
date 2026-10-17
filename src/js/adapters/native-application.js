@@ -1,7 +1,7 @@
 /* N15 pure v2 transport/validation adapter. N16 owns host bindings. */
 (function (root, factory) {
-  const fontContract = ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract);
-  const api = factory(fontContract);
+  const fontContract = [typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
+  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract));
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeApplicationAdapter = api;
 }(typeof globalThis === 'object' ? globalThis : this, function (fontContract) {
