@@ -51,6 +51,52 @@ fn receipts_are_the_compact_command_result_and_a_duplicate_names_its_minted_laye
 }
 
 #[test]
+fn the_shared_result_check_routes_the_object_edit_operations_through_this_module() {
+    let applied = json!({"applied":true,"historyEntriesAdded":1});
+    let noop = json!({"applied":false,"historyEntriesAdded":0});
+    let minted = json!({"applied":true,"historyEntriesAdded":1,"layerUid":"native-layer:8:0"});
+    for (suffix, payload) in valid() {
+        let operation = format!("{P}{suffix}");
+        let shared = |body: &Value, receipt: &Value| {
+            crate::native_contract::validate_result(&operation, "document-A", body, receipt)
+        };
+        if suffix == "layer.duplicate" {
+            assert!(shared(&payload, &minted), "{suffix}");
+            for flawed in [
+                &applied,
+                &noop,
+                &json!({"applied":true,"historyEntriesAdded":1,"layerUid":""}),
+                &json!({"applied":false,"historyEntriesAdded":0,"layerUid":"x"}),
+            ] {
+                assert!(!shared(&payload, flawed), "{suffix}: {flawed}");
+            }
+        } else {
+            for accepted in [&applied, &noop] {
+                assert!(shared(&payload, accepted), "{suffix}: {accepted}");
+            }
+            for flawed in [
+                &minted,
+                &json!({"applied":true,"historyEntriesAdded":0}),
+                &json!({"applied":false,"historyEntriesAdded":1}),
+                &json!({"applied":true,"historyEntriesAdded":1,"extra":true}),
+                &Value::Null,
+            ] {
+                assert!(!shared(&payload, flawed), "{suffix}: {flawed}");
+            }
+        }
+        // The request is validated first: a payload outside the closed shape never reaches the receipt check.
+        let mut foreign = payload.clone();
+        foreign["command"] = json!("object.layer.policy.edit");
+        let receipt = if suffix == "layer.duplicate" {
+            &minted
+        } else {
+            &applied
+        };
+        assert!(!shared(&foreign, receipt), "{suffix}");
+    }
+}
+
+#[test]
 fn the_revision_advances_by_exactly_the_applied_edit() {
     let changed = json!({"applied":true,"historyEntriesAdded":1});
     let noop = json!({"applied":false,"historyEntriesAdded":0});
