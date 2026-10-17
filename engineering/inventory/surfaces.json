@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e8adefeb5f4b5f1607903031ad6998a72b4f8051",
-  "describe": "v0.7.0-alpha.4-2213-ge8adefeb"
+  "head": "b2de6df7698224618e3bd39d58865231a89ef329",
+  "describe": "v0.7.0-alpha.4-2215-gb2de6df7"
  },
- "inputsDigest": "51dc40f93d54917adc72671e03bbe267d4689eacc3d26a1d990585604b5344d8",
+ "inputsDigest": "7bb84c8c7a5e2c3870a296f480852a75f1d1a129656b98f9f3a44cbf87780386",
  "states": [
   "inventoried",
   "characterized",
@@ -9953,7 +9953,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 23,
+    "functionsVisited": 22,
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-ui.js:244 renderNativeObjectUiMetadata()"
@@ -9998,7 +9998,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 26,
+    "functionsVisited": 25,
     "via": "chain",
     "references": [
      "src/js/timeline.js:10385"
@@ -10326,7 +10326,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 26,
+    "functionsVisited": 25,
     "via": "chain",
     "references": [
      "src/js/timeline.js:10393"
@@ -14617,7 +14617,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 22,
+    "functionsVisited": 21,
     "via": "chain",
     "references": []
    },
@@ -16135,7 +16135,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 568,
+    "functionsVisited": 563,
     "via": "variable save",
     "references": []
    },
@@ -16432,7 +16432,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 22,
+    "functionsVisited": 21,
     "via": "chain",
     "references": []
    },
