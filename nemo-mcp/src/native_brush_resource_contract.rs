@@ -222,8 +222,8 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
         }
 }
 
-/// A successful answer belongs to the request owner. A publication moves no revision; a read answers at the revision it
-/// asked for. Complete responses stay within 4096 bytes.
+/// A successful answer carries a result and belongs to the request owner. A publication moves no revision; a read
+/// answers at the revision it asked for. Complete responses stay within 4096 bytes.
 pub(crate) fn response_matches(
     request: &NativeApplicationRequest,
     response: &NativeApplicationResponse,
@@ -234,6 +234,7 @@ pub(crate) fn response_matches(
     if response.request_id != request.request_id
         || response.instance_id != request.instance_id
         || response.document_id != request.document_id
+        || response.result.is_none()
         || !serde_json::to_vec(response).is_ok_and(|bytes| bytes.len() <= NATIVE_MAX_MESSAGE_BYTES)
     {
         return false;
