@@ -1,5 +1,5 @@
 //! PRIVATE: ports into the existing history owner, never another authority.
-use crate::native_dispatch::object_host::NativeObjectHost;
+use crate::native_dispatch::{object_host::NativeObjectHost, NativeDispatch};
 use native_engine::commands::{OpacityRequest, ResponseEnvelope};
 
 impl NativeObjectHost {
