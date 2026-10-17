@@ -1,0 +1,139 @@
+/* Ordinary native line/rectangle/ellipse gestures. Only pointer-local data and SVG preview live here;
+ * the existing vector client and Project resource queue own every committed command. */
+(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;
+  else root.NemoNativeObjectShapeTool=api;
+}(typeof globalThis==='object'?globalThis:this,function(){
+  'use strict';
+  var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
+  var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
+  function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
+  function fail(message){throw new Error(message);}
+  function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
+  function create(root,ports){
+    var drag=null,pending=null,uncertain=null,overlay=null,retired=false,settled=Promise.resolve({status:'idle'});
+    function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
+    function nativeMode(){try{var s=session();return !!s&&s.blocksLegacy();}catch(_){return true;}}
+    function notice(message){if(typeof root.showToast==='function')root.showToast(message);}
+    function stageOrigin(e){var d=root.document;return e.target===d.getElementById('drawing-canvas')||e.target===d.getElementById('canvas-area');}
+    function bounds(info){
+      var d=root.document,el=d.getElementById('drawing-canvas'),r=el&&el.getBoundingClientRect(),html=d.documentElement;
+      if(!r||![r.left,r.top,r.width,r.height,info.canvasW,info.canvasH].every(Number.isFinite)||r.width<=0||r.height<=0||info.canvasW<=0||info.canvasH<=0||
+          r.left<0||r.top<0||r.left+r.width>html.clientWidth||r.top+r.height>html.clientHeight||!html.classList.contains('nemo-native-underlay'))fail('Native canvas presentation is unavailable.');
+      var edges=[r.left,r.top,r.left+r.width,r.top+r.height];
+      if(!['left','top','right','bottom'].every(function(k,i){return parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===edges[i];}))fail('Native canvas presentation changed.');
+      return {left:r.left,top:r.top,width:r.width,height:r.height};
+    }
+    // Exactly desktop_viewport::ViewportMapping::pointer_to_composition. Native
+    // StretchToSurface uses these confirmed CSS bounds, not Paper's pan/zoom view.
+    function point(e,t){if(!Number.isFinite(e.clientX)||!Number.isFinite(e.clientY))fail('Pointer position is unavailable.');
+      return [(e.clientX-t.bounds.left)*t.pin.canvasW/t.bounds.width,(e.clientY-t.bounds.top)*t.pin.canvasH/t.bounds.height];}
+    function style(tool){
+      var s=root.state;
+      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||s.symmetryEnabled||s.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+      if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||(!s.strokeEnabled&&(tool==='line'||!s.fillEnabled)))fail('Enable a supported stroke or fill to draw.');
+      if(!Number.isFinite(s.brushSize)||s.brushSize<=0||!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>100)fail('Native shape style is unavailable.');
+      var hex=/^#(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/;
+      if(s.strokeEnabled&&!hex.test(s.strokeColor)||tool!=='line'&&s.fillEnabled&&!hex.test(s.fillColor))fail('Native shapes require solid colours.');
+      if(!['solid','dashed','dotted'].includes(s.strokeStyle)||tool!=='line'&&s.strokeStyle!=='solid')fail('This shape stroke style is unavailable.');
+      var out={strokeColor:s.strokeEnabled?s.strokeColor:null,hasRealStroke:s.strokeEnabled,strokeWidth:s.brushSize,
+        fillColor:tool!=='line'&&s.fillEnabled?s.fillColor:null,opacity:s.opacity/100,
+        strokeCap:tool==='line'?s.strokeCap:'butt',strokeJoin:'miter',miterLimit:10,dashOffset:0};
+      // Reuse applyStrokeStyle on a detached plain style, never a Paper item.
+      if(tool==='line')Object.assign(out,ports.lineStyle());
+      if(!['butt','round','square'].includes(out.strokeCap))fail('Native stroke cap is unavailable.');
+      return out;
+    }
+    function selection(info){
+      var s=root.state,index=s.activeLayerIdx,row=s.layers&&s.layers[index],selected=root._layerSel;
+      if(!Number.isSafeInteger(index)||!row||!Array.isArray(selected)||selected.length!==1||selected[0]!==index)fail('Select one native Drawing layer.');
+      var layer=info.layers.filter(function(l){return l.layerUid===row.layerUid;});
+      if(layer.length!==1||layer[0].locked===true||layer[0].visible===false||layer[0].parentLayerUid||row.threeD||row.motion&&Object.keys(row.motion).length)fail('The selected native layer is unavailable for this gesture.');
+      return row.layerUid;
+    }
+    function capture(e){
+      var s=session(),pin=s&&s.info(),state=root.state,frame=state.currentFrame,shown=s&&s.readPresentedObjectSession();
+      if(!s||!s.isActive()||!pin||typeof s.runResourceCommand!=='function'||!shown||!same(pin,shown)||!same(pin,shown.presentation)||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
+          shown.presentation.contextId!=='scene-root'||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=pin.totalFrames||
+          !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
+      var t={session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
+      t.start=point(e,t);return t;
+    }
+    function current(t,requirePresentation){
+      try{var s=session(),pin=s&&s.info();
+        if(retired||t.cancelled||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||root.state.tool!==t.tool||selection(pin)!==t.layerUid||
+            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(style(t.tool))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
+        var shown=requirePresentation&&s.readPresentedObjectSession();
+        return !requirePresentation||!!shown&&same(shown,t.pin)&&shown.presentation===t.presentation;
+      }catch(_){return false;}
+    }
+    function clear(){if(overlay){overlay.remove();overlay=null;}}
+    function release(t){try{var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.releasePointerCapture)el.releasePointerCapture(t.pointer);}catch(_){} }
+    function cancel(){if(drag){var t=drag;drag=null;t.cancelled=true;clear();release(t);}return {status:'cancelled'};}
+    function endpoint(t,e){var end=point(e,t);return e.shiftKey?ports.constrain(t.tool,t.start,end):end;}
+    function dictionary(t,end){
+      var g=ports.geometry(t.tool,t.start[0],t.start[1],end[0],end[1]);
+      var out=Object.assign({},t.style,{closed:g.closed,segments:g.segments.map(function(s){return {point:s.point.slice(),handleIn:(s.handleIn||[0,0]).slice(),handleOut:(s.handleOut||[0,0]).slice()};})});
+      if(t.tool==='rect')out.paramShape={kind:'rect',tl:0,tr:0,br:0,bl:0,box:{x1:Math.min(t.start[0],end[0]),y1:Math.min(t.start[1],end[1]),x2:Math.max(t.start[0],end[0]),y2:Math.max(t.start[1],end[1])}};
+      return out;
+    }
+    function preview(t,end){
+      var d=root.document,dict=dictionary(t,end),segments=dict.segments;
+      if(!overlay){overlay=d.createElementNS('http://www.w3.org/2000/svg','svg');overlay.setAttribute('aria-hidden','true');
+        Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});
+        overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');
+        overlay.appendChild(d.createElementNS('http://www.w3.org/2000/svg','path'));d.body.appendChild(overlay);}
+      var path=overlay.firstChild,start=segments[0].point,text='M '+start[0]+' '+start[1],count=segments.length+(dict.closed?1:0);
+      for(var i=1;i<count;i++){var a=segments[i-1],b=segments[i%segments.length];text+=' C '+(a.point[0]+a.handleOut[0])+' '+(a.point[1]+a.handleOut[1])+' '+(b.point[0]+b.handleIn[0])+' '+(b.point[1]+b.handleIn[1])+' '+b.point[0]+' '+b.point[1];}
+      if(dict.closed)text+=' Z';path.setAttribute('d',text);path.setAttribute('fill',dict.fillColor||'none');path.setAttribute('stroke',dict.strokeColor||'none');
+      path.setAttribute('stroke-width',dict.strokeWidth);path.setAttribute('stroke-linecap',dict.strokeCap);path.setAttribute('stroke-linejoin',dict.strokeJoin);path.setAttribute('opacity',dict.opacity);
+      if(dict.dashArray)path.setAttribute('stroke-dasharray',dict.dashArray.join(' '));path.setAttribute('stroke-dashoffset',dict.dashOffset);path.setAttribute('stroke-miterlimit',dict.miterLimit);
+      path.setAttribute('paint-order',dict.paintOrder==='strokeFirst'?'stroke fill':'fill stroke');
+    }
+    function commit(t,end){
+      if(!current(t,true))return Promise.resolve({status:'cancelled'});
+      if(Math.hypot(end[0]-t.start[0],end[1]-t.start[1])<2)return Promise.resolve({status:'cancelled'});
+      var dict=dictionary(t,end),s=t.session;
+      // No second queue: only add a current-intent check to the real Project
+      // resource action. While that action runs, its own pending count hides presentation.
+      var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:function(action){return s.runResourceCommand(function(ctx){
+        if(!current(t,false))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
+        return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
+      });}};
+      return root.NemoNativeObjectVector.create(guarded).createStroke(t.layerUid,t.frame,dict,{origin:t.pin});
+    }
+    function handle(kind,e){
+      if(retired)return false;
+      // Chrome controls share the capture ancestor. Handle their event without
+      // consuming it or falling through to the legacy shape handler.
+      if(kind==='down'&&!stageOrigin(e))return !!drag||nativeMode()&&shapeTools.includes(root.state.tool);
+      if(drag){consume(e);if(e.pointerId!==drag.pointer)return true;
+        if(kind==='cancel'){cancel();return true;}
+        if(!current(drag,true)){cancel();return true;}
+        var t=drag,end;
+        try{end=endpoint(t,e);if(kind==='move'){preview(t,end);return true;}
+          if(kind==='up'){drag=null;clear();pending=t;settled=Promise.resolve(commit(t,end)).catch(function(){return {status:'unconfirmed'};}).then(function(result){
+            if(result.status==='indeterminate'||result.status==='unconfirmed')uncertain=t;
+            if(!retired&&result.status!=='applied'&&result.status!=='noop'&&result.status!=='cancelled')notice('Native shape drawing was not confirmed.');return result;
+          }).finally(function(){if(pending===t)pending=null;});release(t);return true;}
+        }catch(_){cancel();notice('Native shape drawing is unavailable.');return true;}
+        return true;
+      }
+      if(!nativeMode()||!shapeTools.includes(root.state.tool))return false;
+      if(!stageOrigin(e))return true;
+      consume(e);if(kind!=='down'||pending)return true;
+      if(uncertain){var owner=session(),pin=owner&&owner.info();
+        if(owner===uncertain.session&&pin&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===uncertain.pin[k];})){notice('Reopen the native project before drawing again; the previous result is unconfirmed.');return true;}
+        uncertain=null;
+      }
+      if(!tools.includes(root.state.tool)){notice('This shape tool is not available in native Drawing.');return true;}
+      if(e.button!==0||e.isPrimary===false||!Number.isSafeInteger(e.pointerId))return true;
+      try{drag=capture(e);var el=root.document.getElementById('canvas-area')||root.document.getElementById('drawing-canvas');if(el.setPointerCapture)el.setPointerCapture(e.pointerId);preview(drag,drag.start);}
+      catch(error){cancel();notice(error.message||'Native Drawing is unavailable.');}return true;
+    }
+    function key(e){if(e.key==='Escape'&&drag){consume(e);cancel();}}
+    root.document.addEventListener('keydown',key,{capture:true});
+    return Object.freeze({handle:handle,cancel:cancel,whenSettled:function(){return settled;},isDragging:function(){return !!drag;},
+      dispose:function(){retired=true;cancel();if(pending)pending.cancelled=true;root.document.removeEventListener('keydown',key,{capture:true});}});
+  }
+  return Object.freeze({create:create});
+}));

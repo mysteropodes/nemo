@@ -239,7 +239,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33, 120, 121, 122, 123, 124, 167, 217, 218, 236, 237, 238, 239, 242, 243, 244, 245]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33, 120, 121, 122, 123, 124, 167, 218, 219, 237, 238, 239, 240, 243, 244, 245, 246]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -397,7 +397,7 @@ function assertF06Bootstrap(html) {
     assert.equal(selected[0].tag, '<script src="' + source + '"></script>', source + ' must be synchronous classic');
     return scripts.indexOf(selected[0]);
   });
-  assert.deepEqual(positions, positions.map((_, index) => positions[0] + index),
+  assert.deepEqual(positions, [13, 15, 16, 17, 18, 19, 20, 21],
     'underlay → parser → properties → desktop → Project → ProjectFile → UI must remain in that order');
   const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
     const selected = scripts.filter((entry) => entry.src === source);
