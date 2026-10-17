@@ -767,6 +767,7 @@
         "src/registry.rs",
         "src/schema.rs",
         "src/server.rs",
+        "src/server_command_projection.rs",
         "src/wire.rs",
         "src/native_project_settings_contract.rs",
         "src/native_project_settings_wire_tests.rs",
