@@ -18,6 +18,7 @@ mod dispatch_tests;
 mod order;
 #[path = "object_raster_asset_commands_refusals.rs"]
 mod refusals;
+#[cfg(feature = "project_media_codec")] // the project-file workflow exists only with this feature
 #[path = "object_raster_asset_commands_reopen.rs"]
 mod reopen;
 

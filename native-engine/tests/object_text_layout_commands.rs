@@ -283,6 +283,7 @@ fn text_delete_removes_the_block_and_keeps_a_raster_item_in_the_same_container()
     assert_ne!(bytes(&only_text), bare_start);
 }
 
+#[cfg(feature = "project_media_codec")]
 #[test]
 fn a_text_block_survives_save_and_reopen_with_the_same_glyph_identity_and_layout() {
     use super::support::{images_only, project};
