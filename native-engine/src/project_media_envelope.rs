@@ -211,6 +211,9 @@ mod tests {
             } else {
                 Presence::Present(order)
             },
+            image_meshes: Presence::Missing,
+            items: Presence::Missing,
+            component_tables: Presence::Missing,
         }
     }
 

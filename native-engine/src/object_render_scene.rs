@@ -4,6 +4,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::Sce
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
 use crate::render_geometry::ClosedCubicPath;
 use std::sync::Arc;
+use vello::kurbo::BezPath;
 
 use scene_effect_kernels::object_scene_resource_set::{
     same_scene_resources, SceneResourceMismatch,
@@ -11,6 +12,7 @@ use scene_effect_kernels::object_scene_resource_set::{
 pub use scene_effect_kernels::object_scene_resource_set::{
     ObjectSceneResourceSet, SceneResourceMismatchKind,
 };
+use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_reference_scene.rs"]
@@ -32,10 +34,32 @@ mod paint;
 #[path = "object_scene_producer_contour.rs"]
 mod object_scene_producer_contour;
 use object_scene_producer_contour::CompiledContour;
+// L07-J (#2113): leased bitmap-brush ink drawn into a Vello scene (scene consumer of the brush producer).
+#[path = "object_scene_producer_brush_ink.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_brush_ink;
+// L07-I (#2113): typed scene style -> Vello paint (fill, stroke, gradient, paint order); the compositor draws through it.
+#[path = "object_scene_style_emit.rs"]
+pub(crate) mod object_scene_style_emit;
+// L07-L (#2113): text block scene producer joined through the L07-C pin registry.
+#[path = "object_scene_producer_text.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_text;
 // L08-A (#2144): lane-8 scene composition/effect family aggregator.
 #[path = "scene_effect_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod scene_effect_kernels;
+// L06-K (#2112): lane-6 text/raster scene join family aggregator.
+#[path = "text_glyph_scene_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod text_glyph_scene_kernels;
+// L03-S (#2109): lane-3 image-mesh scene join family aggregator (scene item and vello replay).
+#[path = "render_image_mesh_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_image_mesh_kernels;
+// L01-I (#2107): drawn geometry of the editable vector family (open or closed path, clipping contour, envelope).
+#[path = "render_vector_path.rs"]
+pub(crate) mod render_vector_path;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use paint::tests::paint_contents;
 #[cfg(test)]
@@ -53,6 +77,8 @@ pub struct ObjectCompositionWitness {
     plan: ObjectPaintPlan,
     viewport: bool,
     resources: Option<Arc<ObjectSceneResourceSet>>,
+    /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
+    scene_effects: Option<Arc<SceneEffectPlan>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     reference: Option<reference::ReferenceScene>,
 }
@@ -66,6 +92,7 @@ pub fn prepare_object_composition(
         plan: plan.clone(),
         viewport: false,
         resources: None,
+        scene_effects: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         reference: None,
     })
@@ -91,6 +118,21 @@ impl ObjectCompositionWitness {
     }
     pub fn scene_resources(&self) -> Option<&Arc<ObjectSceneResourceSet>> {
         self.resources.as_ref()
+    }
+    /// Attach the joined layer/effect plan of THIS witness' packet (L08-K). A plan joined onto another
+    /// instance/document/revision/snapshot/context/scope/frame is refused and nothing is attached.
+    pub(crate) fn with_scene_effects(
+        mut self,
+        effects: Arc<SceneEffectPlan>,
+    ) -> Result<Self, ObjectSceneError> {
+        if !effects.is_for_packet(self.plan.packet()) {
+            return Err(ObjectSceneError::WrongSnapshot);
+        }
+        self.scene_effects = Some(effects);
+        Ok(self)
+    }
+    pub(crate) fn scene_effects(&self) -> Option<&Arc<SceneEffectPlan>> {
+        self.scene_effects.as_ref()
     }
     /// Set equality with an evaluation key's declaration; an absent set is empty.
     pub(crate) fn verify_scene_resources(
@@ -132,6 +174,7 @@ impl ObjectCompositionWitness {
             && self.plan.packet().scope_kind() == other.plan.packet().scope_kind()
             && self.frame() == other.frame()
             && same_scene_resources(self.resources.as_deref(), other.resources.as_deref())
+            && self.scene_effects == other.scene_effects
     }
 }
 
@@ -166,6 +209,15 @@ impl<'a> ObjectRenderEntry<'a> {
     }
     pub fn envelope(&self) -> [f64; 4] {
         self.compiled.envelope
+    }
+    /// The geometry the compositor draws (L01-I): the open or closed evaluated path of a vector record, otherwise the path
+    /// of the closed contour itself. Use this, not `contour()`, to paint.
+    pub(crate) fn path(&self) -> &'a BezPath {
+        let compiled = self.compiled;
+        compiled
+            .drawn
+            .as_ref()
+            .unwrap_or_else(|| compiled.contour.path())
     }
     /// Typed straight-RGBA paint admitted with the contour (L07-A `SceneSolid`).
     pub(crate) fn solid(&self) -> &'a SceneSolid {

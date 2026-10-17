@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.brush-resources",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "unavailable",
+    "reason": "native brush resource route is not registered: the brush store and the pinned-scene brush producer have no public host route yet"
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.brush.bitmap.publish",
+    "query.document.object.brush.bitmap"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-bitmap-brush-resources-v1.schema.json#/$defs/Publish"
+      },
+      {
+        "$ref": "../native-bitmap-brush-resources-v1.schema.json#/$defs/Query"
+      }
+    ]
+  },
+  "output": {
+    "$ref": "../native-bitmap-brush-resources-v1.schema.json#/$defs/Output"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "resources": "native-engine::bitmap_brush_resources_store::BrushBitmapStore",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Ids, sizes and one scene entry per read; no pixel, canvas or byte payload in either direction. Bitmaps are charged to the one shared image quota by the native store."
+  },
+  "semantics": "Publish decodes an embedded PNG asset already in the project asset catalog (attached through the asset operations, whose host reads the file) into charged retained pixels and publishes them as the bitmap of brushId in the native store. The same asset allocation again reuses the retained bitmap (applied=false, same version); another asset under the id replaces it atomically as the next version while scenes that hold the previous version keep it alive. A publication changes no document revision and adds no history entry. Missing, wrong-kind, linked, malformed, unsupported, oversize or wrong-size assets and an exhausted quota are typed refusals that leave the store and the quota unchanged. Inspect reads one store row. Scene reads the brush-bearing records of the scene pinned to the document snapshot and frame, one entry per request in the owner's numeric order plan; an ink that is not drawn stays a typed entry (ink-missing, ink-refused, trim and anchor reasons) and is never dropped. Eviction, the byte budget and re-baking belong to the native owner; a client never retires, caches or draws bitmaps. Unavailable until the native route is registered by its owner; until then every caller receives typed unavailability and no fallback writer exists.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": []
+}

@@ -107,6 +107,10 @@ impl JsonSchema for CommandRequest {
             "../../engineering/application/native-font-assets-v1.schema.json"
         ))
         .expect("native font assets schema is valid JSON");
+        let native_items: Value = serde_json::from_str(include_str!(
+            "../../engineering/application/native-object-item-v1.schema.json"
+        ))
+        .expect("native item schema is valid JSON");
         let mut native = native_transport.clone();
         let native_object = native
             .as_object_mut()
@@ -138,7 +142,7 @@ impl JsonSchema for CommandRequest {
             "required": ["apiVersion", "requestId", "operation", "payload"],
             "description": "Use apiVersion 2 for native operations. The versioned native request schema and registered feature declarations constrain each operation; a declared staged capability can still refuse execution. Copy a root example, replace instanceId from discovery and documentId, expectedRevision and layerUid from the native snapshot when that operation requires them. command.document.apply changes static base opacity (0..100), not evaluated keyed frame opacity. Undo/redo require payload {} and the latest revision. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
             "examples": examples,
-            "$defs": {"legacy": legacy, "native": native, "nativePropertyMetadata": native_metadata, "nativeFontAssets": native_fonts},
+            "$defs": {"legacy": legacy, "native": native, "nativeBitmapBrushResources": serde_json::from_str::<Value>(include_str!("../../engineering/application/native-bitmap-brush-resources-v1.schema.json")).expect("native bitmap brush resources schema is valid JSON"), "nativePropertyMetadata": native_metadata, "nativeFontAssets": native_fonts, "nativeObjectItem": native_items},
             "if": {"required": ["apiVersion"], "properties": {"apiVersion": {"const": 1}}},
             "then": {"$ref": "#/$defs/legacy"},
             "else": {"$ref": "#/$defs/native"},

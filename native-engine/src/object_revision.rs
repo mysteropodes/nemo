@@ -399,18 +399,10 @@ mod tests {
 
     #[test]
     fn safe_integer_exhaustion_preserves_all_retained_snapshots_and_head() {
-        let document = ObjectDocument {
-            format: "nemo.native-object-document".into(),
-            format_version: 1,
-            total_frames: 1,
-            layers: vec![crate::object_document::ObjectLayer::identified(
-                "limit-layer".into(),
-            )],
-            objects: vec![],
-            property_holders: Default::default(),
-            layer_folders: Default::default(),
-            composition_order: Default::default(),
-        };
+        let document: ObjectDocument = serde_json::from_value(serde_json::json!({
+            "format":"nemo.native-object-document","formatVersion":1,"totalFrames":1,
+            "layers":[{"layerUid":"limit-layer"}],"objects":[]}))
+        .unwrap();
         let bare = ObjectSnapshot::from_admitted("limit-test".into(), document.clone()).unwrap();
         let project = ProjectEnvelope::no_media(
             crate::object_document::ProjectMetadata::new(320, 180, 24.).unwrap(),

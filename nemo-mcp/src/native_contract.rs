@@ -4,8 +4,14 @@ use crate::contract::bounded_identifier;
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 
+#[path = "native_media_export_contract.rs"]
+mod export;
+
 #[path = "native_font_contract.rs"]
 pub(crate) mod font;
+
+#[path = "native_brush_resource_contract.rs"]
+pub(crate) mod brush;
 
 #[path = "native_reproduction_contract.rs"]
 mod reproduction;
@@ -20,14 +26,28 @@ pub(crate) mod settings;
 
 #[path = "native_diagnostics_contract.rs"]
 mod diagnostics;
+#[path = "native_frame_edit_contract.rs"]
+pub(crate) mod frame_edit;
+#[path = "native_import_contract.rs"]
+pub(crate) mod import;
+#[path = "native_item_contract.rs"]
+pub(crate) mod item;
 #[path = "native_layer_policy_contract.rs"]
 pub(crate) mod layer_policy;
+#[path = "native_object_component_contract.rs"]
+pub(crate) mod object_component;
+#[path = "native_object_edit_contract.rs"]
+pub(crate) mod object_edit;
+#[path = "native_object_rig_contract.rs"]
+pub(crate) mod object_rig;
 #[path = "native_property_edit_contract.rs"]
 pub(crate) mod property_edit;
 #[path = "native_property_read_contract.rs"]
 pub(crate) mod property_read;
 #[path = "native_property_track_contract.rs"]
 pub(crate) mod property_track;
+#[path = "native_vector_contract.rs"]
+pub(crate) mod vector;
 use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
@@ -77,6 +97,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | metadata::OP
             | property_read::OP
             | font::QUERY
+            | brush::QUERY
             | "query.document.object.layer.timing"
             | "query.document.serialize"
             | "query.document.evaluate"
@@ -92,6 +113,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
         font::IMPORT | font::QUERY => font::request(operation, payload),
+        brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
         "query.document.object" => object::request(payload),
         metadata::OP => metadata::request(payload),
         property_read::OP => property_read::request(payload),
@@ -101,7 +123,17 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         layer_policy::OP => layer_policy::request(payload),
         property_track::OP => property_track::request(payload),
         property_edit::OP => property_edit::request(payload),
+        op if frame_edit::declares(op) => frame_edit::request(op, payload),
+        op if object_component::admitted(op) => object_component::request(op, payload),
+        op if object_rig::admitted(op) => object_rig::request(op, payload),
+        op if object_edit::admitted(op) => object_edit::request(op, payload),
+        item::ITEM | item::ATTACH | item::REMOVE => item::request(operation, payload),
+        vector::VECTOR | vector::PARAMETRIC | vector::EFFECTS => {
+            vector::request(operation, payload)
+        }
         "command.document.object.layer.create" => object::create_request(payload),
+        import::OP => import::request(payload),
+        operation if export::owns(operation) => export::request(operation, payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
         | "query.reproduction.status"
@@ -247,6 +279,9 @@ pub(crate) fn validate_result(
     if operation == property_read::OP {
         return property_read::result(request_document_id, payload, result);
     }
+    if brush::owns(operation) {
+        return brush::result(operation, payload, result);
+    }
     if operation == metadata::OP {
         return metadata::result(request_document_id, payload, result);
     }
@@ -265,11 +300,32 @@ pub(crate) fn validate_result(
     if operation == layer_policy::OP {
         return layer_policy::result(result);
     }
+    if frame_edit::declares(operation) {
+        return frame_edit::result(result);
+    }
+    if object_component::admitted(operation) {
+        return object_component::result(operation, result);
+    }
+    if object_rig::admitted(operation) {
+        return object_rig::result(operation, result);
+    }
+    if object_edit::admitted(operation) {
+        return object_edit::result(operation, result);
+    }
+    if item::owns(operation) {
+        return item::result(operation, payload, result);
+    }
+    if vector::owns(operation) {
+        return vector::result(operation, payload, result);
+    }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);
     }
     if operation == "command.document.object.layer.create" {
         return object::create_result(result);
+    }
+    if operation == import::OP {
+        return import::result(result);
     }
     if operation == "command.document.object.layer.visibility.set" {
         return object::visibility_result(result);

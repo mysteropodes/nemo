@@ -1,6 +1,5 @@
 //! Staged N25A records; distinct from the active opacity project family.
 use serde::{Deserialize, Serialize};
-use serde_json::Number;
 
 pub const OBJECT_DOCUMENT_FORMAT: &str = "nemo.native-object-document";
 pub const OBJECT_DOCUMENT_FORMAT_VERSION: u32 = 1;
@@ -37,9 +36,19 @@ mod timing;
 #[allow(unused_imports)]
 pub(crate) use timing::TimingEdit;
 pub(crate) use timing::{LayerTiming, LayerTimingError};
+#[allow(unused_imports)]
+pub(crate) use timing::{RetimeEdit, RetimePair, RetimePlan};
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;
+// L03-J (#2109, F17): lane-3 image-mesh store record; the document carries it as an optional member.
+#[path = "object_image_mesh_record.rs"]
+#[allow(dead_code)]
+mod object_image_mesh_record;
+#[allow(unused_imports)]
+pub(crate) use object_image_mesh_record::{
+    ImageMesh, ImageMeshAdmissionError, ImageMeshStore, MeshIdSequence,
+};
 // L09-A (#2126): private lane-9 media timing aggregator; its kernels are private children there.
 #[path = "object_media_timing_core.rs"]
 #[allow(dead_code)]
@@ -48,16 +57,87 @@ pub(crate) mod media_timing;
 #[path = "object_group_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_group_kernels;
+// L02-G (#2108): the per-layer group table stored on `ObjectLayer`.
+pub(crate) use object_group_kernels::object_group_record::GroupTable;
 // L06-C (#2137): lane-6 raster asset family aggregator.
 #[path = "object_raster_asset_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_raster_asset_kernels;
+// L06-A/B/F (#2135, #2136, #2175) re-homed by L06-L (#2112): the text layout / glyph family aggregator is declared from
+// the document layer because the text block record is a document member (object_raster_asset_record.rs).
+#[path = "object_text_layout_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_text_layout_kernels;
+// L06-L (#2112): raster items and text blocks as the additive `items` document member.
+#[path = "object_raster_asset_record.rs"]
+#[allow(dead_code)]
+mod item_records;
+#[allow(unused_imports)]
+pub(crate) use item_records::{
+    font_asset_issue, item_asset_issue, raster_asset_issue, text_holder_id, ItemAssetIssue,
+    ItemRecords, RasterEntry, TextEntry,
+};
+// L04-G (#2110): lane-4 component/StoryBoard/duplicator record family aggregator.
+#[path = "object_component_record_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_component_record_kernels;
 
 // L01-D (#2107): editable-vector-path record body (storage DTO; admission is object_vector_codec.rs).
 #[path = "object_vector_record.rs"]
 #[allow(dead_code)]
 mod vector_record;
 pub(crate) use vector_record::{VectorBody, VECTOR_FAMILY};
+
+// L04-I (#2110): optional lane-4 component/StoryBoard/duplicator tables (a v2 member).
+#[path = "object_component_document.rs"]
+#[allow(dead_code)]
+mod object_component_document;
+#[allow(unused_imports)]
+pub(crate) use object_component_document::{
+    resolve_sound_assets, ComponentTables, SoundAssetError,
+};
+
+// L03-K (#2109): widget (rig control) layer record, F19; a private child like the other document members.
+#[path = "object_widget_record.rs"]
+#[allow(dead_code)]
+mod object_widget_record;
+#[allow(unused_imports)]
+pub(crate) use object_widget_record::{
+    validate_widget_layers, AxisBinding, AxisUnresolved, WidgetAdmissionError, WidgetAxis,
+    WidgetBindings, WidgetLayerKind, WidgetRecord, WidgetRest,
+};
+// L03-N (#2109): native rig record (I11, the stored `ld.rig`); its admission and link-report files are private children of it.
+#[path = "object_rig_record.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_rig_record;
+// L01-E (#2107): pressure fields, paramShape record, per-layer pathFx stack record, vector extension slot
+// (storage DTOs only; their admission is object_vector_ext_codec.rs under the codec).
+#[path = "object_vector_pressure.rs"]
+#[allow(dead_code)]
+mod vector_pressure;
+pub(crate) use vector_pressure::{PressureFields, STROKE_PROFILE_KINDS};
+#[path = "object_parametric_record.rs"]
+#[allow(dead_code)]
+mod parametric_record;
+pub(crate) use parametric_record::{ParamShape, PARAM_SHAPE_KINDS};
+#[path = "object_path_effects_record.rs"]
+#[allow(dead_code)]
+mod path_effects_record;
+pub(crate) use path_effects_record::{PathFxRecord, PATH_FX_TYPE_IDS};
+#[path = "object_vector_ext.rs"]
+#[allow(dead_code)]
+mod vector_ext;
+pub(crate) use vector_ext::VectorExt;
+
+// L08-J (#2114): layer compositing fields; transactions are scene_effect_layer_edit.rs / _history.rs.
+#[path = "scene_effect_layer_record.rs"]
+#[allow(dead_code)]
+mod scene_effect_layer_record;
+#[allow(unused_imports)]
+pub(crate) use scene_effect_layer_record::{
+    blend_write, freeze_legacy_matte_sources, remap_compositing_refs, validate_layer_compositing,
+    LayerEffect, MatteRef, BLEND_MODE_NAMES, MATTE_MODE_NAMES,
+};
 
 #[path = "object_layer_organization.rs"]
 mod organization;
@@ -68,6 +148,23 @@ pub use organization::{LayerFolder, LayerFolders};
 mod layer_organization_tests;
 #[path = "object_layer_policy.rs"]
 mod layer_policy;
+// L05-G (#2111): the stored layer range (inPoint, outPoint, timeLink, markers) and the private range kernel it owns.
+#[path = "object_frame_edit_range_records.rs"]
+#[allow(dead_code)]
+mod range_records;
+#[allow(unused_imports)]
+pub(crate) use range_records::{
+    marker_bounds, markers_with_bounds, split_layer_range, FrameBound, FrameEditKind, LayerRange,
+    LayerRole, MarkerRecord, RangeEdit, RangeEditError, RangeRecordError, RangeSplit,
+    TimeLinkRecord,
+};
+// #2106 size split: the object record DTOs (target, frame scope, geometry, solid fill), moved verbatim.
+#[path = "object_record.rs"]
+mod object_record;
+pub use object_record::{
+    FrameScope, FrameScopeKind, ObjectGeometry, ObjectPoint, ObjectRecord, ObjectSegment,
+    ObjectTarget, SolidFill,
+};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -83,6 +180,13 @@ pub struct ObjectDocument {
     pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) composition_order: Presence<OrderPlan>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) image_meshes: Presence<ImageMeshStore>,
+    /// Raster items and text blocks (L06-L); absent when the document holds none.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) items: Presence<ItemRecords>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) component_tables: Presence<ComponentTables>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -105,94 +209,39 @@ pub struct ObjectLayer {
     pub(crate) shy: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) timing: Presence<LayerTiming>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectTarget {
-    pub(crate) context_id: String,
-    pub(crate) frame_scope: FrameScope,
-    pub(crate) layer_uid: String,
-    pub(crate) stroke_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct FrameScope {
-    pub(crate) kind: FrameScopeKind,
-    pub(crate) frame: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum FrameScopeKind {
-    Authored,
-    Reference,
-}
-
-impl<'de> Deserialize<'de> for FrameScopeKind {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        // Derived enum decoding also admits externally tagged object variants.
-        // The frozen contract permits only these two literal JSON strings.
-        match String::deserialize(deserializer)?.as_str() {
-            "authored" => Ok(Self::Authored),
-            "reference" => Ok(Self::Reference),
-            other => Err(serde::de::Error::unknown_variant(
-                other,
-                &["authored", "reference"],
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectRecord {
-    pub(crate) schema_version: u32,
-    pub(crate) family: String,
-    pub(crate) target: ObjectTarget,
-    pub(crate) geometry: ObjectGeometry,
-    /// Legacy family: a required solid fill. Vector family: explicit null (no fill) or solid.
+    /// Ordered non-destructive path effects (baseline `ld.pathFx`); absent differs from an empty stack.
     #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) fill: Presence<Option<SolidFill>>,
-    /// Present exactly for the `editable-vector-path` family.
+    pub(crate) path_fx: Presence<Vec<PathFxRecord>>,
+    /// Present exactly for a widget (rig control) layer; its presence is the baseline `isWidgetLayer`.
     #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) vector: Presence<VectorBody>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectGeometry {
-    pub(crate) kind: String,
-    pub(crate) closed: bool,
-    pub(crate) coordinate_space: String,
-    pub(crate) handle_space: String,
-    pub(crate) segments: Vec<ObjectSegment>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectSegment {
-    pub(crate) point: ObjectPoint,
-    pub(crate) handle_in: ObjectPoint,
-    pub(crate) handle_out: ObjectPoint,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct ObjectPoint {
-    pub(crate) x: Number,
-    pub(crate) y: Number,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct SolidFill {
-    pub(crate) kind: String,
-    pub(crate) r: Number,
-    pub(crate) g: Number,
-    pub(crate) b: Number,
-    pub(crate) a: Number,
+    pub(crate) widget: Presence<WidgetRecord>,
+    /// Absent: the layer never had a group table. Present: an authored table (possibly empty).
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) groups: Presence<GroupTable>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) blend_mode: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) matte_mode: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) matte_source_layer_uid: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) mattes_more: Presence<Vec<MatteRef>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_effect_layer: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_folder_layer: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) folder_collapsed: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) effects: Presence<Vec<LayerEffect>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) effects_from: Presence<String>,
+    /// Present once a layer is rigged (baseline `ld.rig`); an empty rig is present, absent never had one.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) rig: Presence<object_rig_record::RigRecord>,
+    /// F11 (L05-G): the stored inPoint / outPoint / timeLink / markers. Absent: the layer never had any of them.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) range: Presence<LayerRange>,
 }
 
 // Serde's derived struct decoder also accepts positional sequences. These
@@ -227,50 +276,27 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
     #[serde(default)] layer_folders: Presence<Option<LayerFolders>>,
-    #[serde(default)] composition_order: Presence<OrderPlan> });
+    #[serde(default)] composition_order: Presence<OrderPlan>,
+    #[serde(default)] image_meshes: Presence<ImageMeshStore>,
+    #[serde(default)] items: Presence<ItemRecords>,
+    #[serde(default)] component_tables: Presence<ComponentTables> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
     #[serde(default)] color: Presence<String>,
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
     #[serde(default)] folder_id: Presence<Option<String>>,
     #[serde(default)] shy: Presence<bool>,
-    #[serde(default)] timing: Presence<LayerTiming> });
-object_deserialize!(ObjectTarget {
-    context_id: String,
-    frame_scope: FrameScope,
-    layer_uid: String,
-    stroke_id: String
-});
-object_deserialize!(FrameScope {
-    kind: FrameScopeKind,
-    frame: u32
-});
-object_deserialize!(ObjectRecord {
-    schema_version: u32,
-    family: String,
-    target: ObjectTarget,
-    geometry: ObjectGeometry,
-    #[serde(default)] fill: Presence<Option<SolidFill>>,
-    #[serde(default)] vector: Presence<VectorBody>
-});
-object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
-    handle_space: String, segments: Vec<ObjectSegment> });
-object_deserialize!(ObjectSegment {
-    point: ObjectPoint,
-    handle_in: ObjectPoint,
-    handle_out: ObjectPoint
-});
-object_deserialize!(ObjectPoint {
-    x: Number,
-    y: Number
-});
-object_deserialize!(SolidFill {
-    kind: String,
-    r: Number,
-    g: Number,
-    b: Number,
-    a: Number
-});
+    #[serde(default)] timing: Presence<LayerTiming>,
+    #[serde(default)] path_fx: Presence<Vec<PathFxRecord>>,
+    #[serde(default)] widget: Presence<WidgetRecord>,
+    #[serde(default)] groups: Presence<GroupTable>,
+    #[serde(default)] blend_mode: Presence<String>, #[serde(default)] matte_mode: Presence<String>,
+    #[serde(default)] matte_source_layer_uid: Presence<String>, #[serde(default)] mattes_more: Presence<Vec<MatteRef>>,
+    #[serde(default)] is_effect_layer: Presence<bool>, #[serde(default)] is_folder_layer: Presence<bool>,
+    #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,
+    #[serde(default)] effects_from: Presence<String>,
+    #[serde(default)] rig: Presence<object_rig_record::RigRecord>,
+    #[serde(default)] range: Presence<LayerRange> });
 
 impl ObjectDocument {
     /// Organizational folder metadata, not structural folder layers.
@@ -280,6 +306,11 @@ impl ObjectDocument {
     /// Immutable authored holder metadata; absence is not an empty authored table.
     pub fn property_holders(&self) -> Option<&[PropertyHolder]> {
         self.property_holders.value().map(Vec::as_slice)
+    }
+    /// Immutable authored image-mesh table; absence is not an empty table.
+    #[allow(dead_code)]
+    pub(crate) fn image_meshes(&self) -> Option<&ImageMeshStore> {
+        self.image_meshes.value()
     }
     pub fn format_version(&self) -> u32 {
         self.format_version
@@ -305,28 +336,6 @@ impl ObjectDocument {
     }
     pub fn layers(&self) -> &[ObjectLayer] {
         &self.layers
-    }
-}
-impl ObjectRecord {
-    pub fn target(&self) -> &ObjectTarget {
-        &self.target
-    }
-    /// The solid fill; `None` for an explicit null (no fill) or an absent slot.
-    pub(crate) fn solid_fill(&self) -> Option<&SolidFill> {
-        self.fill.value().and_then(Option::as_ref)
-    }
-    /// The vector body of an `editable-vector-path` record.
-    #[allow(dead_code)]
-    pub(crate) fn vector(&self) -> Option<&VectorBody> {
-        self.vector.value()
-    }
-}
-impl SolidFill {
-    pub(crate) fn valid_channels(&self) -> bool {
-        [&self.r, &self.g, &self.b, &self.a].into_iter().all(|n| {
-            n.as_f64()
-                .is_some_and(|v| v.is_finite() && (0.0..=1.0).contains(&v))
-        })
     }
 }
 impl ObjectLayer {
@@ -357,6 +366,7 @@ impl ObjectLayer {
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Present(LayerTiming::blank_drawing()),
+            ..Self::identified(String::new())
         }
     }
     /// Identified, unnamed layer with earlier native-file visibility semantics.
@@ -371,6 +381,20 @@ impl ObjectLayer {
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Missing,
+            path_fx: Presence::Missing,
+            widget: Presence::Missing,
+            groups: Presence::Missing,
+            blend_mode: Presence::Missing,
+            matte_mode: Presence::Missing,
+            matte_source_layer_uid: Presence::Missing,
+            mattes_more: Presence::Missing,
+            is_effect_layer: Presence::Missing,
+            is_folder_layer: Presence::Missing,
+            folder_collapsed: Presence::Missing,
+            effects: Presence::Missing,
+            effects_from: Presence::Missing,
+            rig: Presence::Missing,
+            range: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {
@@ -383,24 +407,8 @@ impl ObjectLayer {
     pub fn visible(&self) -> bool {
         self.visible.value().copied().unwrap_or(true)
     }
-}
-impl ObjectTarget {
-    pub fn context_id(&self) -> &str {
-        &self.context_id
-    }
-    pub fn layer_uid(&self) -> &str {
-        &self.layer_uid
-    }
-    pub fn stroke_id(&self) -> &str {
-        &self.stroke_id
-    }
-    pub fn frame(&self) -> u32 {
-        self.frame_scope.frame
-    }
-    pub fn scope_kind(&self) -> &FrameScopeKind {
-        &self.frame_scope.kind
-    }
-    pub(crate) fn valid(&self) -> bool {
-        self.context_id == "scene-root" && !self.layer_uid.is_empty() && !self.stroke_id.is_empty()
+    /// The stored ordered path-effect stack; `None` when the layer has none (an empty stack is `Some(&[])`).
+    pub(crate) fn path_fx(&self) -> Option<&[PathFxRecord]> {
+        self.path_fx.value().map(Vec::as_slice)
     }
 }

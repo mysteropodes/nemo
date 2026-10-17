@@ -77,6 +77,12 @@ pub(crate) struct PreparedPropertyEdit {
     document: ObjectDocument,
     changed: bool,
 }
+impl PreparedPropertyEdit {
+    /// The proposed document, for a caller that chains further edits before sealing its own candidate.
+    pub(super) fn into_document(self) -> ObjectDocument {
+        self.document
+    }
+}
 fn finite(n: &Number) -> Result<f64, DispatchErrorCode> {
     n.as_f64()
         .filter(|v| v.is_finite())
@@ -168,6 +174,17 @@ impl ObjectFillOwner {
         &self,
         bytes: &[u8],
     ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
+        let origin = self.current_snapshot();
+        let document = origin.document().clone();
+        Self::apply_property_edit_json(origin, document, bytes)
+    }
+    /// The same strict edit applied to `document`, a working copy of `origin` (the snapshot the
+    /// candidate is sealed to), so a chain of edits stays one atomic candidate.
+    pub(super) fn apply_property_edit_json(
+        origin: ObjectSnapshot,
+        mut document: ObjectDocument,
+        bytes: &[u8],
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         if bytes.len() > 4096 {
             return Err(DispatchErrorCode::InvalidRequest);
         }
@@ -179,8 +196,6 @@ impl ObjectFillOwner {
         if matches!(payload.property.as_str(), "order" | "timeRemap") {
             return Err(DispatchErrorCode::Unavailable);
         }
-        let origin = self.current_snapshot();
-        let mut document = origin.document().clone();
         let mut holders = document
             .property_holders
             .value()

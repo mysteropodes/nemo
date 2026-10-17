@@ -11,9 +11,45 @@ mod object_fill_owner;
 pub(crate) use object_fill_owner::{insert_order_element, remove_order_element, OrderEditError};
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::{
-    ObjectFillOwner, PreparedLayerCreate, PreparedLayerPolicy, PreparedLayerVisibility,
-    PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit,
-    ReferenceEdit, VectorEditResult, MAX_VECTOR_REQUEST_BYTES,
+    ComponentTablesEdit, ImportBatchResult, ImportSkipReport, ItemEditResult, ObjectFillOwner,
+    PasteDestination, PreparedBooleanEdit, PreparedComponentTables, PreparedGroupEdit,
+    PreparedImageMeshEdit, PreparedImportBatch, PreparedItemEdit, PreparedLayerCreate,
+    PreparedLayerLifecycle, PreparedLayerPolicy, PreparedLayerVisibility, PreparedPlacementEdit,
+    PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit, PreparedSelectionEdit,
+    PreparedVectorEdit, PreparedWidgetEdit, ReferenceEdit, VectorEditResult,
+    MAX_VECTOR_REQUEST_BYTES,
+};
+
+#[cfg(feature = "history")]
+#[allow(unused_imports)]
+pub(crate) use object_fill_owner::component_owner::{
+    PreparedComponentSetup, SetupError, SetupKind, SetupRefusal, SourceRefusal,
+};
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::scene_effect_layer_edit::PreparedLayerCompositing;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedExposureKey;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedExposureRetime;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedFrameStructure;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedRigEdit;
+
+#[cfg(feature = "history")]
+#[allow(unused_imports)]
+pub(crate) use object_fill_owner::ClipboardContexts;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedRigPose;
+#[cfg(feature = "history")]
+#[allow(unused_imports)]
+pub(crate) use object_fill_owner::{
+    clamp_times, grown_total, repeat_payload, PreparedFrameRepeat, RepeatRequest,
+};
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::{
+    packet_paste_cells, paste_payload, CellRef, FrameClipboardOperation, FrameClipboardOutcome,
+    FrameClipboardPacket, PasteCell, PasteRequest, PreparedFrameClipboard,
 };
 
 use crate::document::OpacityDocument;

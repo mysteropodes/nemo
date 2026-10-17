@@ -1,4 +1,7 @@
 //! Pinned CPU commands join existing numeric order to retained real contours.
+use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
+    style_of_record, SceneItemStyle, StyleUnavailable,
+};
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
 use crate::object_render_scene::object_scene_producer_contour;
@@ -9,6 +12,7 @@ use crate::render_geometry::ClosedCubicPath;
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use vello::kurbo::BezPath;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectPaintPlanError {
@@ -29,21 +33,32 @@ impl<'a> ObjectPaintCommand<'a> {
     pub fn contour(&self) -> &'a ClosedCubicPath {
         self.entry.contour()
     }
+    /// The geometry to draw: the vector record's open or closed path, otherwise the closed contour's path (L01-I).
+    pub(crate) fn path(&self) -> &'a BezPath {
+        self.entry.path()
+    }
     pub fn paint(&self) -> [&'a Number; 4] {
-        // Paint commands exist only for closed-solid-fill-cubic-path records: the scene compiler refuses every
-        // other family and the codec requires a solid fill for that one.
-        let paint = self
-            .entry
-            .source()
-            .record()
-            .solid_fill()
-            .expect("paint commands come from records with a solid fill");
-        [&paint.r, &paint.g, &paint.b, &paint.a]
+        // The fill of the source record when it has one (the legacy family always does), otherwise the retained primary solid
+        // of the entry (L01-I): an unfilled vector retains its stroke paint, an item without any paint a transparent solid.
+        match self.entry.source().record().solid_fill() {
+            Some(paint) => [&paint.r, &paint.g, &paint.b, &paint.a],
+            None => self.entry.solid().channels(),
+        }
     }
     /// Typed straight-RGBA paint (L07-A `SceneSolid`) retained with the contour;
     /// equal by value to `paint()`, which keeps borrowing the immutable source fill.
     pub(crate) fn solid(&self) -> &'a SceneSolid {
         self.entry.solid()
+    }
+    /// Typed item style (L07-I): the retained L07-A solid for the legacy family, otherwise the one
+    /// record-to-style function (stroke, paint order, opacity). The scene admits legacy contours only
+    /// today; the second arm is the join point for the vector family.
+    pub(crate) fn style(&self) -> Result<SceneItemStyle, StyleUnavailable> {
+        let record = self.entry.source().record();
+        if record.vector().is_none() {
+            return Ok(SceneItemStyle::solid_fill(self.solid().clone()));
+        }
+        style_of_record(record)
     }
 }
 

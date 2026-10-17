@@ -1,0 +1,417 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.frame-edit",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.frames.insert",
+    "command.document.object.frames.extend",
+    "command.document.object.frames.duplicate",
+    "command.document.object.frames.remove",
+    "command.document.object.layer.key.promote",
+    "command.document.object.layer.key.clear",
+    "command.document.object.layer.key.clear_cells",
+    "command.document.object.layer.tween.remove",
+    "command.document.object.layer.key.move",
+    "command.document.object.frames.clipboard.duplicate",
+    "command.document.object.frames.repeat"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesInsertPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesExtendPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesDuplicatePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesRemovePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyPromotePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyClearPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyClearCellsPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerTweenRemovePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyMovePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesClipboardDuplicatePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesRepeatPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained frame-edit receipt or typed refusal; no document, packet or resource payload. Lists are bounded by the 4096-byte request."
+  },
+  "semantics": "Eleven frame, key and exposure edits of the dense editor (F5/F6, extend, duplicate key, remove frame(s), clear key, delete frames, remove tween, move key, duplicate selection, repeat selection). Each is prepared against the retained snapshot and published through the shared revision, history and request-receipt owner: one changed operation adds one revision and one undo entry; a semantic no-op adds neither and keeps redo; a locked layer is skipped or refused exactly as the baseline does. Frame numbers are zero-based u32 cells; layers are named by their opaque stable layerUid. The result is the compact receipt only; cut, copy and paste are not declared because a clipboard packet is produced by the typed native API. F7 blank key is not declared. No JS/Paper writer, optimistic mutation or fallback.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "F5 insert frame: one blank slot after the cell in the selected unlocked layers, the others padded; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-insert-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.insert",
+        "payload": {
+          "command": "object.frames.insert",
+          "cell": 3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-insert-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Extend exposure: insert count blank slots after the cell in every layer; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-extend-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.extend",
+        "payload": {
+          "command": "object.frames.extend",
+          "cell": 3,
+          "count": 1
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-extend-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Duplicate key: a new key after the cell holding what the layer shows there; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.duplicate",
+        "payload": {
+          "command": "object.frames.duplicate",
+          "layerUid": "layer-a",
+          "cell": 3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Remove frame / frame span from every layer; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-remove-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.remove",
+        "payload": {
+          "command": "object.frames.remove",
+          "from": 3,
+          "to": 3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-remove-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "F6 insert key / convert to keyframes: promote cells to keys; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-key-promote-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.key.promote",
+        "payload": {
+          "command": "object.layer.key.promote",
+          "cells": [
+            3
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-key-promote-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Clear keyframe: demote a key to a hold; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-key-clear-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.key.clear",
+        "payload": {
+          "command": "object.layer.key.clear",
+          "layerUid": "layer-a",
+          "cell": 3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-key-clear-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Delete frames: clear the listed cells; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-key-clear-cells-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.key.clear_cells",
+        "payload": {
+          "command": "object.layer.key.clear_cells",
+          "targets": [
+            {
+              "layerUid": "layer-a",
+              "frame": 3
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-key-clear-cells-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Remove tween: demote the in-betweens strictly between two keys; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-tween-remove-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.tween.remove",
+        "payload": {
+          "command": "object.layer.tween.remove",
+          "layerUid": "layer-a",
+          "from": 2,
+          "to": 6
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-tween-remove-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Move a key to another frame, rippling later keys; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-key-move-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.key.move",
+        "payload": {
+          "command": "object.layer.key.move",
+          "layerUid": "layer-a",
+          "from": 2,
+          "to": 4
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-key-move-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Duplicate selection in place after itself; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.clipboard.duplicate",
+        "payload": {
+          "command": "object.frames.clipboard.duplicate",
+          "layerUid": "layer-a",
+          "selection": [
+            {
+              "layerUid": "layer-a",
+              "frame": 2
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Repeat selection N times, growing the timeline when needed; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-repeat-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.repeat",
+        "payload": {
+          "command": "object.frames.repeat",
+          "fromLayerUid": "layer-a",
+          "toLayerUid": "layer-a",
+          "fromFrame": 2,
+          "toFrame": 3,
+          "times": 2
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-repeat-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

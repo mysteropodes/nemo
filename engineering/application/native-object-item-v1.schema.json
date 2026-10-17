@@ -1,0 +1,738 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mysteropodes/nemo/engineering/application/native-object-item-v1.schema.json",
+  "description": "Lane-6 object operations: raster/text item edits and the embedded-image asset catalog. Request and result shapes of command.document.object.item.edit, command.document.object.asset.attach and command.document.object.asset.remove. The native owner repeats every rule on the original bytes; this document is the closed public shape.",
+  "$comment": "Bounds, request/reply correlation and the 4096-byte envelope are also enforced by the SDK contract (native-object-item-contract.js) and the common Rust validators (native_item_contract.rs).",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "Opaque": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "\\S",
+      "description": "Authored bytes are preserved; no identifier grammar is invented. Not blank. The schema is looser by design than the validators: maxLength counts characters here while the validators bound the UTF-8 byte length at 255, and the validators also refuse NUL."
+    },
+    "FrameScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "frame"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "authored",
+            "reference"
+          ]
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "Target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/FrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/Opaque"
+        }
+      }
+    },
+    "CreateTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/FrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "strokeId": {
+          "const": ""
+        }
+      }
+    },
+    "RasterItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetId",
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "assetId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "opacity": {
+          "type": "number"
+        },
+        "rotation": {
+          "type": "number"
+        },
+        "isBitmapBrush": {
+          "type": "boolean"
+        },
+        "brushGroupId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "isBrushTextureCopy": {
+          "type": "boolean"
+        },
+        "meshId": {
+          "$ref": "#/$defs/Opaque"
+        }
+      }
+    },
+    "Font": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "fontKey"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bundled"
+            },
+            "fontKey": {
+              "enum": [
+                "Roboto-Regular",
+                "Roboto-Bold",
+                "DejaVuSans-Regular",
+                "DejaVuSans-Bold",
+                "DejaVuSerif-Regular",
+                "DejaVuSerif-Bold",
+                "Manrope-Regular",
+                "Inter-Regular"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "assetId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "asset"
+            },
+            "assetId": {
+              "$ref": "#/$defs/Opaque"
+            }
+          }
+        }
+      ]
+    },
+    "TextBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "font",
+        "size",
+        "color",
+        "align",
+        "anchorTopLeft"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "font": {
+          "$ref": "#/$defs/Font"
+        },
+        "size": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        },
+        "align": {
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ]
+        },
+        "fixedWidth": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fixedHeight": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "bold": {
+          "type": "boolean"
+        },
+        "italic": {
+          "type": "boolean"
+        },
+        "underline": {
+          "type": "boolean"
+        },
+        "strike": {
+          "type": "boolean"
+        },
+        "letterSpacing": {
+          "type": "number"
+        },
+        "wordSpacing": {
+          "type": "number"
+        },
+        "lineHeightMult": {
+          "type": "number"
+        },
+        "textCase": {
+          "enum": [
+            "none",
+            "upper",
+            "lower",
+            "capitalize"
+          ]
+        },
+        "anchorTopLeft": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "TextPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "font": {
+          "$ref": "#/$defs/Font"
+        },
+        "size": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        },
+        "align": {
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ]
+        },
+        "fixedWidth": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fixedHeight": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "bold": {
+          "type": "boolean"
+        },
+        "italic": {
+          "type": "boolean"
+        },
+        "underline": {
+          "type": "boolean"
+        },
+        "strike": {
+          "type": "boolean"
+        },
+        "letterSpacing": {
+          "type": "number"
+        },
+        "wordSpacing": {
+          "type": "number"
+        },
+        "lineHeightMult": {
+          "type": "number"
+        },
+        "textCase": {
+          "enum": [
+            "none",
+            "upper",
+            "lower",
+            "capitalize"
+          ]
+        }
+      },
+      "minProperties": 1
+    },
+    "ItemEdit": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "target",
+            "item"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.raster.create"
+            },
+            "target": {
+              "$ref": "#/$defs/CreateTarget"
+            },
+            "item": {
+              "$ref": "#/$defs/RasterItem"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "stableTarget",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.raster.move"
+            },
+            "stableTarget": {
+              "$ref": "#/$defs/Target"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "stableTarget",
+            "width",
+            "height"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.raster.resize"
+            },
+            "stableTarget": {
+              "$ref": "#/$defs/Target"
+            },
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "stableTarget",
+            "rotation"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.raster.rotate"
+            },
+            "stableTarget": {
+              "$ref": "#/$defs/Target"
+            },
+            "rotation": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "stableTarget",
+            "opacity"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.raster.opacity"
+            },
+            "stableTarget": {
+              "$ref": "#/$defs/Target"
+            },
+            "opacity": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "stableTarget"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.raster.delete"
+            },
+            "stableTarget": {
+              "$ref": "#/$defs/Target"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "target",
+            "block"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.text.create"
+            },
+            "target": {
+              "$ref": "#/$defs/CreateTarget"
+            },
+            "block": {
+              "$ref": "#/$defs/TextBlock"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "stableTarget",
+            "patch"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.text.edit"
+            },
+            "stableTarget": {
+              "$ref": "#/$defs/Target"
+            },
+            "patch": {
+              "$ref": "#/$defs/TextPatch"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "stableTarget"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.text.delete"
+            },
+            "stableTarget": {
+              "$ref": "#/$defs/Target"
+            }
+          }
+        }
+      ]
+    },
+    "AssetAttach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "name",
+        "mediaType",
+        "source"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "mediaType": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "image/bmp",
+            "image/svg+xml",
+            "image/avif"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
+    "AssetRemove": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "assetId"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "assetId": {
+          "$ref": "#/$defs/Opaque"
+        }
+      }
+    },
+    "Input": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ItemEdit"
+        },
+        {
+          "$ref": "#/$defs/AssetAttach"
+        },
+        {
+          "$ref": "#/$defs/AssetRemove"
+        }
+      ]
+    },
+    "ItemEditResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "operation",
+        "strokeId"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "operation": {
+          "enum": [
+            "raster.create",
+            "raster.move",
+            "raster.resize",
+            "raster.rotate",
+            "raster.opacity",
+            "raster.delete",
+            "text.create",
+            "text.edit",
+            "text.delete"
+          ]
+        },
+        "strokeId": {
+          "$ref": "#/$defs/Opaque"
+        }
+      }
+    },
+    "AssetCommandResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "Output": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ItemEditResult"
+        },
+        {
+          "$ref": "#/$defs/AssetCommandResult"
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "label": "Move one raster item; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "item-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.item.edit",
+        "payload": {
+          "command": "object.raster.move",
+          "stableTarget": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 0
+            },
+            "layerUid": "legacy layer:alpha",
+            "strokeId": "native-raster:3:0"
+          },
+          "x": 120,
+          "y": 80.5
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "item-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "operation": "raster.move",
+          "strokeId": "native-raster:3:0"
+        }
+      }
+    },
+    {
+      "label": "Attach one PNG file; the host reads the bytes, the owner admits them (not available until the host byte-source route is registered)",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "asset-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 8,
+        "operation": "command.document.object.asset.attach",
+        "payload": {
+          "documentSnapshotId": "snapshot-8",
+          "name": "photo",
+          "mediaType": "image/png",
+          "source": {
+            "kind": "file",
+            "path": "/Users/a/Pictures/photo.png"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "asset-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 9,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

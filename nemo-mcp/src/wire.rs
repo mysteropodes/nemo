@@ -259,11 +259,17 @@ fn validate_native_response(
     let track_command = request.operation == crate::native_contract::property_track::OP;
     let property_edit = request.operation == crate::native_contract::property_edit::OP;
     let property_read = request.operation == crate::native_contract::property_read::OP;
+    let frame_edit_command = crate::native_contract::frame_edit::declares(&request.operation);
     let correlated_operation = request.operation == crate::native_contract::metadata::OP
         || policy_command
         || track_command
         || property_edit
-        || property_read;
+        || property_read
+        || frame_edit_command
+        || crate::native_contract::object_edit::admitted(&request.operation)
+        || crate::native_contract::object_rig::admitted(&request.operation)
+        || crate::native_contract::object_component::admitted(&request.operation)
+        || crate::native_contract::import::admitted(&request.operation);
     let correlated_identity = !correlated_operation
         || (response.request_id == request.request_id
             && response.instance_id == request.instance_id
@@ -336,7 +342,20 @@ fn validate_native_response(
                         response.content_revision,
                         result,
                     ))
+                && (!frame_edit_command
+                    || crate::native_contract::frame_edit::revision_matches(
+                        request.expected_revision,
+                        response.content_revision,
+                        result,
+                    ))
                 && crate::native_contract::font::response_matches(request, response)
+                && crate::native_contract::object_edit::response_matches(request, response)
+                && crate::native_contract::object_rig::response_matches(request, response)
+                && crate::native_contract::object_component::response_matches(request, response)
+                && crate::native_contract::import::response_matches(request, response)
+                && crate::native_contract::item::response_matches(request, response)
+                && crate::native_contract::vector::response_matches(request, response)
+                && crate::native_contract::brush::response_matches(request, response)
                 && crate::native_contract::validate_result(
                     &request.operation,
                     &request.document_id,

@@ -150,6 +150,16 @@ impl ObjectSnapshot {
         encode_project_envelope(project, wire_limits()).map_err(refused)
     }
 
+    /// L06-H: dry-run of `serialize_project_file` on a candidate project that has
+    /// not been published. Same encoder, same limits; the bytes are discarded.
+    pub(crate) fn check_candidate_saveable(
+        candidate: &crate::object_codec::ProjectEnvelope,
+    ) -> Result<(), DispatchErrorCode> {
+        encode_project_envelope(candidate, wire_limits())
+            .map(|_| ())
+            .map_err(refused)
+    }
+
     pub(crate) fn prepare_reference_attachment(
         &self,
         id: String,

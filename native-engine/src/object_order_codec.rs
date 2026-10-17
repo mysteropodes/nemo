@@ -1,11 +1,12 @@
 //! Explicit v2 admission/migration core; existing v1 host codecs do not opt in.
 use crate::object_codec::{
-    parse, validate, validate_content, validate_property_holders, ObjectCodecError,
-    ObjectCodecErrorKind, ObjectDocument,
+    parse, validate, validate_component_tables, validate_content, validate_image_meshes,
+    validate_item_parts, validate_property_holders, ObjectCodecError, ObjectCodecErrorKind,
+    ObjectDocument,
 };
 use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, OrderContext, OrderCurvePoint,
-    OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
+    AuthoredOrder, FrameScopeKind, ItemRecords, ObjectLayer, ObjectRecord, OrderContext,
+    OrderCurvePoint, OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
 };
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
@@ -113,6 +114,7 @@ fn validate_order(
     total_frames: u32,
     layers: &[ObjectLayer],
     objects: &[ObjectRecord],
+    items: Option<&ItemRecords>,
 ) -> Result<(), ObjectCodecError> {
     if plan.format != "nemo.native-object-order-plan"
         || plan.format_version != 1
@@ -125,13 +127,15 @@ fn validate_order(
     let declared: HashSet<_> = layers.iter().map(|l| l.layer_uid.as_str()).collect();
     let expected: HashSet<_> = objects
         .iter()
-        .filter(|r| r.target.frame_scope.kind == FrameScopeKind::Authored)
-        .map(|r| {
+        .map(|r| &r.target)
+        .chain(items.into_iter().flat_map(|items| items.targets()))
+        .filter(|target| target.frame_scope.kind == FrameScopeKind::Authored)
+        .map(|target| {
             (
-                r.target.context_id.as_str(),
-                r.target.frame_scope.frame,
-                r.target.layer_uid.as_str(),
-                r.target.stroke_id.as_str(),
+                target.context_id.as_str(),
+                target.frame_scope.frame,
+                target.layer_uid.as_str(),
+                target.stroke_id.as_str(),
             )
         })
         .collect();
@@ -201,11 +205,19 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.objects,
         true,
     )?;
+    validate_item_parts(
+        &document.items,
+        document.format_version,
+        document.total_frames,
+        &document.layers,
+        &document.objects,
+    )?;
     validate_order(
         &document.composition_order,
         document.total_frames,
         &document.layers,
         &document.objects,
+        document.items.value(),
     )?;
     crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
@@ -213,7 +225,9 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.layers,
         &document.objects,
         Some(&document.composition_order),
-    )
+    )?;
+    validate_image_meshes(&document.image_meshes)?;
+    validate_component_tables(&document.component_tables, &document.layers)
 }
 
 pub(crate) fn validate_storage_order(
@@ -229,11 +243,19 @@ pub(crate) fn validate_storage_order(
         &document.objects,
         true,
     )?;
+    validate_item_parts(
+        &document.items,
+        document.format_version,
+        document.total_frames,
+        &document.layers,
+        &document.objects,
+    )?;
     validate_order(
         plan,
         document.total_frames,
         &document.layers,
         &document.objects,
+        document.items.value(),
     )?;
     crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
@@ -241,7 +263,8 @@ pub(crate) fn validate_storage_order(
         &document.layers,
         &document.objects,
         Some(plan),
-    )
+    )?;
+    validate_image_meshes(&document.image_meshes)
 }
 
 pub fn decode_ordered_project(bytes: &[u8]) -> Result<OrderedObjectDocument, ObjectCodecError> {
@@ -271,6 +294,9 @@ pub fn migrate_ordered_project(
         property_holders: document.property_holders.clone(),
         layer_folders: document.layer_folders.clone(),
         composition_order: plan,
+        image_meshes: document.image_meshes.clone(),
+        items: document.items.clone(),
+        component_tables: document.component_tables.clone(),
     };
     ordered(&migrated)?;
     Ok(migrated)

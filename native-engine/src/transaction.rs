@@ -226,6 +226,8 @@ pub(crate) enum CompactResult {
         layer_uid: String,
     },
     VectorEdit(crate::commands::VectorEditResult),
+    ItemEdit(crate::commands::ItemEditResult),
+    ImportBatch(crate::commands::ImportBatchResult),
     Transaction(TransactionRecord),
 }
 
@@ -266,6 +268,8 @@ impl RetainedDisposition {
                         "applied": true, "historyEntriesAdded": 1, "layerUid": layer_uid
                     }),
                     CompactResult::VectorEdit(vector) => vector.result(),
+                    CompactResult::ItemEdit(item) => item.result(),
+                    CompactResult::ImportBatch(batch) => batch.result(),
                     CompactResult::Transaction(record) => record.result(),
                 };
                 (true, Some(result), None)

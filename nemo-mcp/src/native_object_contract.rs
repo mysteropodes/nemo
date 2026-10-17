@@ -221,6 +221,9 @@ fn fill(value: &Value) -> bool {
 }
 
 fn record(value: &Value) -> bool {
+    if value.get("family").and_then(Value::as_str) == Some(crate::native_contract::vector::FAMILY) {
+        return crate::native_contract::vector::record(value);
+    }
     exact(
         value,
         &["schemaVersion", "family", "target", "geometry", "fill"],

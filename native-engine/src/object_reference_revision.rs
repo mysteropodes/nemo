@@ -5,6 +5,11 @@ use crate::revision::object_revision::{
 };
 use std::sync::Arc;
 
+// L06-H (lane #2112): asset attach / remove publication (revision layer).
+#[path = "object_raster_asset_attach.rs"]
+#[allow(dead_code)]
+mod object_raster_asset_attach;
+
 impl ObjectRevisionOwner {
     #[cfg(feature = "font_asset_wire")]
     pub(crate) fn publish_admitted_font(

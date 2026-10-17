@@ -4,10 +4,10 @@
 (function(root,factory){
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
   var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding);
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -312,12 +312,17 @@
       return {apiVersion:2,requestId:requestId('layer-create'),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.layer.create',expectedRevision:pin.contentRevision,payload:{command:'object.layer.create',name:name}};
     },'nemo_native_dispatch');}
+    function importBatch(payload,expected){return mutation(function(pin){
+      if(!same(pin,expected)||!payload||typeof payload!=='object'||Array.isArray(payload)||payload.command!=='object.import.batch')throw new Error('Native import intent is stale or invalid');
+      return {apiVersion:2,requestId:requestId('import-batch'),instanceId:pin.instanceId,documentId:pin.documentId,operation:'command.document.object.import.batch',expectedRevision:pin.contentRevision,payload:payload};
+    },'nemo_native_dispatch');}
     function editLayerPolicy(payload,expected){return mutation(function(pin){
       if(!same(pin,expected)||!payload||Array.isArray(payload)||Object.keys(payload).length!==4||!['command','layerUid','flag','value'].every(function(k){return Object.prototype.hasOwnProperty.call(payload,k);})||payload.command!=='object.layer.policy.edit'||!['locked','shy'].includes(payload.flag)||typeof payload.value!=='boolean'||typeof payload.layerUid!=='string'||!payload.layerUid||pin.layers.filter(function(l){return l.layerUid===payload.layerUid;}).length!==1)throw new Error('Native layer policy intent is stale or invalid');
       return {apiVersion:2,requestId:requestId('layer-policy'),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.layer.policy.edit',expectedRevision:pin.contentRevision,
         payload:{command:'object.layer.policy.edit',layerUid:payload.layerUid,flag:payload.flag,value:payload.value}};
     },'nemo_native_dispatch');}
+    function editFrames(operation,payload,expected){return mutation(function(pin){if(!same(pin,expected)||!FrameEdit||!FrameEdit.valid(operation,payload))throw new Error('Native frame edit intent is '+(same(pin,expected)?'invalid':'stale'));return {apiVersion:2,requestId:requestId('frame-edit'),instanceId:pin.instanceId,documentId:pin.documentId,operation:operation,expectedRevision:pin.contentRevision,payload:JSON.parse(JSON.stringify(payload))};},'nemo_native_dispatch');}
     function editProjectSettings(action,expected){return mutation(function(pin){
       if(!same(pin,expected))throw new Error('Native project settings intent is stale');
       return {apiVersion:2,requestId:requestId('project-settings'),instanceId:pin.instanceId,documentId:pin.documentId,
@@ -397,13 +402,17 @@
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
-      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
+      get editFrames(){return FrameEdit&&typeof ports.dispatchApplication==='function'&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editFrames:undefined;},
       get editProjectSettings(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editProjectSettings:undefined;},
       get createLayer(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?createLayer:undefined;},
+      get importBatch(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?importBatch:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
       presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,

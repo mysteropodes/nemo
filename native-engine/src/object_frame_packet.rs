@@ -1,5 +1,6 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
+use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
 use crate::object_document::{AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord};
 use crate::revision::ObjectSnapshot;
 use std::collections::HashMap;
@@ -318,10 +319,18 @@ where
     }
     // The typed holder table is admitted for persistence and native reads.
     // Until its sampled values reach this producer, never paint unmodified
-    // geometry while silently ignoring authored Motion properties.
+    // geometry while silently ignoring authored Motion properties. L01-H consumes exactly
+    // the parametric-shape tracks of vector records (holders_fully_consumed); any other
+    // holder still keeps the packet unavailable.
+    if !holders_fully_consumed(document) {
+        return Err(ObjectFrameError::Unavailable.into());
+    }
+    // F11 (L05-G): a stored in/out point or live time link decides which frames a layer shows; until the D27
+    // evaluator consumes them, never paint every frame of such a layer.
     if document
-        .property_holders()
-        .is_some_and(|holders| !holders.is_empty())
+        .layers()
+        .iter()
+        .any(ObjectLayer::range_gates_frames)
     {
         return Err(ObjectFrameError::Unavailable.into());
     }
@@ -389,3 +398,6 @@ where
 #[cfg(all(test, feature = "codec"))]
 #[path = "../tests/object_exposure.rs"]
 mod exposure_tests;
+#[cfg(test)]
+#[path = "../tests/render_vector_eval_guard.rs"]
+mod render_vector_eval_guard;

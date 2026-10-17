@@ -17,3 +17,15 @@ pub(crate) mod object_media_link_reopen;
 
 #[path = "object_media_link_join.rs"]
 pub(crate) mod object_media_link_join;
+
+#[path = "object_media_link_plan.rs"]
+pub(crate) mod object_media_link_plan;
+
+#[path = "object_media_link_needs.rs"]
+pub(crate) mod object_media_link_needs;
+
+#[path = "object_media_link_edit.rs"]
+pub(crate) mod object_media_link_edit;
+
+#[path = "native_media_export_audio.rs"]
+pub(crate) mod native_media_export_audio;

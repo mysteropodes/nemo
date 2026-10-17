@@ -7436,12 +7436,64 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // holder), including the stopwatch and the add-key diamond, so both
   // locations can add/remove keyframes and neither can drift from the
   // other's behavior.
+  // The accepted opacity owner has a separate native projection from the
+  // Object Project inspector. Only its two admitted properties are presented;
+  // no generic holder renderer, expression writer or release route is entered.
+  function renderNativeOpacityPropsPanel(body) {
+    var owner = window.NemoNativeOpacityCutover, surface = window.NemoNativeOpacityMotionSurface;
+    try {
+      if (!owner || !surface || typeof owner.isActive !== 'function' || owner.isActive() !== true) return false;
+      var prepared = owner.prepared(), selected = state.layers && state.layers[state.activeLayerIdx];
+      if (!prepared || !selected || selected.layerUid !== prepared.layerUid ||
+          _motionCanvasEmptyClick || (typeof _layerSel !== 'undefined' && !_layerSel.length)) return false;
+      var holder = Object.freeze({ layerUid: prepared.layerUid }), frame = state.currentFrame;
+      var plan = surface.opacityReadModel(owner, holder, frame);
+      var position = surface.read(owner, holder, 'position', frame), opacity = surface.read(owner, holder, 'opacity', frame);
+      if (!plan.handled || !position.handled || !opacity.handled) return false;
+      body.innerHTML = '';
+      var heading = document.createElement('div'); heading.className = 'motion-props-layername';
+      heading.textContent = 'Native properties'; body.appendChild(heading);
+      [['position', position.value], ['opacity', opacity.value]].forEach(function (entry) {
+        var prop = entry[0], values = entry[1], row = document.createElement('div');
+        row.className = 'lrow motion-prop-row'; row._smHolder = holder; row._smProp = prop;
+        var label = document.createElement('span'); label.textContent = PROP_LABEL[prop]; row.appendChild(label);
+        var fields = document.createElement('div'); fields.className = 'motion-fields'; row.appendChild(fields);
+        values.forEach(function (value) {
+          var input;
+          if (prop === 'opacity' && plan.opacityMode === 'static' && window.NemoOpacityApplication &&
+              typeof window.NemoOpacityApplication.legacy === 'function') {
+            input = scrubField(value, function (next) {
+              var current = state.layers && state.layers[state.activeLayerIdx];
+              if (window.NemoNativeOpacityCutover !== owner || state.currentFrame !== frame ||
+                  !current || current.layerUid !== plan.layerUid ||
+                  (typeof _layerSel !== 'undefined' && !_layerSel.length)) return;
+              surface.routeDimension(plan, window.NemoOpacityApplication, values, 0, next, frame);
+            }, false, plan);
+          } else {
+            input = document.createElement('input'); input.type = 'number'; input.className = 'motion-val';
+            input.value = fmtVal(value); input.readOnly = true; input.disabled = true;
+          }
+          fields.appendChild(input);
+        });
+        body.appendChild(row);
+        var opened = window._exprEditorOpen;
+        if (opened && opened.holder && opened.holder.layerUid === plan.layerUid && opened.prop === prop) {
+          var expression = document.createElement('div'); expression.className = 'lrow motion-expr-editor';
+          var raw = document.createElement('span'); raw.className = 'motion-expr-raw';
+          raw.textContent = SM.t('exprRawValuePrefix') + values.map(fmtVal).join(', ') + ' ' + PROP_UNIT[prop];
+          expression.appendChild(raw); body.appendChild(expression);
+        }
+      });
+      return true;
+    } catch (_) { return false; }
+  }
   function renderMotionPropsPanel() {
     var body = document.getElementById('motion-props-body');
     if (!body) return;
     if(n20AllowLegacyWrite('motion.metadata.read')!==true){
       var nativeUi=window.NemoNativeObjectUI;
       if(nativeUi&&typeof nativeUi.paintMotionInspector==='function'&&nativeUi.paintMotionInspector(window)===true)return;
+      if(renderNativeOpacityPropsPanel(body))return;
       body.textContent='Native Motion property metadata is unavailable.';return;
     }
     body.innerHTML = '';

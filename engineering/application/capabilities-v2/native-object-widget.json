@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.widget",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.widget.create",
+    "command.document.object.widget.write",
+    "command.document.object.widget.settings"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectWidgetCreatePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectWidgetWritePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectWidgetSettingsPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Create a joystick or slider widget layer with its axis controls, write a drag through the existing control property edits (local, world with anchor and angle, or rest) as one history entry, or edit the presentation settings (position, size floor 8, axis range, rest and label). A widget has no value of its own: its axes name ordinary layer controls. Widget layers never render. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native widget.create command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "widget-create-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.widget.create",
+        "payload": {
+          "command": "object.widget.create",
+          "kind": "joystick",
+          "name": "Joystick 1",
+          "pos": [
+            320,
+            180
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "widget-create-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    },
+    {
+      "label": "Shared native widget.write command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "widget-write-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.widget.write",
+        "payload": {
+          "command": "object.widget.write",
+          "layerUid": "native-layer:8:0",
+          "frame": 0,
+          "to": {
+            "kind": "world",
+            "point": [
+              420,
+              200
+            ],
+            "anchor": [
+              320,
+              180
+            ],
+            "angleDegrees": 30
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "widget-write-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native widget.settings command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "widget-settings-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.widget.settings",
+        "payload": {
+          "command": "object.widget.settings",
+          "layerUid": "native-layer:8:0",
+          "set": {
+            "pos": [
+              10,
+              20
+            ],
+            "x": {
+              "min": -50,
+              "max": 50,
+              "rest": 0,
+              "label": "Turn"
+            },
+            "y": {
+              "rest": 5
+            }
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "widget-settings-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.import",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.import.batch"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectImportBatchPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained import receipt or typed refusal. The caller sends source ids only: the owner mints every layer and stroke identity. Raster pixels, text and fonts are never carried; an element that needs them is an unavailable row and refuses the whole batch."
+  },
+  "semantics": "Import one parsed artwork batch atomically: N new layers, M complete editable-vector-path records and the importer's own skip report. Each record names its layer by the source id of a batch layer or by an existing layer uid, an empty stroke id and an authored frame scope; the owner allocates native-layer:<revision>:<n> and native-stroke:<revision>:<n> deterministically from the origin revision. A changing batch adds exactly one revision and one undo entry for the WHOLE batch; a batch that creates nothing preserves presence, bytes, history and redo and returns its skip report. Every layer, record and skip entry is accounted for in the receipt (created plus skipped equals declared). An unavailable row (raster-asset, text, font) or a locked existing layer refuses the whole batch before anything publishes; there is no partial import and no JS/Paper writer or optimistic mutation. The importers (SVG, Figma, PSD, drop/paste) parse with Paper.js, the Figma REST API and ag-psd and only submit this plan.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native import batch command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "import-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.import.batch",
+        "payload": {
+          "command": "object.import.batch",
+          "layers": [
+            {
+              "sourceId": "figma:0",
+              "name": "Home"
+            }
+          ],
+          "records": [
+            {
+              "sourceId": "figma:0:svg:1:0",
+              "record": {
+                "schemaVersion": 1,
+                "family": "editable-vector-path",
+                "target": {
+                  "contextId": "scene-root",
+                  "frameScope": {
+                    "kind": "authored",
+                    "frame": 0
+                  },
+                  "layerUid": "figma:0",
+                  "strokeId": ""
+                },
+                "geometry": {
+                  "kind": "cubic-path",
+                  "closed": false,
+                  "coordinateSpace": "document-world",
+                  "handleSpace": "relative",
+                  "segments": [
+                    {
+                      "point": {
+                        "x": 10,
+                        "y": 20
+                      },
+                      "handleIn": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "handleOut": {
+                        "x": 0,
+                        "y": 0
+                      }
+                    },
+                    {
+                      "point": {
+                        "x": 110,
+                        "y": 70
+                      },
+                      "handleIn": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "handleOut": {
+                        "x": 0,
+                        "y": 0
+                      }
+                    }
+                  ]
+                },
+                "fill": null,
+                "vector": {
+                  "stroke": {
+                    "kind": "solid",
+                    "r": 0.06666666666666667,
+                    "g": 0.13333333333333333,
+                    "b": 0.2,
+                    "a": 1
+                  },
+                  "hasRealStroke": true,
+                  "strokeWidth": 4,
+                  "strokeCap": "butt",
+                  "strokeJoin": "miter",
+                  "miterLimit": 10,
+                  "dashOffset": 0,
+                  "opacity": 1
+                }
+              }
+            }
+          ],
+          "skipped": [
+            {
+              "kind": "element",
+              "sourceId": "figma:0:skip:0",
+              "reason": "STAR (Star)"
+            }
+          ],
+          "unavailable": []
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "import-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layers": [
+            {
+              "sourceId": "figma:0",
+              "layerUid": "native-layer:8:0"
+            }
+          ],
+          "objects": [
+            {
+              "sourceId": "figma:0:svg:1:0",
+              "strokeId": "native-stroke:8:0"
+            }
+          ],
+          "skipped": [
+            {
+              "kind": "element",
+              "sourceId": "figma:0:skip:0",
+              "reason": "STAR (Star)"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -51,6 +51,9 @@ miniz_oxide = { version = "=0.9.1", default-features = false, optional = true }
 base64 = { version = "=0.22.1", optional = true }
 read-fonts = { version = "=0.39.2", optional = true }
 rquickjs = { version = "=0.14.0", default-features = false, features = ["std"], optional = true }
+# L02-I (#2108): the polygon boolean / eraser engine of the native boolean join. MIT OR Apache-2.0,
+# edition 2024 / rust-version 1.88; the rayon feature stays off (single-threaded, deterministic).
+i_overlay = { version = "=9.0.0", default-features = false }
 
 [[test]]
 name = "codec"

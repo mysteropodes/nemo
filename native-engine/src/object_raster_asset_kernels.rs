@@ -10,3 +10,13 @@ pub(crate) mod object_raster_asset_item;
 #[path = "object_raster_asset_admission.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_raster_asset_admission;
+
+// L06-I (#2112): Image placement holder rule and placement queries.
+#[path = "object_raster_asset_placement.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_raster_asset_placement;
+
+// L06-H (lane #2112): the shared "asset in use" predicate of the attach / remove transaction.
+#[path = "object_raster_asset_use.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_raster_asset_use;

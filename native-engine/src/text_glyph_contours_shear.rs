@@ -1,7 +1,7 @@
 //! Faux-italic shear and the scene-join flag report of the glyph contour kernel
 //! (G38b / L06-B). See `text_glyph_contours.rs` for the baseline contract.
 
-use crate::evaluation::object_text_layout_kernels::text_glyph_contours::{
+use crate::object_document::object_text_layout_kernels::text_glyph_contours::{
     GlyphContourError, GlyphSegment,
 };
 

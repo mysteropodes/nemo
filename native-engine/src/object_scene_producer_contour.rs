@@ -1,6 +1,6 @@
 //! Contour scene producer joined through the pinned registry (L07-F; F16, D32, G03a).
 //!
-//! The one admitted record family (`closed-solid-fill-cubic-path`) is produced as a
+//! The admitted record families (`closed-solid-fill-cubic-path`, and with L01-H `editable-vector-path`) are produced as a
 //! typed `ProducerOutput` of the L07-C registry and consumed by the paint plan:
 //! * `produce` compiles every selected record of one `ObjectFramePacket` into a
 //!   `CompiledContour` (admitted contour, envelope and the L07-A `SceneSolid` paint).
@@ -23,10 +23,18 @@
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, PinField, ProducerEntry, ProducerOutput, SceneJoinError, ScenePin,
 };
+use crate::evaluation::object_scene_style_kernels::object_scene_style_item::style_of_record;
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
+use crate::evaluation::object_vector_kernels::render_vector_eval::{
+    evaluate_record, is_vector_record, record_layer_has_active_path_fx,
+};
+use crate::evaluation::object_vector_kernels::render_vector_stroke::{primary_solid, stroke_reach};
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
+use crate::object_render_scene::object_scene_style_emit::prepare_item;
+use crate::object_render_scene::render_vector_path::VectorShape;
 use crate::object_render_scene::{ObjectPaintPlanError, ObjectRenderScene, ObjectSceneError};
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
+use vello::kurbo::BezPath;
 
 /// Producer name in the pinned registry.
 pub(crate) const PRODUCER: &str = "contour";
@@ -34,11 +42,15 @@ pub(crate) const PRODUCER: &str = "contour";
 const UNREPORTED: &str = "contour producer reported the record unavailable";
 
 /// One admitted contour with its typed solid paint, owned by the retained scene.
+/// `drawn` is the geometry the compositor draws when it is not the closed contour itself: the open or closed path of an
+/// `editable-vector-path` record (L01-I). For such a record `contour` is its real closed contour when `ClosedCubicPath`
+/// admits one and its clipping rectangle otherwise; `solid` is the retained primary paint (fill, else stroke, else transparent).
 #[derive(Debug)]
 pub(crate) struct CompiledContour {
     pub(crate) contour: ClosedCubicPath,
     pub(crate) envelope: [f64; 4],
     pub(crate) solid: SceneSolid,
+    pub(crate) drawn: Option<BezPath>,
 }
 
 /// Everything the contour producer reports for one packet. `rejections` holds the
@@ -54,7 +66,7 @@ pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
     let mut rejections = Vec::new();
     for record in packet.records() {
         let index = record.source_object_index();
-        output = match compile(record) {
+        output = match compile(packet, record) {
             Ok(compiled) => output.with_item(index, compiled),
             Err(reason) => {
                 rejections.push((index, reason));
@@ -93,7 +105,18 @@ impl ContourProduction {
     }
 }
 
-fn compile(source: ObjectFrameRecord<'_>) -> Result<CompiledContour, &'static str> {
+fn compile(
+    packet: &ObjectFramePacket,
+    source: ObjectFrameRecord<'_>,
+) -> Result<CompiledContour, &'static str> {
+    if is_vector_record(source.record()) {
+        return compile_vector(packet, source);
+    }
+    // The baseline applies a layer's path effects to every stroke of the layer (app.js:1813); the legacy family
+    // does not go through the join, so an active stack must refuse rather than draw the stored geometry.
+    if record_layer_has_active_path_fx(packet, source.record()) {
+        return Err("layer path effects on a legacy record await the vector join");
+    }
     // Field access is confined to the original record returned by the admitted
     // evaluation port. No document lookup or second source authority exists.
     let record = source.record();
@@ -136,6 +159,42 @@ fn compile(source: ObjectFrameRecord<'_>) -> Result<CompiledContour, &'static st
         contour,
         envelope,
         solid,
+        drawn: None,
+    })
+}
+
+/// L01-I (G14): an `editable-vector-path` record reaches the compositor through the one evaluation join (L01-H: path
+/// effects, then the parametric rebuild, at the packet's pinned frame), so scene, viewport preview and export draw the same
+/// geometry:
+/// * its typed style (fill, stroke, paint order, opacity) is L07-I's `style_of_record`, and `prepare_item` must accept it, so
+///   a style the compositor could not draw is a typed refusal here and never a missing or flat shape;
+/// * the drawn path is open or closed exactly as stored (`VectorShape`), with its clipping contour and envelope;
+/// * the retained solid is the fill, else the stroke paint, else transparent: an item without any paint is valid and draws
+///   nothing, exactly as the baseline draws it.
+/// Trim paths, gradient paint and the Motion/camera transforms are other stages and other leaves; none is faked here.
+fn compile_vector(
+    packet: &ObjectFramePacket,
+    source: ObjectFrameRecord<'_>,
+) -> Result<CompiledContour, &'static str> {
+    let style = style_of_record(source.record()).map_err(|error| error.message())?;
+    prepare_item(&style).map_err(|error| error.message())?;
+    let evaluated = evaluate_record(packet, source).map_err(|error| error.message())?;
+    let segments = evaluated
+        .segments
+        .iter()
+        .map(|segment| CubicSegment {
+            point: segment.point,
+            handle_in: segment.handle_in,
+            handle_out: segment.handle_out,
+        })
+        .collect::<Vec<_>>();
+    let shape = VectorShape::new(&segments, evaluated.closed, stroke_reach(&style))?;
+    let solid = primary_solid(&style).map_err(|error| error.message())?;
+    Ok(CompiledContour {
+        contour: shape.contour,
+        envelope: shape.envelope,
+        solid,
+        drawn: Some(shape.path),
     })
 }
 
@@ -219,6 +278,9 @@ fn plan_error(error: SceneJoinError) -> ObjectPaintPlanError {
 #[cfg(test)]
 #[path = "../tests/object_scene_producer_contour_controls.rs"]
 mod controls;
+#[cfg(test)]
+#[path = "../tests/render_vector_eval_scene.rs"]
+mod render_vector_eval_scene;
 #[cfg(test)]
 #[path = "../tests/object_scene_producer_contour_rows.rs"]
 mod rows;

@@ -30,29 +30,37 @@ pub(crate) mod expression_time;
 #[path = "motion_parent_chain.rs"]
 #[allow(dead_code)]
 pub(crate) mod motion_parent_chain;
-#[path = "property_expression_runtime.rs"]
-#[allow(dead_code)]
-pub(crate) mod property_expression_runtime;
-#[path = "property_transform_eval.rs"]
-#[allow(dead_code)]
-pub(crate) mod property_transform_eval;
-#[path = "property_follow_path_sample.rs"]
-#[allow(dead_code)]
-pub(crate) mod property_follow_path_sample;
-#[path = "property_expression_views.rs"]
-#[allow(dead_code)]
-pub(crate) mod property_expression_views;
 #[path = "property_camera_eval.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_camera_eval;
+#[path = "property_expression_runtime.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_expression_runtime;
+#[path = "property_expression_views.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_expression_views;
+#[path = "property_follow_path_sample.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_follow_path_sample;
 #[path = "property_projection_3d.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_projection_3d;
+#[path = "property_transform_eval.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_transform_eval;
 // L10-A (#2123): private montage timing kernel (retime, totals, source-frame map,
 // looping montage-layer frame, montage-view segments); consumers arrive in L10-I.
 #[path = "object_montage_timing.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_montage_timing;
+// L10-I (#2116): montage layer join (persisted montageId record, placeMontageAsLayer plan, layer
+// frame -> component source frame) and montage view context (enter/exit swap), over the L04-G records.
+#[path = "object_montage_layer.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_montage_layer;
+#[path = "object_shot_context.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_shot_context;
 // L01-A (#2129): lane-1 vector/parametric/path-effect family aggregator.
 #[path = "object_vector_kernels.rs"]
 #[allow(dead_code)]
@@ -65,10 +73,10 @@ pub(crate) mod object_image_mesh_kernels;
 #[path = "object_component_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_component_kernels;
-// L06-A (#2135): lane-6 text layout/glyph family aggregator.
-#[path = "object_text_layout_kernels.rs"]
-#[allow(dead_code)]
-pub(crate) mod object_text_layout_kernels;
+// L06-A (#2135): the lane-6 text layout/glyph family aggregator is declared from the document layer since L06-L
+// (#2112), where the text block record is stored; this re-export keeps every `crate::evaluation::...` consumer path valid.
+#[allow(unused_imports)]
+pub(crate) use crate::object_document::object_text_layout_kernels;
 // L07-A (#2141): lane-7 typed scene/style family aggregator.
 #[path = "object_scene_style_kernels.rs"]
 #[allow(dead_code)]

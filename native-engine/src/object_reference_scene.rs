@@ -66,6 +66,7 @@ pub fn prepare_object_viewport_composition(
         plan: plan.clone(),
         viewport: true,
         resources: None,
+        scene_effects: None,
         reference,
     })
 }

@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.selection-edit",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.selection.delete",
+    "command.document.object.selection.duplicate",
+    "command.document.object.layer.split",
+    "command.document.object.clipboard.paste"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectSelectionDeletePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectSelectionDuplicatePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerSplitPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectClipboardPastePayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Delete or duplicate selected shapes, split a layer into one layer per element, or paste an inline clip into a layer cell, by stable identity, atomically with element Motion, groups and references. One revision and one undo entry per applied edit; an empty selection or empty clip is a no-op. Copy and cut have no wire operation: the compact receipt cannot carry a clip. Animation 2D hold promotion is unavailable until its provider is joined. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native selection.delete command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-selection-delete-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.selection.delete",
+        "payload": {
+          "command": "object.selection.delete",
+          "contextId": "scene-root",
+          "layerUid": "layer-a",
+          "frame": 0,
+          "mode": "animation2d",
+          "strokeIds": [
+            "stroke-1"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-selection-delete-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native selection.duplicate command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-selection-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.selection.duplicate",
+        "payload": {
+          "command": "object.selection.duplicate",
+          "contextId": "scene-root",
+          "layerUid": "layer-a",
+          "frame": 0,
+          "mode": "animation2d",
+          "strokeIds": [
+            "stroke-1"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-selection-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native layer.split command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-layer-split-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.split",
+        "payload": {
+          "command": "object.layer.split",
+          "contextId": "scene-root",
+          "layerUid": "layer-a",
+          "frame": 0,
+          "labels": {
+            "shape": "Shape",
+            "stroke": "Stroke"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-layer-split-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native clipboard.paste command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-clipboard-paste-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.clipboard.paste",
+        "payload": {
+          "command": "object.clipboard.paste",
+          "contextId": "scene-root",
+          "layerUid": "layer-a",
+          "frame": 0,
+          "mode": "motion",
+          "clip": {
+            "contextId": "scene-root",
+            "layerUid": "layer-a",
+            "frame": 0,
+            "records": []
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "selection-edit-clipboard-paste-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "applied": false,
+          "historyEntriesAdded": 0
+        }
+      }
+    }
+  ]
+}

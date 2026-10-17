@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.rig",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.rig.edit",
+    "command.document.object.rig.pose"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectRigEditPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectRigPosePayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Edit the native rig of a layer (draw, move and remove bones, influence radius, stroke binds, auto-assign, per-vertex weights, two-bone IK chains) as one sealed transaction per action, and reset or commit the pose as one reversible transaction each. Mesh binds report a typed unavailable until a native raster carries the mesh. Pose and IK dragging is evaluation, not an operation. No JS/Paper writer, no legacy fallback.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native rig.edit command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "rig-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.rig.edit",
+        "payload": {
+          "command": "object.rig.edit",
+          "layerUid": "native-layer:8:0",
+          "action": {
+            "kind": "bindStroke",
+            "strokeId": "native-stroke:3:0",
+            "frame": 0,
+            "boneIds": [
+              "bone1",
+              "bone2"
+            ],
+            "radius": 200,
+            "rotate": false,
+            "softness": 0.25
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "rig-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native rig.pose command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "rig-pose-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.rig.pose",
+        "payload": {
+          "command": "object.rig.pose",
+          "layerUid": "native-layer:8:0",
+          "action": {
+            "kind": "commit",
+            "frame": 12
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "rig-pose-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

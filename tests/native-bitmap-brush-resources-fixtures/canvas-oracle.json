@@ -1,0 +1,378 @@
+{
+ "provenance": {
+  "baseline": "fbe4b8a33e6d5a229f014154df2ba21988a9fabc",
+  "generator": "L07/leaves/L07-M/tools/gen_canvas_oracle.js",
+  "bitmapBrushSha256": "23e4afcdb11374e7e591b96a2bd8f9bc7e06fac72add32e459069123e11c2ecb",
+  "imageBudgetSha256": "c93eb2d0ef588abd31d7c2ca2d4d04d255351447e1c16e1ceb2465c22060966f",
+  "paperVersion": "0.12.18",
+  "maxTexLine": "var MAX_TEX = 4096;",
+  "note": "canvas = the canvas bakeToCanvas (verbatim) leaves; baselineBytes = verbatim noteRegistered(id, canvas.width, canvas.height) -> totalBytes()"
+ },
+ "stats": {
+  "maxW": 4096,
+  "maxH": 4096,
+  "atLimit": 9
+ },
+ "rows": [
+  {
+   "name": "straight 100px",
+   "canvas": {
+    "width": 241,
+    "height": 41
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 120.5,
+    "h": 20.5
+   },
+   "baselineBytes": 39524
+  },
+  {
+   "name": "straight 100px, scatter 50",
+   "canvas": {
+    "width": 261,
+    "height": 61
+   },
+   "world": {
+    "minX": -15.25,
+    "minY": -15.25,
+    "w": 130.5,
+    "h": 30.5
+   },
+   "baselineBytes": 63684
+  },
+  {
+   "name": "size 1 dot",
+   "canvas": {
+    "width": 19,
+    "height": 19
+   },
+   "world": {
+    "minX": -1.625,
+    "minY": -0.625,
+    "w": 9.25,
+    "h": 9.25
+   },
+   "baselineBytes": 1444
+  },
+  {
+   "name": "size 400 dot",
+   "canvas": {
+    "width": 1016,
+    "height": 1016
+   },
+   "world": {
+    "minX": -251,
+    "minY": -250,
+    "w": 508,
+    "h": 508
+   },
+   "baselineBytes": 4129024
+  },
+  {
+   "name": "diagonal",
+   "canvas": {
+    "width": 196,
+    "height": 166
+   },
+   "world": {
+    "minX": -43.9,
+    "minY": -48.9,
+    "w": 97.8,
+    "h": 82.8
+   },
+   "baselineBytes": 130144
+  },
+  {
+   "name": "S curve",
+   "canvas": {
+    "width": 460,
+    "height": 180
+   },
+   "world": {
+    "minX": -14.85,
+    "minY": -14.85,
+    "w": 229.7,
+    "h": 89.7
+   },
+   "baselineBytes": 331200
+  },
+  {
+   "name": "closed triangle",
+   "canvas": {
+    "width": 156,
+    "height": 140
+   },
+   "world": {
+    "minX": -9,
+    "minY": -9,
+    "w": 78,
+    "h": 70
+   },
+   "baselineBytes": 87360
+  },
+  {
+   "name": "empty path",
+   "canvas": {
+    "width": 41,
+    "height": 41
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 20.5,
+    "h": 20.5
+   },
+   "baselineBytes": 6724
+  },
+  {
+   "name": "single point",
+   "canvas": {
+    "width": 41,
+    "height": 41
+   },
+   "world": {
+    "minX": -5.25,
+    "minY": -4.25,
+    "w": 20.5,
+    "h": 20.5
+   },
+   "baselineBytes": 6724
+  },
+  {
+   "name": "fractional extents",
+   "canvas": {
+    "width": 100,
+    "height": 68
+   },
+   "world": {
+    "minX": -8.125,
+    "minY": -7.625,
+    "w": 49.8,
+    "h": 33.7
+   },
+   "baselineBytes": 27200
+  },
+  {
+   "name": "scatter 400",
+   "canvas": {
+    "width": 506,
+    "height": 386
+   },
+   "world": {
+    "minX": -96.5,
+    "minY": -96.5,
+    "w": 253,
+    "h": 193
+   },
+   "baselineBytes": 781264
+  },
+  {
+   "name": "width 2000: SCALE 2",
+   "canvas": {
+    "width": 4041,
+    "height": 41
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 2020.5,
+    "h": 20.5
+   },
+   "baselineBytes": 662724
+  },
+  {
+   "name": "width exactly 2048 (before padding)",
+   "canvas": {
+    "width": 4096,
+    "height": 41
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 2048,
+    "h": 20.5
+   },
+   "baselineBytes": 671744
+  },
+  {
+   "name": "wide path 10000: SCALE < 2",
+   "canvas": {
+    "width": 4096,
+    "height": 10
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 10020.5,
+    "h": 23.5
+   },
+   "baselineBytes": 163840
+  },
+  {
+   "name": "tall path 10000",
+   "canvas": {
+    "width": 10,
+    "height": 4096
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 23.5,
+    "h": 10020.5
+   },
+   "baselineBytes": 163840
+  },
+  {
+   "name": "huge both axes 20000",
+   "canvas": {
+    "width": 4096,
+    "height": 4096
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 20020.5,
+    "h": 20020.5
+   },
+   "baselineBytes": 67108864
+  },
+  {
+   "name": "huge negative origin",
+   "canvas": {
+    "width": 4096,
+    "height": 209
+   },
+   "world": {
+    "minX": -30010.25,
+    "minY": -30010.25,
+    "w": 20020.5,
+    "h": 1020.5
+   },
+   "baselineBytes": 3424256
+  },
+  {
+   "name": "3 percent zoom stroke ~8000 world px",
+   "canvas": {
+    "width": 4096,
+    "height": 44
+   },
+   "world": {
+    "minX": -22.75,
+    "minY": -22.75,
+    "w": 8045.5,
+    "h": 85.5
+   },
+   "baselineBytes": 720896
+  },
+  {
+   "name": "extent 4000.25: ceil edge",
+   "canvas": {
+    "width": 4096,
+    "height": 21
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 4020.75,
+    "h": 20.5
+   },
+   "baselineBytes": 344064
+  },
+  {
+   "name": "extent just under SCALE 1",
+   "canvas": {
+    "width": 4096,
+    "height": 21
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 4105.5,
+    "h": 20.5
+   },
+   "baselineBytes": 344064
+  },
+  {
+   "name": "extent just over SCALE 1",
+   "canvas": {
+    "width": 4096,
+    "height": 21
+   },
+   "world": {
+    "minX": -10.25,
+    "minY": -10.25,
+    "w": 4120.5,
+    "h": 20.5
+   },
+   "baselineBytes": 344064
+  }
+ ],
+ "sequences": [
+  {
+   "steps": [
+    {
+     "id": "a",
+     "w": 10,
+     "h": 10
+    }
+   ],
+   "totalBytes": 400,
+   "count": 1
+  },
+  {
+   "steps": [
+    {
+     "id": "a",
+     "w": 10,
+     "h": 10
+    },
+    {
+     "id": "b",
+     "w": 4096,
+     "h": 4096
+    }
+   ],
+   "totalBytes": 67109264,
+   "count": 2
+  },
+  {
+   "steps": [
+    {
+     "id": "a",
+     "w": 10,
+     "h": 10
+    },
+    {
+     "id": "a",
+     "w": 20,
+     "h": 20
+    }
+   ],
+   "totalBytes": 1600,
+   "count": 1
+  },
+  {
+   "steps": [
+    {
+     "id": "a",
+     "w": 1,
+     "h": 1
+    },
+    {
+     "id": "b",
+     "w": 1,
+     "h": 1
+    },
+    {
+     "id": "a",
+     "w": 2,
+     "h": 3
+    }
+   ],
+   "totalBytes": 28,
+   "count": 2
+  }
+ ]
+}
