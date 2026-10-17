@@ -342,25 +342,20 @@ fn linked_read(state: &ApplicationMcp, action: &str, asset: &str) -> NativeAppli
 fn assert_linked_refusal(
     state: &ApplicationMcp,
     request: &NativeApplicationRequest,
-    response: &nemo_mcp::contract::NativeApplicationResponse,
+    response: &Value,
     code: &str,
 ) {
-    assert_eq!(response.api_version, 2);
-    assert_eq!(response.request_id, request.request_id);
-    assert_eq!(response.instance_id, state.instance_id());
-    assert_eq!(response.document_id, request.document_id);
-    assert_eq!(response.content_revision, 0);
-    assert!(!response.ok);
-    assert!(response.result.is_none());
-    assert_eq!(response.error.as_ref().unwrap().code, code);
-    assert_eq!(
-        response.error.as_ref().unwrap().message,
-        "native font read refused"
-    );
-    assert!(serde_json::to_value(response)
-        .unwrap()
-        .get("result")
-        .is_none());
+    assert_eq!(response["apiVersion"], 2);
+    assert_eq!(response["requestId"], request.request_id);
+    assert_eq!(response["instanceId"], state.instance_id());
+    assert_eq!(response["documentId"], request.document_id);
+    assert_eq!(response["contentRevision"], 0);
+    assert_eq!(response["ok"], false);
+    assert!(response.get("result").is_none());
+    assert_eq!(response.as_object().unwrap().len(), 7);
+    assert_eq!(response["error"].as_object().unwrap().len(), 2);
+    assert_eq!(response["error"]["code"], code);
+    assert_eq!(response["error"]["message"], "native font read refused");
     assert!(serde_json::to_vec(response).unwrap().len() <= 4096);
 }
 #[tokio::test]
@@ -390,7 +385,12 @@ async fn linked_read_refusal_is_typed_correlated_and_does_not_resolve_or_mutate(
             .await
             .expect("typed owner refusal must not escape as transport error");
         assert!(delivery.notification.is_none());
-        assert_linked_refusal(&state, &request, &delivery.response, code);
+        assert_linked_refusal(
+            &state,
+            &request,
+            &serde_json::to_value(&delivery.response).unwrap(),
+            code,
+        );
         assert_eq!(info(&state), pin);
         assert_eq!(save(&state), original);
     }
@@ -410,7 +410,10 @@ async fn linked_read_refusal_is_typed_correlated_and_does_not_resolve_or_mutate(
 #[tokio::test]
 async fn linked_read_refusal_reaches_public_native_socket_without_revision_publication() {
     use std::time::Duration;
-    use tokio::net::{TcpListener, TcpStream};
+    use tokio::{
+        io::{AsyncBufReadExt, AsyncReadExt, BufReader},
+        net::{TcpListener, TcpStream},
+    };
     let state = linked_state();
     let request = linked_read(&state, "read", " legacy font / 雪 #1 ");
     let original = save(&state);
@@ -431,13 +434,16 @@ async fn linked_read_refusal_reaches_public_native_socket_without_revision_publi
         Duration::from_secs(2),
     );
     let receive = async {
-        tokio::time::timeout(
-            Duration::from_secs(2),
-            nemo_mcp::wire::read_json::<nemo_mcp::contract::NativeApplicationResponse>(&mut client),
-        )
-        .await
-        .expect("correlated refusal must be written promptly")
-        .expect("transport closure/malformed response is not an accepted refusal")
+        // Observe the real adapter-owned socket frame without importing MCP internals.
+        let mut reader = BufReader::new((&mut client).take(4097));
+        let mut line = String::new();
+        let count = tokio::time::timeout(Duration::from_secs(2), reader.read_line(&mut line))
+            .await
+            .expect("correlated refusal must be written promptly")
+            .expect("transport loss is not an accepted refusal");
+        assert!(count > 0 && count <= 4096 && line.ends_with('\n'));
+        serde_json::from_str::<Value>(line.strip_suffix('\n').unwrap())
+            .expect("malformed response is not an accepted refusal")
     };
     let (served, response) = tokio::join!(serve, receive);
     served.expect("public native serve must write typed linked refusal");
