@@ -5418,7 +5418,7 @@ test('L04-M setup and convert transactions stay private owner children behind th
     assert.match(read(`native-engine/src/${file}`), new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`), `${file} mounts ${name}`);
   }
   const rows = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8').split('\n').filter((line) => line && !line.startsWith('#')).length;
-  assert.equal(rows('native-engine/tests/fixtures/object-component-convert/oracle.txt'), 208, 'convert oracle rows');
+  assert.equal(rows('native-engine/tests/fixtures/object-component-convert/oracle.txt'), 244, 'convert oracle rows');
   assert.equal(rows('native-engine/tests/fixtures/object-duplicator-convert/oracle.txt'), 24, 'duplicator oracle rows');
   for (const [id, file] of [
     ['rust.native.engine.commands', 'native-engine/src/object_component_owner_kernels.rs'],

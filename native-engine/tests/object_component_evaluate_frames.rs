@@ -250,6 +250,67 @@ fn motion_property_holders_keep_the_scene_unavailable_not_flat() {
     assert!(prepared.query("sym_comp", 3).is_ok());
 }
 
+/// The "variants" set with `range` set on one inner layer of one component.
+fn variants_with_range(symbol: usize, layer: usize, range: serde_json::Value) -> Prepared {
+    let mut set = set("variants");
+    set.document["componentTables"]["components"]["components"][symbol]["layers"][layer]["range"] =
+        range;
+    Prepared::from_set(set)
+}
+
+#[test]
+fn a_visible_inner_layer_with_a_gating_range_makes_the_entered_view_unavailable() {
+    // The entered view shows inner layers as ordinary layers, which obey their own window
+    // (`getEffectiveStrokes` -> `layerHasTimeRange`); until the D27 evaluator reads in points, out points
+    // and time links, painting every frame of such a layer would silently lose the window.
+    let want = Some(ComponentFrameError::Inside(
+        ComponentUnavailable::InnerFeature {
+            layer_uid: "ly_comp_ia".into(),
+            feature: "layer range",
+        },
+    ));
+    for range in [
+        json!({"inPoint": 2}),
+        json!({"outPoint": 0}),
+        json!({"timeLink": {"uid": "ly_comp_ib"}}),
+    ] {
+        let prepared = variants_with_range(0, 0, range.clone());
+        for frame in [0, 3, 11] {
+            assert_eq!(
+                prepared.query("sym_comp", frame).err(),
+                want,
+                "{range} @{frame}"
+            );
+        }
+        // The placed instance and the scene are unaffected: the baseline's symbol branch never reads an
+        // inner layer's range, and the root packet gate only looks at scene layers.
+        assert!(prepared.query(SCENE, 3).is_ok(), "{range}");
+        assert!(
+            prepared.query("sym_late", 5).is_ok(),
+            "{range}: another component"
+        );
+    }
+}
+
+#[test]
+fn a_range_that_gates_nothing_or_sits_on_a_hidden_layer_does_not_block_the_entered_view() {
+    // Markers never gate, explicit nulls are no window, and a hidden layer shows nothing to lose.
+    for range in [
+        json!({"markers": [{"frame": 2}]}),
+        json!({"inPoint": null, "outPoint": null, "timeLink": null}),
+        json!({}),
+    ] {
+        let prepared = variants_with_range(0, 0, range.clone());
+        assert!(prepared.query("sym_comp", 3).is_ok(), "{range}");
+    }
+    // `sym_hidden`'s second layer is hidden.
+    let hidden = variants_with_range(1, 1, json!({"inPoint": 2}));
+    assert!(hidden.query("sym_hidden", 3).is_ok());
+    // The same range on a visible layer of that component does block.
+    let visible = variants_with_range(1, 0, json!({"inPoint": 2}));
+    assert!(visible.query("sym_hidden", 3).is_err());
+}
+
 #[test]
 fn an_unwired_time_remap_sampler_is_a_typed_slot_and_the_others_evaluate() {
     let prepared = Prepared::of("remap");

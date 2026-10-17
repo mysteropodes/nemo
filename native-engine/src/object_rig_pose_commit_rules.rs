@@ -11,7 +11,8 @@
 //!   anchors and both relative handle vectors replace the stored segments of the stroke at the exposed
 //!   key. Only the segment values change (the count is the bind's, so every per-vertex companion stays
 //!   aligned); a computed value is spelled like `JSON.stringify` would, and a value equal to the stored
-//!   one keeps the stored spelling, so posing nothing changes no byte.
+//!   one keeps the stored spelling, so posing nothing changes no byte. A pressure ribbon is refused
+//!   (`PoseRefusal::PressureRibbon`) and the detached candidate with it, so no outline is posed alone.
 use crate::commands::object_fill_owner::widget_edit::object_rig_pose_commit::PoseRefusal;
 use crate::object_document::object_rig_record::{KeyedTable, RigPair, RigRecord, RigSegment};
 use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectPoint, Presence};
@@ -115,6 +116,11 @@ pub(super) fn replace_segments(
                     && *target.scope_kind() == FrameScopeKind::Authored
             })
             .ok_or(PoseRefusal::Internal)?;
+        // The baseline poses `centerSegments` with the outline (`rigCommitFrame`); only the outline is
+        // written here, so a ribbon is refused instead of left with a centreline at rest.
+        if document.objects[index].is_pressure_ribbon() {
+            return Err(PoseRefusal::PressureRibbon);
+        }
         let segments = &mut document.objects[index].geometry.segments;
         if segments.len() != stroke.vertices.len() {
             return Err(PoseRefusal::Internal);

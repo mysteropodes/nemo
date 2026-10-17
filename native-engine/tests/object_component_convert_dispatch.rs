@@ -1,7 +1,7 @@
 //! The staged dispatcher envelope of the lane-4 setup / convert operations
 //! (L04-M): compact results, exact request replay, and typed refusals that publish
 //! nothing and claim no raw ingress.
-use super::fixture::{decode, s1_document, s2_document};
+use super::fixture::{decode, document, layer, s1_document, s1_with_item, s2_document};
 use super::*;
 use crate::object_codec::encode_storage_project;
 use serde_json::{json, Value};
@@ -191,4 +191,53 @@ fn every_staged_operation_name_is_routed_and_unrelated_names_are_not() {
         place,
     );
     assert_eq!(reply["error"]["code"], "not_found");
+}
+
+#[test]
+fn an_effect_layer_and_a_layer_with_items_are_refused_in_typed_receipts_that_publish_nothing() {
+    let layers = [
+        layer("ly_fx", "Effects", &[]).with(json!({"isEffectLayer":true,"effects":[]})),
+        layer("ly_plain", "Plain", &[(0, "pa")]),
+    ];
+    let mut owner = owner(&document(&layers, json!({})));
+    let original = value(&owner);
+    for (id, uids) in [
+        ("fx", vec!["ly_fx"]),
+        ("fx-in-selection", vec!["ly_plain", "ly_fx"]),
+    ] {
+        let reply = send(&mut owner, id, CONVERT, convert(&uids));
+        assert_eq!(reply["ok"], false, "{id}");
+        assert_eq!(reply["error"]["code"], "invalid_request", "{id}");
+        assert_eq!(
+            reply["error"]["message"], "Impossible de convertir : un calque d'effet",
+            "{id}"
+        );
+    }
+    let mut owner_items = owner_for_items();
+    let original_items = value(&owner_items);
+    for (id, uids) in [
+        ("single", vec!["ly_hand"]),
+        ("merge", vec!["ly_other", "ly_hand"]),
+    ] {
+        let reply = send(&mut owner_items, id, CONVERT, convert(&uids));
+        assert_eq!(reply["ok"], false, "{id}");
+        assert_eq!(reply["error"]["code"], "unavailable", "{id}");
+        assert_eq!(
+            reply["error"]["message"],
+            "component-convert-items: raster and text items cannot enter a component yet.",
+            "{id}"
+        );
+    }
+    assert_eq!(value(&owner), original);
+    assert_eq!(value(&owner_items), original_items);
+    for held in [&owner, &owner_items] {
+        assert_eq!(
+            (held.content_revision(), held.history_depths()),
+            (0, (0, 0))
+        );
+    }
+}
+
+fn owner_for_items() -> NativeObjectHistory {
+    owner(&s1_with_item("ly_hand", 3))
 }

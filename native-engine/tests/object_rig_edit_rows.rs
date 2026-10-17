@@ -87,6 +87,39 @@ pub(crate) fn owner_for(row: &oracle::ActRow) -> NativeObjectHistory {
     owner_of_text(&text_for(row))
 }
 
+/// The owner holding the row's rig and strokes on a layer that also carries `members` (raw JSON members,
+/// e.g. `"locked":true` or `"pathFx":[{"type":"zigzag"}]`).
+pub(crate) fn owner_with_layer_members(row: &oracle::ActRow, members: &str) -> NativeObjectHistory {
+    let text = text_for(row);
+    let head = format!("{{\"layerUid\":\"{LAYER}\"");
+    let with = text.replacen(&head, &format!("{head},{members}"), 1);
+    assert_ne!(with, text, "the layer head was found");
+    owner_of_text(&with)
+}
+
+/// The owner holding the row's rig and strokes where stroke `stroke_id` (an open path, which is a vector
+/// record) is a pressure ribbon: its `vectorExt` carries the pressure fields.
+pub(crate) fn owner_with_ribbon(row: &oracle::ActRow, stroke_id: &str) -> NativeObjectHistory {
+    let records: Vec<Value> = row
+        .strokes
+        .as_array()
+        .expect("strokes")
+        .iter()
+        .map(|stroke| {
+            let mut one = record(stroke);
+            if stroke["id"] == stroke_id {
+                assert_eq!(
+                    one["family"], "editable-vector-path",
+                    "only a vector record is a ribbon"
+                );
+                one["vectorExt"] = json!({"pressure": {"strokeProfile": "even"}});
+            }
+            one
+        })
+        .collect();
+    owner_of_text(&doc_text(row.before, &records))
+}
+
 pub(crate) fn current(owner: &NativeObjectHistory) -> ObjectSnapshot {
     owner.acquire_snapshot(owner.content_revision()).unwrap()
 }

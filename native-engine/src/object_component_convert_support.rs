@@ -21,7 +21,7 @@ use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::{
     LayerEditPolicy, LayerOp, LifecycleError, PolicyRefusal, MAX_REVISION,
 };
 use crate::object_document::{
-    AuthoredOrder, ComponentTables, ObjectDocument, ObjectLayer, OrderLayer, Presence,
+    AuthoredOrder, ComponentTables, LayerRange, ObjectDocument, ObjectLayer, OrderLayer, Presence,
 };
 use serde_json::Number;
 use std::collections::HashSet;
@@ -99,6 +99,12 @@ pub(crate) enum SetupError {
     },
     /// Only authored-frame records can enter a component.
     ObjectScope {
+        layer_uid: String,
+    },
+    /// Raster items and text blocks of the layer: the baseline moves a raster with the frames it clones
+    /// into the component, but the component record has no `items` member and item admission resolves
+    /// layers of the scene only, so they cannot follow (stable code `component-convert-items`).
+    ItemsUnavailable {
         layer_uid: String,
     },
     DuplicateKey(String),
@@ -341,6 +347,50 @@ pub(crate) fn layer_index(document: &ObjectDocument, uid: &str) -> Result<usize,
         .iter()
         .position(|layer| layer.layer_uid == uid)
         .ok_or_else(|| SetupError::UnknownLayer(uid.to_string()))
+}
+
+/// Whether the scene layer holds raster items or text blocks (`document.items`).
+pub(crate) fn items_on(document: &ObjectDocument, uid: &str) -> bool {
+    document.item_records().is_some_and(|items| {
+        items
+            .targets()
+            .any(|target| target.layer_uid() == uid && target.context_id() == SCENE_CONTEXT)
+    })
+}
+
+/// A live edge: the baseline lifts `inPoint` / `outPoint` only when `!= null`.
+fn live_edge(edge: Presence<Option<i64>>) -> Presence<Option<i64>> {
+    match edge {
+        Presence::Present(Some(frame)) => Presence::Present(Some(frame)),
+        _ => Presence::Missing,
+    }
+}
+
+/// The `lifted` set of `convertLayersToComponent`: the FIRST source's in point, out point and time link
+/// move to the outer instance (only values that are not null / falsy; an explicit null is dropped) and
+/// leave inner layer 0, so the window applies once, outside. Markers are not lifted and stay inside. The
+/// instance gets no `range` when nothing was lifted, and inner layer 0 keeps none when nothing is left.
+pub(crate) fn lift_window(first: &mut ObjectLayer) -> Presence<LayerRange> {
+    let Presence::Present(range) = &mut first.range else {
+        return Presence::Missing;
+    };
+    let window = LayerRange {
+        in_point: live_edge(std::mem::take(&mut range.in_point)),
+        out_point: live_edge(std::mem::take(&mut range.out_point)),
+        time_link: match std::mem::take(&mut range.time_link) {
+            Presence::Present(Some(link)) => Presence::Present(Some(link)),
+            _ => Presence::Missing,
+        },
+        markers: Presence::Missing,
+    };
+    if range.markers.missing() {
+        first.range = Presence::Missing;
+    }
+    if window == LayerRange::default() {
+        Presence::Missing
+    } else {
+        Presence::Present(window)
+    }
 }
 
 /// Motion holders of a scene layer: `(layer level, per element)`.

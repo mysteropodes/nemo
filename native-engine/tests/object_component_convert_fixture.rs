@@ -199,7 +199,8 @@ pub(crate) fn s2_document() -> Value {
         layer("ly_x", "X", &[(0, "xa")]),
         layer("ly_a", "A", &[(0, "aa"), (0, "ab"), (6, "aa")]).with(
             json!({"groups":a_groups,"shy":true,"color":"#5FA875","folderId":"fold_1",
-                "pathFx":[{"type":"zigzag","enabled":true,"p1":10.0,"p2":2.0,"p3":0.0}]}),
+                "pathFx":[{"type":"zigzag","enabled":true,"p1":10.0,"p2":2.0,"p3":0.0}],
+                "rig":rig_for("aa")}),
         ),
         layer("ly_b", "B", &[(0, "ba"), (0, "bb")])
             .with(json!({"groups":b_groups,"locked":true,"visible":false,"color":"#5FA875"})),
@@ -226,8 +227,57 @@ pub(crate) fn s1_document(members: Value) -> Value {
             "Hand",
             &[(0, "sa"), (0, "sb"), (0, "sc"), (12, "sa"), (12, "sb")],
         )
-        .with(json!({"groups":groups})),
+        .with(json!({"groups":groups,"rig":rig_for("sa")})),
         layer("ly_other", "Other", &[(0, "oa")]),
     ];
     document(&layers, members)
+}
+
+/// A rig with one bone whose single bind drives `stroke` (oracle S1 binds `sa`, S2 binds `aa`).
+pub(crate) fn rig_for(stroke: &str) -> Value {
+    json!({"bones":{"bone1":{"segments":[{"point":[0,0]},{"point":[10,0]}],
+            "restSegments":[{"point":[0,0]},{"point":[10,0]}],"closed":false}},
+        "ikChains":{},"nextId":2,
+        "binds":[{"strokeId":stroke,"rest":[[0,0]],
+            "weights":[[{"boneId":"bone1","ptIndex":0,"w":1}]],"rotate":true}]})
+}
+
+/// One one-stroke layer per `(uid, name, stroke, range)`; a `null` range is no `range` member. The layers of
+/// oracle scenarios W1..W3 (`ly_x`, `ly_a`, ...), whose baseline rows read the time window around a conversion.
+/// Mounted by several parents; only the convert tests build windows.
+#[allow(dead_code)]
+pub(crate) fn windowed_document(
+    layers: &[(&'static str, &'static str, &'static str, Value)],
+) -> Value {
+    let built: Vec<Layer> = layers
+        .iter()
+        .map(|(uid, name, stroke, range)| {
+            let one = layer(uid, name, &[(0, *stroke)]);
+            if range.is_null() {
+                one
+            } else {
+                one.with(json!({ "range": range }))
+            }
+        })
+        .collect();
+    document(&built, json!({}))
+}
+
+/// A text block (an `items.text` entry, L06-L) on a scene layer at authored frame 0.
+pub(crate) fn text_item(layer_uid: &str) -> Value {
+    json!({"target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+            "layerUid":layer_uid,"strokeId":"t0"},
+        "block":{"text":"Hi","font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":48,
+            "color":"#112233","align":"left","anchorTopLeft":{"x":10,"y":20}}})
+}
+
+/// The S1 document with one text block on `layer_uid` (frame 0), covered by the order plan as a v2 file must.
+pub(crate) fn s1_with_item(layer_uid: &str, position: u32) -> Value {
+    let mut doc = s1_document(json!({"items":{"text":[text_item(layer_uid)]}}));
+    doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":layer_uid,"strokeId":"t0",
+            "naturalPosition":position,"order":{}}));
+    doc
 }

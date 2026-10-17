@@ -16,11 +16,12 @@
   const UNAVAILABLE = Object.freeze({ dragPose: 'rig_pose_drag_unavailable', dragIkEnd: 'rig_pose_drag_unavailable' });
   function unavailable(name) { return () => Promise.reject(Command.fault('unavailable', 'Native rig ' + name + ' is unavailable', { reason: UNAVAILABLE[name] })); }
 
-  // timeline.js btn-rig-auto-assign at the baseline: the panel fields to the arguments of the auto-assign.
+  // timeline.js btn-rig-auto-assign at the baseline: the panel fields to the options of `autoAssign`. The baseline's positional
+  // `radius` is the wire's `defaultRadius`; the result is passed to `autoAssign(layerUid, frame, options)` as it is.
   function autoAssignArgs(form) {
     const f = form || {};
     return {
-      radius: parseFloat(f.radius) || 200,
+      defaultRadius: parseFloat(f.radius) || 200,
       rotate: !!f.rotate,
       softness: (parseFloat(f.softness) || 0) / 100,
       paths: !f.driveShapes || f.driveShapes.checked,

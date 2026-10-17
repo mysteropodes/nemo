@@ -240,3 +240,151 @@ fn the_oracle_discriminates_the_flaws_the_rows_exist_for() {
         }
     }
 }
+
+fn outcome(reply: &Value) -> String {
+    if reply["ok"] == true {
+        "ok".to_owned()
+    } else {
+        code(reply).to_owned()
+    }
+}
+
+/// The rig edit kinds whose weights come from the evaluation kernels: without that feature they are
+/// `unavailable` whatever the layer is, so only the other kinds can show a lock refusal by themselves.
+const KERNEL_BACKED: [&str; 5] = [
+    "bindStroke",
+    "autoAssign",
+    "resetWeights",
+    "addWeight",
+    "setIk",
+];
+
+#[test]
+fn a_locked_layer_refuses_every_kind_of_rig_edit_and_publishes_nothing() {
+    let kinds = [
+        "drawBone",
+        "moveSegment",
+        "setBoneRadius",
+        "bindStroke",
+        "autoAssign",
+        "setWeight",
+        "addWeight",
+        "removeWeight",
+        "resetWeights",
+        "setIk",
+    ];
+    for kind in kinds {
+        let row = oracle::of_kind(kind)
+            .into_iter()
+            .find(|row| row.ret != json!(false))
+            .unwrap_or_else(|| panic!("no accepted {kind} row"));
+        let id = format!("{kind}-{}", row.name);
+        // Control: the same request on the unlocked document is accepted (kernel-backed kinds need the
+        // evaluation feature to be accepted at all).
+        if cfg!(feature = "evaluation") || !KERNEL_BACKED.contains(&kind) {
+            let mut open = owner_for(&row);
+            let reply = run(&mut open, &id, payload(row.action.clone()));
+            assert_eq!(outcome(&reply), "ok", "control {id}: {reply}");
+        }
+        let mut locked = owner_with_layer_members(&row, "\"locked\":true");
+        let before = state(&locked);
+        let reply = run(&mut locked, &id, payload(row.action.clone()));
+        assert_eq!(outcome(&reply), "unavailable", "{id}: {reply}");
+        assert_eq!(state(&locked), before, "{id}: nothing was published");
+    }
+    // The kinds the baseline has no button for, on a rigged and bound layer.
+    let row = oracle::act("set_weight_40");
+    for (name, action) in [
+        ("bindMesh", json!({"kind":"bindMesh","meshId":"im_1"})),
+        ("removeIk", json!({"kind":"removeIk","endKey":"bone2:1"})),
+        ("removeBone", json!({"kind":"removeBone","boneId":"bone2"})),
+        (
+            "removeBind",
+            json!({"kind":"removeBind","target":{"strokeId":"s1"}}),
+        ),
+    ] {
+        if name != "bindMesh" {
+            // Control: unlocked, none of them is `unavailable` (a missing chain or a still-weighted bone is a
+            // different refusal; removing the bind succeeds).
+            let mut open = owner_for(&row);
+            let reply = run(&mut open, name, payload(action.clone()));
+            assert_ne!(outcome(&reply), "unavailable", "control {name}: {reply}");
+        }
+        let mut locked = owner_with_layer_members(&row, "\"locked\":true");
+        let before = state(&locked);
+        let reply = run(&mut locked, name, payload(action));
+        assert_eq!(outcome(&reply), "unavailable", "{name}: {reply}");
+        assert_eq!(state(&locked), before, "{name}");
+    }
+}
+
+#[cfg(feature = "evaluation")]
+#[test]
+fn auto_assign_refuses_an_active_path_effect_and_no_other_rig_edit_does() {
+    let auto = oracle::act("auto_two_strokes_default_radius");
+    let mv = oracle::act("move_an_anchor");
+    let active = [
+        json!([{"type": "zigzag"}]),
+        json!([{"type": "roughen", "enabled": true}]),
+        json!([{"type": "zigzag", "enabled": false}, {"type": "roughen"}]),
+    ];
+    for (index, stack) in active.into_iter().enumerate() {
+        let members = format!("\"pathFx\":{stack}");
+        let mut owner = owner_with_layer_members(&auto, &members);
+        let before = state(&owner);
+        let reply = run(
+            &mut owner,
+            &format!("auto{index}"),
+            payload(auto.action.clone()),
+        );
+        assert_eq!(outcome(&reply), "unavailable", "{stack}: {reply}");
+        assert_eq!(state(&owner), before, "{stack}");
+        // The baseline gates only the auto-assign button: moving a bone is not a drawing edit.
+        let mut moving = owner_with_layer_members(&mv, &members);
+        let reply = run(
+            &mut moving,
+            &format!("move{index}"),
+            payload(mv.action.clone()),
+        );
+        assert_eq!(outcome(&reply), "ok", "{stack}: {reply}");
+    }
+    // A stack with nothing active (empty, or every entry disabled) never blocks.
+    for (index, stack) in [json!([]), json!([{"type": "zigzag", "enabled": false}])]
+        .into_iter()
+        .enumerate()
+    {
+        let mut owner = owner_with_layer_members(&auto, &format!("\"pathFx\":{stack}"));
+        let reply = run(
+            &mut owner,
+            &format!("quiet{index}"),
+            payload(auto.action.clone()),
+        );
+        assert_eq!(outcome(&reply), "ok", "{stack}: {reply}");
+    }
+}
+
+#[cfg(feature = "evaluation")]
+#[test]
+fn a_pressure_ribbon_is_never_bound_and_the_refusal_publishes_nothing() {
+    // `s3` of this row is an open path, i.e. an `editable-vector-path` record that can be a ribbon.
+    let bind = oracle::act("bind_an_open_path");
+    let auto = json!({"kind": "autoAssign", "frame": 0});
+    let radius = json!({"kind": "setBoneRadius", "boneId": "bone1", "radius": 50});
+    // Control: the plain stroke binds, by hand and by auto-assign.
+    for (id, action) in [("bind", bind.action.clone()), ("auto", auto.clone())] {
+        let mut plain = owner_for(&bind);
+        let reply = run(&mut plain, id, payload(action));
+        assert_eq!(outcome(&reply), "ok", "control {id}: {reply}");
+    }
+    for (id, action) in [("bind", bind.action.clone()), ("auto", auto)] {
+        let mut owner = owner_with_ribbon(&bind, "s3");
+        let before = state(&owner);
+        let reply = run(&mut owner, id, payload(action));
+        assert_eq!(outcome(&reply), "unavailable", "{id}: {reply}");
+        assert_eq!(state(&owner), before, "{id}: nothing was published");
+    }
+    // The ribbon does not stop edits that do not bind it.
+    let mut owner = owner_with_ribbon(&bind, "s3");
+    let reply = run(&mut owner, "radius", payload(radius));
+    assert_eq!(outcome(&reply), "ok", "{reply}");
+}

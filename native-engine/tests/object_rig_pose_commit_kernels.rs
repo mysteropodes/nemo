@@ -367,3 +367,33 @@ fn the_same_commit_twice_gives_bit_identical_documents() {
     };
     assert_eq!(run_once(), run_once());
 }
+
+#[test]
+fn a_bound_pressure_ribbon_refuses_the_commit_and_publishes_nothing() {
+    // `o1` is an open path, i.e. a vector record that can be a ribbon. The baseline poses its centreline too;
+    // writing only the outline would leave the centreline and width profile at rest.
+    let row = oracle::row("open_path_bind_rotate");
+    assert!(row.commits_natively(), "the plain stroke commits");
+    let mut plain = owner_for(&row, HELD);
+    run_ok(&mut plain, "plain", commit_payload(HELD_FRAME));
+    let mut doc = doc_for(&row, HELD);
+    let ribbon = doc["objects"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|record| record["target"]["strokeId"] == "o1")
+        .expect("the open stroke");
+    assert_eq!(ribbon["family"], "editable-vector-path");
+    ribbon["vectorExt"] = json!({"pressure": {"strokeProfile": "even"}});
+    let mut owner = owner_of(&doc);
+    let before = state(&owner);
+    assert_refused(
+        &mut owner,
+        "ribbon",
+        commit_payload(HELD_FRAME),
+        ("unavailable", "pressure_ribbon_unavailable"),
+    );
+    assert_eq!(state(&owner), before, "no promotion, no pose, no history");
+    // A reset writes no geometry, so a ribbon does not stop it.
+    run_ok(&mut owner, "reset", reset_payload());
+}

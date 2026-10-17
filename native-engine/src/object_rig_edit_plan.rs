@@ -13,7 +13,10 @@
 //! bone, in layer order, with the radius grown to the farthest vertex of any path from any bone
 //! without a radius of its own; a CompoundPath is skipped and counted (`skippedUnsupported`). A
 //! record of any object family other than the two cubic-path families is the native equivalent of
-//! that unsupported target and is skipped and counted the same way.
+//! that unsupported target and is skipped and counted the same way. A pressure ribbon (the baseline
+//! vector brush) is NOT skipped: the baseline binds and poses it, centreline included, which the commit
+//! cannot do yet, so binding one is the typed `PressureRibbon` refusal for `bindStroke` and for an
+//! `autoAssign` pass that meets one, never a bind whose centreline would silently stay at rest.
 use crate::object_document::object_rig_record::{
     BindTarget, RigBind, RigPair, RigRecord, RigSegment, PATH_FAMILIES,
 };
@@ -37,6 +40,9 @@ pub(crate) enum PlanRefusal {
     UnknownBone,
     DuplicateBone,
     UnsupportedFamily,
+    /// A pressure ribbon: a bind poses `geometry.segments` only, so its centreline and width profile would go
+    /// stale at the first commit (the same reason L01-G refuses a ribbon).
+    PressureRibbon,
     EmptyStroke,
     BadVertex,
     Kernel(KernelRefusal),
@@ -49,7 +55,9 @@ impl PlanRefusal {
             Self::NoLayer | Self::NoRig | Self::NoStroke | Self::NoBind | Self::NoBone => {
                 DispatchErrorCode::NotFound
             }
-            Self::Kernel(KernelRefusal::Unavailable) => DispatchErrorCode::Unavailable,
+            Self::Kernel(KernelRefusal::Unavailable) | Self::PressureRibbon => {
+                DispatchErrorCode::Unavailable
+            }
             Self::AmbiguousBind
             | Self::UnknownBone
             | Self::DuplicateBone
@@ -230,6 +238,9 @@ fn bind_for(
 ) -> Result<PlannedBind, PlanRefusal> {
     if !PATH_FAMILIES.contains(&record.family.as_str()) {
         return Err(PlanRefusal::UnsupportedFamily);
+    }
+    if record.is_pressure_ribbon() {
+        return Err(PlanRefusal::PressureRibbon);
     }
     let segments = &record.geometry.segments;
     if segments.is_empty() {

@@ -32,13 +32,17 @@
 //! 1e9 in magnitude; ids and counts are bounded; a bone needs two vertices (the baseline silently
 //! stores nothing); an unknown bone in `boneIds` or a vertex past the bind is refused (the baseline
 //! skips it silently); an absent rig is created only by `drawBone` (the baseline creates an empty one
-//! in every call); the legacy window switch `SM_RIG_CONTROL_POINT_WEIGHTS` is not modelled.
+//! in every call); the legacy window switch `SM_RIG_CONTROL_POINT_WEIGHTS` is not modelled; a locked
+//! layer refuses EVERY action (`Unavailable`, as each sibling Drawing writer does; the baseline gates only
+//! the auto-assign button) and `autoAssign` also refuses an active path effect (`canEditActiveLayer`); a
+//! pressure ribbon cannot be bound (`Unavailable`: the pose commit would leave its centreline at rest).
 //!
 //! Not provided: pose evaluation, IK dragging, reset/commit pose, mesh binds, selection, the locked-layer
 //! gesture escape (F06), the scene/export join and the JS adapter.
+use crate::commands::object_fill_owner::path_effects_edit::layer_has_active_path_fx;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_rig_record::{BindTarget, RigRecord, RigSegment};
-use crate::object_document::{ObjectDocument, Presence};
+use crate::object_document::{ObjectDocument, ObjectLayer, Presence};
 use crate::object_snapshot::object_rig_edit_read::KernelRef;
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -193,6 +197,21 @@ impl PreparedRigEdit {
     }
 }
 
+/// The Drawing guard of every sibling writer (`check_drawing_layer`): a rig edit writes the layer's
+/// drawing data, so a locked layer refuses all of them (F06), and `autoAssign` also refuses an active
+/// path effect (`rigAutoAssignLayer` runs behind `canEditActiveLayer` -> `editRefusalReason`: what is on
+/// screen is the deformed geometry, so weights computed from the stored points would belong to a shape
+/// nobody sees). A refusal is the typed `Unavailable`; nothing is published.
+fn check_layer(layer: &ObjectLayer, action: &RigAction) -> Result<(), DispatchErrorCode> {
+    if layer.locked() {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    if matches!(action, RigAction::AutoAssign { .. }) && layer_has_active_path_fx(layer) {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    Ok(())
+}
+
 /// Builds the proposed rig of `layer_uid` (and the summary) without touching the document.
 fn apply(
     document: &ObjectDocument,
@@ -328,6 +347,7 @@ impl ObjectFillOwner {
             .iter()
             .find(|layer| layer.layer_uid() == layer_uid)
             .ok_or(DispatchErrorCode::NotFound)?;
+        check_layer(layer, &action)?;
         let (rig, summary) = apply(document, &layer_uid, layer.rig(), &action)?;
         let mut candidate = document.clone();
         if layer.rig() != Some(&rig) {

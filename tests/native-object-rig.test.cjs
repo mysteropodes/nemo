@@ -79,9 +79,11 @@ test('the Auto-assign panel arguments are the baseline ones (oracle rows)', () =
   assert.equal(rules.autoAssign.length, 6);
   for (const row of rules.autoAssign) {
     const form = { radius: row.form.radius, rotate: row.form.rotate, softness: row.form.softness, driveShapes: row.form.shapes, driveMeshes: row.form.meshes };
-    assert.deepEqual(Rig.autoAssignArgs(form), row.args, JSON.stringify(row.form));
+    // The baseline's positional `radius` argument is the wire option `defaultRadius`; every other field keeps its name.
+    const { radius, ...rest } = row.args;
+    assert.deepEqual(Rig.autoAssignArgs(form), { defaultRadius: radius, ...rest }, JSON.stringify(row.form));
   }
-  assert.deepEqual(Rig.autoAssignArgs(), { radius: 200, rotate: false, softness: 0, paths: true, meshes: true });
+  assert.deepEqual(Rig.autoAssignArgs(), { defaultRadius: 200, rotate: false, softness: 0, paths: true, meshes: true });
 });
 
 test('the IK chain key and the flip coercion are the baseline ones (oracle rows)', async () => {
@@ -99,7 +101,8 @@ test('the IK chain key and the flip coercion are the baseline ones (oracle rows)
 test('panel arguments flow into one auto-assign request', async () => {
   const fx = createFixture({});
   const args = Rig.autoAssignArgs({ radius: '150', rotate: true, softness: '40', driveShapes: { checked: true }, driveMeshes: { checked: false } });
-  await Rig.create(fx.session).autoAssign(L, 0, { defaultRadius: args.radius, rotate: args.rotate, softness: args.softness, paths: args.paths, meshes: args.meshes });
+  // The arguments go to `autoAssign` as they are: the panel radius must reach the wire as `defaultRadius` (it was dropped).
+  await Rig.create(fx.session).autoAssign(L, 0, args);
   assert.deepEqual(fx.owner.log.received[0].payload.action, { kind: 'autoAssign', frame: 0, defaultRadius: 150, rotate: true, softness: 0.4, paths: true, meshes: false });
 });
 

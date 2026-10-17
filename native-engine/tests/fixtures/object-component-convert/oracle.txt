@@ -179,6 +179,45 @@ S2.sb.modules|[{"id":"sbm1","type":"instance","x":40,"y":40},{"id":"sbm2","type"
 S2.sb.lastModule|{"id":"sbm8","type":"instance","x":180,"y":200}
 S2.sb.moduleCount|8
 S2.sb.lastModuleSymbolIsInstanceSymbol|true
+# W1: convertLayersToComponent([1,2,3]); the first source A carries a full window
+W1.sym.l0.inPoint|null
+W1.sym.l0.outPoint|null
+W1.sym.l0.timeLink|null
+W1.sym.l0.markers|[{"frame":2,"name":"m","color":"#112233"}]
+W1.sym.l1.inPoint|6
+W1.sym.l1.outPoint|0
+W1.sym.l1.timeLink|null
+W1.sym.l1.markers|[{"frame":5}]
+W1.sym.l2.inPoint|null
+W1.sym.l2.outPoint|null
+W1.sym.l2.timeLink|{"uid":"ly_a","mode":"out","srcAnchor":"in"}
+W1.sym.l2.markers|null
+W1.inst.inPoint|4
+W1.inst.outPoint|18
+W1.inst.timeLink|{"uid":"ly_x","mode":"in"}
+W1.inst.markers|null
+# W2: the first source carries explicit nulls and an empty marker list: nothing but the zero out point lifts
+W2.sym.l0.inPoint|null
+W2.sym.l0.outPoint|null
+W2.sym.l0.timeLink|null
+W2.sym.l0.markers|[]
+W2.sym.l1.inPoint|null
+W2.sym.l1.outPoint|null
+W2.sym.l1.timeLink|null
+W2.sym.l1.markers|null
+W2.inst.inPoint|null
+W2.inst.outPoint|0
+W2.inst.timeLink|null
+W2.inst.markers|null
+# W3: convertLayerToComponent(1); the layer stays the instance and keeps its window, the inner layer has none
+W3.sym.l0.inPoint|null
+W3.sym.l0.outPoint|null
+W3.sym.l0.timeLink|null
+W3.sym.l0.markers|null
+W3.inst.inPoint|4
+W3.inst.outPoint|18
+W3.inst.timeLink|{"uid":"ly_x","mode":"in"}
+W3.inst.markers|[{"frame":2,"name":"m"}]
 # P: placeComponentInstance(symId, name) on a document with 3 layers
 P.index|3
 P.layerCount|4

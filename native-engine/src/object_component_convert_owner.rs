@@ -92,6 +92,10 @@ fn refusal_of(error: SetupError) -> SetupRefusal {
             "Per-element Motion cannot follow its shapes into a component yet.",
         ),
         SetupError::ObjectScope { .. } => (Unavailable, "Only authored frames can be converted."),
+        SetupError::ItemsUnavailable { .. } => (
+            Unavailable,
+            "component-convert-items: raster and text items cannot enter a component yet.",
+        ),
         SetupError::RevisionOutOfRange | SetupError::IdUnavailable | SetupError::TooMany => {
             (Unavailable, "No identity is available for the new record.")
         }

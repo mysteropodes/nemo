@@ -3,9 +3,9 @@
 //! JavaScript, never a value read back from the code under test.
 use super::fixture::{
     convert_oracle, decode, document, duplicator_table, layer, s1_document, s2_document, uids,
-    wire, CONVERT_ORACLE,
+    windowed_document, wire, CONVERT_ORACLE,
 };
-use super::verify::verify;
+use super::verify::{verify, verify_window};
 use super::*;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -43,7 +43,7 @@ fn positions(after: &Value) -> BTreeMap<String, u64> {
 #[test]
 fn the_oracle_is_pinned_to_the_baseline_commit_and_its_row_count() {
     assert!(CONVERT_ORACLE.contains("fbe4b8a33e6d5a229f014154df2ba21988a9fabc"));
-    assert_eq!(convert_oracle().rows(), 208);
+    assert_eq!(convert_oracle().rows(), 244);
 }
 
 #[test]
@@ -265,4 +265,223 @@ fn merged_groups_stay_per_layer_with_their_original_ids() {
     assert_eq!(layers[0]["groups"]["entries"][0]["gid"], "g1");
     assert_eq!(layers[1]["groups"]["entries"][0]["gid"], "g1");
     assert_eq!(layers[2].get("groups"), None);
+}
+
+#[test]
+fn the_rig_moves_inside_with_its_strokes_and_leaves_the_instance_without_one() {
+    // Oracle S1 (`cloneRigForSymbol` + `delete ld.rig`): `sym.l0.rigPresent` true, `rigBindStrokes` ["sa"],
+    // `inst.rigPresent` false. `verify` reads those rows; the fixture's layer is the rigged one.
+    let o = convert_oracle();
+    let doc = decode(&s1_document(json!({})));
+    assert!(
+        doc.layers()[0].rig().is_some(),
+        "the source layer is rigged"
+    );
+    let after = wire(&plan_convert(&doc, 1, &uids(&["ly_hand"])).unwrap().document);
+    verify(&after, FIRST_SYMBOL, "S1", &o).unwrap();
+    assert!(after["layers"][0].get("rig").is_none(), "no dangling rig");
+    let inner = &after["componentTables"]["components"]["components"][0]["layers"][0];
+    assert_eq!(inner["rig"], wire(&doc)["layers"][0]["rig"], "moved whole");
+    // The binds name strokes that exist inside, none are left on the scene layer.
+    assert_eq!(inner["rig"]["binds"][0]["strokeId"], "sa");
+    let inside: Vec<&str> = after["componentTables"]["components"]["components"][0]["objects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["target"]["strokeId"].as_str().unwrap())
+        .collect();
+    assert!(inside.contains(&"sa"));
+    // A layer that never had a rig gets none, and an empty rig moves as an empty rig (a truthy `{}` in JS).
+    let bare = decode(&document(&[layer("a", "A", &[(0, "x")])], json!({})));
+    let plain = wire(&plan_convert(&bare, 1, &uids(&["a"])).unwrap().document);
+    assert!(
+        plain["componentTables"]["components"]["components"][0]["layers"][0]
+            .get("rig")
+            .is_none()
+    );
+    let mut empty = document(&[layer("a", "A", &[(0, "x")])], json!({}));
+    empty["layers"][0]["rig"] = json!({"bones":{},"ikChains":{},"nextId":1,"binds":[]});
+    let moved = wire(
+        &plan_convert(&decode(&empty), 1, &uids(&["a"]))
+            .unwrap()
+            .document,
+    );
+    assert_eq!(
+        moved["componentTables"]["components"]["components"][0]["layers"][0]["rig"],
+        empty["layers"][0]["rig"]
+    );
+    assert!(moved["layers"][0].get("rig").is_none());
+}
+
+#[test]
+fn a_merge_keeps_each_rig_with_its_inner_layer_and_gives_the_instance_none() {
+    // Oracle S2: only layer A is rigged (`sym.l0.rigBindStrokes` ["aa"]); B and C have none; `inst` none.
+    let o = convert_oracle();
+    let after = wire(
+        &plan_convert(&decode(&s2_document()), 5, &uids(&["ly_a", "ly_b", "ly_c"]))
+            .unwrap()
+            .document,
+    );
+    verify(&after, "native-component:5:0", "S2", &o).unwrap();
+    let inner = &after["componentTables"]["components"]["components"][7]["layers"];
+    assert!(inner[0].get("rig").is_some());
+    assert!(inner[1].get("rig").is_none() && inner[2].get("rig").is_none());
+    assert!(after["layers"][1].get("rig").is_none(), "the new instance");
+}
+
+#[test]
+fn the_time_window_travels_like_the_baseline_rows() {
+    let o = convert_oracle();
+    let full = json!({"inPoint":4,"outPoint":18,"timeLink":{"uid":"ly_x","mode":"in"},
+        "markers":[{"frame":2,"name":"m","color":"#112233"}]});
+    // W1: the first source's window moves to the instance, its markers stay inside, the others keep theirs.
+    let w1 = windowed_document(&[
+        ("ly_x", "X", "xa", Value::Null),
+        ("ly_a", "A", "aa", full.clone()),
+        (
+            "ly_b",
+            "B",
+            "ba",
+            json!({"inPoint":6,"outPoint":0,"markers":[{"frame":5}]}),
+        ),
+        (
+            "ly_c",
+            "C",
+            "ca",
+            json!({"timeLink":{"uid":"ly_a","mode":"out","srcAnchor":"in"}}),
+        ),
+        ("ly_y", "Y", "ya", Value::Null),
+    ]);
+    let plan = plan_convert(&decode(&w1), 5, &uids(&["ly_a", "ly_b", "ly_c"])).unwrap();
+    let after = wire(&plan.document);
+    verify_window(&after, "native-component:5:0", "W1", &o).unwrap();
+    assert_eq!(
+        after["layers"][1]["range"],
+        json!({"inPoint":4,"outPoint":18,"timeLink":{"uid":"ly_x","mode":"in"}})
+    );
+    assert_eq!(decode(&after), plan.document, "storage round trip");
+    // W2: explicit nulls are not lifted (and not kept); a zero out point is; an empty marker list stays inside.
+    let w2 = windowed_document(&[
+        ("ly_x", "X", "xa", Value::Null),
+        (
+            "ly_a",
+            "A",
+            "aa",
+            json!({"inPoint":null,"outPoint":0,"timeLink":null,"markers":[]}),
+        ),
+        ("ly_b", "B", "ba", json!({"inPoint":null,"timeLink":null})),
+    ]);
+    let after = wire(
+        &plan_convert(&decode(&w2), 5, &uids(&["ly_a", "ly_b"]))
+            .unwrap()
+            .document,
+    );
+    verify_window(&after, "native-component:5:0", "W2", &o).unwrap();
+    assert_eq!(after["layers"][1]["range"], json!({"outPoint":0}));
+    // W3: one layer stays the instance and keeps its window; the inner layer has none.
+    let w3 = windowed_document(&[
+        ("ly_x", "X", "xa", Value::Null),
+        (
+            "ly_a",
+            "A",
+            "aa",
+            json!({"inPoint":4,"outPoint":18,
+            "timeLink":{"uid":"ly_x","mode":"in"},"markers":[{"frame":2,"name":"m"}]}),
+        ),
+    ]);
+    let after = wire(
+        &plan_convert(&decode(&w3), 1, &uids(&["ly_a"]))
+            .unwrap()
+            .document,
+    );
+    verify_window(&after, FIRST_SYMBOL, "W3", &o).unwrap();
+    // No first-source window, no instance range: a layer without any `range` gets none.
+    let none = windowed_document(&[
+        ("ly_a", "A", "aa", Value::Null),
+        ("ly_b", "B", "ba", json!({"inPoint":3})),
+    ]);
+    let after = wire(
+        &plan_convert(&decode(&none), 5, &uids(&["ly_a", "ly_b"]))
+            .unwrap()
+            .document,
+    );
+    assert!(after["layers"][0].get("range").is_none());
+}
+
+#[test]
+fn an_effect_layer_is_refused_alone_and_inside_a_selection_with_the_baseline_reason() {
+    let o = convert_oracle();
+    let doc = decode(&document(
+        &[
+            layer("ly_fx", "Effects", &[]).with(json!({"isEffectLayer":true,"effects":[]})),
+            layer("ly_plain", "Plain", &[(0, "pa")]),
+        ],
+        json!({}),
+    ));
+    assert!(facts_from_document(&doc, &doc.layers()[0]).effect_layer);
+    assert!(!facts_from_document(&doc, &doc.layers()[1]).effect_layer);
+    let want = SetupError::BadSource {
+        layer_uid: "ly_fx".into(),
+        refusal: SourceRefusal::Effect,
+    };
+    assert_eq!(plan_convert(&doc, 1, &uids(&["ly_fx"])).unwrap_err(), want);
+    assert_eq!(
+        plan_convert(&doc, 1, &uids(&["ly_plain", "ly_fx"])).unwrap_err(),
+        want
+    );
+    assert_eq!(SourceRefusal::Effect.reason(), o.text("R.isEffectLayer"));
+    assert!(
+        plan_convert(&doc, 1, &uids(&["ly_plain"])).is_ok(),
+        "control"
+    );
+}
+
+#[cfg(feature = "evaluation")]
+#[test]
+fn the_lifted_window_gates_the_root_frame_packet_so_a_merged_block_is_never_painted_unwindowed() {
+    use crate::object_document::FrameScopeKind;
+    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameError, ObjectFrameSelector};
+    use crate::object_snapshot::ObjectSnapshot;
+    // Three layers, A and B merged; `a` and `b` are the ranges of A (the first source) and B.
+    let packet = |a: Value, b: Value| {
+        let doc = windowed_document(&[
+            ("ly_x", "X", "xa", Value::Null),
+            ("ly_a", "A", "aa", a),
+            ("ly_b", "B", "ba", b),
+        ]);
+        let plan = plan_convert(&decode(&doc), 5, &uids(&["ly_a", "ly_b"])).unwrap();
+        let snapshot = ObjectSnapshot::new("convert-packet", plan.document).unwrap();
+        let selector = ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "scene-root",
+            scope_kind: FrameScopeKind::Authored,
+            frame: 0,
+        };
+        prepare_object_frame(&snapshot, &selector).map(|_| ())
+    };
+    // Control: a block with no window is an ordinary packet.
+    assert_eq!(packet(Value::Null, Value::Null), Ok(()));
+    // The first source's window now sits on the instance, where the packet gate looks for it. Before the
+    // lift it was copied into the component and the block was painted on every frame.
+    for range in [
+        json!({"inPoint":4}),
+        json!({"outPoint":0}),
+        json!({"timeLink":{"uid":"ly_x"}}),
+    ] {
+        assert_eq!(
+            packet(range.clone(), Value::Null),
+            Err(ObjectFrameError::Unavailable),
+            "{range}"
+        );
+    }
+    // Markers never gate; another source's window stays inside (the placed view ignores it, as the baseline
+    // does, and the entered view refuses it).
+    assert_eq!(
+        packet(json!({"markers":[{"frame":2}]}), Value::Null),
+        Ok(())
+    );
+    assert_eq!(packet(Value::Null, json!({"inPoint":4})), Ok(()));
 }

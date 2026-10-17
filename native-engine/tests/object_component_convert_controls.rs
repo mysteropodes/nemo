@@ -2,9 +2,10 @@
 //! oracle check must notice every single deviation, and every refusal must be the
 //! typed reason of its own rule, leaving the input document untouched.
 use super::fixture::{
-    convert_oracle, decode, document, layer, s1_document, s2_document, uids, wire,
+    convert_oracle, decode, document, layer, s1_document, s1_with_item, s2_document, text_item,
+    uids, windowed_document, wire,
 };
-use super::verify::verify;
+use super::verify::{verify, verify_window};
 use super::*;
 use crate::commands::object_fill_owner::component_owner::object_component_place::plan_place;
 use serde_json::{json, Value};
@@ -50,7 +51,7 @@ fn the_unmutated_conversions_pass_the_check() {
 #[test]
 fn every_single_deviation_of_a_single_conversion_is_noticed() {
     let o = convert_oracle();
-    let mutations: [Mutation; 20] = [
+    let mutations: [Mutation; 23] = [
         ("play mode", |v| inst(v)["symPlayMode"] = json!("loop")),
         ("speed", |v| inst(v)["symSpeed"] = json!(2)),
         ("placed at", |v| inst(v)["symPlacedAt"] = json!(4)),
@@ -107,6 +108,16 @@ fn every_single_deviation_of_a_single_conversion_is_noticed() {
         ("module slot", |v| {
             v["componentTables"]["storyboard"]["modules"][0]["x"] = json!(0)
         }),
+        ("rig left on the instance", |v| {
+            let rig = comp(v)["layers"][0]["rig"].clone();
+            v["layers"][0]["rig"] = rig;
+        }),
+        ("rig lost", |v| {
+            comp(v)["layers"][0].as_object_mut().unwrap().remove("rig");
+        }),
+        ("rig bind retargeted", |v| {
+            comp(v)["layers"][0]["rig"]["binds"][0]["strokeId"] = json!("zz")
+        }),
     ];
     for (name, mutate) in mutations {
         let mut v = s1_after();
@@ -121,7 +132,7 @@ fn every_single_deviation_of_a_single_conversion_is_noticed() {
 #[test]
 fn every_single_deviation_of_a_merge_is_noticed() {
     let o = convert_oracle();
-    let mutations: [Mutation; 10] = [
+    let mutations: [Mutation; 12] = [
         ("block not collapsed", |v| {
             let l = v["layers"][1].clone();
             v["layers"].as_array_mut().unwrap().push(l);
@@ -155,6 +166,13 @@ fn every_single_deviation_of_a_merge_is_noticed() {
                 .as_object_mut()
                 .unwrap()
                 .remove("pathFx");
+        }),
+        ("rig dropped from its inner layer", |v| {
+            comp(v)["layers"][0].as_object_mut().unwrap().remove("rig");
+        }),
+        ("rig left on the new instance", |v| {
+            let rig = comp(v)["layers"][0]["rig"].clone();
+            v["layers"][1]["rig"] = rig;
         }),
     ];
     for (name, mutate) in mutations {
@@ -329,4 +347,118 @@ fn a_merged_effector_layer_leaves_no_record_and_other_effectors_stay() {
     assert_eq!(records.len(), 1, "the merged layer's record is gone");
     assert_eq!(records[0]["layerUid"], "ly_y");
     assert_eq!(table["duplicators"][0]["layerUid"], "native-layer:5:0");
+}
+
+fn w1_after() -> Value {
+    let full = json!({"inPoint":4,"outPoint":18,"timeLink":{"uid":"ly_x","mode":"in"},
+        "markers":[{"frame":2,"name":"m","color":"#112233"}]});
+    let doc = windowed_document(&[
+        ("ly_x", "X", "xa", Value::Null),
+        ("ly_a", "A", "aa", full),
+        (
+            "ly_b",
+            "B",
+            "ba",
+            json!({"inPoint":6,"outPoint":0,"markers":[{"frame":5}]}),
+        ),
+        (
+            "ly_c",
+            "C",
+            "ca",
+            json!({"timeLink":{"uid":"ly_a","mode":"out","srcAnchor":"in"}}),
+        ),
+    ]);
+    wire(
+        &plan_convert(&decode(&doc), 5, &uids(&["ly_a", "ly_b", "ly_c"]))
+            .unwrap()
+            .document,
+    )
+}
+
+#[test]
+fn every_single_deviation_of_the_time_window_is_noticed() {
+    let o = convert_oracle();
+    verify_window(&w1_after(), S2_SYMBOL, "W1", &o).unwrap();
+    let mutations: [Mutation; 7] = [
+        ("window left on inner layer 0", |v| {
+            comp(v)["layers"][0]["range"]["inPoint"] = json!(4)
+        }),
+        ("link left on inner layer 0", |v| {
+            comp(v)["layers"][0]["range"]["timeLink"] = json!({"uid":"ly_x","mode":"in"})
+        }),
+        ("window not lifted", |v| {
+            v["layers"][1].as_object_mut().unwrap().remove("range");
+        }),
+        ("lifted link lost", |v| {
+            v["layers"][1]["range"]
+                .as_object_mut()
+                .unwrap()
+                .remove("timeLink");
+        }),
+        ("markers lifted to the instance", |v| {
+            v["layers"][1]["range"]["markers"] = json!([{"frame":2}])
+        }),
+        ("markers lost inside", |v| {
+            comp(v)["layers"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("range");
+        }),
+        ("another source's window dropped", |v| {
+            comp(v)["layers"][1]
+                .as_object_mut()
+                .unwrap()
+                .remove("range");
+        }),
+    ];
+    for (name, mutate) in mutations {
+        let mut v = w1_after();
+        mutate(&mut v);
+        assert!(
+            verify_window(&v, S2_SYMBOL, "W1", &o).is_err(),
+            "{name} went unnoticed"
+        );
+    }
+}
+
+#[test]
+fn items_that_cannot_enter_a_component_refuse_the_conversion_never_stay_behind() {
+    // Raster items and text blocks live in `items`, which the component record has no member for.
+    let doc = decode(&s1_with_item("ly_hand", 3));
+    assert!(
+        doc.item_records().is_some(),
+        "the fixture really holds an item"
+    );
+    let want = SetupError::ItemsUnavailable {
+        layer_uid: "ly_hand".into(),
+    };
+    assert_eq!(
+        plan_convert(&doc, 1, &uids(&["ly_hand"])).unwrap_err(),
+        want
+    );
+    assert_eq!(
+        plan_convert(&doc, 1, &uids(&["ly_other", "ly_hand"])).unwrap_err(),
+        want,
+        "a merge refuses the same way"
+    );
+    // An item on a layer that stays out of the selection is not in the way.
+    let elsewhere = decode(&s1_with_item("ly_other", 1));
+    assert!(plan_convert(&elsewhere, 1, &uids(&["ly_hand"])).is_ok());
+    // The baseline reasons win over the items refusal.
+    let layers = [
+        layer("ly_item", "Item", &[(0, "ia")]),
+        layer("ly_fx", "Fx", &[]).with(json!({"isEffectLayer":true,"effects":[]})),
+    ];
+    let mut mixed = document(&layers, json!({"items":{"text":[text_item("ly_item")]}}));
+    mixed["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"ly_item","strokeId":"t0","naturalPosition":1,"order":{}}));
+    assert_eq!(
+        plan_convert(&decode(&mixed), 1, &uids(&["ly_item", "ly_fx"])).unwrap_err(),
+        SetupError::BadSource {
+            layer_uid: "ly_fx".into(),
+            refusal: SourceRefusal::Effect
+        }
+    );
 }

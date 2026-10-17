@@ -281,6 +281,69 @@ fn a_locked_layer_refuses_both_actions_after_the_rig_checks() {
 }
 
 #[test]
+fn an_active_path_effect_refuses_both_actions_like_a_lock_and_a_quiet_stack_does_not() {
+    // `canEditActiveLayer` -> `editRefusalReason`: what is on screen is the deformed geometry.
+    let row = oracle::row("arm_rotate_soft_bone_turned_40_degrees");
+    let with_stack = |stack: Value, locked: bool| {
+        let mut doc = doc_for(&row, Build { locked, ..HELD });
+        doc["layers"][0]["pathFx"] = stack;
+        owner_of(&doc)
+    };
+    let active = [
+        json!([{"type": "zigzag"}]),
+        json!([{"type": "roughen", "enabled": true}]),
+        json!([{"type": "zigzag", "enabled": false}, {"type": "roughen"}]),
+    ];
+    for (index, stack) in active.into_iter().enumerate() {
+        let mut owner = with_stack(stack, false);
+        assert_refused(
+            &mut owner,
+            &format!("reset{index}"),
+            reset_payload(),
+            ("unavailable", "path_effects_active"),
+        );
+        assert_refused(
+            &mut owner,
+            &format!("commit{index}"),
+            commit_payload(3),
+            ("unavailable", "path_effects_active"),
+        );
+    }
+    // The lock is reported first when both apply (the sibling writers' order), the effect alone otherwise.
+    let mut both = with_stack(json!([{"type": "zigzag"}]), true);
+    assert_refused(
+        &mut both,
+        "both",
+        reset_payload(),
+        ("unavailable", "layer_locked"),
+    );
+    // The baseline's own checks still come first: no rig resets to nothing, no binds report no bind.
+    let rigless = oracle::row("layer_that_never_had_a_rig");
+    let mut doc = doc_for(&rigless, HELD);
+    doc["layers"][0]["pathFx"] = json!([{"type": "zigzag"}]);
+    let mut owner = owner_of(&doc);
+    let before = state(&owner);
+    let reply = run_ok(&mut owner, "rigless-reset", reset_payload());
+    assert_eq!(reply["result"]["applied"], false);
+    assert_eq!(state(&owner), before);
+    assert_refused(
+        &mut owner,
+        "rigless-commit",
+        commit_payload(3),
+        ("not_found", "no_rigged_stroke"),
+    );
+    // Control: a stack with nothing active never blocks a reset (this rig is posed, so it changes).
+    for (index, stack) in [json!([]), json!([{"type": "zigzag", "enabled": false}])]
+        .into_iter()
+        .enumerate()
+    {
+        let mut owner = with_stack(stack, false);
+        let reply = run_ok(&mut owner, &format!("quiet{index}"), reset_payload());
+        assert_eq!(reply["result"]["applied"], true, "quiet stack {index}");
+    }
+}
+
+#[test]
 fn commit_without_a_rig_or_without_binds_is_the_typed_no_rigged_stroke_refusal() {
     for name in ["empty_rig_has_no_binds", "layer_that_never_had_a_rig"] {
         let row = oracle::row(name);

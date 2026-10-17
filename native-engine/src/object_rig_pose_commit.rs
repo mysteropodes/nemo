@@ -28,8 +28,12 @@
 //!   one is the typed `pose_unavailable`; a reset needs only the store (it writes zeros);
 //! - the baseline reset re-deforms the live objects and may throw midway; the record edit is complete
 //!   before any evaluation, so the native reset has no such failure;
-//! - locked layers are refused (`canEditActiveLayer`, `ObjectLayer::locked`), after the baseline's own
-//!   "no rig / no binds" checks;
+//! - locked layers and layers with an active path effect are refused (`canEditActiveLayer` ->
+//!   `editRefusalReason`: `ObjectLayer::locked`, `layer_has_active_path_fx`), after the baseline's own
+//!   "no rig / no binds" checks, for the reset as well as the commit;
+//! - a commit that would pose a pressure ribbon (`ObjectRecord::is_pressure_ribbon`) is the typed
+//!   `pressure_ribbon_unavailable` refusal: the baseline poses the centreline too (`rigCommitFrame`), which
+//!   no kernel here does, and writing only the outline would leave the centreline and width profile at rest;
 //! - a layer without a timing record has no held cells: the frame is its own key and nothing is promoted.
 //!
 //! Not provided: the pose drag and IK dragging (L03-P kernels), the scene/export join (L03-S), the
@@ -38,8 +42,9 @@
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     promote_cells, DocumentEdit, FrameEditError,
 };
+use crate::commands::object_fill_owner::path_effects_edit::layer_has_active_path_fx;
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{ObjectDocument, Presence};
+use crate::object_document::{ObjectDocument, ObjectLayer, Presence};
 use crate::object_snapshot::object_rig_pose_read::{
     evaluate_layer_pose, PoseBind, PoseRefusal as ReadRefusal,
 };
@@ -68,6 +73,12 @@ pub(crate) enum PoseRefusal {
     LayerAbsent,
     /// The layer is locked (`canEditActiveLayer`).
     Locked,
+    /// The layer has an active path effect (`canEditActiveLayer` -> `editRefusalReason`): what is on
+    /// screen is the deformed geometry, so a pose written to the stored points would land under it.
+    PathEffects,
+    /// A posed stroke is a pressure ribbon: the commit poses `geometry.segments` only, so its centreline
+    /// and width profile would stay at rest while the outline moves (the baseline poses them too).
+    PressureRibbon,
     /// No rig, no binds, or no bind that poses a stroke at this frame (`toastNoRiggedStroke`).
     NoRiggedStroke,
     FrameOutOfRange,
@@ -92,9 +103,11 @@ impl PoseRefusal {
             Self::LayerAbsent | Self::NoRiggedStroke | Self::NotExposed => {
                 DispatchErrorCode::NotFound
             }
-            Self::Locked | Self::KeyframeUnavailable | Self::PoseUnavailable => {
-                DispatchErrorCode::Unavailable
-            }
+            Self::Locked
+            | Self::PathEffects
+            | Self::PressureRibbon
+            | Self::KeyframeUnavailable
+            | Self::PoseUnavailable => DispatchErrorCode::Unavailable,
             Self::Internal => DispatchErrorCode::Internal,
         }
     }
@@ -105,6 +118,8 @@ impl PoseRefusal {
             Self::Malformed => "malformed_request",
             Self::LayerAbsent => "layer_absent",
             Self::Locked => "layer_locked",
+            Self::PathEffects => "path_effects_active",
+            Self::PressureRibbon => "pressure_ribbon_unavailable",
             Self::NoRiggedStroke => "no_rigged_stroke",
             Self::FrameOutOfRange => "frame_out_of_range",
             Self::KeyframeUnavailable => "keyframe_unavailable",
@@ -120,6 +135,10 @@ impl PoseRefusal {
             Self::Malformed => "malformed_request: not a valid object.rig.pose request.",
             Self::LayerAbsent => "layer_absent: the layer is not in the document.",
             Self::Locked => "layer_locked: the layer is locked.",
+            Self::PathEffects => "path_effects_active: the layer has an active path effect.",
+            Self::PressureRibbon => {
+                "pressure_ribbon_unavailable: a bound stroke is a pressure ribbon."
+            }
             Self::NoRiggedStroke => "no_rigged_stroke: no bound stroke to pose at this frame.",
             Self::FrameOutOfRange => "frame_out_of_range: the frame is outside the document.",
             Self::KeyframeUnavailable => "keyframe_unavailable: the frame cannot become a key.",
@@ -182,7 +201,18 @@ fn admit(
     Ok((candidate, report))
 }
 
-/// `rigResetPose` as the Reset button runs it: no rig is a silent return, then the lock check.
+/// `canEditActiveLayer()` as far as the document records it: the lock, then an active path effect.
+fn check_editable(layer: &ObjectLayer) -> Result<(), PoseRefusal> {
+    if layer.locked() {
+        return Err(PoseRefusal::Locked);
+    }
+    if layer_has_active_path_fx(layer) {
+        return Err(PoseRefusal::PathEffects);
+    }
+    Ok(())
+}
+
+/// `rigResetPose` as the Reset button runs it: no rig is a silent return, then the edit guard.
 fn plan_reset(
     document: &ObjectDocument,
     uid: &str,
@@ -193,9 +223,7 @@ fn plan_reset(
         Some(rig) => rig,
         None => return Ok((document.clone(), PoseReport::default())),
     };
-    if layer.locked() {
-        return Err(PoseRefusal::Locked);
-    }
+    check_editable(layer)?;
     let mut candidate = document.clone();
     if let Some(next) = rules::rest_rig(rig) {
         candidate.layers[index].rig = Presence::Present(next);
@@ -244,9 +272,7 @@ fn plan_commit(
     if layer.rig().map_or(true, |rig| rig.binds.is_empty()) {
         return Err(PoseRefusal::NoRiggedStroke);
     }
-    if layer.locked() {
-        return Err(PoseRefusal::Locked);
-    }
+    check_editable(layer)?;
     if frame >= document.total_frames() {
         return Err(PoseRefusal::FrameOutOfRange);
     }

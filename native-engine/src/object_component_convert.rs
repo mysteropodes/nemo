@@ -11,11 +11,14 @@
 //! - one layer: the layer stays and becomes the instance (`ld.symbolId`, locked,
 //!   `once`, speed 1, placed 0, single frame 0); its drawing moves to a fresh inner
 //!   layer "Layer 1" with the same stroke ids, timing and group table; its own
-//!   layer-level Motion holder stays on the instance (the instance keeps its motion);
+//!   layer-level Motion holder and its time range stay on the instance (the instance
+//!   keeps its motion and its window); its rig moves inside with the strokes it binds
+//!   (`cloneRigForSymbol` + `delete ld.rig`), so the instance is left with none;
 //! - several layers: each source becomes an inner layer (same layerUid, unlocked,
-//!   groups and path effects carried) in index order, the block is replaced by ONE
+//!   groups, path effects and rig carried) in index order, the block is replaced by ONE
 //!   new locked "Composant" instance at the position of the first source, and the
-//!   first source's duplicator descriptor moves to it (`firstSrc.duplicator`);
+//!   first source's duplicator descriptor and time window (in point, out point, time
+//!   link; its markers stay inside) move to it (`firstSrc.duplicator`, `lifted`);
 //! - the component is named `ld.name + ' (Comp)'` (one layer) or `'Composant'`;
 //! - a StoryBoard instance module is added (`SMStoryboard.addInstanceAuto`).
 //!
@@ -25,11 +28,14 @@
 //! no copy of the groups (that copy was a rendering detail of the flattened
 //! registry); an unknown layer is refused instead of silently skipped; and Motion
 //! holders that would have to land inside a component are refused (`Unavailable`)
-//! because the component record has no holder member yet, never dropped.
+//! because the component record has no holder member yet, never dropped; and a layer
+//! with raster items or text blocks is refused (`Unavailable`, `component-convert-items`)
+//! because the component record has no `items` member (the baseline carries a raster
+//! with its frames), never left behind on an instance that no longer owns the strokes.
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
-    add_instance_module, append_layer, empty_component_set, holders_on, layer_index,
-    mint_layer_uid, mint_symbol_id, new_instance, require_v2, update, with_tables, PermitAll,
-    SetupError, SetupPlan, SourceRefusal,
+    add_instance_module, append_layer, empty_component_set, holders_on, items_on, layer_index,
+    lift_window, mint_layer_uid, mint_symbol_id, new_instance, require_v2, update, with_tables,
+    PermitAll, SetupError, SetupPlan, SourceRefusal,
 };
 use crate::commands::remove_order_element;
 use crate::object_document::object_component_record_kernels::object_component_records::{
@@ -45,9 +51,9 @@ use crate::object_document::{
 };
 
 /// What a layer is, as far as the baseline refusal list needs it. The native
-/// document stores a record for two of the eight kinds (a component instance in
-/// the tables, a widget on the layer); the other six have no native record yet, so
-/// `facts_from_document` reports them false instead of guessing.
+/// document stores a record for three of the eight kinds (a component instance in
+/// the tables, an effect layer and a widget on the layer); the other five have no
+/// native record yet, so `facts_from_document` reports them false instead of guessing.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct SourceFacts {
     pub(crate) component: bool,
@@ -84,6 +90,7 @@ pub(crate) fn facts_from_document(document: &ObjectDocument, layer: &ObjectLayer
         component: document
             .component_set()
             .is_some_and(|set| set.instance(SCENE_CONTEXT, layer.layer_uid()).is_some()),
+        effect_layer: layer.is_effect_layer(),
         widget_layer: layer.widget.value().is_some(),
         ..SourceFacts::default()
     }
@@ -159,6 +166,14 @@ pub(crate) fn plan_convert(
             });
         }
     }
+    for &index in &indices {
+        let layer_uid = document.layers[index].layer_uid();
+        if items_on(document, layer_uid) {
+            return Err(SetupError::ItemsUnavailable {
+                layer_uid: layer_uid.to_string(),
+            });
+        }
+    }
     if indices.len() == 1 {
         convert_single(document, next_revision, indices[0])
     } else {
@@ -189,6 +204,8 @@ fn convert_single(
     inner.locked = Presence::Present(false);
     inner.timing = source.timing.clone();
     inner.groups = retarget_groups(&source.groups, &symbol_id);
+    // `rig: cloneRigForSymbol(ld.rig)` then `delete ld.rig`: the binds name strokes that now live inside.
+    inner.rig = source.rig.clone();
     let record = ComponentRecord {
         symbol_id: symbol_id.clone(),
         name: Presence::Present(format!("{name} (Comp)")),
@@ -203,6 +220,7 @@ fn convert_single(
     let instance = &mut candidate.layers[index];
     instance.timing = Presence::Present(LayerTiming::blank_drawing());
     instance.groups = Presence::Missing;
+    instance.rig = Presence::Missing;
     instance.locked = Presence::Present(true);
     with_tables(&mut candidate, |tables| {
         update(&mut tables.components, empty_component_set, |set| {
@@ -258,6 +276,7 @@ fn convert_merge(
     let instance_uid = mint_layer_uid(document, next_revision)?;
     let mut inner_layers: Vec<ObjectLayer> = Vec::new();
     let mut moved: Vec<ObjectRecord> = Vec::new();
+    let mut window = Presence::Missing;
     for &index in indices {
         let source = &document.layers[index];
         moved.extend(retarget_objects(
@@ -270,9 +289,13 @@ fn convert_merge(
         inner.locked = Presence::Present(false);
         inner.folder_id = Presence::Missing;
         inner.groups = retarget_groups(&source.groups, &symbol_id);
+        if inner_layers.is_empty() {
+            window = lift_window(&mut inner);
+        }
         inner_layers.push(inner);
     }
     let mut instance = ObjectLayer::identified(instance_uid.clone());
+    instance.range = window;
     instance.name = Presence::Present("Composant".to_string());
     instance.visible = Presence::Present(true);
     instance.locked = Presence::Present(true);

@@ -37,6 +37,15 @@ fn strokes_by_frame(objects: &Value, layer_uid: &Value) -> Value {
     Value::Object(map)
 }
 
+/// The `strokeId` of every bind of a layer's rig, in bind order (`[]` without a rig).
+fn rig_bind_strokes(layer: &Value) -> Value {
+    let binds = layer["rig"]["binds"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    Value::Array(binds.iter().map(|b| b["strokeId"].clone()).collect())
+}
+
 fn group_shape(layer: &Value) -> (Value, Value, Value) {
     let entries = layer["groups"]["entries"]
         .as_array()
@@ -98,6 +107,16 @@ pub(crate) fn verify(after: &Value, symbol: &str, p: &str, o: &Oracle) -> Result
         same(&count, o.get(&row("groupCount")), "group count")?;
         same(&modes, o.get(&row("groupModes")), "group modes")?;
         same(&lens, o.get(&row("groupOrderLens")), "group member counts")?;
+        same(
+            &json!(layer.get("rig").is_some()),
+            o.get(&row("rigPresent")),
+            "inner rig",
+        )?;
+        same(
+            &rig_bind_strokes(layer),
+            o.get(&row("rigBindStrokes")),
+            "inner rig binds",
+        )?;
         same(&layer["shy"], o.get(&row("shy")), "inner shy")?;
         same(&layer["color"], o.get(&row("color")), "inner color")?;
         if p == "S2" {
@@ -147,6 +166,12 @@ pub(crate) fn verify(after: &Value, symbol: &str, p: &str, o: &Oracle) -> Result
         "inst.folderId",
     )?;
     same(&host["locked"], o.get(&key("inst.locked")), "inst.locked")?;
+    // `cloneRigForSymbol` then `delete ld.rig`: the rig lives inside, never on the instance.
+    same(
+        &json!(host.get("rig").is_some()),
+        o.get(&key("inst.rigPresent")),
+        "inst.rigPresent",
+    )?;
     same(
         &host["visible"],
         o.get(&key("inst.visible")),
@@ -219,4 +244,48 @@ pub(crate) fn verify(after: &Value, symbol: &str, p: &str, o: &Oracle) -> Result
         &json!(symbol),
         "the new module places the new component",
     )
+}
+
+/// The time window rows (`W*.sym.lK.*`, `W*.inst.*`) of the baseline: in point, out point, time link and
+/// markers of every inner layer of `symbol` and of its instance. An absent member and an explicit null both
+/// read `null`: the baseline leaves the first `undefined` and never copies the second.
+pub(crate) fn verify_window(
+    after: &Value,
+    symbol: &str,
+    p: &str,
+    o: &Oracle,
+) -> Result<(), String> {
+    let components = after["componentTables"]["components"]["components"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let comp = components
+        .iter()
+        .find(|c| c["symbolId"] == symbol)
+        .ok_or("the component record is missing")?;
+    let instances = after["componentTables"]["components"]["instances"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let instance = instances
+        .iter()
+        .find(|i| i["symbolId"] == symbol)
+        .ok_or("the instance record is missing")?;
+    let layers = after["layers"].as_array().cloned().unwrap_or_default();
+    let host = layers
+        .iter()
+        .find(|l| l["layerUid"] == instance["layerUid"])
+        .ok_or("the instance layer is missing")?;
+    let window = |layer: &Value, prefix: &str| -> Result<(), String> {
+        for member in ["inPoint", "outPoint", "timeLink", "markers"] {
+            let row = format!("{prefix}.{member}");
+            same(&layer["range"][member], o.get(&row), &row)?;
+        }
+        Ok(())
+    };
+    let inner = comp["layers"].as_array().cloned().unwrap_or_default();
+    for (k, layer) in inner.iter().enumerate() {
+        window(layer, &format!("{p}.sym.l{k}"))?;
+    }
+    window(host, &format!("{p}.inst"))
 }

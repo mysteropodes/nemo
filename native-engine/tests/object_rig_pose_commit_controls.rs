@@ -280,6 +280,16 @@ fn every_refusal_has_a_distinct_stable_reason_a_matching_message_and_the_documen
             DispatchErrorCode::Unavailable,
         ),
         (
+            PoseRefusal::PathEffects,
+            "path_effects_active",
+            DispatchErrorCode::Unavailable,
+        ),
+        (
+            PoseRefusal::PressureRibbon,
+            "pressure_ribbon_unavailable",
+            DispatchErrorCode::Unavailable,
+        ),
+        (
             PoseRefusal::NoRiggedStroke,
             "no_rigged_stroke",
             DispatchErrorCode::NotFound,
