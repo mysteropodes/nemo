@@ -2293,7 +2293,7 @@ test('L05-B document frame-edit kernel stays a private lane-5 aggregator child a
 test('L03-E rig deform kernel stays a private image-mesh-family child and fails closed without registration', () => {
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
-  assert.match(coverage.nativeRigPoseDeformRegistration, /L03-E \(lane #2109/);
+  assert.match(coverage.nativeRigPoseDeformRegistration, /L03-E\/#2188 \(lane #2109/);
   const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_kernels.rs'), 'utf8');
   for (const name of ['rig_pose_deform_anchor', 'rig_pose_deform']) {
     assert.match(aggregatorText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
@@ -2527,7 +2527,7 @@ test('L09-G media binding plan stays a private aggregator child and fails closed
 test('L10-E Figma node-walk kernel stays a private history-aggregator child and fails closed without registration', () => {
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
-  assert.match(coverage.nativeImportFigmaWalkRegistration, /L10-E \(lane #2116/);
+  assert.match(coverage.nativeImportFigmaWalkRegistration, /L10-E\/#2195 \(lane #2116/);
   const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_shot_kernels.rs'), 'utf8');
   assert.match(aggregatorText, /#\[path = "native_import_figma_walk\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod native_import_figma_walk;/);
   const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_history.rs'), 'utf8');
