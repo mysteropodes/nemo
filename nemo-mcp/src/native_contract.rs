@@ -20,8 +20,12 @@ pub(crate) mod settings;
 
 #[path = "native_diagnostics_contract.rs"]
 mod diagnostics;
+#[path = "native_item_contract.rs"]
+pub(crate) mod item;
 #[path = "native_layer_policy_contract.rs"]
 pub(crate) mod layer_policy;
+#[path = "native_object_edit_contract.rs"]
+pub(crate) mod object_edit;
 use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
@@ -91,6 +95,8 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
         layer_policy::OP => layer_policy::request(payload),
+        op if object_edit::admitted(op) => object_edit::request(op, payload),
+        item::ITEM | item::ATTACH | item::REMOVE => item::request(operation, payload),
         "command.document.object.layer.create" => object::create_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -245,6 +251,12 @@ pub(crate) fn validate_result(
     }
     if operation == layer_policy::OP {
         return layer_policy::result(result);
+    }
+    if object_edit::admitted(operation) {
+        return object_edit::result(operation, result);
+    }
+    if item::owns(operation) {
+        return item::result(operation, payload, result);
     }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);

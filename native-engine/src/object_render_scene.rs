@@ -4,6 +4,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::Sce
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
 use crate::render_geometry::ClosedCubicPath;
 use std::sync::Arc;
+use vello::kurbo::BezPath;
 
 use scene_effect_kernels::object_scene_resource_set::{
     same_scene_resources, SceneResourceMismatch,
@@ -32,6 +33,13 @@ mod paint;
 #[path = "object_scene_producer_contour.rs"]
 mod object_scene_producer_contour;
 use object_scene_producer_contour::CompiledContour;
+// L07-I (#2113): typed scene style -> Vello paint (fill, stroke, gradient, paint order); the compositor draws through it.
+#[path = "object_scene_style_emit.rs"]
+pub(crate) mod object_scene_style_emit;
+// L07-L (#2113): text block scene producer joined through the L07-C pin registry.
+#[path = "object_scene_producer_text.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_text;
 // L08-A (#2144): lane-8 scene composition/effect family aggregator.
 #[path = "scene_effect_kernels.rs"]
 #[allow(dead_code)]
@@ -40,6 +48,9 @@ pub(crate) mod scene_effect_kernels;
 #[path = "text_glyph_scene_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod text_glyph_scene_kernels;
+// L01-I (#2107): drawn geometry of the editable vector family (open or closed path, clipping contour, envelope).
+#[path = "render_vector_path.rs"]
+pub(crate) mod render_vector_path;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use paint::tests::paint_contents;
 #[cfg(test)]
@@ -170,6 +181,15 @@ impl<'a> ObjectRenderEntry<'a> {
     }
     pub fn envelope(&self) -> [f64; 4] {
         self.compiled.envelope
+    }
+    /// The geometry the compositor draws (L01-I): the open or closed evaluated path of a vector record, otherwise the path
+    /// of the closed contour itself. Use this, not `contour()`, to paint.
+    pub(crate) fn path(&self) -> &'a BezPath {
+        let compiled = self.compiled;
+        compiled
+            .drawn
+            .as_ref()
+            .unwrap_or_else(|| compiled.contour.path())
     }
     /// Typed straight-RGBA paint admitted with the contour (L07-A `SceneSolid`).
     pub(crate) fn solid(&self) -> &'a SceneSolid {

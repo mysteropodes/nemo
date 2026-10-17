@@ -10,8 +10,8 @@ use super::{
     unit_count, unit_index_of, weight_at, weights, BasedOn, Selector, SelectorType, UnitIndices,
     Units, SHAPE_RAMP_UP,
 };
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::layout_text;
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::{
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::layout_text;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::{
     FontAdvancePort, FontCatalogPort, TextAlign, TextLayoutRequest, TextStyle,
 };
 

@@ -1,12 +1,14 @@
 //! D2 headless object pixels on the existing compositor; never presentation.
 use crate::compositor::object_target::ObjectTarget;
+use crate::compositor::scene_effect_gpu_blend::GpuLayerStack;
 use crate::compositor::{align_to, Compositor, CompositorError};
+use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
 use crate::object_render_scene::{
     LiveObjectComposition, ObjectCompositionWitness, ObjectPaintCommand, ScheduledObjectComposition,
 };
 use crate::render_scene::ScheduledFrameIdentity;
 use vello::kurbo::Affine;
-use vello::peniko::{Color, Fill};
+use vello::peniko::Color;
 
 const MAX_DIMENSION: u32 = 4096;
 const MAX_PIXELS: u64 = 16_777_216;
@@ -64,14 +66,13 @@ fn output_budget(width: u32, height: u32, device_max: u32) -> Result<(), Composi
     Ok(())
 }
 
-fn color(command: ObjectPaintCommand<'_>) -> Result<Color, CompositorError> {
-    // AlphaColor<Srgb> holds straight float channels; do not quantize to RGB8.
-    // The channel rule lives once, in the L07-A SceneSolid kernel.
-    let rgba = command
-        .solid()
-        .rgba_f32()
+/// Typed style of one command, converted to Vello values but not drawn: paint channels, stroke style
+/// and gradient preparation all fail here, before any target allocation or scene replacement.
+fn prepare_command(command: ObjectPaintCommand<'_>) -> Result<PreparedItem, CompositorError> {
+    let style = command
+        .style()
         .map_err(|error| CompositorError::new(error.message()))?;
-    Ok(Color::new(rgba))
+    prepare_item(&style).map_err(|error| CompositorError::new(error.message()))
 }
 
 impl Compositor {
@@ -91,7 +92,7 @@ impl Compositor {
             self.device.limits().max_texture_dimension_2d,
         )?;
         for command in plan.commands() {
-            color(command)?;
+            prepare_command(command)?;
         }
         if self
             .retained_object_reference
@@ -151,6 +152,75 @@ impl Compositor {
         })
     }
 
+    /// Layered counterpart of [`Self::compose_scheduled_object`] (L08-G): the same
+    /// liveness check and output spec, pixels from a GPU layer stack built from the
+    /// same plan. Staleness, cancellation and replacement are refused by `check_live`
+    /// before any texture exists, exactly as on the fast path.
+    #[allow(dead_code)]
+    pub(crate) fn compose_layered_scheduled_object(
+        &mut self,
+        live: &LiveObjectComposition<'_>,
+        stack: &GpuLayerStack<'_>,
+    ) -> Result<ScheduledObjectCompositionResult, CompositorError> {
+        let prepared = live.prepared();
+        check_live(live, prepared)?;
+        let (width, height) = prepared.dimensions();
+        let output = ObjectOutputSpec::new(width, height, "project-srgb-normal-rgba8-area")?;
+        Ok(ScheduledObjectCompositionResult {
+            pixels: self.compose_object_layered(prepared.composition(), output, stack)?,
+            prepared: prepared.clone(),
+        })
+    }
+
+    /// Layered counterpart of [`Self::compose_object`] (L08-G). Same admission (output
+    /// budget, every paint validated, same background rule); pixels come from the GPU
+    /// layer stack, which must account for every paint command of this witness' plan
+    /// exactly once (`GpuLayerStack::covers_plan`: same contour address and colour bits,
+    /// compared as a multiset, so a count-preserving mis-mapping is refused). A reference image is refused: the layered path draws solid layers.
+    #[allow(dead_code)]
+    pub(crate) fn compose_object_layered(
+        &mut self,
+        prepared: &ObjectCompositionWitness,
+        output: ObjectOutputSpec,
+        stack: &GpuLayerStack<'_>,
+    ) -> Result<ObjectCompositionResult, CompositorError> {
+        let plan = prepared.plan();
+        output_budget(
+            output.width,
+            output.height,
+            self.device.limits().max_texture_dimension_2d,
+        )?;
+        for command in plan.commands() {
+            prepare_command(command)?;
+        }
+        if !stack.covers_plan(plan) {
+            return Err(CompositorError::new(
+                "layer stack does not cover the composition plan",
+            ));
+        }
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if prepared.reference_image().is_some() {
+            return Err(CompositorError::new(
+                "reference image is unavailable on the layered path",
+            ));
+        }
+        let background = if output.project_background {
+            prepared.canvas_background_rgba8()
+        } else {
+            [255; 4]
+        };
+        let target = self
+            .compose_layered_stack(stack, (output.width, output.height), background)?
+            .into_target();
+        Ok(ObjectCompositionResult {
+            instance: self.instance.clone(),
+            device: self.device.clone(),
+            target,
+            output,
+            prepared: prepared.clone(),
+        })
+    }
+
     pub(crate) fn readback_scheduled_object_rgba8(
         &self,
         result: &ScheduledObjectCompositionResult,
@@ -175,9 +245,9 @@ impl Compositor {
             output.height,
             self.device.limits().max_texture_dimension_2d,
         )?;
-        // Validate all paints before target allocation or replacing retained scene data.
+        // Validate all styles before target allocation or replacing retained scene data.
         for command in plan.commands() {
-            color(command)?;
+            prepare_command(command)?;
         }
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         let reference_image = prepared
@@ -237,13 +307,7 @@ impl Compositor {
         commands: impl Iterator<Item = ObjectPaintCommand<'a>>,
     ) -> Result<(), CompositorError> {
         for command in commands {
-            self.scene.fill(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                color(command)?,
-                None,
-                command.contour().path(),
-            );
+            prepare_command(command)?.draw(&mut self.scene, Affine::IDENTITY, command.path());
         }
         Ok(())
     }
@@ -366,6 +430,13 @@ impl ObjectRgba8Readback {
     }
 }
 
+// L01-I: Metal readback and export parity of the editable vector family through this module's private scene and target.
+#[cfg(all(test, feature = "export_job"))]
+#[path = "../tests/render_vector_export_parity.rs"]
+mod render_vector_export_parity;
+#[cfg(test)]
+#[path = "../tests/render_vector_pixels.rs"]
+mod render_vector_pixels;
 #[cfg(test)]
 #[path = "../tests/object_compositor.rs"]
 mod tests;
@@ -377,3 +448,8 @@ pub(super) mod scheduled_tests;
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_project_background.rs"]
 mod project_background_tests;
+
+// L07-I: Metal readback of the typed scene style through this module's private scene and target.
+#[cfg(test)]
+#[path = "../tests/object_scene_style_emit_gpu.rs"]
+mod object_scene_style_emit_gpu;

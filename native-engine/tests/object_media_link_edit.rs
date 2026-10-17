@@ -214,8 +214,8 @@ fn place_refusals_are_typed_and_leave_the_inventory_as_it_was() {
             PlacementEditError::Refused(PlacementRefusal::Layer),
         ),
         (
-            place("p2", "im", layer("M"), 0),
-            PlacementEditError::Refused(PlacementRefusal::ImageOwner),
+            place("p2", "im", layer("nope"), 0),
+            PlacementEditError::Refused(PlacementRefusal::Layer),
         ),
         (
             place("p2", "a1", track("t1"), 0),

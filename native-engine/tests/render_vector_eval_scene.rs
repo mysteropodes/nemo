@@ -63,7 +63,7 @@ fn a_closed_fill_only_vector_reaches_the_contour_with_the_evaluated_geometry() {
 }
 
 #[test]
-fn what_the_fill_only_compositor_cannot_draw_exactly_stays_a_typed_refusal() {
+fn vectors_the_compositor_draws_are_admitted_and_only_the_undrawable_stays_a_typed_refusal() {
     let (_, all) = rows();
     let closed = authored_at(&row(&all, "plain-closed-zigzag@0").doc, 0);
     assert_eq!(
@@ -81,30 +81,27 @@ fn what_the_fill_only_compositor_cannot_draw_exactly_stays_a_typed_refusal() {
         );
     };
 
+    // L01-I: the render/export vector join draws these, so the scene admits them (their pixels are pinned by
+    // render_vector_pixels and render_vector_export_parity).
     let mut stroked = closed.clone();
     stroked["objects"][0]["vector"] = json!({"stroke": {"kind": "solid", "r": 0, "g": 0, "b": 0, "a": 1},
         "hasRealStroke": true, "strokeWidth": 2, "strokeCap": "round", "strokeJoin": "round", "opacity": 1});
-    refused(
-        &stroked,
-        "vector stroke paint awaits the render/export vector join (L01-I)",
-    );
+    assert_eq!(scene_of(&stroked, 0), Ok(1), "a stroked vector is drawn");
 
     let mut translucent = closed.clone();
     translucent["objects"][0]["vector"]["opacity"] = json!(0.5);
-    refused(
-        &translucent,
-        "vector opacity awaits the render/export vector join (L01-I)",
-    );
+    assert_eq!(scene_of(&translucent, 0), Ok(1), "an item opacity is drawn");
 
     let mut unfilled = closed.clone();
     unfilled["objects"][0]["fill"] = Value::Null;
-    refused(&unfilled, "packet record carries no solid fill");
+    assert_eq!(
+        scene_of(&unfilled, 0),
+        Ok(1),
+        "an item without paint is valid and draws nothing"
+    );
 
     let open = authored_at(&row(&all, "plain-open-zigzag@0").doc, 0);
-    refused(
-        &open,
-        "open vector paths await the render/export vector join (L01-I)",
-    );
+    assert_eq!(scene_of(&open, 0), Ok(1), "an open path is drawn open");
 
     let mut budget = closed.clone();
     budget["layers"][0]["pathFx"][0]["p2"] = json!(1.0e9);

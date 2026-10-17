@@ -105,6 +105,9 @@ fn blank_project(
             migration: "explicit-plan-required".into(),
             reference_policy: "unresolved".into(),
         }),
+        image_meshes: Presence::Missing,
+        items: Presence::Missing,
+        component_tables: Presence::Missing,
     };
     Ok(ProjectEnvelope::no_media(metadata, drawing))
 }

@@ -35,8 +35,8 @@
 //! typography and the L06-A layout request), `object_text_layout_root.rs`
 //! (capture from a live `root.data` object) and this record.
 
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::flow::is_js_trim_whitespace;
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::MAX_TEXT_UNITS;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::flow::is_js_trim_whitespace;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::MAX_TEXT_UNITS;
 use crate::object_document::{object_deserialize, Presence};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;

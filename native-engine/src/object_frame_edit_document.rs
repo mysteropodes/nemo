@@ -178,7 +178,11 @@ fn remap(
 }
 
 /// Remove one layer's authored records and order elements at the matching frames; emptied scopes stay.
-fn drop_cells(document: &mut ObjectDocument, layer: &str, matches: &dyn Fn(u32) -> bool) {
+pub(crate) fn drop_cells(
+    document: &mut ObjectDocument,
+    layer: &str,
+    matches: &dyn Fn(u32) -> bool,
+) {
     document.objects.retain(|record| {
         !(scene_authored(record)
             && record.target.layer_uid == layer

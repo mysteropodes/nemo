@@ -30,6 +30,12 @@ use wire::{
     RenamePayload, UngroupPayload, MAX_ID_BYTES, MAX_NAME_BYTES,
 };
 
+// L02-I (#2108): boolean tool / eraser / Flatten owner transactions. Declared here, not in
+// object_fill_owner.rs (498 of 500 non-blank lines); still a descendant of that module.
+#[path = "object_boolean_ops_owner.rs"]
+mod boolean_edit;
+pub(crate) use boolean_edit::PreparedBooleanEdit;
+
 /// How a typed plan refusal reaches the request-receipt vocabulary. Exhaustive:
 /// a new kernel variant fails the build instead of defaulting.
 pub(crate) fn refusal_code(error: &GroupPlanError) -> DispatchErrorCode {

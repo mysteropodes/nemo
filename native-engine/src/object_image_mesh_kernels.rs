@@ -4,6 +4,9 @@
 #[path = "object_image_mesh_geometry.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_image_mesh_geometry;
+#[path = "object_image_mesh_topology.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_image_mesh_topology;
 #[path = "object_widget_geometry.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_widget_geometry;
@@ -24,9 +27,24 @@ pub(crate) mod object_image_mesh_orient;
 #[allow(dead_code)]
 pub(crate) mod rig_pose_weights;
 
+#[path = "render_image_mesh_plan.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_image_mesh_plan;
 #[path = "rig_pose_deform.rs"]
 #[allow(dead_code)]
 pub(crate) mod rig_pose_deform;
 #[path = "rig_pose_deform_anchor.rs"]
 #[allow(dead_code)]
 pub(crate) mod rig_pose_deform_anchor;
+#[path = "rig_pose_nearest.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_pose_nearest;
+#[path = "rig_pose_nearest_curve.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_pose_nearest_curve;
+#[path = "rig_pose_nearest_solve.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_pose_nearest_solve;
+#[path = "rig_pose_nearest_weigh.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_pose_nearest_weigh;

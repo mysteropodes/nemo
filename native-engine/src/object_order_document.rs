@@ -1,7 +1,7 @@
 //! Strict v2 storage DTOs. They carry no live owner, evaluator or painter state.
 use crate::object_document::{
-    object_deserialize, FrameScope, LayerFolders, ObjectDocument, ObjectLayer, ObjectRecord,
-    PropertyHolder,
+    object_deserialize, ComponentTables, FrameScope, ImageMeshStore, ItemRecords, LayerFolders,
+    ObjectDocument, ObjectLayer, ObjectRecord, PropertyHolder,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
@@ -55,12 +55,21 @@ pub struct OrderedObjectDocument {
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     pub(crate) composition_order: OrderPlan,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) image_meshes: Presence<ImageMeshStore>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) items: Presence<ItemRecords>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) component_tables: Presence<ComponentTables>,
 }
 object_deserialize!(OrderedObjectDocument {
     format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
-    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>, composition_order: OrderPlan
+    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>, composition_order: OrderPlan,
+    #[serde(default)] image_meshes: Presence<ImageMeshStore>,
+    #[serde(default)] items: Presence<ItemRecords>,
+    #[serde(default)] component_tables: Presence<ComponentTables>
 });
 impl OrderedObjectDocument {
     pub(crate) fn into_storage(self) -> ObjectDocument {
@@ -73,6 +82,9 @@ impl OrderedObjectDocument {
             property_holders: self.property_holders,
             layer_folders: self.layer_folders,
             composition_order: Presence::Present(self.composition_order),
+            image_meshes: self.image_meshes,
+            items: self.items,
+            component_tables: self.component_tables,
         }
     }
     pub fn total_frames(&self) -> u32 {

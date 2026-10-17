@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.group",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.group.create",
+    "command.document.object.group.ungroup",
+    "command.document.object.group.combine",
+    "command.document.object.group.mode.set",
+    "command.document.object.group.rename",
+    "command.document.object.group.member.remove"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectGroupCreatePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectGroupUngroupPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectGroupCombinePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectGroupModeSetPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectGroupRenamePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectGroupMemberRemovePayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Group, ungroup, combine, set combine mode, rename and remove a member of nested groups on one layer and context by stable stroke identity. One revision and one undo entry per applied edit; a no-op publishes nothing; groups left below two entries dissolve in the same revision. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native group.create command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "group-group-create-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.group.create",
+        "payload": {
+          "command": "object.group.create",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "groupId": "group-1",
+          "name": "Head",
+          "strokeIds": [
+            "stroke-1",
+            "stroke-2"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "group-group-create-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native group.ungroup command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "group-group-ungroup-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.group.ungroup",
+        "payload": {
+          "command": "object.group.ungroup",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "strokeIds": [
+            "stroke-1",
+            "stroke-2"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "group-group-ungroup-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native group.combine command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "group-group-combine-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.group.combine",
+        "payload": {
+          "command": "object.group.combine",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "groupId": "group-1",
+          "mode": "unite",
+          "strokeIds": [
+            "stroke-1",
+            "stroke-2"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "group-group-combine-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native group.mode.set command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "group-group-mode-set-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.group.mode.set",
+        "payload": {
+          "command": "object.group.mode.set",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "groupId": "group-1",
+          "mode": "subtract"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "group-group-mode-set-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native group.rename command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "group-group-rename-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.group.rename",
+        "payload": {
+          "command": "object.group.rename",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "groupId": "group-1",
+          "name": "Face"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "group-group-rename-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native group.member.remove command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "group-group-member-remove-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.group.member.remove",
+        "payload": {
+          "command": "object.group.member.remove",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "strokeId": "stroke-1"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "group-group-member-remove-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

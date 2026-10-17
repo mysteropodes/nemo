@@ -2,11 +2,11 @@
 //! authored (absent / null / value) readings, the typography with defaults
 //! applied at evaluation only, and the L06-A `TextLayoutRequest`.
 
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::{
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::{
     TextAlign, TextCase, TextLayoutRequest, TextStyle,
 };
-use crate::evaluation::object_text_layout_kernels::object_text_layout_record::font::FontRef;
-use crate::evaluation::object_text_layout_kernels::object_text_layout_record::{
+use crate::object_document::object_text_layout_kernels::object_text_layout_record::font::FontRef;
+use crate::object_document::object_text_layout_kernels::object_text_layout_record::{
     f64_of, TextBlockRecord,
 };
 use crate::object_document::Presence;

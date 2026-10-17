@@ -2,6 +2,8 @@
 use crate::commands::MAX_VECTOR_REQUEST_BYTES;
 use crate::history::object_history::object_exposure_edit_key::is_exposure_key_operation;
 use crate::history::object_history::object_exposure_edit_retime::is_exposure_retime_operation;
+use crate::history::object_history::object_frame_clipboard_paste::is_frame_clipboard_operation;
+use crate::history::object_history::object_frame_clipboard_repeat::is_frame_repeat_operation;
 use crate::history::object_history::object_frame_edit_structure::is_frame_structure_operation;
 use crate::history::NativeObjectHistory;
 use crate::request_receipts::{
@@ -19,15 +21,18 @@ const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
 const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
+const OP_OBJECT_ITEM: &str = "command.document.object.item.edit";
 const OP_WIDGET_CREATE: &str = "command.document.object.widget.create";
 const OP_WIDGET_WRITE: &str = "command.document.object.widget.write";
 const OP_WIDGET_SETTINGS: &str = "command.document.object.widget.settings";
 const OP_OBJECT_VECTOR: &str = "command.document.object.vector.edit";
+const OP_IMAGE_MESH_EDIT: &str = "command.document.object.image.mesh.edit";
 const MAX_MESSAGE_BYTES: usize = 4096;
 
-/// Request-envelope bound per operation: only the vector edit may carry a bounded vector body.
+/// Request-envelope bound per operation: only the vector and image-mesh edits may carry a bounded body
+/// (a hand-drawn mask outline is hundreds of points).
 fn request_limit(operation: &str) -> usize {
-    if operation == OP_OBJECT_VECTOR {
+    if operation == OP_OBJECT_VECTOR || operation == OP_IMAGE_MESH_EDIT {
         MAX_VECTOR_REQUEST_BYTES
     } else {
         MAX_MESSAGE_BYTES
@@ -68,6 +73,10 @@ impl NativeObjectHistory {
     ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
         if !Self::layer_lifecycle_operation(&request.operation)
             && !Self::group_operation(&request.operation)
+            && !Self::compositing_operation(&request.operation)
+            && !Self::boolean_operation(&request.operation)
+            && !Self::selection_edit_operation(&request.operation)
+            && !Self::import_batch_operation(&request.operation)
             && !matches!(
                 request.operation.as_str(),
                 OP_OBJECT_FILL
@@ -80,13 +89,17 @@ impl NativeObjectHistory {
                     | OP_PROPERTY_TRACK_EDIT
                     | OP_PROJECT_SETTINGS
                     | OP_OBJECT_VECTOR
+                    | OP_IMAGE_MESH_EDIT
                     | OP_WIDGET_CREATE
                     | OP_WIDGET_WRITE
                     | OP_WIDGET_SETTINGS
+                    | OP_OBJECT_ITEM
             )
             && !is_frame_structure_operation(request.operation.as_str())
+            && !is_frame_clipboard_operation(request.operation.as_str())
             && !is_exposure_key_operation(request.operation.as_str())
             && !is_exposure_retime_operation(request.operation.as_str())
+            && !is_frame_repeat_operation(request.operation.as_str())
         {
             return Ok(None);
         }
@@ -103,8 +116,12 @@ impl NativeObjectHistory {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let message = |fill, history| {
-            if request.operation == OP_OBJECT_VECTOR {
+            if request.operation == OP_OBJECT_ITEM {
+                "Item edit request refused."
+            } else if request.operation == OP_OBJECT_VECTOR {
                 "Vector edit request refused."
+            } else if request.operation == OP_IMAGE_MESH_EDIT {
+                "Image mesh edit request refused."
             } else if matches!(
                 request.operation.as_str(),
                 OP_WIDGET_CREATE | OP_WIDGET_WRITE | OP_WIDGET_SETTINGS
@@ -114,6 +131,8 @@ impl NativeObjectHistory {
                 "Project settings request refused."
             } else if is_frame_structure_operation(request.operation.as_str()) {
                 "Frame structure request refused."
+            } else if is_frame_clipboard_operation(request.operation.as_str()) {
+                "Frame clipboard request refused."
             } else if matches!(
                 request.operation.as_str(),
                 OP_PROPERTY_EDIT | OP_PROPERTY_TRACK_EDIT
@@ -123,10 +142,20 @@ impl NativeObjectHistory {
                 "Layer lifecycle request refused."
             } else if Self::group_operation(&request.operation) {
                 "Group request refused."
+            } else if Self::compositing_operation(&request.operation) {
+                "Layer compositing request refused."
+            } else if Self::boolean_operation(&request.operation) {
+                "Boolean request refused."
+            } else if Self::selection_edit_operation(&request.operation) {
+                "Selection edit request refused."
             } else if is_exposure_key_operation(request.operation.as_str()) {
                 "Exposure key request refused."
             } else if is_exposure_retime_operation(request.operation.as_str()) {
                 "Key retime request refused."
+            } else if is_frame_repeat_operation(request.operation.as_str()) {
+                "Frame repeat request refused."
+            } else if Self::import_batch_operation(&request.operation) {
+                "Import batch request refused."
             } else if request.operation == OP_LAYER_CREATE {
                 "Layer creation request refused."
             } else if request.operation == OP_LAYER_POLICY {
@@ -227,7 +256,35 @@ impl NativeObjectHistory {
                 ),
             ))
         } else {
-            if request.operation == OP_OBJECT_VECTOR {
+            if request.operation == OP_OBJECT_ITEM {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                match self.prepare_item_edit_json(&payload) {
+                    Ok(candidate) => {
+                        let result = candidate.result();
+                        // The echoed stroke id comes from the request; check the complete success envelope
+                        // before publishing. This temporary reply is never retained.
+                        let preflight = RetainedDisposition::Exact {
+                            content_revision: MAX_SAFE_REVISION,
+                            outcome: Ok(CompactResult::ItemEdit(result.clone())),
+                        };
+                        if self.object_reply(request, &preflight).is_err() {
+                            Err((
+                                DispatchErrorCode::InvalidRequest,
+                                "Item edit result exceeds the response bound.",
+                            ))
+                        } else {
+                            self.commit_item_edit(candidate)
+                                .map(|_| CompactResult::ItemEdit(result))
+                                .map_err(|code| (code, "Item edit could not commit."))
+                        }
+                    }
+                    Err(code) => Err((
+                        code,
+                        "Item edit payload or target is invalid or unavailable.",
+                    )),
+                }
+            } else if request.operation == OP_OBJECT_VECTOR {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 match self.prepare_vector_edit_json(&payload) {
@@ -259,6 +316,18 @@ impl NativeObjectHistory {
                 self.dispatch_layer_lifecycle(&request.operation, &request.payload)
             } else if Self::group_operation(&request.operation) {
                 self.dispatch_group(&request.operation, &request.payload)
+            } else if Self::compositing_operation(&request.operation) {
+                self.dispatch_compositing(&request.operation, &request.payload)
+            } else if Self::boolean_operation(&request.operation) {
+                self.dispatch_boolean(&request.operation, &request.payload)
+            } else if Self::selection_edit_operation(&request.operation) {
+                self.dispatch_selection_edit(&request.operation, &request.payload)
+            } else if request.operation == OP_IMAGE_MESH_EDIT {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                self.dispatch_image_mesh_edit(&payload)
+            } else if Self::import_batch_operation(&request.operation) {
+                self.dispatch_import_batch(&request.payload)
             } else if request.operation == OP_LAYER_CREATE {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -292,6 +361,8 @@ impl NativeObjectHistory {
                 self.dispatch_exposure_key(request.operation.as_str(), &request.payload)
             } else if is_exposure_retime_operation(request.operation.as_str()) {
                 self.dispatch_exposure_retime(&request.payload)
+            } else if is_frame_repeat_operation(request.operation.as_str()) {
+                self.dispatch_frame_repeat(request.operation.as_str(), &request.payload)
             } else if request.operation == OP_LAYER_VISIBILITY {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -319,6 +390,8 @@ impl NativeObjectHistory {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 self.dispatch_widget_command(request.operation.as_str(), &payload)
+            } else if is_frame_clipboard_operation(request.operation.as_str()) {
+                self.dispatch_frame_clipboard(request.operation.as_str(), &request.payload)
             } else if request.operation == OP_PROJECT_SETTINGS {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;

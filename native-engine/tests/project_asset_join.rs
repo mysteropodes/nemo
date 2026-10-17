@@ -183,7 +183,7 @@ fn failed_identity_releases_pending_charge_and_existing_pin_stays_unmodified() {
 }
 
 #[test]
-fn image_placement_stays_refused_until_its_raster_owner_exists() {
+fn image_placement_on_an_existing_layer_is_admitted_and_a_dangling_one_charges_nothing() {
     use crate::object_document::{AssetPlacement, AssetTarget};
     let base = project();
     let records = inventory(&base, true).records().to_vec();
@@ -201,9 +201,29 @@ fn image_placement_stays_refused_until_its_raster_owner_exists() {
     let inventory = AssetInventory::new(records, vec![placement], 2, 1).unwrap();
     let value = base.with_asset_inventory(Some(inventory));
     let budget = EncodedRetentionBudget::new(1024).unwrap();
+    // The fixture drawing has exactly one layer, `L`: the image placement is admitted and charges the three
+    // encoded allocations (reference plus the two catalog records), all released when the tickets drop.
+    let tickets = pending_charges(&value, &budget).unwrap();
+    assert_eq!(tickets.len(), 3);
+    drop(tickets);
+    assert_eq!(budget.used(), Ok(0));
+    let dangling = AssetPlacement::new(
+        "p".into(),
+        AssetId::new("first".into()).unwrap(),
+        AssetTarget::Drawing {
+            context_id: "scene-root".into(),
+            layer_uid: "nope".into(),
+            stroke_id: None,
+        },
+        0,
+    )
+    .unwrap();
+    let records = value.asset_inventory().unwrap().records().to_vec();
+    let inventory = AssetInventory::new(records, vec![dangling], 2, 1).unwrap();
+    let missing = base.with_asset_inventory(Some(inventory));
     assert_eq!(
-        pending_charges(&value, &budget).err(),
-        Some("asset image placement unavailable")
+        pending_charges(&missing, &budget).err(),
+        Some("asset placement layer unresolved")
     );
     assert_eq!(budget.used(), Ok(0));
 }

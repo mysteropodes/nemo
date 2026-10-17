@@ -2101,6 +2101,66 @@
       ]
     },
     {
+      "id": "app.native.object.edit.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-edit-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-edit-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.edit.intent.core",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-edit-intent-core.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-edit-intent-core.js"
+      ]
+    },
+    {
+      "id": "app.native.object.edit.seam",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-edit-seam.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-edit-seam.js"
+      ]
+    },
+    {
+      "id": "app.native.object.group.intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-group-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-group-intent.js"
+      ]
+    },
+    {
+      "id": "app.native.object.layer-lifecycle.intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-layer-lifecycle-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-layer-lifecycle-intent.js"
+      ]
+    },
+    {
       "id": "app.native.diagnostics.query.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2581,6 +2641,54 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-font-resources.js"
+      ]
+    },
+    {
+      "id": "app.native.object.item.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-item-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-item-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.item.command",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-item-command.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-item-command.js"
+      ]
+    },
+    {
+      "id": "app.native.object.raster.asset.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-raster-asset.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-raster-asset.js"
+      ]
+    },
+    {
+      "id": "app.native.object.text.layout.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-text-layout.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-text-layout.js"
       ]
     },
     {

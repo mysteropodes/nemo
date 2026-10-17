@@ -25,6 +25,33 @@ impl ProjectStructure {
     pub fn to_json(&self) -> String {
         self.value.to_string()
     }
+
+    /// Ids of the legacy `symbols` table (the components), sorted by id because the retained
+    /// value keeps object members in key order; empty when the table is absent or not an
+    /// object. A read-only listing: the symbol bodies stay opaque and nothing here admits
+    /// them as native components.
+    pub fn component_ids(&self) -> Vec<&str> {
+        self.value
+            .get("symbols")
+            .and_then(Value::as_object)
+            .map(|symbols| symbols.keys().map(String::as_str).collect())
+            .unwrap_or_default()
+    }
+
+    /// `(layerUid, symbolId)` of every identified layer that places a component, in layer
+    /// order. A layer without a uid, or with an empty or non-string `symbolId`, is not listed.
+    pub fn component_instances(&self) -> Vec<(&str, &str)> {
+        let layers = self.value.get("layers").and_then(Value::as_array);
+        layers
+            .into_iter()
+            .flatten()
+            .filter_map(|layer| {
+                let uid = layer.get("layerUid").and_then(Value::as_str)?;
+                let symbol = layer.get("symbolId").and_then(Value::as_str)?;
+                (!uid.is_empty() && !symbol.is_empty()).then_some((uid, symbol))
+            })
+            .collect()
+    }
 }
 
 /// Indices are zero-based; legacy display messages use one-based indices.

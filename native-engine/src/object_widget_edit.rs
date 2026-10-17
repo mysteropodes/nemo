@@ -34,6 +34,9 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::{json, Number};
 
+#[path = "object_image_mesh_edit.rs"]
+mod object_image_mesh_edit;
+pub(crate) use object_image_mesh_edit::PreparedImageMeshEdit;
 #[path = "object_widget_settings.rs"]
 mod settings;
 

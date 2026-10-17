@@ -491,6 +491,10 @@ impl PreparedProjectWire {
             .map_err(|_| ProjectWireError::Invalid)?;
             project = project.with_asset_inventory(Some(inventory));
         }
+        crate::object_codec::validate_item_assets(project.drawing(), project.asset_inventory())
+            .map_err(|_| ProjectWireError::Invalid)?;
+        crate::object_document::resolve_sound_assets(project.drawing(), project.asset_inventory())
+            .map_err(|_| ProjectWireError::Invalid)?;
         Ok(DecodedProjectWire {
             project,
             allocations,

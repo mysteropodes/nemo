@@ -23,3 +23,7 @@ pub(crate) mod native_import_figma_walk;
 #[path = "native_import_psd_plan.rs"]
 #[allow(dead_code)]
 pub(crate) mod native_import_psd_plan;
+
+#[path = "native_import_transaction.rs"]
+#[allow(dead_code)]
+pub(crate) mod native_import_transaction;

@@ -15,12 +15,44 @@ pub(crate) use property_edit::PreparedPropertyEdit;
 #[path = "object_project_settings.rs"]
 mod project_settings;
 pub(crate) use project_settings::PreparedProjectSettings;
+// L10-H (#2116): atomic import batch (sealed candidate + the single publish).
+#[path = "native_import_transaction_owner.rs"]
+mod import_batch;
+pub(crate) use import_batch::{ImportBatchResult, ImportSkipReport, PreparedImportBatch};
+// L05-H (#2134), re-homed from the lane-5 evaluation aggregator: detached frame-clipboard packet kernel (copyFrames).
+#[path = "object_frame_clipboard_packet.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_packet;
+pub(crate) use object_frame_clipboard_packet::FrameClipboardPacket;
+// L05-I (lane #2111): sealed paste / cut / duplicate-selection transactions (pasteFrames, cutFrames, duplicateSelectedFrames).
+#[path = "object_frame_clipboard_paste.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_paste;
+#[path = "object_frame_clipboard_paste_plan.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_paste_plan;
+#[path = "object_frame_clipboard_paste_wire.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_paste_wire;
+pub(crate) use object_frame_clipboard_paste::{
+    CellRef, FrameClipboardOperation, PasteCell, PasteRequest,
+};
+pub(crate) use object_frame_clipboard_paste_plan::{
+    packet_paste_cells, FrameClipboardOutcome, PreparedFrameClipboard,
+};
+pub(crate) use object_frame_clipboard_paste_wire::paste_payload;
+// L04-I (#2110): sealed replacement of the lane-4 component/StoryBoard/duplicator tables.
+#[path = "object_component_commit.rs"]
+#[allow(dead_code)]
+mod component_tables;
+#[allow(unused_imports)]
+pub(crate) use component_tables::{ComponentTablesEdit, PreparedComponentTables};
 #[path = "object_layer_lifecycle_ops.rs"]
 mod layer_lifecycle;
 pub(crate) use layer_lifecycle::PreparedLayerLifecycle;
 #[path = "object_group_ops.rs"]
 mod group_edit;
-pub(crate) use group_edit::PreparedGroupEdit;
+pub(crate) use group_edit::{PreparedBooleanEdit, PreparedGroupEdit};
 // L05-B (#2160), re-homed from the evaluation aggregator: pure document-level frame remap kernel.
 #[path = "object_frame_edit_document.rs"]
 #[allow(dead_code)]
@@ -37,10 +69,23 @@ pub(crate) use object_exposure_edit_key::PreparedExposureKey;
 #[path = "object_exposure_edit_retime.rs"]
 mod object_exposure_edit_retime;
 pub(crate) use object_exposure_edit_retime::PreparedExposureRetime;
+// L05-J1 (lane #2111): sealed Repeat Selection transaction (repeatSelection). Imports L05-I's helpers and L05-B's kernel.
+#[path = "object_frame_clipboard_repeat.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_repeat;
+#[path = "object_frame_clipboard_repeat_wire.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_repeat_wire;
+#[allow(unused_imports)]
+pub(crate) use object_frame_clipboard_repeat::{
+    clamp_times, grown_total, PreparedFrameRepeat, RepeatRequest,
+};
+#[allow(unused_imports)]
+pub(crate) use object_frame_clipboard_repeat_wire::repeat_payload;
 // L03-M (#2109): widget (rig control) transactions; the settings edit is a child of this module.
 #[path = "object_widget_edit.rs"]
 mod widget_edit;
-pub(crate) use widget_edit::PreparedWidgetEdit;
+pub(crate) use widget_edit::{PreparedImageMeshEdit, PreparedWidgetEdit};
 // L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_asset_owner.rs"]
@@ -63,6 +108,17 @@ pub(crate) use vector_edit::order::{
 #[path = "object_layer_policy_edit.rs"]
 mod layer_policy_edit;
 pub(crate) use layer_policy_edit::PreparedLayerPolicy;
+#[path = "scene_effect_layer_edit.rs"]
+pub(crate) mod scene_effect_layer_edit;
+#[path = "object_selection_edit_ops.rs"]
+mod selection_edit;
+pub(crate) use selection_edit::{PasteDestination, PreparedSelectionEdit};
+// L06-L (#2112): sealed raster-item / text-block create, edit and delete over the same revision owner.
+#[path = "object_raster_asset_commands.rs"]
+mod item_commands;
+pub(crate) use item_commands::{ItemEditResult, PreparedItemEdit};
+#[path = "object_text_layout_commands.rs"]
+mod text_commands;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ReferenceEdit {

@@ -256,8 +256,9 @@ fn validate_native_response(
     request: &NativeApplicationRequest,
 ) -> io::Result<()> {
     let policy_command = request.operation == crate::native_contract::layer_policy::OP;
-    let correlated_operation =
-        request.operation == crate::native_contract::metadata::OP || policy_command;
+    let correlated_operation = request.operation == crate::native_contract::metadata::OP
+        || policy_command
+        || crate::native_contract::object_edit::admitted(&request.operation);
     let correlated_identity = !correlated_operation
         || (response.request_id == request.request_id
             && response.instance_id == request.instance_id
@@ -316,6 +317,8 @@ fn validate_native_response(
                         result,
                     ))
                 && crate::native_contract::font::response_matches(request, response)
+                && crate::native_contract::object_edit::response_matches(request, response)
+                && crate::native_contract::item::response_matches(request, response)
                 && crate::native_contract::validate_result(
                     &request.operation,
                     &request.document_id,

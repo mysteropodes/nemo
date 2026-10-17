@@ -3,7 +3,7 @@
 //! layout of the same block.
 use super::super::oracle::{baseline_glyphs, case, layout_of};
 use super::{pins_of, GlyphPin, GlyphPinError};
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::glyph_key;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::glyph_key;
 
 #[test]
 fn the_key_is_the_kernel_identity() {

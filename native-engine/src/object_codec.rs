@@ -20,7 +20,9 @@ pub(crate) use font_assets::{
 pub(crate) use crate::object_document::AssetRecord;
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};
-use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
+use crate::object_document::{
+    ImageMeshStore, ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+};
 pub(crate) use crate::object_document::{Presence, PropertyHolder};
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -98,6 +100,10 @@ mod order;
 #[path = "object_vector_codec.rs"]
 #[allow(dead_code)]
 mod object_vector_codec;
+// L04-I (#2110): admission of the componentTables member (v2 only).
+#[path = "object_component_codec.rs"]
+mod object_component_codec;
+pub(crate) use object_component_codec::validate_component_tables;
 // L02-G (#2108): admission of the per-layer group table.
 #[path = "object_group_codec.rs"]
 mod object_group_codec;
@@ -105,7 +111,13 @@ mod object_group_codec;
 #[path = "object_vector_ext_codec.rs"]
 #[allow(dead_code)]
 mod object_vector_ext_codec;
+// L06-L (#2112): admission of the lane-6 `items` document member (raster items and text blocks).
+#[path = "object_raster_asset_codec.rs"]
+#[allow(dead_code)]
+mod object_raster_asset_codec;
 pub use crate::object_document::OrderedObjectDocument;
+#[allow(unused_imports)]
+pub(crate) use object_raster_asset_codec::{validate_item_assets, validate_item_parts};
 pub use order::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -155,6 +167,9 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         property_holders: wire.property_holders,
         layer_folders: wire.layer_folders,
         composition_order: Presence::Missing,
+        image_meshes: wire.image_meshes,
+        items: wire.items,
+        component_tables: Presence::Missing,
     };
     validate(&document)?;
     Ok(document)
@@ -169,12 +184,16 @@ struct LegacyDocument {
     objects: Vec<ObjectRecord>,
     property_holders: Presence<Vec<PropertyHolder>>,
     layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
+    image_meshes: Presence<ImageMeshStore>,
+    items: Presence<crate::object_document::ItemRecords>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
-    #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>
+    #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
+    #[serde(default)] image_meshes: Presence<ImageMeshStore>,
+    #[serde(default)] items: Presence<crate::object_document::ItemRecords>
 });
 
 /// Explicit core storage admission; both attempts read the original raw bytes.
@@ -204,7 +223,8 @@ pub(crate) fn validate_storage(document: &ObjectDocument) -> Result<(), ObjectCo
             "v2 requires explicit compositionOrder",
         )
     })?;
-    order::validate_storage_order(document, plan)
+    order::validate_storage_order(document, plan)?;
+    validate_component_tables(&document.component_tables, &document.layers)
 }
 
 pub(crate) fn parse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ObjectCodecError> {
@@ -232,6 +252,7 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
     if document.format != OBJECT_DOCUMENT_FORMAT
         || document.format_version != OBJECT_DOCUMENT_FORMAT_VERSION
         || !document.composition_order.missing()
+        || !document.component_tables.missing()
     {
         return Err(reject(
             Unsupported,
@@ -250,7 +271,26 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.layers,
         &document.objects,
         None,
-    )
+    )?;
+    validate_image_meshes(&document.image_meshes)?;
+    object_raster_asset_codec::validate_items(document)
+}
+
+/// L03-J: typed admission of the optional image-mesh table; absent is valid, present is checked whole.
+pub(crate) fn validate_image_meshes(
+    store: &Presence<ImageMeshStore>,
+) -> Result<(), ObjectCodecError> {
+    match store.value() {
+        None => Ok(()),
+        Some(store) => store.validate().map_err(|error| {
+            let kind = if error.is_duplicate() {
+                ObjectCodecErrorKind::DuplicateId
+            } else {
+                ObjectCodecErrorKind::Invalid
+            };
+            ObjectCodecError::new(kind, error.message())
+        }),
+    }
 }
 
 pub(crate) fn validate_layer_organization(
@@ -349,6 +389,9 @@ pub(crate) fn validate_content(
         }
     }
     crate::object_document::validate_widget_layers(declared_layers, objects)
+        .map_err(|error| reject(Invalid, error.message()))?;
+    // L08-J (#2114): layer compositing fields (blend, mattes, effects stack, kind flags).
+    crate::object_document::validate_layer_compositing(declared_layers, objects)
         .map_err(|error| reject(Invalid, error.message()))?;
     let mut targets = HashSet::new();
     for record in objects {

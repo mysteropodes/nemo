@@ -14,8 +14,8 @@
 //! decoded record, so a member the baseline tolerates but the record refuses
 //! (`align: 'justify'`, `textCase: 'weird'`) is a typed refusal.
 
-use crate::evaluation::object_text_layout_kernels::object_text_layout_record::font::FontRef;
-use crate::evaluation::object_text_layout_kernels::object_text_layout_record::{
+use crate::object_document::object_text_layout_kernels::object_text_layout_record::font::FontRef;
+use crate::object_document::object_text_layout_kernels::object_text_layout_record::{
     TextAnchor, TextBlockRecord, TextRecordError,
 };
 use crate::object_document::Presence;

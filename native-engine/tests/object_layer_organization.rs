@@ -143,7 +143,6 @@ fn unresolved_membership_invalid_shape_null_boolean_and_unknown_metadata_refuse(
         // Structural parent/cycle and other family activation stay refused.
         for (key, value) in [
             ("parentLayerUid", json!("L1")),
-            ("isFolderLayer", json!(true)),
             ("solo", json!(false)),
             ("linkGroupId", json!("linked")),
         ] {

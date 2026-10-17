@@ -52,18 +52,18 @@ pub(crate) mod js;
 #[path = "text_glyph_selector_model.rs"]
 pub(crate) mod model;
 
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::PlacedGlyph;
-use crate::evaluation::object_text_layout_kernels::text_glyph_selector::curve::{
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::PlacedGlyph;
+use crate::object_document::object_text_layout_kernels::text_glyph_selector::curve::{
     smooth_noise_1d, Easer,
 };
-use crate::evaluation::object_text_layout_kernels::text_glyph_selector::js::{
+use crate::object_document::object_text_layout_kernels::text_glyph_selector::js::{
     js_max, js_min, js_or,
 };
-use crate::evaluation::object_text_layout_kernels::text_glyph_selector::model::{
+use crate::object_document::object_text_layout_kernels::text_glyph_selector::model::{
     check_selector, finite,
 };
 
-pub(crate) use crate::evaluation::object_text_layout_kernels::text_glyph_selector::model::{
+pub(crate) use crate::object_document::object_text_layout_kernels::text_glyph_selector::model::{
     BasedOn, Selector, SelectorError, SelectorType, Units, MAX_SELECTOR_UNITS, SHAPE_RAMP_DOWN,
     SHAPE_RAMP_UP, SHAPE_ROUND, SHAPE_SMOOTH, SHAPE_SQUARE, SHAPE_TRIANGLE,
 };

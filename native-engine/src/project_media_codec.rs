@@ -232,6 +232,11 @@ pub(crate) fn decode_validated_project(
         let metadata = wire.project.into_metadata()?;
         let drawing = crate::object_codec::decode_storage_project(wire.drawing.get().as_bytes())
             .map_err(ProjectWireError::Drawing)?;
+        crate::object_codec::validate_item_assets(&drawing, None)
+            .map_err(ProjectWireError::Drawing)?;
+        // A bare v1 project has no asset inventory: a StoryBoard sound cannot resolve.
+        crate::object_document::resolve_sound_assets(&drawing, None)
+            .map_err(|_| ProjectWireError::Invalid)?;
         let reference = if wire.viewport_reference.get() == "null" {
             if asset.is_some() {
                 return Err(ProjectWireError::Unsupported);

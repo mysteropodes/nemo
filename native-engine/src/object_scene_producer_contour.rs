@@ -23,13 +23,18 @@
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, PinField, ProducerEntry, ProducerOutput, SceneJoinError, ScenePin,
 };
+use crate::evaluation::object_scene_style_kernels::object_scene_style_item::style_of_record;
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_record, is_vector_record, record_layer_has_active_path_fx,
 };
+use crate::evaluation::object_vector_kernels::render_vector_stroke::{primary_solid, stroke_reach};
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
+use crate::object_render_scene::object_scene_style_emit::prepare_item;
+use crate::object_render_scene::render_vector_path::VectorShape;
 use crate::object_render_scene::{ObjectPaintPlanError, ObjectRenderScene, ObjectSceneError};
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
+use vello::kurbo::BezPath;
 
 /// Producer name in the pinned registry.
 pub(crate) const PRODUCER: &str = "contour";
@@ -37,11 +42,15 @@ pub(crate) const PRODUCER: &str = "contour";
 const UNREPORTED: &str = "contour producer reported the record unavailable";
 
 /// One admitted contour with its typed solid paint, owned by the retained scene.
+/// `drawn` is the geometry the compositor draws when it is not the closed contour itself: the open or closed path of an
+/// `editable-vector-path` record (L01-I). For such a record `contour` is its real closed contour when `ClosedCubicPath`
+/// admits one and its clipping rectangle otherwise; `solid` is the retained primary paint (fill, else stroke, else transparent).
 #[derive(Debug)]
 pub(crate) struct CompiledContour {
     pub(crate) contour: ClosedCubicPath,
     pub(crate) envelope: [f64; 4],
     pub(crate) solid: SceneSolid,
+    pub(crate) drawn: Option<BezPath>,
 }
 
 /// Everything the contour producer reports for one packet. `rejections` holds the
@@ -150,32 +159,26 @@ fn compile(
         contour,
         envelope,
         solid,
+        drawn: None,
     })
 }
 
-/// L01-H (G22/G13): an `editable-vector-path` record reaches the existing fill-only compositor through the one evaluation
-/// join (path effects, then the parametric rebuild, at the packet's pinned frame), so scene, preview and export draw the same
-/// geometry. Only what that compositor draws exactly is admitted: a closed contour with a solid fill, no authored stroke and
-/// opacity 1. Stroke, dash, paint order, opacity and open paths wait for the render/export vector join (L01-I) and stay a
-/// typed refusal, never a silent fill-only drawing.
+/// L01-I (G14): an `editable-vector-path` record reaches the compositor through the one evaluation join (L01-H: path
+/// effects, then the parametric rebuild, at the packet's pinned frame), so scene, viewport preview and export draw the same
+/// geometry:
+/// * its typed style (fill, stroke, paint order, opacity) is L07-I's `style_of_record`, and `prepare_item` must accept it, so
+///   a style the compositor could not draw is a typed refusal here and never a missing or flat shape;
+/// * the drawn path is open or closed exactly as stored (`VectorShape`), with its clipping contour and envelope;
+/// * the retained solid is the fill, else the stroke paint, else transparent: an item without any paint is valid and draws
+///   nothing, exactly as the baseline draws it.
+/// Trim paths, gradient paint and the Motion/camera transforms are other stages and other leaves; none is faked here.
 fn compile_vector(
     packet: &ObjectFramePacket,
     source: ObjectFrameRecord<'_>,
 ) -> Result<CompiledContour, &'static str> {
-    let record = source.record();
-    let body = record
-        .vector()
-        .ok_or("vector record carries no vector body")?;
-    if body.has_real_stroke() {
-        return Err("vector stroke paint awaits the render/export vector join (L01-I)");
-    }
-    if body.opacity.as_f64() != Some(1.0) {
-        return Err("vector opacity awaits the render/export vector join (L01-I)");
-    }
+    let style = style_of_record(source.record()).map_err(|error| error.message())?;
+    prepare_item(&style).map_err(|error| error.message())?;
     let evaluated = evaluate_record(packet, source).map_err(|error| error.message())?;
-    if !evaluated.closed {
-        return Err("open vector paths await the render/export vector join (L01-I)");
-    }
     let segments = evaluated
         .segments
         .iter()
@@ -185,16 +188,13 @@ fn compile_vector(
             handle_out: segment.handle_out,
         })
         .collect::<Vec<_>>();
-    let contour = ClosedCubicPath::new(segments)?;
-    let envelope = contour.transformed_envelope([1., 0., 0., 1., 0., 0.])?;
-    let fill = record
-        .solid_fill()
-        .ok_or("packet record carries no solid fill")?;
-    let solid = SceneSolid::from_fill(fill).map_err(|error| error.message())?;
+    let shape = VectorShape::new(&segments, evaluated.closed, stroke_reach(&style))?;
+    let solid = primary_solid(&style).map_err(|error| error.message())?;
     Ok(CompiledContour {
-        contour,
-        envelope,
+        contour: shape.contour,
+        envelope: shape.envelope,
         solid,
+        drawn: Some(shape.path),
     })
 }
 

@@ -14,16 +14,38 @@ use crate::transaction::StageReceipts;
 mod font_assets;
 #[path = "object_layer_policy_history.rs"]
 mod layer_policy;
+// L06-L (#2112): raster-item / text-block edits use the same history and receipt owner.
+#[path = "object_raster_asset_history.rs"]
+mod item_history;
 #[path = "object_command_dispatch.rs"]
 mod object_command_dispatch;
+// L05-I (lane #2111): frame-clipboard transactions (paste / cut / duplicate selection).
+#[path = "object_frame_clipboard_paste_history.rs"]
+mod object_frame_clipboard_paste;
+// L03-L (#2109): image-mesh edit history wrappers, dispatch body and the tests of the transaction.
+#[path = "object_image_mesh_edit_history.rs"]
+mod object_image_mesh_edit_history;
 #[path = "object_project_settings_history.rs"]
 mod project_settings;
+// L04-I (#2110): component-table replacement as one history transaction.
+#[path = "object_component_history.rs"]
+#[allow(dead_code)]
+mod component_tables;
+// L02-H (#2108): selection delete / duplicate / split and clipboard paste as owner transactions.
+#[path = "object_selection_edit_history.rs"]
+mod selection_edit;
 // L02-F (#2108): layer delete/duplicate/rename/reorder as owner transactions.
 #[path = "object_layer_lifecycle_history.rs"]
 mod layer_lifecycle;
 // L02-G (#2108): group / ungroup / combine / mode / rename as owner transactions.
 #[path = "object_group_history.rs"]
 mod group_history;
+// L08-J (#2114): layer compositing edits and kind-layer creation as owner transactions.
+#[path = "scene_effect_layer_history.rs"]
+mod scene_effect_layer_history;
+// L02-I (#2108): boolean tool / eraser / Flatten as owner transactions.
+#[path = "object_boolean_ops_history.rs"]
+mod boolean_history;
 // L05-C (lane #2111): frame-structure transactions (insert / extend / duplicate / remove frames).
 #[path = "object_frame_edit_structure_history.rs"]
 mod object_frame_edit_structure;
@@ -33,6 +55,9 @@ mod object_exposure_edit_key;
 // L05-E (lane #2111): key retime (moveKeyframe) transaction.
 #[path = "object_exposure_edit_retime_history.rs"]
 mod object_exposure_edit_retime;
+// L05-J1 (lane #2111): Repeat Selection transaction (repeatSelection).
+#[path = "object_frame_clipboard_repeat_history.rs"]
+mod object_frame_clipboard_repeat;
 // L09-H (#2115): placement edits as one history transaction (G42, I16b).
 #[path = "object_media_link_history.rs"]
 #[allow(dead_code)]
@@ -58,6 +83,27 @@ mod project_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_create.rs"]
 mod layer_create_tests;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_apply.rs"]
+mod object_boolean_ops_apply;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_envelope.rs"]
+mod object_boolean_ops_envelope;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_erase.rs"]
+mod object_boolean_ops_erase;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_flatten.rs"]
+mod object_boolean_ops_flatten;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_refusals.rs"]
+mod object_boolean_ops_refusals;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_stack.rs"]
+mod object_boolean_ops_stack;
+#[cfg(test)]
+#[path = "../tests/object_boolean_ops_plan.rs"]
+mod object_boolean_ops_tests;
 #[cfg(test)]
 #[path = "../tests/object_group_ops_chain.rs"]
 mod object_group_ops_chain;
@@ -94,6 +140,30 @@ mod object_layer_lifecycle_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_lifecycle_topology.rs"]
 mod object_layer_lifecycle_topology;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit_atomic.rs"]
+mod object_selection_edit_atomic;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit_clipboard.rs"]
+mod object_selection_edit_clipboard;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit_controls.rs"]
+mod object_selection_edit_controls;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit_delete.rs"]
+mod object_selection_edit_delete;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit_duplicate.rs"]
+mod object_selection_edit_duplicate;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit_split.rs"]
+mod object_selection_edit_split;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit_split_literals.rs"]
+mod object_selection_edit_split_literals;
+#[cfg(test)]
+#[path = "../tests/object_selection_edit.rs"]
+mod object_selection_edit_tests;
 #[cfg(test)]
 #[path = "../tests/object_property_edit.rs"]
 mod property_edit_tests;

@@ -624,6 +624,628 @@
         }
       }
     },
+    "ObjectEditId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Authored stable native identity. The owner enforces at most 128 UTF-8 bytes and no control character; the string syntax cannot establish provenance or uniqueness."
+    },
+    "ObjectLayerSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "active",
+        "selected"
+      ],
+      "properties": {
+        "active": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "selected": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
+        },
+        "anchor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectOpaqueId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "Editor layer selection by stable layerUid. The compact receipt does not carry the resulting selection; adapters rebuild it from the post-revision projection."
+    },
+    "ObjectClipPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "layerUid",
+        "frame",
+        "records"
+      ],
+      "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "records": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "type": "object"
+          }
+        },
+        "groups": {
+          "type": "object"
+        }
+      },
+      "description": "Detached copied selection carried inline. Bounded structural declaration only: the native owner validates every record and remaps every reference atomically. The 4096-byte request envelope bounds the clip."
+    },
+    "ObjectLayerDeletePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "selection"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.delete"
+        },
+        "selection": {
+          "$ref": "#/$defs/ObjectLayerSelection"
+        }
+      }
+    },
+    "ObjectLayerDuplicatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.duplicate"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      }
+    },
+    "ObjectLayerRenamePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "name"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.rename"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "ObjectLayerReorderPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUids",
+        "gap",
+        "selection"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.reorder"
+        },
+        "layerUids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectOpaqueId"
+          }
+        },
+        "gap": {
+          "type": "number"
+        },
+        "selection": {
+          "$ref": "#/$defs/ObjectLayerSelection"
+        }
+      }
+    },
+    "ObjectGroupCreatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "groupId",
+        "name",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.group.create"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "groupId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectGroupUngroupPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.group.ungroup"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectGroupCombinePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "groupId",
+        "mode",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.group.combine"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "groupId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "mode": {
+          "enum": [
+            "none",
+            "unite",
+            "subtract",
+            "intersect",
+            "exclude"
+          ]
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectGroupModeSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "groupId",
+        "mode"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.group.mode.set"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "groupId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "mode": {
+          "enum": [
+            "none",
+            "unite",
+            "subtract",
+            "intersect",
+            "exclude"
+          ]
+        }
+      }
+    },
+    "ObjectGroupRenamePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "groupId",
+        "name"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.group.rename"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "groupId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "ObjectGroupMemberRemovePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "strokeId"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.group.member.remove"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectEditId"
+        }
+      }
+    },
+    "ObjectSelectionDeletePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame",
+        "mode",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.selection.delete"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "mode": {
+          "enum": [
+            "animation2d",
+            "motion"
+          ]
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectSelectionDuplicatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame",
+        "mode",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.selection.duplicate"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "mode": {
+          "enum": [
+            "animation2d",
+            "motion"
+          ]
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectLayerSplitPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame",
+        "labels"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.split"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "shape",
+            "stroke"
+          ],
+          "properties": {
+            "shape": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "stroke": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        }
+      }
+    },
+    "ObjectClipboardPastePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame",
+        "mode",
+        "clip"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.clipboard.paste"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "mode": {
+          "enum": [
+            "animation2d",
+            "motion"
+          ]
+        },
+        "clip": {
+          "$ref": "#/$defs/ObjectClipPayload"
+        }
+      }
+    },
+    "ObjectBooleanApplyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "mode",
+        "layerUid",
+        "contextId",
+        "frame",
+        "strokeIds"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.boolean.apply"
+        },
+        "mode": {
+          "enum": [
+            "unite",
+            "subtract",
+            "intersect",
+            "exclude"
+          ]
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
+    },
+    "ObjectBooleanErasePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "frame",
+        "strokeId",
+        "footprint"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.boolean.erase"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "footprint": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 1024,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "ObjectBooleanFlattenPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "frame",
+        "groupId"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.boolean.flatten"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "groupId": {
+          "$ref": "#/$defs/ObjectEditId"
+        }
+      }
+    },
     "ObjectQueryResult": {
       "type": "object",
       "additionalProperties": false,
@@ -1169,6 +1791,295 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.delete"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerDeletePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.duplicate"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerDuplicatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.rename"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerRenamePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.reorder"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerReorderPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.group.create"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectGroupCreatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.group.ungroup"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectGroupUngroupPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.group.combine"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectGroupCombinePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.group.mode.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectGroupModeSetPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.group.rename"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectGroupRenamePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.group.member.remove"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectGroupMemberRemovePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.selection.delete"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectSelectionDeletePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.selection.duplicate"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectSelectionDuplicatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.split"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerSplitPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.clipboard.paste"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectClipboardPastePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.boolean.apply"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectBooleanApplyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.boolean.erase"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectBooleanErasePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.boolean.flatten"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectBooleanFlattenPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/ForbiddenRevisionRequest"
             },
             {
@@ -1596,6 +2507,57 @@
                 },
                 "payload": {
                   "$ref": "native-font-assets-v1.schema.json#/$defs/Query"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.item.edit"
+                },
+                "payload": {
+                  "$ref": "native-object-item-v1.schema.json#/$defs/ItemEdit"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.asset.attach"
+                },
+                "payload": {
+                  "$ref": "native-object-item-v1.schema.json#/$defs/AssetAttach"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.asset.remove"
+                },
+                "payload": {
+                  "$ref": "native-object-item-v1.schema.json#/$defs/AssetRemove"
                 }
               }
             }
@@ -2402,6 +3364,9 @@
             },
             {
               "$ref": "#/$defs/JobReceipt"
+            },
+            {
+              "$ref": "native-object-item-v1.schema.json#/$defs/ItemEditResult"
             }
           ]
         },

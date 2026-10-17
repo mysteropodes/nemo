@@ -23,7 +23,7 @@
 //! * `U basedOn c:w:l | idx` (`unitIndexOf`), `C basedOn c:w:l,.. | n`
 //!   (`taUnitCount`, `~` is no strokes).
 
-use crate::evaluation::object_text_layout_kernels::text_glyph_selector::{
+use crate::object_document::object_text_layout_kernels::text_glyph_selector::{
     BasedOn, Selector, SelectorType, UnitIndices, Units, SHAPE_SMOOTH,
 };
 

@@ -13,6 +13,15 @@ pub(crate) mod text_glyph_contours;
 #[allow(dead_code)]
 pub(crate) mod object_text_layout_record;
 
+#[path = "text_glyph_source.rs"]
+#[allow(dead_code)]
+pub(crate) mod text_glyph_source;
+
+#[cfg(feature = "commands")] // its only non-document dependency is crate::revision::ObjectSnapshot
+#[path = "object_text_layout_retained.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_text_layout_retained;
+
 #[path = "text_glyph_selector.rs"]
 #[allow(dead_code)]
 pub(crate) mod text_glyph_selector;

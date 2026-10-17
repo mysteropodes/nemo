@@ -5,7 +5,7 @@
 //! mutation controls in `text_glyph_selector_mutations.rs`.
 
 use super::{weight_at, weights, Selector, SelectorError, SelectorType, MAX_SELECTOR_UNITS};
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::MAX_TEXT_UNITS;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::MAX_TEXT_UNITS;
 
 fn wiggly() -> Selector {
     Selector {

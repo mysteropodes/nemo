@@ -3,8 +3,8 @@
 //! request. Refusals and capture from root data are in the sibling test files.
 use super::oracle::{catalog, minimal, with, FULL, MINIMAL};
 use super::TextBlockRecord;
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::layout_text;
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::{
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::layout_text;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::{
     TextAlign, TextCase, TextLayoutError, TextStyle,
 };
 use serde_json::{json, Value};

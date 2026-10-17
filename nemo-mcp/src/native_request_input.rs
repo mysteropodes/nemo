@@ -49,6 +49,18 @@ impl NativeApplicationRequest {
                 "native object selector does not match its declared contract".into(),
             ));
         }
+        if crate::native_contract::object_edit::admitted(&self.operation) {
+            if self.expected_revision.is_none() {
+                return Err(RequestError::InvalidRequest(
+                    "native object edit command requires expectedRevision".into(),
+                ));
+            }
+            if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+                return Err(RequestError::InvalidRequest(
+                    "native object edit command does not match its declared contract".into(),
+                ));
+            }
+        }
         if matches!(
             self.operation.as_str(),
             "command.document.object.layer.visibility.set"
@@ -56,9 +68,14 @@ impl NativeApplicationRequest {
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
                 | crate::native_contract::font::IMPORT
+                | crate::native_contract::item::ITEM
+                | crate::native_contract::item::ATTACH
+                | crate::native_contract::item::REMOVE
         ) {
             let action = if self.operation == crate::native_contract::font::IMPORT {
                 "font import"
+            } else if crate::native_contract::item::owns(&self.operation) {
+                "item or asset"
             } else if self.operation == crate::native_contract::layer_policy::OP {
                 "layer policy"
             } else if self.operation.ends_with(".settings.edit") {

@@ -37,9 +37,14 @@
         "src/native_diagnostics_contract.rs",
         "src/native_layer_policy_contract.rs",
         "src/native_layer_policy_wire_tests.rs",
+        "src/native_object_edit_contract.rs",
+        "src/native_object_edit_contract_tests.rs",
+        "src/native_object_edit_receipt_tests.rs",
         "src/native_contract_tests.rs",
         "src/native_font_contract.rs",
-        "src/native_font_contract_tests.rs"
+        "src/native_font_contract_tests.rs",
+        "src/native_item_contract.rs",
+        "src/native_item_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

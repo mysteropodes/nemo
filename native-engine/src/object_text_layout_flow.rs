@@ -11,7 +11,7 @@
 //! (`cur + ' ' + word`), which repeats the baseline's addition sequence bit
 //! for bit instead of re-measuring the joined string each word.
 
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::TextCase;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::TextCase;
 
 /// Half-open range of UTF-16 units of the displayed (case-mapped) text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

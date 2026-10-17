@@ -1,0 +1,121 @@
+{
+ "baseline": "fbe4b8a33e6d5a229f014154df2ba21988a9fabc",
+ "imagesJsSha256": "c6c2e240935b1eba9d80244ae70b36d6b4d4556dbf3a2307990374906a2796a7",
+ "dialogExtensions": [
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "bmp",
+  "svg",
+  "avif"
+ ],
+ "rows": [
+  {
+   "path": "/Users/a/Pictures/photo.png",
+   "baseName": "photo.png",
+   "ext": "png",
+   "name": "photo",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "C:\\Art\\Sprite.PNG",
+   "baseName": "Sprite.PNG",
+   "ext": "png",
+   "name": "Sprite",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "/x/archive.tar.gz",
+   "baseName": "archive.tar.gz",
+   "ext": "gz",
+   "name": "archive.tar",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "/x/.png",
+   "baseName": ".png",
+   "ext": "png",
+   "name": "",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "/x/noext",
+   "baseName": "noext",
+   "ext": "",
+   "name": "noext",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "/x/trailing/",
+   "baseName": "",
+   "ext": "",
+   "name": "",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "/x/pic.jpeg",
+   "baseName": "pic.jpeg",
+   "ext": "jpeg",
+   "name": "pic",
+   "mediaType": "image/jpeg"
+  },
+  {
+   "path": "/x/anim.GIF",
+   "baseName": "anim.GIF",
+   "ext": "gif",
+   "name": "anim",
+   "mediaType": "image/gif"
+  },
+  {
+   "path": "/x/logo.svg",
+   "baseName": "logo.svg",
+   "ext": "svg",
+   "name": "logo",
+   "mediaType": "image/svg+xml"
+  },
+  {
+   "path": "/x/photo.tiff",
+   "baseName": "photo.tiff",
+   "ext": "tiff",
+   "name": "photo",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "/x/ünï cödé.webp",
+   "baseName": "ünï cödé.webp",
+   "ext": "webp",
+   "name": "ünï cödé",
+   "mediaType": "image/webp"
+  },
+  {
+   "path": "/x/a.b.avif",
+   "baseName": "a.b.avif",
+   "ext": "avif",
+   "name": "a.b",
+   "mediaType": "image/avif"
+  },
+  {
+   "path": "/x/dir.d/noext",
+   "baseName": "noext",
+   "ext": "d/noext",
+   "name": "noext",
+   "mediaType": "image/png"
+  },
+  {
+   "path": "/x/shot.bmp",
+   "baseName": "shot.bmp",
+   "ext": "bmp",
+   "name": "shot",
+   "mediaType": "image/bmp"
+  },
+  {
+   "path": "/x/cover.jpg",
+   "baseName": "cover.jpg",
+   "ext": "jpg",
+   "name": "cover",
+   "mediaType": "image/jpeg"
+  }
+ ]
+}

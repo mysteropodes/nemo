@@ -7,6 +7,10 @@ use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
 pub use crate::revision::ObjectSnapshot;
+// L03-L (#2109): image-mesh retopology through the evaluation kernel (commands may not import it).
+#[path = "object_image_mesh_edit_read.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_image_mesh_edit_read;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_dispatch.rs"]
 mod property_metadata_dispatch_tests;

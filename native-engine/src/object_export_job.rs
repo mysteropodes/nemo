@@ -1,4 +1,5 @@
 //! A bounded pinned object frame sequence. The host must reconcile before releasing this job.
+use crate::export_job::native_media_export::native_media_export_job::declared_resources;
 use crate::export_job::native_media_export::native_media_export_plan::{
     frame_file_name, FrameFormat,
 };
@@ -139,7 +140,7 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
             pins.frame,
             "final",
             request.output.clone(),
-            [],
+            declared_resources(&witness),
         )
         .map_err(|e| invalid(e.to_string()))?;
         let work = self
@@ -370,7 +371,7 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
                 pins.frame,
                 "final",
                 job.request.output.clone(),
-                [],
+                declared_resources(&witness),
             )
             .map_err(|error| error.to_string())?;
             job.work = self

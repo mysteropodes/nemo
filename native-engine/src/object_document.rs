@@ -42,6 +42,14 @@ pub(crate) use timing::{RetimeEdit, RetimePair, RetimePlan};
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;
+// L03-J (#2109, F17): lane-3 image-mesh store record; the document carries it as an optional member.
+#[path = "object_image_mesh_record.rs"]
+#[allow(dead_code)]
+mod object_image_mesh_record;
+#[allow(unused_imports)]
+pub(crate) use object_image_mesh_record::{
+    ImageMesh, ImageMeshAdmissionError, ImageMeshStore, MeshIdSequence,
+};
 // L09-A (#2126): private lane-9 media timing aggregator; its kernels are private children there.
 #[path = "object_media_timing_core.rs"]
 #[allow(dead_code)]
@@ -56,6 +64,20 @@ pub(crate) use object_group_kernels::object_group_record::GroupTable;
 #[path = "object_raster_asset_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_raster_asset_kernels;
+// L06-A/B/F (#2135, #2136, #2175) re-homed by L06-L (#2112): the text layout / glyph family aggregator is declared from
+// the document layer because the text block record is a document member (object_raster_asset_record.rs).
+#[path = "object_text_layout_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_text_layout_kernels;
+// L06-L (#2112): raster items and text blocks as the additive `items` document member.
+#[path = "object_raster_asset_record.rs"]
+#[allow(dead_code)]
+mod item_records;
+#[allow(unused_imports)]
+pub(crate) use item_records::{
+    font_asset_issue, item_asset_issue, raster_asset_issue, text_holder_id, ItemAssetIssue,
+    ItemRecords, RasterEntry, TextEntry,
+};
 // L04-G (#2110): lane-4 component/StoryBoard/duplicator record family aggregator.
 #[path = "object_component_record_kernels.rs"]
 #[allow(dead_code)]
@@ -66,6 +88,15 @@ pub(crate) mod object_component_record_kernels;
 #[allow(dead_code)]
 mod vector_record;
 pub(crate) use vector_record::{VectorBody, VECTOR_FAMILY};
+
+// L04-I (#2110): optional lane-4 component/StoryBoard/duplicator tables (a v2 member).
+#[path = "object_component_document.rs"]
+#[allow(dead_code)]
+mod object_component_document;
+#[allow(unused_imports)]
+pub(crate) use object_component_document::{
+    resolve_sound_assets, ComponentTables, SoundAssetError,
+};
 
 // L03-K (#2109): widget (rig control) layer record, F19; a private child like the other document members.
 #[path = "object_widget_record.rs"]
@@ -95,6 +126,16 @@ pub(crate) use path_effects_record::{PathFxRecord, PATH_FX_TYPE_IDS};
 mod vector_ext;
 pub(crate) use vector_ext::VectorExt;
 
+// L08-J (#2114): layer compositing fields; transactions are scene_effect_layer_edit.rs / _history.rs.
+#[path = "scene_effect_layer_record.rs"]
+#[allow(dead_code)]
+mod scene_effect_layer_record;
+#[allow(unused_imports)]
+pub(crate) use scene_effect_layer_record::{
+    blend_write, freeze_legacy_matte_sources, remap_compositing_refs, validate_layer_compositing,
+    LayerEffect, MatteRef, BLEND_MODE_NAMES, MATTE_MODE_NAMES,
+};
+
 #[path = "object_layer_organization.rs"]
 mod organization;
 pub(crate) use organization::validate_layer_organization;
@@ -119,6 +160,13 @@ pub struct ObjectDocument {
     pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) composition_order: Presence<OrderPlan>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) image_meshes: Presence<ImageMeshStore>,
+    /// Raster items and text blocks (L06-L); absent when the document holds none.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) items: Presence<ItemRecords>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) component_tables: Presence<ComponentTables>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -150,6 +198,24 @@ pub struct ObjectLayer {
     /// Absent: the layer never had a group table. Present: an authored table (possibly empty).
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) groups: Presence<GroupTable>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) blend_mode: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) matte_mode: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) matte_source_layer_uid: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) mattes_more: Presence<Vec<MatteRef>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_effect_layer: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_folder_layer: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) folder_collapsed: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) effects: Presence<Vec<LayerEffect>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) effects_from: Presence<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -275,7 +341,10 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
     #[serde(default)] layer_folders: Presence<Option<LayerFolders>>,
-    #[serde(default)] composition_order: Presence<OrderPlan> });
+    #[serde(default)] composition_order: Presence<OrderPlan>,
+    #[serde(default)] image_meshes: Presence<ImageMeshStore>,
+    #[serde(default)] items: Presence<ItemRecords>,
+    #[serde(default)] component_tables: Presence<ComponentTables> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
     #[serde(default)] color: Presence<String>,
@@ -285,7 +354,12 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] timing: Presence<LayerTiming>,
     #[serde(default)] path_fx: Presence<Vec<PathFxRecord>>,
     #[serde(default)] widget: Presence<WidgetRecord>,
-    #[serde(default)] groups: Presence<GroupTable> });
+    #[serde(default)] groups: Presence<GroupTable>,
+    #[serde(default)] blend_mode: Presence<String>, #[serde(default)] matte_mode: Presence<String>,
+    #[serde(default)] matte_source_layer_uid: Presence<String>, #[serde(default)] mattes_more: Presence<Vec<MatteRef>>,
+    #[serde(default)] is_effect_layer: Presence<bool>, #[serde(default)] is_folder_layer: Presence<bool>,
+    #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,
+    #[serde(default)] effects_from: Presence<String> });
 object_deserialize!(ObjectTarget {
     context_id: String,
     frame_scope: FrameScope,
@@ -332,6 +406,11 @@ impl ObjectDocument {
     /// Immutable authored holder metadata; absence is not an empty authored table.
     pub fn property_holders(&self) -> Option<&[PropertyHolder]> {
         self.property_holders.value().map(Vec::as_slice)
+    }
+    /// Immutable authored image-mesh table; absence is not an empty table.
+    #[allow(dead_code)]
+    pub(crate) fn image_meshes(&self) -> Option<&ImageMeshStore> {
+        self.image_meshes.value()
     }
     pub fn format_version(&self) -> u32 {
         self.format_version
@@ -409,9 +488,7 @@ impl ObjectLayer {
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Present(LayerTiming::blank_drawing()),
-            path_fx: Presence::Missing,
-            widget: Presence::Missing,
-            groups: Presence::Missing,
+            ..Self::identified(String::new())
         }
     }
     /// Identified, unnamed layer with earlier native-file visibility semantics.
@@ -429,6 +506,15 @@ impl ObjectLayer {
             path_fx: Presence::Missing,
             widget: Presence::Missing,
             groups: Presence::Missing,
+            blend_mode: Presence::Missing,
+            matte_mode: Presence::Missing,
+            matte_source_layer_uid: Presence::Missing,
+            mattes_more: Presence::Missing,
+            is_effect_layer: Presence::Missing,
+            is_folder_layer: Presence::Missing,
+            folder_collapsed: Presence::Missing,
+            effects: Presence::Missing,
+            effects_from: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {

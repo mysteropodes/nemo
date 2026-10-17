@@ -17,6 +17,11 @@ pub(crate) mod object_scene_style_paint;
 #[allow(dead_code)]
 pub(crate) mod object_scene_style_stroke;
 
+// L07-I: typed item style (record -> fill, stroke, paint order) over the paint and stroke kernels.
+#[path = "object_scene_style_item.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_style_item;
+
 // L07-C: private pinned multi-producer scene join (ScenePin, plan order, unavailable entries, declared resources).
 #[path = "object_scene_producer_pin.rs"]
 #[allow(dead_code)]
@@ -37,3 +42,19 @@ pub(crate) mod object_scene_producer_component;
 #[path = "object_scene_producer_component_shape.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_scene_producer_component_shape;
+
+// L07-L (#2113): rig-posed stroke and image-mesh producer (I16a, G03a) joined through the L07-C registry.
+#[path = "object_scene_producer_rig.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_rig;
+
+// L07-K (#2113): component evaluated-shape producer join (D32, I16a): select -> scene (layer-slot pin join) -> join (producer).
+#[path = "object_scene_producer_component_join.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_component_join;
+#[path = "object_scene_producer_component_scene.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_component_scene;
+#[path = "object_scene_producer_component_select.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_component_select;

@@ -3,8 +3,8 @@
 //! that the oracle comparison, the strict decoder or a named equality rejects it.
 use super::oracle::{baseline_glyphs, case, catalog, native_glyphs};
 use super::{TextBlockRecord, TextRecordError};
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::layout_text;
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::TextCase;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::layout_text;
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::TextCase;
 use serde_json::{json, Value};
 
 const MEMBERS: [&str; 16] = [

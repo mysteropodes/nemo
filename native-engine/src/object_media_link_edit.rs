@@ -14,17 +14,19 @@
 //! (`scene-root` when there is none), the layer is a document layer and an
 //! element is an authored record of that context and layer.
 //!
-//! Only `Video` assets on a drawing layer are admitted. Everything else keeps
-//! the typed refusal the codec had before placements existed, and names the
-//! owner that has to lift it: `Image` (raster asset items, lane 6), `Audio`
-//! (a native audio-track record does not exist yet) and `Font` (retained
-//! fonts). No decode, file access, clock or history lives here.
+//! `Video` and `Image` assets on a drawing are admitted. An image resolves its
+//! element through `image_element_exists` (lane 6: an authored path record or
+//! raster item). Everything else keeps the typed refusal the codec had before
+//! placements existed, and names the owner that has to lift it: `Audio` (a
+//! native audio-track record does not exist yet) and `Font` (retained fonts).
+//! No decode, file access, clock or history lives here.
 //!
 //! The relative edit [`PlacementEdit::ShiftOffset`] is the audio-track drag of
 //! `src/js/audio-bridge.js` (`startOffset + Math.round(dx / FC)`) in whole
 //! frames; like the catalog it refuses a result beyond +-(2^53 - 1) instead of
 //! rounding it the way a JS double would.
 
+use crate::object_document::object_raster_asset_kernels::object_raster_asset_placement::image_element_exists;
 use crate::object_document::{
     AssetId, AssetInventory, AssetKind, AssetPlacement, AssetTarget, FrameScopeKind, ObjectDocument,
 };
@@ -41,7 +43,7 @@ const MAX_FRAME_OFFSET: u64 = 9_007_199_254_740_991;
 pub(crate) enum PlacementRefusal {
     /// The asset id is not in the catalog (an inventory cannot hold one).
     Asset,
-    /// Image placements belong to the raster asset owner.
+    /// A drawing target of an asset kind that is neither Image nor Video (the catalog constructor never builds one).
     ImageOwner,
     /// Audio placements need a native audio-track record; none exists.
     AudioTrackOwner,
@@ -143,6 +145,23 @@ pub(crate) fn check_placement(
             layer_uid.as_str(),
             stroke_id.as_deref(),
         ),
+        (
+            AssetTarget::Drawing {
+                context_id,
+                layer_uid,
+                stroke_id,
+            },
+            AssetKind::Image,
+        ) => {
+            // Context and layer resolve exactly as for a video; an element must be an image holder.
+            resolve_drawing(document, context_id.as_str(), layer_uid.as_str(), None)?;
+            match stroke_id.as_deref() {
+                Some(stroke) if !image_element_exists(document, context_id, layer_uid, stroke) => {
+                    Err(PlacementRefusal::Element)
+                }
+                _ => Ok(()),
+            }
+        }
         (AssetTarget::Drawing { .. }, _) => Err(PlacementRefusal::ImageOwner),
         (AssetTarget::AudioTrack { .. }, _) => Err(PlacementRefusal::AudioTrackOwner),
         (AssetTarget::Text { .. }, _) => Err(PlacementRefusal::FontOwner),

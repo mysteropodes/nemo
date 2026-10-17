@@ -952,7 +952,7 @@ test('L06-A text layout kernel stays a private evaluation child and fails closed
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
   assert.match(coverage.nativeObjectTextLayoutKernelRegistration, /L06-A\/#2135/);
-  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
   assert.match(familyParentText, /#\[path = "object_text_layout_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernels;/);
   const evaluationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_text_layout_kernels.rs'), 'utf8');
   assert.match(evaluationText, /#\[path = "object_text_layout_kernel\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernel;/);
@@ -1264,8 +1264,10 @@ test('L05-H frame clipboard packet kernel stays a private commands child and fai
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
   assert.match(coverage.nativeFrameClipboardPacketRegistration, /L05-H\/#2134/);
-  const commandsText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_frame_edit_kernels.rs'), 'utf8');
-  assert.match(commandsText, /#\[path = "object_frame_clipboard_packet\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_frame_clipboard_packet;/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_frame_edit_kernels.rs'), 'utf8');
+  assert.doesNotMatch(aggregatorText, /object_frame_clipboard_packet/);
+  const ownerText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_fill_owner.rs'), 'utf8');
+  assert.match(ownerText, /#\[path = "object_frame_clipboard_packet\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_frame_clipboard_packet;/);
   const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
   assert.match(familyParentText, /#\[path = "object_frame_edit_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_frame_edit_kernels;/);
   const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_frame_clipboard_packet.rs'), 'utf8');
@@ -1275,7 +1277,7 @@ test('L05-H frame clipboard packet kernel stays a private commands child and fai
     assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
   }
   for (const [id, file] of [
-    ['rust.native.engine.evaluation', 'native-engine/src/object_frame_clipboard_packet.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_clipboard_packet.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_packet.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_packet_render.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_packet_literals.rs'],
@@ -1729,7 +1731,7 @@ test('L06-B glyph contour kernel stays a private lane-6 child and fails closed w
   assert.match(coverage.nativeTextGlyphContoursRegistration, /L06-B\/#2136/);
   const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_text_layout_kernels.rs'), 'utf8');
   assert.match(aggregatorText, /#\[path = "text_glyph_contours\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod text_glyph_contours;/);
-  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
   assert.match(familyParentText, /#\[path = "object_text_layout_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernels;/);
   const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/text_glyph_contours.rs'), 'utf8');
   assert.match(kernelText, /#\[path = "text_glyph_contours_shear\.rs"\]\s*pub\(crate\) mod shear;/);
@@ -2007,7 +2009,8 @@ test('L07-F contour producer join stays a private render-scene child and fails c
   const planText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_paint_plan.rs'), 'utf8');
   assert.match(planText, /object_scene_producer_contour::command_sequence\(scene, expected\)\?/);
   const compositorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_compositor.rs'), 'utf8');
-  assert.match(compositorText, /\.solid\(\)\s*\.rgba_f32\(\)/);
+  assert.match(compositorText, /prepare_item\(&style\)/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'native-engine/src/object_scene_style_emit.rs'), 'utf8'), /\.rgba_f32\(\)/);
   const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_scene_producer_contour.rs'), 'utf8');
   assert.doesNotMatch(kernelText, /super::/);
   for (const [name, mod] of [
@@ -2393,7 +2396,7 @@ test('L06-F text block record stays a private lane-6 child and fails closed with
     const childText = fs.readFileSync(path.join(ROOT, `native-engine/src/${source}.rs`), 'utf8');
     assert.match(childText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod tests;`));
   }
-  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
   assert.match(familyParentText, /#\[path = "object_text_layout_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernels;/);
   for (const [id, file] of [
     ['rust.native.engine.evaluation', 'native-engine/src/object_text_layout_record.rs'],
@@ -2986,7 +2989,7 @@ test('L06-G text range-selector kernel stays a private lane-6 child and fails cl
   assert.match(coverage.nativeTextGlyphSelectorRegistration, /L06-G\/#2200/);
   const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_text_layout_kernels.rs'), 'utf8');
   assert.match(aggregatorText, /#\[path = "text_glyph_selector\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod text_glyph_selector;/);
-  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
   assert.match(familyParentText, /#\[path = "object_text_layout_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernels;/);
   const driverText = fs.readFileSync(path.join(ROOT, 'native-engine/src/text_glyph_selector.rs'), 'utf8');
   for (const child of ['curve', 'js', 'model']) {
@@ -3246,13 +3249,13 @@ test('L02-G group record and transactions stay private kernel/codec/owner/histor
     /#\[path = "object_group_plan\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_group_plan;\s*#\[path = "object_group_record\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_group_record;/);
   assert.match(source('object_document.rs'), /pub\(crate\) use object_group_kernels::object_group_record::GroupTable;/);
   assert.match(source('object_document.rs'), /pub\(crate\) groups: Presence<GroupTable>,/);
-  assert.match(source('object_document.rs'), /#\[serde\(default\)\] groups: Presence<GroupTable> \}\);/);
+  assert.match(source('object_document.rs'), /#\[serde\(default\)\] groups: Presence<GroupTable>(?: \}\);|,)/);
   assert.match(source('object_codec.rs'), /#\[path = "object_group_codec\.rs"\]\s*mod object_group_codec;/);
   assert.match(source('object_codec.rs'), /object_group_codec::validate_group_table\(/);
   assert.match(source('object_group_codec.rs'),
     /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_group_ops_admission\.rs"\]\s*mod object_group_ops_admission;\s*#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_group_ops_admission_limits\.rs"\]\s*mod object_group_ops_admission_limits;/);
-  assert.match(source('object_fill_owner.rs'), /#\[path = "object_group_ops\.rs"\]\s*mod group_edit;\s*pub\(crate\) use group_edit::PreparedGroupEdit;/);
-  assert.match(source('commands.rs'), /ObjectFillOwner, PreparedGroupEdit, /);
+  assert.match(source('object_fill_owner.rs'), /#\[path = "object_group_ops\.rs"\]\s*mod group_edit;\s*pub\(crate\) use group_edit::(?:\{PreparedBooleanEdit, PreparedGroupEdit\}|PreparedGroupEdit);/);
+  assert.match(source('commands.rs'), /pub\(crate\) use object_fill_owner::\{[^}]*\bPreparedGroupEdit\b[^}]*\};/);
   assert.match(source('object_group_ops.rs'), /#\[path = "object_group_payload\.rs"\]\s*mod wire;/);
   assert.match(source('object_group_ops.rs'),
     /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_group_ops_refusals\.rs"\]\s*mod object_group_ops_refusals;/);
@@ -3447,7 +3450,7 @@ test('L03-M widget transactions stay private command children behind the shared 
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
   assert.match(coverage.nativeObjectWidgetEditRegistration, /L03-M\/#2209/);
   const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
-  assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_widget_edit\.rs"\]\s*mod widget_edit;\s*pub\(crate\) use widget_edit::PreparedWidgetEdit;/);
+  assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_widget_edit\.rs"\]\s*mod widget_edit;\s*pub\(crate\) use widget_edit::\{PreparedImageMeshEdit, PreparedWidgetEdit\};/);
   assert.match(read('native-engine/src/object_snapshot.rs'), /#\[path = "object_widget_read\.rs"\]\s*pub\(crate\) mod widget_read;/);
   const editText = read('native-engine/src/object_widget_edit.rs');
   assert.match(editText, /#\[path = "object_widget_settings\.rs"\]\s*mod settings;/);
@@ -3597,6 +3600,1480 @@ test('L09-H placement persistence stays private document, codec, owner, history 
     ['rust.native.engine.tests', 'native-engine/tests/object_media_link_history_refusals.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_media_link_track.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_media_link_track_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L07-I scene style consumer stays a private evaluation and render-scene child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectSceneStyleEmitRegistration, /L07-I\/#2218/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_scene_style_kernels.rs'), /#\[path = "object_scene_style_item\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_scene_style_item;/);
+  assert.match(read('native-engine/src/object_render_scene.rs'), /#\[path = "object_scene_style_emit\.rs"\]\s*pub\(crate\) mod object_scene_style_emit;/);
+  assert.match(read('native-engine/src/object_paint_plan.rs'), /SceneItemStyle::solid_fill\(self\.solid\(\)\.clone\(\)\)/);
+  const compositorText = read('native-engine/src/object_compositor.rs');
+  assert.match(compositorText, /prepare_item\(&style\)/);
+  assert.match(compositorText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_scene_style_emit_gpu\.rs"\]\s*mod object_scene_style_emit_gpu;/);
+  assert.doesNotMatch(compositorText, /self\.scene\.fill\(/);
+  for (const file of ['object_scene_style_item', 'object_scene_style_emit']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}.rs`), /super::/);
+  }
+  const itemText = read('native-engine/src/object_scene_style_item.rs');
+  for (const [name, mod] of [['object_scene_style_item_controls', 'controls'], ['object_scene_style_item', 'tests']]) {
+    assert.match(itemText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const emitText = read('native-engine/src/object_scene_style_emit.rs');
+  for (const [name, mod, vis] of [
+    ['object_scene_style_emit_controls', 'controls', ''],
+    ['object_scene_style_emit_rows', 'rows', 'pub(crate) '],
+    ['object_scene_style_emit', 'tests', ''],
+  ]) {
+    assert.match(emitText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*${vis.replace(/[()]/g, '\\$&')}mod ${mod};`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_scene_style_item.rs'],
+    ['rust.native.engine.render-scene', 'native-engine/src/object_scene_style_emit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_item.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_item_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_emit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_emit_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_emit_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_style_emit_gpu.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('G14 vector render/export join stays private lane children and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeVectorRenderJoinRegistration, /L01-I\/#2223/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_vector_kernels.rs'), /#\[path = "render_vector_stroke\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod render_vector_stroke;/);
+  assert.match(read('native-engine/src/object_render_scene.rs'), /#\[path = "render_vector_path\.rs"\]\s*pub\(crate\) mod render_vector_path;/);
+  assert.match(read('native-engine/src/render_vector_stroke.rs'), /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/render_vector_stroke\.rs"\]\s*mod tests;/);
+  assert.match(read('native-engine/src/render_vector_path.rs'), /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/render_vector_path\.rs"\]\s*mod tests;/);
+  const compositorText = read('native-engine/src/object_compositor.rs');
+  assert.match(compositorText, /#\[path = "\.\.\/tests\/render_vector_pixels\.rs"\]\s*mod render_vector_pixels;/);
+  assert.match(compositorText, /#\[cfg\(all\(test, feature = "export_job"\)\)\]\s*#\[path = "\.\.\/tests\/render_vector_export_parity\.rs"\]\s*mod render_vector_export_parity;/);
+  assert.match(compositorText, /command\.path\(\)/);
+  assert.doesNotMatch(compositorText, /command\.contour\(\)\.path\(\)/);
+  const funnelText = read('native-engine/src/object_scene_producer_contour.rs');
+  assert.match(funnelText, /VectorShape::new\(/);
+  assert.match(funnelText, /drawn: Some\(shape\.path\)/);
+  assert.doesNotMatch(funnelText, /super::/);
+  assert.doesNotMatch(funnelText, /await the render\/export vector join/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/render_vector_stroke.rs'],
+    ['rust.native.engine.render-scene', 'native-engine/src/render_vector_path.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_vector_stroke.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_vector_path.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_vector_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_vector_support.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_vector_pixels.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_vector_export_parity.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L02-H selection edit and clipboard transactions stay private owner/history/kernel children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectSelectionEditRegistration, /L02-H\/#2210/);
+  const source = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
+  const kernelsText = source('object_group_kernels.rs');
+  for (const name of [
+    'object_selection_edit_frames', 'object_selection_edit_groups', 'object_selection_edit_plan', 'object_selection_edit_clones',
+    'object_selection_edit_split_parts', 'object_selection_edit_split', 'object_clipboard_plan',
+  ]) {
+    assert.match(kernelsText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  assert.match(source('object_fill_owner.rs'), /#\[path = "object_selection_edit_ops\.rs"\]\s*mod selection_edit;\s*pub\(crate\) use selection_edit::\{PasteDestination, PreparedSelectionEdit\};/);
+  const opsText = source('object_selection_edit_ops.rs');
+  assert.match(opsText, /#\[path = "object_clipboard_ops\.rs"\]\s*mod clipboard;/);
+  assert.match(opsText, /#\[path = "object_selection_edit_payload\.rs"\]\s*mod wire;/);
+  assert.match(source('commands.rs'), /PasteDestination,/);
+  assert.match(source('commands.rs'), /PreparedSelectionEdit,/);
+  const historyText = source('object_history.rs');
+  assert.match(historyText, /#\[path = "object_selection_edit_history\.rs"\]\s*mod selection_edit;/);
+  for (const [name, mod] of [
+    ['object_selection_edit', 'object_selection_edit_tests'], ['object_selection_edit_atomic', 'object_selection_edit_atomic'],
+    ['object_selection_edit_clipboard', 'object_selection_edit_clipboard'], ['object_selection_edit_controls', 'object_selection_edit_controls'],
+    ['object_selection_edit_delete', 'object_selection_edit_delete'], ['object_selection_edit_duplicate', 'object_selection_edit_duplicate'],
+    ['object_selection_edit_split', 'object_selection_edit_split'], ['object_selection_edit_split_literals', 'object_selection_edit_split_literals'],
+  ]) {
+    assert.match(historyText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const dispatchText = source('object_command_dispatch.rs');
+  assert.match(dispatchText, /!Self::selection_edit_operation\(&request\.operation\)/);
+  assert.match(dispatchText, /self\.dispatch_selection_edit\(&request\.operation, &request\.payload\)/);
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-selection-edit/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 48, 'the split oracle keeps its 48 scenarios');
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_selection_edit_frames.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_selection_edit_groups.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_selection_edit_plan.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_selection_edit_clones.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_selection_edit_split_parts.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_selection_edit_split.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_clipboard_plan.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_selection_edit_ops.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_selection_edit_payload.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_clipboard_ops.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_selection_edit_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_atomic.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_clipboard.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_delete.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_duplicate.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_split.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_selection_edit_split_literals.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L02-I boolean join stays kernel children, a private owner child and a private history child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectBooleanOpsRegistration, /L02-I/);
+  const source = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
+  assert.match(source('object_group_kernels.rs'),
+    /#\[path = "object_boolean_ops\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_boolean_ops;\s*#\[path = "object_fill_trace_ops\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_fill_trace_ops;/);
+  for (const child of ['bake', 'fit', 'ring']) {
+    assert.match(source('object_boolean_ops.rs'), new RegExp(`#\\[path = "object_boolean_ops_${child}\\.rs"\\]\\s*mod ${child};`));
+  }
+  assert.match(source('object_boolean_ops.rs'), /#\[path = "object_boolean_ops_plan\.rs"\]\s*pub\(crate\) mod plan;/);
+  assert.match(source('object_boolean_ops.rs'), /#\[path = "object_boolean_ops_stack\.rs"\]\s*pub\(crate\) mod stack;/);
+  assert.match(source('object_boolean_ops_plan.rs'), /#\[path = "object_boolean_ops_erase\.rs"\]\s*mod erase;\s*#\[path = "object_boolean_ops_flatten\.rs"\]\s*mod flatten;/);
+  assert.match(source('object_group_ops.rs'), /#\[path = "object_boolean_ops_owner\.rs"\]\s*mod boolean_edit;\s*pub\(crate\) use boolean_edit::PreparedBooleanEdit;/);
+  assert.match(source('object_fill_owner.rs'), /pub\(crate\) use group_edit::\{PreparedBooleanEdit, PreparedGroupEdit\};/);
+  assert.match(source('commands.rs'), /pub\(crate\) use object_fill_owner::\{[^}]*\bPreparedBooleanEdit\b[^}]*\};/);
+  assert.match(source('object_boolean_ops_owner.rs'), /#\[path = "object_boolean_ops_payload\.rs"\]\s*mod wire;/);
+  const historyText = source('object_history.rs');
+  assert.match(historyText, /#\[path = "object_boolean_ops_history\.rs"\]\s*mod boolean_history;/);
+  for (const [name, mod] of [["object_boolean_ops_plan","object_boolean_ops_tests"],["object_boolean_ops_apply","object_boolean_ops_apply"],["object_boolean_ops_erase","object_boolean_ops_erase"],["object_boolean_ops_flatten","object_boolean_ops_flatten"],["object_boolean_ops_refusals","object_boolean_ops_refusals"],["object_boolean_ops_stack","object_boolean_ops_stack"],["object_boolean_ops_envelope","object_boolean_ops_envelope"]]) {
+    assert.match(historyText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const dispatchText = source('object_command_dispatch.rs');
+  assert.match(dispatchText, /!Self::boolean_operation\(&request\.operation\)/);
+  assert.match(dispatchText, /self\.dispatch_boolean\(&request\.operation, &request\.payload\)/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'native-engine/Cargo.toml'), 'utf8'), /^i_overlay = \{ version = "=9\.0\.0", default-features = false \}$/m);
+  for (const [dir, rows] of [['object-boolean-ops', 84], ['object-fill-trace-ops', 34]]) {
+    const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures', dir, 'oracle.txt'), 'utf8');
+    assert.equal(oracle.trim().split('\n').length, rows, `the ${dir} oracle keeps its rows`);
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops_bake.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops_erase.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops_fit.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops_flatten.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops_plan.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops_ring.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_boolean_ops_stack.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_fill_trace_ops.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_boolean_ops_owner.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_boolean_ops_payload.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_boolean_ops_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_apply.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_bake.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_envelope.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_erase.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_fit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_flatten.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_plan.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_refusals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_ring.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_boolean_ops_stack.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_fill_trace_ops.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_fill_trace_ops_commit.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-J image-mesh store record stays a private document child wired into both codecs and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectImageMeshRecordRegistration, /L03-J\/#2171/);
+  const documentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
+  assert.match(documentText, /#\[path = "object_image_mesh_record\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_image_mesh_record;/);
+  assert.match(documentText, /pub\(crate\) image_meshes: Presence<ImageMeshStore>,/);
+  const recordText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_record.rs'), 'utf8');
+  for (const [name, mod] of [
+    ['object_image_mesh_record_rows', 'oracle_rows'],
+    ['object_image_mesh_record', 'tests'],
+    ['object_image_mesh_record_controls', 'controls_tests'],
+    ['object_image_mesh_record_mutants', 'mutant_tests'],
+  ]) {
+    assert.match(recordText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const admissionCalls = (file) => (fs.readFileSync(path.join(ROOT, file), 'utf8').match(/validate_image_meshes\(&document\.image_meshes\)/g) || []).length;
+  assert.equal(admissionCalls('native-engine/src/object_codec.rs'), 1, 'v1 admission');
+  assert.equal(admissionCalls('native-engine/src/object_order_codec.rs'), 2, 'v2 admission (ordered DTO and storage document)');
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-image-mesh-record/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 76, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_image_mesh_record.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_record.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_record_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_record_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_record_mutants.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L06-L raster item and text block transactions stay private owner children and the items member stays an additive document member', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeRasterTextItemTransactionsRegistration, /L06-L\/#2217/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, `native-engine/src/${file}`), 'utf8');
+  const declares = (file, decl) => assert.match(read(file), new RegExp(`#\\[path = "${decl}\\.rs"\\]\\s*(?:#\\[allow\\(dead_code\\)\\]\\s*)?(?:pub\\(crate\\) )?mod `));
+  declares('object_document.rs', 'object_text_layout_kernels');
+  declares('object_document.rs', 'object_raster_asset_record');
+  declares('object_codec.rs', 'object_raster_asset_codec');
+  declares('object_fill_owner.rs', 'object_raster_asset_commands');
+  declares('object_fill_owner.rs', 'object_text_layout_commands');
+  declares('object_raster_asset_commands.rs', 'object_raster_asset_edit');
+  declares('object_text_layout_commands.rs', 'object_text_layout_patch');
+  declares('object_history.rs', 'object_raster_asset_history');
+  assert.doesNotMatch(read('evaluation.rs'), /#\[path = "object_text_layout_kernels\.rs"\]/);
+  assert.match(read('evaluation.rs'), /pub\(crate\) use crate::object_document::object_text_layout_kernels;/);
+  const history = read('object_raster_asset_history.rs');
+  for (const [name, decl] of [
+    ['object_raster_asset_commands_support', 'pub\\(crate\\) mod support;'],
+    ['object_raster_asset_commands', 'mod object_raster_asset_commands_tests;'],
+    ['object_text_layout_commands', 'mod object_text_layout_commands_tests;'],
+  ]) {
+    assert.match(history, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*${decl}`));
+  }
+  assert.match(read('object_raster_asset_codec.rs'), /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_raster_asset_codec\.rs"\]\s*mod tests;/);
+  // The layer rules: no commands, codec or history file of this leaf names the evaluation layer.
+  for (const file of ['object_raster_asset_codec.rs', 'object_raster_asset_commands.rs', 'object_raster_asset_edit.rs',
+    'object_text_layout_commands.rs', 'object_text_layout_patch.rs', 'object_raster_asset_history.rs', 'object_raster_asset_record.rs']) {
+    assert.doesNotMatch(read(file), /crate::evaluation::/, `${file} must not name the evaluation layer`);
+    assert.doesNotMatch(read(file), /\bsuper::/, `${file} must not import with super::`);
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_raster_asset_record.rs'],
+    ['rust.native.engine.codec', 'native-engine/src/object_raster_asset_codec.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_raster_asset_commands.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_raster_asset_edit.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_text_layout_commands.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_text_layout_patch.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_raster_asset_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_codec.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_commands.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_commands_support.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_commands_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_commands_dispatch.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_commands_order.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_commands_refusals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_commands_reopen.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_commands.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_commands_refusals.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L06-I raster asset placement holder stays a private document aggregator child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectRasterAssetPlacementRegistration, /L06-I\/#2228/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_raster_asset_kernels.rs'), 'utf8');
+  assert.match(aggregatorText, /#\[path = "object_raster_asset_placement\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_raster_asset_placement;/);
+  const placementText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_raster_asset_placement.rs'), 'utf8');
+  assert.match(placementText, /#\[cfg\(all\(test, feature = "history", feature = "project_media_codec"\)\)\]\s*#\[path = "\.\.\/tests\/object_raster_asset_placement\.rs"\]\s*mod tests;/);
+  const testsText = fs.readFileSync(path.join(ROOT, 'native-engine/tests/object_raster_asset_placement.rs'), 'utf8');
+  for (const name of ['controls', 'flow', 'join']) {
+    assert.match(testsText, new RegExp(`#\\[path = "object_raster_asset_placement_${name}\\.rs"\\]\\s*mod ${name};`));
+  }
+  // The Image arm of the lane-9 owner join consults this module's element rule.
+  const joinText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_media_link_edit.rs'), 'utf8');
+  assert.match(joinText, /object_raster_asset_placement::image_element_exists/);
+  // Layer discipline: the holder module imports nothing outside the document group.
+  assert.doesNotMatch(placementText, /crate::(?!object_document::)/);
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_raster_asset_placement.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_placement.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_placement_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_placement_flow.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_raster_asset_placement_join.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L06-J retained text layout stays private lane-6 children and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectTextLayoutRetainedRegistration, /L06-J\/#2229/);
+  const src = (name) => fs.readFileSync(path.join(ROOT, `native-engine/src/${name}`), 'utf8');
+  const aggregatorText = src('object_text_layout_kernels.rs');
+  for (const name of ['text_glyph_source', 'object_text_layout_retained']) {
+    assert.match(aggregatorText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  const testMod = (text, cfg, name, decl) => assert.match(text, new RegExp(`${cfg}\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*${decl}`), `${name} included`);
+  const cfgTest = '#\\[cfg\\(test\\)\\]';
+  const sourceText = src('text_glyph_source.rs');
+  assert.match(sourceText, /#\[cfg\(feature = "font_asset_admission"\)\]\s*#\[path = "text_glyph_source_font\.rs"\]\s*pub\(crate\) mod font;/);
+  testMod(sourceText, cfgTest, 'text_glyph_source', 'mod tests;');
+  testMod(sourceText, cfgTest, 'text_glyph_source_controls', 'mod controls;');
+  testMod(sourceText, cfgTest, 'text_glyph_source_oracle', 'pub\\(crate\\) mod oracle;');
+  const fontText = src('text_glyph_source_font.rs');
+  testMod(fontText, cfgTest, 'text_glyph_source_font', 'mod tests;');
+  testMod(fontText, cfgTest, 'text_glyph_source_font_cases', 'mod cases;');
+  const retainedText = src('object_text_layout_retained.rs');
+  assert.match(retainedText, /#\[path = "object_text_layout_retained_fonts\.rs"\]\s*pub\(crate\) mod fonts;/);
+  testMod(retainedText, cfgTest, 'object_text_layout_retained', 'pub\\(crate\\) mod tests;');
+  testMod(retainedText, cfgTest, 'object_text_layout_retained_controls', 'mod controls;');
+  testMod(retainedText, '#\\[cfg\\(all\\(test, feature = "font_asset_wire"\\)\\)\\]', 'object_text_layout_retained_inventory', 'mod inventory;');
+  testMod(src('object_text_layout_retained_fonts.rs'), cfgTest, 'object_text_layout_retained_fonts', 'mod tests;');
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_text_layout_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_text_layout_kernels;/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/text_glyph_source.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/text_glyph_source_font.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_text_layout_retained.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_text_layout_retained_fonts.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/text_glyph_source.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/text_glyph_source_oracle.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/text_glyph_source_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/text_glyph_source_font.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/text_glyph_source_font_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_retained.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_retained_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_retained_fonts.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_text_layout_retained_inventory.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-G image-mesh topology kernel stays a private image-mesh-family child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectImageMeshTopologyRegistration, /L03-G\/#2211 \(lane #2109/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_kernels.rs'), 'utf8');
+  for (const name of ['object_image_mesh_geometry', 'object_image_mesh_delaunay', 'object_image_mesh_topology']) {
+    assert.match(aggregatorText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_image_mesh_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_image_mesh_kernels;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_topology.rs'), 'utf8');
+  for (const [name, mod] of [['object_image_mesh_topology_rows', 'oracle_rows'], ['object_image_mesh_topology', 'tests'], ['object_image_mesh_topology_limits', 'limits_tests'], ['object_image_mesh_topology_controls', 'controls_tests']]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  assert.doesNotMatch(kernelText.split('#[cfg(test)]')[0], /\bsuper::/, 'production imports use absolute crate paths');
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-image-mesh-topology/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 214, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_image_mesh_topology.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_topology.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_topology_limits.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_topology_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_topology_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-H image-mesh draw plan stays a private image-mesh-family child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeRenderImageMeshPlanRegistration, /L03-H\/#2212 \(lane #2109/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_kernels.rs'), 'utf8');
+  assert.match(aggregatorText, /#\[path = "render_image_mesh_plan\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod render_image_mesh_plan;/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_image_mesh_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_image_mesh_kernels;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/render_image_mesh_plan.rs'), 'utf8');
+  assert.doesNotMatch(kernelText, /\bsuper::/, 'production uses absolute crate paths (R5)');
+  assert.doesNotMatch(kernelText, /^use (vello|kurbo|wgpu)/m, 'the plan is pure data, no GPU or geometry crate');
+  assert.match(kernelText, /use crate::evaluation::object_image_mesh_kernels::object_image_mesh_geometry::ScenePayload;/);
+  for (const [name, mod] of [['render_image_mesh_plan_controls', 'controls_tests'], ['render_image_mesh_plan_literals', 'literal_tests'], ['render_image_mesh_plan_rows', 'oracle_rows'], ['render_image_mesh_plan', 'tests']]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/render-image-mesh-plan/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 170, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/render_image_mesh_plan.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_image_mesh_plan.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_image_mesh_plan_literals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_image_mesh_plan_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/render_image_mesh_plan_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-I Paper nearest-location kernel stays a private image-mesh-family child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeRigPoseNearestRegistration, /L03-I\/#2213 \(lane #2109/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_image_mesh_kernels.rs'), 'utf8');
+  for (const name of ['rig_pose_nearest_curve', 'rig_pose_nearest_solve', 'rig_pose_nearest', 'rig_pose_nearest_weigh']) {
+    assert.match(aggregatorText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_image_mesh_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_image_mesh_kernels;/);
+  for (const [file, children] of [
+    ['rig_pose_nearest', [['rig_pose_nearest_controls', 'controls_tests'], ['rig_pose_nearest_flawed', 'flawed'], ['rig_pose_nearest_rows', 'oracle_rows'], ['rig_pose_nearest_pins', 'pins_tests'], ['rig_pose_nearest_prims', 'prim_rows'], ['rig_pose_nearest', 'tests']]],
+    ['rig_pose_nearest_weigh', [['rig_pose_nearest_weigh_controls', 'controls_tests'], ['rig_pose_nearest_weigh', 'tests']]],
+  ]) {
+    const kernelText = fs.readFileSync(path.join(ROOT, `native-engine/src/${file}.rs`), 'utf8');
+    for (const [name, mod] of children) {
+      assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*(?:pub\\(crate\\) )?mod ${mod};`));
+    }
+  }
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/rig-pose-nearest/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 2210, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/rig_pose_nearest_curve.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/rig_pose_nearest_solve.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/rig_pose_nearest.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/rig_pose_nearest_weigh.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest_prims.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest_flawed.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest_pins.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest_weigh.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/rig_pose_nearest_weigh_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L03-L image-mesh edit stays a private command child behind the shared dispatch and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectImageMeshEditRegistration, /L03-L\/#2224/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_widget_edit.rs'), /#\[path = "object_image_mesh_edit\.rs"\]\s*mod object_image_mesh_edit;\s*pub\(crate\) use object_image_mesh_edit::PreparedImageMeshEdit;/);
+  assert.match(read('native-engine/src/object_fill_owner.rs'), /pub\(crate\) use widget_edit::\{PreparedImageMeshEdit, PreparedWidgetEdit\};/);
+  assert.match(read('native-engine/src/object_snapshot.rs'), /#\[path = "object_image_mesh_edit_read\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_image_mesh_edit_read;/);
+  assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_image_mesh_edit_history\.rs"\]\s*mod object_image_mesh_edit_history;/);
+  const editText = read('native-engine/src/object_image_mesh_edit.rs');
+  assert.match(editText, /#\[path = "object_image_mesh_edit_rules\.rs"\]\s*mod rules;/);
+  for (const [name, mod] of [['object_image_mesh_edit_oracle', 'object_image_mesh_edit_oracle'], ['object_image_mesh_edit_controls', 'object_image_mesh_edit_controls_tests']]) {
+    assert.match(editText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  for (const file of ['object_image_mesh_edit.rs', 'object_image_mesh_edit_rules.rs', 'object_image_mesh_edit_read.rs', 'object_image_mesh_edit_history.rs']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}`), /super::/, `${file} imports without super::`);
+  }
+  for (const file of ['object_image_mesh_edit.rs', 'object_image_mesh_edit_rules.rs', 'object_image_mesh_edit_history.rs']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}`), /crate::evaluation::/, `${file} reaches the kernel only through the facade`);
+  }
+  assert.match(read('native-engine/src/object_image_mesh_edit_read.rs'), /crate::evaluation::object_image_mesh_kernels::object_image_mesh_topology::/);
+  const dispatchText = read('native-engine/src/object_command_dispatch.rs');
+  assert.equal((dispatchText.match(/self\.dispatch_image_mesh_edit\(/g) || []).length, 1, 'one image-mesh dispatch body');
+  assert.match(dispatchText, /operation == OP_OBJECT_VECTOR \|\| operation == OP_IMAGE_MESH_EDIT/);
+  assert.match(dispatchText, /\| OP_OBJECT_VECTOR\s*\| OP_IMAGE_MESH_EDIT\s*\| OP_WIDGET_CREATE/);
+  const historyText = read('native-engine/src/object_image_mesh_edit_history.rs');
+  for (const [name, mod, gate] of [
+    ['object_image_mesh_edit_oracle', 'object_image_mesh_edit_oracle', 'test'], ['object_image_mesh_edit_rows', 'object_image_mesh_edit_rows', 'test'],
+    ['object_image_mesh_edit', 'object_image_mesh_edit_tests', 'test'], ['object_image_mesh_edit_guards', 'object_image_mesh_edit_guards_tests', 'test'],
+    ['object_image_mesh_edit_payloads', 'object_image_mesh_edit_payloads_tests', 'test'],
+    ['object_image_mesh_edit_retopology', 'object_image_mesh_edit_retopology_tests', 'all\\(test, feature = "evaluation"\\)'],
+  ]) {
+    assert.match(historyText, new RegExp(`#\\[cfg\\(${gate}\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-image-mesh-edit/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 266, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/object_image_mesh_edit.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_image_mesh_edit_rules.rs'],
+    ['rust.native.engine.read-queries', 'native-engine/src/object_image_mesh_edit_read.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_image_mesh_edit_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_edit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_edit_oracle.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_edit_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_edit_guards.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_edit_payloads.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_edit_retopology.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_image_mesh_edit_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L04-D duplicator application kernels stay private aggregator children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeDuplicatorApplicationRegistration, /L04-D\/#2153/);
+  const declarationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_component_kernels.rs'), 'utf8');
+  for (const name of ['duplicator_placement_jsnum', 'duplicator_placement_color', 'duplicator_placement_matrix', 'duplicator_placement_apply', 'duplicator_placement_temporal']) {
+    assert.match(declarationText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  for (const [name, children] of [
+    ['duplicator_placement_jsnum', [['duplicator_placement_jsnum', 'tests'], ['duplicator_placement_jsnum_controls', 'controls_tests']]],
+    ['duplicator_placement_color', [['duplicator_placement_color', 'tests'], ['duplicator_placement_color_controls', 'controls_tests']]],
+    ['duplicator_placement_matrix', [['duplicator_placement_matrix', 'tests'], ['duplicator_placement_matrix_controls', 'controls_tests'], ['duplicator_placement_matrix_codec', 'test_codec']]],
+    ['duplicator_placement_apply', [['duplicator_placement_apply', 'tests'], ['duplicator_placement_apply_controls', 'controls_tests']]],
+    ['duplicator_placement_temporal', [['duplicator_placement_temporal', 'tests'], ['duplicator_placement_temporal_controls', 'controls_tests'], ['duplicator_placement_temporal_codec', 'test_codec']]],
+  ]) {
+    const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_component_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_component_kernels;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, `native-engine/src/${name}.rs`), 'utf8');
+    for (const [file, mod] of children) {
+      assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${file}\\.rs"\\]\\s*(?:pub\\(crate\\) )?mod ${mod};`));
+    }
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/duplicator_placement_jsnum.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/duplicator_placement_color.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/duplicator_placement_matrix.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/duplicator_placement_apply.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/duplicator_placement_temporal.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_jsnum.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_jsnum_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_color.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_color_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_matrix.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_matrix_codec.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_matrix_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_apply.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_apply_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_temporal.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_temporal_codec.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/duplicator_placement_temporal_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L04-H workspace context and element-split kernels stay private aggregator children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectContextWorkspaceRegistration, /L04-H\/#2215/);
+  const declarationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_component_kernels.rs'), 'utf8');
+  for (const mod of ['object_context_workspace', 'object_context_split_facts', 'object_context_split']) {
+    assert.match(declarationText, new RegExp(`#\\[path = "${mod}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${mod};`));
+  }
+  const children = {
+    object_context_workspace: [
+      ['object_context_workspace', 'tests'],
+      ['object_context_workspace_pinned', 'pinned_tests'],
+      ['object_context_workspace_remap', 'remap_tests'],
+      ['object_context_workspace_controls', 'controls_tests'],
+    ],
+    object_context_split: [
+      ['object_context_split', 'tests'],
+      ['object_context_split_pinned', 'pinned_tests'],
+      ['object_context_split_carry', 'carry_tests'],
+      ['object_context_split_entry', 'entry_tests'],
+      ['object_context_split_controls', 'controls_tests'],
+    ],
+  };
+  for (const [kernel, tests] of Object.entries(children)) {
+    const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_component_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_component_kernels;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, `native-engine/src/${kernel}.rs`), 'utf8');
+    for (const [file, mod] of tests) {
+      assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${file}\\.rs"\\]\\s*mod ${mod};`));
+    }
+  }
+  // R5: no production file reaches a sibling by `super::`; the split kernel reaches its facts by an absolute chain.
+  for (const file of ['object_context_workspace', 'object_context_split_facts', 'object_context_split']) {
+    const text = fs.readFileSync(path.join(ROOT, `native-engine/src/${file}.rs`), 'utf8');
+    assert.doesNotMatch(text.split('#[cfg(test)]')[0], /\bsuper::/);
+  }
+  const splitText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_context_split.rs'), 'utf8');
+  assert.match(splitText, /use crate::evaluation::object_component_kernels::object_context_split_facts::\{/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_context_workspace.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_context_split_facts.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_context_split.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_workspace.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_workspace_pinned.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_workspace_remap.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_workspace_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_split.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_split_pinned.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_split_carry.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_split_entry.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_split_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L04-I component document admission stays private document, codec, commands and history children and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectComponentDocumentRegistration, /L04-I\/#2214/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_document.rs'), /#\[path = "object_component_document\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_component_document;/);
+  assert.match(read('native-engine/src/object_codec.rs'), /#\[path = "object_component_codec\.rs"\]\s*mod object_component_codec;/);
+  assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_component_commit\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod component_tables;/);
+  assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_component_history\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod component_tables;/);
+  const documentText = read('native-engine/src/object_component_document.rs');
+  for (const [file, mod, gate] of [
+    ['object_component_document', 'tests', 'test'],
+    ['object_component_document_cases', 'cases', 'test'],
+    ['object_component_document_controls', 'controls_tests', 'test'],
+    ['object_component_document_assets', 'assets_tests', 'test'],
+    ['object_component_document_history', 'history_tests', 'all\\(test, feature = "history"\\)'],
+    ['object_component_document_views', 'views_tests', 'all\\(test, feature = "evaluation"\\)'],
+  ]) {
+    assert.match(documentText, new RegExp(`#\\[cfg\\(${gate}\\)\\]\\s*#\\[path = "\\.\\./tests/${file}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  for (const file of ['object_component_document', 'object_component_codec', 'object_component_commit', 'object_component_history']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}.rs`).split('#[cfg(test)]')[0], /super::/, `${file} production code imports by absolute path`);
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_component_document.rs'],
+    ['rust.native.engine.codec', 'native-engine/src/object_component_codec.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_component_commit.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_component_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_document.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_document_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_document_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_document_assets.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_document_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_component_document_views.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L04-J nested-context resolver, admission and selection kernels stay private aggregator children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectContextResolverRegistration, /L04-J\/#2225/);
+  const declarationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_component_kernels.rs'), 'utf8');
+  const kernels = ['object_context_resolver', 'object_context_admission', 'object_context_selection'];
+  for (const mod of kernels) {
+    assert.match(declarationText, new RegExp(`#\\[path = "${mod}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${mod};`));
+  }
+  const children = {
+    object_context_resolver: [
+      ['object_context_resolver', 'tests'],
+      ['object_context_resolver_elements', 'element_tests'],
+      ['object_context_resolver_sequence', 'sequence_tests'],
+      ['object_context_resolver_controls', 'controls_tests'],
+      ['object_context_resolver_world', 'world'],
+    ],
+    object_context_admission: [['object_context_admission', 'tests']],
+    object_context_selection: [
+      ['object_context_selection', 'tests'],
+      ['object_context_selection_remap', 'remap_tests'],
+      ['object_context_selection_controls', 'controls_tests'],
+    ],
+  };
+  const source = {};
+  for (const [kernel, tests] of Object.entries(children)) {
+    source[kernel] = fs.readFileSync(path.join(ROOT, `native-engine/src/${kernel}.rs`), 'utf8');
+    for (const [file, mod] of tests) {
+      assert.match(source[kernel], new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${file}\\.rs"\\]\\s*(?:pub\\(crate\\) )?mod ${mod};`));
+    }
+  }
+  // R5: no production file reaches a sibling by `super::`; they use the absolute aggregator chain.
+  for (const kernel of kernels) {
+    assert.doesNotMatch(source[kernel].split('#[cfg(test)]')[0], /\bsuper::/);
+  }
+  const chain = 'use crate::evaluation::object_component_kernels::';
+  assert.ok(source.object_context_admission.includes(`${chain}object_context_resolver::{`));
+  assert.ok(source.object_context_selection.includes(`${chain}object_context_resolver::{`));
+  assert.ok(source.object_context_selection.includes(`${chain}object_context_workspace::{`));
+  // The kernels only read: no mutable borrow and no id written in production code.
+  for (const kernel of kernels) {
+    const production = source[kernel].split('#[cfg(test)]')[0];
+    assert.doesNotMatch(production, /&mut /);
+    assert.doesNotMatch(production, /\bunsafe\b/);
+  }
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_component_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_component_kernels;/);
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_context_resolver.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_context_admission.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_context_selection.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_resolver.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_resolver_world.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_resolver_elements.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_resolver_sequence.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_resolver_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_admission.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_selection.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_selection_remap.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_context_selection_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L04-L duplicator evaluation join and effector layers stay private aggregator children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeDuplicatorEvaluateRegistration, /L04-L\/#2226/);
+  const declarationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_component_kernels.rs'), 'utf8');
+  for (const name of ['object_effector_layers', 'object_duplicator_evaluate_spec', 'object_duplicator_evaluate_types', 'object_duplicator_evaluate_place', 'object_duplicator_evaluate']) {
+    assert.match(declarationText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  for (const [name, children] of [
+    ['object_effector_layers', [['object_effector_layers', 'tests'], ['object_effector_layers_controls', 'controls_tests']]],
+    ['object_duplicator_evaluate', [['object_duplicator_evaluate', 'tests'], ['object_duplicator_evaluate_codec', 'test_codec'], ['object_duplicator_evaluate_compare', 'test_compare'], ['object_duplicator_evaluate_controls', 'controls_tests'], ['object_duplicator_evaluate_pins', 'pins_tests']]],
+  ]) {
+    const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_component_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_component_kernels;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, `native-engine/src/${name}.rs`), 'utf8');
+    for (const [file, mod] of children) {
+      assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${file}\\.rs"\\]\\s*(?:pub\\(crate\\) )?mod ${mod};`));
+    }
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_effector_layers.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_duplicator_evaluate_spec.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_duplicator_evaluate_types.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_duplicator_evaluate_place.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_duplicator_evaluate.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_effector_layers.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_effector_layers_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_duplicator_evaluate.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_duplicator_evaluate_codec.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_duplicator_evaluate_compare.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_duplicator_evaluate_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_duplicator_evaluate_pins.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L05-I frame-clipboard transactions stay sealed children of the fill owner and the history owner and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeFrameClipboardPasteRegistration, /L05-I\/#2216/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const owner = read('native-engine/src/object_fill_owner.rs');
+  for (const name of ['object_frame_clipboard_paste', 'object_frame_clipboard_paste_plan', 'object_frame_clipboard_paste_wire']) {
+    assert.match(owner, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*mod ${name};`));
+  }
+  assert.match(owner, /pub\(crate\) use object_frame_clipboard_packet::FrameClipboardPacket;/);
+  assert.match(read('native-engine/src/commands.rs'), /#\[cfg\(feature = "history"\)\]\s*pub\(crate\) use object_fill_owner::\{[^}]*PreparedFrameClipboard[^}]*\};/);
+  assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_frame_clipboard_paste_history\.rs"\]\s*mod object_frame_clipboard_paste;/);
+  const dispatch = read('native-engine/src/object_command_dispatch.rs');
+  assert.match(dispatch, /is_frame_clipboard_operation\(request\.operation\.as_str\(\)\)/);
+  assert.match(dispatch, /self\.dispatch_frame_clipboard\(request\.operation\.as_str\(\), &request\.payload\)/);
+  for (const [file, tests] of [
+    ['native-engine/src/object_frame_clipboard_paste.rs', 'object_frame_clipboard_paste'],
+    ['native-engine/src/object_frame_clipboard_paste_plan.rs', 'object_frame_clipboard_paste_plan'],
+    ['native-engine/src/object_frame_clipboard_paste_wire.rs', 'object_frame_clipboard_paste_wire'],
+    ['native-engine/src/object_frame_clipboard_paste_history.rs', 'object_frame_clipboard_paste_history']]) {
+    const text = read(file);
+    assert.doesNotMatch(text.split('#[cfg(test)]')[0], /super::/);
+    assert.match(text, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${tests}\\.rs"\\]\\s*mod tests;`));
+  }
+  const historyTests = read('native-engine/tests/object_frame_clipboard_paste_history.rs');
+  for (const [name, mod] of [['object_frame_edit_document_build', 'build'], ['object_frame_clipboard_paste_apply', 'runner'],
+    ['object_frame_clipboard_paste_controls', 'controls'], ['object_frame_clipboard_paste_edges', 'edges'],
+    ['object_frame_clipboard_paste_exposure', 'exposure'], ['object_frame_clipboard_paste_rows', 'rows']]) {
+    assert.match(historyTests, new RegExp(`#\\[path = "${name}\\.rs"\\]`));
+    assert.match(historyTests, new RegExp(`mod ${mod};`));
+  }
+  assert.match(historyTests, /#\[cfg\(feature = "evaluation"\)\]\s*#\[path = "object_frame_clipboard_paste_exposure\.rs"\]/);
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_clipboard_paste.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_clipboard_paste_plan.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_clipboard_paste_wire.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_frame_clipboard_paste_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_plan.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_wire.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_apply.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_edges.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_paste_exposure.rs'],
+  ]) {
+    const entry = profile.modules.find((module) => module.id === id);
+    assert.equal(entry?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(entry.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((module) => module.id === id).files = entry.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((violation) => violation.rule === 'coverage-unprofiled-source' && violation.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L05-J1 repeat-selection transaction stays sealed children of the timing owner, the fill owner and the history owner and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeFrameClipboardRepeatRegistration, /L05-J1\/#2227/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_layer_timing.rs'), /#\[path = "object_frame_clipboard_repeat_timing\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_frame_clipboard_repeat_timing;/);
+  const owner = read('native-engine/src/object_fill_owner.rs');
+  for (const name of ['object_frame_clipboard_repeat', 'object_frame_clipboard_repeat_wire']) {
+    assert.match(owner, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*mod ${name};`));
+  }
+  assert.match(read('native-engine/src/commands.rs'), /#\[cfg\(feature = "history"\)\]\s*#\[allow\(unused_imports\)\]\s*pub\(crate\) use object_fill_owner::\{[^}]*PreparedFrameRepeat[^}]*RepeatRequest[^}]*\};/);
+  assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_frame_clipboard_repeat_history\.rs"\]\s*mod object_frame_clipboard_repeat;/);
+  const dispatch = read('native-engine/src/object_command_dispatch.rs');
+  assert.match(dispatch, /is_frame_repeat_operation\(request\.operation\.as_str\(\)\)/);
+  assert.match(dispatch, /self\.dispatch_frame_repeat\(request\.operation\.as_str\(\), &request\.payload\)/);
+  for (const [file, tests] of [
+    ['native-engine/src/object_frame_clipboard_repeat_timing.rs', 'object_frame_clipboard_repeat_timing'],
+    ['native-engine/src/object_frame_clipboard_repeat.rs', 'object_frame_clipboard_repeat'],
+    ['native-engine/src/object_frame_clipboard_repeat_wire.rs', 'object_frame_clipboard_repeat_wire'],
+    ['native-engine/src/object_frame_clipboard_repeat_history.rs', 'object_frame_clipboard_repeat_history']]) {
+    const text = read(file);
+    assert.doesNotMatch(text.split('#[cfg(test)]')[0], /super::/);
+    assert.match(text, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${tests}\\.rs"\\]\\s*mod tests;`));
+  }
+  const historyTests = read('native-engine/tests/object_frame_clipboard_repeat_history.rs');
+  for (const [name, mod] of [['object_frame_edit_document_build', 'build'], ['object_frame_clipboard_repeat_controls', 'controls'],
+    ['object_frame_clipboard_repeat_edges', 'edges'], ['object_frame_clipboard_repeat_exposure', 'exposure'],
+    ['object_frame_clipboard_repeat_rows', 'rows']]) {
+    assert.match(historyTests, new RegExp(`#\\[path = "${name}\\.rs"\\]`));
+    assert.match(historyTests, new RegExp(`mod ${mod};`));
+  }
+  assert.match(historyTests, /#\[cfg\(feature = "evaluation"\)\]\s*#\[path = "object_frame_clipboard_repeat_exposure\.rs"\]/);
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_frame_clipboard_repeat_timing.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_clipboard_repeat.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_frame_clipboard_repeat_wire.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_frame_clipboard_repeat_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat_timing.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat_wire.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat_edges.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_frame_clipboard_repeat_exposure.rs'],
+  ]) {
+    const entry = profile.modules.find((module) => module.id === id);
+    assert.equal(entry?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(entry.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((module) => module.id === id).files = entry.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((violation) => violation.rule === 'coverage-unprofiled-source' && violation.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L07-K component producer join stays private evaluation children and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectSceneProducerComponentJoinRegistration, /L07-K\/#2231/);
+  const src = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
+  const sources = ['select', 'scene', 'join'].map((part) => `object_scene_producer_component_${part}`);
+  for (const name of sources) {
+    assert.match(src('object_scene_style_kernels.rs'), new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+    assert.doesNotMatch(src(`${name}.rs`), /\bsuper::/);
+  }
+  const join = src('object_scene_producer_component_join.rs');
+  for (const mod of ['controls', 'edges', 'inputs', 'overrides', 'pins', 'rows', 'support']) {
+    assert.match(join, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/object_scene_producer_component_join_${mod}\\.rs"\\]\\s*mod ${mod};`), `join test child ${mod}`);
+  }
+  assert.match(join, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_scene_producer_component_join\.rs"\]\s*mod tests;/);
+  assert.match(join, /evaluate_component_playback\(&input, f64::from\(total\), i64::from\(frame\), remap\)/);
+  assert.match(src('object_scene_producer_component_select.rs'), /evaluate_component_shapes\(&sources, placement\)/);
+  assert.match(src('object_scene_producer_component_scene.rs'), /order\.layers\(\)\.iter\(\)\.enumerate\(\)/);
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_scene_style_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_scene_style_kernels;/);
+  for (const [id, file] of [
+    ...sources.map((name) => ['rust.native.engine.evaluation', `native-engine/src/${name}.rs`]),
+    ...['', '_rows', '_support', '_inputs', '_overrides', '_controls', '_pins', '_edges']
+      .map((suffix) => ['rust.native.engine.tests', `native-engine/tests/object_scene_producer_component_join${suffix}.rs`]),
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L07-L text and rig producers stay private children of their parents and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectSceneProducerTextRigRegistration, /L07-L\/#2230/);
+  const src = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
+  assert.match(src('object_render_scene.rs'), /#\[path = "object_scene_producer_text\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_scene_producer_text;/);
+  assert.match(src('object_scene_style_kernels.rs'), /#\[path = "object_scene_producer_rig\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_scene_producer_rig;/);
+  for (const owner of ['object_scene_producer_text.rs', 'object_scene_producer_rig.rs']) {
+    const kernelText = src(owner);
+    assert.doesNotMatch(kernelText, /super::/);
+    const stem = owner.replace(/\.rs$/, '');
+    const kind = stem.endsWith('_text') ? 'text' : 'rig';
+    for (const [name, mod] of [
+      [`${stem}_controls`, 'controls'],
+      [`${stem}_rows`, 'rows'],
+      [stem, 'tests'],
+    ]) {
+      assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`), `${kind} test child ${mod}`);
+    }
+  }
+  assert.match(src('object_scene_producer_rig.rs'), /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_scene_producer_packet_rows\.rs"\]\s*pub\(crate\) mod packet_rows;/);
+  assert.match(src('object_scene_producer_text.rs'), /text_glyph_scene_kernels::text_glyph_scene::\{/);
+  assert.match(src('object_scene_producer_text.rs'), /layout_text\(&request, Some\(provider\.catalog\)\)/);
+  assert.match(src('object_scene_producer_rig.rs'), /apply_rig_deform\(bones, &binds\)/);
+  assert.match(src('object_scene_producer_rig.rs'), /plan_mesh_draw\(/);
+  for (const [id, file] of [
+    ['rust.native.engine.render-scene', 'native-engine/src/object_scene_producer_text.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_scene_producer_rig.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_producer_text.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_producer_text_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_producer_text_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_producer_rig.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_producer_rig_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_producer_rig_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_scene_producer_packet_rows.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L08-G layered GPU blend/matte/mask path stays a private compositor child on the retained shaders and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeSceneEffectGpuBlendRegistration, /L08-G\/#2235/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/compositor.rs'),
+    /#\[path = "scene_effect_gpu_blend\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod scene_effect_gpu_blend;/);
+  const main = read('native-engine/src/scene_effect_gpu_blend.rs');
+  for (const child of ['pipes', 'pool', 'stack']) {
+    assert.match(main, new RegExp('#\\[path = "scene_effect_gpu_blend_' + child + '\\.rs"\\]\\s*mod ' + child + ';'));
+  }
+  for (const [name, mod] of [['scene_effect_gpu_blend_support', 'support'], ['scene_effect_gpu_blend', 'tests'],
+    ['scene_effect_gpu_blend_cases', 'cases'], ['scene_effect_gpu_blend_controls', 'controls']]) {
+    assert.match(main, new RegExp('#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/' + name + '\\.rs"\\]\\s*mod ' + mod + ';'));
+  }
+  assert.match(main, /#\[cfg\(all\(test, feature = "history"\)\)\]\s*#\[path = "\.\.\/tests\/scene_effect_gpu_blend_owner\.rs"\]\s*mod owner;/);
+  const production = ['scene_effect_gpu_blend', 'scene_effect_gpu_blend_pipes', 'scene_effect_gpu_blend_pool', 'scene_effect_gpu_blend_stack']
+    .map((name) => 'native-engine/src/' + name + '.rs');
+  for (const file of production) {
+    const text = read(file);
+    assert.doesNotMatch(text, /\bsuper::/, file + ' must import through absolute crate paths (R5)');
+    assert.doesNotMatch(text, /FrameScheduler|ScheduledFrameIdentity|thread::|Renderer::new|RendererOptions/, file + ' adds no scheduler or renderer');
+  }
+  const pipes = read('native-engine/src/scene_effect_gpu_blend_pipes.rs');
+  assert.match(pipes, /include_str!\("\.\.\/\.\.\/geometry-wasm\/src\/blend\.wgsl"\)/);
+  assert.match(pipes, /include_str!\("\.\.\/\.\.\/geometry-wasm\/src\/matte\.wgsl"\)/);
+  for (const dir of ['native-engine/src', 'native-engine/tests']) {
+    assert.deepEqual(fs.readdirSync(path.join(ROOT, dir)).filter((name) => name.endsWith('.wgsl')), [], dir + ' holds no shader copy');
+  }
+  // The fast path keeps its body: the layered entries are siblings, never an edit of compose_object.
+  const objectCompositor = read('native-engine/src/object_compositor.rs');
+  assert.match(objectCompositor, /fn compose_object_layered\(/);
+  assert.match(objectCompositor, /fn compose_layered_scheduled_object\(/);
+  assert.match(objectCompositor, /use crate::compositor::scene_effect_gpu_blend::GpuLayerStack;/);
+  for (const [id, file] of [
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_blend.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_blend_pipes.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_blend_pool.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_blend_stack.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_blend.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_blend_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_blend_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_blend_owner.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_blend_support.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L08-H GPU effect executor stays a private compositor child on the retained shaders and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeSceneEffectGpuPassRegistration, /L08-H\/#2236/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/compositor.rs'),
+    /#\[path = "scene_effect_gpu_pass\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod scene_effect_gpu_pass;/);
+  const main = read('native-engine/src/scene_effect_gpu_pass.rs');
+  for (const child of ['pipes', 'pool', 'stack']) {
+    assert.match(main, new RegExp('#\\[path = "scene_effect_gpu_pass_' + child + '\\.rs"\\]\\s*mod ' + child + ';'));
+  }
+  for (const [name, mod] of [['scene_effect_gpu_pass', 'tests'], ['scene_effect_gpu_pass_cases', 'cases'],
+    ['scene_effect_gpu_pass_controls', 'controls'], ['scene_effect_gpu_pass_lifetime', 'lifetime'],
+    ['scene_effect_gpu_pass_reference', 'reference'], ['scene_effect_gpu_pass_support', 'support']]) {
+    assert.match(main, new RegExp('#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/' + name + '\\.rs"\\]\\s*mod ' + mod + ';'));
+  }
+  const production = ['scene_effect_gpu_pass', 'scene_effect_gpu_pass_pipes', 'scene_effect_gpu_pass_pool', 'scene_effect_gpu_pass_stack']
+    .map((name) => 'native-engine/src/' + name + '.rs');
+  for (const file of production) {
+    const text = read(file);
+    assert.doesNotMatch(text, /\bsuper::/, file + ' must import through absolute crate paths (R5)');
+    assert.doesNotMatch(text, /FrameScheduler|ScheduledFrameIdentity|thread::|Renderer::new|RendererOptions|Scene::new/, file + ' adds no scheduler or renderer');
+    assert.doesNotMatch(text, /include_str!\("(?!\.\.\/\.\.\/geometry-wasm\/src\/)/, file + ' takes shaders only from geometry-wasm/src');
+  }
+  const pipes = read('native-engine/src/scene_effect_gpu_pass_pipes.rs');
+  for (const shader of ['blur', 'color_adjust', 'vignette']) {
+    assert.match(pipes, new RegExp('include_str!\\("\\.\\./\\.\\./geometry-wasm/src/' + shader + '\\.wgsl"\\)'));
+  }
+  assert.doesNotMatch(pipes, /blend\.wgsl/, 'glow composites through the layered path blend pipeline, not a second one');
+  assert.match(main, /use crate::compositor::scene_effect_gpu_blend::BlendKernels;/);
+  for (const dir of ['native-engine/src', 'native-engine/tests']) {
+    assert.deepEqual(fs.readdirSync(path.join(ROOT, dir)).filter((name) => name.endsWith('.wgsl')), [], dir + ' holds no shader copy');
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_pass.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_pass_pipes.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_pass_pool.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_pass_stack.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_pass.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_pass_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_pass_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_pass_lifetime.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_pass_reference.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_pass_support.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L08-I GPU simple_fx and hqBloom stay a private compositor child on the retained shader and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeSceneEffectGpuFxRegistration, /L08-I\/#2237/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/compositor.rs'),
+    /#\[path = "scene_effect_gpu_fx\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod scene_effect_gpu_fx;/);
+  const main = read('native-engine/src/scene_effect_gpu_fx.rs');
+  for (const child of ['bounds', 'frame']) {
+    assert.match(main, new RegExp('#\\[path = "scene_effect_gpu_fx_' + child + '\\.rs"\\]\\s*mod ' + child + ';'));
+  }
+  for (const [name, mod] of [['scene_effect_gpu_fx', 'tests'], ['scene_effect_gpu_fx_bounds_cases', 'bounds_cases'],
+    ['scene_effect_gpu_fx_cases', 'cases'], ['scene_effect_gpu_fx_controls', 'controls'],
+    ['scene_effect_gpu_fx_lifetime', 'lifetime'], ['scene_effect_gpu_fx_reference', 'reference'],
+    ['scene_effect_gpu_fx_support', 'support']]) {
+    assert.match(main, new RegExp('#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/' + name + '\\.rs"\\]\\s*mod ' + mod + ';'));
+  }
+  const production = ['scene_effect_gpu_fx', 'scene_effect_gpu_fx_bounds', 'scene_effect_gpu_fx_frame']
+    .map((name) => 'native-engine/src/' + name + '.rs');
+  for (const file of production) {
+    const text = read(file);
+    assert.doesNotMatch(text, /\bsuper::/, file + ' must import through absolute crate paths (R5)');
+    assert.doesNotMatch(text, /FrameScheduler|ScheduledFrameIdentity|thread::|Renderer::new|RendererOptions|Scene::new|wgpu::|include_str!/,
+      file + ' is device-free: no scheduler, renderer, wgpu call or shader text');
+  }
+  const pipes = read('native-engine/src/scene_effect_gpu_pass_pipes.rs');
+  assert.match(pipes, /include_str!\("\.\.\/\.\.\/geometry-wasm\/src\/simple_fx\.wgsl"\)/);
+  assert.match(pipes, /fx: std::sync::OnceLock<Pass>,/);
+  assert.match(read('native-engine/src/scene_effect_gpu_pass_stack.rs'),
+    /pub\(crate\) fn from_plan_with_frame\(/);
+  assert.match(read('native-engine/src/scene_effect_gpu_pass_pool.rs'), /BloomExtract,/);
+  for (const dir of ['native-engine/src', 'native-engine/tests']) {
+    assert.deepEqual(fs.readdirSync(path.join(ROOT, dir)).filter((name) => name.endsWith('.wgsl')), [], dir + ' holds no shader copy');
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_fx.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_fx_bounds.rs'],
+    ['rust.native.engine.compositor', 'native-engine/src/scene_effect_gpu_fx_frame.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_fx.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_fx_bounds_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_fx_cases.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_fx_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_fx_lifetime.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_fx_reference.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_gpu_fx_support.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L08-J layer compositing record stays a private document child with sealed owner and history children and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeSceneEffectLayerRecordRegistration, /L08-J\/#2238/);
+  const documentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
+  assert.match(documentText, /#\[path = "scene_effect_layer_record\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod scene_effect_layer_record;/);
+  assert.match(documentText, /pub\(crate\) effects: Presence<Vec<LayerEffect>>,/);
+  const recordText = fs.readFileSync(path.join(ROOT, 'native-engine/src/scene_effect_layer_record.rs'), 'utf8');
+  assert.doesNotMatch(recordText.split('#[cfg(test)]')[0], /super::/);
+  for (const [name, mod] of [['scene_effect_layer_record_rows', 'oracle_rows'], ['scene_effect_layer_record', 'tests'], ['scene_effect_layer_record_refs', 'refs_tests'], ['scene_effect_layer_record_controls', 'controls_tests']]) {
+    assert.match(recordText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const ownerText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_fill_owner.rs'), 'utf8');
+  assert.match(ownerText, /#\[path = "scene_effect_layer_edit\.rs"\]\s*pub\(crate\) mod scene_effect_layer_edit;/);
+  const historyParent = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_history.rs'), 'utf8');
+  assert.match(historyParent, /#\[path = "scene_effect_layer_history\.rs"\]\s*mod scene_effect_layer_history;/);
+  const historyText = fs.readFileSync(path.join(ROOT, 'native-engine/src/scene_effect_layer_history.rs'), 'utf8');
+  for (const name of ['scene_effect_layer_record_edit', 'scene_effect_layer_record_edit_rows']) {
+    assert.match(historyText, new RegExp(`#\\[cfg\\(all\\(test, feature = "history"\\)\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${name};`));
+  }
+  for (const file of ['scene_effect_layer_edit', 'scene_effect_layer_payload', 'scene_effect_layer_history']) {
+    const production = fs.readFileSync(path.join(ROOT, `native-engine/src/${file}.rs`), 'utf8').split('#[cfg(')[0];
+    assert.doesNotMatch(production, /super::/, `${file} must not import with super::`);
+  }
+  const codecText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_codec.rs'), 'utf8');
+  assert.equal((codecText.match(/validate_layer_compositing\(declared_layers, objects\)/g) || []).length, 1, 'single shared admission call');
+  const dispatchText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_command_dispatch.rs'), 'utf8');
+  assert.equal((dispatchText.match(/Self::compositing_operation\(&request\.operation\)/g) || []).length, 3, 'gate, message and dispatch branch');
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/scene-effect-layer-record/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 67, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/scene_effect_layer_record.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/scene_effect_layer_edit.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/scene_effect_layer_payload.rs'],
+    ['rust.native.engine.history', 'native-engine/src/scene_effect_layer_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_layer_record.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_layer_record_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_layer_record_refs.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_layer_record_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_layer_record_edit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/scene_effect_layer_record_edit_rows.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L09-F media export audio disposition stays a private aggregator child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeMediaExportAudioRegistration, /L09-F\/#2239/);
+  const coreText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_media_timing_core.rs'), 'utf8');
+  assert.match(coreText, /#\[path = "native_media_export_audio\.rs"\]\s*pub\(crate\) mod native_media_export_audio;/);
+  const audioText = fs.readFileSync(path.join(ROOT, 'native-engine/src/native_media_export_audio.rs'), 'utf8');
+  for (const [name, mod] of [['native_media_export_audio', 'tests'], ['native_media_export_audio_baseline', 'baseline'],
+    ['native_media_export_audio_controls', 'controls'], ['native_media_export_audio_pins', 'pins']]) {
+    assert.match(audioText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  assert.doesNotMatch(audioText, /\buse super::/, 'production code imports through the absolute module chain');
+  assert.match(audioText, /use crate::object_document::media_timing::object_media_timing_audio::/);
+  assert.doesNotMatch(audioText, /crate::export_job|crate::scheduler|crate::compositor/, 'the disposition stays in the document layer');
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/native_media_export_audio.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_media_export_audio.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_media_export_audio_baseline.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_media_export_audio_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_media_export_audio_pins.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L09-J media export join keeps a document-layer needs kernel and an export-layer gate private and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeMediaExportJobRegistration, /L09-J\/#2232/);
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  assert.match(read('native-engine/src/object_media_timing_core.rs'),
+    /#\[path = "object_media_link_needs\.rs"\]\s*pub\(crate\) mod object_media_link_needs;/);
+  const exportCore = read('native-engine/src/native_media_export_core.rs');
+  for (const name of ['native_media_export_job', 'native_media_export_lease']) {
+    assert.match(exportCore, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  const children = [
+    ['native-engine/src/object_media_link_needs.rs', [['object_media_link_needs_cases', 'mod cases;'],
+      ['object_media_link_needs_controls', 'mod controls;'], ['object_media_link_needs', 'pub\\(crate\\) mod tests;']]],
+    ['native-engine/src/native_media_export_job.rs', [['native_media_export_job_controls', 'mod controls;'],
+      ['native_media_export_job_host', 'mod host;'], ['native_media_export_job_lifecycle', 'mod lifecycle;'],
+      ['native_media_export_job_support', 'mod support;'], ['native_media_export_job', 'mod tests;']]],
+  ];
+  for (const [file, mods] of children) {
+    const text = read(file);
+    for (const [name, decl] of mods) {
+      assert.match(text, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*${decl}`));
+    }
+  }
+  for (const file of ['object_media_link_needs', 'native_media_export_lease', 'native_media_export_job']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}.rs`), /\buse super::/, 'production code imports through the absolute module chain');
+  }
+  // Layering: the export half never names a document type; the document half never names the export layer.
+  for (const file of ['native_media_export_lease', 'native_media_export_job']) {
+    assert.doesNotMatch(read(`native-engine/src/${file}.rs`), /crate::object_document|crate::export_job::native_media_export::native_media_export_plan::MediaExportPlan/);
+  }
+  assert.doesNotMatch(read('native-engine/src/object_media_link_needs.rs'), /crate::export_job|crate::scheduler|crate::revision/);
+  // The accepted job declares the witness resources at both of its key sites and nowhere hard-codes an empty set.
+  const job = read('native-engine/src/object_export_job.rs');
+  assert.equal((job.match(/declared_resources\(&witness\)/g) || []).length, 2);
+  assert.doesNotMatch(job, /clone\(\),\n\s*\[\],\n\s*\)/);
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_media_link_needs.rs'],
+    ['rust.native.engine.export-job', 'native-engine/src/native_media_export_lease.rs'],
+    ['rust.native.engine.export-job', 'native-engine/src/native_media_export_job.rs'],
+    ...['object_media_link_needs', 'object_media_link_needs_cases', 'object_media_link_needs_controls', 'native_media_export_job',
+      'native_media_export_job_controls', 'native_media_export_job_host', 'native_media_export_job_lifecycle',
+      'native_media_export_job_support'].map((name) => ['rust.native.engine.tests', `native-engine/tests/${name}.rs`]),
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L10-H atomic import transaction stays a private history child with a private owner child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeImportTransactionRegistration, /L10-H\/#2219/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_shot_kernels.rs'), 'utf8');
+  assert.match(aggregatorText, /#\[path = "native_import_transaction\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod native_import_transaction;/);
+  const ownerText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_fill_owner.rs'), 'utf8');
+  assert.match(ownerText, /#\[path = "native_import_transaction_owner\.rs"\]\s*mod import_batch;/);
+  const parentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/native_import_transaction.rs'), 'utf8');
+  for (const [file, mod] of [
+    ['native_import_transaction_session', 'session'],
+    ['native_import_transaction_svg', 'svg'],
+    ['native_import_transaction_types', 'types'],
+    ['native_import_transaction_wire', 'wire'],
+  ]) {
+    assert.match(parentText, new RegExp(`#\\[path = "${file}\\.rs"\\]\\s*(pub\\(crate\\) )?mod ${mod};`));
+  }
+  for (const [name, mod] of [
+    ['native_import_transaction_atomic', 'atomic'],
+    ['native_import_transaction_chain', 'chain'],
+    ['native_import_transaction_controls', 'controls'],
+    ['native_import_transaction_dispatch', 'dispatch_tests'],
+    ['native_import_transaction_rows', 'rows'],
+    ['native_import_transaction_support', 'support'],
+    ['native_import_transaction_svg', 'svg_tests'],
+    ['native_import_transaction', 'tests'],
+  ]) {
+    assert.match(parentText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  // R5: no super:: import in any production file of the leaf.
+  for (const name of ['', '_owner', '_session', '_svg', '_types', '_wire']) {
+    const text = fs.readFileSync(path.join(ROOT, `native-engine/src/native_import_transaction${name}.rs`), 'utf8');
+    assert.doesNotMatch(text, /^use super::/m, `native_import_transaction${name}.rs must import by absolute path`);
+  }
+  const familyParentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_history.rs'), 'utf8');
+  assert.match(familyParentText, /#\[path = "object_shot_kernels\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_shot_kernels;/);
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/native_import_transaction_owner.rs'],
+    ['rust.native.engine.history', 'native-engine/src/native_import_transaction.rs'],
+    ['rust.native.engine.history', 'native-engine/src/native_import_transaction_session.rs'],
+    ['rust.native.engine.history', 'native-engine/src/native_import_transaction_svg.rs'],
+    ['rust.native.engine.history', 'native-engine/src/native_import_transaction_types.rs'],
+    ['rust.native.engine.history', 'native-engine/src/native_import_transaction_wire.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction_atomic.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction_chain.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction_dispatch.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction_support.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/native_import_transaction_svg.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L10-I montage layer join and shot context stay private evaluation children and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectMontageLayerRegistration, /L10-I\/#2233/);
+  assert.match(coverage.nativeObjectShotContextRegistration, /L10-I\/#2233/);
+  const evaluationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  for (const name of ['object_montage_layer', 'object_shot_context']) {
+    assert.match(evaluationText, new RegExp(`#\\[path = "${name}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*pub\\(crate\\) mod ${name};`));
+  }
+  const layerText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_montage_layer.rs'), 'utf8');
+  for (const [name, mod] of [['object_montage_layer_rows', 'rows'], ['object_montage_layer', 'tests'], ['object_montage_layer_controls', 'controls']]) {
+    assert.match(layerText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  const layerTests = fs.readFileSync(path.join(ROOT, 'native-engine/tests/object_montage_layer.rs'), 'utf8');
+  assert.match(layerTests, /#\[path = "object_montage_layer_records\.rs"\]\s*mod records;/);
+  const contextText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_shot_context.rs'), 'utf8');
+  for (const [name, mod] of [['object_shot_context_rows', 'rows'], ['object_shot_context', 'tests'], ['object_shot_context_controls', 'controls']]) {
+    assert.match(contextText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_montage_layer.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_shot_context.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_montage_layer.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_montage_layer_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_montage_layer_records.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_montage_layer_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_shot_context.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_shot_context_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_shot_context_controls.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);

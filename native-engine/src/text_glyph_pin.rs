@@ -12,7 +12,7 @@
 //! carries a position: [`GlyphPin::resolve`] reads it from a layout, and a layout
 //! of another holder or a smaller block refuses instead of answering.
 
-use crate::evaluation::object_text_layout_kernels::object_text_layout_kernel::model::{
+use crate::object_document::object_text_layout_kernels::object_text_layout_kernel::model::{
     glyph_key, valid_id, LaidOutText, PlacedGlyph,
 };
 

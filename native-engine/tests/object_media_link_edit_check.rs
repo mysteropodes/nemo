@@ -140,9 +140,10 @@ fn kinds_without_an_owner_are_typed_refusals_before_any_target_lookup() {
         layer_uid: "nope".to_owned(),
         stroke_id: None,
     };
+    // An image placement now looks its target up like a video does: the context is resolved first.
     assert_eq!(
         check(&doc, AssetKind::Image, at("nowhere", "nope", None)),
-        Err(PlacementRefusal::ImageOwner)
+        Err(PlacementRefusal::Context)
     );
     assert_eq!(
         check(&doc, AssetKind::Audio, track("t1")),
