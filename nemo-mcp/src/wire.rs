@@ -257,9 +257,11 @@ fn validate_native_response(
 ) -> io::Result<()> {
     let policy_command = request.operation == crate::native_contract::layer_policy::OP;
     let track_command = request.operation == crate::native_contract::property_track::OP;
+    let property_read = request.operation == crate::native_contract::property_read::OP;
     let correlated_operation = request.operation == crate::native_contract::metadata::OP
         || policy_command
-        || track_command;
+        || track_command
+        || property_read;
     let correlated_identity = !correlated_operation
         || (response.request_id == request.request_id
             && response.instance_id == request.instance_id
@@ -289,11 +291,14 @@ fn validate_native_response(
                     "query.document.object"
                         | "query.document.object.layer.timing"
                         | crate::native_contract::metadata::OP
+                        | crate::native_contract::property_read::OP
                 ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
                     == Some(response.content_revision))
                 && (!matches!(
                     request.operation.as_str(),
-                    "query.document.object.layer.timing" | crate::native_contract::metadata::OP
+                    "query.document.object.layer.timing"
+                        | crate::native_contract::metadata::OP
+                        | crate::native_contract::property_read::OP
                 ) || (response.instance_id == request.instance_id
                     && response.document_id == request.document_id
                     && result.get("instanceId").and_then(serde_json::Value::as_str)
@@ -463,3 +468,7 @@ mod layer_policy_tests;
 #[cfg(test)]
 #[path = "native_property_track_wire_tests.rs"]
 mod property_track_tests;
+
+#[cfg(test)]
+#[path = "native_property_read_wire_tests.rs"]
+mod property_read_tests;

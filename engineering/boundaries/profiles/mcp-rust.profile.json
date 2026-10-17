@@ -41,7 +41,11 @@
         "src/native_property_track_wire_tests.rs",
         "src/native_contract_tests.rs",
         "src/native_font_contract.rs",
-        "src/native_font_contract_tests.rs"
+        "src/native_font_contract_tests.rs",
+        "src/server_command_projection.rs",
+        "src/native_property_read_contract.rs",
+        "src/native_property_read_contract_tests.rs",
+        "src/native_property_read_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

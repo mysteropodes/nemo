@@ -80,7 +80,104 @@
         throw new TypeError('invalid property track disposition');
       }
     }
-    return Object.freeze({ metadataPayload, metadataResult, metadataCorrelated, trackPayload, trackResult });
+    function readTarget(value) {
+      exact(value, ['contextId', 'layerUid'], ['strokeId'], 'property read target');
+      Object.values(value).forEach(objectUid);
+    }
+    function readPayload(value) {
+      exact(value, ['atRevision', 'documentSnapshotId', 'view'], [], 'property read');
+      revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
+      const view = value.view;
+      if (!plain(view) || !['rawSample', 'authoredKeys'].includes(view.kind)) {
+        throw new TypeError('unsupported property read view');
+      }
+      const fields = view.kind === 'rawSample' ? ['frame'] : ['offset', 'limit'];
+      exact(view, ['kind', 'target', 'property', ...fields], [], 'property read view');
+      readTarget(view.target); objectUid(view.property);
+      if (view.kind === 'rawSample') {
+        if (!Number.isFinite(view.frame)) throw new TypeError('invalid raw sample frame');
+      } else {
+        frame(view.offset);
+        if (!Number.isInteger(view.limit) || view.limit < 1 || view.limit > 8) {
+          throw new TypeError('invalid authored key page');
+        }
+      }
+    }
+    function readVector(value, dimension) {
+      if (!Array.isArray(value) || value.length !== dimension || !Array.from(value).every(Number.isFinite)) {
+        throw new TypeError('invalid property read vector');
+      }
+    }
+    function readKey(value, dimension) {
+      exact(value, ['frame', 'v'], ['hold', 'curvePoints', 'hIn', 'hOut'], 'authored property key');
+      if (!Number.isFinite(value.frame)) throw new TypeError('invalid authored key frame');
+      readVector(value.v, dimension);
+      if (has(value, 'hold') && typeof value.hold !== 'boolean') throw new TypeError('invalid authored hold');
+      for (const name of ['hIn', 'hOut']) if (has(value, name)) readVector(value[name], 2);
+      if (has(value, 'curvePoints') && value.curvePoints !== null) {
+        if (!Array.isArray(value.curvePoints)) throw new TypeError('invalid authored curve');
+        let previous = -Infinity;
+        for (const point of value.curvePoints) {
+          exact(point, ['x', 'y'], ['tx', 'ty'], 'authored curve point');
+          if (!Object.values(point).every(Number.isFinite) || point.x <= previous) {
+            throw new TypeError('invalid authored curve coordinates');
+          }
+          previous = point.x;
+        }
+        if (value.curvePoints.length >= 2 && (value.curvePoints[0].x !== 0 || previous !== 1)) {
+          throw new TypeError('invalid authored curve endpoints');
+        }
+      }
+    }
+    function readResult(value) {
+      const raw = value && value.kind === 'rawSample';
+      const fields = raw ? ['frame', 'value'] : ['trackPresent', 'items', 'nextOffset'];
+      exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId',
+        'kind', 'target', 'property', 'dimension', ...fields], [], 'property read result');
+      id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
+      revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
+      readTarget(value.target); objectUid(value.property);
+      if (!Number.isInteger(value.dimension) || value.dimension < 1 || value.dimension > 4) {
+        throw new TypeError('invalid property read dimension');
+      }
+      if (raw) {
+        if (!Number.isFinite(value.frame)) throw new TypeError('invalid sampled frame');
+        readVector(value.value, value.dimension);
+      } else {
+        if (value.kind !== 'authoredKeys' || typeof value.trackPresent !== 'boolean' ||
+            !Array.isArray(value.items) || value.items.length > 8) throw new TypeError('invalid authored page');
+        let previous = -Infinity;
+        for (const key of value.items) {
+          readKey(key, value.dimension);
+          if (key.frame <= previous) throw new TypeError('authored keys must strictly increase');
+          previous = key.frame;
+        }
+        if (value.nextOffset !== null) frame(value.nextOffset);
+        if (!value.trackPresent && (value.items.length || value.nextOffset !== null)) {
+          throw new TypeError('absent track cannot contain an authored page');
+        }
+      }
+      const encoded = JSON.stringify(value);
+      const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length
+        : unescape(encodeURIComponent(encoded)).length;
+      if (bytes > 3072) throw new TypeError('property read result exceeds provider bound');
+    }
+    function readCorrelated(payload, result) {
+      const view = payload.view;
+      if (result.atRevision !== payload.atRevision || result.documentSnapshotId !== payload.documentSnapshotId ||
+          result.kind !== view.kind || result.property !== view.property ||
+          ['contextId', 'layerUid', 'strokeId'].some(key => result.target[key] !== view.target[key] ||
+            has(result.target, key) !== has(view.target, key))) throw new TypeError('property read selector mismatch');
+      if (view.kind === 'rawSample') {
+        if (result.frame !== view.frame) throw new TypeError('raw sample frame mismatch');
+      } else if (result.items.length > view.limit || result.nextOffset !== null &&
+          (result.items.length !== view.limit || result.nextOffset !== view.offset + result.items.length)) {
+        throw new TypeError('authored page cursor mismatch');
+      }
+    }
+    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
+    return Object.freeze({ metadataPayload, metadataResult, metadataCorrelated, trackPayload, trackResult,
+      readPayload, readResult, readCorrelated, readPaths });
   }
   return Object.freeze({ create });
 }));

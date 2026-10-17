@@ -22,6 +22,8 @@ pub(crate) mod settings;
 mod diagnostics;
 #[path = "native_layer_policy_contract.rs"]
 pub(crate) mod layer_policy;
+#[path = "native_property_read_contract.rs"]
+pub(crate) mod property_read;
 #[path = "native_property_track_contract.rs"]
 pub(crate) mod property_track;
 use diagnostics::diagnostics_result;
@@ -71,6 +73,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
         operation,
         "query.document.object"
             | metadata::OP
+            | property_read::OP
             | font::QUERY
             | "query.document.object.layer.timing"
             | "query.document.serialize"
@@ -89,6 +92,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         font::IMPORT | font::QUERY => font::request(operation, payload),
         "query.document.object" => object::request(payload),
         metadata::OP => metadata::request(payload),
+        property_read::OP => property_read::request(payload),
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
@@ -236,6 +240,9 @@ pub(crate) fn validate_result(
     }
     if matches!(operation, font::IMPORT | font::QUERY) {
         return font::result(operation, payload, result);
+    }
+    if operation == property_read::OP {
+        return property_read::result(request_document_id, payload, result);
     }
     if operation == metadata::OP {
         return metadata::result(request_document_id, payload, result);

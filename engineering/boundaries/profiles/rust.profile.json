@@ -711,7 +711,8 @@
         "object_vector_edit_controls.rs",
         "object_vector_edit_limits.rs",
         "object_vector_edit_lock.rs",
-        "object_vector_edit_support.rs"
+        "object_vector_edit_support.rs",
+        "object_property_public_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -782,7 +783,11 @@
         "src/native_property_track_wire_tests.rs",
         "src/native_contract_tests.rs",
         "src/native_font_contract.rs",
-        "src/native_font_contract_tests.rs"
+        "src/native_font_contract_tests.rs",
+        "src/server_command_projection.rs",
+        "src/native_property_read_contract.rs",
+        "src/native_property_read_contract_tests.rs",
+        "src/native_property_read_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -815,7 +820,9 @@
         "native_catalog.rs",
         "native_status.rs",
         "native_contract_boundaries.rs",
-        "server_failure_paths.rs"
+        "server_failure_paths.rs",
+        "support/native_property_read_schema.rs",
+        "support/native_layer_policy_schema.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1021,7 +1028,8 @@
         "native_project_settings_public_tests.rs",
         "native_property_metadata_dispatch_tests.rs",
         "native_property_track_dispatch_tests.rs",
-        "native_layer_policy_dispatch_tests.rs"
+        "native_layer_policy_dispatch_tests.rs",
+        "native_property_read_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -9,8 +9,9 @@
   'use strict';
 
   const trackOperation = 'command.document.object.property.track.edit';
+  const readOperation = 'query.document.object.property.read';
   const operations = new Set([
-    trackOperation,
+    trackOperation, readOperation,
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
@@ -64,6 +65,7 @@
     return value;
   }
   function objectIdPaths(operation) {
+    if (operation === readOperation) return property.readPaths;
     if (operation === trackOperation) return { has: p => /^payload\.selections\.\d+\.(?:property|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
     if (fontContract && fontContract.admitted(operation)) return fontContract.paths(operation);
     if(operation==='query.document.object.property.metadata') return {has:p=>p==='payload.view.property'||/^(?:payload\.view\.target|result\.target|result\.items\.\d+\.target)\.(?:contextId|layerUid|strokeId)$/.test(p)||/^result\.items\.\d+\.(?:contextId|controlName|property)$/.test(p)};
@@ -156,6 +158,7 @@
     } else if (!fields[action.kind].every(key => Number.isFinite(action[key]))) throw new TypeError('invalid numeric project setting');
   }
   function validatePayload(operation, payload, envelope) {
+    if (operation === readOperation) return property.readPayload(payload);
     if (operation === trackOperation) return property.trackPayload(payload);
     if (fontContract && fontContract.admitted(operation)) return fontContract.payload(operation, payload, envelope);
     if(operation==='query.document.object.property.metadata') property.metadataPayload(payload);
@@ -317,6 +320,7 @@
     if (!valid) throw new TypeError('invalid timing exposure disposition');
   }
   function validateResult(value, operation) {
+    if (operation === readOperation) return property.readResult(value);
     if (!operation) return;
     if (operation === trackOperation) return property.trackResult(value);
     if (fontContract && fontContract.admitted(operation)) return fontContract.result(operation, value);
@@ -401,7 +405,7 @@
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value, undefined, objectIdPaths(operation));
     if ((fontContract && fontContract.admitted(operation)) || ['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
-    'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', trackOperation, 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
+    'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', trackOperation, readOperation, 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -414,7 +418,7 @@
       validateResult(value.result, operation);
       if (operation === 'query.document.object' && (value.result.atRevision !== value.contentRevision ||
           value.result.documentSnapshotId !== `native-object:${value.documentId}:${value.result.atRevision}`)) throw new TypeError('object read snapshot mismatch');
-      if (['query.document.object.layer.timing','query.document.object.property.metadata'].includes(operation) && (value.result.atRevision !== value.contentRevision ||
+      if (['query.document.object.layer.timing','query.document.object.property.metadata',readOperation].includes(operation) && (value.result.atRevision !== value.contentRevision ||
           value.result.instanceId !== value.instanceId || value.result.documentId !== value.documentId)) throw new TypeError('timing response identity mismatch');
     } else {
       if (!has(value, 'error') || has(value, 'result')) throw new TypeError('failed response must contain only error');
@@ -432,6 +436,10 @@
     if (!transport || typeof transport.dispatch !== 'function') throw new TypeError('injected transport requires dispatch(request)');
     return Object.freeze({
       label,
+      readProperty(request) {
+        if (!request || request.operation !== readOperation) throw new TypeError('invalid property read operation');
+        return this.dispatch(request);
+      },
       editPropertyTrack(request) {
         if (!request || request.operation !== trackOperation) throw new TypeError('invalid property track operation');
         return this.dispatch(request);
@@ -442,7 +450,7 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
-          if (['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', trackOperation].includes(outbound.operation)) {
+          if (['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', trackOperation, readOperation].includes(outbound.operation)) {
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
@@ -452,6 +460,7 @@
                   ['kind', 'frame'].some((key) => actual.frameScope[key] !== expected.frameScope[key])) throw new TypeError('object read selector mismatch');
             }
             if (response.ok && outbound.operation==='query.document.object.property.metadata') property.metadataCorrelated(outbound.payload,response.result);
+            if (response.ok && outbound.operation === readOperation) property.readCorrelated(outbound.payload, response.result);
             if (response.ok && outbound.operation === 'query.document.object.layer.timing' &&
                 ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key])) throw new TypeError('timing read selector mismatch');
             if (response.ok && outbound.operation === 'command.document.object.layer.create' &&

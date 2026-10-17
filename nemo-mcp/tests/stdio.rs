@@ -144,6 +144,7 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         .expect("advertised command schema is valid Draft 2020-12");
     let validator = jsonschema::draft202012::new(&command_schema)
         .expect("advertised command schema compiles with a standard validator");
+    property_read_schema::check(|value| validator.is_valid(value));
     // This exercises the schema emitted by the actual server, including D12's
     // inline native definitions; no separate test-only schema is substituted.
     let track = json!({"apiVersion":2,"requestId":"track-schema","instanceId":"instance-a",
@@ -238,6 +239,7 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         "payload": {"layerId": "layer-a", "property": "opacity", "value": 25}
     });
     assert!(validator.is_valid(&legacy_request));
+    native_layer_policy_schema::check(&validator, &legacy_request);
     for (field, value) in [
         ("operation", json!("property.not_registered")),
         ("payload", json!("{}")),
@@ -490,3 +492,9 @@ fn schema_binary_rejects_unsupported_arguments_without_partial_contract_output()
         assert_eq!(output.stderr, b"usage: nemo-mcp-schema [--api-version 2]\n");
     }
 }
+
+#[path = "support/native_property_read_schema.rs"]
+mod property_read_schema;
+
+#[path = "support/native_layer_policy_schema.rs"]
+mod native_layer_policy_schema;

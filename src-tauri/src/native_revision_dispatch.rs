@@ -273,3 +273,7 @@ mod layer_policy_tests;
 #[cfg(test)]
 #[path = "native_property_track_dispatch_tests.rs"]
 mod property_track_tests;
+
+#[cfg(test)]
+#[path = "native_property_read_dispatch_tests.rs"]
+mod property_read_tests;
