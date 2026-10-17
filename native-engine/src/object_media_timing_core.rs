@@ -17,3 +17,6 @@ pub(crate) mod object_media_link_reopen;
 
 #[path = "object_media_link_join.rs"]
 pub(crate) mod object_media_link_join;
+
+#[path = "object_media_link_plan.rs"]
+pub(crate) mod object_media_link_plan;

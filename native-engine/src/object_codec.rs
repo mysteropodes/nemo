@@ -39,7 +39,11 @@ pub(crate) mod project_settings_test_codec {
     pub(crate) use super::project::{decode_project, encode_project, ProjectWireLimits};
 }
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
-pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
+#[allow(unused_imports)]
+pub(crate) use crate::object_document::AssetKind;
+// L06-E (lane #2112): the asset value types the read-queries pixel handle names; read-queries may not import object_document.
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::{AssetId, AssetInventory, AssetKind};
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use project::{
     decode_allocated_project, decode_validated_project, encode_project as encode_project_envelope,
@@ -86,6 +90,10 @@ mod order;
 #[path = "object_vector_codec.rs"]
 #[allow(dead_code)]
 mod object_vector_codec;
+// L01-E (#2107): admission of the vector extension slot and of the per-layer pathFx stack.
+#[path = "object_vector_ext_codec.rs"]
+#[allow(dead_code)]
+mod object_vector_ext_codec;
 pub use crate::object_document::OrderedObjectDocument;
 pub use order::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
 
@@ -313,6 +321,7 @@ pub(crate) fn validate_content(
                 reject(kind, message)
             })?;
         }
+        object_vector_ext_codec::validate_layer_path_fx(layer)?;
         if layer.layer_uid.is_empty() {
             return Err(reject(Invalid, "empty layerUid"));
         }
@@ -320,6 +329,8 @@ pub(crate) fn validate_content(
             return Err(reject(DuplicateId, "duplicate layerUid"));
         }
     }
+    crate::object_document::validate_widget_layers(declared_layers, objects)
+        .map_err(|error| reject(Invalid, error.message()))?;
     let mut targets = HashSet::new();
     for record in objects {
         let vector_family = record.family == crate::object_document::VECTOR_FAMILY;
@@ -344,6 +355,7 @@ pub(crate) fn validate_content(
         if !targets.insert(&record.target) {
             return Err(reject(DuplicateId, "duplicate scoped object key"));
         }
+        object_vector_ext_codec::validate_vector_ext(record)?;
         if vector_family {
             object_vector_codec::validate_vector_record(record)?;
             continue;

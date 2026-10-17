@@ -15,3 +15,11 @@ pub(crate) mod native_import_svg_explode;
 #[path = "object_import_remap_ids.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_import_remap_ids;
+
+#[path = "native_import_figma_walk.rs"]
+#[allow(dead_code)]
+pub(crate) mod native_import_figma_walk;
+
+#[path = "native_import_psd_plan.rs"]
+#[allow(dead_code)]
+pub(crate) mod native_import_psd_plan;

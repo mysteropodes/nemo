@@ -48,16 +48,44 @@ pub(crate) mod media_timing;
 #[path = "object_group_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_group_kernels;
-// L06-C (#2137): lane-6 raster asset family aggregator.
-#[path = "object_raster_asset_kernels.rs"]
+// L04-G (#2110): lane-4 component/StoryBoard/duplicator record family aggregator.
+#[path = "object_component_record_kernels.rs"]
 #[allow(dead_code)]
-pub(crate) mod object_raster_asset_kernels;
+pub(crate) mod object_component_record_kernels;
 
 // L01-D (#2107): editable-vector-path record body (storage DTO; admission is object_vector_codec.rs).
 #[path = "object_vector_record.rs"]
 #[allow(dead_code)]
 mod vector_record;
 pub(crate) use vector_record::{VectorBody, VECTOR_FAMILY};
+
+// L03-K (#2109): widget (rig control) layer record, F19; a private child like the other document members.
+#[path = "object_widget_record.rs"]
+#[allow(dead_code)]
+mod object_widget_record;
+#[allow(unused_imports)]
+pub(crate) use object_widget_record::{
+    validate_widget_layers, AxisBinding, AxisUnresolved, WidgetAdmissionError, WidgetAxis,
+    WidgetBindings, WidgetLayerKind, WidgetRecord, WidgetRest,
+};
+// L01-E (#2107): pressure fields, paramShape record, per-layer pathFx stack record, vector extension slot
+// (storage DTOs only; their admission is object_vector_ext_codec.rs under the codec).
+#[path = "object_vector_pressure.rs"]
+#[allow(dead_code)]
+mod vector_pressure;
+pub(crate) use vector_pressure::{PressureFields, STROKE_PROFILE_KINDS};
+#[path = "object_parametric_record.rs"]
+#[allow(dead_code)]
+mod parametric_record;
+pub(crate) use parametric_record::{ParamShape, PARAM_SHAPE_KINDS};
+#[path = "object_path_effects_record.rs"]
+#[allow(dead_code)]
+mod path_effects_record;
+pub(crate) use path_effects_record::{PathFxRecord, PATH_FX_TYPE_IDS};
+#[path = "object_vector_ext.rs"]
+#[allow(dead_code)]
+mod vector_ext;
+pub(crate) use vector_ext::VectorExt;
 
 #[path = "object_layer_organization.rs"]
 mod organization;
@@ -105,6 +133,12 @@ pub struct ObjectLayer {
     pub(crate) shy: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) timing: Presence<LayerTiming>,
+    /// Ordered non-destructive path effects (baseline `ld.pathFx`); absent differs from an empty stack.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) path_fx: Presence<Vec<PathFxRecord>>,
+    /// Present exactly for a widget (rig control) layer; its presence is the baseline `isWidgetLayer`.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) widget: Presence<WidgetRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -158,6 +192,9 @@ pub struct ObjectRecord {
     /// Present exactly for the `editable-vector-path` family.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) vector: Presence<VectorBody>,
+    /// Pressure fields, paramShape and boxAngle of the `editable-vector-path` family (L01-E).
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) vector_ext: Presence<VectorExt>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -234,7 +271,9 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
     #[serde(default)] folder_id: Presence<Option<String>>,
     #[serde(default)] shy: Presence<bool>,
-    #[serde(default)] timing: Presence<LayerTiming> });
+    #[serde(default)] timing: Presence<LayerTiming>,
+    #[serde(default)] path_fx: Presence<Vec<PathFxRecord>>,
+    #[serde(default)] widget: Presence<WidgetRecord> });
 object_deserialize!(ObjectTarget {
     context_id: String,
     frame_scope: FrameScope,
@@ -251,7 +290,8 @@ object_deserialize!(ObjectRecord {
     target: ObjectTarget,
     geometry: ObjectGeometry,
     #[serde(default)] fill: Presence<Option<SolidFill>>,
-    #[serde(default)] vector: Presence<VectorBody>
+    #[serde(default)] vector: Presence<VectorBody>,
+    #[serde(default)] vector_ext: Presence<VectorExt>
 });
 object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
     handle_space: String, segments: Vec<ObjectSegment> });
@@ -357,6 +397,8 @@ impl ObjectLayer {
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Present(LayerTiming::blank_drawing()),
+            widget: Presence::Missing,
+            path_fx: Presence::Missing,
         }
     }
     /// Identified, unnamed layer with earlier native-file visibility semantics.
@@ -371,6 +413,8 @@ impl ObjectLayer {
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Missing,
+            widget: Presence::Missing,
+            path_fx: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {
@@ -382,6 +426,10 @@ impl ObjectLayer {
     }
     pub fn visible(&self) -> bool {
         self.visible.value().copied().unwrap_or(true)
+    }
+    /// The stored ordered path-effect stack; `None` when the layer has none (an empty stack is `Some(&[])`).
+    pub(crate) fn path_fx(&self) -> Option<&[PathFxRecord]> {
+        self.path_fx.value().map(Vec::as_slice)
     }
 }
 impl ObjectTarget {

@@ -14,3 +14,10 @@ pub(crate) mod rig_ik_solve;
 #[path = "rig_pose_weights.rs"]
 #[allow(dead_code)]
 pub(crate) mod rig_pose_weights;
+
+#[path = "rig_pose_deform.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_pose_deform;
+#[path = "rig_pose_deform_anchor.rs"]
+#[allow(dead_code)]
+pub(crate) mod rig_pose_deform_anchor;
