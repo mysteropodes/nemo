@@ -111,6 +111,7 @@
       },
       markSavedIndeterminate:function(){baseline=null;ports.repaint();}
     });
+    function diagnostic(event,code){try{if(ports.openDiagnostic)ports.openDiagnostic(event,code);}catch(_){}}
     async function openPath(path){return enter(path,null);}
     async function newProject(config,isCurrent,onCreationFailure){
       if(!config||typeof config!=='object')return false;
@@ -120,6 +121,7 @@
     async function enter(path,config,isCurrent,onCreationFailure){
       if(saving||opening)return false;
       opening=true;
+      diagnostic(config?'file-new-started':'file-open-started');
       try{
         var creating=!!config,revealing=false;
         if(creating&&typeof session.newProject!=='function')throw {message:'Native New Project is unavailable',details:{disposition:'notDispatched'}};
@@ -139,8 +141,10 @@
           }
         });
         if(creating&&info&&ports.createdNotice)ports.createdNotice();
+        diagnostic(info?'file-completed':'file-cancelled');
         return info===null?null:!!info;
       }catch(error){
+        try{diagnostic('file-failed',error&&error.details&&error.details.disposition==='notDispatched'?'not-dispatched':'unconfirmed');}catch(_){}
         if(error&&error.details&&error.details.disposition==='notDispatched')ports.refused(error);
         else{baseline=null;ports.failed(error);ports.repaint();if(onCreationFailure)onCreationFailure(error);}
         return false;
@@ -187,6 +191,7 @@
   function bind(root,ports){
     var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
     if(!session)return null;
+    function diagnostic(event,code){try{var d=root.NemoNativeObjectProjectDesktop;if(d&&d.openDiagnostic)d.openDiagnostic(root,event,code);}catch(_){}}
     var startWasHidden=false;
     function commit(path,info){
       var name=root.SMProjectDocument.baseName(path);
@@ -194,18 +199,23 @@
       ports.touchRecent(path,name,info,true);ports.commit(path,name);ports.renderRecents();return true;
     }
     var ui=create(session,{
+      openDiagnostic:diagnostic,
       readUI:function(){return {handle:ports.read().tabId||'native-project-opening',generation:1};},
       confirmReplace:function(creating){return root.__TAURI__.dialog.ask('Unsaved changes will be lost. '+(creating?'Create a new project?':'Open another project?'),
         {title:'Unsaved changes',kind:'warning',okLabel:creating?'Discard and create':'Discard and open',cancelLabel:'Cancel'});},
       occlude:function(){startWasHidden=root.document.getElementById('start-screen').classList.contains('hid');ports.show();},
       restore:function(previous){if(previous&&startWasHidden)ports.hide();},
       reveal:async function(info){
-        projectView(root,info);if(root.updateUI)root.updateUI();ports.hide();
+        diagnostic('file-stage','projection');projectView(root,info);
+        diagnostic('file-stage','ui-refresh');if(root.updateUI)root.updateUI();
+        diagnostic('file-stage','hide-start');ports.hide();
+        diagnostic('file-stage','layout-wait');
         await new Promise(function(resolve,reject){var done=false,timer=setTimeout(function(){
             if(done)return;done=true;reject(new Error('Native project layout did not settle'));
           },1500);
           function finish(){if(done)return;done=true;clearTimeout(timer);resolve();}
           root.requestAnimationFrame(function(){root.requestAnimationFrame(finish);});});
+        diagnostic('file-stage','layout-settled');
       },
       opened:function(path,info){if(commit(path,info)!==true)return false;ports.opened();ports.notice('Opened: '+ports.read().name);return true;},
       created:function(name){ports.commit(null,name);ports.opened();return true;},

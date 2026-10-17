@@ -5,6 +5,51 @@
   else root.NemoNativeObjectProjectDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
+  var openLogs=new WeakMap();
+  var stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
+  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation',
+    'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
+    'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
+  function safeCode(event,code){
+    if(event==='bootstrap-rejected')return code==='unsupported-format'?'unsupported-format':'other';
+    if(event==='file-stage')return ['projection','ui-refresh','hide-start','layout-wait','layout-settled'].includes(code)?code:'unknown';
+    if(event==='file-failed')return ['not-dispatched','unconfirmed'].includes(code)?code:'unknown';
+    if(event!=='post-bootstrap-failed')return null;
+    if(typeof code!=='string')return 'unknown';
+    var parts=code.split(':'),stage=parts[0].replace(/^post-bootstrap-/,'');
+    var known=stages.includes(stage)||['first-preview','second-preview'].some(function(prefix){return previewDetails.some(function(detail){return stage===prefix+'-'+detail;});});
+    return parts.length===4&&known&&['invoke-rejected','local-refusal'].includes(parts[1])&&
+      ['unknown','invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled',
+        'wrong_instance','wrong_document','cancelled_before_dispatch'].includes(parts[2])&&['other','notDispatched'].includes(parts[3])?code:'unknown';
+  }
+  // Production-only observation: fixed vocabulary, no paths, names, messages, stacks or document bytes.
+  // A single coalesced writer keeps the last 32 events; storage can fail or hang without delaying Open.
+  function openDiagnostic(root,event,code){
+    if(!['file-open-started','file-new-started','file-completed','file-cancelled','file-failed','file-stage',
+      'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed'].includes(event))return;
+    try{
+      var log=openLogs.get(root);if(!log){log={startedAt:Date.now(),events:[],serial:0,attempt:0,writing:false,pending:null};openLogs.set(root,log);}
+      if(event==='file-open-started'||event==='file-new-started')log.attempt++;
+      log.events.push({sequence:++log.serial,attempt:log.attempt,event:event,code:safeCode(event,code)});
+      log.events=log.events.slice(-32);
+      log.pending=JSON.stringify({schemaVersion:1,kind:'native-open-diagnostic',startedAt:log.startedAt,updatedAt:Date.now(),events:log.events});
+      if(!log.writing){
+        log.writing=true;
+        (async function(){
+          try{
+            var api=root.__TAURI__,base=await api.path.appDataDir(),dir=base.replace(/[\\/]+$/,'')+'/diagnostics';
+            await api.fs.mkdir(dir,{recursive:true});
+            while(log.pending!==null){var bytes=log.pending;log.pending=null;
+              await api.fs.writeTextFile(dir+'/native-open.pending.json',bytes);
+              await api.fs.rename(dir+'/native-open.pending.json',dir+'/native-open.json');}
+          }catch(_){log.pending=null;}
+          finally{log.writing=false;}
+        })();
+      }
+    }catch(_){}
+    // Preserve the existing optional fixture observer; it is never required to collect production evidence.
+    try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){}
+  }
   function createPorts(root){
     var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
     function settingsNotice(kind,info){var c=root.NemoNativeProjectSettingsController;if(c&&typeof c[kind]==='function')c[kind](info);}
@@ -47,7 +92,7 @@
         if(request.operation==='command.document.object.layer.policy.edit'){if(typeof client.editLayerPolicy!=='function')throw new Error('Native public layer policy SDK is unavailable');return client.editLayerPolicy(request);}
         return client.dispatch(request);
       },
-      openDiagnostic:typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function'?function(event,code){try{root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){} }:null,
+      openDiagnostic:function(event,code){openDiagnostic(root,event,code);},
       presented:function(info){
         settingsNotice('presented',info);
         if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
@@ -57,5 +102,5 @@
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
   }
-  return Object.freeze({createPorts:createPorts});
+  return Object.freeze({createPorts:createPorts,openDiagnostic:openDiagnostic});
 }));
