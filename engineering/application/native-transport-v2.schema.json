@@ -1600,6 +1600,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.property.track.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPropertyTrackPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -2475,6 +2492,159 @@
             "atRevision": 0,
             "layerUid": "r08_curve_layer",
             "value": 25
+          }
+        }
+      ]
+    },
+    "ObjectPropertyTrackPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "selections",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.property.track.edit"
+        },
+        "selections": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "property",
+              "frame"
+            ],
+            "properties": {
+              "target": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "contextId",
+                  "layerUid"
+                ],
+                "properties": {
+                  "contextId": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  },
+                  "layerUid": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  },
+                  "strokeId": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  }
+                }
+              },
+              "property": {
+                "$ref": "#/$defs/ObjectOpaqueId"
+              },
+              "frame": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "preset"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "preset"
+                },
+                "preset": {
+                  "enum": [
+                    "linear",
+                    "ease",
+                    "easeIn",
+                    "easeOut",
+                    "hold"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "side",
+                "percent"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "influence"
+                },
+                "side": {
+                  "enum": [
+                    "in",
+                    "out"
+                  ]
+                },
+                "percent": {
+                  "type": "number",
+                  "description": "Finite native input; the authority applies the retained baseline clamp to 0..100."
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "subdivide"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectPropertyTrackResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applied",
+            "historyEntriesAdded"
+          ],
+          "properties": {
+            "applied": {
+              "const": true
+            },
+            "historyEntriesAdded": {
+              "const": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applied",
+            "historyEntriesAdded"
+          ],
+          "properties": {
+            "applied": {
+              "const": false
+            },
+            "historyEntriesAdded": {
+              "const": 0
+            }
           }
         }
       ]

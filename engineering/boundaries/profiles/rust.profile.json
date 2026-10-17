@@ -777,6 +777,9 @@
         "src/native_diagnostics_contract.rs",
         "src/native_layer_policy_contract.rs",
         "src/native_layer_policy_wire_tests.rs",
+        "src/native_property_track_contract.rs",
+        "src/native_property_track_contract_tests.rs",
+        "src/native_property_track_wire_tests.rs",
         "src/native_contract_tests.rs",
         "src/native_font_contract.rs",
         "src/native_font_contract_tests.rs"
@@ -1017,6 +1020,7 @@
         "native_object_inactive_project_tests.rs",
         "native_project_settings_public_tests.rs",
         "native_property_metadata_dispatch_tests.rs",
+        "native_property_track_dispatch_tests.rs",
         "native_layer_policy_dispatch_tests.rs"
       ],
       "publicApi": [],

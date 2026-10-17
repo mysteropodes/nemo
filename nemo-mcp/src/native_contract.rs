@@ -22,6 +22,8 @@ pub(crate) mod settings;
 mod diagnostics;
 #[path = "native_layer_policy_contract.rs"]
 pub(crate) mod layer_policy;
+#[path = "native_property_track_contract.rs"]
+pub(crate) mod property_track;
 use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
@@ -91,6 +93,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
         layer_policy::OP => layer_policy::request(payload),
+        property_track::OP => property_track::request(payload),
         "command.document.object.layer.create" => object::create_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -242,6 +245,9 @@ pub(crate) fn validate_result(
     }
     if operation == "query.document.object.layer.timing" {
         return object::timing_result(request_document_id, payload, result);
+    }
+    if operation == property_track::OP {
+        return property_track::result(result);
     }
     if operation == layer_policy::OP {
         return layer_policy::result(result);

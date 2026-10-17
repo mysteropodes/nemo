@@ -199,6 +199,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/application/native-opacity-viewport.js',
     'src/js/application/native-object-save-as-workflow.js',
     'src/js/application/native-object-saved-acknowledgement.js',
+    'src/js/adapters/native-font-panel.js',
     'src/js/adapters/native-viewport-underlay.js',
     'src/js/adapters/native-object-project-metadata.js',
     'src/js/adapters/native-object-project-desktop.js',
@@ -218,6 +219,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-motion-property-panel.js',
     'src/js/adapters/native-motion-property-binding.js',
     'src/js/adapters/native-object-inactive-project-tabs.js',
+    'src/js/adapters/native-property-contract.js',
     'src/js/adapters/native-application.js',
     'src/js/adapters/native-opacity-editor.js',
     'src/js/adapters/native-opacity-selection.js',
@@ -234,7 +236,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 102, 103, 104, 148, 195, 196, 197, 198, 199, 200, 201, 202, 203]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 103, 104, 105, 149, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -242,10 +244,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 145);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 146);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 147);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 149);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 146);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 147);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 148);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 150);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
@@ -352,14 +354,14 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
   const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
   assert.equal(runtime.length, 1); assert.equal(data.length, 1);
-  assert.equal(runtime[0].ordinal, 90); assert.equal(data[0].ordinal, 91);
+  assert.equal(runtime[0].ordinal, 91); assert.equal(data[0].ordinal, 92);
   assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 90);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 91);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};
@@ -381,7 +383,7 @@ function assertF06Bootstrap(html) {
   const scripts = [...html.matchAll(/<script\b([^>]*)>\s*<\/script>/gi)].map((match) => ({
     tag: match[0], src: match[1].match(/\bsrc=["']([^"']+)/)?.[1],
   }));
-  const sources = ['native-viewport-underlay', 'native-object-project-metadata',
+  const sources = ['native-font-panel', 'native-viewport-underlay', 'native-object-project-metadata',
     'native-object-project-desktop', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const positions = sources.map((name) => {
     const source = 'js/adapters/' + name + '.js';
@@ -404,10 +406,13 @@ function assertF06Bootstrap(html) {
 test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFile and UI', () => {
   const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
   assertF06Bootstrap(html);
+  const fonts = '<script src="js/adapters/native-font-panel.js"></script>';
   const parser = '<script src="js/adapters/native-object-project-metadata.js"></script>';
   const desktop = '<script src="js/adapters/native-object-project-desktop.js"></script>';
   const project = '<script src="js/adapters/native-object-project.js"></script>';
   for (const broken of [
+    html.replace(fonts, ''),
+    html.replace(fonts, fonts.replace('<script ', '<script defer ')),
     html.replace(parser, ''),
     html.replace(parser, parser + '\n' + parser),
     html.replace(parser, parser.replace('<script ', '<script async ')),
