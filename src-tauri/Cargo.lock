@@ -2632,6 +2632,7 @@ dependencies = [
  "png 0.18.1",
  "pollster",
  "raw-window-handle",
+ "read-fonts",
  "serde",
  "serde_json",
  "vello",

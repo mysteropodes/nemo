@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "operation": "command.document.object.asset.font.import",
+  "canonicalization": "OpacityRequest struct field order; payload/source maps sorted; false cancelledBeforeDispatch omitted; UTF8 JSON without insignificant whitespace",
+  "provenance": "Independently generated with Python stdlib json and hashlib; native serialization remains UNRUN",
+  "vectors": [
+    {
+      "name": "bundled",
+      "request": {
+        "payload": {
+          "source": {
+            "kind": "bundled",
+            "fontKey": "Roboto-Regular"
+          },
+          "lifecycleGeneration": 1,
+          "documentSnapshotId": "native-object:document:0",
+          "command": "object.asset.font.import"
+        },
+        "operation": "command.document.object.asset.font.import",
+        "expectedRevision": 0,
+        "documentId": "document",
+        "instanceId": "instance",
+        "requestId": "font-vector-1",
+        "apiVersion": 2
+      },
+      "canonicalJson": "{\"apiVersion\":2,\"requestId\":\"font-vector-1\",\"instanceId\":\"instance\",\"documentId\":\"document\",\"expectedRevision\":0,\"operation\":\"command.document.object.asset.font.import\",\"payload\":{\"command\":\"object.asset.font.import\",\"documentSnapshotId\":\"native-object:document:0\",\"lifecycleGeneration\":1,\"source\":{\"fontKey\":\"Roboto-Regular\",\"kind\":\"bundled\"}}}",
+      "sha256": "1d2159e694537b1ba9e823fe5df0abc2bb9d1ae734d779d3294c207c100acc48"
+    },
+    {
+      "name": "google_unicode_spaces_italic",
+      "request": {
+        "payload": {
+          "source": {
+            "italic": true,
+            "weight": 675,
+            "family": "  雪 Sans Étoile  ",
+            "kind": "google"
+          },
+          "lifecycleGeneration": 2,
+          "documentSnapshotId": "native-object:document:1",
+          "command": "object.asset.font.import"
+        },
+        "operation": "command.document.object.asset.font.import",
+        "expectedRevision": 1,
+        "documentId": "document",
+        "instanceId": "instance",
+        "requestId": "font-vector-2",
+        "apiVersion": 2
+      },
+      "canonicalJson": "{\"apiVersion\":2,\"requestId\":\"font-vector-2\",\"instanceId\":\"instance\",\"documentId\":\"document\",\"expectedRevision\":1,\"operation\":\"command.document.object.asset.font.import\",\"payload\":{\"command\":\"object.asset.font.import\",\"documentSnapshotId\":\"native-object:document:1\",\"lifecycleGeneration\":2,\"source\":{\"family\":\"  雪 Sans Étoile  \",\"italic\":true,\"kind\":\"google\",\"weight\":675}}}",
+      "sha256": "00d9ed808fda298d4cd4769a42af5eb7eb30f1a3878cb13f1bd6c38928d22a59"
+    },
+    {
+      "name": "explicit_false_cancel_is_omitted",
+      "request": {
+        "payload": {
+          "source": {
+            "fontKey": "DejaVuSerif-Bold",
+            "kind": "bundled"
+          },
+          "lifecycleGeneration": 3,
+          "documentSnapshotId": "native-object:document:2",
+          "command": "object.asset.font.import"
+        },
+        "operation": "command.document.object.asset.font.import",
+        "expectedRevision": 2,
+        "documentId": "document",
+        "instanceId": "instance",
+        "requestId": "font-vector-3",
+        "apiVersion": 2,
+        "cancelledBeforeDispatch": false
+      },
+      "canonicalJson": "{\"apiVersion\":2,\"requestId\":\"font-vector-3\",\"instanceId\":\"instance\",\"documentId\":\"document\",\"expectedRevision\":2,\"operation\":\"command.document.object.asset.font.import\",\"payload\":{\"command\":\"object.asset.font.import\",\"documentSnapshotId\":\"native-object:document:2\",\"lifecycleGeneration\":3,\"source\":{\"fontKey\":\"DejaVuSerif-Bold\",\"kind\":\"bundled\"}}}",
+      "sha256": "0c53b5e9f4e329b43d70584e14b112ffee69c901ca5d0ed17e956a70fd2446a1"
+    }
+  ]
+}

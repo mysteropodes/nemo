@@ -253,18 +253,38 @@ mod catalog {
                 locator,
             }
         } else {
-            if record.kind() != AssetKind::Image
-                || record.source().media_type() != Some("image/png")
-            {
-                return Err(ProjectWireError::Unsupported);
+            let bytes = record
+                .source()
+                .encoded_allocation()
+                .ok_or(ProjectWireError::Invalid)?;
+            match (
+                record.kind(),
+                record.source().media_type(),
+                record.source().has_font_admission(),
+            ) {
+                (AssetKind::Image, Some("image/png"), false) => embedded(bytes, limits)?,
+                #[cfg(feature = "font_asset_wire")]
+                (AssetKind::Font, Some("font/ttf"), true) => {
+                    let cap = limits
+                        .font
+                        .ok_or(ProjectWireError::Unsupported)?
+                        .encoded_byte_limit();
+                    if bytes.is_empty()
+                        || bytes.len() > cap
+                        || base64::encoded_len(bytes.len(), true).ok_or(ProjectWireError::Budget)?
+                            > limits.envelope_bytes
+                    {
+                        return Err(ProjectWireError::Budget);
+                    }
+                    Source::Embedded {
+                        kind: "embedded",
+                        media_type: "font/ttf",
+                        encoding: "base64",
+                        data: Encoded(bytes),
+                    }
+                }
+                _ => return Err(ProjectWireError::Unsupported),
             }
-            embedded(
-                record
-                    .source()
-                    .encoded_allocation()
-                    .ok_or(ProjectWireError::Invalid)?,
-                limits,
-            )?
         };
         Ok(CatalogAsset {
             id: record.id().as_str(),

@@ -338,10 +338,24 @@ test('production composition reuses frozen callback identities and resolves sess
   h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){bindings.push(ports);return render(root,info,frameOnly,ports);}};
   await h.open();const first=bindings[0],old=first.currentSession().info(),button=eye(h.root,0);
   h.root.updateUI(true);assert.equal(eye(h.root,0),button);assert.equal(Object.isFrozen(first),true);
-  assert.deepEqual(Object.keys(first).sort(),['currentSession','projectSettings','projectionReady','repaint','selectLayer']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','fontResources','layerPolicy','projectSettings','projectionReady','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.equal(first.fontResources(),null);
+  const fontCalls=[],assetId=' opaque font / 雪 ',source={kind:'google',family:'Poppins',weight:700,italic:false},signal={aborted:false};
+  h.root.SMVectorText={listNativeFontAssets:async()=>{fontCalls.push(['list']);return [{assetId}];},
+    loadNativeFontAsset:async id=>{fontCalls.push(['load',id]);return {loaded:id};},
+    importNativeFontSource:async(value,cancel)=>{fontCalls.push(['import',value,cancel]);return {assetId};}};
+  const fonts=first.fontResources();assert.equal(Object.isFrozen(fonts),true);
+  assert.deepEqual(Object.keys(fonts).sort(),['importSource','list','load']);
+  assert.deepEqual(await fonts.list(),[{assetId}]);assert.deepEqual(await fonts.load(assetId),{loaded:assetId});
+  assert.deepEqual(await fonts.importSource(source,signal),{assetId});
+  assert.deepEqual(fontCalls,[['list'],['load',assetId],['import',source,signal]]);
+  delete h.root.SMVectorText;assert.equal(first.fontResources(),null);
+  const generation=first.readTransportGeneration();assert.equal(generation,first.currentSession().readSubscriptionGeneration());
   await h.external([A,B,C]);assert.equal(first.currentSession().info().contentRevision,old.contentRevision+1);
+  assert.equal(first.readTransportGeneration(),generation,'content revision does not invent a subscription generation');
   await h.file.newProject({w:320,h:180,fps:24,name:'Replacement'});
   assert.notEqual(first.currentSession().info().documentId,old.documentId);assert.ok(bindings.every(value=>value===first));
+  assert.ok(first.readTransportGeneration()>generation,'replacement advances the existing owner subscription ticket');
   const before=h.calls.length;assert.equal(await button.click(),false);assert.equal(h.calls.length,before);
 });
 for(const name of ['projectionReady','currentSession','selectLayer','repaint'])test('actual row and eye events fail closed if injected '+name+' disappears',async()=>{
@@ -402,7 +416,7 @@ test('native optional Drawing fields retain exact values and absent old metadata
   }
 });
 test('Drawing field projection refresh preserves rows and rejects invalid tables before any publication',()=>{
-  const invalid=[{locked:true},{locked:null},{locked:0},{color:null},{color:123},{color:'#fff'},{color:'#GG0000'},
+  const invalid=[{locked:null},{locked:0},{shy:null},{shy:0},{color:null},{color:123},{color:'#fff'},{color:'#GG0000'},
     {color:'123456'},{parentLayerUid:'B'},{parentLayerUid:false}];
   for(const fields of invalid){
     const root=view(),before=JSON.stringify(root.state),rows=root.state.layers,selection=root._layerSel;
@@ -419,13 +433,14 @@ test('Drawing field projection refresh preserves rows and rejects invalid tables
   const old=metadata([A,B],2);assert.equal(Files.refreshLayerTable(root,old),true);assert.equal(row.color,'#b49Be6');
   assert.equal(Files.refreshVisibility(root,old),true);assert.equal(row.color,'#b49Be6');assert.equal(Files.projectionReadyForUI(root,old),true);
   const absent=metadata([A,B,C],3);assert.equal(Files.refreshLayerTable(root,absent),true);
-  for(const key of ['locked','color','parentLayerUid'])assert.equal(Object.hasOwn(root.state.layers[2],key),false);
+  for(const key of ['color','parentLayerUid'])assert.equal(Object.hasOwn(root.state.layers[2],key),false);
+  for(const flag of ['locked','shy']){assert.equal(root.state.layers[2][flag],false);assert.equal(Object.hasOwn(absent.layers[2],flag),false);}
   assert.equal(Files.projectionReadyForUI(root,absent),true);
   const added={...C,locked:false,color:'#7EA0FA',parentLayerUid:null};assert.equal(Files.refreshLayerTable(root,metadata([A,B,added],4)),true);
   assert.equal(root.state.layers[2].color,'#7EA0FA');assert.equal(root.state.layers[2].locked,false);assert.equal(root.state.layers[2].parentLayerUid,null);
 });
 test('unsupported Drawing fields are rejected by the session before detached metadata or UI publication',async()=>{
-  for(const fields of [{locked:true},{locked:null},{locked:'false'},{color:null},{color:'#123'},{color:'#12345G'},{parentLayerUid:'B'}]){
+  for(const fields of [{locked:null},{locked:'false'},{shy:null},{shy:'false'},{color:null},{color:'#123'},{color:'#12345G'},{parentLayerUid:'B'}]){
     const h=desktop([{...A,...fields},B]),before=JSON.stringify(h.root.state),rows=h.root.state.layers;
     assert.equal(await h.file.openPath('/native.json'),false);assert.equal(h.session.info(),null);
     assert.equal(JSON.stringify(h.root.state),before);assert.equal(h.root.state.layers,rows);assert.equal(h.log.includes('ACK'),false);
@@ -446,5 +461,13 @@ test('Drawing field refresh preserves final-presentation selection fence while A
   for(const pin of badPins){
     const selected=root._layerSel,frame=root.state.currentFrame;assert.equal(Files.refreshLayerTable(root,pin),false);
     assert.equal(root.state.layers[0],row);assert.equal(row.color,'#Ee7c58');assert.equal(root._layerSel,selected);assert.equal(root.state.currentFrame,frame);
+  }
+});
+
+test('admitted native lock and shy booleans preserve authored presence in session and readonly UI projection',async()=>{
+  for(const flags of [{locked:true},{shy:true},{locked:true,shy:false}]){
+    const h=desktop([{...A,...flags},B]);await h.open();const meta=h.session.info(),row=h.root.state.layers[0];
+    for(const flag of ['locked','shy']){assert.equal(Object.hasOwn(meta.layers[0],flag),Object.hasOwn(flags,flag));if(Object.hasOwn(flags,flag))assert.equal(meta.layers[0][flag],flags[flag]);assert.equal(row[flag],flags[flag]===true);}
+    assert.equal(Object.isFrozen(meta.layers[0]),true);assert.equal(Files.projectionReadyForUI(h.root,meta),true);
   }
 });

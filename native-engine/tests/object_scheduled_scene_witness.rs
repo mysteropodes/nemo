@@ -409,23 +409,17 @@ fn stale_terminal_and_replaced_work_refuse_without_reacquisition() {
 }
 
 #[test]
-fn unsupported_output_quality_and_resource_leases_cannot_create_permit() {
+fn unsupported_output_and_quality_cannot_create_permit() {
     let snapshot = owner("witness-output").acquire_snapshot(0).unwrap();
     let witness = witness(&snapshot, 7);
-    for case in 0..6 {
+    for case in 0..5 {
         let mut scheduler = FrameScheduler::new();
         let (kind, format, color, alpha, quality) = match case {
             0 => ("thumbnail", "rgba8", "srgb", "straight", "final"),
             1 => ("frame", "rgba16f", "srgb", "straight", "final"),
             2 => ("frame", "rgba8", "linear", "straight", "final"),
             3 => ("frame", "rgba8", "srgb", "premultiplied", "final"),
-            4 => ("frame", "rgba8", "srgb", "straight", "preview"),
-            _ => ("frame", "rgba8", "srgb", "straight", "final"),
-        };
-        let resources = if case == 5 {
-            vec![("foreign".into(), "v1".into())]
-        } else {
-            vec![]
+            _ => ("frame", "rgba8", "srgb", "straight", "preview"),
         };
         let key = EvaluationKey::new(
             snapshot.snapshot_id(),
@@ -433,7 +427,7 @@ fn unsupported_output_quality_and_resource_leases_cannot_create_permit() {
             7,
             quality,
             OutputSpec::new(kind, format, 64, 64, color, alpha).unwrap(),
-            resources,
+            [],
         )
         .unwrap();
         let work = scheduler

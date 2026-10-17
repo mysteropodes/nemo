@@ -17,7 +17,7 @@ const DECODER_BYTES: usize = 64 * 1024 * 1024;
 const DIMENSION: u32 = 8192;
 
 fn wire_limits() -> ProjectWireLimits {
-    ProjectWireLimits::new(ENVELOPE_BYTES, DRAWING_BYTES)
+    let limits = ProjectWireLimits::new(ENVELOPE_BYTES, DRAWING_BYTES)
         .unwrap()
         .with_png_limits(
             ENCODED_BYTES,
@@ -26,7 +26,11 @@ fn wire_limits() -> ProjectWireLimits {
             DIMENSION,
             DIMENSION,
         )
-        .unwrap()
+        .unwrap();
+    #[cfg(feature = "font_asset_wire")]
+    let limits = limits
+        .with_font_limits(crate::object_codec::FontAssetLimits::new(ENCODED_BYTES, 256).unwrap());
+    limits
 }
 fn png_limits() -> ImageAssetLimits {
     ImageAssetLimits::new(
@@ -64,6 +68,76 @@ impl PreparedReferenceAttachment {
 }
 
 impl ObjectSnapshot {
+    /// Trusted host supplies bytes separately from the bounded scalar request.
+    /// This value is not a public DTO, identity publisher or another owner.
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn admit_font_asset(
+        &self,
+        id: String,
+        name: String,
+        source: &[u8],
+    ) -> Result<Arc<crate::object_codec::AssetRecord>, DispatchErrorCode> {
+        self.admit_font_asset_using(
+            id,
+            name,
+            source,
+            Self::reserve_encoded,
+            |p| p.allocate().map_err(|_| "encoded allocation unavailable"),
+            |p, a| p.bind(a).map_err(|_| "encoded binding unavailable"),
+        )
+    }
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn admit_font_asset_using<R>(
+        &self,
+        id: String,
+        name: String,
+        source: &[u8],
+        reserve: impl FnOnce(usize) -> Result<R, &'static str>,
+        allocate: impl FnOnce(&mut R) -> Result<Vec<u8>, &'static str>,
+        bind: impl FnOnce(&mut R, &Arc<Vec<u8>>) -> Result<(), &'static str>,
+    ) -> Result<Arc<crate::object_codec::AssetRecord>, DispatchErrorCode> {
+        use crate::object_codec::{AssetId, AssetKind, AssetRecord};
+        let invalid = DispatchErrorCode::InvalidRequest;
+        let unavailable = DispatchErrorCode::Unavailable;
+        let project = self.project().ok_or(unavailable)?;
+        if project
+            .asset_inventory()
+            .is_some_and(|a| a.records().len() >= 1024 || !a.placements().is_empty())
+        {
+            return Err(unavailable);
+        }
+        let id = AssetId::new(id).map_err(|_| invalid)?;
+        if name.trim().is_empty() || name.len() > 255 || name.contains('\0') {
+            return Err(invalid);
+        }
+        if project
+            .asset_inventory()
+            .is_some_and(|a| a.records().iter().any(|r| r.id() == &id))
+        {
+            return Err(DispatchErrorCode::BusyConflict);
+        }
+        let limits = crate::object_codec::FontAssetLimits::new(ENCODED_BYTES, 256).unwrap();
+        let font_error = |error| match error {
+            crate::object_codec::FontAssetError::Invalid => invalid,
+            _ => unavailable,
+        };
+        crate::object_codec::validate_font(source, limits).map_err(font_error)?;
+        // Reservation precedes the only retained byte copy; exact original Arc
+        // is bound before native catalog publication. Failed paths drop it.
+        let mut permit = reserve(source.len()).map_err(|_| unavailable)?;
+        let mut bytes = allocate(&mut permit).map_err(|_| unavailable)?;
+        if bytes.len() != source.len() || bytes.capacity() != source.len() {
+            return Err(unavailable);
+        }
+        bytes.copy_from_slice(source);
+        let bytes = Arc::new(bytes);
+        let source = crate::object_codec::admitted_font_source(Arc::clone(&bytes), limits)
+            .map_err(font_error)?;
+        let record =
+            Arc::new(AssetRecord::new(id, name, AssetKind::Font, source).map_err(|_| invalid)?);
+        bind(&mut permit, &bytes).map_err(|_| unavailable)?;
+        Ok(record)
+    }
     pub(crate) fn admit_project_file(
         instance: String,
         bytes: &[u8],

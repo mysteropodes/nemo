@@ -175,9 +175,18 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         assert_eq!(discovery["apiVersion"], 1);
         assert!(discovery["registeredCapabilities"].is_array());
         assert_eq!(discovery["nativeApiVersion"], 2);
-        assert_eq!(
-            discovery["registeredNativeCapabilities"][0]["id"],
-            "native.opacity"
+        let mut opacity_capabilities = discovery["registeredNativeCapabilities"]
+            .as_array()
+            .expect("native capability catalog must be an array")
+            .iter()
+            .filter(|capability| capability["id"] == "native.opacity");
+        assert!(
+            opacity_capabilities.next().is_some(),
+            "native.opacity is advertised"
+        );
+        assert!(
+            opacity_capabilities.next().is_none(),
+            "native.opacity is unique"
         );
         assert_eq!(
             discovery["instances"],

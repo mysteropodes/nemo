@@ -1,8 +1,16 @@
 //! Order-neutral CPU contours from the admitted immutable object packet port.
 //! Source indices are provenance; composition/display policy is not inferred.
+use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
-use crate::render_geometry::{ClosedCubicPath, CubicSegment};
+use crate::render_geometry::ClosedCubicPath;
 use std::sync::Arc;
+
+use scene_effect_kernels::object_scene_resource_set::{
+    same_scene_resources, SceneResourceMismatch,
+};
+pub use scene_effect_kernels::object_scene_resource_set::{
+    ObjectSceneResourceSet, SceneResourceMismatchKind,
+};
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_reference_scene.rs"]
@@ -20,6 +28,10 @@ pub use scheduled::{
 
 #[path = "object_paint_plan.rs"]
 mod paint;
+// L07-F (#2113): contour scene producer joined through the L07-C pin registry.
+#[path = "object_scene_producer_contour.rs"]
+mod object_scene_producer_contour;
+use object_scene_producer_contour::CompiledContour;
 // L08-A (#2144): lane-8 scene composition/effect family aggregator.
 #[path = "scene_effect_kernels.rs"]
 #[allow(dead_code)]
@@ -40,6 +52,7 @@ pub use paint::{
 pub struct ObjectCompositionWitness {
     plan: ObjectPaintPlan,
     viewport: bool,
+    resources: Option<Arc<ObjectSceneResourceSet>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     reference: Option<reference::ReferenceScene>,
 }
@@ -52,6 +65,7 @@ pub fn prepare_object_composition(
     Ok(ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: false,
+        resources: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         reference: None,
     })
@@ -68,6 +82,25 @@ impl ObjectCompositionWitness {
     }
     pub fn plan(&self) -> &ObjectPaintPlan {
         &self.plan
+    }
+    /// Attach the immutable declared-resource set (and its retention tokens).
+    /// The tokens live as long as any clone of the witness, permit or result.
+    pub fn with_scene_resources(mut self, resources: Arc<ObjectSceneResourceSet>) -> Self {
+        self.resources = Some(resources);
+        self
+    }
+    pub fn scene_resources(&self) -> Option<&Arc<ObjectSceneResourceSet>> {
+        self.resources.as_ref()
+    }
+    /// Set equality with an evaluation key's declaration; an absent set is empty.
+    pub(crate) fn verify_scene_resources(
+        &self,
+        declared: &std::collections::BTreeMap<String, String>,
+    ) -> Result<(), SceneResourceMismatch> {
+        match &self.resources {
+            Some(set) => set.verify_declared(declared),
+            None => ObjectSceneResourceSet::empty().verify_declared(declared),
+        }
     }
     pub fn instance_id(&self) -> &str {
         self.plan.packet().instance_id()
@@ -98,6 +131,7 @@ impl ObjectCompositionWitness {
             && self.context_id() == other.context_id()
             && self.plan.packet().scope_kind() == other.plan.packet().scope_kind()
             && self.frame() == other.frame()
+            && same_scene_resources(self.resources.as_deref(), other.resources.as_deref())
     }
 }
 
@@ -117,12 +151,6 @@ pub enum ObjectSceneError {
     },
 }
 
-#[derive(Debug)]
-struct CompiledContour {
-    contour: ClosedCubicPath,
-    envelope: [f64; 4],
-}
-
 /// Borrow both the original scoped source record and its admitted contour.
 #[derive(Debug, Clone, Copy)]
 pub struct ObjectRenderEntry<'a> {
@@ -138,6 +166,10 @@ impl<'a> ObjectRenderEntry<'a> {
     }
     pub fn envelope(&self) -> [f64; 4] {
         self.compiled.envelope
+    }
+    /// Typed straight-RGBA paint admitted with the contour (L07-A `SceneSolid`).
+    pub(crate) fn solid(&self) -> &'a SceneSolid {
+        &self.compiled.solid
     }
 }
 
@@ -174,10 +206,7 @@ pub fn prepare_object_render_scene(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectRenderScene, ObjectSceneError> {
     validate_pins(packet, expected)?;
-    let contours = packet
-        .records()
-        .map(compile)
-        .collect::<Result<Vec<_>, _>>()?;
+    let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
     Ok(ObjectRenderScene {
         packet: packet.clone(),
         contours: contours.into(),
@@ -210,50 +239,4 @@ fn validate_pins(
         return Err(ObjectSceneError::WrongFrame);
     }
     Ok(())
-}
-
-fn compile(source: ObjectFrameRecord<'_>) -> Result<CompiledContour, ObjectSceneError> {
-    let reject = |reason| ObjectSceneError::UnsupportedGeometry {
-        source_object_index: source.source_object_index(),
-        reason,
-    };
-    // Field access is confined to the original record returned by the admitted
-    // evaluation port. No document lookup or second source authority exists.
-    let record = source.record();
-    let geometry = &record.geometry;
-    if record.family != "closed-solid-fill-cubic-path"
-        || geometry.kind != "cubic-path"
-        || !geometry.closed
-        || geometry.coordinate_space != "document-world"
-        || geometry.handle_space != "relative"
-    {
-        return Err(reject(
-            "packet geometry has no admitted contour representation",
-        ));
-    }
-    let number = |value: &serde_json::Number| {
-        value
-            .as_f64()
-            .filter(|n| n.is_finite())
-            .ok_or_else(|| reject("packet geometry coordinates must be finite f64 values"))
-    };
-    let segments = geometry
-        .segments
-        .iter()
-        .map(|segment| {
-            Ok(CubicSegment {
-                point: [number(&segment.point.x)?, number(&segment.point.y)?],
-                handle_in: [number(&segment.handle_in.x)?, number(&segment.handle_in.y)?],
-                handle_out: [
-                    number(&segment.handle_out.x)?,
-                    number(&segment.handle_out.y)?,
-                ],
-            })
-        })
-        .collect::<Result<Vec<_>, ObjectSceneError>>()?;
-    let contour = ClosedCubicPath::new(segments).map_err(reject)?;
-    let envelope = contour
-        .transformed_envelope([1., 0., 0., 1., 0., 0.])
-        .map_err(reject)?;
-    Ok(CompiledContour { contour, envelope })
 }

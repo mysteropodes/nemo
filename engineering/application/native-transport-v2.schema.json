@@ -4,8 +4,12 @@
   "title": "Nemo staged native application transport v2",
   "description": "N15 machine-readable contract. Host discovery is N16 and authority activation is N20.",
   "oneOf": [
-    { "$ref": "#/$defs/Request" },
-    { "$ref": "#/$defs/Response" }
+    {
+      "$ref": "#/$defs/Request"
+    },
+    {
+      "$ref": "#/$defs/Response"
+    }
   ],
   "$defs": {
     "Identifier": {
@@ -20,57 +24,104 @@
     "StableTarget": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["layerUid"],
-      "properties": { "layerUid": { "$ref": "#/$defs/Identifier" } }
+      "required": [
+        "layerUid"
+      ],
+      "properties": {
+        "layerUid": {
+          "$ref": "#/$defs/Identifier"
+        }
+      }
     },
     "OpaqueResourceHandle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["resourceId", "resourceVersion"],
+      "required": [
+        "resourceId",
+        "resourceVersion"
+      ],
       "properties": {
-        "resourceId": { "$ref": "#/$defs/Identifier" },
-        "resourceVersion": { "$ref": "#/$defs/Identifier" }
+        "resourceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "resourceVersion": {
+          "$ref": "#/$defs/Identifier"
+        }
       },
       "description": "Opaque lease identity only; pixels, canvas, binary data and geometry JSON are forbidden."
     },
     "CommandPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["command", "stableTarget", "value"],
+      "required": [
+        "command",
+        "stableTarget",
+        "value"
+      ],
       "properties": {
-        "command": { "const": "layer.opacity.set" },
-        "stableTarget": { "$ref": "#/$defs/StableTarget" },
-        "value": { "type": "number", "minimum": 0, "maximum": 100 }
+        "command": {
+          "const": "layer.opacity.set"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/StableTarget"
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
       }
     },
     "OpacityQueryPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stableTarget"],
+      "required": [
+        "stableTarget"
+      ],
       "properties": {
-        "stableTarget": { "$ref": "#/$defs/StableTarget" },
-        "atRevision": { "$ref": "#/$defs/Revision" }
+        "stableTarget": {
+          "$ref": "#/$defs/StableTarget"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        }
       }
     },
     "RevisionQueryPayload": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "frame": { "$ref": "#/$defs/Revision" },
-        "contextId": { "$ref": "#/$defs/Identifier" },
-        "viewGeneration": { "$ref": "#/$defs/Revision" }
+        "frame": {
+          "$ref": "#/$defs/Revision"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "$ref": "#/$defs/Revision"
+        }
       }
     },
     "SnapshotQueryPayload": {
       "type": "object",
       "additionalProperties": false,
-      "properties": { "atRevision": { "$ref": "#/$defs/Revision" } }
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        }
+      }
     },
     "TransactionBeginPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stableTarget"],
-      "properties": { "stableTarget": { "$ref": "#/$defs/StableTarget" } }
+      "required": [
+        "stableTarget"
+      ],
+      "properties": {
+        "stableTarget": {
+          "$ref": "#/$defs/StableTarget"
+        }
+      }
     },
     "ObjectOpaqueId": {
       "type": "string",
@@ -263,8 +314,12 @@
         }
       }
     },
-    "ObjectPropertyMetadataPayload": { "$ref": "./native-property-metadata-v1.schema.json#/$defs/Selector" },
-    "ObjectPropertyMetadataResult": { "$ref": "./native-property-metadata-v1.schema.json#/$defs/ReadResult" },
+    "ObjectPropertyMetadataPayload": {
+      "$ref": "./native-property-metadata-v1.schema.json#/$defs/Selector"
+    },
+    "ObjectPropertyMetadataResult": {
+      "$ref": "./native-property-metadata-v1.schema.json#/$defs/ReadResult"
+    },
     "ObjectLayerTimingFrame": {
       "type": "integer",
       "minimum": 0,
@@ -486,25 +541,87 @@
       }
     },
     "ObjectLayerCreatePayload": {
-      "type": "object", "additionalProperties": false,
-      "required": ["command", "name"],
-      "properties": { "command": { "const": "object.layer.create" }, "name": { "type": "string" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "name"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.create"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
     },
     "ObjectLayerCreateResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["applied", "historyEntriesAdded", "layerUid"],
-      "properties": { "applied": { "const": true }, "historyEntriesAdded": { "const": 1 },
-        "layerUid": { "$ref": "#/$defs/ObjectOpaqueId" } },
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "layerUid"
+      ],
+      "properties": {
+        "applied": {
+          "const": true
+        },
+        "historyEntriesAdded": {
+          "const": 1
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      },
       "description": "Prepared success contract only: outer contentRevision equals expectedRevision + 1. Retained replay proves historical creation identity, not current presence after undo. Public execution remains unavailable until native readers and caller policy are accepted."
     },
     "ObjectLayerVisibilityPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["command", "layerUid", "visible"],
+      "required": [
+        "command",
+        "layerUid",
+        "visible"
+      ],
       "properties": {
-        "command": { "const": "object.layer.visibility.set" },
-        "layerUid": { "$ref": "#/$defs/ObjectOpaqueId" },
-        "visible": { "type": "boolean" }
+        "command": {
+          "const": "object.layer.visibility.set"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectLayerPolicyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "flag",
+        "value"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.policy.edit"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "flag": {
+          "enum": [
+            "locked",
+            "shy"
+          ]
+        },
+        "value": {
+          "type": "boolean"
+        }
       }
     },
     "ObjectQueryResult": {
@@ -529,33 +646,68 @@
       "description": "Staged immutable common-envelope result: atRevision equals outer contentRevision; snapshot token is native-object:<documentId>:<atRevision>. Complete envelope is limited to 4096 bytes."
     },
     "SerializeQueryPayload": {
-      "type": "object", "additionalProperties": false,
-      "required": ["atRevision"],
-      "properties": { "atRevision": { "$ref": "#/$defs/Revision" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        }
+      }
     },
     "EvaluateQueryPayload": {
-      "type": "object", "additionalProperties": false,
-      "required": ["atRevision", "contextId", "frame"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "contextId",
+        "frame"
+      ],
       "properties": {
-        "atRevision": { "$ref": "#/$defs/Revision" },
-        "contextId": { "$ref": "#/$defs/Identifier" },
-        "frame": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
       }
     },
     "TransactionUpdatePayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["transactionId", "value"],
+      "required": [
+        "transactionId",
+        "value"
+      ],
       "properties": {
-        "transactionId": { "$ref": "#/$defs/Identifier" },
-        "value": { "type": "number", "minimum": 0, "maximum": 100 }
+        "transactionId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
       }
     },
     "TransactionIdPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["transactionId"],
-      "properties": { "transactionId": { "$ref": "#/$defs/Identifier" } }
+      "required": [
+        "transactionId"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "#/$defs/Identifier"
+        }
+      }
     },
     "EmptyPayload": {
       "type": "object",
@@ -563,98 +715,322 @@
       "maxProperties": 0
     },
     "ReproductionReportPayload": {
-      "type": "object", "additionalProperties": false,
-      "required": ["expectedContentRevision", "expectedSequence"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expectedContentRevision",
+        "expectedSequence"
+      ],
       "properties": {
-        "expectedContentRevision": { "$ref": "#/$defs/Revision" },
-        "expectedSequence": { "$ref": "#/$defs/Revision" }
+        "expectedContentRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "expectedSequence": {
+          "$ref": "#/$defs/Revision"
+        }
       }
     },
     "ReproductionReportResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["bundle", "verifiedContentRevision", "verifiedSequence"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle",
+        "verifiedContentRevision",
+        "verifiedSequence"
+      ],
       "properties": {
-        "bundle": { "$ref": "#/$defs/ReproductionBundle" },
-        "verifiedContentRevision": { "$ref": "#/$defs/Revision" },
-        "verifiedSequence": { "type": "integer", "minimum": 0, "maximum": 9007199254740990 }
+        "bundle": {
+          "$ref": "#/$defs/ReproductionBundle"
+        },
+        "verifiedContentRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "verifiedSequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740990
+        }
       },
       "description": "Both verified values equal the request tokens; verifiedContentRevision also equals the response envelope contentRevision. The native authority atomically verifies tokens, catalog provenance and exportable journal. Sequence exhaustion rejects."
     },
     "ReproductionReplayPayload": {
-      "type": "object", "additionalProperties": false,
-      "required": ["bundle"],
-      "properties": { "bundle": { "$ref": "#/$defs/ReproductionBundle" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle"
+      ],
+      "properties": {
+        "bundle": {
+          "$ref": "#/$defs/ReproductionBundle"
+        }
+      }
     },
     "ReproductionBundle": {
-      "type": "object", "additionalProperties": false,
-      "required": ["format", "formatVersion", "apiVersion", "fixture", "command", "stableTarget", "clock", "seed", "versions", "commands"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "formatVersion",
+        "apiVersion",
+        "fixture",
+        "command",
+        "stableTarget",
+        "clock",
+        "seed",
+        "versions",
+        "commands"
+      ],
       "properties": {
-        "format": { "const": "nemo.native-opacity-reproduction" },
-        "formatVersion": { "const": 1 }, "apiVersion": { "const": 2 },
-        "fixture": { "type": "object", "additionalProperties": false,
-          "required": ["id", "version", "sha256"],
-          "properties": { "id": { "type": "string" }, "version": { "const": 1 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } },
-        "command": { "const": "layer.opacity.set" },
-        "stableTarget": { "$ref": "#/$defs/StableTarget" },
-        "clock": { "type": "null" }, "seed": { "type": "null" },
-        "versions": { "type": "object", "additionalProperties": false,
-          "required": ["nativeEngine"], "properties": { "nativeEngine": { "type": "string" } } },
-        "commands": { "type": "array", "minItems": 1, "maxItems": 32,
-          "items": { "type": "object", "additionalProperties": false,
-            "required": ["id", "expectedRevision", "value", "revision", "applied"],
-            "properties": { "id": { "type": "integer", "minimum": 1, "maximum": 32 },
-              "expectedRevision": { "$ref": "#/$defs/Revision" },
-              "value": { "type": "number", "minimum": 0, "maximum": 100 },
-              "revision": { "$ref": "#/$defs/Revision" },
-              "applied": { "type": "boolean" } } } }
+        "format": {
+          "const": "nemo.native-opacity-reproduction"
+        },
+        "formatVersion": {
+          "const": 1
+        },
+        "apiVersion": {
+          "const": 2
+        },
+        "fixture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "version",
+            "sha256"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "const": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "command": {
+          "const": "layer.opacity.set"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/StableTarget"
+        },
+        "clock": {
+          "type": "null"
+        },
+        "seed": {
+          "type": "null"
+        },
+        "versions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nativeEngine"
+          ],
+          "properties": {
+            "nativeEngine": {
+              "type": "string"
+            }
+          }
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "expectedRevision",
+              "value",
+              "revision",
+              "applied"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "expectedRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "revision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "applied": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "description": "Complete encoded bundle is capped at 3072 bytes before replay. The native decoder additionally validates the pinned catalog identity and entire causal sequence."
     },
     "ReproductionStatusResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["state", "reason", "commandCount", "exportable"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "commandCount",
+        "exportable"
+      ],
       "properties": {
-        "state": { "enum": ["disabled", "recording", "invalid"] },
-        "reason": { "anyOf": [{ "type": "null" }, { "enum": ["not_catalog", "not_pristine", "already_opted_in", "not_opted_in", "empty_journal", "failed_mutation", "changed_retry", "unsupported_transition", "released", "replaced", "command_limit", "byte_limit", "invalid_projection"] }] },
-        "commandCount": { "type": "integer", "minimum": 0, "maximum": 32 },
-        "exportable": { "type": "boolean" }
+        "state": {
+          "enum": [
+            "disabled",
+            "recording",
+            "invalid"
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "not_catalog",
+                "not_pristine",
+                "already_opted_in",
+                "not_opted_in",
+                "empty_journal",
+                "failed_mutation",
+                "changed_retry",
+                "unsupported_transition",
+                "released",
+                "replaced",
+                "command_limit",
+                "byte_limit",
+                "invalid_projection"
+              ]
+            }
+          ]
+        },
+        "commandCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "exportable": {
+          "type": "boolean"
+        }
       }
     },
     "ReproductionExportResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["bundle"],
-      "properties": { "bundle": { "$ref": "#/$defs/ReproductionBundle" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle"
+      ],
+      "properties": {
+        "bundle": {
+          "$ref": "#/$defs/ReproductionBundle"
+        }
+      }
     },
     "ReproductionReplayState": {
-      "type": "object", "additionalProperties": false,
-      "required": ["revision", "opacity", "undoDepth", "redoDepth"],
-      "properties": { "revision": { "$ref": "#/$defs/Revision" },
-        "opacity": { "type": "number", "minimum": 0, "maximum": 100 },
-        "undoDepth": { "type": "integer", "minimum": 0, "maximum": 32 },
-        "redoDepth": { "type": "integer", "minimum": 0, "maximum": 32 } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "opacity",
+        "undoDepth",
+        "redoDepth"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "undoDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "redoDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        }
+      }
     },
     "ReproductionReplayResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["initial", "steps"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "initial",
+        "steps"
+      ],
       "properties": {
-        "initial": { "$ref": "#/$defs/ReproductionReplayState" },
-        "steps": { "type": "array", "minItems": 1, "maxItems": 32,
-          "items": { "type": "object", "additionalProperties": false,
-            "required": ["id", "expectedRevision", "applied", "state"],
-            "properties": { "id": { "type": "integer", "minimum": 1, "maximum": 32 },
-              "expectedRevision": { "$ref": "#/$defs/Revision" },
-              "applied": { "type": "boolean" },
-              "state": { "$ref": "#/$defs/ReproductionReplayState" } } } }
+        "initial": {
+          "$ref": "#/$defs/ReproductionReplayState"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "expectedRevision",
+              "applied",
+              "state"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 32
+              },
+              "expectedRevision": {
+                "$ref": "#/$defs/Revision"
+              },
+              "applied": {
+                "type": "boolean"
+              },
+              "state": {
+                "$ref": "#/$defs/ReproductionReplayState"
+              }
+            }
+          }
+        }
       }
     },
     "PngBeginPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contextId", "quality", "outputHandle", "frames"],
+      "required": [
+        "contextId",
+        "quality",
+        "outputHandle",
+        "frames"
+      ],
       "properties": {
-        "contextId": { "$ref": "#/$defs/Identifier" },
-        "quality": { "const": "final" },
-        "outputHandle": { "$ref": "#/$defs/Identifier" },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "quality": {
+          "const": "final"
+        },
+        "outputHandle": {
+          "$ref": "#/$defs/Identifier"
+        },
         "frames": {
           "type": "array",
           "minItems": 1,
@@ -662,10 +1038,17 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["sourceFrame", "geometryHandle"],
+            "required": [
+              "sourceFrame",
+              "geometryHandle"
+            ],
             "properties": {
-              "sourceFrame": { "$ref": "#/$defs/Revision" },
-              "geometryHandle": { "$ref": "#/$defs/OpaqueResourceHandle" }
+              "sourceFrame": {
+                "$ref": "#/$defs/Revision"
+              },
+              "geometryHandle": {
+                "$ref": "#/$defs/OpaqueResourceHandle"
+              }
             }
           }
         }
@@ -674,194 +1057,580 @@
     "JobIdPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["jobId"],
-      "properties": { "jobId": { "$ref": "#/$defs/Identifier" } }
+      "required": [
+        "jobId"
+      ],
+      "properties": {
+        "jobId": {
+          "$ref": "#/$defs/Identifier"
+        }
+      }
     },
     "RequestBase": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["apiVersion", "requestId", "instanceId", "documentId", "operation", "payload"],
+      "required": [
+        "apiVersion",
+        "requestId",
+        "instanceId",
+        "documentId",
+        "operation",
+        "payload"
+      ],
       "properties": {
-        "apiVersion": { "const": 2 },
-        "requestId": { "$ref": "#/$defs/Identifier" },
-        "instanceId": { "$ref": "#/$defs/Identifier" },
-        "documentId": { "$ref": "#/$defs/Identifier" },
-        "expectedRevision": { "$ref": "#/$defs/Revision" },
-        "cancelledBeforeDispatch": { "type": "boolean" },
-        "operation": { "type": "string" },
-        "payload": { "type": "object" }
+        "apiVersion": {
+          "const": 2
+        },
+        "requestId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "expectedRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "cancelledBeforeDispatch": {
+          "type": "boolean"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "object"
+        }
       }
     },
     "RequiredRevisionRequest": {
       "allOf": [
-        { "$ref": "#/$defs/RequestBase" },
-        { "required": ["expectedRevision"] }
+        {
+          "$ref": "#/$defs/RequestBase"
+        },
+        {
+          "required": [
+            "expectedRevision"
+          ]
+        }
       ]
     },
     "ForbiddenRevisionRequest": {
       "allOf": [
-        { "$ref": "#/$defs/RequestBase" },
-        { "not": { "required": ["expectedRevision"] } }
+        {
+          "$ref": "#/$defs/RequestBase"
+        },
+        {
+          "not": {
+            "required": [
+              "expectedRevision"
+            ]
+          }
+        }
       ]
     },
     "Request": {
       "oneOf": [
-        { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" }, { "properties": { "operation": { "const": "command.document.object.project.settings.edit" }, "payload": { "$ref": "#/$defs/ObjectProjectSettingsPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" }, { "properties": { "operation": { "const": "query.document.object.layer.timing" }, "payload": { "$ref": "#/$defs/ObjectLayerTimingPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" }, { "properties": { "operation": { "const": "query.document.object.property.metadata" }, "payload": { "$ref": "#/$defs/ObjectPropertyMetadataPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" },
-          { "properties": { "operation": { "const": "command.document.object.layer.create" },
-            "payload": { "$ref": "#/$defs/ObjectLayerCreatePayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
-          { "properties": { "operation": { "const": "query.document.object" },
-            "payload": { "$ref": "#/$defs/ObjectQueryPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" },
-          { "properties": { "operation": { "const": "command.document.object.layer.visibility.set" },
-            "payload": { "$ref": "#/$defs/ObjectLayerVisibilityPayload" } } }] },
-
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
-          { "properties": { "operation": { "const": "command.reproduction.opt_in" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
-          { "properties": { "operation": { "const": "query.reproduction.status" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
-          { "properties": { "operation": { "const": "query.reproduction.export" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
-          { "properties": { "operation": { "const": "query.reproduction.report" }, "payload": { "$ref": "#/$defs/ReproductionReportPayload" } } }] },
-        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
-          { "properties": { "operation": { "const": "query.reproduction.replay" }, "payload": { "$ref": "#/$defs/ReproductionReplayPayload" } } }] },
         {
           "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
-            { "properties": {
-              "operation": { "const": "query.diagnostics.recent" },
-              "payload": { "$ref": "#/$defs/EmptyPayload" }
-            } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
-            { "properties": {
-              "operation": { "const": "query.document.serialize" },
-              "payload": { "$ref": "#/$defs/SerializeQueryPayload" }
-            } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
-            { "properties": {
-              "operation": { "const": "query.document.evaluate" },
-              "payload": { "$ref": "#/$defs/EvaluateQueryPayload" }
-            } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "const": "command.document.apply" },
-                "payload": { "$ref": "#/$defs/CommandPayload" }
+                "operation": {
+                  "const": "command.document.object.project.settings.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectSettingsPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "const": "query.document.opacity" },
-                "payload": { "$ref": "#/$defs/OpacityQueryPayload" }
+                "operation": {
+                  "const": "command.document.object.layer.policy.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerPolicyPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "const": "query.document.revision" },
-                "payload": { "$ref": "#/$defs/RevisionQueryPayload" }
+                "operation": {
+                  "const": "query.document.object.layer.timing"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerTimingPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "const": "query.document.snapshot.acquire" },
-                "payload": { "$ref": "#/$defs/SnapshotQueryPayload" }
+                "operation": {
+                  "const": "query.document.object.property.metadata"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPropertyMetadataPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "const": "transaction.begin" },
-                "payload": { "$ref": "#/$defs/TransactionBeginPayload" }
+                "operation": {
+                  "const": "query.document.object.property.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPropertyReadPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "enum": ["transaction.commit", "transaction.cancel", "transaction.status"] },
-                "payload": { "$ref": "#/$defs/TransactionIdPayload" }
+                "operation": {
+                  "const": "command.document.object.layer.create"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerCreatePayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "const": "transaction.update" },
-                "payload": { "$ref": "#/$defs/TransactionUpdatePayload" }
+                "operation": {
+                  "const": "query.document.object"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectQueryPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "enum": ["history.undo", "history.redo"] },
-                "payload": { "$ref": "#/$defs/EmptyPayload" }
+                "operation": {
+                  "const": "command.document.object.layer.visibility.set"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerVisibilityPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "const": "job.export.png.begin" },
-                "payload": { "$ref": "#/$defs/PngBeginPayload" }
+                "operation": {
+                  "const": "command.reproduction.opt_in"
+                },
+                "payload": {
+                  "$ref": "#/$defs/EmptyPayload"
+                }
               }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
             {
               "properties": {
-                "operation": { "enum": ["job.export.png.status", "job.export.png.cancel"] },
-                "payload": { "$ref": "#/$defs/JobIdPayload" }
+                "operation": {
+                  "const": "query.reproduction.status"
+                },
+                "payload": {
+                  "$ref": "#/$defs/EmptyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.reproduction.export"
+                },
+                "payload": {
+                  "$ref": "#/$defs/EmptyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.reproduction.report"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ReproductionReportPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.reproduction.replay"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ReproductionReplayPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.diagnostics.recent"
+                },
+                "payload": {
+                  "$ref": "#/$defs/EmptyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.serialize"
+                },
+                "payload": {
+                  "$ref": "#/$defs/SerializeQueryPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.evaluate"
+                },
+                "payload": {
+                  "$ref": "#/$defs/EvaluateQueryPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.apply"
+                },
+                "payload": {
+                  "$ref": "#/$defs/CommandPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.opacity"
+                },
+                "payload": {
+                  "$ref": "#/$defs/OpacityQueryPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.revision"
+                },
+                "payload": {
+                  "$ref": "#/$defs/RevisionQueryPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.snapshot.acquire"
+                },
+                "payload": {
+                  "$ref": "#/$defs/SnapshotQueryPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "transaction.begin"
+                },
+                "payload": {
+                  "$ref": "#/$defs/TransactionBeginPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "enum": [
+                    "transaction.commit",
+                    "transaction.cancel",
+                    "transaction.status"
+                  ]
+                },
+                "payload": {
+                  "$ref": "#/$defs/TransactionIdPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "transaction.update"
+                },
+                "payload": {
+                  "$ref": "#/$defs/TransactionUpdatePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "enum": [
+                    "history.undo",
+                    "history.redo"
+                  ]
+                },
+                "payload": {
+                  "$ref": "#/$defs/EmptyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "job.export.png.begin"
+                },
+                "payload": {
+                  "$ref": "#/$defs/PngBeginPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "enum": [
+                    "job.export.png.status",
+                    "job.export.png.cancel"
+                  ]
+                },
+                "payload": {
+                  "$ref": "#/$defs/JobIdPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.asset.font.import"
+                },
+                "payload": {
+                  "$ref": "native-font-assets-v1.schema.json#/$defs/Import"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.asset.font"
+                },
+                "payload": {
+                  "$ref": "native-font-assets-v1.schema.json#/$defs/Query"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.property.track.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPropertyTrackPayload"
+                }
               }
             }
           ]
@@ -874,7 +1643,11 @@
           "instanceId": "instance-a",
           "documentId": "native-document-1",
           "operation": "query.document.opacity",
-          "payload": { "stableTarget": { "layerUid": "r08_curve_layer" } }
+          "payload": {
+            "stableTarget": {
+              "layerUid": "r08_curve_layer"
+            }
+          }
         },
         {
           "apiVersion": 2,
@@ -887,10 +1660,15 @@
             "contextId": "scene-root",
             "quality": "final",
             "outputHandle": "output/fixture",
-            "frames": [{
-              "sourceFrame": 0,
-              "geometryHandle": { "resourceId": "geometry/r08", "resourceVersion": "v1" }
-            }]
+            "frames": [
+              {
+                "sourceFrame": 0,
+                "geometryHandle": {
+                  "resourceId": "geometry/r08",
+                  "resourceVersion": "v1"
+                }
+              }
+            ]
           }
         }
       ]
@@ -898,188 +1676,513 @@
     "CommandResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["applied", "historyEntriesAdded"],
+      "required": [
+        "applied",
+        "historyEntriesAdded"
+      ],
       "properties": {
-        "applied": { "type": "boolean" },
-        "historyEntriesAdded": { "type": "integer", "minimum": 0, "maximum": 1 }
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "OpacityQueryResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["atRevision", "layerUid", "value"],
+      "required": [
+        "atRevision",
+        "layerUid",
+        "value"
+      ],
       "properties": {
-        "atRevision": { "$ref": "#/$defs/Revision" },
-        "layerUid": { "$ref": "#/$defs/Identifier" },
-        "value": { "type": "number", "minimum": 0, "maximum": 100 }
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
       }
     },
     "RevisionQueryResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contentRevision", "frame", "contextId", "viewGeneration"],
+      "required": [
+        "contentRevision",
+        "frame",
+        "contextId",
+        "viewGeneration"
+      ],
       "properties": {
-        "contentRevision": { "$ref": "#/$defs/Revision" },
-        "frame": { "oneOf": [{ "$ref": "#/$defs/Revision" }, { "type": "null" }] },
-        "contextId": { "oneOf": [{ "$ref": "#/$defs/Identifier" }, { "type": "null" }] },
-        "viewGeneration": { "oneOf": [{ "$ref": "#/$defs/Revision" }, { "type": "null" }] }
+        "contentRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "frame": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contextId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "viewGeneration": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       }
     },
     "SnapshotQueryResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["atRevision", "documentSnapshotId"],
+      "required": [
+        "atRevision",
+        "documentSnapshotId"
+      ],
       "properties": {
-        "atRevision": { "$ref": "#/$defs/Revision" },
-        "documentSnapshotId": { "$ref": "#/$defs/Identifier" }
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        }
       }
     },
     "OpacityVector": {
-      "type": "array", "minItems": 1, "maxItems": 1,
-      "items": { "type": "number", "minimum": 0, "maximum": 100 }
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      }
     },
     "OpacityKey": {
-      "type": "object", "additionalProperties": false,
-      "required": ["frame", "v", "curvePoints", "hOut", "hIn"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "v",
+        "curvePoints",
+        "hOut",
+        "hIn"
+      ],
       "properties": {
-        "frame": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
-        "v": { "$ref": "#/$defs/OpacityVector" },
-        "curvePoints": { "const": [
-          { "x": 0, "y": 0 }, { "x": 0.25, "y": 0.156 },
-          { "x": 0.5, "y": 0.5 }, { "x": 0.75, "y": 0.844 },
-          { "x": 1, "y": 1 }
-        ] },
-        "hOut": { "const": [0, 0] },
-        "hIn": { "const": [0, 0] }
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "v": {
+          "$ref": "#/$defs/OpacityVector"
+        },
+        "curvePoints": {
+          "const": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.25,
+              "y": 0.156
+            },
+            {
+              "x": 0.5,
+              "y": 0.5
+            },
+            {
+              "x": 0.75,
+              "y": 0.844
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        "hOut": {
+          "const": [
+            0,
+            0
+          ]
+        },
+        "hIn": {
+          "const": [
+            0,
+            0
+          ]
+        }
       }
     },
     "NativeOpacityLayer": {
-      "type": "object", "additionalProperties": false,
-      "required": ["layerUid"],
-      "anyOf": [{ "required": ["motionStatic"] }, { "required": ["motion"] }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layerUid"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "motionStatic"
+          ]
+        },
+        {
+          "required": [
+            "motion"
+          ]
+        }
+      ],
       "properties": {
-        "layerUid": { "$ref": "#/$defs/Identifier" },
+        "layerUid": {
+          "$ref": "#/$defs/Identifier"
+        },
         "motionStatic": {
-          "type": "object", "additionalProperties": false, "required": ["opacity"],
-          "properties": { "opacity": { "$ref": "#/$defs/OpacityVector" } }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "opacity"
+          ],
+          "properties": {
+            "opacity": {
+              "$ref": "#/$defs/OpacityVector"
+            }
+          }
         },
         "motion": {
-          "type": "object", "additionalProperties": false, "required": ["opacity"],
-          "properties": { "opacity": {
-            "type": "object", "additionalProperties": false, "required": ["keys"],
-            "properties": { "keys": {
-              "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/OpacityKey" }
-            } }
-          } }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "opacity"
+          ],
+          "properties": {
+            "opacity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "keys"
+              ],
+              "properties": {
+                "keys": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/OpacityKey"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
     "NativeOpacityDocument": {
-      "type": "object", "additionalProperties": false,
-      "required": ["format", "formatVersion", "totalFrames", "layers"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "formatVersion",
+        "totalFrames",
+        "layers"
+      ],
       "properties": {
-        "format": { "const": "nemo.native-opacity-document" },
-        "formatVersion": { "const": 1 },
-        "totalFrames": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "format": {
+          "const": "nemo.native-opacity-document"
+        },
+        "formatVersion": {
+          "const": 1
+        },
+        "totalFrames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
         "layers": {
-          "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/NativeOpacityLayer" }
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/NativeOpacityLayer"
+          }
         }
       }
     },
     "SerializeQueryResult": {
       "description": "Codec-validated native subset, never legacy v13 packaging. The complete encoded response is limited to 4096 UTF-8 bytes; oversized reads fail unavailable without truncation.",
-      "type": "object", "additionalProperties": false,
-      "required": ["atRevision", "documentSnapshotId", "document"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "document"
+      ],
       "properties": {
-        "atRevision": { "$ref": "#/$defs/Revision" },
-        "documentSnapshotId": { "$ref": "#/$defs/Identifier" },
-        "document": { "$ref": "#/$defs/NativeOpacityDocument" }
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "document": {
+          "$ref": "#/$defs/NativeOpacityDocument"
+        }
       }
     },
     "EvaluateQueryResult": {
       "description": "Pure immutable snapshot evaluation. The complete encoded response is limited to 4096 UTF-8 bytes; oversized reads fail unavailable without truncation.",
-      "type": "object", "additionalProperties": false,
-      "required": ["documentSnapshotId", "documentId", "contentRevision", "contextId", "frame", "layers"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "documentId",
+        "contentRevision",
+        "contextId",
+        "frame",
+        "layers"
+      ],
       "properties": {
-        "documentSnapshotId": { "$ref": "#/$defs/Identifier" },
-        "documentId": { "$ref": "#/$defs/Identifier" },
-        "contentRevision": { "$ref": "#/$defs/Revision" },
-        "contextId": { "$ref": "#/$defs/Identifier" },
-        "frame": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
-        "layers": { "type": "array", "items": {
-          "type": "object", "additionalProperties": false,
-          "required": ["layerUid", "value"],
-          "properties": {
-            "layerUid": { "$ref": "#/$defs/Identifier" },
-            "value": { "type": "number", "minimum": 0, "maximum": 100 }
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contentRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "layerUid",
+              "value"
+            ],
+            "properties": {
+              "layerUid": {
+                "$ref": "#/$defs/Identifier"
+              },
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
           }
-        } }
+        }
       }
     },
     "TransactionResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["transactionId", "baseRevision", "workingGeneration", "workingState", "committedRevision", "terminalDisposition", "historyEntriesAdded"],
+      "required": [
+        "transactionId",
+        "baseRevision",
+        "workingGeneration",
+        "workingState",
+        "committedRevision",
+        "terminalDisposition",
+        "historyEntriesAdded"
+      ],
       "properties": {
-        "transactionId": { "$ref": "#/$defs/Identifier" },
-        "baseRevision": { "$ref": "#/$defs/Revision" },
-        "workingGeneration": { "$ref": "#/$defs/Revision" },
+        "transactionId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "baseRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "workingGeneration": {
+          "$ref": "#/$defs/Revision"
+        },
         "workingState": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["stableTarget", "value"],
+          "required": [
+            "stableTarget",
+            "value"
+          ],
           "properties": {
-            "stableTarget": { "$ref": "#/$defs/StableTarget" },
-            "value": { "type": "number", "minimum": 0, "maximum": 100 }
+            "stableTarget": {
+              "$ref": "#/$defs/StableTarget"
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
           }
         },
-        "committedRevision": { "oneOf": [{ "$ref": "#/$defs/Revision" }, { "type": "null" }] },
-        "terminalDisposition": { "enum": [null, "succeeded", "cancelled"] },
-        "historyEntriesAdded": { "type": "integer", "minimum": 0, "maximum": 1 }
+        "committedRevision": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terminalDisposition": {
+          "enum": [
+            null,
+            "succeeded",
+            "cancelled"
+          ]
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "DispatchError": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message"],
+      "required": [
+        "code",
+        "message"
+      ],
       "properties": {
         "code": {
-          "enum": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "busy_conflict", "unavailable", "not_found", "cancelled_before_dispatch", "internal"]
+          "enum": [
+            "invalid_request",
+            "wrong_instance",
+            "wrong_document",
+            "stale_revision",
+            "busy_conflict",
+            "unavailable",
+            "not_found",
+            "cancelled_before_dispatch",
+            "internal"
+          ]
         },
-        "message": { "type": "string" },
-        "details": { "type": "object" }
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object"
+        }
       }
     },
     "JobError": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message"],
+      "required": [
+        "code",
+        "message"
+      ],
       "properties": {
-        "code": { "enum": ["staging_failed", "frame_failed", "write_failed", "publish_failed", "cleanup_failed", "document_replaced"] },
-        "message": { "type": "string" },
-        "details": { "type": "object" }
+        "code": {
+          "enum": [
+            "staging_failed",
+            "frame_failed",
+            "write_failed",
+            "publish_failed",
+            "cleanup_failed",
+            "document_replaced"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object"
+        }
       }
     },
     "JobReceipt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["jobId", "status", "pinnedRevision", "documentSnapshotId", "progress", "artifact", "cleanup", "externalEffectDisposition"],
+      "required": [
+        "jobId",
+        "status",
+        "pinnedRevision",
+        "documentSnapshotId",
+        "progress",
+        "artifact",
+        "cleanup",
+        "externalEffectDisposition"
+      ],
       "properties": {
-        "jobId": { "$ref": "#/$defs/Identifier" },
-        "status": { "enum": ["running", "succeeded", "failed", "cancelled"] },
-        "pinnedRevision": { "$ref": "#/$defs/Revision" },
-        "documentSnapshotId": { "$ref": "#/$defs/Identifier" },
-        "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+        "jobId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "status": {
+          "enum": [
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "pinnedRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
         "artifact": {
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["target", "files"],
+              "required": [
+                "target",
+                "files"
+              ],
               "properties": {
-                "target": { "$ref": "#/$defs/Identifier" },
-                "files": { "type": "array", "items": { "type": "string" } }
+                "target": {
+                  "$ref": "#/$defs/Identifier"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
               }
             }
           ]
@@ -1087,102 +2190,312 @@
         "cleanup": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["status"],
+          "required": [
+            "status"
+          ],
           "properties": {
-            "status": { "enum": ["not_required", "pending", "complete", "failed"] },
-            "error": { "$ref": "#/$defs/JobError" }
+            "status": {
+              "enum": [
+                "not_required",
+                "pending",
+                "complete",
+                "failed"
+              ]
+            },
+            "error": {
+              "$ref": "#/$defs/JobError"
+            }
           }
         },
-        "externalEffectDisposition": { "enum": ["none", "contained", "committed", "indeterminate"] },
-        "error": { "$ref": "#/$defs/JobError" }
+        "externalEffectDisposition": {
+          "enum": [
+            "none",
+            "contained",
+            "committed",
+            "indeterminate"
+          ]
+        },
+        "error": {
+          "$ref": "#/$defs/JobError"
+        }
       }
     },
     "DiagnosticsRecord": {
-      "type": "object", "additionalProperties": false,
-      "required": ["sequence", "operation", "contentRevision", "ok"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "operation",
+        "contentRevision",
+        "ok"
+      ],
       "properties": {
-        "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-        "requestId": { "allOf": [{ "$ref": "#/$defs/Identifier" }, { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }] },
-        "requestIdRedacted": { "const": true },
-        "operation": { "enum": ["command.document.apply", "transaction.begin", "transaction.update", "transaction.commit", "transaction.cancel", "history.undo", "history.redo"] },
-        "targetId": { "allOf": [{ "$ref": "#/$defs/Identifier" }, { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }] },
-        "contentRevision": { "$ref": "#/$defs/Revision" },
-        "ok": { "type": "boolean" },
-        "errorCode": { "enum": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "busy_conflict", "unavailable", "not_found", "cancelled_before_dispatch", "internal"] }
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "requestId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            }
+          ]
+        },
+        "requestIdRedacted": {
+          "const": true
+        },
+        "operation": {
+          "enum": [
+            "command.document.apply",
+            "transaction.begin",
+            "transaction.update",
+            "transaction.commit",
+            "transaction.cancel",
+            "history.undo",
+            "history.redo"
+          ]
+        },
+        "targetId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            }
+          ]
+        },
+        "contentRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "errorCode": {
+          "enum": [
+            "invalid_request",
+            "wrong_instance",
+            "wrong_document",
+            "stale_revision",
+            "busy_conflict",
+            "unavailable",
+            "not_found",
+            "cancelled_before_dispatch",
+            "internal"
+          ]
+        }
       },
       "anyOf": [
-        { "required": ["requestId"], "not": { "required": ["requestIdRedacted"] } },
-        { "required": ["requestIdRedacted"], "not": { "required": ["requestId"] } }
+        {
+          "required": [
+            "requestId"
+          ],
+          "not": {
+            "required": [
+              "requestIdRedacted"
+            ]
+          }
+        },
+        {
+          "required": [
+            "requestIdRedacted"
+          ],
+          "not": {
+            "required": [
+              "requestId"
+            ]
+          }
+        }
       ],
       "oneOf": [
-        { "properties": { "ok": { "const": true } }, "not": { "required": ["errorCode"] } },
-        { "properties": { "ok": { "const": false } }, "required": ["errorCode"] }
+        {
+          "properties": {
+            "ok": {
+              "const": true
+            }
+          },
+          "not": {
+            "required": [
+              "errorCode"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "ok": {
+              "const": false
+            }
+          },
+          "required": [
+            "errorCode"
+          ]
+        }
       ]
     },
     "DiagnosticsResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["records", "truncated"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "records",
+        "truncated"
+      ],
       "properties": {
-        "records": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/DiagnosticsRecord" } },
-        "truncated": { "type": "boolean" }
+        "records": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/DiagnosticsRecord"
+          }
+        },
+        "truncated": {
+          "type": "boolean"
+        }
       },
       "description": "Ordered native terminal attempts, with oldest records omitted as needed to keep the full v2 response within 4096 encoded bytes."
     },
     "ResponseBase": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["apiVersion", "requestId", "instanceId", "documentId", "contentRevision", "ok"],
+      "required": [
+        "apiVersion",
+        "requestId",
+        "instanceId",
+        "documentId",
+        "contentRevision",
+        "ok"
+      ],
       "properties": {
-        "apiVersion": { "const": 2 },
-        "requestId": { "$ref": "#/$defs/Identifier" },
-        "instanceId": { "$ref": "#/$defs/Identifier" },
-        "documentId": { "$ref": "#/$defs/Identifier" },
-        "contentRevision": { "$ref": "#/$defs/Revision" },
-        "ok": { "type": "boolean" },
+        "apiVersion": {
+          "const": 2
+        },
+        "requestId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contentRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "ok": {
+          "type": "boolean"
+        },
         "result": {
           "oneOf": [
-            { "$ref": "#/$defs/DiagnosticsResult" },
-            { "$ref": "#/$defs/ReproductionStatusResult" },
-            { "$ref": "#/$defs/ReproductionExportResult" },
-            { "$ref": "#/$defs/ReproductionReportResult" },
-            { "$ref": "#/$defs/ReproductionReplayResult" },
-            { "$ref": "#/$defs/ObjectLayerCreateResult" },
-            { "$ref": "#/$defs/ObjectLayerTimingResult" },
-            { "$ref": "#/$defs/ObjectPropertyMetadataResult" },
-            { "$ref": "#/$defs/CommandResult" },
-            { "$ref": "#/$defs/OpacityQueryResult" },
-            { "$ref": "#/$defs/RevisionQueryResult" },
-            { "$ref": "#/$defs/SnapshotQueryResult" },
-            { "$ref": "#/$defs/SerializeQueryResult" },
-            { "$ref": "#/$defs/EvaluateQueryResult" },
-            { "$ref": "#/$defs/TransactionResult" },
-            { "$ref": "#/$defs/JobReceipt" }
+            {
+              "$ref": "#/$defs/DiagnosticsResult"
+            },
+            {
+              "$ref": "#/$defs/ReproductionStatusResult"
+            },
+            {
+              "$ref": "#/$defs/ReproductionExportResult"
+            },
+            {
+              "$ref": "#/$defs/ReproductionReportResult"
+            },
+            {
+              "$ref": "#/$defs/ReproductionReplayResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectLayerCreateResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectLayerTimingResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectPropertyMetadataResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectPropertyReadResult"
+            },
+            {
+              "$ref": "#/$defs/CommandResult"
+            },
+            {
+              "$ref": "#/$defs/OpacityQueryResult"
+            },
+            {
+              "$ref": "#/$defs/RevisionQueryResult"
+            },
+            {
+              "$ref": "#/$defs/SnapshotQueryResult"
+            },
+            {
+              "$ref": "#/$defs/SerializeQueryResult"
+            },
+            {
+              "$ref": "#/$defs/EvaluateQueryResult"
+            },
+            {
+              "$ref": "#/$defs/TransactionResult"
+            },
+            {
+              "$ref": "#/$defs/JobReceipt"
+            }
           ]
         },
-        "error": { "$ref": "#/$defs/DispatchError" }
+        "error": {
+          "$ref": "#/$defs/DispatchError"
+        }
       }
     },
     "Response": {
       "oneOf": [
         {
           "allOf": [
-            { "$ref": "#/$defs/ResponseBase" },
+            {
+              "$ref": "#/$defs/ResponseBase"
+            },
             {
               "type": "object",
-              "required": ["result"],
-              "not": { "required": ["error"] },
-              "properties": { "ok": { "const": true }, "result": true }
+              "required": [
+                "result"
+              ],
+              "not": {
+                "required": [
+                  "error"
+                ]
+              },
+              "properties": {
+                "ok": {
+                  "const": true
+                },
+                "result": true
+              }
             }
           ]
         },
         {
           "allOf": [
-            { "$ref": "#/$defs/ResponseBase" },
+            {
+              "$ref": "#/$defs/ResponseBase"
+            },
             {
               "type": "object",
-              "required": ["error"],
-              "not": { "required": ["result"] },
-              "properties": { "ok": { "const": false }, "error": { "$ref": "#/$defs/DispatchError" } }
+              "required": [
+                "error"
+              ],
+              "not": {
+                "required": [
+                  "result"
+                ]
+              },
+              "properties": {
+                "ok": {
+                  "const": false
+                },
+                "error": {
+                  "$ref": "#/$defs/DispatchError"
+                }
+              }
             }
           ]
         }
@@ -1195,7 +2508,701 @@
           "documentId": "native-document-1",
           "contentRevision": 0,
           "ok": true,
-          "result": { "atRevision": 0, "layerUid": "r08_curve_layer", "value": 25 }
+          "result": {
+            "atRevision": 0,
+            "layerUid": "r08_curve_layer",
+            "value": 25
+          }
+        }
+      ]
+    },
+    "ObjectPropertyTrackPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "selections",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.property.track.edit"
+        },
+        "selections": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "property",
+              "frame"
+            ],
+            "properties": {
+              "target": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "contextId",
+                  "layerUid"
+                ],
+                "properties": {
+                  "contextId": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  },
+                  "layerUid": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  },
+                  "strokeId": {
+                    "$ref": "#/$defs/ObjectOpaqueId"
+                  }
+                }
+              },
+              "property": {
+                "$ref": "#/$defs/ObjectOpaqueId"
+              },
+              "frame": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "preset"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "preset"
+                },
+                "preset": {
+                  "enum": [
+                    "linear",
+                    "ease",
+                    "easeIn",
+                    "easeOut",
+                    "hold"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "side",
+                "percent"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "influence"
+                },
+                "side": {
+                  "enum": [
+                    "in",
+                    "out"
+                  ]
+                },
+                "percent": {
+                  "type": "number",
+                  "description": "Finite native input; the authority applies the retained baseline clamp to 0..100."
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "subdivide"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectPropertyTrackResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applied",
+            "historyEntriesAdded"
+          ],
+          "properties": {
+            "applied": {
+              "const": true
+            },
+            "historyEntriesAdded": {
+              "const": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "applied",
+            "historyEntriesAdded"
+          ],
+          "properties": {
+            "applied": {
+              "const": false
+            },
+            "historyEntriesAdded": {
+              "const": 0
+            }
+          }
+        }
+      ]
+    },
+    "ObjectPropertyReadTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "layerUid"
+      ],
+      "properties": {
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strokeId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ObjectPropertyReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "view": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "property",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "rawSample"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectPropertyReadTarget"
+                },
+                "property": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "frame": {
+                  "type": "number",
+                  "minimum": -1.7976931348623157e+308,
+                  "maximum": 1.7976931348623157e+308
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "property",
+                "offset",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "authoredKeys"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectPropertyReadTarget"
+                },
+                "property": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectPropertyReadKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "v"
+      ],
+      "properties": {
+        "frame": {
+          "type": "number",
+          "minimum": -1.7976931348623157e+308,
+          "maximum": 1.7976931348623157e+308
+        },
+        "v": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "number",
+            "minimum": -1.7976931348623157e+308,
+            "maximum": 1.7976931348623157e+308
+          }
+        },
+        "hold": {
+          "type": "boolean"
+        },
+        "curvePoints": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "y": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "tx": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  },
+                  "ty": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "hIn": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -1.7976931348623157e+308,
+            "maximum": 1.7976931348623157e+308
+          }
+        },
+        "hOut": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -1.7976931348623157e+308,
+            "maximum": 1.7976931348623157e+308
+          }
+        }
+      }
+    },
+    "ObjectPropertyReadResult": {
+      "description": "Exact authored storage DTO or raw native sample. Native/shared runtime validators additionally correlate owner, revision, snapshot, target, property, frame and cursor; enforce increasing key/curve coordinates and actual native curve endpoints. Missing/null/empty curve distinctions are preserved. Provider result limit3072 and full envelope limit4096 are encoded UTF8 byte bounds, not JSON string lengths. Oversized pages refuse unavailable; no dynamic truncation.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "property",
+            "dimension",
+            "frame",
+            "value"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "rawSample"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dimension": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "frame": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "value": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 1
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 2
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 3
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 4
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "property",
+            "dimension",
+            "trackPresent",
+            "items",
+            "nextOffset"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "authoredKeys"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dimension": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "trackPresent": {
+              "type": "boolean"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "$ref": "#/$defs/ObjectPropertyReadKey"
+              }
+            },
+            "nextOffset": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 1
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "items": {
+                    "items": {
+                      "properties": {
+                        "v": {
+                          "minItems": 1,
+                          "maxItems": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 2
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "items": {
+                    "items": {
+                      "properties": {
+                        "v": {
+                          "minItems": 2,
+                          "maxItems": 2
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 3
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "items": {
+                    "items": {
+                      "properties": {
+                        "v": {
+                          "minItems": 3,
+                          "maxItems": 3
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "dimension": {
+                    "const": 4
+                  }
+                },
+                "required": [
+                  "dimension"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "items": {
+                    "items": {
+                      "properties": {
+                        "v": {
+                          "minItems": 4,
+                          "maxItems": 4
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "trackPresent": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "trackPresent"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "items": {
+                    "maxItems": 0
+                  },
+                  "nextOffset": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ]
         }
       ]
     }

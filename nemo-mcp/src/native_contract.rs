@@ -4,6 +4,9 @@ use crate::contract::bounded_identifier;
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 
+#[path = "native_font_contract.rs"]
+pub(crate) mod font;
+
 #[path = "native_reproduction_contract.rs"]
 mod reproduction;
 
@@ -14,6 +17,16 @@ mod object;
 
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
+
+#[path = "native_diagnostics_contract.rs"]
+mod diagnostics;
+#[path = "native_layer_policy_contract.rs"]
+pub(crate) mod layer_policy;
+#[path = "native_property_read_contract.rs"]
+pub(crate) mod property_read;
+#[path = "native_property_track_contract.rs"]
+pub(crate) mod property_track;
+use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
     [0.0, 0.0],
@@ -60,6 +73,8 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
         operation,
         "query.document.object"
             | metadata::OP
+            | property_read::OP
+            | font::QUERY
             | "query.document.object.layer.timing"
             | "query.document.serialize"
             | "query.document.evaluate"
@@ -74,11 +89,15 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
 
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
+        font::IMPORT | font::QUERY => font::request(operation, payload),
         "query.document.object" => object::request(payload),
         metadata::OP => metadata::request(payload),
+        property_read::OP => property_read::request(payload),
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
+        layer_policy::OP => layer_policy::request(payload),
+        property_track::OP => property_track::request(payload),
         "command.document.object.layer.create" => object::create_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -219,6 +238,12 @@ pub(crate) fn validate_result(
     if !validate_request(operation, payload) {
         return false;
     }
+    if matches!(operation, font::IMPORT | font::QUERY) {
+        return font::result(operation, payload, result);
+    }
+    if operation == property_read::OP {
+        return property_read::result(request_document_id, payload, result);
+    }
     if operation == metadata::OP {
         return metadata::result(request_document_id, payload, result);
     }
@@ -227,6 +252,12 @@ pub(crate) fn validate_result(
     }
     if operation == "query.document.object.layer.timing" {
         return object::timing_result(request_document_id, payload, result);
+    }
+    if operation == property_track::OP {
+        return property_track::result(result);
+    }
+    if operation == layer_policy::OP {
+        return layer_policy::result(result);
     }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);
@@ -312,212 +343,6 @@ pub(crate) fn validate_result(
     }
 }
 
-fn diagnostics_result(value: &Value) -> bool {
-    let Some(result) = exact(value, &["records", "truncated"], &[]) else {
-        return false;
-    };
-    let Some(records) = result["records"].as_array() else {
-        return false;
-    };
-    let mut prior = 0;
-    result["truncated"].is_boolean()
-        && (records.first().is_none_or(|record| record["sequence"] == 1)
-            || result["truncated"] == true)
-        && records.len() <= 32
-        && records.iter().all(|record| {
-            let Some(record) = exact(
-                record,
-                &["sequence", "operation", "contentRevision", "ok"],
-                &["requestId", "requestIdRedacted", "targetId", "errorCode"],
-            ) else {
-                return false;
-            };
-            let Some(sequence) = revision(record.get("sequence"))
-                .filter(|sequence| *sequence > 0 && (prior == 0 || *sequence == prior + 1))
-            else {
-                return false;
-            };
-            prior = sequence;
-            let disposition = match record.get("ok").and_then(Value::as_bool) {
-                Some(true) => !record.contains_key("errorCode"),
-                Some(false) => {
-                    record
-                        .get("errorCode")
-                        .and_then(Value::as_str)
-                        .is_some_and(|code| {
-                            matches!(
-                                code,
-                                "invalid_request"
-                                    | "wrong_instance"
-                                    | "wrong_document"
-                                    | "stale_revision"
-                                    | "busy_conflict"
-                                    | "unavailable"
-                                    | "not_found"
-                                    | "cancelled_before_dispatch"
-                                    | "internal"
-                            )
-                        })
-                }
-                None => false,
-            };
-            disposition
-                && revision(record.get("contentRevision")).is_some()
-                && match (record.get("requestId"), record.get("requestIdRedacted")) {
-                    (Some(id), None) => id
-                        .as_str()
-                        .is_some_and(|id| bounded_identifier(id) && !id.contains([':', '/'])),
-                    (None, Some(redacted)) => redacted == true,
-                    _ => false,
-                }
-                && record.get("targetId").is_none_or(|value| {
-                    value
-                        .as_str()
-                        .is_some_and(|id| bounded_identifier(id) && !id.contains([':', '/']))
-                })
-                && record
-                    .get("operation")
-                    .and_then(Value::as_str)
-                    .is_some_and(|operation| {
-                        matches!(
-                            operation,
-                            "command.document.apply"
-                                | "transaction.begin"
-                                | "transaction.update"
-                                | "transaction.commit"
-                                | "transaction.cancel"
-                                | "history.undo"
-                                | "history.redo"
-                        )
-                    })
-        })
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn diagnostics_result_rejects_open_shapes_bad_dispositions_and_unordered_sequences() {
-        let record = json!({"sequence":1,"requestId":"edit-1","operation":"history.undo","contentRevision":2,"ok":true});
-        let valid = json!({"records":[record.clone()],"truncated":false});
-        assert!(diagnostics_result(&valid));
-        let mut redacted = valid.clone();
-        redacted["records"][0]
-            .as_object_mut()
-            .unwrap()
-            .remove("requestId");
-        assert!(!diagnostics_result(&redacted));
-        redacted["records"][0]["requestIdRedacted"] = json!(true);
-        assert!(diagnostics_result(&redacted));
-        redacted["records"][0]["requestIdRedacted"] = json!(false);
-        assert!(!diagnostics_result(&redacted));
-        let mut bad = Vec::new();
-        for (key, value) in [
-            ("payload", json!({"private":"secret"})),
-            ("sequence", json!(0)),
-            ("ok", json!(false)),
-            ("errorCode", json!("internal")),
-            ("operation", json!("query.diagnostics.recent")),
-            ("targetId", json!("/private/path")),
-            ("targetId", json!("file:/private/path")),
-            ("requestId", json!("file:/private/path")),
-            ("requestIdRedacted", json!(true)),
-        ] {
-            let mut altered = valid.clone();
-            altered["records"][0][key] = value;
-            bad.push(altered);
-        }
-        bad.push(json!({"records":[record.clone(), record.clone()],"truncated":false}));
-        let mut gap = record.clone();
-        gap["sequence"] = json!(3);
-        bad.push(json!({"records":[record.clone(), gap.clone()],"truncated":true}));
-        bad.push(json!({"records":[gap],"truncated":false}));
-        bad.push(json!({"records":vec![record;33],"truncated":true}));
-        bad.push(json!({"records":[],"truncated":false,"privatePath":"secret"}));
-        for value in bad {
-            assert!(!diagnostics_result(&value));
-        }
-        assert!(!validate_result(
-            "query.diagnostics.recent",
-            "doc",
-            &json!({"limit":32}),
-            &valid
-        ));
-    }
-
-    fn serialized(document: Value) -> Value {
-        json!({
-            "atRevision": 0,
-            "documentSnapshotId": "native-opacity:native-document-1:0",
-            "document": document
-        })
-    }
-
-    fn document() -> Value {
-        json!({
-            "format": "nemo.native-opacity-document", "formatVersion": 1, "totalFrames": 21,
-            "layers": [{"layerUid": "layer-a", "motionStatic": {"opacity": [25]}}]
-        })
-    }
-
-    fn decimal_keyed_document() -> Value {
-        json!({
-            "format": "nemo.native-opacity-document", "formatVersion": 1, "totalFrames": 21,
-            "layers": [{"layerUid": "layer-a", "motion": {"opacity": {"keys": [{
-                "frame": 0, "v": [25], "curvePoints": [
-                    {"x": 0.0, "y": 0.0}, {"x": 0.25, "y": 0.156},
-                    {"x": 0.5, "y": 0.5}, {"x": 0.75, "y": 0.844},
-                    {"x": 1.0, "y": 1.0}
-                ], "hOut": [0.0, 0.0], "hIn": [0.0, 0.0]
-            }]}}}]
-        })
-    }
-
-    #[test]
-    fn serialized_document_contract_accepts_semantic_numbers_and_rejects_bad_shapes() {
-        let payload = json!({"atRevision": 0});
-        let valid = document();
-        assert!(validate_result(
-            "query.document.serialize",
-            "native-document-1",
-            &payload,
-            &serialized(valid.clone())
-        ));
-        assert!(validate_result(
-            "query.document.serialize",
-            "native-document-1",
-            &payload,
-            &serialized(decimal_keyed_document()),
-        ));
-        let mut open = valid.clone();
-        open["legacyVersion"] = json!(13);
-        let mut duplicate = valid.clone();
-        let duplicate_layer = duplicate["layers"][0].clone();
-        duplicate["layers"]
-            .as_array_mut()
-            .unwrap()
-            .push(duplicate_layer);
-        let mut malformed_track = valid;
-        malformed_track["layers"][0] = json!({
-            "layerUid": "layer-a", "motion": {"opacity": {"keys": [{
-                "frame": 0, "v": [25], "curvePoints": [], "hOut": [0, 0], "hIn": [0, 0]
-            }]}}
-        });
-        for rejected in [
-            json!({}),
-            json!({"version": 13, "layers": []}),
-            open,
-            duplicate,
-            malformed_track,
-        ] {
-            assert!(!validate_result(
-                "query.document.serialize",
-                "native-document-1",
-                &payload,
-                &serialized(rejected)
-            ));
-        }
-    }
-}
+#[path = "native_contract_tests.rs"]
+mod tests;

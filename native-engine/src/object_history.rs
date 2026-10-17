@@ -1,17 +1,26 @@
 //! Staged object edits/history authority; no transport, retries or replacement port.
 use crate::commands::{
     ObjectFillOwner, PreparedLayerCreate, PreparedLayerVisibility, PreparedObjectFill,
-    PreparedPropertyEdit, PreparedReferenceEdit, ReferenceEdit,
+    PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit, ReferenceEdit,
 };
 use crate::object_document::{ObjectDocument, ProjectEnvelope};
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use crate::transaction::StageReceipts;
 
+#[cfg(feature = "font_asset_wire")]
+#[path = "object_font_asset_history.rs"]
+mod font_assets;
+#[path = "object_layer_policy_history.rs"]
+mod layer_policy;
 #[path = "object_command_dispatch.rs"]
 mod object_command_dispatch;
 #[path = "object_project_settings_history.rs"]
 mod project_settings;
+// L10-B (#2124): lane-10 shot/montage/import family aggregator.
+#[path = "object_shot_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_shot_kernels;
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_project_settings.rs"]
 mod project_settings_tests;
@@ -73,6 +82,28 @@ impl NativeObjectHistory {
     ) -> Result<u64, DispatchErrorCode> {
         let before = self.content_revision();
         let after = self.owner.commit_property_edit(candidate)?;
+        if before != after {
+            self.undo.push(ObjectHistoryEntry {
+                before_revision: before,
+                after_revision: after,
+            });
+            self.redo.clear();
+        }
+        Ok(after)
+    }
+    pub(crate) fn prepare_vector_edit_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedVectorEdit, DispatchErrorCode> {
+        self.owner.prepare_vector_edit_json(bytes)
+    }
+    /// History entry only when the revision changed: an exact no-op keeps both stacks.
+    pub(crate) fn commit_vector_edit(
+        &mut self,
+        candidate: PreparedVectorEdit,
+    ) -> Result<u64, DispatchErrorCode> {
+        let before = self.content_revision();
+        let after = self.owner.commit_vector_edit(candidate)?;
         if before != after {
             self.undo.push(ObjectHistoryEntry {
                 before_revision: before,

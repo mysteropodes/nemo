@@ -379,55 +379,19 @@
     },
   ];
 
-  function describeOf(name) {
-    if (!window.SMLabs || !window.SMLabs.list) return '';
-    var found = window.SMLabs.list().find(function (p) { return p.name === name; });
-    return found ? found.what : '';
-  }
-
-  function renderLabsPanel() {
-    if (!window.SMLabs) return;
-    var toolsEl = document.getElementById('labs-tools-list');
-    var actionsEl = document.getElementById('labs-actions-list');
-    if (!toolsEl || !actionsEl) return;
-    toolsEl.innerHTML = '';
-    actionsEl.innerHTML = '';
-
-    TOOLS.forEach(function (spec) {
-      if (!window.SMLabs.isOn) return;
-      var row = mkRow();
-      var head = mkHeadLine();
-      var on = window.SMLabs.isOn(spec.name);
-      var cb = mkCheckbox(on, function (checked) {
-        window.SMLabs[checked ? 'enable' : 'disable'](spec.name);
-        renderLabsPanel(); // rebuild so inline params show/hide with the toggle
-        if (window.renderLabsFloatPanel) window.renderLabsFloatPanel(); // same toggle, other entry point
-      });
-      head.appendChild(cb);
-      head.appendChild(mkLabel(SM.t(spec.label), describeOf(spec.name) || (spec.hintExtra && SM.t(spec.hintExtra))));
-      row.appendChild(head);
-      if (on && spec.extra) spec.extra(row);
-      if (on && spec.hintExtra && !spec.extra) {
-        var hint = subRow();
-        var hs = document.createElement('span'); hs.style.cssText = 'font-size:9px;color:var(--text-dim);'; hs.textContent = SM.t(spec.hintExtra);
-        hint.appendChild(hs); row.appendChild(hint);
-      }
-      toolsEl.appendChild(row);
+  var settingsUi=null;
+  function renderLabsPanel(){
+    if(!settingsUi)settingsUi=window.NemoLabsSettingsUI.create({
+      document:document,tools:TOOLS,actions:ACTIONS,
+      ready:function(){return !!window.SMLabs;},canList:function(){return window.SMLabs&&window.SMLabs.list;},
+      canIsOn:function(){return window.SMLabs.isOn;},list:function(){return window.SMLabs.list();},
+      isOn:function(name){return window.SMLabs.isOn(name);},
+      setOn:function(name,on){return window.SMLabs[on?'enable':'disable'](name);},
+      translate:function(key){return SM.t(key);},
+      refreshFloating:function(){if(window.renderLabsFloatPanel)window.renderLabsFloatPanel();},
+      mkRow:mkRow,mkHeadLine:mkHeadLine,mkCheckbox:mkCheckbox,mkLabel:mkLabel,subRow:subRow
     });
-
-    ACTIONS.forEach(function (spec) {
-      var row = mkRow();
-      var lbl = document.createElement('div');
-      lbl.style.cssText = 'font-size:11px;color:var(--text);margin-bottom:3px;';
-      lbl.textContent = SM.t(spec.label);
-      lbl.title = describeOf(spec.name);
-      row.appendChild(lbl);
-      var controls = subRow();
-      controls.style.paddingLeft = '0';
-      spec.build(controls);
-      row.appendChild(controls);
-      actionsEl.appendChild(row);
-    });
+    return settingsUi.render();
   }
 
   window.renderLabsPanel = renderLabsPanel;
