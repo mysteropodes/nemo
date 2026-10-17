@@ -10,6 +10,25 @@ impl RevisionSync {
         external: bool,
         object_client: bool,
     ) -> Result<Delivery, String> {
+        self.dispatch_font_step(
+            instance,
+            native,
+            request,
+            external,
+            object_client,
+            FontPhase::Regular,
+        )?
+        .ok_or_else(|| "font source requires async application dispatch".into())
+    }
+    pub(super) fn dispatch_font_step(
+        &self,
+        instance: &str,
+        native: &NativeState,
+        request: NativeApplicationRequest,
+        external: bool,
+        object_client: bool,
+        font_phase: FontPhase<'_>,
+    ) -> Result<Option<Delivery>, String> {
         let mut authority = native
             .lock()
             .map_err(|_| "native application lock unavailable")?;
@@ -20,7 +39,7 @@ impl RevisionSync {
         let generation = match authority.active_generation() {
             Ok(generation) => generation,
             Err(_) => {
-                return Ok(Delivery {
+                return Ok(Some(Delivery {
                     response: unavailable(
                         &request,
                         instance,
@@ -29,10 +48,28 @@ impl RevisionSync {
                         false,
                     ),
                     notification: None,
-                })
+                }))
             }
         };
         let application = authority.active_mut(generation)?;
+        if request.operation == crate::application_mcp::font_source::IMPORT
+            && request
+                .payload
+                .get("lifecycleGeneration")
+                .and_then(serde_json::Value::as_u64)
+                != Some(generation)
+        {
+            return Ok(Some(Delivery {
+                response: unavailable(
+                    &request,
+                    instance,
+                    application.content_revision(),
+                    "native font lifecycle generation is stale",
+                    false,
+                ),
+                notification: None,
+            }));
+        }
         // The private raw token is not the only route into this core: the
         // versioned public API and bundled MCP also carry object operations.
         // Fence those before an unrelated active native owner sees the body.
@@ -40,7 +77,7 @@ impl RevisionSync {
             || request.operation.starts_with("query.document.object.")
             || request.operation.starts_with("command.document.object.");
         if (object_client || object_operation) && !application.object_client_available() {
-            return Ok(Delivery {
+            return Ok(Some(Delivery {
                 response: unavailable(
                     &request,
                     instance,
@@ -53,7 +90,7 @@ impl RevisionSync {
                     false,
                 ),
                 notification: None,
-            });
+            }));
         }
         state.reconcile(generation, application.document_id());
         let before = application.content_revision();
@@ -69,20 +106,20 @@ impl RevisionSync {
                     // This identity has already committed. Only the authority may classify its body.
                     let response = invoke_dispatch(application, &request)?;
                     if !response.ok {
-                        return Ok(Delivery {
+                        return Ok(Some(Delivery {
                             response,
                             notification: None,
-                        });
+                        }));
                     }
                 }
                 if retained || !request.cancelled_before_dispatch {
-                    return Ok(Delivery { response: unavailable(&request, instance, before,
+                    return Ok(Some(Delivery { response: unavailable(&request, instance, before,
                     "native revision synchronization is pending or indeterminate; do not execute again; release before re-entry",
-                    retained), notification: None });
+                    retained), notification: None }));
                 }
             }
             if external && state.subscriber.is_none() && !request.cancelled_before_dispatch {
-                return Ok(Delivery {
+                return Ok(Some(Delivery {
                     response: unavailable(
                         &request,
                         instance,
@@ -91,10 +128,17 @@ impl RevisionSync {
                         false,
                     ),
                     notification: None,
-                });
+                }));
             }
         }
-        let response = invoke_dispatch(application, &request)?;
+        let response = if request.operation == crate::application_mcp::font_source::IMPORT {
+            match invoke_font(application, &request, font_phase)? {
+                Some(response) => response,
+                None => return Ok(None),
+            }
+        } else {
+            invoke_dispatch(application, &request)?
+        };
         let after = application.content_revision();
         let notification = if external && response.ok && after > before {
             let event = RevisionEvent {
@@ -129,10 +173,10 @@ impl RevisionSync {
                 spawn_export_pump(Arc::clone(native), generation, job_id.to_owned());
             }
         }
-        Ok(Delivery {
+        Ok(Some(Delivery {
             response,
             notification,
-        })
+        }))
     }
 }
 
@@ -221,3 +265,19 @@ mod tests {
 #[cfg(test)]
 #[path = "native_property_metadata_dispatch_tests.rs"]
 mod metadata_tests;
+
+#[cfg(test)]
+#[path = "native_layer_policy_dispatch_tests.rs"]
+mod layer_policy_tests;
+
+#[cfg(test)]
+#[path = "native_property_track_dispatch_tests.rs"]
+mod property_track_tests;
+
+#[cfg(test)]
+#[path = "native_property_read_dispatch_tests.rs"]
+mod property_read_tests;
+
+#[cfg(test)]
+#[path = "native_property_edit_dispatch_tests.rs"]
+mod property_edit_tests;

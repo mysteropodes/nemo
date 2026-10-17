@@ -15,6 +15,9 @@ mod property_metadata_read;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_read.rs"]
 mod property_metadata_tests;
+#[cfg(all(test, feature = "test-commands"))]
+#[path = "../tests/object_property_public_read.rs"]
+mod property_public_read_tests;
 #[path = "object_property_read.rs"]
 mod property_read;
 #[path = "object_timing_snapshot.rs"]
@@ -230,6 +233,9 @@ impl ObjectSnapshot {
         }
         if request.operation == "query.document.object.property.metadata" {
             return self.dispatch_property_metadata(&request);
+        }
+        if request.operation == "query.document.object.property.read" {
+            return self.dispatch_property_read(&request);
         }
         if request.operation != "query.document.object" {
             return failure(

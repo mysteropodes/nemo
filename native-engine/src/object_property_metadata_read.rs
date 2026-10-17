@@ -266,7 +266,7 @@ impl ObjectSnapshot {
         }
         Ok((items, more))
     }
-    fn metadata_holder<'a>(
+    pub(super) fn metadata_holder<'a>(
         &'a self,
         target: &PropertyHolderTarget,
     ) -> Result<Cow<'a, PropertyHolder>, DispatchErrorCode> {
@@ -367,7 +367,7 @@ impl ObjectSnapshot {
                             && r.target.stroke_id == stroke
                             && r.target.frame_scope.kind == FrameScopeKind::Authored
                             && r.family == "closed-solid-fill-cubic-path"
-                            && r.fill.kind == "solid"
+                            && r.solid_fill().is_some_and(|fill| fill.kind == "solid")
                     })
                 }) {
                     keys.push("fillColor");

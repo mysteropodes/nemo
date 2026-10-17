@@ -497,3 +497,25 @@ fn normalized_detached_candidate_rechecks_real_owner_after_runtime_retirement() 
         Ok(4.0)
     );
 }
+
+#[test]
+fn wrapper_breakout_is_a_syntax_refusal_on_both_entries() {
+    // #2088: ending the function early leaves the wrapper tail, a SyntaxError.
+    let syntax = cases().into_iter().find(|c| c.expected == "syntax-error");
+    for code in [
+        "1);})(), (function(){while(true){}})(), (function(){return (1",
+        "1);})(), (function(){throw new Error('x')})(), (function(){return (1",
+        "1\n}); while (true) {} (function(){",
+        "1);} /*",
+        "1);} //",
+        "1);}, (function(){while(true){}})(), function(){return (1",
+    ] {
+        assert_case(&Case {
+            name: "wrapper-breakout",
+            code: code.into(),
+            ..syntax.clone().unwrap()
+        });
+        let order = normalized_order(code);
+        assert_eq!(order, Err(ExpressionRefusal::Syntax), "{code:?}");
+    }
+}

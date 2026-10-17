@@ -285,23 +285,101 @@ fn object_order_history_noop_stale_malformed_and_oversized_responses_keep_comple
 
 #[cfg(feature = "evaluation")]
 #[test]
-fn object_order_history_v2_frame_evaluation_is_unavailable_for_authored_and_reference() {
+fn object_order_history_v2_authored_numeric_packet_preserves_pins_and_reference_refusal() {
     use crate::object_document::FrameScopeKind;
     use crate::object_frame_packet::{prepare_object_frame, ObjectFrameError, ObjectFrameSelector};
-    let snapshot = current(&owner(&source()));
-    for kind in [FrameScopeKind::Authored, FrameScopeKind::Reference] {
-        let selector = ObjectFrameSelector {
-            instance_id: snapshot.instance_id(),
-            document_id: snapshot.document_id(),
-            content_revision: 0,
-            document_snapshot_id: snapshot.snapshot_id(),
-            context_id: "scene-root",
-            scope_kind: kind,
-            frame: 7,
-        };
-        assert_eq!(
-            prepare_object_frame(&snapshot, &selector).unwrap_err(),
-            ObjectFrameError::Unavailable
-        );
-    }
+    let mut initial = source();
+    // Explicit empty curves are linear: frame 7 between (0, 2) and (10, 3) is 2.7.
+    initial["compositionOrder"]["contexts"][0]["scopes"][0]["elements"][0]["order"]["track"]
+        ["keys"][1]["curvePoints"] = json!([]);
+    let mut history = owner(&initial);
+    let zero = current(&history);
+    let before = encode_storage_project(zero.document()).unwrap();
+    let candidate = history
+        .prepare_fill_json(&raw(&payload(&initial["objects"][0]["target"])))
+        .unwrap();
+    assert_eq!(history.commit_fill(candidate), Ok(1));
+    assert_eq!(history.undo(1), Ok(2));
+    let snapshot = current(&history);
+    let snapshot_id = snapshot.snapshot_id().to_owned();
+    assert_eq!(history.history_depths(), (0, 1));
+    let selector = ObjectFrameSelector {
+        instance_id: snapshot.instance_id(),
+        document_id: snapshot.document_id(),
+        content_revision: 2,
+        document_snapshot_id: snapshot.snapshot_id(),
+        context_id: "scene-root",
+        scope_kind: FrameScopeKind::Authored,
+        frame: 7,
+    };
+    let packet = prepare_object_frame(&snapshot, &selector).unwrap();
+    assert_eq!(packet.instance_id(), snapshot.instance_id());
+    assert_eq!(packet.document_id(), snapshot.document_id());
+    assert_eq!(packet.content_revision(), 2);
+    assert_eq!(packet.document_snapshot_id(), snapshot_id);
+    assert_eq!(packet.context_id(), "scene-root");
+    assert_eq!(packet.scope_kind(), &FrameScopeKind::Authored);
+    assert_eq!(packet.frame(), 7);
+    assert_eq!(
+        packet
+            .source_layers()
+            .iter()
+            .map(|layer| layer.layer_uid())
+            .collect::<Vec<_>>(),
+        vec!["L1", "L0"]
+    );
+    assert_eq!(packet.source_frame_for_layer(0), Some(7));
+    assert_eq!(packet.source_frame_for_layer(1), Some(7));
+    let ordered = packet.numeric_order().unwrap().layers();
+    // L0's explicit zero clamps to the front; the public sequence is back-to-front.
+    // L1's enabled empty expression has no numeric routing, so its natural rank is 1.
+    assert_eq!(
+        ordered
+            .iter()
+            .map(|layer| (
+                packet.source_layers()[layer.source_layer_index()].layer_uid(),
+                layer.value(),
+                layer.explicit()
+            ))
+            .collect::<Vec<_>>(),
+        vec![("L1", 1.0, false), ("L0", 0.0, true)]
+    );
+    assert!(ordered[0].elements().is_empty());
+    assert_eq!(ordered[1].elements().len(), 1);
+    let element = &ordered[1].elements()[0];
+    assert_eq!(element.source_object_index(), 0);
+    assert!((element.value() - 2.7).abs() < 1e-12);
+    let records: Vec<_> = packet.records().collect();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].source_layer_index(), 1);
+    assert_eq!(records[0].source_object_index(), 0);
+    assert!(std::ptr::eq(
+        records[0].record(),
+        &snapshot.document().objects()[0]
+    ));
+    assert_eq!(
+        serde_json::to_value(records[0].record()).unwrap(),
+        initial["objects"][0]
+    );
+    let mut reference = selector.clone();
+    reference.scope_kind = FrameScopeKind::Reference;
+    assert_eq!(
+        prepare_object_frame(&snapshot, &reference).unwrap_err(),
+        ObjectFrameError::Unavailable
+    );
+    assert_eq!(history.content_revision(), 2);
+    assert_eq!(history.history_depths(), (0, 1));
+    assert_eq!(current(&history).snapshot_id(), snapshot_id);
+    assert_eq!(image(&current(&history)), initial);
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+    assert_eq!(encode_storage_project(zero.document()).unwrap(), before);
+    assert_eq!(zero.content_revision(), 0);
+    assert_ne!(zero.snapshot_id(), snapshot_id);
+    drop(history);
+    assert_eq!(packet.content_revision(), 2);
+    assert_eq!(packet.document_snapshot_id(), snapshot_id);
+    assert_eq!(
+        serde_json::to_value(packet.records().next().unwrap().record()).unwrap(),
+        initial["objects"][0]
+    );
 }

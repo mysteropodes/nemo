@@ -1,6 +1,7 @@
 //! Strict v2 storage DTOs. They carry no live owner, evaluator or painter state.
 use crate::object_document::{
-    object_deserialize, FrameScope, ObjectDocument, ObjectLayer, ObjectRecord, PropertyHolder,
+    object_deserialize, FrameScope, LayerFolders, ObjectDocument, ObjectLayer, ObjectRecord,
+    PropertyHolder,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
@@ -51,12 +52,15 @@ pub struct OrderedObjectDocument {
     pub(crate) objects: Vec<ObjectRecord>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     pub(crate) composition_order: OrderPlan,
 }
 object_deserialize!(OrderedObjectDocument {
     format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
-    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>, composition_order: OrderPlan
+    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>, composition_order: OrderPlan
 });
 impl OrderedObjectDocument {
     pub(crate) fn into_storage(self) -> ObjectDocument {
@@ -67,6 +71,7 @@ impl OrderedObjectDocument {
             layers: self.layers,
             objects: self.objects,
             property_holders: self.property_holders,
+            layer_folders: self.layer_folders,
             composition_order: Presence::Present(self.composition_order),
         }
     }

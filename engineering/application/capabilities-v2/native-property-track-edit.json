@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.property-track-edit",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.property.track.edit"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPropertyTrackPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete 4096-byte correlated property-track request/receipt or typed refusal; no writable document or binary resource payload."
+  },
+  "semantics": "Edit only existing stable target/property/frame selections through the native revision/history owner. Supports linear/ease/easeIn/easeOut/hold presets, in/out influence (finite inputs retain the native baseline clamp), and subdivision. The authority resolves every selection on the original snapshot; missing or duplicate keys, unsupported properties and stale/cancelled requests cannot partially publish. Changed edits add one revision/history entry; no-op preserves authored presence and redo. This does not admit other property mutations or create a JS evaluator/writer. Public route availability is separate from installed curve UI acceptance.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Native track preset; installed curve UI acceptance pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "track-preset",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.property.track.edit",
+        "payload": {
+          "command": "object.property.track.edit",
+          "selections": [
+            {
+              "target": {
+                "contextId": "scene-root",
+                "layerUid": "legacy layer:alpha"
+              },
+              "property": "position",
+              "frame": 0
+            }
+          ],
+          "action": {
+            "kind": "preset",
+            "preset": "ease"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "track-preset",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Native track influence; installed curve UI acceptance pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "track-influence",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.property.track.edit",
+        "payload": {
+          "command": "object.property.track.edit",
+          "selections": [
+            {
+              "target": {
+                "contextId": "scene-root",
+                "layerUid": "legacy layer:alpha"
+              },
+              "property": "position",
+              "frame": 0
+            }
+          ],
+          "action": {
+            "kind": "influence",
+            "side": "out",
+            "percent": 100
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "track-influence",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Native track subdivide; installed curve UI acceptance pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "track-subdivide",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.property.track.edit",
+        "payload": {
+          "command": "object.property.track.edit",
+          "selections": [
+            {
+              "target": {
+                "contextId": "scene-root",
+                "layerUid": "legacy layer:alpha"
+              },
+              "property": "position",
+              "frame": 0
+            }
+          ],
+          "action": {
+            "kind": "subdivide"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "track-subdivide",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ],
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPropertyTrackResult"
+  }
+}

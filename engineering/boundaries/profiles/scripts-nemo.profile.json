@@ -218,6 +218,18 @@
       "sizeProfile": "Platform/engine adapter"
     },
     {
+      "id": "nemo.lib.boundariesRustVendor",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-rust-vendor.cjs"
+      ],
+      "publicApi": [
+        "boundaries-rust-vendor.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
       "id": "nemo.lib.boundariesCoverage",
       "layer": "tooling-adapters",
       "dir": "scripts/nemo/lib",

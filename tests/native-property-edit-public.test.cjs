@@ -1,0 +1,197 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const SDK = require('../src/js/adapters/native-application.js');
+const ROOT = path.resolve(__dirname, '..');
+const OP = 'command.document.object.property.edit';
+const request = (action = {kind:'setValue', frame:-0.5, values:[1, 2]}) => ({
+  apiVersion:2, requestId:'property-edit-7', instanceId:'instance-A', documentId:'document-A',
+  expectedRevision:7, operation:OP, payload:{command:'object.property.edit',
+    target:{contextId:'data:opaque context 雪', layerUid:'blob:opaque layer 雪', strokeId:'data:opaque stroke'},
+    property:'data:opaque property', action},
+});
+const reply = (q, applied = true) => ({apiVersion:2, requestId:q.requestId,
+  instanceId:q.instanceId, documentId:q.documentId, contentRevision:q.expectedRevision + Number(applied),
+  ok:true, result:{applied, historyEntriesAdded:Number(applied)},
+});
+const adapter = dispatch => SDK.createNativeApplicationAdapter('property-edit-test', {dispatch});
+const descriptor = JSON.parse(fs.readFileSync(path.join(ROOT,
+  'engineering/application/capabilities-v2/native-property-edit.json')));
+const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/native-transport-v2.schema.json')));
+
+test('D36 declaration keeps mutation admission separate from read-only metadata and closes the typed action subset', () => {
+  assert.equal(descriptor.id, 'native.property-edit');
+  assert.deepEqual(descriptor.operations, [OP]);
+  assert.equal(descriptor.authority.adapterOwnsWritableMirror, false);
+  assert.equal(descriptor.authority.fallback, 'none');
+  assert.equal(descriptor.resourceBoundary.maxRequestBytes, 4096);
+  assert.equal(descriptor.resourceBoundary.maxReadResponseBytes, 4096);
+  assert.equal(descriptor.output.$ref, '../native-transport-v2.schema.json#/$defs/ObjectPropertyEditResult');
+  const branches = schema.$defs.Request.oneOf.filter(v => v.allOf[1].properties.operation.const === OP);
+  assert.equal(branches.length, 1);
+  assert.equal(branches[0].allOf[0].$ref, '#/$defs/RequiredRevisionRequest');
+  assert.equal(branches[0].allOf[1].properties.payload.$ref, '#/$defs/ObjectPropertyEditPayload');
+  const payload = schema.$defs.ObjectPropertyEditPayload;
+  assert.equal(payload.additionalProperties, false);
+  assert.deepEqual(payload.required, ['command', 'target', 'property', 'action']);
+  assert.deepEqual(payload.properties.target.required, ['contextId', 'layerUid']);
+  assert.equal(payload.properties.target.additionalProperties, false);
+  assert.deepEqual(payload.properties.action.oneOf.map(v => v.properties.kind.const),
+    ['setValue', 'setKey', 'removeKey', 'setAnimated']);
+  for (const action of payload.properties.action.oneOf) {
+    assert.equal(action.additionalProperties, false);
+    assert.equal(action.properties.frame.type, 'number');
+    assert.equal(action.properties.frame.minimum, undefined);
+    assert.equal(action.properties.curvePoints, undefined);
+    if (action.properties.values) {
+      assert.equal(action.properties.values.minItems, 1);
+      assert.equal(action.properties.values.maxItems, 4);
+    }
+  }
+  const metadata = JSON.parse(fs.readFileSync(path.join(ROOT,
+    'engineering/application/capabilities-v2/native-object-property-metadata.json')));
+  assert.deepEqual(metadata.operations, ['query.document.object.property.metadata']);
+  for (const example of descriptor.examples) {
+    assert.doesNotThrow(() => SDK.validateRequest(example.request));
+    assert.doesNotThrow(() => SDK.validateResponse(example.response, example.request.requestId, OP));
+  }
+});
+
+test('all four actions preserve native frames, vectors and opaque selector bytes before a single authority dispatch', async () => {
+  for (const frame of [-100.5, -Number.MIN_VALUE, 0, 1.25, 4294967296, Number.MAX_VALUE]) {
+    const actions = [{kind:'removeKey', frame}, {kind:'setAnimated', frame, animated:true},
+      {kind:'setAnimated', frame, animated:false}];
+    for (let dimension = 1; dimension <= 4; dimension++) {
+      for (const kind of ['setValue', 'setKey']) actions.push({kind, frame,
+        values:Array.from({length:dimension}, (_, i) => i ? -1e20 * i : 123.125)});
+    }
+    for (const action of actions) {
+      const q = request(action), before = structuredClone(q); let sent, calls = 0;
+      const response = await adapter(value => {sent = value; calls++; return reply(value);}).editProperty(q);
+      assert.equal(calls, 1); assert.notEqual(sent, q);
+      assert.deepEqual(sent, before); assert.deepEqual(q, before);
+      assert.deepEqual(response, reply(q));
+    }
+  }
+  const q = request(); delete q.payload.target.strokeId;
+  assert.deepEqual(await adapter(value => reply(value, false)).editProperty(q), reply(q, false));
+});
+
+test('open, missing, positional and untyped input is refused before transport, including custom curvePoints', () => {
+  const mutations = [
+    q => q.payload = [], q => q.payload.extra = true, q => delete q.payload.command,
+    q => q.payload.command = 'object.property.track.edit', q => q.payload.target = [],
+    q => q.payload.target.extra = 'data:extra', q => delete q.payload.target.layerUid,
+    q => q.payload.target.layerUid = '', q => q.payload.target.strokeId = null,
+    q => q.payload.property = 1, q => q.payload.property = '', q => q.payload.action = [],
+    q => q.payload.action = null, q => q.payload.action.extra = true,
+    q => delete q.payload.action.frame, q => q.payload.action.frame = '0',
+    q => q.payload.action.frame = Infinity, q => q.payload.action.frame = NaN,
+    q => q.payload.action.values = [], q => q.payload.action.values = [1, 2, 3, 4, 5],
+    q => q.payload.action.values = [1, null], q => q.payload.action.values = [1, '2'],
+    q => q.payload.action.values = [NaN], q => q.payload.action.values = [Infinity],
+    q => q.payload.action.values = new Float32Array([1, 2]),
+    q => q.payload.action.values = Array(2), q => {q.payload.action.values = [1, 2]; delete q.payload.action.values[0];},
+    q => {const values = Array(1); values.extra = 1; Object.setPrototypeOf(values, {0:2, __proto__:Array.prototype}); q.payload.action.values = values;},
+    q => {q.payload.action.values.extra = 1;}, q => {q.payload.action.values.toJSON = () => [9];},
+    q => q.payload.action = {kind:'setKey', frame:0, values:[1], curvePoints:null},
+    q => q.payload.action = {kind:'setKey', frame:0, values:[1], curvePoints:[]},
+    q => q.payload.action = {kind:'removeKey', frame:0, values:[1]},
+    q => q.payload.action = {kind:'setAnimated', frame:0, animated:1},
+    q => q.payload.action = {kind:'setAnimated', frame:0},
+    q => q.payload.action = {kind:'setAnimated', frame:0, animated:true, values:[1]},
+    q => q.payload.action = {kind:'preset', frame:0, preset:'ease'},
+    q => q.payload.action = {kind:'toString', frame:0},
+    q => q.payload.action = {kind:['setValue'], frame:0, values:[1]},
+    q => q.payload.action = {kind:['setKey'], frame:0, values:[1]},
+    q => q.payload.action = {kind:['removeKey'], frame:0},
+    q => q.payload.action = {kind:['setAnimated'], frame:0, animated:true},
+  ];
+  let calls = 0; const port = adapter(() => {calls++;});
+  for (const mutate of mutations) {const q = request(); mutate(q); assert.throws(() => port.editProperty(q));}
+  for (const value of [undefined, null, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const q = request(); q.expectedRevision = value; assert.throws(() => port.editProperty(q));
+  }
+  assert.equal(calls, 0);
+});
+
+test('opaque resource-looking strings are exempt only at exact property selectors; UTF8 request and response bounds stay 4096', async () => {
+  const q = request();
+  const remaining = 4096 - Buffer.byteLength(JSON.stringify(q));
+  q.payload.target.layerUid += '雪'.repeat(Math.floor(remaining / 3)) + 'x'.repeat(remaining % 3);
+  assert.equal(Buffer.byteLength(JSON.stringify(q)), 4096);
+  assert.doesNotThrow(() => SDK.validateRequest(q));
+  q.payload.target.layerUid += 'x'; assert.throws(() => SDK.validateRequest(q), /4096/);
+  for (const mutate of [q => q.requestId = 'data:resource',
+    q => q.payload.action.values = ['data:resource'], q => q.payload.action.frame = 'blob:resource']) {
+    const q = request(); mutate(q); assert.throws(() => SDK.validateRequest(q));
+  }
+  for (const code of ['unavailable', 'invalid_request']) {
+    const q = request();
+    const r = {apiVersion:2, requestId:q.requestId, instanceId:q.instanceId, documentId:q.documentId,
+      contentRevision:7, ok:false, error:{code, message:''}};
+    r.error.message = 'x'.repeat(4096 - Buffer.byteLength(JSON.stringify(r)));
+    assert.equal(Buffer.byteLength(JSON.stringify(r)), 4096);
+    assert.deepEqual(await adapter(() => r).editProperty(q), r);
+    r.error.message += 'x'; await assert.rejects(adapter(() => r).editProperty(q), /4096/);
+  }
+  const old = {...request(), operation:'command.document.object.layer.policy.edit',
+    payload:{command:'object.layer.policy.edit', layerUid:'x'.repeat(4096), flag:'locked', value:true}};
+  assert.throws(() => SDK.validateRequest(old), /4096/);
+});
+
+test('changed/no-op/replay receipts carry exact disposition and revision without a local document state', async () => {
+  for (const applied of [true, false]) {
+    const q = request(), frozen = reply(q, applied); let calls = 0;
+    const port = adapter(() => {calls++; return structuredClone(frozen);});
+    assert.deepEqual(await port.editProperty(q), frozen);
+    assert.deepEqual(await port.dispatch(q), frozen);
+    assert.equal(calls, 2, 'native receipt owner receives exact replay');
+  }
+  const q = request(); q.expectedRevision = Number.MAX_SAFE_INTEGER;
+  assert.deepEqual(await adapter(value => reply(value, false)).editProperty(q), reply(q, false));
+  await assert.rejects(adapter(value => reply(value)).editProperty(q));
+  for (const mutate of [r => r.requestId = 'foreign', r => r.instanceId = 'foreign',
+    r => r.documentId = 'foreign', r => r.contentRevision = 7,
+    r => r.result.applied = false, r => r.result.historyEntriesAdded = 0,
+    r => r.result.historyEntriesAdded = 2, r => r.result.extra = [], r => r.result = []]) {
+    await assert.rejects(adapter(value => {const r = reply(value); mutate(r); return r;}).editProperty(request()));
+  }
+});
+
+test('native refusals, cancellation and transport uncertainty never invent a successful local write or retry', async () => {
+  for (const code of ['invalid_request', 'stale_revision', 'not_found', 'unavailable',
+    'cancelled_before_dispatch', 'wrong_document']) {
+    const q = request(); q.cancelledBeforeDispatch = code === 'cancelled_before_dispatch';
+    const before = structuredClone(q); let calls = 0;
+    const r = await adapter(value => {calls++; return {apiVersion:2, requestId:value.requestId,
+      instanceId:value.instanceId, documentId:code === 'wrong_document' ? 'replacement' : value.documentId,
+      contentRevision:8, ok:false, error:{code, message:'Native refusal'}};}).editProperty(q);
+    assert.equal(calls, 1); assert.equal(r.error.code, code); assert.deepEqual(q, before);
+  }
+  let calls = 0; const unknown = new Error('transport outcome unknown');
+  const port = adapter(() => {calls++; throw unknown;});
+  for (const operation of ['query.document.object.property.metadata', 'command.document.object.property.track.edit',
+    'command.document.object.vector.edit']) {const q = request(); q.operation = operation; assert.throws(() => port.editProperty(q));}
+  assert.equal(calls, 0);
+  assert.throws(() => port.editProperty(request()), e => e === unknown); assert.equal(calls, 1);
+});
+
+test('browser classic-script SDK exposes editProperty through the same cohesive private contract', async () => {
+  const context = vm.createContext({TextEncoder});
+  for (const name of ['native-font-contract.js', 'native-property-contract.js', 'native-application.js']) {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters', name), 'utf8'), context, {filename:name});
+  }
+  context.requestJson = JSON.stringify(request());
+  const r = await vm.runInContext(`(() => {
+    const api = NemoNativeApplicationAdapter.createNativeApplicationAdapter('browser-property-edit', {
+      dispatch(q) {return {apiVersion:2, requestId:q.requestId, instanceId:q.instanceId,
+        documentId:q.documentId, contentRevision:8, ok:true, result:{applied:true, historyEntriesAdded:1}};}
+    });
+    return api.editProperty(JSON.parse(requestJson));
+  })()`, context);
+  assert.equal(r.result.applied, true); assert.equal(r.contentRevision, 8);
+});
