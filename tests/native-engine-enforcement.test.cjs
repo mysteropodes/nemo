@@ -2787,7 +2787,7 @@ test('L07-G brush asset publication stays a private read-queries child and fails
   const parentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/read_queries.rs'), 'utf8');
   assert.match(parentText, /#\[path = "bitmap_brush_resources_publish\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod bitmap_brush_resources_publish;/);
   const codecText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_codec.rs'), 'utf8');
-  assert.match(codecText, /pub\(crate\) use crate::object_document::AssetKind;/);
+  assert.match(codecText, /pub\(crate\) use crate::object_document::\{AssetId, AssetInventory, AssetKind\};/);
   const storeText = fs.readFileSync(path.join(ROOT, 'native-engine/src/bitmap_brush_resources_store.rs'), 'utf8');
   assert.match(storeText, /pub\(crate\) fn budget\(&self\) -> &ImageResourceBudget/);
   const moduleText = fs.readFileSync(path.join(ROOT, 'native-engine/src/bitmap_brush_resources_publish.rs'), 'utf8');

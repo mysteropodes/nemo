@@ -23,17 +23,17 @@ pub(crate) mod object_scene_style_stroke;
 pub(crate) mod object_scene_producer_pin;
 
 // L07-E (#2165): bitmap-brush stamp plan (G06/G17): Paper path bounds + Numerical.solveQuadratic port, then the plan.
-#[path = "bitmap_brush_resources_stamp_bounds.rs"]
-#[allow(dead_code)]
-pub(crate) mod bitmap_brush_resources_stamp_bounds;
 #[path = "bitmap_brush_resources_stamp.rs"]
 #[allow(dead_code)]
 pub(crate) mod bitmap_brush_resources_stamp;
+#[path = "bitmap_brush_resources_stamp_bounds.rs"]
+#[allow(dead_code)]
+pub(crate) mod bitmap_brush_resources_stamp_bounds;
 
 // L07-H: component evaluated-shape kernel (detached copies from a resolved placement, symMatrix + component camera).
-#[path = "object_scene_producer_component_shape.rs"]
-#[allow(dead_code)]
-pub(crate) mod object_scene_producer_component_shape;
 #[path = "object_scene_producer_component.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_scene_producer_component;
+#[path = "object_scene_producer_component_shape.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_component_shape;

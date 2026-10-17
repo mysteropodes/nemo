@@ -17,7 +17,9 @@ pub(crate) use font_assets::{
 };
 
 #[cfg(feature = "font_asset_wire")]
-pub(crate) use crate::object_document::{AssetId, AssetKind, AssetRecord};
+pub(crate) use crate::object_document::AssetRecord;
+#[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
+pub(crate) use crate::object_document::{AssetId, AssetKind};
 use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 pub(crate) use crate::object_document::{Presence, PropertyHolder};
 use serde::Deserialize;
@@ -39,8 +41,7 @@ pub(crate) mod project_settings_test_codec {
     pub(crate) use super::project::{decode_project, encode_project, ProjectWireLimits};
 }
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
-#[allow(unused_imports)]
-pub(crate) use crate::object_document::AssetKind;
+pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 // L06-E (lane #2112): the asset value types the read-queries pixel handle names; read-queries may not import object_document.
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use crate::object_document::{AssetId, AssetInventory, AssetKind};

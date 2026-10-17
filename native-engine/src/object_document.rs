@@ -401,8 +401,8 @@ impl ObjectLayer {
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Present(LayerTiming::blank_drawing()),
-            widget: Presence::Missing,
             path_fx: Presence::Missing,
+            widget: Presence::Missing,
         }
     }
     /// Identified, unnamed layer with earlier native-file visibility semantics.
@@ -417,8 +417,8 @@ impl ObjectLayer {
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Missing,
-            widget: Presence::Missing,
             path_fx: Presence::Missing,
+            widget: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {

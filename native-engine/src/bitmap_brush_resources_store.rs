@@ -114,6 +114,8 @@ impl BrushBitmapStore {
         &self.budget
     }
 
+    /// `setBudgetBytes(n)`: `Math.max(1, Math.floor(n))`; returns the budget.
+    pub(crate) fn set_budget_bytes(&mut self, n: f64) -> u64 {
         self.soft_budget = budget_bytes_from_number(n);
         self.soft_budget
     }

@@ -381,13 +381,12 @@ fn a_duplicated_layer_resolves_only_with_its_own_copy_of_the_holder() {
 
 #[test]
 fn locking_and_parenting_a_widget_layer_stay_refused_by_the_existing_layer_rule() {
-    // Baseline widget layers can be locked (the gesture escape hatch) and parented. The native
-    // layer admission still refuses both for EVERY layer until F06 and a transform-parent consumer
-    // land; this record does not paper over that. When those providers arrive this test must be
-    // replaced by the real policy tests.
+    // Baseline widget layers can be locked (the gesture escape hatch) and parented. F06 admits
+    // locked layers (Drawing Fill enforces its own lock guard); parenting stays refused for EVERY
+    // layer until a transform-parent consumer lands, and this record does not paper over that.
     let locked = format!("{{\"layerUid\":\"W\",\"locked\":true,\"widget\":{TWIN}}}");
-    let error = decode_project(v1(&[locked], &[], None).as_bytes()).expect_err("locked");
-    assert_eq!(error.kind(), ObjectCodecErrorKind::Unsupported);
+    decode_project(v1(&[locked], &[], None).as_bytes())
+        .expect("F06: a locked widget layer is admitted");
     let parented = format!("{{\"layerUid\":\"W\",\"parentLayerUid\":\"P\",\"widget\":{TWIN}}}");
     let layers = [parented, "{\"layerUid\":\"P\"}".to_string()];
     let error = decode_project(v1(&layers, &[], None).as_bytes()).expect_err("parented");
