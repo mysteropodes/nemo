@@ -1,6 +1,5 @@
 //! Staged N25A records; distinct from the active opacity project family.
 use serde::{Deserialize, Serialize};
-use serde_json::Number;
 
 pub const OBJECT_DOCUMENT_FORMAT: &str = "nemo.native-object-document";
 pub const OBJECT_DOCUMENT_FORMAT_VERSION: u32 = 1;
@@ -145,6 +144,13 @@ pub use organization::{LayerFolder, LayerFolders};
 mod layer_organization_tests;
 #[path = "object_layer_policy.rs"]
 mod layer_policy;
+// #2106 size split: the object record DTOs (target, frame scope, geometry, solid fill), moved verbatim.
+#[path = "object_record.rs"]
+mod object_record;
+pub use object_record::{
+    FrameScope, FrameScopeKind, ObjectGeometry, ObjectPoint, ObjectRecord, ObjectSegment,
+    ObjectTarget, SolidFill,
+};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -218,97 +224,6 @@ pub struct ObjectLayer {
     pub(crate) effects_from: Presence<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectTarget {
-    pub(crate) context_id: String,
-    pub(crate) frame_scope: FrameScope,
-    pub(crate) layer_uid: String,
-    pub(crate) stroke_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct FrameScope {
-    pub(crate) kind: FrameScopeKind,
-    pub(crate) frame: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum FrameScopeKind {
-    Authored,
-    Reference,
-}
-
-impl<'de> Deserialize<'de> for FrameScopeKind {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        // Derived enum decoding also admits externally tagged object variants.
-        // The frozen contract permits only these two literal JSON strings.
-        match String::deserialize(deserializer)?.as_str() {
-            "authored" => Ok(Self::Authored),
-            "reference" => Ok(Self::Reference),
-            other => Err(serde::de::Error::unknown_variant(
-                other,
-                &["authored", "reference"],
-            )),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectRecord {
-    pub(crate) schema_version: u32,
-    pub(crate) family: String,
-    pub(crate) target: ObjectTarget,
-    pub(crate) geometry: ObjectGeometry,
-    /// Legacy family: a required solid fill. Vector family: explicit null (no fill) or solid.
-    #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) fill: Presence<Option<SolidFill>>,
-    /// Present exactly for the `editable-vector-path` family.
-    #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) vector: Presence<VectorBody>,
-    /// Pressure fields, paramShape and boxAngle of the `editable-vector-path` family (L01-E).
-    #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) vector_ext: Presence<VectorExt>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectGeometry {
-    pub(crate) kind: String,
-    pub(crate) closed: bool,
-    pub(crate) coordinate_space: String,
-    pub(crate) handle_space: String,
-    pub(crate) segments: Vec<ObjectSegment>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ObjectSegment {
-    pub(crate) point: ObjectPoint,
-    pub(crate) handle_in: ObjectPoint,
-    pub(crate) handle_out: ObjectPoint,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct ObjectPoint {
-    pub(crate) x: Number,
-    pub(crate) y: Number,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct SolidFill {
-    pub(crate) kind: String,
-    pub(crate) r: Number,
-    pub(crate) g: Number,
-    pub(crate) b: Number,
-    pub(crate) a: Number,
-}
-
 // Serde's derived struct decoder also accepts positional sequences. These
 // schema objects must enter through visit_map; Fields retains strict duplicate
 // and unknown-member checks while nested DTOs apply the same object-only rule.
@@ -360,43 +275,6 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] is_effect_layer: Presence<bool>, #[serde(default)] is_folder_layer: Presence<bool>,
     #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,
     #[serde(default)] effects_from: Presence<String> });
-object_deserialize!(ObjectTarget {
-    context_id: String,
-    frame_scope: FrameScope,
-    layer_uid: String,
-    stroke_id: String
-});
-object_deserialize!(FrameScope {
-    kind: FrameScopeKind,
-    frame: u32
-});
-object_deserialize!(ObjectRecord {
-    schema_version: u32,
-    family: String,
-    target: ObjectTarget,
-    geometry: ObjectGeometry,
-    #[serde(default)] fill: Presence<Option<SolidFill>>,
-    #[serde(default)] vector: Presence<VectorBody>,
-    #[serde(default)] vector_ext: Presence<VectorExt>
-});
-object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
-    handle_space: String, segments: Vec<ObjectSegment> });
-object_deserialize!(ObjectSegment {
-    point: ObjectPoint,
-    handle_in: ObjectPoint,
-    handle_out: ObjectPoint
-});
-object_deserialize!(ObjectPoint {
-    x: Number,
-    y: Number
-});
-object_deserialize!(SolidFill {
-    kind: String,
-    r: Number,
-    g: Number,
-    b: Number,
-    a: Number
-});
 
 impl ObjectDocument {
     /// Organizational folder metadata, not structural folder layers.
@@ -436,28 +314,6 @@ impl ObjectDocument {
     }
     pub fn layers(&self) -> &[ObjectLayer] {
         &self.layers
-    }
-}
-impl ObjectRecord {
-    pub fn target(&self) -> &ObjectTarget {
-        &self.target
-    }
-    /// The solid fill; `None` for an explicit null (no fill) or an absent slot.
-    pub(crate) fn solid_fill(&self) -> Option<&SolidFill> {
-        self.fill.value().and_then(Option::as_ref)
-    }
-    /// The vector body of an `editable-vector-path` record.
-    #[allow(dead_code)]
-    pub(crate) fn vector(&self) -> Option<&VectorBody> {
-        self.vector.value()
-    }
-}
-impl SolidFill {
-    pub(crate) fn valid_channels(&self) -> bool {
-        [&self.r, &self.g, &self.b, &self.a].into_iter().all(|n| {
-            n.as_f64()
-                .is_some_and(|v| v.is_finite() && (0.0..=1.0).contains(&v))
-        })
     }
 }
 impl ObjectLayer {
@@ -530,25 +386,5 @@ impl ObjectLayer {
     /// The stored ordered path-effect stack; `None` when the layer has none (an empty stack is `Some(&[])`).
     pub(crate) fn path_fx(&self) -> Option<&[PathFxRecord]> {
         self.path_fx.value().map(Vec::as_slice)
-    }
-}
-impl ObjectTarget {
-    pub fn context_id(&self) -> &str {
-        &self.context_id
-    }
-    pub fn layer_uid(&self) -> &str {
-        &self.layer_uid
-    }
-    pub fn stroke_id(&self) -> &str {
-        &self.stroke_id
-    }
-    pub fn frame(&self) -> u32 {
-        self.frame_scope.frame
-    }
-    pub fn scope_kind(&self) -> &FrameScopeKind {
-        &self.frame_scope.kind
-    }
-    pub(crate) fn valid(&self) -> bool {
-        self.context_id == "scene-root" && !self.layer_uid.is_empty() && !self.stroke_id.is_empty()
     }
 }

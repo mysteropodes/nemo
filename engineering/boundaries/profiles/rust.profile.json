@@ -19,6 +19,7 @@
       "files": [
         "document.rs",
         "object_document.rs",
+        "object_record.rs",
         "project_media_envelope.rs",
         "object_order_document.rs",
         "object_layer_timing.rs",
@@ -180,6 +181,7 @@
         "commands.rs",
         "object_fill.rs",
         "object_fill_owner.rs",
+        "object_layer_create_visibility.rs",
         "object_property_edit.rs",
         "object_project_settings.rs",
         "object_media_link_owner.rs",
@@ -238,6 +240,7 @@
         "object_reference_dispatch.rs",
         "object_raster_asset_dispatch.rs",
         "object_command_dispatch.rs",
+        "object_command_dispatch_edits.rs",
         "object_project_settings_history.rs",
         "object_media_link_history.rs",
         "object_layer_policy_history.rs",
