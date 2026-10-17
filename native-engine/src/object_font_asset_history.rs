@@ -466,6 +466,32 @@ impl NativeObjectHistory {
             count = (count / 2).max(1);
         }
     }
+    /// Keep immutable Font refusals in the existing native response port.
+    pub fn font_read_response(&self, request: &OpacityRequest) -> Option<ResponseEnvelope> {
+        if !id(&request.request_id) || !id(self.instance_id()) || !id(self.document_id()) {
+            return None;
+        }
+        let response = self
+            .query_font_asset(request)
+            .unwrap_or_else(|code| ResponseEnvelope {
+                api_version: crate::request_receipts::APPLICATION_API_VERSION,
+                request_id: request.request_id.clone(),
+                instance_id: self.instance_id().to_owned(),
+                document_id: self.document_id().to_owned(),
+                content_revision: self.content_revision(),
+                ok: false,
+                result: None,
+                error: Some(crate::request_receipts::DispatchError {
+                    code,
+                    message: "native font read refused".into(),
+                    details: None,
+                }),
+            });
+        serde_json::to_vec(&response)
+            .ok()
+            .filter(|bytes| bytes.len() <= 4096)
+            .map(|_| response)
+    }
 }
 
 #[cfg(test)]

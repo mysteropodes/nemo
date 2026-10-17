@@ -275,34 +275,11 @@ fn invoke_dispatch(
         serde_json::from_value(serde_json::to_value(request).map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
     let response = if request.operation == crate::application_mcp::font_source::QUERY {
-        let result = application
+        application
             .as_any_mut()
             .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
             .ok_or("native font owner unavailable")?
-            .font_read(&native_request)?;
-        match result {
-            Ok(response) => response,
-            Err(code) => {
-                // Map the exact native refusal only in this application adapter.
-                let code = serde_json::to_value(code)
-                    .map_err(|_| "native font refusal encoding failed")?;
-                let code = code.as_str().ok_or("native font refusal code invalid")?;
-                return Ok(NativeApplicationResponse {
-                    api_version: NATIVE_API_VERSION,
-                    request_id: request.request_id.clone(),
-                    instance_id: application.instance_id().to_owned(),
-                    document_id: application.document_id().to_owned(),
-                    content_revision: application.content_revision(),
-                    ok: false,
-                    result: None,
-                    error: Some(NativeApplicationError {
-                        code: code.to_owned(),
-                        message: "native font read refused".into(),
-                        details: None,
-                    }),
-                });
-            }
-        }
+            .font_read(&native_request)?
     } else {
         application.dispatch(native_request)?
     };

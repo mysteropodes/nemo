@@ -1,6 +1,6 @@
 //! PRIVATE: ports into the existing history owner, never another authority.
 use crate::native_dispatch::{object_host::NativeObjectHost, NativeDispatch};
-use native_engine::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
+use native_engine::commands::{OpacityRequest, ResponseEnvelope};
 
 impl NativeObjectHost {
     pub(crate) fn font_status(
@@ -32,15 +32,12 @@ impl NativeObjectHost {
         }
         Ok(response)
     }
-    // Outer failure preserves host lifecycle failure; inner failure is the
-    // immutable native owner's typed refusal. Protocol mapping belongs above us.
-    pub(crate) fn font_read(
-        &self,
-        request: &OpacityRequest,
-    ) -> Result<Result<ResponseEnvelope, DispatchErrorCode>, String> {
+    pub(crate) fn font_read(&self, request: &OpacityRequest) -> Result<ResponseEnvelope, String> {
         if self.released.is_some() {
             return Err("native object host was released".into());
         }
-        Ok(self.history.query_font_asset(request))
+        self.history
+            .font_read_response(request)
+            .ok_or_else(|| "native font read refused".into())
     }
 }
