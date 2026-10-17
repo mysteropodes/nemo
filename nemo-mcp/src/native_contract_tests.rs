@@ -214,3 +214,41 @@ fn numeric_selectors_preserve_zero_and_refuse_missing_or_unsafe_values() {
         assert_eq!(frame(Some(&encoded)), expected_frame, "frame {value}");
     }
 }
+
+#[test]
+fn common_result_dispatch_routes_each_batch_eight_family_to_its_own_receipt_validator() {
+    let catalog = crate::capabilities::native_catalog();
+    for operation in [
+        "command.document.object.frames.insert",
+        "command.document.object.component.convert",
+        "command.document.object.rig.edit",
+        "command.document.object.vector.edit",
+        "command.document.object.import.batch",
+    ] {
+        let example = catalog
+            .capability_for_operation(operation)
+            .expect("declared")["examples"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|example| example["request"]["operation"] == operation)
+            .expect("registered example");
+        let document_id = example["request"]["documentId"].as_str().unwrap();
+        let payload = &example["request"]["payload"];
+        let valid = &example["response"]["result"];
+        assert!(
+            validate_result(operation, document_id, payload, valid),
+            "{operation}"
+        );
+        let mut open = valid.clone();
+        open["privatePath"] = json!("/private/path");
+        assert!(
+            !validate_result(operation, document_id, payload, &open),
+            "{operation} open"
+        );
+        assert!(
+            !validate_result(operation, document_id, payload, &json!({})),
+            "{operation} empty"
+        );
+    }
+}
