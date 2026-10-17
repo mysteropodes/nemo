@@ -295,9 +295,10 @@ fn commit_without_a_rig_or_without_binds_is_the_typed_no_rigged_stroke_refusal()
         for build in [PLAIN, HELD] {
             let mut owner = owner_for(&row, build);
             for frame in [0, 3] {
+                // One id per request: a refusal is receipted, so a second body under `name` is a changed-body reuse.
                 assert_refused(
                     &mut owner,
-                    name,
+                    &format!("{name}-{frame}"),
                     commit_payload(frame),
                     ("not_found", "no_rigged_stroke"),
                 );

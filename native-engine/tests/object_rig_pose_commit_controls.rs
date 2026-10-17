@@ -113,7 +113,8 @@ fn computed_numbers_are_spelled_like_json_stringify_and_equal_values_keep_their_
         let record = json!({"schemaVersion":1,"family":"editable-vector-path",
             "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L1","strokeId":"s1"},
             "geometry":{"kind":"cubic-path","closed":false,"coordinateSpace":"document-world","handleSpace":"relative",
-                "segments":[{"point":{"x":1,"y":2},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}]},
+                "segments":[{"point":{"x":1,"y":2},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}},
+                    {"point":{"x":7,"y":8},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}]},
             "fill":null,"vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1}});
         let text = serde_json::to_string(&record)
             .unwrap()
@@ -123,14 +124,22 @@ fn computed_numbers_are_spelled_like_json_stringify_and_equal_values_keep_their_
         );
         decode_storage_project(document.as_bytes()).unwrap()
     };
+    // The record admission wants 2..256 cubic segments: the second vertex is posed to its stored value.
     let pose = |x: f64| PoseStroke {
         stroke_id: "s1".to_owned(),
         closed: false,
-        vertices: vec![PoseVertex {
-            point: [x, 2.0],
-            handle_in: [0.0, 0.0],
-            handle_out: [0.0, 0.0],
-        }],
+        vertices: vec![
+            PoseVertex {
+                point: [x, 2.0],
+                handle_in: [0.0, 0.0],
+                handle_out: [0.0, 0.0],
+            },
+            PoseVertex {
+                point: [7.0, 8.0],
+                handle_in: [0.0, 0.0],
+                handle_out: [0.0, 0.0],
+            },
+        ],
     };
     let mut same = doc("1.0");
     let before = same.clone();
@@ -159,7 +168,8 @@ fn replacing_segments_refuses_a_missing_stroke_or_another_vertex_count() {
         json!({"schemaVersion":1,"family":"editable-vector-path",
             "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":frame},"layerUid":"L1","strokeId":id},
             "geometry":{"kind":"cubic-path","closed":false,"coordinateSpace":"document-world","handleSpace":"relative",
-                "segments":[{"point":{"x":1,"y":2},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}]},
+                "segments":[{"point":{"x":1,"y":2},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}},
+                    {"point":{"x":5,"y":6},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}]},
             "fill":null,"vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1}})
     };
     let text = json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":3,
@@ -177,24 +187,29 @@ fn replacing_segments_refuses_a_missing_stroke_or_another_vertex_count() {
             vertices
         ],
     };
+    // Each stored record has two vertices: one more or one fewer is another vertex count.
     assert_eq!(
-        replace_segments(&mut document, "L1", 0, &[pose("nope", 1)]),
+        replace_segments(&mut document, "L1", 0, &[pose("nope", 2)]),
         Err(PoseRefusal::Internal)
     );
     assert_eq!(
-        replace_segments(&mut document, "L1", 2, &[pose("s1", 1)]),
+        replace_segments(&mut document, "L1", 2, &[pose("s1", 2)]),
         Err(PoseRefusal::Internal)
     );
     assert_eq!(
-        replace_segments(&mut document, "L2", 0, &[pose("s1", 1)]),
+        replace_segments(&mut document, "L2", 0, &[pose("s1", 2)]),
         Err(PoseRefusal::Internal)
     );
     assert_eq!(
-        replace_segments(&mut document, "L1", 0, &[pose("s1", 2)]),
+        replace_segments(&mut document, "L1", 0, &[pose("s1", 3)]),
+        Err(PoseRefusal::Internal)
+    );
+    assert_eq!(
+        replace_segments(&mut document, "L1", 0, &[pose("s1", 1)]),
         Err(PoseRefusal::Internal)
     );
     // The frame selects the record: frame 1 is written, frame 0 is not.
-    replace_segments(&mut document, "L1", 1, &[pose("s1", 1)]).unwrap();
+    replace_segments(&mut document, "L1", 1, &[pose("s1", 2)]).unwrap();
     let wire = serde_json::to_value(&document).unwrap();
     assert_eq!(
         wire["objects"][0]["geometry"]["segments"][0]["point"]["x"],

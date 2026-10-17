@@ -2,8 +2,8 @@
 //! selected into a real packet, drawn by the real contour producer and joined by the real L07-C registry before
 //! `plan_scene_effects` reads them through the packet. Expected values are hand-derived literals.
 use super::support::{
-    base_document, contour_claims, packet, paint_plan, pinned, push_layer, render_scene, selector,
-    set_layer, snapshot, FRAME,
+    base_document, contour_claims, document_at, packet, paint_plan, pinned, push_layer,
+    render_scene, selector, set_layer, snapshot, FRAME,
 };
 use super::{
     bind_scene_resources, plan_scene_effects, BindResourcesError, EntryOutcome, JoinOptions,
@@ -222,7 +222,8 @@ fn unclaimed_and_reported_entries_stay_typed_on_their_layer_and_other_producers_
 
 #[test]
 fn a_scene_joined_onto_another_pin_is_refused_before_anything_is_read() {
-    let document = base_document();
+    // The order plan of a v2 document names its frames: `FRAME + 1` is a packet only because the plan has a scope for it.
+    let document = document_at(&[FRAME, FRAME + 1]);
     let snap_a = snapshot(&document, "join-pin-a");
     let snap_b = snapshot(&document, "join-pin-b");
     let pk_a = packet(&snap_a, FRAME);

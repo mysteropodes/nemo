@@ -327,7 +327,7 @@ pub(crate) fn assert_refused(
     let before = state(owner);
     let reply = run(owner, id, body);
     assert_eq!(reply["ok"], false, "{id}: {reply}");
-    assert_eq!(code(&reply), want.0, "{id}");
+    assert_eq!(code(&reply), want.0, "{id}: {reply}");
     assert!(
         message(&reply).starts_with(want.1),
         "{id}: {}",

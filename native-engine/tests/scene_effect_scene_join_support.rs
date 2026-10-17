@@ -26,6 +26,12 @@ pub(crate) fn base_document() -> Value {
     paint_test_document(&[FRAME])
 }
 
+/// The paint-plan document with a composition-order scope (and its objects) at each of `frames`: a v2 document
+/// has no inferred scope, so a packet exists only at a frame the plan names.
+pub(crate) fn document_at(frames: &[u32]) -> Value {
+    paint_test_document(frames)
+}
+
 /// Merge `members` into the existing layer `uid`.
 pub(crate) fn set_layer(document: &mut Value, uid: &str, members: Value) {
     let layer = document["layers"]

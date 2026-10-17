@@ -141,9 +141,10 @@ fn a_track_collision_refuses_the_whole_cycle_cells_included() {
         before,
         "the drawing half did not publish either"
     );
+    // `cell` gives every stroke z 1 and g 10: the refused cycle leaves the cells exactly as `document_with` built them.
     assert_eq!(
         render_layer(head(&o).document(), 0),
-        "K=a.1.10;.;K=b.2.20;."
+        "K=a.1.10;.;K=b.1.10;."
     );
 }
 

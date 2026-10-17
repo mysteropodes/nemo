@@ -280,7 +280,8 @@ fn unknown_targets_and_out_of_range_indices_are_refused_and_publish_nothing() {
     for (name, row, action, want) in cases {
         let mut owner = owner_for(row);
         let initial = state(&owner);
-        let reply = run(&mut owner, name, payload(action));
+        // The case name is a label; the request id must be an identifier (no spaces).
+        let reply = run(&mut owner, &name.replace(' ', "-"), payload(action));
         assert_eq!(reply["ok"], false, "{name}");
         assert_eq!(code(&reply), want, "{name}");
         assert_eq!(state(&owner), initial, "{name}");

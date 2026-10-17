@@ -393,10 +393,17 @@ fn a_scene_lease_pins_its_ink_against_eviction_until_the_scene_is_dropped() {
     let dropped = store.end_build(Some(&mut accept));
     assert_eq!(dropped, ["ink-b".to_owned(), "ink-c".to_owned()]);
     assert!(store.contains("ink-a"));
-    assert_eq!(
-        &ink_of(payloads(&scene)[0]).bitmap.rgba8()[..4],
-        BLUE.as_slice()
-    );
+    // Only `a` has a source: `b` and `c` stay the registry's `Unclaimed` entries, so `payloads` (all entries) is not usable.
+    let SceneOutcome::Item { payload, .. } = scene.entries()[0].outcome() else {
+        panic!("the claimed anchor is an item");
+    };
+    assert_eq!(&ink_of(payload).bitmap.rgba8()[..4], BLUE.as_slice());
+    for entry in &scene.entries()[1..] {
+        assert!(matches!(
+            entry.outcome(),
+            SceneOutcome::Unavailable(UnavailableCause::Unclaimed)
+        ));
+    }
     drop(scene);
     store.begin_build();
     assert_eq!(store.end_build(Some(&mut accept)), ["ink-a".to_owned()]);

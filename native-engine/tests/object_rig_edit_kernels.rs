@@ -286,6 +286,8 @@ fn auto_assign_rebinds_what_was_bound_and_keeps_the_rest() {
 #[test]
 fn unknown_bones_strokes_frames_and_missing_rigs_are_refused_and_publish_nothing() {
     let base = oracle::act("bind_rotate_and_softness");
+    // The weight cases need a stroke that already has a bind: `base` has none, so there every weight edit is "unknown bind".
+    let bound = oracle::act("reset_a_vertex_to_the_offset_model");
     let no_rig = oracle::act("draw_first_bone_creates_the_rig");
     let bind = |change: &dyn Fn(&mut Value)| {
         let mut action = base.action.clone();
@@ -332,13 +334,13 @@ fn unknown_bones_strokes_frames_and_missing_rigs_are_refused_and_publish_nothing
         ),
         (
             "reset of a vertex past the bind",
-            &base,
+            &bound,
             json!({"kind":"resetWeights","target":{"strokeId":"s1"},"vertex":9}),
             "invalid_request",
         ),
         (
             "add of an unknown bone",
-            &base,
+            &bound,
             json!({"kind":"addWeight","target":{"strokeId":"s1"},"vertex":0,"boneId":"bone9"}),
             "not_found",
         ),
@@ -346,7 +348,8 @@ fn unknown_bones_strokes_frames_and_missing_rigs_are_refused_and_publish_nothing
     for (name, row, action, want) in cases {
         let mut owner = owner_for(row);
         let initial = state(&owner);
-        let reply = run(&mut owner, name, payload(action));
+        // The case name is a label; the request id must be an identifier (no spaces).
+        let reply = run(&mut owner, &name.replace(' ', "-"), payload(action));
         assert_eq!(reply["ok"], false, "{name}");
         assert_eq!(code(&reply), want, "{name}");
         assert_eq!(state(&owner), initial, "{name}");
