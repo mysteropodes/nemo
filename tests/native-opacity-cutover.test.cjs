@@ -487,9 +487,11 @@ test('classic startup loads frozen guard modules before the production first-lay
     'js/application/native-opacity-viewport.js',
     'js/application/native-object-save-as-workflow.js',
     'js/application/native-object-saved-acknowledgement.js',
+    'js/adapters/native-font-panel.js',
     'js/adapters/native-frame-edit-contract.js',
     'js/adapters/native-viewport-underlay.js',
     'js/adapters/native-object-project-metadata.js',
+    'js/adapters/native-object-project-properties.js',
     'js/adapters/native-object-project-desktop.js',
     'js/adapters/native-object-project.js',
     'js/adapters/native-object-project-file.js',
@@ -1217,6 +1219,7 @@ test('a real Draw gesture captured before bootstrap cannot commit or release nat
     resume() { calls.resume++; }, renderNow() { calls.render++; }, setPressureCursor() {} };
   Object.defineProperty(scope, 'userLayers', { get() { calls.documentAccess++; return []; } });
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/draw-bridge.js'), 'utf8'), scope);
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters/native-object-shape-tool.js'), 'utf8'), scope);
   function event() {
     return { clientX: 10, clientY: 20, pressure: 0.5, stopped: 0, prevented: 0,
       stopImmediatePropagation() { this.stopped++; }, preventDefault() { this.prevented++; } };

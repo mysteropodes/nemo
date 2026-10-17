@@ -120,6 +120,38 @@
       notify(toastText(routed.plan));
       return { status: 'routed', plan: routed.plan, applied: await run(files, routed.plan) };
     }
+    // Media-library/image-menu semantics: an SVG selected as an image stays an image.
+    // Providers own native queue admission and correlated ACK/readback; this router never retries.
+    async function media(fileList, options) {
+      options = options || {};
+      const files = Array.prototype.slice.call(fileList || []);
+      const groups = ['image', 'video'].map((group) => ({ group, indices: files.map((_, i) => i).filter((i) =>
+        options.kind ? options.kind === group : (files[i].type || '').indexOf(group + '/') === 0) })).filter((g) => g.indices.length);
+      if (!groups.length) return { status: 'empty' };
+      const available = availability();
+      const blocked = groups.filter((g) => !available[g.group]).map((g) => ({
+        group: g.group, provider: PROVIDERS[g.group].name, tasks: PROVIDERS[g.group].tasks.slice(),
+        reason: 'provider-unavailable', indices: g.indices.slice(),
+      }));
+      if (blocked.length) return { status: 'unavailable', blocked, applied: [] };
+      const applied = [];
+      for (const entry of groups) {
+        const batches = entry.group === 'video' ? entry.indices.map((i) => [files[i]]) : [entry.indices.map((i) => files[i])];
+        for (const batch of batches) {
+          if (options.current && !options.current(applied.length === 0)) return { status: 'stale', reason: 'context_changed', applied };
+          let result;
+          try { result = await slot(entry.group).importFiles(batch); }
+          catch (_) { return { status: 'unconfirmed', reason: 'native_media_failed', applied }; }
+          if (!result || result.status !== 'imported' || result.readback !== 'confirmed') {
+            const refused = result && ['busy','stale','refused','unavailable','invalid','too_large','unconfirmed','cancelled'].includes(result.status);
+            return { status: refused ? result.status : 'unconfirmed', group: entry.group, result, applied };
+          }
+          applied.push({ group: entry.group, result });
+          if (options.current && !options.current(false)) return { status: 'stale', reason: 'context_changed', applied };
+        }
+      }
+      return { status: 'routed', applied };
+    }
     function onDragOver(e) {
       if (!isDraggingFiles(e)) return;
       e.preventDefault();
@@ -160,10 +192,80 @@
       detach.push(() => doc.removeEventListener('paste', onPaste));
       return () => detach.forEach((fn) => fn());
     }
-    return Object.freeze({ drop, onDragOver, onDragLeave, onDrop, onPaste, attach, availability, openSvg: (opts) => (ports.svg ? ports.svg.openFile(opts) : Promise.resolve({ status: 'unavailable', reason: 'vector_import_absent' })) });
+    return Object.freeze({ drop, media, onDragOver, onDragLeave, onDrop, onPaste, attach, availability, openSvg: (opts) => (ports.svg ? ports.svg.openFile(opts) : Promise.resolve({ status: 'unavailable', reason: 'vector_import_absent' })) });
+  }
+  // null means this is not a native-owned action. Every native-owned outcome is a Promise,
+  // including unavailable/refused states, so callers cannot fall through into legacy writers.
+  function desktopMedia(host, files, kind) {
+    const project = host.NemoNativeObjectProject;
+    let session;
+    try { session = project && project.desktop(host); if (!session || !session.blocksLegacy()) return null; }
+    catch (_) { return Promise.resolve({ status: 'unavailable', reason: 'native_session_unavailable' }); }
+    const controller = host.NemoNativeImportController;
+    const surface = (result) => {
+      try {
+        if (controller && typeof controller.surface === 'function') controller.surface(result);
+        else if (result.status !== 'routed' && result.status !== 'empty' && host.showToast) host.showToast('Native media import is unavailable.');
+      } catch (_) {}
+      return result;
+    };
+    return (async () => {
+      if (!controller || !controller.drop || typeof controller.drop.media !== 'function') return { status: 'unavailable', reason: 'native_media_route_absent' };
+      if (files === null) return { status: 'unavailable', reason: 'native_media_picker_absent', blocked: [{ group: kind, reason: 'provider-unavailable' }], applied: [] };
+      const keys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
+      const info = session.info();
+      const origin = info && Object.fromEntries(keys.map((key) => [key, info[key]]));
+      const state = host.state, frame = state && state.currentFrame, layer = state && state.activeLayerIdx;
+      const current = (first) => {
+        try {
+        const now = session.info();
+        return project.desktop(host) === session && session.isActive() && origin && now &&
+          keys.slice(0, first ? keys.length : 3).every((key) => now[key] === origin[key]) &&
+          (!state || (host.state === state && state.currentFrame === frame && (!first || state.activeLayerIdx === layer)));
+        } catch (_) { return false; }
+      };
+      return controller.drop.media(files, { kind, current });
+    })().catch(() => ({ status: 'unconfirmed', reason: 'native_media_failed', applied: [] })).then(surface);
+  }
+  // File-input reset and dispatch are the same for the ordinary image/video controls.
+  function fileInput(event, kind, dispatch) {
+    const files = Array.prototype.slice.call(event.target.files);
+    event.target.value = '';
+    if (kind === 'video' && !files.length) return;
+    return dispatch(files);
+  }
+    // One at a time, not Promise.all (2026-09, feedback #806): each import
+    // creates a layer, decodes and writes frames through the same shared
+    // state — running them concurrently would interleave those writes. The
+    // sequential loop keeps the picked order in the layer stack too.
+  async function videoFiles(files, pickInfos, picked, file, notify) {
+    var okN=0,failed=[];
+    for(var i=0;i<files.length;i++){
+      try{
+        if(pickInfos&&pickInfos[i])await picked(pickInfos[i]);
+        else await file(files[i]);
+        okN++;
+      }catch(e){failed.push((files[i]&&files[i].name)||('#'+(i+1)));}
+    }
+    if(files.length>1)notify(failed.length?(okN+'/'+files.length+' vidéos importées — échec : '+failed.join(', ')):(okN+' vidéos importées'),failed.length?'warn':'success');
+    else if(failed.length)notify('Import vidéo échoué : '+failed[0],'warn');
+  }
+  // The complete OS-file media-library dispatch; native ownership is tested before any legacy callback.
+  async function libraryMedia(host, files, legacyImage, legacyVideo) {
+    const native = desktopMedia(host, files);
+    if (native) {
+      const result = await native;
+      if (result.status === 'empty' && host.showToast) host.showToast(host.SM.t('toastFormatNotRecognizedDropHint'));
+      return result;
+    }
+    const images = files.filter((file) => file.type.indexOf('image/') === 0);
+    const videos = files.filter((file) => file.type.indexOf('video/') === 0);
+    if (images.length && typeof legacyImage === 'function') legacyImage(images);
+    videos.forEach((file) => { if (typeof legacyVideo === 'function') legacyVideo(file); });
+    if (!images.length && !videos.length && host.showToast) host.showToast(host.SM.t('toastFormatNotRecognizedDropHint'));
   }
   return Object.freeze({
-    EXECUTION_ORDER, TOAST_ORDER, PROVIDERS, NATIVE_REFERENCE_DROP_TOAST, TOAST_PREFIX,
+    desktopMedia, fileInput, videoFiles, libraryMedia, EXECUTION_ORDER, TOAST_ORDER, PROVIDERS, NATIVE_REFERENCE_DROP_TOAST, TOAST_PREFIX,
     isSvgFile, looksLikeSvg, isDraggingFiles, memberships, planGroups, toastText, route, routePaste, create,
   });
 }));
