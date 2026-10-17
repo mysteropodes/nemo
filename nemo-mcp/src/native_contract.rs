@@ -22,6 +22,8 @@ pub(crate) mod settings;
 mod diagnostics;
 #[path = "native_layer_policy_contract.rs"]
 pub(crate) mod layer_policy;
+#[path = "native_property_edit_contract.rs"]
+pub(crate) mod property_edit;
 #[path = "native_property_read_contract.rs"]
 pub(crate) mod property_read;
 #[path = "native_property_track_contract.rs"]
@@ -98,6 +100,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "command.document.object.project.settings.edit" => settings::request(payload),
         layer_policy::OP => layer_policy::request(payload),
         property_track::OP => property_track::request(payload),
+        property_edit::OP => property_edit::request(payload),
         "command.document.object.layer.create" => object::create_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -252,6 +255,9 @@ pub(crate) fn validate_result(
     }
     if operation == "query.document.object.layer.timing" {
         return object::timing_result(request_document_id, payload, result);
+    }
+    if operation == property_edit::OP {
+        return property_edit::result(result);
     }
     if operation == property_track::OP {
         return property_track::result(result);

@@ -257,10 +257,12 @@ fn validate_native_response(
 ) -> io::Result<()> {
     let policy_command = request.operation == crate::native_contract::layer_policy::OP;
     let track_command = request.operation == crate::native_contract::property_track::OP;
+    let property_edit = request.operation == crate::native_contract::property_edit::OP;
     let property_read = request.operation == crate::native_contract::property_read::OP;
     let correlated_operation = request.operation == crate::native_contract::metadata::OP
         || policy_command
         || track_command
+        || property_edit
         || property_read;
     let correlated_identity = !correlated_operation
         || (response.request_id == request.request_id
@@ -318,6 +320,12 @@ fn validate_native_response(
                     ))
                 && (!policy_command
                     || crate::native_contract::layer_policy::revision_matches(
+                        request.expected_revision,
+                        response.content_revision,
+                        result,
+                    ))
+                && (!property_edit
+                    || crate::native_contract::property_edit::revision_matches(
                         request.expected_revision,
                         response.content_revision,
                         result,
@@ -472,3 +480,7 @@ mod property_track_tests;
 #[cfg(test)]
 #[path = "native_property_read_wire_tests.rs"]
 mod property_read_tests;
+
+#[cfg(test)]
+#[path = "native_property_edit_wire_tests.rs"]
+mod property_edit_tests;

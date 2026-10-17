@@ -1634,6 +1634,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.property.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPropertyEditPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -3205,6 +3222,139 @@
           ]
         }
       ]
+    },
+    "ObjectPropertyEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "target",
+        "property",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.property.edit"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contextId",
+            "layerUid"
+          ],
+          "properties": {
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "strokeId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "property": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame",
+                "values"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setValue"
+                },
+                "frame": {
+                  "type": "number"
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame",
+                "values"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setKey"
+                },
+                "frame": {
+                  "type": "number"
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "removeKey"
+                },
+                "frame": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame",
+                "animated"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setAnimated"
+                },
+                "frame": {
+                  "type": "number"
+                },
+                "animated": {
+                  "type": "boolean"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectPropertyEditResult": {
+      "$ref": "#/$defs/ObjectPropertyTrackResult"
     }
   }
 }

@@ -52,7 +52,7 @@
         throw new Error('Native metadata result is uncorrelated');
       return ports.freeze(result);
     }
-    function editPropertyTrack(payload,expectedPin,isCurrent){
+    function edit(payload,expectedPin,isCurrent,track){
       var copied,pin;
       try{
         if(typeof isCurrent!=='function'||isCurrent()!==true||!available())throw new Error('Native property edit owner or intent is unavailable');
@@ -66,12 +66,12 @@
         if(!state.active||state.opening||state.synchronizing||!state.subscribed||!state.presentationCurrent||
           !state.dispatchAvailable||!state.projectionReady||!state.subscriptionActive)
           throw new Error('Native property edit owner or presentation is unavailable');
-        return {apiVersion:2,requestId:ports.requestId('property-track'),instanceId:current.instanceId,documentId:current.documentId,
-          operation:'command.document.object.property.track.edit',expectedRevision:current.contentRevision,payload:copied};
+        return {apiVersion:2,requestId:ports.requestId(track?'property-track':'property'),instanceId:current.instanceId,documentId:current.documentId,
+          operation:track?'command.document.object.property.track.edit':'command.document.object.property.edit',expectedRevision:current.contentRevision,payload:copied};
       },'nemo_native_dispatch');
     }
     return Object.freeze({available:available,readPropertyMetadata:function(selector){return read(selector,'metadata');},
-      readProperty:function(selector){return read(selector,'property-read');},editPropertyTrack:editPropertyTrack});
+      readProperty:function(selector){return read(selector,'property-read');},editProperty:function(payload,pin,current){return edit(payload,pin,current,false);},editPropertyTrack:function(payload,pin,current){return edit(payload,pin,current,true);}});
   }
   return Object.freeze({create:create});
 }));

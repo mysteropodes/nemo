@@ -45,7 +45,10 @@
         "src/server_command_projection.rs",
         "src/native_property_read_contract.rs",
         "src/native_property_read_contract_tests.rs",
-        "src/native_property_read_wire_tests.rs"
+        "src/native_property_read_wire_tests.rs",
+        "src/native_property_edit_contract.rs",
+        "src/native_property_edit_contract_tests.rs",
+        "src/native_property_edit_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

@@ -54,12 +54,15 @@ impl NativeApplicationRequest {
             "command.document.object.layer.visibility.set"
                 | crate::native_contract::layer_policy::OP
                 | crate::native_contract::property_track::OP
+                | crate::native_contract::property_edit::OP
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
                 | crate::native_contract::font::IMPORT
         ) {
             let action = if self.operation == crate::native_contract::font::IMPORT {
                 "font import"
+            } else if self.operation == crate::native_contract::property_edit::OP {
+                "property edit"
             } else if self.operation == crate::native_contract::property_track::OP {
                 "property track"
             } else if self.operation == crate::native_contract::layer_policy::OP {

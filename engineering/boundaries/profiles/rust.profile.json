@@ -787,7 +787,10 @@
         "src/server_command_projection.rs",
         "src/native_property_read_contract.rs",
         "src/native_property_read_contract_tests.rs",
-        "src/native_property_read_wire_tests.rs"
+        "src/native_property_read_wire_tests.rs",
+        "src/native_property_edit_contract.rs",
+        "src/native_property_edit_contract_tests.rs",
+        "src/native_property_edit_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -822,7 +825,8 @@
         "native_contract_boundaries.rs",
         "server_failure_paths.rs",
         "support/native_property_read_schema.rs",
-        "support/native_layer_policy_schema.rs"
+        "support/native_layer_policy_schema.rs",
+        "support/native_property_edit_schema.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1029,7 +1033,8 @@
         "native_property_metadata_dispatch_tests.rs",
         "native_property_track_dispatch_tests.rs",
         "native_layer_policy_dispatch_tests.rs",
-        "native_property_read_dispatch_tests.rs"
+        "native_property_read_dispatch_tests.rs",
+        "native_property_edit_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

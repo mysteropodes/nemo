@@ -277,3 +277,7 @@ mod property_track_tests;
 #[cfg(test)]
 #[path = "native_property_read_dispatch_tests.rs"]
 mod property_read_tests;
+
+#[cfg(test)]
+#[path = "native_property_edit_dispatch_tests.rs"]
+mod property_edit_tests;

@@ -83,8 +83,8 @@
       if(!sameBase(before,after))throw new Error('Native property read became stale');
       return value;
     }
-    async function editPropertyTrack(payload,pin,isCurrent){
-      var before=scope(),edit=ui.editPropertyTrack;
+    async function editProperty(payload,pin,isCurrent,track){
+      var before=scope(),edit=track?ui.editPropertyTrack:ui.editProperty;
       if(!before||!same(before.identity,pin)||typeof edit!=='function'||typeof isCurrent!=='function')
         throw new Error('Native property editing is unavailable');
       // Queue entry temporarily hides readPresentedObjectSession(). The owner
@@ -126,8 +126,8 @@
           }
           if(sameOwner()){
             var refreshed=await update(true);
-            if(sameOwner())caller.notice(failure?'Key edit could not be confirmed.':
-              (response.result.applied?'Keys updated.':'No key changes.')+(refreshed?'':' Native properties are unavailable.'));
+            if(sameOwner())caller.notice(failure?(track?'Key edit could not be confirmed.':'Property edit could not be confirmed.'):
+              (response.result.applied?(track?'Keys updated.':'Property updated.'):(track?'No key changes.':'No property change.'))+(refreshed?'':' Native properties are unavailable.'));
           }
         }catch(_){} // Preserve the native receipt/error if presentation is unavailable.
       }
@@ -143,7 +143,8 @@
     var caller=Panel.createCaller({document:root.document,container:options.container,pageBudget:options.pageBudget,yieldControl:options.yieldControl,
       isMotion:function(){return !retired&&root.state.appMode==='motion';},readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,
       query:query,readProperty:readProperty,
-      get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?editPropertyTrack:undefined;},
+      get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
+      get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
       selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
     async function update(force){var ticket=++updateSerial,base=baseScope();if(base&&!base.explicit&&!cacheMatches(base)&&uniqueContextAllowed())showWait('Loading properties…',true);
       if(base)await resolveContext(base,!!force);if(retired||ticket!==updateSerial)return false;clearWait();return caller.update(force);}

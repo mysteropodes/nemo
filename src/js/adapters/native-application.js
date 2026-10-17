@@ -8,10 +8,11 @@
 }(typeof globalThis === 'object' ? globalThis : this, function (fontContract, propertyContract) {
   'use strict';
 
+  const editOperation = 'command.document.object.property.edit';
   const trackOperation = 'command.document.object.property.track.edit';
   const readOperation = 'query.document.object.property.read';
   const operations = new Set([
-    trackOperation, readOperation,
+    editOperation, trackOperation, readOperation,
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
@@ -24,7 +25,7 @@
     'job.export.png.begin', 'job.export.png.status', 'job.export.png.cancel',
   ]);
   const requiredRevision = new Set([
-    trackOperation,
+    editOperation, trackOperation,
     'command.document.apply', 'transaction.begin', 'history.undo', 'history.redo',
     'job.export.png.begin',
     'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
@@ -65,6 +66,7 @@
     return value;
   }
   function objectIdPaths(operation) {
+    if (operation === editOperation) return { has: p => /^payload\.(?:property|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
     if (operation === readOperation) return property.readPaths;
     if (operation === trackOperation) return { has: p => /^payload\.selections\.\d+\.(?:property|target\.(?:contextId|layerUid|strokeId))$/.test(p) };
     if (fontContract && fontContract.admitted(operation)) return fontContract.paths(operation);
@@ -158,6 +160,7 @@
     } else if (!fields[action.kind].every(key => Number.isFinite(action[key]))) throw new TypeError('invalid numeric project setting');
   }
   function validatePayload(operation, payload, envelope) {
+    if (operation === editOperation) return property.editPayload(payload);
     if (operation === readOperation) return property.readPayload(payload);
     if (operation === trackOperation) return property.trackPayload(payload);
     if (fontContract && fontContract.admitted(operation)) return fontContract.payload(operation, payload, envelope);
@@ -320,6 +323,7 @@
     if (!valid) throw new TypeError('invalid timing exposure disposition');
   }
   function validateResult(value, operation) {
+    if (operation === editOperation) return property.trackResult(value);
     if (operation === readOperation) return property.readResult(value);
     if (!operation) return;
     if (operation === trackOperation) return property.trackResult(value);
@@ -405,7 +409,7 @@
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value, undefined, objectIdPaths(operation));
     if ((fontContract && fontContract.admitted(operation)) || ['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
-    'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', trackOperation, readOperation, 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
+    'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation, readOperation, 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -440,6 +444,10 @@
         if (!request || request.operation !== readOperation) throw new TypeError('invalid property read operation');
         return this.dispatch(request);
       },
+      editProperty(request) {
+        if (!request || request.operation !== editOperation) throw new TypeError('invalid property edit operation');
+        return this.dispatch(request);
+      },
       editPropertyTrack(request) {
         if (!request || request.operation !== trackOperation) throw new TypeError('invalid property track operation');
         return this.dispatch(request);
@@ -450,7 +458,7 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
-          if (['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', trackOperation, readOperation].includes(outbound.operation)) {
+          if (['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation, readOperation].includes(outbound.operation)) {
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
@@ -465,7 +473,7 @@
                 ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key])) throw new TypeError('timing read selector mismatch');
             if (response.ok && outbound.operation === 'command.document.object.layer.create' &&
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError('creation receipt revision mismatch');
-            if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', trackOperation].includes(outbound.operation) &&
+            if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation].includes(outbound.operation) &&
                 response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
           }
           if (['query.diagnostics.recent', 'query.reproduction.report'].includes(outbound.operation) &&

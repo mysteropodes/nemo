@@ -2543,7 +2543,8 @@
         "native-motion-property-view.js",
         "native-motion-property-panel.js",
         "native-motion-property-binding.js",
-        "native-motion-property-keys.js"
+        "native-motion-property-keys.js",
+        "native-motion-property-value.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [

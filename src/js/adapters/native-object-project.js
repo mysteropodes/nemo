@@ -396,6 +396,7 @@
       readSubscriptionGeneration:function(){return subscriptionTicket;},
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
+      get editProperty(){return properties.available()?properties.editProperty:undefined;},
       info:function(){return info;},requestId:requestId,runFontResource:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
@@ -433,6 +434,7 @@
       },
       readProperty:function(selector){var session=uiSession(root);if(!session)return Promise.reject(new Error('Native property session is unavailable'));return session.readProperty(selector);},
       get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},
+      get editProperty(){var session=uiSession(root);return session&&session.editProperty;},
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
       projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},
       repaint:function(frameOnly){return paintUI(root,frameOnly);}

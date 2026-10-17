@@ -4,9 +4,10 @@
  * Every cursor is consumed as returned. Reads yield/cancel between whole pages. */
 (function(root,factory){
   var api=factory(typeof module==='object'&&module.exports?require('./native-motion-property-view.js'):root.NemoNativeMotionPropertyView,
-    typeof module==='object'&&module.exports?require('./native-motion-property-keys.js'):root.NemoNativeMotionPropertyKeys);
+    typeof module==='object'&&module.exports?require('./native-motion-property-keys.js'):root.NemoNativeMotionPropertyKeys,
+    typeof module==='object'&&module.exports?require('./native-motion-property-value.js'):root.NemoNativeMotionPropertyValue);
   if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeMotionPropertyPanel=api;
-}(typeof globalThis==='object'?globalThis:this,function(View,Keys){
+}(typeof globalThis==='object'?globalThis:this,function(View,Keys,Value){
   'use strict';
   var shortcuts={p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'};
   var modes=['all','animated','modified','expressions','errors','effects','mattes'];
@@ -14,7 +15,7 @@
   function create(container,ports){
     if(!View||!container||!ports||!ports.document||typeof ports.query!=='function'||typeof ports.readContext!=='function'||typeof ports.readSelection!=='function')throw new TypeError('Native Motion panel ports are unavailable');
     var doc=ports.document,retired=false,serial=0,client=View.createConsumer(ports),accepted=null;
-    var propertySet=null,mode='all',contentOnly=false,collapsed=false,search='',scope='inspector',rowBindings=[],loading=false;
+    var propertySet=null,mode='all',contentOnly=false,collapsed=false,search='',scope='inspector',rowBindings=[],valueEditors=[],loading=false;
     var maxPages=ports.pageBudget===undefined?Infinity:ports.pageBudget;
     if(maxPages!==Infinity&&(!Number.isSafeInteger(maxPages)||maxPages<1))throw new TypeError('Invalid explicit native Motion read budget');
     var section=make('section',''),toolbar=make('div',''),status=make('div',''),body=make('div',''),controls=[];
@@ -45,7 +46,8 @@
     function readPreference(){try{var value=ports.readPreference&&ports.readPreference('nemo-motion-filter');if(modes.includes(value))mode=value;}catch(_){}}
     function savePreference(){try{if(ports.writePreference)ports.writePreference('nemo-motion-filter',mode);}catch(_){}}
     function button(label,action){var node=make('button',label);node.type='button';node.addEventListener('click',action);toolbar.appendChild(node);controls.push([node,action]);return node;}
-    function clearBody(){if(keyEditor)keyEditor.clear();rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=[];body.replaceChildren();}
+    function clearValues(){valueEditors.forEach(function(editor){editor.dispose();});valueEditors=[];}
+    function clearBody(){clearValues();if(keyEditor)keyEditor.clear();rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=[];body.replaceChildren();}
     function labelTarget(t,token){return (ports.labelTarget&&ports.labelTarget(t,token.pin))||((t.strokeId===undefined?'Layer ':'Element ')+(t.strokeId===undefined?t.layerUid:t.strokeId));}
     function wantedTargets(targets,selection){
       if(!targets.some(function(item){return item.kind==='context'&&item.contextId===selection.contextId;}))throw new Error('Native active context is absent');
@@ -81,7 +83,7 @@
     function paintRows(){
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       if(['errors','effects','mattes'].includes(mode)){clearBody();notify('This Motion filter is unavailable.');return false;}
-      var fragment=make('div',''),unknown=false,shown=0,nextBindings=[],selected=new Set(accepted.selection.selected.map(key));
+      var fragment=make('div',''),unknown=false,shown=0,nextBindings=[],nextValues=[],selected=new Set(accepted.selection.selected.map(key));
       if(!selected.size&&accepted.selection.primary)selected.add(key(accepted.selection.primary));
       accepted.targets.forEach(function(item){
         if(item.kind==='context'){if(item.contextId===accepted.selection.contextId){var heading=make('div','Context '+item.contextId);heading.className='phdr';fragment.appendChild(heading);}return;}
@@ -106,12 +108,14 @@
             };
             keysButton.addEventListener('click',openKeys);nextBindings.push([keysButton,openKeys]);line.appendChild(keysButton);
           }
+          if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:line,target:group.target,row:row});
           fragment.appendChild(line);shown++;});
       });
       // Unsupported native families do not become an empty global-U result.
       if(appendRevealLimits(fragment))unknown=true;
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
-      rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;body.replaceChildren(fragment);
+      rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);
+      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,get editProperty(){return ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       notify(collapsed?'Properties collapsed.':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':shown?(keyEditor?'Select Keys to inspect native animation.':'Properties are read-only.'):accepted.groups.length?'No matching properties.':'Select a native target to view properties.');return true;
     }
     function paint(){try{return paintRows();}catch(_){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}}
@@ -158,7 +162,7 @@
         if(retired||ticket!==serial)return false;var selected=selectionInfo();if(!selected.primary||key(selected.primary)!==key(target)){notify('Native selection did not confirm.');return false;}
         scope='inspector';propertySet=null;contentOnly=false;collapsed=false;return refresh(true);
       }catch(_){if(!retired)notify('Native selection is unavailable.');return false;}}
-    function cancel(){var keyCancelled=keyEditor?keyEditor.cancel():false;if(retired||!loading)return keyCancelled;serial++;loading=false;accepted=null;clearBody();notify('Property read cancelled.');return true;}
+    function cancel(){valueEditors.forEach(function(editor){editor.cancel();});var keyCancelled=keyEditor?keyEditor.cancel():false;if(retired||!loading)return keyCancelled;serial++;loading=false;accepted=null;clearBody();notify('Property read cancelled.');return true;}
     function dispose(){if(retired)return;retired=true;serial++;loading=false;client.dispose();if(keyEditor)keyEditor.dispose();accepted=null;clearBody();container.removeEventListener('keydown',onKey);searchInput.removeEventListener('input',onSearch);controls.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});if(section.parentNode===container)container.removeChild(section);}
     button('All',function(){scope='inspector';propertySet=null;contentOnly=false;collapsed=false;mode='all';savePreference();return refreshPaint();});
     Object.keys(shortcuts).forEach(function(k){button(k.toUpperCase(),function(){return reveal(shortcuts[k],false);});});button('U',function(){return revealContent();});

@@ -218,6 +218,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-opacity-motion-surface.js',
     'src/js/adapters/native-motion-property-view.js',
     'src/js/adapters/native-motion-property-keys.js',
+    'src/js/adapters/native-motion-property-value.js',
     'src/js/adapters/native-motion-property-panel.js',
     'src/js/adapters/native-motion-property-binding.js',
     'src/js/adapters/native-object-inactive-project-tabs.js',
@@ -238,7 +239,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107, 151, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107, 108, 152, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -246,15 +247,15 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 148);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 149);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 150);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 152);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 149);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 150);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 151);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 153);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
   assert.ok(order('js/adapters/native-object-project-properties.js') < order('js/adapters/native-object-project.js'));
-  assert.ok(order('js/adapters/native-motion-property-view.js') < order('js/adapters/native-motion-property-keys.js') && order('js/adapters/native-motion-property-keys.js') < order('js/adapters/native-motion-property-panel.js'));
+  assert.ok(order('js/adapters/native-motion-property-view.js') < order('js/adapters/native-motion-property-keys.js') && order('js/adapters/native-motion-property-keys.js') < order('js/adapters/native-motion-property-value.js') && order('js/adapters/native-motion-property-value.js') < order('js/adapters/native-motion-property-panel.js'));
   assert.ok(order('js/adapters/native-motion-property-binding.js') < order('js/motion.js'));
   assert.equal(policy.retainedSources.find(record => record.path === 'src/js/adapters/native-object-project-desktop.js').moduleId, 'app.native.object.project.adapter');
   for (const name of ['view', 'keys', 'panel', 'binding']) assert.equal(policy.retainedSources.find(record => record.path === 'src/js/adapters/native-motion-property-' + name + '.js').moduleId, 'app.native.motion.properties.adapter');

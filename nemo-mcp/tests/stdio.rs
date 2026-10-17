@@ -145,6 +145,7 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     let validator = jsonschema::draft202012::new(&command_schema)
         .expect("advertised command schema compiles with a standard validator");
     property_read_schema::check(|value| validator.is_valid(value));
+    property_edit_schema::check(|value| validator.is_valid(value));
     // This exercises the schema emitted by the actual server, including D12's
     // inline native definitions; no separate test-only schema is substituted.
     let track = json!({"apiVersion":2,"requestId":"track-schema","instanceId":"instance-a",
@@ -498,3 +499,6 @@ mod property_read_schema;
 
 #[path = "support/native_layer_policy_schema.rs"]
 mod native_layer_policy_schema;
+
+#[path = "support/native_property_edit_schema.rs"]
+mod property_edit_schema;

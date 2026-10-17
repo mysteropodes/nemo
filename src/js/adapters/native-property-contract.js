@@ -41,6 +41,31 @@
       if(r.kind==='storedProperty'){if(r.items.length!==1||r.items[0].property!==p.view.property||r.nextOffset!==null)throw new TypeError('stored property mismatch');}
       else if(r.items.length>p.view.limit||r.nextOffset!==null&&(!r.items.length||r.nextOffset!==p.view.offset+r.items.length))throw new TypeError('nonadvancing/mismatched page cursor');
     }
+    // The native holder owns dimensions, applicability and animated/static state.
+    // This public subset carries intent only; curve controls use the track route.
+    function editPayload(value) {
+      exact(value, ['command', 'target', 'property', 'action'], [], 'property edit');
+      if (value.command !== 'object.property.edit') throw new TypeError('invalid property edit command');
+      exact(value.target, ['contextId', 'layerUid'], ['strokeId'], 'property holder');
+      Object.values(value.target).forEach(objectUid); objectUid(value.property);
+      const action = value.action;
+      if (!plain(action)) throw new TypeError('property action must be an object');
+      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated']};
+      if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
+      exact(action, ['kind', 'frame', ...fields[action.kind]], [], 'property action');
+      // Native frames are finite numbers, including negative and fractional values.
+      if (!Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (has(action, 'values')) {
+        const values = action.values;
+        if (!Array.isArray(values) || values.length < 1 || values.length > 4 ||
+            !Array.from({length:values.length}, (_, i) => has(values, i) && Number.isFinite(values[i])).every(Boolean) ||
+            Object.getOwnPropertyNames(values).length !== values.length + 1) {
+          throw new TypeError('property values must be a dense finite vector of dimension 1..4');
+        }
+      } else if (has(action, 'animated') && typeof action.animated !== 'boolean') {
+        throw new TypeError('property animated intent must be boolean');
+      }
+    }
     function trackPayload(value) {
       exact(value, ['command', 'selections', 'action'], [], 'property track edit');
       if (value.command !== 'object.property.track.edit' || !Array.isArray(value.selections) ||
@@ -176,7 +201,7 @@
       }
     }
     const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
-    return Object.freeze({ metadataPayload, metadataResult, metadataCorrelated, trackPayload, trackResult,
+    return Object.freeze({ metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }
   return Object.freeze({ create });
