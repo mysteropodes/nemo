@@ -451,3 +451,29 @@ async fn linked_read_refusal_reaches_public_native_socket_without_revision_publi
     assert_eq!(info(&state), pin);
     assert_eq!(save(&state), original);
 }
+
+// This checks outer application admission, not the native wrapper's None branch.
+#[tokio::test]
+async fn malformed_font_correlation_is_rejected_by_application_admission_without_mutation() {
+    let state = linked_state();
+    let original = save(&state);
+    let pin = info(&state);
+    let template = linked_read(&state, "read", " legacy font / 雪 #1 ");
+    for bad in [
+        String::new(),
+        "bad id".into(),
+        "x".repeat(129),
+        "x".repeat(8192),
+    ] {
+        let mut request = template.clone();
+        request.request_id = bad;
+        assert!(state.dispatch_native_async(request).await.is_err());
+        assert_eq!(info(&state), pin);
+        assert_eq!(save(&state), original);
+    }
+    let mut large = template;
+    large.payload["padding"] = json!("x".repeat(8192));
+    assert!(state.dispatch_native_async(large).await.is_err());
+    assert_eq!(info(&state), pin);
+    assert_eq!(save(&state), original);
+}
