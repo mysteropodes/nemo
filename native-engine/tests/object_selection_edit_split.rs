@@ -392,11 +392,11 @@ fn every_baseline_scenario_replays_on_v1_and_v2_documents() {
             );
             split_rows += 1;
             grouped += usize::from(pieces[pieces.len() - 1]["groups"].is_array());
-            motioned += usize::from(
-                pieces
-                    .iter()
-                    .any(|p| !p["motion"].as_array().unwrap().is_empty()),
-            );
+            // The generator's `motioned` counts a piece with promoted tracks OR static values.
+            motioned += usize::from(pieces.iter().any(|p| {
+                !p["motion"].as_array().unwrap().is_empty()
+                    || !p["motionStatic"].as_array().unwrap().is_empty()
+            }));
         }
     }
     assert_eq!(

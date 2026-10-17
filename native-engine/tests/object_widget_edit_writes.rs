@@ -225,13 +225,42 @@ fn a_widget_layer_adds_no_objects_and_leaves_the_pinned_frame_packet_records_unc
     };
     let (layers_before, before) = records(&owner);
     assert!(!before.is_empty(), "the pinned frame has drawn objects");
+    // the fixture also holds a record on another frame, so the document total is not the pinned-frame count
+    let objects_before = current(&owner).document().objects().len();
     run_ok(
         &mut owner,
         "c",
         "create",
         create_payload("joystick", "Joystick 1", [960., 540.]),
     );
-    let (layers_after, after) = records(&owner);
+    // The creation declares a layer-level property holder, and L01-H's packet guard (`holders_fully_consumed`,
+    // pinned by `every_other_holder_keeps_the_packet_unavailable`) keeps a packet over ANY unconsumed holder
+    // `Unavailable`, so the pinned-frame packet of the created document is refused rather than compared.
+    {
+        let snapshot = current(&owner);
+        let selector = ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "scene-root",
+            scope_kind: FrameScopeKind::Authored,
+            frame: 7,
+        };
+        assert_eq!(
+            prepare_object_frame(&snapshot, &selector).err(),
+            Some(crate::object_frame_packet::ObjectFrameError::Unavailable)
+        );
+    }
+    // The widget layer itself contributes nothing: the same document without its holder table (the only
+    // thing that gate reads) yields the very same frame records plus exactly one more source layer.
+    let mut stripped = wire(&owner);
+    stripped
+        .as_object_mut()
+        .unwrap()
+        .remove("propertyHolders")
+        .expect("creation declared the holder");
+    let (layers_after, after) = records(&owner_of(&stripped));
     assert_eq!((layers_after, &after), (layers_before + 1, &before));
-    assert_eq!(current(&owner).document().objects().len(), before.len());
+    assert_eq!(current(&owner).document().objects().len(), objects_before);
 }

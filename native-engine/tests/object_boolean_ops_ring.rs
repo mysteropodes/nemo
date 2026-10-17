@@ -333,6 +333,26 @@ fn the_refit_runs_only_without_preserve_and_never_after_a_kept_slit() {
 }
 
 #[test]
+fn a_refit_that_collapses_to_one_anchor_keeps_the_exact_polygon() {
+    // The 5 x 10 remainder of an eraser bite (x 100..110 minus x < 105), ring as the clipper returns it: Paper's PathFitter closes it with ONE looped anchor, which storage
+    // (2..=256 anchors) refuses, so the ring stays the plain four-corner polygon and reports no refit.
+    let corners = vec![[105.0, 10.0], [105.0, 0.0], [110.0, 0.0], [110.0, 10.0]];
+    assert_eq!(simplify_closed(&corners, 2.5).map(|fit| fit.len()), Some(1));
+    let (segments, refit) = erase_degenerate_self_loops(corners.clone(), false);
+    assert!(!refit);
+    assert_eq!(
+        segments.iter().map(|s| s.point).collect::<Vec<_>>(),
+        corners
+    );
+    assert!(segments
+        .iter()
+        .all(|s| s.handle_in == [0.0, 0.0] && s.handle_out == [0.0, 0.0]));
+    // every ring whose refit keeps two anchors or more is still refitted
+    let (square_fit, refit) = erase_degenerate_self_loops(square(0.0, 0.0, 100.0), false);
+    assert!(refit && square_fit.len() == 3);
+}
+
+#[test]
 fn degenerate_polygons_are_dropped_and_bad_holes_refused() {
     assert!(flatten_polygons(&[], false).unwrap().is_empty());
     assert!(

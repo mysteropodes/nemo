@@ -334,11 +334,33 @@ fn the_scene_draws_exactly_the_evaluated_vector_for_every_l01_h_oracle_row() {
     // the anchors the evaluation join returns, through the independently recomposed baseline builder, bit for bit.
     let (_, all) = eval_rows();
     assert_eq!(all.len(), 57);
-    let mut open = 0;
+    // Three rows carry property tracks the evaluation join does not read (a foreign kind on a rect or a star, any
+    // track on a plain vector): L01-H's packet guard keeps their packet `Unavailable` (pinned there as
+    // `a_packet_over_consumed_shape_tracks_evaluates_to_the_oracle`), so no scene can exist for them either.
+    const PACKET_UNAVAILABLE: [&str; 3] = [
+        "rect-foreign-kind-tracks-are-ignored@5",
+        "plain-vector-with-foreign-tracks-is-not-rebuilt@5",
+        "star-foreign-kind-tracks-are-ignored@5",
+    ];
+    let (mut open, mut refused) = (0, 0);
     for row in &all {
         let mut value: serde_json::Value = serde_json::from_str(&row.doc).expect("oracle document");
         value["objects"][0]["target"]["frameScope"]["frame"] = json!(row.frame);
         let snap = eval_snapshot(&value.to_string());
+        if PACKET_UNAVAILABLE.contains(&row.id.as_str()) {
+            assert_eq!(
+                crate::object_frame_packet::prepare_object_frame(
+                    &snap,
+                    &selector(&snap, row.frame)
+                )
+                .err(),
+                Some(crate::object_frame_packet::ObjectFrameError::Unavailable),
+                "{}",
+                row.id
+            );
+            refused += 1;
+            continue;
+        }
         let evaluated = evaluate_vector(&snap, 0, row.frame).expect("join");
         let scene = scene_at(&snap, row.frame).unwrap_or_else(|e| panic!("{}: {e:?}", row.id));
         let anchors: Vec<CubicSegment> = evaluated
@@ -355,5 +377,5 @@ fn the_scene_draws_exactly_the_evaluated_vector_for_every_l01_h_oracle_row() {
         assert_eq!(entry.path().elements(), want.elements(), "{}", row.id);
         open += usize::from(!evaluated.closed);
     }
-    assert_eq!(open, 5);
+    assert_eq!((open, refused), (5, 3));
 }

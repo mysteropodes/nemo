@@ -9,7 +9,8 @@
 //! revisits and, unless the caller preserves geometry, are refitted with
 //! `simplify(2.5)` (module `fit`).
 //!
-//! Deliberate, reported differences from the baseline: a hole belongs to the
+//! Deliberate, reported differences from the baseline: a refit that collapses to a single anchor (storage
+//! admits 2..=256) keeps the exact polygon instead, a hole belongs to the
 //! polygon the provider returned it with, not to every exterior whose bounds
 //! contain it (the baseline cut an island's hole into the donut around it too),
 //! and a hole of fewer than three points is a typed refusal (see
@@ -24,6 +25,8 @@ use crate::object_document::object_group_kernels::object_boolean_topology::{
     admit_polygons, IslandBuild, Polygon, TopologyError,
 };
 
+/// Fewest anchors of a stored cubic ring (storage admission, `object_codec`: 2..=256).
+const MIN_STORED_SEGMENTS: usize = 2;
 /// `REVISIT_TOL`: two ring vertices this close are the same junction.
 const REVISIT_TOL: f64 = 1.5;
 /// `MIN_LOOP_FRAC`: a loop above this share of the bounding box is real geometry.
@@ -155,7 +158,11 @@ pub(crate) fn erase_degenerate_self_loops(
         }
     }
     if !skip_refit && !kept_revisit && points.len() >= 3 {
-        if let Some(fitted) = simplify_closed(&points, REFIT_TOLERANCE) {
+        // Paper may collapse a small ring into ONE looped anchor (the oracle's `keyhole-ring`); storage admits a
+        // cubic ring of 2..=256 anchors only, so such a refit is dropped and the exact polygon is kept.
+        if let Some(fitted) =
+            simplify_closed(&points, REFIT_TOLERANCE).filter(|fit| fit.len() >= MIN_STORED_SEGMENTS)
+        {
             return (fitted, true);
         }
     }

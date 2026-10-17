@@ -354,6 +354,10 @@ fn gpu_scheduled_layered_entry_keeps_the_work_identity_and_refuses_stale_pixels(
         assert!(bytes.bytes(&live).is_err());
         drop(live);
         drop((result, bytes));
+        // A frame superseded by a newer schedule is not terminal: without its own cancel (terminal 0 here, as in
+        // `gpu_stale_cancel_fail_replace_and_success_refuse_old_texture_and_bytes`) it still holds its lease.
+        let old_receipt = scheduler.cancel(old.work_id()).unwrap();
+        assert_eq!(scheduler.succeed(old.work_id()).unwrap(), old_receipt);
         scheduler.cancel(next.work_id()).unwrap();
         assert_eq!(scheduler.lease_counters().live(), 0);
         complete(&gpu);

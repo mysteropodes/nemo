@@ -79,12 +79,12 @@ fn document(locked: bool) -> ObjectDocument {
 
 #[test]
 fn a_locked_layer_is_refused_as_unavailable_until_a_provider_decides() {
-    // Storage admission refuses locked layers today, so the fact can only be
-    // reached by planning over an un-admitted document and sealing the plan to
-    // an admitted origin: the seal must turn the typed policy refusal into
-    // Unavailable and keep the candidate away from every owner.
+    // Since #2147 (62c8c83b, the layer-policy owner) storage admits a locked layer, but the lifecycle
+    // kernels still ask no provider about it: planning over the locked document and sealing the plan
+    // to an origin must turn the typed policy refusal into Unavailable and keep the candidate away
+    // from every owner.
     let origin = ObjectSnapshot::new("lock-origin", document(false)).unwrap();
-    assert!(ObjectSnapshot::new("lock-refused", document(true)).is_err());
+    assert!(ObjectSnapshot::new("lock-admitted", document(true)).is_ok());
     let locked = document(true);
     let policy = UnavailableLayerEditPolicy;
     let pick = |active: &str| LayerSelection {

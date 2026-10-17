@@ -108,7 +108,9 @@ fn a_nested_combined_child_is_one_operand_with_all_its_pieces() {
         (300.0, 0.0, 10.0),
     ]));
     let out = render_combines(&combine, &mut port).unwrap();
-    assert_eq!(out.suppress, vec![0, 1, 2, 3]);
+    // first-seen order, inner group first: the same nested layer is pinned as [1, 2, 0, 3] by L02-B
+    // (`a_combining_child_is_exactly_one_operand`), the baseline `suppressBlock` walk
+    assert_eq!(out.suppress, vec![1, 2, 0, 3]);
     let shapes: Vec<MultiPolygon> = out.paths.iter().map(|p| p.shape.clone()).collect();
     let got = areas(&shapes);
     assert_eq!(got.len(), 3);

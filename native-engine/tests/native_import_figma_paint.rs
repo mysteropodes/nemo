@@ -81,7 +81,15 @@ fn abs_matrix_matches_every_oracle_case() {
             .iter()
             .find_map(|l| l.strip_prefix("x mat "))
             .expect("expected matrix");
-        assert_eq!(enc_mat(&node_abs_matrix(&node)), expected, "A {}", block.id);
+        // The oracle writes a missing absoluteTransform entry (`undefined`) as `~`; the Rust model reads
+        // it as NaN, and no A row holds a literal NaN, so `~` is exactly the NaN slot of the encoding.
+        let m = node_abs_matrix(&node);
+        let encoded = [m.a, m.b, m.c, m.d, m.e, m.f]
+            .iter()
+            .map(|v| if v.is_nan() { "~".to_string() } else { hex(*v) })
+            .collect::<Vec<_>>()
+            .join(",");
+        assert_eq!(encoded, expected, "A {}", block.id);
     }
 }
 

@@ -232,10 +232,11 @@ fn effect_entries_roundtrip_the_shapes_addeffect_pushes() {
     for row in rows("effect-entry") {
         let json = row["json"].as_str().unwrap();
         let entry: LayerEffect = serde_json::from_str(json).unwrap();
-        // serde_json prints 1e21 where JSON.stringify prints 1e+21: same number, other spelling.
+        // The locked serde_json (1.0.151, zmij float printer) spells 1e21 as JSON.stringify does (1e+21),
+        // so the round trip is byte-exact with the baseline oracle.
         assert_eq!(
             serde_json::to_string(&entry).unwrap(),
-            json.replace("e+", "e"),
+            json,
             "{}",
             row["id"]
         );

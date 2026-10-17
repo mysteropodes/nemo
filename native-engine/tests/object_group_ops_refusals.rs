@@ -129,7 +129,8 @@ fn a_locked_layer_is_refused_until_the_lock_provider_decides() {
             "{edit:?}"
         );
     }
-    // An explicit unlocked layer plans; the codec refusal of locked documents stays separate.
+    // An explicit unlocked layer plans; storage admission of a locked layer (#2147, 62c8c83b) is separate
+    // from the group plan's own lock refusal asserted above.
     let open = unadmitted(json!({"layerUid":"L0","locked":false}));
     assert!(
         plan_group_edit(&open, "L0", "scene-root", &grouping())
@@ -140,7 +141,7 @@ fn a_locked_layer_is_refused_until_the_lock_provider_decides() {
         "formatVersion":1,"totalFrames":1,"layers":[{"layerUid":"L0","locked":true}],
         "objects":[record("s1"), record("s2")]}))
     .unwrap();
-    assert!(crate::object_codec::decode_storage_project(&bytes).is_err());
+    assert!(crate::object_codec::decode_storage_project(&bytes).is_ok());
 }
 
 #[test]

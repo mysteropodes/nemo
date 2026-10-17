@@ -301,7 +301,9 @@ fn unknown_mesh_and_missing_store_are_not_found() {
     let mut owner = owner_with(&start);
     let before = state(&owner);
     for (id, body) in [("other", set_offset(0, 0.1, 0.1)), ("M", reset_offsets())] {
-        let reply = run(&mut owner, "x", payload(id, body));
+        // one request id per request: reusing "x" with another payload is a fingerprint conflict
+        // (`invalid_request`), which would mask the lookup this loop is about
+        let reply = run(&mut owner, &format!("x-{id}"), payload(id, body));
         assert_eq!(code(&reply), "not_found", "{id}");
         assert_eq!(state(&owner), before, "{id}");
     }
