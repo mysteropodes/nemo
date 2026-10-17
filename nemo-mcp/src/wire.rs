@@ -252,10 +252,13 @@ pub async fn call_native(
             read_json_bounded(stream, NATIVE_MAX_MESSAGE_BYTES).await?;
         validate_native_response(&response, &response_contract)?;
         let reports_replacement = !response.ok
-            && response
-                .error
-                .as_ref()
-                .is_some_and(|error| error.code == "wrong_document");
+            && response.error.as_ref().is_some_and(|error| {
+                error.code == "wrong_document"
+                    || crate::native_contract::text_read::wrong_instance_refusal(
+                        &response_contract,
+                        &response,
+                    )
+            });
         if response.api_version != NATIVE_API_VERSION
             || response.request_id != request_id
             || response.instance_id != endpoint.instance_id
@@ -277,7 +280,8 @@ fn validate_native_response(
     let property_edit = request.operation == crate::native_contract::property_edit::OP;
     let property_read = request.operation == crate::native_contract::property_read::OP;
     let frame_edit_command = crate::native_contract::frame_edit::declares(&request.operation);
-    let correlated_operation = request.operation == crate::native_contract::metadata::OP
+    let correlated_operation = request.operation == crate::native_contract::text_read::OP
+        || request.operation == crate::native_contract::metadata::OP
         || policy_command
         || track_command
         || property_edit
@@ -289,13 +293,15 @@ fn validate_native_response(
         || crate::native_contract::import::admitted(&request.operation);
     let correlated_identity = !correlated_operation
         || (response.request_id == request.request_id
-            && response.instance_id == request.instance_id
-            && (response.document_id == request.document_id
-                || (!response.ok
-                    && response
-                        .error
-                        .as_ref()
-                        .is_some_and(|e| e.code == "wrong_document")))
+            && crate::native_contract::text_read::owner_matches(request, response).unwrap_or(
+                response.instance_id == request.instance_id
+                    && (response.document_id == request.document_id
+                        || (!response.ok
+                            && response
+                                .error
+                                .as_ref()
+                                .is_some_and(|e| e.code == "wrong_document"))),
+            )
             && serde_json::to_vec(response).is_ok_and(|b| b.len() <= NATIVE_MAX_MESSAGE_BYTES));
     let identity_is_valid = correlated_identity
         && response.api_version == NATIVE_API_VERSION
@@ -316,6 +322,7 @@ fn validate_native_response(
                     "query.document.object"
                         | "query.document.object.layer.timing"
                         | crate::native_contract::metadata::OP
+                        | crate::native_contract::text_read::OP
                         | crate::native_contract::property_read::OP
                 ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
                     == Some(response.content_revision))
@@ -323,6 +330,7 @@ fn validate_native_response(
                     request.operation.as_str(),
                     "query.document.object.layer.timing"
                         | crate::native_contract::metadata::OP
+                        | crate::native_contract::text_read::OP
                         | crate::native_contract::property_read::OP
                 ) || (response.instance_id == request.instance_id
                     && response.document_id == request.document_id
@@ -520,3 +528,7 @@ mod property_read_tests;
 #[cfg(test)]
 #[path = "native_property_edit_wire_tests.rs"]
 mod property_edit_tests;
+
+#[cfg(test)]
+#[path = "native_text_read_wire_tests.rs"]
+mod text_read_tests;

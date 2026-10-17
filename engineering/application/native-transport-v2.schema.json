@@ -5899,6 +5899,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.text"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectTextReadPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -6722,6 +6739,9 @@
             },
             {
               "$ref": "#/$defs/ObjectPropertyReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectTextReadResult"
             }
           ]
         },
@@ -7621,6 +7641,473 @@
     },
     "ObjectPropertyEditResult": {
       "$ref": "#/$defs/ObjectPropertyTrackResult"
+    },
+    "ObjectTextReadScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "layerUid",
+        "frameScope"
+      ],
+      "properties": {
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "frameScope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "authored",
+                "reference"
+              ]
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        }
+      }
+    },
+    "ObjectTextReadMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "font",
+        "size",
+        "color",
+        "align",
+        "anchorTopLeft"
+      ],
+      "properties": {
+        "font": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "fontKey"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "bundled"
+                },
+                "fontKey": {
+                  "enum": [
+                    "Roboto-Regular",
+                    "Roboto-Bold",
+                    "DejaVuSans-Regular",
+                    "DejaVuSans-Bold",
+                    "DejaVuSerif-Regular",
+                    "DejaVuSerif-Bold",
+                    "Manrope-Regular",
+                    "Inter-Regular"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "assetId"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "asset"
+                },
+                "assetId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                }
+              }
+            }
+          ]
+        },
+        "size": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        },
+        "align": {
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ]
+        },
+        "anchorTopLeft": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        "fixedWidth": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ]
+        },
+        "fixedHeight": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ]
+        },
+        "bold": {
+          "type": "boolean"
+        },
+        "italic": {
+          "type": "boolean"
+        },
+        "underline": {
+          "type": "boolean"
+        },
+        "strike": {
+          "type": "boolean"
+        },
+        "letterSpacing": {
+          "type": "number"
+        },
+        "wordSpacing": {
+          "type": "number"
+        },
+        "lineHeightMult": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "textCase": {
+          "enum": [
+            "none",
+            "upper",
+            "lower",
+            "capitalize"
+          ]
+        }
+      }
+    },
+    "ObjectTextReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "view": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "scope",
+                "offset",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "targets"
+                },
+                "scope": {
+                  "$ref": "#/$defs/ObjectTextReadScope"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "inspect"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectTarget"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "offset",
+                "limit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "text"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectTarget"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 196608
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1024
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectTextReadResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "scope",
+            "offset",
+            "total",
+            "items",
+            "nextOffset"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "kind": {
+              "const": "targets"
+            },
+            "scope": {
+              "$ref": "#/$defs/ObjectTextReadScope"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "$ref": "#/$defs/ObjectTarget"
+                  }
+                }
+              }
+            },
+            "nextOffset": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "textBytes",
+            "block"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "kind": {
+              "const": "inspect"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectTarget"
+            },
+            "textBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 196608
+            },
+            "block": {
+              "$ref": "#/$defs/ObjectTextReadMetadata"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "textBytes",
+            "offset",
+            "text",
+            "nextOffset"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "kind": {
+              "const": "text"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectTarget"
+            },
+            "textBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 196608
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 196608
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "nextOffset": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 196608
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "description": "At most 3072 UTF-8 encoded JSON result bytes; complete envelope at most4096. Chunk offsets count original UTF-8 text bytes, never UTF-16 code units. Pagination never splits a native identity or Unicode scalar."
     }
   }
 }

@@ -36,6 +36,17 @@ mod property_metadata_tests;
 mod property_public_read_tests;
 #[path = "object_property_read.rs"]
 mod property_read;
+#[path = "object_text_read.rs"]
+mod text_read;
+#[cfg(all(
+    test,
+    feature = "test-commands",
+    feature = "history",
+    feature = "project_media_codec",
+    feature = "font_asset_admission"
+))]
+#[path = "../tests/object_text_read.rs"]
+mod text_read_tests;
 #[path = "object_timing_snapshot.rs"]
 mod timing;
 // L03-M (#2109): widget write planning through the evaluation kernel (commands may not import it).
@@ -257,6 +268,9 @@ impl ObjectSnapshot {
                 DispatchErrorCode::InvalidRequest,
                 "Only pinned object reads without expectedRevision are supported.",
             );
+        }
+        if request.operation == "query.document.object.text" {
+            return self.dispatch_text_read(&request);
         }
         if request.operation == "query.document.object.serialize" {
             return self.serialize_response(&request);

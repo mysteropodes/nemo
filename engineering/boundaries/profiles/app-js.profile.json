@@ -3092,6 +3092,30 @@
       "publicApi": [
         "native-font-panel.js"
       ]
+    },
+    {
+      "id": "app.native.text.read.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-read-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-text-read-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.text.read.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-read.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-read.js"
+      ]
     }
   ],
   "layerRules": {
@@ -3162,7 +3186,7 @@
       "ceiling": 581,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3171,7 +3195,7 @@
       "ceiling": 842,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3189,7 +3213,7 @@
       "ceiling": 748,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3198,7 +3222,7 @@
       "ceiling": 884,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3207,7 +3231,7 @@
       "ceiling": 667,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3216,7 +3240,7 @@
       "ceiling": 963,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3225,7 +3249,7 @@
       "ceiling": 1312,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Shader effect catalog embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'). Confirmed by direct read: lines 20-28 are two small builder helpers (param(), fx(), 9 lines combined), lines 30-1306 are the `effects` array — roughly 80 WGSL-fragment-body entries built via those helpers — and lines 1308-1313 are the window.SMSHADER_EFFECTS/SMSHADER_EFFECT_CATEGORIES assignments plus a 4-line window.SMShaderEffectDef lookup helper. Data catalog, not undisciplined control-flow growth; ceiling captured as an exact no-growth baseline, not an application-code review.",
+      "reason": "Shader effect catalog embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'). Confirmed by direct read: lines 20-28 are two small builder helpers (param(), fx(), 9 lines combined), lines 30-1306 are the `effects` array \u2014 roughly 80 WGSL-fragment-body entries built via those helpers \u2014 and lines 1308-1313 are the window.SMSHADER_EFFECTS/SMSHADER_EFFECT_CATEGORIES assignments plus a 4-line window.SMShaderEffectDef lookup helper. Data catalog, not undisciplined control-flow growth; ceiling captured as an exact no-growth baseline, not an application-code review.",
       "expires": "2026-12-05"
     },
     {
@@ -3234,7 +3258,7 @@
       "ceiling": 539,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3243,7 +3267,7 @@
       "ceiling": 1864,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3252,7 +3276,7 @@
       "ceiling": 607,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
       "expires": "2026-12-05"
     },
     {
@@ -3262,7 +3286,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
     },
     {
       "path": "src/js/audio-bridge.js",
@@ -3271,7 +3295,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/bitmap-brush.js",
@@ -3280,7 +3304,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/camera.js",
@@ -3289,7 +3313,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/draw-bridge.js",
@@ -3298,7 +3322,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/effects-panel.js",
@@ -3307,7 +3331,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/engine-bridge.js",
@@ -3316,7 +3340,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
     },
     {
       "path": "src/js/export.js",
@@ -3325,7 +3349,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/figma-import.js",
@@ -3334,7 +3358,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/image-mesh.js",
@@ -3343,7 +3367,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/images.js",
@@ -3352,7 +3376,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/layer-inout.js",
@@ -3361,7 +3385,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/motion.js",
@@ -3370,7 +3394,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
     },
     {
       "path": "src/js/native-video-bridge.js",
@@ -3379,7 +3403,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/project.js",
@@ -3388,7 +3412,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/rig-bridge.js",
@@ -3397,7 +3421,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/rig-widget.js",
@@ -3406,7 +3430,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/select-bridge.js",
@@ -3415,7 +3439,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/shapes-panel.js",
@@ -3424,7 +3448,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/storyboard.js",
@@ -3433,7 +3457,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/timeline.js",
@@ -3442,7 +3466,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
     },
     {
       "path": "src/js/tools.js",
@@ -3451,7 +3475,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
     },
     {
       "path": "src/js/tweens.js",
@@ -3460,7 +3484,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
     },
     {
       "path": "src/js/ui.js",
@@ -3469,7 +3493,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     },
     {
       "path": "src/js/vectorize-bridge.js",
@@ -3478,7 +3502,7 @@
       "owner": "ivg-design",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content."
     }
   ]
 }

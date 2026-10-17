@@ -20,6 +20,8 @@ mod reproduction;
 pub(crate) mod metadata;
 #[path = "native_object_contract.rs"]
 mod object;
+#[path = "native_text_read_contract.rs"]
+pub(crate) mod text_read;
 
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
@@ -94,6 +96,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
         "query.document.object"
+            | text_read::OP
             | metadata::OP
             | property_read::OP
             | font::QUERY
@@ -115,6 +118,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
         "query.document.object" => object::request(payload),
+        text_read::OP => text_read::request(payload),
         metadata::OP => metadata::request(payload),
         property_read::OP => property_read::request(payload),
         "query.document.object.layer.timing" => object::timing_request(payload),
@@ -281,6 +285,9 @@ pub(crate) fn validate_result(
     }
     if brush::owns(operation) {
         return brush::result(operation, payload, result);
+    }
+    if operation == text_read::OP {
+        return text_read::result(request_document_id, payload, result);
     }
     if operation == metadata::OP {
         return metadata::result(request_document_id, payload, result);

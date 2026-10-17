@@ -74,7 +74,10 @@
         "src/native_request_spans.rs",
         "src/native_request_bytes_tests.rs",
         "src/native_request_framing_tests.rs",
-        "src/native_request_limit_tests.rs"
+        "src/native_request_limit_tests.rs",
+        "src/native_text_read_contract.rs",
+        "src/native_text_read_contract_tests.rs",
+        "src/native_text_read_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

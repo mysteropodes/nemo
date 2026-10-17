@@ -647,7 +647,8 @@
         "object_image_mesh_edit_read.rs",
         "object_rig_edit_read.rs",
         "object_rig_pose_read.rs",
-        "object_parametric_edit_read.rs"
+        "object_parametric_edit_read.rs",
+        "object_text_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1424,7 +1425,8 @@
         "object_path_effects_edit.rs",
         "object_path_effects_edit_parity.rs",
         "object_parametric_transform.rs",
-        "object_parametric_transform_controls.rs"
+        "object_parametric_transform_controls.rs",
+        "object_text_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1528,7 +1530,10 @@
         "src/native_request_spans.rs",
         "src/native_request_bytes_tests.rs",
         "src/native_request_framing_tests.rs",
-        "src/native_request_limit_tests.rs"
+        "src/native_request_limit_tests.rs",
+        "src/native_text_read_contract.rs",
+        "src/native_text_read_contract_tests.rs",
+        "src/native_text_read_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
