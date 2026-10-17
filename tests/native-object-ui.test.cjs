@@ -338,7 +338,18 @@ test('production composition reuses frozen callback identities and resolves sess
   h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){bindings.push(ports);return render(root,info,frameOnly,ports);}};
   await h.open();const first=bindings[0],old=first.currentSession().info(),button=eye(h.root,0);
   h.root.updateUI(true);assert.equal(eye(h.root,0),button);assert.equal(Object.isFrozen(first),true);
-  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','layerPolicy','projectSettings','projectionReady','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','fontResources','layerPolicy','projectSettings','projectionReady','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.equal(first.fontResources(),null);
+  const fontCalls=[],assetId=' opaque font / 雪 ',source={kind:'google',family:'Poppins',weight:700,italic:false},signal={aborted:false};
+  h.root.SMVectorText={listNativeFontAssets:async()=>{fontCalls.push(['list']);return [{assetId}];},
+    loadNativeFontAsset:async id=>{fontCalls.push(['load',id]);return {loaded:id};},
+    importNativeFontSource:async(value,cancel)=>{fontCalls.push(['import',value,cancel]);return {assetId};}};
+  const fonts=first.fontResources();assert.equal(Object.isFrozen(fonts),true);
+  assert.deepEqual(Object.keys(fonts).sort(),['importSource','list','load']);
+  assert.deepEqual(await fonts.list(),[{assetId}]);assert.deepEqual(await fonts.load(assetId),{loaded:assetId});
+  assert.deepEqual(await fonts.importSource(source,signal),{assetId});
+  assert.deepEqual(fontCalls,[['list'],['load',assetId],['import',source,signal]]);
+  delete h.root.SMVectorText;assert.equal(first.fontResources(),null);
   const generation=first.readTransportGeneration();assert.equal(generation,first.currentSession().readSubscriptionGeneration());
   await h.external([A,B,C]);assert.equal(first.currentSession().info().contentRevision,old.contentRevision+1);
   assert.equal(first.readTransportGeneration(),generation,'content revision does not invent a subscription generation');

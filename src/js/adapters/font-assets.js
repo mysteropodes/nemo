@@ -143,6 +143,7 @@
 
     return Object.freeze({ fonts: fonts, load: load, googleWeight: googleWeight,
       addGoogle: addGoogle, hasLoad: hasLoad,
+      importNativeSource: function(source, signal){if(!active)return Promise.reject(new Error('font assets disposed'));if(!options.nativeResources)return Promise.reject(new Error('Native font resources unavailable'));return native().importSource(source,signal);},
       discoverNative: function(){return native().discover();},
       loadNativeAsset: function(assetId){return native().loadAsset(assetId);}, dispose: dispose });
   }

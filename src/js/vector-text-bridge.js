@@ -224,7 +224,7 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
   var baseFamily = fontKey.replace(/-(Bold|Regular)$/, '');
   var resolvedFontKey = opts.bold ? baseFamily + '-Bold' : baseFamily + '-Regular';
   // An explicit desktop Google Bold request loads that weight without a warmup.
-  var requestedFont = window.__TAURI__ && opts.bold && baseFamily.indexOf('Google:') === 0 && VECTOR_FONTS[fontKey]
+  var requestedFont = window.__TAURI__ && opts.bold && baseFamily.indexOf('Google:') === 0 && (VECTOR_FONTS[fontKey] || VECTOR_FONTS[baseFamily + '-Regular'])
     ? fetchGoogleFontWeight(baseFamily.slice(7), 700, false) : null;
   if (!requestedFont && !VECTOR_FONTS[resolvedFontKey] && !_vectorFontAssets.hasLoad(resolvedFontKey)) resolvedFontKey = fontKey; // unknown family — don't 404 on a guessed name
   return (requestedFont || loadVectorFont(resolvedFontKey)).then(function (font) {
@@ -420,6 +420,7 @@ window.SMVectorText = {
   // Reopen callers supply the persisted native ID unchanged; no name matching.
   listNativeFontAssets: function(){return _vectorFontAssets.discoverNative();},
   loadNativeFontAsset: function(assetId){return _vectorFontAssets.loadNativeAsset(assetId);},
+  importNativeFontSource: function(source,signal){return _vectorFontAssets.importNativeSource(source,signal);},
   buildVectorTextGroup: buildVectorTextGroup,
   vectorTextGroupMembers: vectorTextGroupMembers,
   addGoogleFont: addGoogleFont,
