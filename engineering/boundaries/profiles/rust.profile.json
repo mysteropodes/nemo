@@ -149,7 +149,9 @@
         "object_project_settings.rs",
         "object_property_curve_edits.rs",
         "object_property_track_edit.rs",
-        "object_layer_policy_edit.rs"
+        "object_layer_policy_edit.rs",
+        "object_vector_edit.rs",
+        "object_vector_edit_order.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -743,6 +745,11 @@
         "font_asset_admission.rs",
         "font_asset_wire.rs",
         "object_font_asset_history.rs",
+        "object_vector_edit.rs",
+        "object_vector_edit_controls.rs",
+        "object_vector_edit_limits.rs",
+        "object_vector_edit_lock.rs",
+        "object_vector_edit_support.rs",
         "rig_pose_deform.rs",
         "rig_pose_deform_mesh.rs",
         "rig_pose_deform_rows.rs",
@@ -869,6 +876,7 @@
         "src/registry.rs",
         "src/schema.rs",
         "src/server.rs",
+        "src/server_command_projection.rs",
         "src/wire.rs",
         "src/native_project_settings_contract.rs",
         "src/native_project_settings_wire_tests.rs",

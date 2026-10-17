@@ -7,9 +7,13 @@ pub use object_fill::{prepare_object_fill_json, PreparedObjectFill};
 #[cfg(feature = "history")]
 mod object_fill_owner;
 #[cfg(feature = "history")]
+#[allow(unused_imports)]
+pub(crate) use object_fill_owner::{insert_order_element, remove_order_element, OrderEditError};
+#[cfg(feature = "history")]
 pub(crate) use object_fill_owner::{
     ObjectFillOwner, PreparedLayerCreate, PreparedLayerPolicy, PreparedLayerVisibility,
-    PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit, ReferenceEdit,
+    PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit,
+    ReferenceEdit, VectorEditResult, MAX_VECTOR_REQUEST_BYTES,
 };
 
 use crate::document::OpacityDocument;

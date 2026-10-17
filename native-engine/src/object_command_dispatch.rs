@@ -1,4 +1,5 @@
 //! Staged actual-owner command dispatch. Public capability admission stays closed.
+use crate::commands::MAX_VECTOR_REQUEST_BYTES;
 use crate::history::NativeObjectHistory;
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,
@@ -15,7 +16,17 @@ const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
 const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
+const OP_OBJECT_VECTOR: &str = "command.document.object.vector.edit";
 const MAX_MESSAGE_BYTES: usize = 4096;
+
+/// Request-envelope bound per operation: only the vector edit may carry a bounded vector body.
+fn request_limit(operation: &str) -> usize {
+    if operation == OP_OBJECT_VECTOR {
+        MAX_VECTOR_REQUEST_BYTES
+    } else {
+        MAX_MESSAGE_BYTES
+    }
+}
 const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
 
 fn identifier(value: &str) -> bool {
@@ -60,6 +71,7 @@ impl NativeObjectHistory {
                 | OP_PROPERTY_EDIT
                 | OP_PROPERTY_TRACK_EDIT
                 | OP_PROJECT_SETTINGS
+                | OP_OBJECT_VECTOR
         ) {
             return Ok(None);
         }
@@ -76,7 +88,9 @@ impl NativeObjectHistory {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let message = |fill, history| {
-            if request.operation == OP_PROJECT_SETTINGS {
+            if request.operation == OP_OBJECT_VECTOR {
+                "Vector edit request refused."
+            } else if request.operation == OP_PROJECT_SETTINGS {
                 "Project settings request refused."
             } else if matches!(
                 request.operation.as_str(),
@@ -100,10 +114,9 @@ impl NativeObjectHistory {
         };
         if request.api_version != APPLICATION_API_VERSION
             || !request.payload.is_object()
-            || !matches!(
-                serde_json::to_vec(request).map(|bytes| bytes.len()),
-                Ok(0..=MAX_MESSAGE_BYTES)
-            )
+            || serde_json::to_vec(request).map_or(true, |bytes| {
+                bytes.len() > request_limit(&request.operation)
+            })
             || request
                 .expected_revision
                 .is_some_and(|revision| revision > MAX_SAFE_REVISION)
@@ -184,7 +197,35 @@ impl NativeObjectHistory {
                 ),
             ))
         } else {
-            if request.operation == OP_LAYER_CREATE {
+            if request.operation == OP_OBJECT_VECTOR {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                match self.prepare_vector_edit_json(&payload) {
+                    Ok(candidate) => {
+                        let result = candidate.result();
+                        // Imported stroke IDs may be large. Check the complete success
+                        // envelope before publishing; this temporary reply is never retained.
+                        let preflight = RetainedDisposition::Exact {
+                            content_revision: MAX_SAFE_REVISION,
+                            outcome: Ok(CompactResult::VectorEdit(result.clone())),
+                        };
+                        if self.object_reply(request, &preflight).is_err() {
+                            Err((
+                                DispatchErrorCode::InvalidRequest,
+                                "Vector edit result exceeds the response bound.",
+                            ))
+                        } else {
+                            self.commit_vector_edit(candidate)
+                                .map(|_| CompactResult::VectorEdit(result))
+                                .map_err(|code| (code, "Vector edit could not commit."))
+                        }
+                    }
+                    Err(code) => Err((
+                        code,
+                        "Vector edit payload or target is invalid or unavailable.",
+                    )),
+                }
+            } else if request.operation == OP_LAYER_CREATE {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 match self.prepare_layer_create_json(&payload) {

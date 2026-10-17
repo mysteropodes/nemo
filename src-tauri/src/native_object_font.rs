@@ -1,5 +1,5 @@
 //! PRIVATE: ports into the existing history owner, never another authority.
-use crate::native_dispatch::object_host::NativeObjectHost;
+use crate::native_dispatch::{object_host::NativeObjectHost, NativeDispatch};
 use native_engine::commands::{OpacityRequest, ResponseEnvelope};
 
 impl NativeObjectHost {
@@ -37,7 +37,7 @@ impl NativeObjectHost {
             return Err("native object host was released".into());
         }
         self.history
-            .query_font_asset(request)
-            .map_err(|_| "native font read refused".into())
+            .font_read_response(request)
+            .ok_or_else(|| "native font read refused".into())
     }
 }
