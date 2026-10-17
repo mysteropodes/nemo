@@ -275,7 +275,8 @@ fn preflight_and_payload_refusals_publish_nothing_and_are_retained() {
         ),
         ("/payload/extra", json!(true), "invalid_request"),
         ("/payload/to", json!(5), "invalid_request"),
-        ("/payload/from", json!(1), "invalid_request"),
+        // frame 3 is no key of L0 and differs from `to`: from == to is a same-frame no-op asked before any key check
+        ("/payload/from", json!(3), "invalid_request"),
         ("/payload/to", json!(-1), "invalid_request"),
         ("/payload/layerUid", json!("nope"), "not_found"),
     ]

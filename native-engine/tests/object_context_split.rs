@@ -137,7 +137,12 @@ fn parse_spec(line: &str) -> Spec {
     let mut layer = LayerFacts {
         name,
         has_symbol: field(&tokens, "sym") == "1",
-        frames: field(&tokens, "frames").split(';').map(frame).collect(),
+        // The generator joins zero frames to the empty string (`noFrames`), not to a token.
+        frames: field(&tokens, "frames")
+            .split(';')
+            .filter(|t| !t.is_empty())
+            .map(frame)
+            .collect(),
         groups,
         ..LayerFacts::default()
     };

@@ -96,6 +96,10 @@ fn pair_text(plan: &RetimePlan) -> String {
         .iter()
         .map(|p| format!("{}-{}>{}-{}", p.from_a, p.from_b, p.to_a, p.to_b))
         .collect();
+    if list.is_empty() {
+        // the fixture writes `-` when the baseline made no rekeyTweenPairData call
+        return "-".to_owned();
+    }
     list.join(";")
 }
 

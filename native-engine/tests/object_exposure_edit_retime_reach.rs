@@ -102,11 +102,13 @@ fn oracle_reaches_every_branch() {
         count(&unlocked, &|row| changed(row) && landed(row) != row.to),
         count(&unlocked, &|row| {
             let (before, _) = row.subject();
-            let all = moves(row);
-            changed(row)
-                && all.iter().any(|(_, dest)| {
+            // `moves` reads the landing frame, which only a changed row has
+            changed(row) && {
+                let all = moves(row);
+                all.iter().any(|(_, dest)| {
                     before[*dest as usize].flag == 'K' && !all.iter().any(|(src, _)| src == dest)
                 })
+            }
         }),
         count(&unlocked, &|row| {
             let (before, _) = row.subject();

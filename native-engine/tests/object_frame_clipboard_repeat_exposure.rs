@@ -8,12 +8,55 @@ use super::{apply, head, owner};
 use crate::object_document::FrameScopeKind;
 use crate::object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector};
 
+/// The frame each cell shows, read from one layer's OUT_EXPOSURE string. A held cell names its key with JavaScript's
+/// `toString(36)`, which takes several characters from frame 36 on, so the string is not one character per frame: a
+/// held cell always names the most recent key (`heldKeyframeAt`), and is read as exactly that many digits.
+fn sources(exposure: &str) -> Vec<Option<usize>> {
+    let chars: Vec<char> = exposure.chars().collect();
+    let (mut out, mut at, mut last_key) = (Vec::new(), 0, None);
+    while at < chars.len() {
+        let frame = out.len();
+        match chars[at] {
+            '*' => {
+                last_key = Some(frame);
+                out.push(Some(frame));
+                at += 1;
+            }
+            '~' | '!' => {
+                out.push(Some(frame));
+                at += 1;
+            }
+            '-' => {
+                out.push(None);
+                at += 1;
+            }
+            _ => {
+                let key = last_key.expect("a held cell follows a key");
+                let digits = base36(key);
+                let rest: String = chars[at..].iter().take(digits.len()).collect();
+                assert_eq!(rest, digits, "held cell at frame {frame} of {exposure}");
+                out.push(Some(key));
+                at += digits.len();
+            }
+        }
+    }
+    out
+}
+
+fn base36(mut n: usize) -> String {
+    let mut digits = Vec::new();
+    loop {
+        digits.push(char::from_digit((n % 36) as u32, 36).unwrap());
+        n /= 36;
+        if n == 0 {
+            break;
+        }
+    }
+    digits.iter().rev().collect()
+}
+
 fn expected_ids(row: &Row, layer: usize, frame: usize) -> Vec<String> {
-    let source = match row.exposure[layer].chars().nth(frame).unwrap() {
-        '*' | '~' | '!' => Some(frame),
-        '-' => None,
-        digit => Some(digit.to_digit(36).unwrap() as usize),
-    };
+    let source = sources(&row.exposure[layer])[frame];
     let mut ids: Vec<String> = match source {
         Some(source) => row.output[layer][source]
             .strokes

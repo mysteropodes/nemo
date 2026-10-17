@@ -105,7 +105,10 @@ fn applying_a_swap_entry_by_entry_would_undo_it() {
     assert_eq!(index.new_id("sym_comp"), "sym_comp_b");
     assert_eq!(sequential(&entries, "sym_comp"), "sym_comp");
     assert_eq!(index.new_id("sym_comp_b"), "sym_comp");
-    assert_eq!(sequential(&entries, "sym_comp_b"), "sym_comp_b");
+    // Entry by entry, the second entry only fires on the id the first one produced:
+    // `sym_comp_b` is touched once (-> `sym_comp`, same as the simultaneous table),
+    // while `sym_comp` is mapped twice and lands back on itself, i.e. the swap is undone.
+    assert_eq!(sequential(&entries, "sym_comp_b"), "sym_comp");
 }
 
 #[test]
