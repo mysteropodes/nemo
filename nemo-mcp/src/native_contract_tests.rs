@@ -123,3 +123,63 @@ fn serialized_document_contract_accepts_semantic_numbers_and_rejects_bad_shapes(
         ));
     }
 }
+
+#[test]
+fn common_result_dispatch_validates_font_import_receipt_shape() {
+    let operation = "command.document.object.asset.font.import";
+    let payload = json!({"command":"object.asset.font.import","documentSnapshotId":"snapshot-0",
+        "lifecycleGeneration":1,"source":{"kind":"bundled","fontKey":"Roboto-Regular"}});
+    let valid = json!({"applied":true,"historyEntriesAdded":1,"assetId":" font / 雪 ",
+        "mediaType":"font/ttf","encodedBytes":3,"encodedSha256":"a".repeat(64)});
+    assert!(validate_result(
+        operation,
+        "font-document",
+        &payload,
+        &valid
+    ));
+    for (key, value) in [
+        ("applied", json!(false)),
+        ("historyEntriesAdded", json!(2)),
+        ("encodedSha256", json!("A".repeat(64))),
+        ("base64", json!("QUJD")),
+    ] {
+        let mut bad = valid.clone();
+        bad[key] = value;
+        assert!(
+            !validate_result(operation, "font-document", &payload, &bad),
+            "{key}"
+        );
+    }
+}
+
+#[test]
+fn common_result_dispatch_preserves_opaque_linked_font_identity_without_locator() {
+    let operation = "query.document.object.asset.font";
+    let payload = json!({"action":"inspect","atRevision":1,
+        "documentSnapshotId":"snapshot-1","assetId":" font / 雪 "});
+    let valid = json!({"atRevision":1,"documentSnapshotId":"snapshot-1","font":{
+        "assetId":" font / 雪 ","name":" Exact font ","sourceKind":"linked",
+        "available":false,"reason":"linked_font_unavailable"}});
+    assert!(validate_result(
+        operation,
+        "font-document",
+        &payload,
+        &valid
+    ));
+    let mut wrong = valid.clone();
+    wrong["font"]["assetId"] = json!("font / 雪");
+    assert!(!validate_result(
+        operation,
+        "font-document",
+        &payload,
+        &wrong
+    ));
+    let mut leaked = valid;
+    leaked["font"]["locator"] = json!("opaque://must-not-resolve");
+    assert!(!validate_result(
+        operation,
+        "font-document",
+        &payload,
+        &leaked
+    ));
+}
