@@ -245,7 +245,9 @@
         "object_component_owner_kernels.rs",
         "object_frame_clipboard_tracks.rs",
         "object_frame_clipboard_tracks_context.rs",
-        "object_frame_edit_range_join.rs"
+        "object_frame_edit_range_join.rs",
+        "object_parametric_edit.rs",
+        "object_path_effects_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -306,7 +308,8 @@
         "object_rig_edit_history.rs",
         "object_rig_pose_history.rs",
         "object_component_convert_history.rs",
-        "object_frame_clipboard_tracks_history.rs"
+        "object_frame_clipboard_tracks_history.rs",
+        "object_parametric_edit_history.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -437,7 +440,8 @@
         "render_image_mesh_scene_policy.rs",
         "object_scene_producer_brush_anchor.rs",
         "object_scene_producer_brush_slot.rs",
-        "object_scene_producer_brush.rs"
+        "object_scene_producer_brush.rs",
+        "object_parametric_transform.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -642,7 +646,8 @@
         "object_widget_read.rs",
         "object_image_mesh_edit_read.rs",
         "object_rig_edit_read.rs",
-        "object_rig_pose_read.rs"
+        "object_rig_pose_read.rs",
+        "object_parametric_edit_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1410,7 +1415,15 @@
         "scene_effect_scene_join_controls.rs",
         "scene_effect_scene_join_docs.rs",
         "scene_effect_scene_join_stack.rs",
-        "scene_effect_scene_join_support.rs"
+        "scene_effect_scene_join_support.rs",
+        "object_parametric_edit.rs",
+        "object_parametric_edit_support.rs",
+        "object_parametric_edit_refusals.rs",
+        "object_parametric_edit_controls.rs",
+        "object_path_effects_edit.rs",
+        "object_path_effects_edit_parity.rs",
+        "object_parametric_transform.rs",
+        "object_parametric_transform_controls.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1498,7 +1511,9 @@
         "src/native_font_contract.rs",
         "src/native_font_contract_tests.rs",
         "src/native_item_contract.rs",
-        "src/native_item_contract_tests.rs"
+        "src/native_item_contract_tests.rs",
+        "src/native_vector_contract.rs",
+        "src/native_vector_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

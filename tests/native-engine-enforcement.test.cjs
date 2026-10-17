@@ -3769,7 +3769,7 @@ test('L02-H selection edit and clipboard transactions stay private owner/history
 test('L02-I boolean join stays kernel children, a private owner child and a private history child and fails closed without registration', () => {
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
-  assert.match(coverage.nativeObjectBooleanOpsRegistration, /L02-I/);
+  assert.match(coverage.nativeObjectBooleanOpsRegistration, /L02-I\/#2222 \(lane #2108/);
   const source = (name) => fs.readFileSync(path.join(ROOT, 'native-engine/src', name), 'utf8');
   assert.match(source('object_group_kernels.rs'),
     /#\[path = "object_boolean_ops\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_boolean_ops;\s*#\[path = "object_fill_trace_ops\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_fill_trace_ops;/);
@@ -5750,6 +5750,68 @@ test('L05-G layer range records stay a private document child with a codec admis
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_range_records_join.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_range_records_oracle.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_frame_edit_range_records_rows.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L01-G parameter edit and path-effect stack edit stay sealed owner children behind a read-queries facade and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeParametricEditRegistration, /L01-G\/#2260/);
+  const ownerText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_fill_owner.rs'), 'utf8');
+  assert.match(ownerText, /#\[path = "object_parametric_edit\.rs"\]\s*mod parametric_edit;/);
+  assert.match(ownerText, /#\[path = "object_path_effects_edit\.rs"\]\s*mod path_effects_edit;/);
+  const historyParent = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_history.rs'), 'utf8');
+  assert.match(historyParent, /#\[path = "object_parametric_edit_history\.rs"\]\s*mod object_parametric_edit_history;/);
+  const snapshotText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_snapshot.rs'), 'utf8');
+  assert.match(snapshotText, /#\[path = "object_parametric_edit_read\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_parametric_edit_read;/);
+  const aggregatorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_vector_kernels.rs'), 'utf8');
+  assert.match(aggregatorText, /#\[path = "object_parametric_transform\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_parametric_transform;/);
+  const dispatchText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_command_dispatch.rs'), 'utf8');
+  assert.equal((dispatchText.match(/Self::vector_param_operation\(&request\.operation\)/g) || []).length, 3, 'gate, message and dispatch branch');
+  const vectorEditText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_vector_edit.rs'), 'utf8');
+  assert.match(vectorEditText, /layer_has_active_path_fx\(layer\)/, 'drawing guard parity with the baseline editRefusalReason');
+  for (const fn of ['check_target', 'check_drawing_layer', 'is_vector_record', 'same_value', 'same_record']) {
+    assert.match(vectorEditText, new RegExp(`pub\\(super\\) fn ${fn}\\(`), `${fn} is shared with the L01-G siblings`);
+  }
+  const historyText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_parametric_edit_history.rs'), 'utf8');
+  assert.match(historyText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_parametric_edit\.rs"\]\s*mod parametric_edit_tests;/);
+  const transformText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_parametric_transform.rs'), 'utf8');
+  assert.match(transformText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_parametric_transform\.rs"\]\s*mod tests;/);
+  const stackText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_path_effects_edit.rs'), 'utf8');
+  assert.match(stackText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_path_effects_edit_parity\.rs"\]\s*mod parity_tests;/);
+  for (const file of ['object_parametric_edit', 'object_path_effects_edit', 'object_parametric_edit_history', 'object_parametric_edit_read', 'object_parametric_transform']) {
+    const production = fs.readFileSync(path.join(ROOT, `native-engine/src/${file}.rs`), 'utf8').split('#[cfg(test)]')[0];
+    assert.doesNotMatch(production, /super::/, `${file} must not import with super::`);
+  }
+  const readText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_parametric_edit_read.rs'), 'utf8');
+  assert.doesNotMatch(readText, /\bvello\b|\bwgpu\b/, 'the facade imports no renderer');
+  const editText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_parametric_edit.rs'), 'utf8');
+  assert.doesNotMatch(editText, /crate::evaluation/, 'the command layer reaches the kernels only through the facade');
+  const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-parametric-edit/oracle.txt'), 'utf8');
+  assert.equal(oracle.trim().split('\n').length, 235, 'oracle row count');
+  for (const [id, file] of [
+    ['rust.native.engine.commands', 'native-engine/src/object_parametric_edit.rs'],
+    ['rust.native.engine.commands', 'native-engine/src/object_path_effects_edit.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_parametric_edit_history.rs'],
+    ['rust.native.engine.read-queries', 'native-engine/src/object_parametric_edit_read.rs'],
+    ['rust.native.engine.evaluation', 'native-engine/src/object_parametric_transform.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_parametric_edit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_parametric_edit_support.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_parametric_edit_refusals.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_parametric_edit_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_path_effects_edit.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_path_effects_edit_parity.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_parametric_transform.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_parametric_transform_controls.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);

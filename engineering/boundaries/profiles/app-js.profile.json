@@ -3006,6 +3006,54 @@
       ]
     },
     {
+      "id": "app.native.object.vector.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-vector-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.stroke",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector-stroke.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-vector-stroke.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.command",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector-command.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-vector-command.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-vector.js"
+      ]
+    },
+    {
       "id": "app.settings.preferences.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

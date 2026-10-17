@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "9d40f82e452695242e55286c39f7c312f1bc7acb",
-  "describe": "v0.7.0-alpha.4-2233-g9d40f82e-dirty"
+  "head": "20dc4a061fcccbbd93c494cf26c3dd3a01c92b65",
+  "describe": "v0.7.0-alpha.4-2235-g20dc4a06-dirty"
  },
- "inputsDigest": "37bce2ea5cbe23214a39325e53cae64871b805d8138e3ac214cc56254be91fb6",
+ "inputsDigest": "7853df1765e328b0a48db025f2f0c5b2c1b2a62338b22d93ccf0e37863608a5c",
  "states": [
   "inventoried",
   "characterized",
@@ -3916,7 +3916,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 83,
+    "functionsVisited": 91,
     "via": "chain",
     "references": []
    },
@@ -3961,7 +3961,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 83,
+    "functionsVisited": 91,
     "via": "chain",
     "references": []
    },
@@ -4006,7 +4006,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 83,
+    "functionsVisited": 91,
     "via": "chain",
     "references": []
    },
@@ -5223,7 +5223,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 36,
+    "functionsVisited": 45,
     "via": "chain",
     "references": []
    },
@@ -26717,7 +26717,7 @@
    "source": "src/js/motion.js:9070",
    "meta": {
     "i18n": "exprExBounce",
-    "functionsVisited": 21
+    "functionsVisited": 27
    },
    "fixtures": [
     "static-props",
@@ -26791,7 +26791,7 @@
    "source": "src/js/motion.js:9083",
    "meta": {
     "i18n": "exprExStagger",
-    "functionsVisited": 17
+    "functionsVisited": 22
    },
    "fixtures": [
     "static-props",

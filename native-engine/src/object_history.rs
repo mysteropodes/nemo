@@ -74,6 +74,9 @@ mod object_frame_clipboard_tracks;
 #[path = "object_media_link_history.rs"]
 #[allow(dead_code)]
 mod object_media_link_history;
+// L01-G (#2107): parameter edit and path-effect stack edit as history transactions (G22, G13).
+#[path = "object_parametric_edit_history.rs"]
+mod object_parametric_edit_history;
 // L10-B (#2124): lane-10 shot/montage/import family aggregator.
 #[path = "object_shot_kernels.rs"]
 #[allow(dead_code)]

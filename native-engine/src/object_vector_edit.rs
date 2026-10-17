@@ -107,7 +107,10 @@ fn order_code(error: OrderEditError) -> DispatchErrorCode {
 }
 
 /// Vector drawing edits require an authored target; reference records remain readable storage.
-fn check_target(document: &ObjectDocument, target: &ObjectTarget) -> Result<(), DispatchErrorCode> {
+pub(super) fn check_target(
+    document: &ObjectDocument,
+    target: &ObjectTarget,
+) -> Result<(), DispatchErrorCode> {
     if !document.valid_target(target) || target.frame() >= document.total_frames() {
         return Err(DispatchErrorCode::InvalidRequest);
     }
@@ -118,8 +121,10 @@ fn check_target(document: &ObjectDocument, target: &ObjectTarget) -> Result<(), 
 }
 
 /// Reuse the persisted F06 flag for Drawing edits only. Shy and visibility do not lock content,
-/// and this helper never participates in generic Motion property/track preparation.
-fn check_drawing_layer(
+/// and this helper never participates in generic Motion property/track preparation. A layer whose
+/// ordered path-effect stack has an active entry is refused too (baseline `editRefusalReason`): the
+/// geometry on screen is the deformed one, so a drawing edit there would be written over the original.
+pub(super) fn check_drawing_layer(
     document: &ObjectDocument,
     target: &ObjectTarget,
 ) -> Result<(), DispatchErrorCode> {
@@ -131,10 +136,13 @@ fn check_drawing_layer(
     if layer.locked() {
         return Err(DispatchErrorCode::Unavailable);
     }
+    if crate::commands::object_fill_owner::path_effects_edit::layer_has_active_path_fx(layer) {
+        return Err(DispatchErrorCode::Unavailable);
+    }
     Ok(())
 }
 
-fn is_vector_record(record: &ObjectRecord) -> bool {
+pub(super) fn is_vector_record(record: &ObjectRecord) -> bool {
     record.schema_version == 1 && record.family == VECTOR_FAMILY
 }
 
@@ -202,7 +210,7 @@ fn same_integer_float(integer: &serde_json::Number, float: f64) -> bool {
 
 /// Exact integers retain their precision; 10 and 10.0 compare equal, but 0 and -0.0 do not.
 /// Every other member compares structurally, extension members included.
-fn same_value(before: &Value, after: &Value) -> bool {
+pub(super) fn same_value(before: &Value, after: &Value) -> bool {
     match (before, after) {
         (Value::Number(x), Value::Number(y)) => {
             if let (Some(x), Some(y)) = (x.as_u64(), y.as_u64()) {
@@ -229,7 +237,7 @@ fn same_value(before: &Value, after: &Value) -> bool {
         _ => before == after,
     }
 }
-fn same_record(before: &ObjectRecord, after: &ObjectRecord) -> bool {
+pub(super) fn same_record(before: &ObjectRecord, after: &ObjectRecord) -> bool {
     match (serde_json::to_value(before), serde_json::to_value(after)) {
         (Ok(before), Ok(after)) => same_value(&before, &after),
         _ => false,

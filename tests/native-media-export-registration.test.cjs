@@ -76,8 +76,8 @@ test('the SDK seam is the single composition point and replaces one line', () =>
   assert.equal((sdk.match(/NemoNativeMediaExportContract/g) || []).length, 1);
   assert.match(sdk, /\[[^\]]*require\('\.\/native-media-export-contract\.js'\)[^\]]*\]\.reduce\(\(base, lane\) => \(lane \? lane\.compose\(base\) : base\)/, 'composed in the lane reduce of the single SDK line');
   const lines = sdk.split('\n');
-  assert.match(lines[2], /^  const fontContract = \[/, 'line 3 is the composed binding (net zero lines: the file is at its ceiling)');
-  assert.match(lines[3], /^  const api = factory\(.*\.join\(fontContract\)\);$/, 'line 4 hands the composed contract to the factory (the frame-edit join of L05-K wraps it)');
+  assert.match(lines[2], /^  const (?:vectorContract = [^;]*?, )?fontContract = \[/, 'line 3 is the composed binding (net zero lines: the file is at its ceiling)');
+  assert.match(lines[3], /^  const api = factory\(.*\.join\(fontContract\)(?:, vectorContract)?\);$/, 'line 4 hands the composed contract to the factory (the frame-edit join of L05-K wraps it)');
 });
 
 test('the MCP validators are listed once in both Rust profiles (mcp.transport / rust.mcp.transport) and dispatched by native_contract.rs', () => {

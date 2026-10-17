@@ -314,6 +314,747 @@
         }
       }
     },
+    "ObjectFiniteNumber": {
+      "type": "number",
+      "minimum": -1.7976931348623157e+308,
+      "maximum": 1.7976931348623157e+308
+    },
+    "ObjectVectorPair": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ObjectFiniteNumber"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "A finite [x, y] pair."
+    },
+    "ObjectVectorGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "closed",
+        "coordinateSpace",
+        "handleSpace",
+        "segments"
+      ],
+      "properties": {
+        "kind": {
+          "const": "cubic-path"
+        },
+        "closed": {
+          "type": "boolean"
+        },
+        "coordinateSpace": {
+          "const": "document-world"
+        },
+        "handleSpace": {
+          "const": "relative"
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectSegment"
+          },
+          "minItems": 2,
+          "maxItems": 256
+        }
+      },
+      "description": "Open or closed cubic anchors with ordered relative handles; closure is independent of the anchors."
+    },
+    "ObjectVectorFill": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectSolidFill"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Explicit null is no fill; absent is refused."
+    },
+    "ObjectVectorBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stroke",
+        "hasRealStroke",
+        "strokeWidth",
+        "strokeCap",
+        "strokeJoin",
+        "opacity"
+      ],
+      "properties": {
+        "stroke": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectSolidFill"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasRealStroke": {
+          "type": "boolean"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "minimum": 0
+        },
+        "strokeCap": {
+          "enum": [
+            "butt",
+            "round",
+            "square"
+          ]
+        },
+        "strokeJoin": {
+          "enum": [
+            "miter",
+            "round",
+            "bevel"
+          ]
+        },
+        "miterLimit": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dashArray": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 1
+        },
+        "dashOffset": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "paintOrder": {
+          "enum": [
+            "fillFirst",
+            "strokeFirst"
+          ]
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "hasRealStroke is authoritative and true exactly when stroke is not null; a fallback colour is never an authored stroke. The owner also requires a positive finite dash length. miterLimit, dashArray, dashOffset and paintOrder keep absent distinct from explicit values."
+    },
+    "ObjectPressureAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point",
+        "handleIn",
+        "handleOut",
+        "width"
+      ],
+      "properties": {
+        "point": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "handleIn": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "handleOut": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "width": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      }
+    },
+    "ObjectWidthStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t",
+        "width"
+      ],
+      "properties": {
+        "t": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      },
+      "description": "t must not decrease along the profile."
+    },
+    "ObjectVectorPressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "centerSegments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectPressureAnchor"
+          }
+        },
+        "widthProfile": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectWidthStop"
+          }
+        },
+        "strokeProfile": {
+          "enum": [
+            "taper-in",
+            "taper-out",
+            "taper-both",
+            "bulge",
+            "even"
+          ]
+        },
+        "profileBase": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "description": "Presence is the vector-brush flag. There is no pressure scalar; the visible ribbon is the record geometry and a ribbon has no real stroke."
+    },
+    "ObjectParamBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+      ],
+      "properties": {
+        "x1": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "y1": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "x2": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "y2": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      }
+    },
+    "ObjectParamShape": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rect"
+            },
+            "tl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "tr": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "br": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "bl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "box": {
+              "$ref": "#/$defs/ObjectParamBox"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "ellipse"
+            },
+            "startAngle": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "sweep": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "box": {
+              "$ref": "#/$defs/ObjectParamBox"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "star"
+            },
+            "pointCount": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRatio": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "cornerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "box": {
+              "$ref": "#/$defs/ObjectParamBox"
+            }
+          }
+        }
+      ],
+      "description": "Stored parametric intent of a dynamic rect, ellipse or star; box is the stored frame the anchors were built from."
+    },
+    "ObjectParamShapeSet": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rect"
+            },
+            "tl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "tr": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "br": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "bl": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "ellipse"
+            },
+            "startAngle": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "sweep": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "star"
+            },
+            "pointCount": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "innerRatio": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "cornerRadius": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        }
+      ],
+      "description": "The declared parameters of a parameter set: the same kind the record holds, no box."
+    },
+    "ObjectVectorExt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "pressure": {
+          "$ref": "#/$defs/ObjectVectorPressure"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShape"
+        },
+        "boxAngle": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        }
+      },
+      "minProperties": 1,
+      "description": "Omitted when empty."
+    },
+    "ObjectVectorRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry",
+        "fill",
+        "vector"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "editable-vector-path"
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "geometry": {
+          "$ref": "#/$defs/ObjectVectorGeometry"
+        },
+        "fill": {
+          "$ref": "#/$defs/ObjectVectorFill"
+        },
+        "vector": {
+          "$ref": "#/$defs/ObjectVectorBody"
+        },
+        "vectorExt": {
+          "$ref": "#/$defs/ObjectVectorExt"
+        }
+      },
+      "description": "An editable open or closed vector path as the object read returns it."
+    },
+    "ObjectVectorCreateTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeId": {
+          "const": ""
+        }
+      },
+      "description": "A created record names no stroke id: the owner allocates native-stroke:{revision}:{n}."
+    },
+    "ObjectVectorCreateRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry",
+        "fill",
+        "vector"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "editable-vector-path"
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectVectorCreateTarget"
+        },
+        "geometry": {
+          "$ref": "#/$defs/ObjectVectorGeometry"
+        },
+        "fill": {
+          "$ref": "#/$defs/ObjectVectorFill"
+        },
+        "vector": {
+          "$ref": "#/$defs/ObjectVectorBody"
+        },
+        "vectorExt": {
+          "$ref": "#/$defs/ObjectVectorExt"
+        }
+      },
+      "description": "The record of a vector create."
+    },
+    "ObjectVectorCreatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "record"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.create"
+        },
+        "record": {
+          "$ref": "#/$defs/ObjectVectorCreateRecord"
+        }
+      }
+    },
+    "ObjectVectorReplacePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "record"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.replace"
+        },
+        "record": {
+          "$ref": "#/$defs/ObjectVectorRecord"
+        }
+      },
+      "description": "Replaces the record with the same full target in place; an authored frame only."
+    },
+    "ObjectVectorDeletePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.delete"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        }
+      }
+    },
+    "ObjectVectorEditPayload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectVectorCreatePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorReplacePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorDeletePayload"
+        }
+      ],
+      "description": "Vector create, replace or delete. Requests above 4096 encoded bytes are refused by the public transport, never split."
+    },
+    "ObjectParametricSetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "paramShape"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.parametric.set"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShapeSet"
+        }
+      }
+    },
+    "ObjectParametricTranslatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "delta"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.parametric.translate"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "delta": {
+          "$ref": "#/$defs/ObjectVectorPair"
+        }
+      }
+    },
+    "ObjectParametricScalePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "scale",
+        "anchor"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.parametric.scale"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "scale": {
+          "$ref": "#/$defs/ObjectVectorPair"
+        },
+        "anchor": {
+          "$ref": "#/$defs/ObjectVectorPair"
+        }
+      }
+    },
+    "ObjectParametricPayload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectParametricSetPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectParametricTranslatePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectParametricScalePayload"
+        }
+      ]
+    },
+    "ObjectPathFxEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "zigzag",
+            "roughen"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "p1": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "p2": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "p3": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "description": "enabled is absent, true or false; p1..p3 are absent, null or numbers, all kept as sent."
+    },
+    "ObjectPathEffectsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "stack"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.path.effects.set"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "stack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectPathFxEntry"
+          }
+        }
+      },
+      "description": "The COMPLETE new ordered effect stack of one layer. Storage order is evaluation order; an empty stack is an authored empty stack."
+    },
+    "ObjectVectorEditResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "operation",
+        "strokeId"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "operation": {
+          "enum": [
+            "create",
+            "replace",
+            "delete"
+          ]
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      },
+      "description": "Compact vector edit receipt: the stroke an owner allocated (create) or the stable target named (replace, delete). Parameter and path-effect edits answer with the compact CommandResult."
+    },
     "ObjectPropertyMetadataPayload": {
       "$ref": "./native-property-metadata-v1.schema.json#/$defs/Selector"
     },
@@ -3012,7 +3753,14 @@
           "$ref": "#/$defs/ObjectOpaqueId"
         },
         "object": {
-          "$ref": "#/$defs/ObjectRecord"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectRecord"
+            },
+            {
+              "$ref": "#/$defs/ObjectVectorRecord"
+            }
+          ]
         }
       },
       "description": "Staged immutable common-envelope result: atRevision equals outer contentRevision; snapshot token is native-object:<documentId>:<atRevision>. Complete envelope is limited to 4096 bytes."
@@ -5049,6 +5797,57 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.vector.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectVectorEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.parametric.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectParametricPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.path.effects.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectPathEffectsPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -5866,6 +6665,9 @@
             },
             {
               "$ref": "native-object-item-v1.schema.json#/$defs/ItemEditResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectVectorEditResult"
             }
           ]
         },

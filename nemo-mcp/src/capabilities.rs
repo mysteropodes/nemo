@@ -40,6 +40,7 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-object-boolean.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-item.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-asset.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-vector.json"),
     include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
     include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-image-mesh.json"),

@@ -4,6 +4,10 @@
 #[path = "object_parametric_geometry.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_parametric_geometry;
+// G22/L01-G: Paper.js move / scale of a stored segment list (the segment half of the select-bridge translate/scale gestures).
+#[path = "object_parametric_transform.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_parametric_transform;
 #[path = "object_path_effects_kernel.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_path_effects_kernel;

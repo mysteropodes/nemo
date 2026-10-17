@@ -84,6 +84,7 @@ impl NativeObjectHistory {
             && !Self::boolean_operation(&request.operation)
             && !Self::selection_edit_operation(&request.operation)
             && !Self::import_batch_operation(&request.operation)
+            && !Self::vector_param_operation(&request.operation)
             && !matches!(
                 request.operation.as_str(),
                 OP_OBJECT_FILL
@@ -129,6 +130,8 @@ impl NativeObjectHistory {
                 "Item edit request refused."
             } else if request.operation == OP_OBJECT_VECTOR {
                 "Vector edit request refused."
+            } else if Self::vector_param_operation(&request.operation) {
+                "Vector parameter request refused."
             } else if request.operation == OP_IMAGE_MESH_EDIT {
                 "Image mesh edit request refused."
             } else if matches!(
@@ -275,6 +278,8 @@ impl NativeObjectHistory {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 self.dispatch_vector_edit_command(request, &payload)
+            } else if Self::vector_param_operation(&request.operation) {
+                self.dispatch_vector_param(&request.operation, &request.payload)
             } else if Self::layer_lifecycle_operation(&request.operation) {
                 self.dispatch_layer_lifecycle(&request.operation, &request.payload)
             } else if Self::component_setup_operation(&request.operation) {

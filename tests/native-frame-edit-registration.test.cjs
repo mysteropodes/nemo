@@ -71,7 +71,7 @@ test('the two Rust files are private members of the nemo-mcp transport module in
 test('the SDK, the session and the MCP contract are wired to the one declaration', () => {
   const sdk = text('src/js/adapters/native-application.js');
   assert.equal(count(sdk, "require('./native-frame-edit-contract.js')"), 1);
-  assert.match(sdk, /factory\(\(typeof module === 'object' && module\.exports \? require\('\.\/native-frame-edit-contract\.js'\) : root\.NemoNativeFrameEditContract \|\| \{ join: \(base\) => base \}\)\.join\(fontContract\)\);/);
+  assert.match(sdk, /factory\(\(typeof module === 'object' && module\.exports \? require\('\.\/native-frame-edit-contract\.js'\) : root\.NemoNativeFrameEditContract \|\| \{ join: \(base\) => base \}\)\.join\(fontContract\)(?:, vectorContract)?\);/);
   assert.ok(sdk.split('\n').filter((line) => line.trim()).length <= 500, 'native-application.js stays within its 500 nonblank-line hard maximum');
   const project = text('src/js/adapters/native-object-project.js');
   assert.equal(count(project, "require('./native-frame-edit-contract.js')"), 1);

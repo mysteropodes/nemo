@@ -1,10 +1,10 @@
 /* N15 pure v2 transport/validation adapter. N16 owns host bindings. */
 (function (root, factory) {
-  const fontContract = [typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
-  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract));
+  const vectorContract = typeof module === 'object' && module.exports ? require('./native-object-vector-contract.js') : root.NemoNativeObjectVectorContract, fontContract = [typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract, vectorContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
+  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.NemoNativeApplicationAdapter = api;
-}(typeof globalThis === 'object' ? globalThis : this, function (fontContract) {
+}(typeof globalThis === 'object' ? globalThis : this, function (fontContract, vectorContract) {
   'use strict';
 
   const operations = new Set([
@@ -115,6 +115,7 @@
     frame(value.frameScope.frame);
   }
   function objectRecord(value) {
+    if (vectorContract && plain(value) && value.family === vectorContract.FAMILY) return vectorContract.record(value, false);
     exact(value, ['schemaVersion', 'family', 'target', 'geometry', 'fill'], [], 'object record');
     if (value.schemaVersion !== 1 || value.family !== 'closed-solid-fill-cubic-path') throw new TypeError('unsupported object family');
     objectTarget(value.target);
@@ -130,8 +131,7 @@
         if (![point.x, point.y].every(Number.isFinite)) throw new TypeError('invalid object coordinates');
       });
     });
-    exact(value.fill, ['kind', 'r', 'g', 'b', 'a'], [], 'object fill');
-    if (value.fill.kind !== 'solid' || !['r', 'g', 'b', 'a'].every((key) =>
+    exact(value.fill, ['kind', 'r', 'g', 'b', 'a'], [], 'object fill'); if (value.fill.kind !== 'solid' || !['r', 'g', 'b', 'a'].every((key) =>
       Number.isFinite(value.fill[key]) && value.fill[key] >= 0 && value.fill[key] <= 1)) throw new TypeError('unsupported object fill');
   }
   function projectSettingsPayload(payload) {

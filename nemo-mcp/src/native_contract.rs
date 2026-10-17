@@ -40,6 +40,8 @@ pub(crate) mod object_component;
 pub(crate) mod object_edit;
 #[path = "native_object_rig_contract.rs"]
 pub(crate) mod object_rig;
+#[path = "native_vector_contract.rs"]
+pub(crate) mod vector;
 use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
@@ -116,6 +118,9 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         op if object_rig::admitted(op) => object_rig::request(op, payload),
         op if object_edit::admitted(op) => object_edit::request(op, payload),
         item::ITEM | item::ATTACH | item::REMOVE => item::request(operation, payload),
+        vector::VECTOR | vector::PARAMETRIC | vector::EFFECTS => {
+            vector::request(operation, payload)
+        }
         "command.document.object.layer.create" => object::create_request(payload),
         import::OP => import::request(payload),
         operation if export::owns(operation) => export::request(operation, payload),
@@ -290,6 +295,9 @@ pub(crate) fn validate_result(
     }
     if item::owns(operation) {
         return item::result(operation, payload, result);
+    }
+    if vector::owns(operation) {
+        return vector::result(operation, payload, result);
     }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);

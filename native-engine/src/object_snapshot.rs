@@ -19,6 +19,10 @@ pub(crate) mod object_rig_pose_read;
 #[path = "object_image_mesh_edit_read.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_image_mesh_edit_read;
+// L01-G (#2107): parametric-shape rebuild / move / scale through the evaluation kernels (same reason).
+#[path = "object_parametric_edit_read.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_parametric_edit_read;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_dispatch.rs"]
 mod property_metadata_dispatch_tests;

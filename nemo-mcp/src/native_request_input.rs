@@ -96,11 +96,16 @@ impl NativeApplicationRequest {
                 | crate::native_contract::item::ITEM
                 | crate::native_contract::item::ATTACH
                 | crate::native_contract::item::REMOVE
+                | crate::native_contract::vector::VECTOR
+                | crate::native_contract::vector::PARAMETRIC
+                | crate::native_contract::vector::EFFECTS
         ) {
             let action = if self.operation == crate::native_contract::font::IMPORT {
                 "font import"
             } else if crate::native_contract::item::owns(&self.operation) {
                 "item or asset"
+            } else if crate::native_contract::vector::owns(&self.operation) {
+                "vector"
             } else if self.operation == crate::native_contract::layer_policy::OP {
                 "layer policy"
             } else if self.operation == crate::native_contract::brush::PUBLISH {

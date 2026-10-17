@@ -333,6 +333,7 @@ fn validate_native_response(
                 && crate::native_contract::object_component::response_matches(request, response)
                 && crate::native_contract::import::response_matches(request, response)
                 && crate::native_contract::item::response_matches(request, response)
+                && crate::native_contract::vector::response_matches(request, response)
                 && crate::native_contract::brush::response_matches(request, response)
                 && crate::native_contract::validate_result(
                     &request.operation,

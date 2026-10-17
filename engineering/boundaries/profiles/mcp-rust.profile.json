@@ -58,7 +58,9 @@
         "src/native_font_contract.rs",
         "src/native_font_contract_tests.rs",
         "src/native_item_contract.rs",
-        "src/native_item_contract_tests.rs"
+        "src/native_item_contract_tests.rs",
+        "src/native_vector_contract.rs",
+        "src/native_vector_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
