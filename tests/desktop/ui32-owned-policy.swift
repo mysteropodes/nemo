@@ -438,7 +438,7 @@ func ui32PostedNewContentReadSelfTest() throws {
         nativeCalls += 1;if fault == "outer-native" && nativeCalls == 4 {throw Refusal(code:"child-owner")}
       },certificate:{deadline,expected in
         reads += 1
-        let proof=try ui32ContentCertificate(0,pid:7,retained:expected,deadline:deadline,now:{clock},equal:==,
+        let proof:UI32ContentCertificate<Int>=try ui32ContentCertificate(0,pid:7,retained:expected,deadline:deadline,now:{clock},equal:==,
           owner:{_ in (0,true,7)},prepare:{_ in true},traits:{($0 == 0 ? "AXWindow" : $0 == 1 ? "AXWebArea" : "AXGroup",false)},
           children:{(0,$0 == 0 ? [1] : $0 == 1 ? [2] : [])},parent:{(0,$0 == 1 ? 0 : 1)},strict:{_,_ in [1,2]})
         if fault == "late-certificate" {clock=deadline};return proof

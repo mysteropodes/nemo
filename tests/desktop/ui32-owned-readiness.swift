@@ -43,7 +43,7 @@ func ui32PostedNewContentReproofSelfTest() throws {
           if (fault == "native-budget" && nativeCalls == 1) || (fault == "final-native-budget" && nativeCalls == 2) {clock=10}
         },certificate:{expected in
           reads += 1
-          let proof=try ui32ContentCertificate(0,pid:7,retained:fault == "root-replaced" ? 9 : expected,deadline:10,
+          let proof:UI32ContentCertificate<Int>=try ui32ContentCertificate(0,pid:7,retained:fault == "root-replaced" ? 9 : expected,deadline:10,
             now:{0},equal:==,owner:{node in (0,true,fault == "foreign" && node == 2 || fault == "parent-foreign" && node == 99 ? 8 : 7)},prepare:{_ in true},
             traits:{node in (node == 0 ? "AXWindow" : node == 1 || fault == "web-ambiguous" ? "AXWebArea" : "AXGroup",fault == "modal" && node == 0)},
             children:{(0,$0 == 0 ? [1] : $0 == 1 ? [2] : [])},parent:{node in
