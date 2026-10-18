@@ -155,8 +155,14 @@ test('original start-screen form Cancel retains its default presentation',()=>{
 });
 for(const drift of ['revision','snapshot','owner','missing-readiness'])test('native entry Cancel refuses '+drift+' drift without revealing an old editor',async()=>{
   const h=host(),app=ordinary(h);await app.project.openPath('/old.json');nativeNewEntry(app,'plus');
-  const s=Project.desktop(app.window),old=s.identity(),gate=deferred();let pending;
-  if(drift==='owner')await s.newProject({canvasW:64,canvasH:64,fps:24});
+  const beforeWrites=JSON.stringify(app.writes),s=Project.desktop(app.window),old=s.identity(),gate=deferred();let pending;
+  if(drift==='owner'){
+    // Replace through File UI so its real projection/metadata publication runs.
+    assert.equal(await app.project.newProject({w:64,h:64,fps:24,name:'Changed owner'}),true);
+    assert.equal(s.readPresentedObjectSession().documentId,'document-2');
+    assert.notEqual(s.identity().lifecycleGeneration,old.lifecycleGeneration);
+    assert.equal(app.project.getCurrentLabel(),'Changed owner (not saved)');
+  }
   else if(drift==='missing-readiness'){
     h.before=async command=>{if(command==='nemo_native_object_preview')await gate.promise;};
     pending=s.presentPreview(0);await turn();assert.equal(s.readPresentedObjectSession(),null);
@@ -172,11 +178,11 @@ for(const drift of ['revision','snapshot','owner','missing-readiness'])test('nat
   assert.equal(app.startScreen.classList.contains('hid'),false);
   assert.equal(app.element('start-newpanel').style.display,'block');
   if(pending){gate.resolve();await pending;}
-  assert.equal(app.mutations,0);assert.equal(app.writes.length,0);
+  assert.equal(app.mutations,0);assert.equal(JSON.stringify(app.writes),beforeWrites,'Cancel adds no preference or document writes');
 });
 for(const stage of ['status','bootstrap','final-preview'])test('native entry late Cancel during '+stage+' keeps the editor covered',async()=>{
   const h=host(),app=ordinary(h),gate=deferred();await app.project.openPath('/old.json');nativeNewEntry(app,'plus');
-  let previews=0;h.before=async command=>{
+  const beforeWrites=JSON.stringify(app.writes);let previews=0;h.before=async command=>{
     if(stage==='status'&&command==='nemo_native_object_client_status'||stage==='bootstrap'&&command==='nemo_native_object_bootstrap'||
       stage==='final-preview'&&command==='nemo_native_object_preview'&&++previews===2)await gate.promise;
   };
@@ -186,7 +192,7 @@ for(const stage of ['status','bootstrap','final-preview'])test('native entry lat
   assert.equal(app.startScreen.classList.contains('hid'),false);assert.equal(app.toasts.includes('New project created'),false);
   if(stage==='status')assert.equal(Project.desktop(app.window).identity().documentId,'document-1');
   else assert.equal(Project.desktop(app.window).isActive(),false);
-  assert.equal(app.mutations,0);assert.equal(app.writes.length,0);
+  assert.equal(app.mutations,0);assert.equal(JSON.stringify(app.writes),beforeWrites,'Cancel adds no preference or document writes');
 });
 test('obsolete native entry Cancel cannot restore the old editor after completed Create',async()=>{
   const h=host(),app=ordinary(h);await app.project.openPath('/old.json');nativeNewEntry(app,'plus');
