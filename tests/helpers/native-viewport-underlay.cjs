@@ -20,6 +20,10 @@ function install(root) {
   }
   if (element.clientWidth === undefined) element.clientWidth = 1280;
   if (element.clientHeight === undefined) element.clientHeight = 900;
+  // This fake desktop owns a non-document stage and an observable presentation callback.
+  if (!Object.hasOwn(root, 'stageLayer')) root.stageLayer = { visible: true };
+  if (!Object.hasOwn(root, 'paper')) root.paper = { view: { updateCalls: 0,
+    update() { this.updateCalls++; } } };
   root.NemoNativeViewportUnderlay = Underlay;
 }
 module.exports = { install };

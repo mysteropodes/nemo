@@ -19,8 +19,8 @@ class Element{
   for(const n of ancestors.slice().reverse()){run(n,true);if(e.stopped)return e;}run(this,true);if(!e.stopped)run(this,false);if(!e.stopped)for(const n of ancestors){run(n,false);if(e.stopped)break;}return e;
  }
 }
-async function fixture(selectionIntent=false){
- const f=portsFixture(),doc=new Element('document');doc.ownerDocument=doc;doc.readyState='complete';doc.createElement=tag=>new Element(tag,doc);doc.body=doc.createElement('body');doc.appendChild(doc.body);doc.documentElement=doc.createElement('html');doc.documentElement.clientWidth=1200;doc.documentElement.clientHeight=800;doc.documentElement.classList.add('nemo-native-underlay');
+async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
+ const f=portsFixture(options),doc=new Element('document');doc.ownerDocument=doc;doc.readyState='complete';doc.createElement=tag=>new Element(tag,doc);doc.body=doc.createElement('body');doc.appendChild(doc.body);doc.documentElement=doc.createElement('html');doc.documentElement.clientWidth=1200;doc.documentElement.clientHeight=800;doc.documentElement.classList.add('nemo-native-underlay');
  function find(n,id){if(n.id===id)return n;for(const c of n.children){const r=find(c,id);if(r)return r;}return null;}doc.getElementById=id=>find(doc.body,id);
  const add=(tag,id,parent=doc.body)=>{const n=doc.createElement(tag);n.id=id;parent.appendChild(n);return n;};
  const stage=add('div','canvas-area'),canvas=add('canvas','drawing-canvas',stage),zoom=add('input','zoom-scrub',stage),container=add('div','native-inspector');let rect={left:20,top:30,width:640,height:360};canvas.getBoundingClientRect=()=>({...rect});const published={'--nemo-native-left':'20px','--nemo-native-top':'30px','--nemo-native-right':'660px','--nemo-native-bottom':'390px'};doc.documentElement.style.getPropertyValue=k=>published[k];
@@ -29,8 +29,8 @@ async function fixture(selectionIntent=false){
  const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});f.session.readPresentedObjectSession=()=>({...f.session.info(),presentation:{frame:root.state.currentFrame}});
  const logs={legacy:0,zoom:0,selected:0};let intent;zoom.addEventListener('pointerdown',()=>logs.zoom++);canvas.addEventListener('pointerdown',()=>logs.legacy++);
  doc.getElementById('text-apply').addEventListener('click',()=>logs.legacy++);
- root.NemoNativeTextToolDesktop=Desktop;root.NemoNativeOpacityCutover={blocksLegacy:()=>true};root.NemoSelectCanvasIntent={create(){if(!selectionIntent)throw new Error('Text reached generic native selection route');intent=require('../src/js/adapters/select-canvas-intent.js').create({context:()=> 'stable',probe:()=>Object.freeze({mode:'clear'}),select:()=>logs.selected++});return intent;}};
- const binding=Desktop.mount(root,container,{currentSession:()=>f.session,fontResources:()=>({list:async()=>[{assetId:'document font / 雪',name:'Imported',available:true}]})});await turn();
+ root.NemoNativeTextToolDesktop=desktopModule;root.NemoNativeOpacityCutover={blocksLegacy:()=>true};root.NemoSelectCanvasIntent={create(){if(!selectionIntent)throw new Error('Text reached generic native selection route');intent=require('../src/js/adapters/select-canvas-intent.js').create({context:()=> 'stable',probe:()=>Object.freeze({mode:'clear'}),select:()=>logs.selected++});return intent;}};
+ const binding=desktopModule.mount(root,container,{currentSession:()=>f.session,fontResources:()=>({list:async()=>[{assetId:'document font / 雪',name:'Imported',available:true}]})});await turn();
  const script=fs.readFileSync(path.join(__dirname,'../src/js/select-bridge.js'),'utf8');
  vm.runInNewContext(script,{window:root,document:doc,state:root.state,console,selectedPaths:[],userLayers:[],project:{layers:[]},view:{zoom:1},setTimeout,clearTimeout},{filename:'actual-select-bridge.js'});
  const get=id=>doc.getElementById(id);
@@ -136,4 +136,22 @@ test('retired queued completion cannot disable a replacement owner editor sharin
  gate.resolve();await f.turn();
  console.log(JSON.stringify({newDraft:!!binding.core.snapshot().draft,newBusy:binding.core.snapshot().busy,disabled:f.get('text-apply').disabled,oldCommands:f.owner.log.executed.length,newCommands:next.owner.log.executed.length}));
  assert.equal(f.get('text-apply').disabled,false,'old callbacks must not disable the new owner editor');
+});
+
+
+test('browser Text bootstrap injects actual existing reader and writer modules into the pure core',async()=>{
+ // VM objects cross into the Node-realm SDK through the fixture's explicit JSON boundary.
+ const browser={NemoNativeTextRead:require('../src/js/adapters/native-text-read.js'),NemoNativeObjectTextLayout:require('../src/js/adapters/native-object-text-layout.js'),NemoNativeObjectItemContract:require('../src/js/adapters/native-object-item-contract.js')};
+ const coreSource=fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-text-tool.js'),'utf8');
+ const desktopSource=fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-text-tool-desktop.js'),'utf8');
+ vm.runInNewContext(coreSource,browser,{filename:'actual-native-text-tool.js'});
+ vm.runInNewContext(desktopSource,browser,{filename:'actual-native-text-tool-desktop.js'});
+ const f=await fixture(false,browser.NemoNativeTextToolDesktop,{browserJsonBoundary:true});await f.click();assert.equal(f.get('text-popover').style.display,'block',JSON.stringify(f.binding.core.snapshot()));f.input('text-input','Browser ports');f.apply();await f.turn();
+ assert.equal(f.owner.log.executed.length,1,JSON.stringify({state:f.binding.core.snapshot(),status:f.get('native-text-controls').children[2].textContent,received:f.owner.log.received}));assert.equal(f.owner.log.received[0].payload.block.text,'Browser ports');assert.equal(f.logs.legacy,0);
+ for(const missing of ['NemoNativeTextRead','NemoNativeObjectTextLayout']){
+   const absent={...browser,[missing]:null};vm.runInNewContext(desktopSource,absent,{filename:'missing-port-desktop.js'});
+   const refused=await fixture(false,absent.NemoNativeTextToolDesktop);assert.equal(refused.binding,null);
+   assert.equal(refused.owner.log.received.length,0);assert.equal(refused.owner.log.executed.length,0);
+   assert.equal(refused.get('native-text-controls'),null);
+ }
 });

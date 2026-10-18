@@ -30,7 +30,7 @@
       return { property: property, value: style.getPropertyValue(property),
         priority: style.getPropertyPriority(property) };
     });
-    var owner = null, disposed = false;
+    var owner = null, disposed = false, backdropHidden = false;
     function clear(expected) {
       if (expected !== undefined && !same(owner, expected)) return false;
       element.classList.remove(className);
@@ -39,6 +39,7 @@
         else style.removeProperty(item.property);
       });
       owner = null;
+      if (backdropHidden) { backdropHidden = false; ports.setBackdropHidden(false); }
       return true;
     }
     function measure() {
@@ -61,6 +62,9 @@
         next = identity(value);
         var edges = measure();
         properties.forEach(function (property, index) { style.setProperty(property, edges[index] + 'px'); });
+        if (typeof ports.setBackdropHidden === 'function') {
+          backdropHidden = true; ports.setBackdropHidden(true);
+        }
         owner = next;
         element.classList.add(className);
         return true;
@@ -73,7 +77,21 @@
     });
   }
   function desktop(root) {
-    var underlay = null, bounds = null;
+    var underlay = null, bounds = null, backdrop = null;
+    // The stage is a non-document Paper backdrop; retain all other Paper/DOM overlays.
+    function setBackdropHidden(hidden) {
+      if (hidden) {
+        var stage = root.stageLayer, view = root.paper && root.paper.view;
+        if (!stage || typeof stage.visible !== 'boolean' || !view || typeof view.update !== 'function')
+          throw new Error('Native presentation stage backdrop is unavailable');
+        if (backdrop && backdrop.stage !== stage) throw new Error('Native presentation stage changed');
+        if (!backdrop) backdrop = { stage: stage, visible: stage.visible, view: view };
+        if (stage.visible) { stage.visible = false; view.update(); }
+      } else if (backdrop) {
+        var previous = backdrop; backdrop = null;
+        previous.stage.visible = previous.visible; previous.view.update();
+      }
+    }
     return Object.freeze({
       projectionReady: function (info) {
         return !!root.NemoNativeObjectProjectFile && root.NemoNativeObjectProjectFile.projectionMatches(root, info);
@@ -88,7 +106,7 @@
       },
       surfaceChanged: function (presentation, mapping) {
         if (!presentation) { if (underlay) underlay.clear(); bounds = null; return; }
-        if (!underlay) underlay = create({ document: root.document, measure: function () { return bounds; } });
+        if (!underlay) underlay = create({ document: root.document, measure: function () { return bounds; }, setBackdropHidden: setBackdropHidden });
         bounds = { left: mapping.x, top: mapping.y, width: mapping.width, height: mapping.height };
         underlay.present(presentation);
       }

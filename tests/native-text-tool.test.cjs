@@ -75,3 +75,14 @@ test('retiring a pending read releases discovery state and cannot publish its ev
  const f=fixture(),gate=deferred();f.hold(gate.promise);const pending=f.core.openNew(placement);f.core.retire();assert.equal(f.core.snapshot().busy,false);assert.equal(f.core.snapshot().discovering,false);
  gate.resolve();await assert.rejects(pending,e=>e.code==='stale_revision');assert.equal(f.drafts.length,0);assert.equal(f.owner.log.executed.length,0);
 });
+
+// The application core receives the same production modules the desktop bootstrap composes.
+test('Text application requires explicit real reader and writer ports without fallback or dispatch',()=>{
+  const Tool=require('../src/js/adapters/native-text-tool.js'),f=fixture();
+  for(const changes of [{reader:null},{writer:null},{reader:{}},{writer:{create:false}}]){
+    assert.throws(()=>Tool.create({...f.ports,...changes}),/Native Text ports unavailable/);
+    assert.equal(f.reads.length,0);assert.equal(f.owner.log.received.length,0);assert.equal(f.owner.log.executed.length,0);
+  }
+  assert.equal(f.ports.reader,require('../src/js/adapters/native-text-read.js'));
+  assert.equal(f.ports.writer,require('../src/js/adapters/native-object-text-layout.js'));
+});

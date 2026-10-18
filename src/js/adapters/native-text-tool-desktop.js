@@ -3,14 +3,16 @@
 (function(root,factory){
   var Tool=typeof module==='object'&&module.exports?require('./native-text-tool.js'):root.NemoNativeTextTool;
   var Item=typeof module==='object'&&module.exports?require('./native-object-item-contract.js'):root.NemoNativeObjectItemContract;
-  var api=factory(Tool,Item);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
-}(typeof globalThis==='object'?globalThis:this,function(Tool,Item){
+  var Reader=typeof module==='object'&&module.exports?require('./native-text-read.js'):root.NemoNativeTextRead;
+  var Writer=typeof module==='object'&&module.exports?require('./native-object-text-layout.js'):root.NemoNativeObjectTextLayout;
+  var api=factory(Tool,Item,Reader,Writer);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
+}(typeof globalThis==='object'?globalThis:this,function(Tool,Item,Reader,Writer){
   'use strict';var bindings=new WeakMap();
   function consume(e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();}
   function mount(root,container,ports){
     var old=bindings.get(root);if(old&&old.container===container&&!old.retired){old.ports=ports;old.refresh();return old;}
     if(old)old.retire();
-    var doc=root.document,session=ports.currentSession();if(!session||!Tool||!Item)return null;
+    var doc=root.document,session=ports.currentSession();if(!session||!Tool||!Item||!Reader||typeof Reader.create!=='function'||!Writer||typeof Writer.create!=='function')return null;
     var b={container:container,ports:ports,retired:false},drag=null,discovery=null,lastTool=root.state&&root.state.tool,area=null,fontChoices=[],fontTicket=0,readyPin=null,shown=null,dirty=new Set(),modelState={busy:false,unknown:false},page=null,refreshing=false;
     function node(tag,text){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
     var section=node('section'),title=node('div','Text'),status=node('div','Refresh to select native text in the current authored frame.'),select=node('select'),refresh=node('button','Refresh text'),prev=node('button','Previous'),next=node('button','Next'),resolve=node('button','Resolve pending text');
@@ -72,7 +74,7 @@
       if(resources&&typeof resources.list==='function')Promise.resolve(resources.list()).then(function(rows){var now=context(true);if(now&&Tool.samePin(now.pin,d.context.pin))fillFonts(rows,d,ticket);}).catch(function(){if(shown===d)notify('Document font resources are unavailable.');});
       controls();
     }
-    var core=Tool.create({session:session,context:context,defaultColor:function(){var color=root.state.strokeColor||'#000000';return /^#[0-9a-fA-F]{3}$/.test(color)?'#'+color.slice(1).split('').map(function(x){return x+x;}).join(''):color;},
+    var core=Tool.create({session:session,reader:Reader,writer:Writer,context:context,defaultColor:function(){var color=root.state.strokeColor||'#000000';return /^#[0-9a-fA-F]{3}$/.test(color)?'#'+color.slice(1).split('').map(function(x){return x+x;}).join(''):color;},
       draft:show,state:function(s){modelState=s;controls();},cancelled:hide,committed:function(){hide();notify('Text updated.');b.refresh();}});
     async function commit(){if(!ownsUI()||!shown||modelState.busy||modelState.unknown)return;var changes={};
       dirty.forEach(function(k){changes[k]=k==='font'?chosenFont(font.value):k==='size'?Number(fields.size.value):k==='text'&&area?area.value:fields[k].value;

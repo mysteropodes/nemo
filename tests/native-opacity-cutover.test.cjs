@@ -493,6 +493,7 @@ test('classic startup loads frozen guard modules before the production first-lay
     'js/adapters/native-object-project-metadata.js',
     'js/adapters/native-object-project-properties.js',
     'js/adapters/native-object-project-desktop.js',
+    'js/adapters/native-object-open-exposure.js',
     'js/adapters/native-object-project.js',
     'js/adapters/native-object-project-file.js',
     'js/adapters/native-object-ui.js', 'js/adapters/native-drawing-add.js', 'js/adapters/native-drawing-add-desktop.js', 'js/adapters/native-project-settings-intent.js', 'js/adapters/native-project-settings-desktop.js',

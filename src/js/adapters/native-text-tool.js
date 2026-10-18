@@ -1,10 +1,8 @@
 /* Ordinary Text intent orchestration. Only selection/draft/request state lives
  * here; immutable native text reads and sealed native item commands own facts. */
 (function(root,factory){
-  var Reader=typeof module==='object'&&module.exports?require('./native-text-read.js'):root.NemoNativeTextRead;
-  var Writer=typeof module==='object'&&module.exports?require('./native-object-text-layout.js'):root.NemoNativeObjectTextLayout;
-  var api=factory(Reader,Writer);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(Reader,Writer){
+  var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextTool=api;
+}(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
   function fault(code,message){var e=new Error(message);e.code=code;return e;}
   function clone(v){return JSON.parse(JSON.stringify(v));}
@@ -13,7 +11,8 @@
   function same(a,b){return owner(a,b)&&a.contentRevision===b.contentRevision&&a.documentSnapshotId===b.documentSnapshotId;}
   function equal(a,b){return JSON.stringify(a)===JSON.stringify(b);}
   function create(ports){
-    if(!ports||!ports.session||typeof ports.context!=='function'||!Reader||!Writer)throw new Error('Native Text ports unavailable');
+    if(!ports||!ports.session||typeof ports.context!=='function'||!ports.reader||typeof ports.reader.create!=='function'||!ports.writer||typeof ports.writer.create!=='function')throw new Error('Native Text ports unavailable');
+    var Reader=ports.reader,Writer=ports.writer;
     var session=ports.session,reader=Reader.create(session),draft=null,busy=false,discovering=false,unknown=null,serial=0,retired=false;
     function context(presented){var c=ports.context(presented!==false);
       if(retired||!c||!c.pin||!session.isActive()||!same(c.pin,session.info())||typeof c.layerUid!=='string'||!c.layerUid||!Number.isInteger(c.frame)||c.frame<0)throw fault('unavailable','Native Text context unavailable');return c;}

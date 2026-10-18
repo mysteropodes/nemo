@@ -3,6 +3,7 @@
  * accepted item session/replay double. Actual Rust ownership is tested separately. */
 const SDK=require('../src/js/adapters/native-application.js');
 const Tool=require('../src/js/adapters/native-text-tool.js');
+const Reader=require('../src/js/adapters/native-text-read.js'),Writer=require('../src/js/adapters/native-object-text-layout.js');
 const {createFixture}=require('./native-object-item-support.cjs');
 const clone=v=>JSON.parse(JSON.stringify(v));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
@@ -35,9 +36,9 @@ function fixture(options={}){
     }
     return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:p.contentRevision,ok:true,result};
   }});
-  const session={...f.session,runResourceCommand:action=>f.session.runResourceCommand(async ctx=>{if(hold)await hold;return action({...ctx,dispatch:q=>sdk.dispatch(q)});})};
+  const session={...f.session,runResourceCommand:action=>f.session.runResourceCommand(async ctx=>{if(hold)await hold;return action({...ctx,dispatch:q=>sdk.dispatch(options.browserJsonBoundary?clone(q):q)});})};
   const context=wantPresented=>!f.state.active||wantPresented&&!presented?null:{pin:clone(session.info()),layerUid:layer,frame,selectionKey:selection,viewKey:view};
-  const ports={session,context,defaultColor:()=> '#123456',draft:d=>drafts.push(d),committed:r=>committed.push(r),state:s=>states.push(s),cancelled:()=>{}};
+  const ports={session,reader:Reader,writer:Writer,context,defaultColor:()=> '#123456',draft:d=>drafts.push(d),committed:r=>committed.push(r),state:s=>states.push(s),cancelled:()=>{}};
   return {...f,session,ports,context,core:Tool.create(ports),reads,drafts,committed,states,targets,
     seed(t=target(),value=block()){targets.set(t.strokeId,clone(t));f.owner.items.set(t.strokeId,clone(value));},
     frame:v=>{frame=v;},layer:v=>{layer=v;},selection:v=>{selection=v;},view:v=>{view=v;},presented:v=>{presented=v;},hold:p=>{hold=p;}};

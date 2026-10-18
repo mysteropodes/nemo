@@ -1,7 +1,7 @@
 'use strict';
 // Independent DOM oracle for native presentation ownership and geometry.
 const test=require('node:test'),assert=require('node:assert/strict');
-const {create}=require('../src/js/adapters/native-viewport-underlay.js');
+const {create,desktop}=require('../src/js/adapters/native-viewport-underlay.js');
 const CLASS='nemo-native-underlay',KEYS=['left','top','right','bottom'].map(x=>'--nemo-native-'+x);
 const A=Object.freeze({instanceId:'instance-A',documentId:'document-A',lifecycleGeneration:1});
 const B=Object.freeze({instanceId:'instance-A',documentId:'document-B',lifecycleGeneration:2});
@@ -11,7 +11,7 @@ function fixture(initial={}){
  const style={setProperty(k,v,p=''){styles.set(k,String(v));priorities.set(k,p);},getPropertyValue:k=>styles.get(k)||'',removeProperty(k){const old=styles.get(k)||'';styles.delete(k);priorities.delete(k);return old;},getPropertyPriority:k=>priorities.get(k)||''};
  const document={documentElement:{classList,style,clientWidth:1280,clientHeight:900}};
  let rect={left:40,top:60,right:1000,bottom:700,width:960,height:640};
- const api=create({document,measure:()=>rect});
+ const api=create({document,measure:()=>rect,...(initial.setBackdropHidden?{setBackdropHidden:initial.setBackdropHidden}:{})});
  return {api,document,classes,styles,priorities,set rect(v){rect=v;},get rect(){return rect;}};
 }
 function opaque(f){assert.equal(f.classes.has(CLASS),false);for(const k of KEYS)assert.equal(f.styles.has(k),false);}
@@ -31,3 +31,13 @@ test('clipped measured rectangle uses viewport intersection as absolute CSS edge
 test('positive rectangle outside viewport refuses and clears prior hole',()=>{const f=fixture();f.api.present(A);f.rect={left:1280,top:0,width:10,height:20};assert.throws(()=>f.api.refresh(A));opaque(f);});
 test('invalid owner cannot activate a new hole',()=>{for(const owner of[null,{...A,instanceId:''},{...A,documentId:'x'.repeat(129)},{...A,lifecycleGeneration:0},{...A,lifecycleGeneration:1.5}]){const f=fixture();assert.throws(()=>f.api.present(owner));opaque(f);}});
 test('preexisting active class refuses second ownership',()=>{assert.throws(()=>fixture({classes:[CLASS]}));});
+
+test('backdrop hiding is owner-scoped and cleanup restores it while foreign clear cannot',()=>{const changes=[],f=fixture({setBackdropHidden:on=>changes.push(on)});f.api.present(A);assert.deepEqual(changes,[true]);assert.equal(f.api.clear(B),false);assert.deepEqual(changes,[true]);f.api.clear(A);assert.deepEqual(changes,[true,false]);f.api.dispose();assert.deepEqual(changes,[true,false]);});
+test('failed backdrop preparation clears the hole and asks the original backdrop to restore',()=>{const changes=[],f=fixture({setBackdropHidden:on=>{changes.push(on);if(on)throw Error('controlled backdrop refusal');}});assert.throws(()=>f.api.present(A),/controlled backdrop refusal/);opaque(f);assert.deepEqual(changes,[true,false]);});
+test('mapping failure restores a previously hidden backdrop and cannot retain transparent hole',()=>{const changes=[],f=fixture({setBackdropHidden:on=>changes.push(on)});f.api.present(A);f.rect=null;assert.throws(()=>f.api.refresh(A));opaque(f);assert.deepEqual(changes,[true,false]);});
+
+function desktopFixture(visible=true){const f=fixture(),updates=[],stage={visible},root={document:f.document,stageLayer:stage,paper:{view:{update(){updates.push(stage.visible);}}}};return {...f,stage,root,updates,desktop:desktop(root)};}
+const desktopBounds={x:40,y:60,width:320,height:180};
+test('desktop hides only the captured stage, repeated presentation is idempotent, clear restores exact prior visibility',()=>{for(const visible of [true,false]){const f=desktopFixture(visible);f.desktop.surfaceChanged(A,desktopBounds);assert.equal(f.stage.visible,false);f.desktop.surfaceChanged(A,desktopBounds);assert.equal(f.stage.visible,false);assert.deepEqual(f.updates,visible?[false]:[]);f.desktop.surfaceChanged(null);assert.equal(f.stage.visible,visible);assert.deepEqual(f.updates,visible?[false,true]:[false]);const count=f.updates.length;f.desktop.surfaceChanged(null);assert.equal(f.updates.length,count);opaque(f);}});
+test('desktop stage identity replacement fails closed and restores the original captured stage without touching the replacement',()=>{const f=desktopFixture();f.desktop.surfaceChanged(A,desktopBounds);const replacement={visible:true};f.root.stageLayer=replacement;assert.throws(()=>f.desktop.surfaceChanged(A,desktopBounds),/stage changed/);assert.equal(f.stage.visible,true);assert.equal(replacement.visible,true);opaque(f);});
+test('desktop refuses missing presentation backdrop without inventing a document or hiding unrelated layers',()=>{const f=desktopFixture();delete f.root.stageLayer;assert.throws(()=>f.desktop.surfaceChanged(A,desktopBounds),/backdrop is unavailable/);assert.equal(f.stage.visible,true);assert.deepEqual(f.updates,[]);opaque(f);});

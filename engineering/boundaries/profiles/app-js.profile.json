@@ -2480,7 +2480,8 @@
       "files": [
         "native-object-project.js",
         "native-object-project-desktop.js",
-        "native-object-project-properties.js"
+        "native-object-project-properties.js",
+        "native-object-open-exposure.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -3119,7 +3120,7 @@
     },
     {
       "id": "app.native.text.tool",
-      "layer": "adapters",
+      "layer": "application",
       "dir": "src/js/adapters",
       "files": [
         "native-text-tool.js"
@@ -3131,7 +3132,7 @@
     },
     {
       "id": "app.native.text.tool.desktop",
-      "layer": "adapters",
+      "layer": "bootstrap",
       "dir": "src/js/adapters",
       "files": [
         "native-text-tool-desktop.js"
