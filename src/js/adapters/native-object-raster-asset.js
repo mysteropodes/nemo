@@ -61,9 +61,11 @@
         if(extOf(path)!=='png')throw fault('unavailable','image_codec_unavailable','This image format is unavailable');
         before=options.origin||originPin();disposition=JSON.parse(JSON.stringify(placement));
       }catch(error){return Promise.reject(error);}
-      return commands.execute(Contract.ATTACH,function(pin){
+      // Admit the picker origin before entering a queue that deliberately hides the global presentation.
+      if(options.current&&options.current()!==true)return Promise.reject(fault('stale_revision','image_origin_changed','Image import context changed'));
+      return commands.execute(Contract.ATTACH,function(pin,queueScope){
         if(!imageRouted())throw fault('unavailable','image_host_route_unavailable','Image import is unavailable');
-        if(!sameOrigin(pin,before)||(options.current&&options.current()!==true))throw fault('stale_revision','image_origin_changed','Image import context changed');
+        if(!sameOrigin(pin,before)||(options.current&&options.current(queueScope)!==true))throw fault('stale_revision','image_origin_changed','Image import context changed');
         return {documentSnapshotId:pin.documentSnapshotId,lifecycleGeneration:pin.lifecycleGeneration,name:baseName(path),
           mediaType:'image/png',source:{kind:'file',path:path},placement:disposition};
       });

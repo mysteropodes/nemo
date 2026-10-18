@@ -282,9 +282,19 @@
       await present(ports.frame?ports.frame():0);return receipt;
     });}
     function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
-      var submitted=epoch(info);return enqueue(async function(){guardEpoch(submitted);return action({dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
-        reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
-          changed();await present(ports.frame?ports.frame():0,next);return next;}});});}
+      var submitted=epoch(info),origin=freeze(presentedSession()),ticket=subscriptionTicket;
+      return enqueue(async function(){guardEpoch(submitted);var running=true;
+        try{return await action({
+          // Read-only and action-local: only this operation's own pending entry is exempted.
+          // Captured presentation/subscription identity must survive; the public getter stays fenced.
+          readPresentedObjectSession:function(){return running&&pending===1&&!openingRequested&&!synchronizing&&active()&&origin&&
+            origin.presentation===presentation&&same(info,origin)&&ticket===subscriptionTicket&&
+            (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
+            typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true?origin:null;},
+          dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
+          reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
+            changed();await present(ports.frame?ports.frame():0,next);return next;}});
+        }finally{running=false;}});}
     function reference(action){return mutation(function(pin){return {apiVersion:2,requestId:requestId('reference'),instanceId:pin.instanceId,
       documentId:pin.documentId,lifecycleGeneration:pin.lifecycleGeneration,expectedRevision:pin.contentRevision,
       documentSnapshotId:pin.documentSnapshotId,action:typeof action==='function'?action(pin.reference):action};},'nemo_native_object_reference');}

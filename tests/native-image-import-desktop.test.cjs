@@ -13,7 +13,7 @@ function fixture(options={}) {
  const state={currentFrame:0,activeLayerIdx:0,layers:[{layerUid:'drawing'}]},root={state,_layerSel:[0],SM:{t:k=>k},showToast:s=>toasts.push(s)};
  function makeSession(){return {
   info:()=>pin,isActive:()=>true,blocksLegacy:()=>true,requestId:()=> 'png-'+(++count),
-  importBatch:()=>assert.fail('image import must not use vector import.batch'),
+  importBatch:()=>assert.fail('image import must not use vector import.batch'),readSubscriptionGeneration:()=>1,
   readPresentedObjectSession:()=>({available:projected,...pin,presentation:{...pin,owner:'native',status:projected?'presented':'pending',frame:state.currentFrame}}),
   runResourceCommand:action=>{const result=serial.then(()=>options.queue?options.queue.promise:undefined).then(()=>action({
    dispatch:q=>SDK.createNativeApplicationAdapter('ui',{dispatch:async req=>{
@@ -29,6 +29,7 @@ function fixture(options={}) {
     if(options.loseAlways||(options.loseBoth&&requests.length<=2))throw Error('lost both exact replies');
     if(options.lostAck&&first){first=false;throw Error('lost ACK');}return structuredClone(response);
    }}).dispatch(q),
+   readPresentedObjectSession:()=>session.readPresentedObjectSession(),
    reconcile:async revision=>{if(revision!==undefined)assert.equal(revision,pin.contentRevision);if(options.unconfirmed)projected=false;return pin;},
   }));serial=result.catch(()=>{});return result;},
  };}
@@ -147,4 +148,156 @@ test('temporarily missing or empty owner information never proves an explicit re
  assert.equal((await h.menu()).status,'unconfirmed');assert.equal(h.requests.length,2);assert.equal(h.picks.length,1);
  h.change({instanceId:'instance',documentId:'document',lifecycleGeneration:1});
  assert.equal((await h.controller.image.recover()).status,'imported');assert.deepEqual(h.requests[2],h.requests[0]);
+});
+
+// Regression of the installed ac0 failure: production Project owns pending/presentation,
+// subscription tickets, reconciliation and serialization. Only native I/O and DOM are controlled.
+const Project=require('../src/js/adapters/native-object-project.js'),Files=require('../src/js/adapters/native-object-project-file.js');
+async function realProjectFixture(options={}) {
+ const events=new Map(),requests=[],picks=[],toasts=[],state={},root={state,_layerSel:[],SM:{t:k=>k},paper:{project:{}},showToast:s=>toasts.push(s)};
+ let installed=false,revision=0,generation=1,documentId='document',subscribed=true,previewSerial=0,extra=[],sync,disconnected,binding,session,surface;
+ const metadata=()=>({apiVersion:2,instanceId:'instance',documentId,lifecycleGeneration:generation,contentRevision:revision,
+  documentSnapshotId:`snapshot-${documentId}-${revision}`,documentDigest:String(revision%10).repeat(64),byteCount:1000+revision,
+  canvasW:320,canvasH:180,fps:24,totalFrames:21,layers:[{layerUid:'drawing',name:'Drawing',visible:true,locked:false},...extra],reference:null,undoDepth:revision,redoDepth:0});
+ async function invoke(command,args) {
+  const r=args&&JSON.parse(args.requestJson);
+  if(command==='nemo_native_object_client_status')return {...metadata(),available:installed};
+  if(command==='nemo_native_object_bootstrap'){
+   if(installed){generation++;documentId='document-'+generation;revision=0;extra=[];}
+   installed=true;return {...metadata(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
+  }
+  if(command==='nemo_native_object_reference'&&r.action.kind==='inspect')return {...metadata(),requestId:r.requestId};
+  if(command==='nemo_native_object_preview')return {status:'presented',workId:'work-'+(++previewSerial),viewGeneration:1};
+  if(command==='nemo_native_object_dispatch'){
+   assert.equal(r.expectedRevision,revision);revision++;
+   return {apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
+  }
+  assert.fail('unexpected native boundary: '+command);
+ }
+ const sdk=SDK.createNativeApplicationAdapter('ui',{dispatch:async request=>{
+  assert.equal(session.readPresentedObjectSession(),null,'the public presentation MUST remain hidden inside the actual queue');
+  assert.equal(request.expectedRevision,revision);assert.equal(request.documentId,documentId);
+  requests.push(structuredClone(request));
+  if(options.dispatchGate)await options.dispatchGate.promise;
+  revision++;const layerUid='native-layer:'+revision+':0';extra.push({layerUid,name:request.payload.name,visible:true,locked:false});
+  return {apiVersion:2,requestId:request.requestId,instanceId:'instance',documentId,contentRevision:revision,ok:true,
+   result:{applied:true,historyEntriesAdded:1,assetId:'canonical-png',naturalWidth:2,naturalHeight:1,displayWidth:2,displayHeight:1,
+    target:{contextId:'scene-root',layerUid,frameScope:{kind:'authored',frame:0},strokeId:'native-raster:'+revision+':0'},newLayer:true}};
+ }});
+ const ready=pin=>Files.projectionReadyForUI(root,pin);
+ session=Project.create({invoke,frame:()=>state.currentFrame,projectionReady:ready,surfaceChanged:value=>{surface=value;},
+  mapping:pin=>({cssBounds:{x:0,y:0,width:320,height:180},physicalExtent:{width:320,height:180},compositionExtent:{width:pin.canvasW,height:pin.canvasH},reportedDpr:1}),
+  subscribeRevisions:async(synchronize,failed)=>{sync=synchronize;disconnected=failed;return binding={...metadata(),subscriptionId:'subscription-'+generation};},
+  unsubscribeRevisions:async()=>{},subscriptionActive:()=>subscribed,
+  publishRevision:pin=>Files.refreshLayerTable(root,pin),changed:pin=>Files.refreshLayerTable(root,pin),
+  dispatchApplication:request=>sdk.dispatch(request),
+ });
+ root.NemoNativeObjectProject={desktop:()=>session,selectLayerUI:(_root,index)=>{state.activeLayerIdx=index;root._layerSel=[index];return true;}};
+ root.NemoNativeObjectProjectFile=Files;root.NemoNativeObjectRasterAsset=Raster;
+ root.NemoNativeImportCore=require('../src/js/adapters/native-import-core.js');root.NemoNativeImportDrop=Drop;
+ for(const [key,name]of Object.entries({NemoNativeImportSvg:'svg',NemoNativeImportFigma:'figma',NemoNativeImportPsd:'psd',NemoNativeImportMontage:'montage'}))root[key]=require('../src/js/adapters/native-import-'+name+'.js');
+ root.__TAURI__={dialog:{open:async opts=>{picks.push(opts);return options.pick?options.pick():'/picked/still.png';}}};
+ const nodes=new Map();for(const id of ['image-input','video-input','btn-import-img','btn-import-video'])nodes.set(id,{
+  addEventListener:(type,handler)=>events.set(id+':'+type,handler),removeEventListener(){},click:()=>assert.fail('no DOM image picker')});
+ const document={readyState:'loading',getElementById:id=>nodes.get(id)||null,addEventListener:(type,handler)=>events.set('document:'+type,handler),removeEventListener(){}};
+ root.document=document;const controller=Desktop.install(root);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/js/images.js'),'utf8'),vm.createContext({window:root,document,state,SM:root.SM,showToast:root.showToast,console,
+  FileReader:()=>assert.fail('no JS decoder'),Image:()=>assert.fail('no JS image'),saveAllLayerFrames:()=>assert.fail('no legacy save'),
+  pushUndoLayers:()=>assert.fail('no legacy history'),createUserLayer:()=>assert.fail('no legacy writer'),localStorage:{getItem:()=>null},setTimeout,clearTimeout}));
+ const open=(path='/project.json',transition={reveal:pin=>Files.projectView(root,pin)})=>session.openPath(path,transition);
+ await open();assert.ok(session.readPresentedObjectSession());assert.equal(ready(session.info()),true);
+ return {root,state,session,controller,requests,picks,toasts,open,menu:()=>events.get('btn-import-img:click')(),
+  subscribe:value=>{subscribed=value;},disconnect:()=>disconnected(Error('retired')),
+  presentationHeader:()=>({available:true,...session.info(),presentation:surface}),
+  async emit(){const fromRevision=revision;revision++;return sync({...metadata(),requestId:'external',fromRevision,toRevision:revision},binding);},
+ };
+}
+test('real Project queue imports unchanged menu PNG once while public presentation remains fenced',async()=>{
+ const h=await realProjectFixture(),origin=h.session.readPresentedObjectSession();
+ const result=await h.menu();assert.equal(result.status,'imported',JSON.stringify(result));assert.equal(result.readback,'confirmed');assert.equal(result.selected,true);
+ assert.equal(h.requests.length,1);assert.equal(h.picks.length,1);assert.equal(h.requests[0].operation,'command.document.object.asset.attach');
+ assert.equal(h.requests[0].payload.documentSnapshotId,origin.documentSnapshotId);assert.equal(h.requests[0].expectedRevision,0);
+ assert.equal(result.receipt.contentRevision,1);assert.equal(result.receipt.historyEntriesAdded,1);assert.equal(h.session.info().undoDepth,1);
+ assert.equal(h.session.readPresentedObjectSession().contentRevision,1);assert.deepEqual(h.root._layerSel,[1]);
+});
+test('real Project action-local presentation expires on resolution, rejection and later action reuse',async()=>{
+ const h=await realProjectFixture();let saved;
+ await h.session.runResourceCommand(scope=>{saved=scope;assert.equal(h.session.readPresentedObjectSession(),null);assert.ok(scope.readPresentedObjectSession());});
+ assert.equal(saved.readPresentedObjectSession(),null);
+ await h.session.runResourceCommand(scope=>{assert.ok(scope.readPresentedObjectSession());assert.equal(saved.readPresentedObjectSession(),null);});
+ await assert.rejects(h.session.runResourceCommand(scope=>{saved=scope;assert.ok(scope.readPresentedObjectSession());throw Error('local abort');}),/local abort/);
+ assert.equal(saved.readPresentedObjectSession(),null);assert.ok(h.session.readPresentedObjectSession());assert.equal(h.requests.length,0);
+});
+test('real Project held work blocks prequeue menu admission without a picker or leaked presentation',async()=>{
+ const h=await realProjectFixture(),hold=deferred();let scope;
+ const work=h.session.runResourceCommand(ctx=>{scope=ctx;return hold.promise;});await turn();
+ assert.equal(h.session.readPresentedObjectSession(),null);assert.ok(scope.readPresentedObjectSession());
+ assert.equal((await h.menu()).status,'unavailable');assert.equal(h.picks.length,0);assert.equal(h.requests.length,0);
+ hold.resolve();await work;assert.equal(scope.readPresentedObjectSession(),null);assert.ok(h.session.readPresentedObjectSession());
+});
+test('real Project rejects changed picker frame, selection, context, active layer, projection, revision, owner and subscription',async()=>{
+ for(const kind of ['frame','selection','context','active-layer','projection','revision','owner','subscription-ticket','subscription-inflight','retired']){
+  const picker=deferred(),h=await realProjectFixture({pick:()=>picker.promise}),pending=h.menu();await turn();
+  if(kind==='frame')h.state.currentFrame=1;
+  if(kind==='selection')h.root._layerSel=[];
+  if(kind==='context')h.state.activeSymbolId='foreign-symbol';
+  if(kind==='active-layer')h.state.activeLayerIdx=7;
+  if(kind==='projection')h.state.layers[0].name='changed-read-side-row';
+  if(kind==='revision')await h.session.historyFromUi('undo');
+  if(kind==='owner')await h.open('/replacement.json');
+  if(kind==='subscription-ticket')await h.open('/cancelled.json',{confirm:()=>false});
+  if(kind==='subscription-inflight')h.subscribe(false);
+  if(kind==='retired')h.controller.dispose();
+  picker.resolve('/picked/still.png');const result=await pending;
+  assert.equal(result.status,kind==='retired'?'unavailable':'stale',kind+': '+JSON.stringify(result));assert.equal(h.requests.length,0,kind);
+  assert.equal(h.controller.image.status(),null,kind+' must not invent an uncertain commit before dispatch');
+ }
+});
+test('real Project validates queued context again after prequeue admission and before asset dispatch',async()=>{
+ for(const kind of ['frame','selection','context','active-layer','projection','subscription-inflight','queued-follower','replacement-opening','subscription-sync']){
+  const h=await realProjectFixture(),follow=deferred();let other;
+  const pending=h.menu();
+  // The resolved picker continuation admits and enters Project first. This microtask
+  // runs before queue.then(action), so all mutations below happen AFTER admission.
+  queueMicrotask(()=>{
+   assert.equal(h.session.readPresentedObjectSession(),null,'real resource queue must already be pending');
+   if(kind==='frame')h.state.currentFrame=1;
+   if(kind==='selection')h.root._layerSel=[];
+   if(kind==='context')h.state.activeSymbolId='foreign-symbol';
+   if(kind==='active-layer')h.state.activeLayerIdx=7;
+   if(kind==='projection')h.state.layers[0].name='changed-read-side-row';
+   if(kind==='subscription-inflight')h.subscribe(false);
+   if(kind==='queued-follower')other=h.session.runResourceCommand(()=>follow.promise);
+   if(kind==='replacement-opening')other=h.open('/cancelled.json',{confirm:()=>false});
+   if(kind==='subscription-sync')other=h.emit();
+  });
+  const result=await pending;follow.resolve();if(other)await other;
+  assert.equal(result.status,'stale',kind+': '+JSON.stringify(result));assert.equal(h.requests.length,0,kind);assert.equal(h.controller.image.status(),null,kind);
+ }
+});
+test('real Project inflight import preserves menu busy exclusion until exact reconciliation',async()=>{
+ const dispatchGate=deferred(),h=await realProjectFixture({dispatchGate}),pending=h.menu();await turn();
+ assert.equal(h.requests.length,1);assert.equal(h.session.readPresentedObjectSession(),null);assert.equal((await h.menu()).status,'busy');assert.equal(h.picks.length,1);
+ dispatchGate.resolve();assert.equal((await pending).status,'imported');assert.ok(h.session.readPresentedObjectSession());assert.equal(h.requests.length,1);
+});
+test('real Project cancelled picker leaves exact owner/revision and presentation unchanged',async()=>{
+ const h=await realProjectFixture({pick:()=>null}),before=h.session.readPresentedObjectSession();
+ assert.equal((await h.menu()).status,'cancelled');assert.equal(h.requests.length,0);assert.equal(h.picks.length,1);
+ assert.deepEqual(h.session.readPresentedObjectSession(),before);assert.equal(h.controller.image.status(),null);
+});
+
+test('real Project queued presentation header cannot be rewritten to revive a later presentation',async()=>{
+ const h=await realProjectFixture();let retainedScope,header,original;
+ await h.session.runResourceCommand(async scope=>{
+  retainedScope=scope;header=scope.readPresentedObjectSession();original=header.presentation;
+  assert.ok(header);assert.equal(Object.isFrozen(header),true);assert.equal(Object.isFrozen(header.presentation),true);
+  await scope.reconcile(0);
+  const later=h.presentationHeader();assert.notStrictEqual(later.presentation,original,'real reconcile presents a new frame receipt');
+  assert.equal(h.session.readPresentedObjectSession(),null,'public getter remains fenced during the resource action');
+  assert.equal(scope.readPresentedObjectSession(),null,'the original presentation must be invalid after reconcile');
+  assert.throws(()=>Object.assign(header,later),TypeError,'a consumer cannot retarget the private original guard header');
+  assert.strictEqual(header.presentation,original);assert.equal(scope.readPresentedObjectSession(),null);
+ });
+ assert.equal(retainedScope.readPresentedObjectSession(),null,'retaining the immutable header never retains authority');
+ assert.notStrictEqual(h.session.readPresentedObjectSession().presentation,original);assert.equal(h.requests.length,0);
 });

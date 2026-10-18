@@ -177,10 +177,14 @@
         if (unresolved) return unresolved;
         const started = core.begin();
         if (!started.ok) return { status: started.status, reason: started.reason };
-        const ctx = started.ctx, state = root.state;
-        const currentIntent = () => !imageRetired && current() === ctx.session && ctx.session.isActive() && root.state === state &&
-          state.currentFrame === ctx.frame && samePins(ctx.session.info(), ctx.before) && sameSelection(selection(), ctx.selection) &&
-          root.NemoNativeObjectProjectFile.projectionReadyForUI(root, ctx.before) === true && m.core.presented(ctx.session, ctx.before, ctx.frame);
+        const ctx = started.ctx, state = root.state, symbol = state.activeSymbolId, activeLayer = state.activeLayerIdx;
+        if (typeof ctx.session.readSubscriptionGeneration !== 'function') return { status: 'unavailable', reason: 'native_subscription_identity_absent' };
+        const subscriptionGeneration = ctx.session.readSubscriptionGeneration();
+        const currentIntent = (queueScope) => !imageRetired && current() === ctx.session && ctx.session.isActive() && root.state === state &&
+          state.currentFrame === ctx.frame && state.activeSymbolId === symbol && state.activeLayerIdx === activeLayer &&
+          ctx.session.readSubscriptionGeneration() === subscriptionGeneration && samePins(ctx.session.info(), ctx.before) && sameSelection(selection(), ctx.selection) &&
+          root.NemoNativeObjectProjectFile.projectionReadyForUI(root, ctx.before) === true &&
+          (!queueScope || typeof queueScope.readPresentedObjectSession === 'function') && m.core.presented(queueScope || ctx.session, ctx.before, ctx.frame);
         const api = root.NemoNativeObjectRasterAsset;
         const client = api && api.desktop(root, { imageRoute: () => !imageRetired && imageDeclared });
         if (!client) return { status: 'unavailable', reason: 'native_image_client_absent' };
