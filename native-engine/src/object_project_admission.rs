@@ -146,7 +146,7 @@ impl ObjectSnapshot {
         Self::from_managed_project_wire(instance, bytes, wire_limits()).map_err(refused)
     }
 
-    pub(crate) fn serialize_project_file(&self) -> Result<Vec<u8>, DispatchErrorCode> {
+    pub fn serialize_project_file(&self) -> Result<Vec<u8>, DispatchErrorCode> {
         let project = self.project().ok_or(DispatchErrorCode::Unavailable)?;
         encode_project_envelope(project, wire_limits()).map_err(refused)
     }

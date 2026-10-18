@@ -39,6 +39,10 @@ pub(crate) mod property_expression_runtime;
 #[path = "property_expression_views.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_expression_views;
+// D28-K1: private contribution kernel over explicit resolved selector inputs.
+#[path = "property_text_animator.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_text_animator;
 #[path = "property_follow_path_sample.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_follow_path_sample;
