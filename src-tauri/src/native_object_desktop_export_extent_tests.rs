@@ -1,5 +1,7 @@
 //! Extent admission through the real owner; no compositor or artifact port runs.
 use crate::native_object_desktop_export::tests::*;
+#[path = "native_object_desktop_export_text_tests.rs"]
+mod text_publication;
 
 fn project_fixture(scratch: &Scratch, width: u32, height: u32) -> (ApplicationMcp, Value) {
     let state = ApplicationMcp::default();
