@@ -113,11 +113,18 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   }
   let pid=pinned.pid, main=pinned.main
   var ordinal=0, originals=[String:String](), observed=false, menuOpened=false
+  var currentCommand:String?
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
   var retainedWebArea:AXUIElement?, latest:UI32ContentCertificate<AXUIElement>?
   func nativeIdentity() throws { try verifyOwnedWindow(pinned) }
   func identity() throws {
     try nativeIdentity()
+    let phase=try ui32IdentityPhase(currentCommand,
+      fixtureActive:fixture?.attempted == true && fixture?.completed != true,
+      syncActive:syncPanel?.attempted == true && syncPanel?.completed != true)
+    // Native picker commands prove their existing attached owner/context before
+    // reads/effects; completion re-proves absence and full content after dismissal.
+    if phase != .content { return }
     guard let web=retainedWebArea else { return }
     var current=web,seen=[AXUIElement]()
     for _ in 0..<13 {
@@ -273,7 +280,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       Set(request.keys).isSubset(of:["purpose","pid","windowId","command","option","value"]),
       request["purpose"] as? String == "UI32", request["pid"] as? Int32 == pid,
       request["windowId"] as? UInt32 == pinned.number, let command=request["command"] as? String else { throw Refusal(code:"adapter-refused") }
-    ordinal += 1; try identity()
+    currentCommand=command; ordinal += 1; try identity()
     var result:[String:Any]=["purpose":"UI32","pid":pid,"windowId":pinned.number,"ordinal":ordinal,"command":command,"status":"ok","actionPosted":false]
     if command == "quit" { try check(request["option"] == nil && request["value"] == nil); try emit(result); return }
     if command == "observe" {
@@ -417,18 +424,21 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
           try check(AXUIElementSetAttributeValue(selected,kAXValueAttribute as CFString,wanted as CFString) == .success)
           result["requestedValue"]=wanted
         }
-      },postScope:{ if base == "fixture.open" || base == "sync.open-cancel" { try identity() } else { _ = try tree() } },posted:{posted=true})
+      },postScope:{ if base == "fixture.open" || base == "sync.open-cancel" { try identity() } else { _ = try tree() } },posted:{
+        posted=true
+        if base == "fixture.open" { fixture?.attempted=true }
+        if base == "sync.open-cancel" { syncPanel?.attempted=true }
+      })
       if base == "settings.menu.open" { menuOpened=true }
       if base == "settings.menu.entry" { menuOpened=false }
-      if base == "fixture.open" { fixture?.attempted=true }
-      if base == "sync.open-cancel" { syncPanel?.attempted=true }
     if rule.operation == "value" {
       let current=try resolve(rule); try check(owns(current,pid))
       if let readback=attr(current,kAXValueAttribute) as? String { result["readback"]=readback } else { result["readback"]=NSNull() }
     }
     } catch {
       throw ActionRefusal(diagnostics:["purpose":"UI32","command":command,"ordinal":ordinal,"actionPosted":posted,"actionAttempted":attempted,
-        "stage":posted ? "post-action-or-scope" : "pre-action-or-perform","note":"No retry; inspect actual result before any new appointment."])
+        "stage":posted ? "post-action-or-scope" : "pre-action-or-perform","underlying":ui32ActionCause(error),
+        "note":"No retry; inspect actual result before any new appointment."])
     }
     result["actionPosted"]=posted; result["actionAttempted"]=attempted
     // AX acknowledgement/readback alone is not application acceptance.

@@ -59,14 +59,22 @@ final class UI32Fixture {
     try verifyOwnedWindow(pinned)
     guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement],
       let children=attr(pinned.main,kAXChildrenAttribute) as? [AXUIElement], windows.count <= 8, children.count <= 512 else { throw Refusal(code:"sheet-ambiguous") }
-    var found=[AXUIElement]()
+    var found=[AXUIElement](), roles=[String:Int]()
     for node in windows+children {
       try check(owns(node,pinned.pid))
-      if attr(node,kAXRoleAttribute) as? String != kAXSheetRole { continue }
+      guard let role=attr(node,kAXRoleAttribute) as? String else {
+        throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"fixture-sheet-role-unreadable"])
+      }
+      let category=["AXWindow","AXSheet","AXGroup"].contains(role) ? role : "other"
+      roles[category,default:0] += 1
+      if role != kAXSheetRole { continue }
       guard let ancestor=axElement(attr(node,kAXParentAttribute)), owns(ancestor,pinned.pid), CFEqual(ancestor,pinned.main) else { throw Refusal(code:"sheet-parent") }
       if !found.contains(where:{CFEqual($0,node)}) { found.append(node) }
     }
-    try check(found.count == 1)
+    guard found.count == 1 else {
+      throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"fixture-sheet-count","sheetCount":found.count,
+        "applicationWindowCount":windows.count,"mainDirectChildCount":children.count,"observedRoleCounts":roles])
+    }
     if let sheet { try check(CFEqual(sheet,found[0])) } else { sheet=found[0] }
     return found[0]
   }

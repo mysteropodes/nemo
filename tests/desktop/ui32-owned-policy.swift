@@ -80,11 +80,31 @@ func ui32Matches(_ rule:UI32Rule, identifier:String, labels:Set<String>, role:St
     (rule.region == nil || ancestors.contains(rule.region!)) && (rule.labels.isEmpty || !rule.labels.isDisjoint(with:labels))
 }
 // Both production actions and fault controls use this exact pre/action/post sequence.
+// A posted native-picker action changes the applicable identity scope, not its owner.
+enum UI32IdentityPhase:Equatable { case content, nativePicker, nativePickerCompletion }
+func ui32IdentityPhase(_ command:String?, fixtureActive:Bool, syncActive:Bool) throws -> UI32IdentityPhase {
+  try check(!(fixtureActive && syncActive))
+  if !fixtureActive && !syncActive { return .content }
+  guard let command else { throw Refusal(code:"adapter-refused") }
+  let allowed:Set<String> = fixtureActive ?
+    ["fixture.open","fixture.observe","fixture.choose","fixture.confirm","fixture.cancel","fixture.complete","quit"] :
+    ["sync.open-cancel","sync.panel-observe","sync.cancel-only","sync.complete","quit"]
+  try check(allowed.contains(command))
+  return command == "fixture.complete" || command == "sync.complete" ? .nativePickerCompletion : .nativePicker
+}
+func ui32ActionCause(_ error:Error) -> [String:Any] {
+  if let value=error as? IdentityRefusal { return ["kind":"identity","stage":value.stage,"facts":value.facts] }
+  if let value=error as? ActionRefusal { return ["kind":"action","facts":value.diagnostics] }
+  if let value=error as? SelectionRefusal { return ["kind":"selection","facts":value.diagnostics] }
+  if let value=error as? Refusal { return ["kind":"refusal","code":value.code] }
+  return ["kind":"unexpected-error"]
+}
 func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, _ action:() throws -> Void,
   postScope:() throws -> Void, posted:() -> Void) throws {
   try identity(); try scope(); try identity(); try action(); posted(); try identity(); try postScope()
 }
 func ui32SelfTest() throws {
+  try ui32IdentityPhaseSelfTest()
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
     try check(!ui32ModeAllowed(mode))
     var refused=false
@@ -138,3 +158,38 @@ func ui32ModeAllowed(_ mode:String) -> Bool { ["--ui32-persistent","--ui32-self-
 func ui32ActionAdmitted(_ observed:Bool) -> Bool { observed }
 
 func ui32RequireObserved(_ observed:Bool) throws { try check(ui32ActionAdmitted(observed)) }
+
+// These controls exercise the production action ordering and phase predicate.
+func ui32IdentityPhaseSelfTest() throws {
+  try check(try ui32IdentityPhase(nil,fixtureActive:false,syncActive:false) == .content)
+  for fixture in [true,false] {
+    let allowed=fixture ? ["fixture.open","fixture.observe","fixture.choose","fixture.confirm","fixture.cancel","fixture.complete","quit"] :
+      ["sync.open-cancel","sync.panel-observe","sync.cancel-only","sync.complete","quit"]
+    for command in allowed {
+      let phase=try ui32IdentityPhase(command,fixtureActive:fixture,syncActive:!fixture)
+      try check(phase == (command.hasSuffix(".complete") ? .nativePickerCompletion : .nativePicker))
+    }
+    for denied in [nil,"observe","capture","settings.open","motion.shortcut",fixture ? "sync.complete" : "fixture.choose"] as [String?] {
+      var actions=0,refused=false
+      do { try ui32GuardedAction({ _ = try ui32IdentityPhase(denied,fixtureActive:fixture,syncActive:!fixture) },{},
+        {actions += 1},postScope:{},posted:{}) } catch { refused=true }
+      try check(refused && actions == 0)
+    }
+  }
+  var refused=false
+  do { _ = try ui32IdentityPhase("fixture.observe",fixtureActive:true,syncActive:true) } catch { refused=true }
+  try check(refused)
+  for loseOwner in [false,true] {
+    var active=false,phases=[UI32IdentityPhase](),actions=0,posts=0,failed=false
+    do { try ui32GuardedAction({
+      phases.append(try ui32IdentityPhase("fixture.open",fixtureActive:active,syncActive:false))
+      if active && loseOwner { throw IdentityRefusal(stage:"process-start",facts:["processStartMatches":false]) }
+    },{}, {actions += 1},postScope:{try check(active)},posted:{active=true;posts += 1}) } catch { failed=true }
+    try check(phases == [.content,.content,.nativePicker] && actions == 1 && posts == 1 && failed == loseOwner)
+  }
+  let identity=ui32ActionCause(IdentityRefusal(stage:"process-start",facts:["processStartMatches":false]))
+  try check(identity["kind"] as? String == "identity" && identity["stage"] as? String == "process-start")
+  let action=ui32ActionCause(ActionRefusal(diagnostics:["stage":"parent-edge"]))
+  try check((action["facts"] as? [String:String])?["stage"] == "parent-edge")
+  try check(ui32ActionCause(Refusal(code:"child-owner"))["code"] as? String == "child-owner")
+}
