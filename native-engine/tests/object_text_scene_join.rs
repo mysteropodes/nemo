@@ -200,17 +200,19 @@ fn parented_text_refuses_atomically_and_keeps_old_witness_usable() {
         .unwrap()
         .push(json!({"layerUid":"parent","naturalPosition":1,"order":{}}));
     doc["layers"][0]["parentLayerUid"] = json!("parent");
-    let foreign = owner(&doc);
-    let other = support::head(&foreign);
-    let pins = selector(&other, 0);
-    let packet = prepare_object_exposure_frame(&other, &pins).unwrap();
-    assert!(matches!(
-        prepare_object_render_scene(&packet, &pins),
-        Err(ObjectSceneError::UnsupportedGeometry {
-            source_object_index: 2,
-            ..
-        })
-    ));
+    // Parenting is refused by native admission before a scene can be prepared.
+    // The storage wrapper preserves its first (v1) error, so check the explicit
+    // ordered codec too rather than inventing an inadmissible native owner.
+    use crate::object_codec::{
+        decode_ordered_project, decode_storage_project, ObjectCodecErrorKind,
+    };
+    let encoded = serde_json::to_vec(&doc).unwrap();
+    let ordered_error = decode_ordered_project(&encoded).unwrap_err();
+    assert_eq!(ordered_error.kind(), ObjectCodecErrorKind::Unsupported);
+    assert_eq!(ordered_error.message(), "layer parenting is unavailable");
+    let storage_error = decode_storage_project(&encoded).unwrap_err();
+    assert_eq!(storage_error.kind(), ObjectCodecErrorKind::Unsupported);
+    assert_eq!(serde_json::to_vec(&doc).unwrap(), encoded);
     assert_eq!(support::state(&o), bytes);
     retained
         .verify_scene_resources(
