@@ -887,7 +887,14 @@ func selfTest() throws {
 func run() throws {
   let args = CommandLine.arguments
   if args == [args[0], "--self-test"] { try selfTest(); return }
+  #if UI32_VALIDATION
+  try check(args.count > 1 && ui32ModeAllowed(args[1]))
+  if args.count > 1 && args[1] == "--ui32-self-test" { try ui32SelfTest(); return }
+  if args.count > 1 && args[1] == "--ui32-persistent" { try runUI32(args,ProcessInfo.processInfo.environment); return }
+  throw Refusal(code:"adapter-refused")
+  #else
   if args.count == 4 && args[1] == "--p38-cg-sample" { try cgWindowSampleWorker(args); return }
+  #endif
   let initialWindow = try discoverOwnedInitialWindow(args,ProcessInfo.processInfo.environment)
   let scope = initialWindow.scope, pid = initialWindow.pid, pinnedProcessStart = initialWindow.start
   let number = initialWindow.number, physical = initialWindow.physical, reportIdentity = initialWindow.reportIdentity
@@ -1119,32 +1126,7 @@ func run() throws {
     let status = transitionObservationStatus(samples,overrun)
     return result(status,samples)
   }
-  func verify() throws {
-    guard processStart(pid) == pinnedProcessStart else {
-      throw IdentityRefusal(stage:"process-start",facts:["processStartMatches":false])
-    }
-    var actualPID: pid_t = 0
-    let ownerError = AXUIElementGetPid(main,&actualPID)
-    var rawWindows: CFTypeRef?
-    let windowsError = AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&rawWindows)
-    let windows = windowsError == .success ? rawWindows as? [AXUIElement] : nil
-    let pinnedAXMember = windows?.contains { CFEqual($0,main) } ?? false
-    var rawMinimized: CFTypeRef?
-    let minimizedError = AXUIElementCopyAttributeValue(main,kAXMinimizedAttribute as CFString,&rawMinimized)
-    let minimizedValue = minimizedError == .success ? (rawMinimized as? Bool) : nil
-    let minimizedReadable = minimizedValue != nil, minimized = minimizedValue ?? false
-    let cgRows = cg(true), identities = cgRows?.filter { $0[kCGWindowNumber as String] as? UInt32 == number } ?? []
-    let stage = identityFailureStage(Int(ownerError.rawValue),ownerError == .success && actualPID == pid,
-      Int(windowsError.rawValue),windows != nil,pinnedAXMember,Int(minimizedError.rawValue),minimizedReadable,minimized,cgRows != nil,identities.count)
-    guard let stage else { return }
-    // Keep the pinned AX object and original CGWindowID; record facts without rediscovery.
-    var facts: [String:Any] = ["axPidQueryError":Int(ownerError.rawValue),"axPidMatches":ownerError == .success && actualPID == pid,
-      "applicationWindowsQueryError":Int(windowsError.rawValue),"applicationWindowsReadable":windows != nil,
-      "pinnedAXWindowMember":pinnedAXMember,"minimizedQueryError":Int(minimizedError.rawValue),
-      "minimizedReadable":minimizedReadable,"minimized":minimized,"pinnedCGWindowListReadable":cgRows != nil]
-    if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
-    throw IdentityRefusal(stage:stage,facts:facts)
-  }
+  func verify() throws { try verifyOwnedWindow(initialWindow) }
   func node(_ value: String, _ root: AXUIElement, owner expectedPID:pid_t? = nil) throws -> AXUIElement {
     var current = root
     for index in try route(value) {
