@@ -1,9 +1,15 @@
-// Only the already admitted Initial-text fixture; no caller-selected file or route.
+// Two reviewed fixed fixture presets; no caller-selected filename, bytes or route.
 import Foundation
 import ApplicationServices
 import CryptoKit
 
 let ui32FixtureHash="642bc4c681373c9a4e7ab3c1795f024ee1c7f277ac255298c5fdf8e1f57c8831"
+let ui32F03FixtureHash="7fba834f64254aa27b828e0fc0fb7e2715977aea282a2b188c09782cb258bed2"
+func ui32UsesF03Fixture(_ raw:String?) throws -> Bool {
+  if raw == nil || raw == "initial-text" { return false }
+  guard raw == "f03-original" else { throw Refusal(code:"adapter-refused") }
+  return true
+}
 func ui32FixtureURLMatches(_ observed:URL?, _ expected:URL) -> Bool {
   observed?.isFileURL == true && observed?.standardizedFileURL == expected
 }
@@ -12,15 +18,25 @@ final class UI32Fixture {
   let fixture:URL
   var attempted=false, completed=false, confirmed=false
   let cancelOnly:Bool
+  let f03Original:Bool
+  let afterDismissal:() throws -> Void
   var sheet:AXUIElement?, root:AXUIElement?, parent:AXUIElement?, owner:pid_t?, start:ProcessStart?
   var selected:AXUIElement?
-  init(_ pinned:OwnedInitialWindow, _ environment:[String:String], cancelOnly:Bool=false) throws {
-    self.pinned=pinned;self.cancelOnly=cancelOnly
+  init(_ pinned:OwnedInitialWindow, _ environment:[String:String], cancelOnly:Bool=false, afterDismissal:@escaping () throws -> Void) throws {
+    self.pinned=pinned;self.cancelOnly=cancelOnly;self.afterDismissal=afterDismissal
+    self.f03Original=try ui32UsesF03Fixture(environment["NEMO_UI32_FIXTURE_KIND"])
     guard let path=environment["NEMO_UI32_FIXTURE"], path.hasPrefix("/") else { throw Refusal(code:"adapter-refused") }
     fixture=URL(fileURLWithPath:path).standardizedFileURL
     try fileProof()
   }
   func fileProof() throws {
+    if f03Original {
+      try check(fixture.resolvingSymlinksInPath() == fixture && fixture.lastPathComponent == "candidate.project.json")
+      let attributes=try FileManager.default.attributesOfItem(atPath:fixture.path)
+      try check(attributes[.type] as? FileAttributeType == .typeRegular && (attributes[.size] as? NSNumber)?.intValue == 7744)
+      let bytes=try Data(contentsOf:fixture);try check(SHA256.hash(data:bytes).map {String(format:"%02x",$0)}.joined() == ui32F03FixtureHash)
+      return
+    }
     try check(fixture.resolvingSymlinksInPath() == fixture && fixture.lastPathComponent == "Initial-text.json")
     let attributes=try FileManager.default.attributesOfItem(atPath:fixture.path)
     try check(attributes[.type] as? FileAttributeType == .typeRegular && (attributes[.size] as? NSNumber)?.intValue == 7791)
@@ -132,10 +148,9 @@ final class UI32Fixture {
     let command=requested == "sync.cancel-only" ? "fixture.cancel" : requested == "sync.complete" ? "fixture.complete" : requested == "sync.panel-observe" ? "fixture.observe" : requested
     try check(attempted && !completed);try fileProof();try verifyOwnedWindow(pinned)
     if command == "fixture.complete" {
-      guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement], windows.count == 1,
-        owns(windows[0],pinned.pid),CFEqual(windows[0],pinned.main) else { throw Refusal(code:"sheet-active") }
-      let finalTree=try ownedTree(pinned.main,pinned.pid)
-      try check(!finalTree.contains { attr($0,kAXRoleAttribute) as? String == kAXSheetRole });completed=true
+      guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement] else { throw Refusal(code:"sheet-active") }
+      let absent=windows.count == 1 && owns(windows[0],pinned.pid) && CFEqual(windows[0],pinned.main)
+      try ui32FinishAfterDismissal(absent,certificate:afterDismissal,finish:{completed=true})
       return ["complete":true,"fixtureConfirmed":confirmed,"note":"Requires actual native SDK fixture baseline; not acceptance."]
     }
     let (rows,pid)=try panel()
@@ -198,7 +213,24 @@ func ui32SingleSelection<Node>(_ rows:[Node], _ selection:[Node], _ expected:Nod
   }
   try check(count == 1)
 }
+func ui32FinishAfterDismissal(_ windowAbsent:Bool, certificate:() throws -> Void, finish:()->Void) throws {
+  try ui32ScopeCheck(windowAbsent,"native-window-present");try certificate();finish()
+}
 func ui32FixtureSelfTest() throws {
+  try check(try ui32UsesF03Fixture(nil) == false)
+  try check(try ui32UsesF03Fixture("initial-text") == false)
+  try check(try ui32UsesF03Fixture("f03-original") == true)
+  for unknown in ["","Initial-text","f03","/private/tmp/candidate.project.json","other"] {
+    var refused=false;do { _ = try ui32UsesF03Fixture(unknown) } catch { refused=true };try check(refused)
+  }
+  try ui32ContentScopeSelfTest()
+  for failure in ["none","window","certificate"] {
+    var completed=false,refused=false
+    do { try ui32FinishAfterDismissal(failure != "window",certificate:{
+      if failure == "certificate" { throw Refusal(code:"adapter-refused") }
+    },finish:{completed=true}) } catch { refused=true }
+    try check(completed == (failure == "none") && refused == (failure != "none"))
+  }
   for fault in ["none","extra","wrong","foreign","unreadable","missing"] {
     var refused=false
     do { try ui32SingleSelection([1,2],fault == "extra" ? [1,2] : fault == "wrong" ? [2] : [1],1,equal:==,
@@ -212,4 +244,77 @@ func ui32FixtureSelfTest() throws {
   try check(ui32FixtureURLMatches(expected,expected))
   try check(!ui32FixtureURLMatches(nil,expected) && !ui32FixtureURLMatches(URL(string:"https://example.invalid/Initial-text.json"),expected))
   try check(!ui32FixtureURLMatches(URL(fileURLWithPath:"/private/other/Initial-text.json"),expected))
+}
+
+// These injected AX ports exercise the SAME certificate and unchanged strict
+// walker used by production. No native app/AX read is part of this self-test.
+func ui32ContentScopeSelfTest() throws {
+  let faults=["none","no-web","multiple","nested","replaced","foreign","owner-error","unreadable",
+    "role-error","timeout","parent-unreadable","parent-outside","root-path","inside-edge","sheet","modal",
+    "inside-sheet","inside-html-dialog","window","alias","children-limit","depth","nodes","deadline","changed","root-path-changed"]
+  for fault in faults {
+    var graph=[0:[1,3],1:[2],2:[],3:[4],4:[]],parents=[1:0,2:1,3:0,4:0]
+    var roles=[0:"AXWindow",1:"AXWebArea",2:"AXButton",3:"AXButton",4:"AXGroup"]
+    if fault == "no-web" { roles[1]="AXGroup" }
+    if fault == "multiple" { roles[3]="AXWebArea" }
+    if fault == "nested" { roles[2]="AXWebArea" }
+    if fault == "root-path" { parents[1]=3 }
+    if fault == "parent-outside" { parents[4]=99 }
+    if fault == "inside-edge" { parents[2]=0 }
+    if fault == "sheet" { roles[4]="AXSheet" }
+    if fault == "inside-sheet" { roles[2]="AXSheet" }
+    if fault == "window" { roles[4]="AXWindow" }
+    if fault == "alias" { graph[0]=[1,3,1] }
+    if fault == "children-limit" { graph[0]=Array(repeating:1,count:513) }
+    if fault == "depth" {
+      for i in 0...13 { graph[i]=i < 13 ? [i+1] : [];if i>0 { parents[i]=i-1;roles[i]=i == 1 ? "AXWebArea" : "AXGroup" } }
+    }
+    if fault == "nodes" {
+      graph[0]=Array(1...512)
+      for i in 1...512 { graph[i]=[];parents[i]=0;roles[i]=i == 1 ? "AXWebArea" : "AXGroup" }
+    }
+    var attributeReads=[Int](),refused=false,reason="",completed=false,result:UI32ContentCertificate<Int>?
+    let owner:(Int)->(Int,Bool,Int)={ node in
+      if fault == "owner-error" && node == 4 { return (-1,false,0) }
+      return (0,!(fault == "foreign" && node == 4),fault == "foreign" && node == 4 ? 8 : 7)
+    }
+    let children:(Int)->(Int,[Int]?)={ node in
+      attributeReads.append(node);return fault == "unreadable" && node == 4 ? (-1,nil) : (0,graph[node] ?? [])
+    }
+    let parent:(Int)->(Int,Int?)={ node in
+      attributeReads.append(node);return fault == "parent-unreadable" && node == 4 ? (-1,nil) : (0,parents[node])
+    }
+    do {
+      try ui32FinishAfterDismissal(true,certificate:{
+      result=try ui32ContentCertificate(0,pid:7,retained:fault == "replaced" ? 99 : nil,deadline:10,
+        now:{fault == "deadline" ? 10 : 0},equal:==,owner:owner,prepare:{node in fault != "timeout" || node != 4},traits:{ node in
+          attributeReads.append(node)
+          if fault == "role-error" && node == 4 { throw Refusal(code:"adapter-refused") }
+          return (roles[node] ?? "AXGroup",(fault == "modal" && node == 4) || (fault == "inside-html-dialog" && node == 2))
+        },children:children,parent:parent,strict:{ web,deadline in
+          if fault == "changed" { graph[1]=[2,6];parents[6]=1;roles[6]="AXGroup" }
+          if fault == "root-path-changed" { parents[1]=3 }
+          return try boundedOwnedTree(web,owner:7,deadline:deadline,now:{0},equal:==,owner:owner,children:children,parent:parent)
+        })
+      },finish:{completed=true})
+    } catch let error as ActionRefusal { refused=true;reason=error.diagnostics["stage"] as? String ?? "" }
+    catch { refused=true }
+    try check(refused == (fault != "none" && fault != "inside-html-dialog"))
+    try check(completed == (!refused))
+    if fault == "inside-sheet" { try check(!completed) }
+    if fault == "inside-edge" { try check(reason == "parent-edge") }
+    if fault == "foreign" || fault == "owner-error" { try check(!attributeReads.contains(4)) }
+    if fault == "none" {
+      try check(result!.inside == Set([1,2]) && result!.outsideMismatches == [4])
+      // The original whole-window reciprocal result remains a failure.
+      var originalRefused=false
+      do { _ = try boundedOwnedTree(0,owner:7,deadline:10,now:{0},equal:==,owner:owner,children:children,parent:parent) }
+      catch let error as ActionRefusal { originalRefused=error.diagnostics["stage"] as? String == "parent-edge" }
+      try check(originalRefused)
+    }
+  }
+  try check(try ui32ScopedCandidate([2],[]) == 2)
+  for values in [([Int](),[Int]()),([1,2],[]),([2],[3])] {
+    var refused=false;do { _ = try ui32ScopedCandidate(values.0,values.1) } catch { refused=true };try check(refused)
+  }
 }
