@@ -1,4 +1,6 @@
 //! Bounded local IPC; no shell, eval, document mirror, or public network listener.
+#[path = "native_request_bytes.rs"]
+mod native_request_bytes;
 #[path = "raw_envelope.rs"]
 mod raw_envelope;
 #[path = "stdio_transport.rs"]
@@ -180,7 +182,22 @@ pub fn decode_json_bounded<T: serde::de::DeserializeOwned>(
         }
         raw_envelope::RawEnvelopeError::Malformed(error) => io::Error::from(error),
     })?;
+    native_request_bytes::check(bytes)?;
     Ok(serde_json::from_slice(bytes)?)
+}
+
+/// Full original/typed vector request limit; every reply and other request stays4096.
+pub fn native_request_byte_limit(operation: &str) -> usize {
+    native_request_bytes::request_limit(operation)
+}
+/// Original-byte, duplicate-first, map-only admission; not execution availability.
+pub fn decode_native_request(bytes: &[u8]) -> io::Result<NativeApplicationRequest> {
+    let request: NativeApplicationRequest = decode_json_bounded(bytes, MAX_MESSAGE_BYTES - 2)?;
+    if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
+        return Err(io::Error::other("native request must be an object"));
+    }
+    request.validate_input().map_err(io::Error::other)?;
+    Ok(request)
 }
 
 pub async fn call(
@@ -234,11 +251,7 @@ pub async fn call_native(
         let response: NativeApplicationResponse =
             read_json_bounded(stream, NATIVE_MAX_MESSAGE_BYTES).await?;
         validate_native_response(&response, &response_contract)?;
-        let reports_replacement = !response.ok
-            && response
-                .error
-                .as_ref()
-                .is_some_and(|error| error.code == "wrong_document");
+        let reports_replacement = response_owner::reports_document(&response_contract, &response);
         if response.api_version != NATIVE_API_VERSION
             || response.request_id != request_id
             || response.instance_id != endpoint.instance_id
@@ -256,24 +269,11 @@ fn validate_native_response(
     request: &NativeApplicationRequest,
 ) -> io::Result<()> {
     let policy_command = request.operation == crate::native_contract::layer_policy::OP;
+    let track_command = request.operation == crate::native_contract::property_track::OP;
+    let property_edit = request.operation == crate::native_contract::property_edit::OP;
+    let property_read = request.operation == crate::native_contract::property_read::OP;
     let frame_edit_command = crate::native_contract::frame_edit::declares(&request.operation);
-    let correlated_operation = request.operation == crate::native_contract::metadata::OP
-        || policy_command
-        || frame_edit_command
-        || crate::native_contract::object_edit::admitted(&request.operation)
-        || crate::native_contract::object_rig::admitted(&request.operation)
-        || crate::native_contract::object_component::admitted(&request.operation)
-        || crate::native_contract::import::admitted(&request.operation);
-    let correlated_identity = !correlated_operation
-        || (response.request_id == request.request_id
-            && response.instance_id == request.instance_id
-            && (response.document_id == request.document_id
-                || (!response.ok
-                    && response
-                        .error
-                        .as_ref()
-                        .is_some_and(|e| e.code == "wrong_document")))
-            && serde_json::to_vec(response).is_ok_and(|b| b.len() <= NATIVE_MAX_MESSAGE_BYTES));
+    let correlated_identity = response_owner::correlated(request, response);
     let identity_is_valid = correlated_identity
         && response.api_version == NATIVE_API_VERSION
         && bounded_identifier(&response.request_id)
@@ -293,11 +293,16 @@ fn validate_native_response(
                     "query.document.object"
                         | "query.document.object.layer.timing"
                         | crate::native_contract::metadata::OP
+                        | crate::native_contract::text_read::OP
+                        | crate::native_contract::property_read::OP
                 ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
                     == Some(response.content_revision))
                 && (!matches!(
                     request.operation.as_str(),
-                    "query.document.object.layer.timing" | crate::native_contract::metadata::OP
+                    "query.document.object.layer.timing"
+                        | crate::native_contract::metadata::OP
+                        | crate::native_contract::text_read::OP
+                        | crate::native_contract::property_read::OP
                 ) || (response.instance_id == request.instance_id
                     && response.document_id == request.document_id
                     && result.get("instanceId").and_then(serde_json::Value::as_str)
@@ -317,6 +322,18 @@ fn validate_native_response(
                     ))
                 && (!policy_command
                     || crate::native_contract::layer_policy::revision_matches(
+                        request.expected_revision,
+                        response.content_revision,
+                        result,
+                    ))
+                && (!property_edit
+                    || crate::native_contract::property_edit::revision_matches(
+                        request.expected_revision,
+                        response.content_revision,
+                        result,
+                    ))
+                && (!track_command
+                    || crate::native_contract::property_track::revision_matches(
                         request.expected_revision,
                         response.content_revision,
                         result,
@@ -470,3 +487,25 @@ mod failure_tests;
 #[cfg(test)]
 #[path = "native_layer_policy_wire_tests.rs"]
 mod layer_policy_tests;
+
+#[cfg(test)]
+#[path = "native_property_track_wire_tests.rs"]
+mod property_track_tests;
+
+#[cfg(test)]
+#[path = "native_property_read_wire_tests.rs"]
+mod property_read_tests;
+
+#[cfg(test)]
+#[path = "native_property_edit_wire_tests.rs"]
+mod property_edit_tests;
+
+#[cfg(test)]
+#[path = "native_text_read_wire_tests.rs"]
+mod text_read_tests;
+
+#[cfg(test)]
+#[path = "native_image_import_owner_wire_tests.rs"]
+mod image_owner_tests;
+#[path = "native_wire_response_owner.rs"]
+mod response_owner;

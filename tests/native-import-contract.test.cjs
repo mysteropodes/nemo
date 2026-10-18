@@ -117,10 +117,10 @@ test('the result is the compact receipt: closed members, one history entry iff a
 });
 
 test('correlation: same owner and document, revision advances by exactly the applied edit', () => {
-  const request = { operation: OP, instanceId: 'i', documentId: 'd', expectedRevision: 7 };
-  const good = (revision, applied) => ({ instanceId: 'i', documentId: 'd', ok: true, contentRevision: revision, result: { applied } });
+  const request = { operation: OP, instanceId: 'i', documentId: 'd', expectedRevision: 7, payload:{command:'object.import.batch',layers:[{sourceId:'w',name:'Wire'}],records:[]} };
+  const good = (revision, applied) => ({ instanceId: 'i', documentId: 'd', ok: true, contentRevision: revision, result: { applied,historyEntriesAdded:applied?1:0,layers:applied?[{sourceId:'w',layerUid:'native-layer:8:0'}]:[],objects:[],skipped:[] } });
   assert.doesNotThrow(() => contract.correlate(request, good(8, true)));
-  assert.doesNotThrow(() => contract.correlate(request, good(7, false)));
+  assert.doesNotThrow(() => contract.correlate({...request,payload:{...request.payload,layers:[]}}, good(7, false)));
   assert.throws(() => contract.correlate(request, good(7, true)), /revision mismatch/);
   assert.throws(() => contract.correlate(request, good(8, false)), /revision mismatch/);
   assert.throws(() => contract.correlate(request, Object.assign(good(8, true), { instanceId: 'x' })), /owner mismatch/);
@@ -169,5 +169,23 @@ test('the shared parity table: every named edit is judged as the table declares 
     let accepted = true;
     try { contract.payload(OP, payload); } catch (_) { accepted = false; }
     assert.equal(accepted, row.valid, row.label);
+  }
+});
+
+test('import receipts cannot drop, duplicate or substitute declared mappings or forge a no-op', () => {
+  const q={instanceId:'i',documentId:'d',expectedRevision:7,payload:{command:'object.import.batch',layers:[{sourceId:'a',name:'A'},{sourceId:'b',name:'B'}],records:[],skipped:[{kind:'asset',sourceId:'skipped',reason:'unsupported'}]}};
+  const value={applied:true,historyEntriesAdded:1,layers:[{sourceId:'a',layerUid:'native-a'},{sourceId:'b',layerUid:'native-b'}],objects:[],skipped:q.payload.skipped};
+  const reply=result=>({instanceId:'i',documentId:'d',contentRevision:result.applied?8:7,ok:true,result});
+  assert.doesNotThrow(()=>contract.correlate(q,reply(value)));
+  for(const mutate of [r=>r.layers.pop(),r=>r.layers[1].sourceId='a',r=>r.layers[0].sourceId='foreign',r=>r.layers[1].layerUid='native-a',r=>r.skipped[0].reason='changed']){
+    const r=structuredClone(value);mutate(r);contract.result(OP,r);assert.throws(()=>contract.correlate(q,reply(r)),/declared batch/);
+  }
+  assert.throws(()=>contract.correlate(q,reply({applied:false,historyEntriesAdded:0,layers:[],objects:[],skipped:q.payload.skipped})),/declared batch/);
+  assert.throws(()=>contract.correlate({...q,payload:{...q.payload,unavailable:[{sourceId:'raster',need:'raster-asset'}]}},reply(value)),/declared batch/);
+  const withRecords={...q,payload:{...q.payload,records:[{sourceId:'one',record:record('a',0)},{sourceId:'two',record:record('b',1)}]}};
+  const complete={...value,objects:[{sourceId:'one',strokeId:'native-one'},{sourceId:'two',strokeId:'native-two'}]};
+  assert.doesNotThrow(()=>contract.correlate(withRecords,reply(complete)));
+  for(const mutate of [r=>r.objects.pop(),r=>r.objects[1].sourceId='one',r=>r.objects[0].sourceId='foreign',r=>r.objects[1].strokeId='native-one',r=>r.skipped=[]]){
+    const r=structuredClone(complete);mutate(r);contract.result(OP,r);assert.throws(()=>contract.correlate(withRecords,reply(r)),/declared batch/);
   }
 });

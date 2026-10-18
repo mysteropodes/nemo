@@ -1,4 +1,4 @@
-//! Private main-window object PNG route; no SDK/MCP capability activation.
+//! Private main-window object PNG/SVG route; no SDK/MCP capability activation.
 use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::{
     bounded_id, host_error, reconcile_export, require_api_instance, require_main, HostResult,
@@ -33,6 +33,14 @@ const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const MAX_PNG_BYTES: usize = 4 * 1024 * 1024;
 const OUTPUT_HANDLE: &str = "object-output";
 
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum ObjectExportFormat {
+    #[default]
+    Png,
+    Svg,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ObjectExportRequest {
@@ -52,6 +60,8 @@ struct ObjectExportRequest {
     viewport: ViewportInput,
     destination_directory: String,
     maximum_encoded_bytes: usize,
+    #[serde(default)]
+    format: ObjectExportFormat,
     #[serde(default)]
     cancelled_before_dispatch: bool,
 }
@@ -79,7 +89,7 @@ struct AdmittedExport {
     mapping: ViewportMapping,
 }
 
-/// The destination is a new directory containing the exact PNG manifest.
+/// The destination is a new directory containing the exact ordinal frame manifest.
 fn admit_request(
     raw: &str,
     instance: &str,
@@ -231,13 +241,32 @@ struct ObjectExportConsumer<'a> {
     request_id: String,
     output: OutputSpec,
     maximum_encoded_bytes: usize,
+    format: ObjectExportFormat,
     destination: PathBuf,
     staging_root: PathBuf,
 }
 impl ObjectExportConsumer<'_> {
     fn run(self, compositor: &mut Compositor) -> Result<ObjectHostExportOutcome, String> {
-        let mut port =
-            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination);
+        let mut port = if self.format == ObjectExportFormat::Svg {
+            LazyDesktopArtifactPort::new_svg(
+                self.staging_root,
+                OUTPUT_HANDLE.into(),
+                self.destination,
+            )
+        } else {
+            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination)
+        };
+        if self.format == ObjectExportFormat::Svg {
+            return self.owner.export_pinned_object_svg_frames(
+                &self.selector,
+                &self.frames,
+                self.request_id,
+                OUTPUT_HANDLE.into(),
+                self.output,
+                self.maximum_encoded_bytes,
+                &mut port,
+            );
+        }
         self.owner.export_pinned_object_png_frames(
             &self.selector,
             &self.frames,
@@ -283,6 +312,7 @@ fn export_with_target(
                 request_id: admitted.request.request_id.clone(),
                 output: admitted.output.clone(),
                 maximum_encoded_bytes: admitted.request.maximum_encoded_bytes,
+                format: admitted.request.format,
                 destination: admitted.destination.clone(),
                 staging_root,
             }))
@@ -328,3 +358,7 @@ pub(crate) async fn nemo_native_object_export(
 #[cfg(test)]
 #[path = "native_object_desktop_export_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_object_svg_desktop_export_tests.rs"]
+mod svg_tests;

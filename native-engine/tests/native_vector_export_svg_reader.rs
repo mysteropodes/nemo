@@ -7,21 +7,21 @@ const PREAMBLE: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 const ROOT_OPEN: &str = "<svg xmlns=\"http://www.w3.org/2000/svg\" ";
 
 #[derive(Debug, PartialEq)]
-pub(super) struct ParsedPath {
-    pub(super) start: [f64; 2],
+pub(crate) struct ParsedPath {
+    pub(crate) start: [f64; 2],
     /// One entry per `C`: [control out, control in, end].
-    pub(super) curves: Vec<[[f64; 2]; 3]>,
-    pub(super) closed: bool,
-    pub(super) percent_text: [String; 3],
-    pub(super) alpha: f64,
-    pub(super) fill_rule: String,
+    pub(crate) curves: Vec<[[f64; 2]; 3]>,
+    pub(crate) closed: bool,
+    pub(crate) percent_text: [String; 3],
+    pub(crate) alpha: f64,
+    pub(crate) fill_rule: String,
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct ParsedSvg {
-    pub(super) width: u32,
-    pub(super) height: u32,
-    pub(super) paths: Vec<ParsedPath>,
+pub(crate) struct ParsedSvg {
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) paths: Vec<ParsedPath>,
 }
 
 fn attr<'a>(tag: &'a str, name: &str) -> Result<&'a str, String> {
@@ -89,7 +89,7 @@ fn parse_path(line: &str) -> Result<ParsedPath, String> {
     })
 }
 
-pub(super) fn parse(bytes: &[u8]) -> Result<ParsedSvg, String> {
+pub(crate) fn parse(bytes: &[u8]) -> Result<ParsedSvg, String> {
     let text = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
     let rest = text.strip_prefix(PREAMBLE).ok_or("missing XML preamble")?;
     let (root, rest) = rest.split_once('\n').ok_or("missing root line")?;

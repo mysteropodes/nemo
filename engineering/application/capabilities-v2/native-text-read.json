@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.text-read",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.text"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectTextReadPayload"
+  },
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectTextReadResult"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "Read-only authoritative text items at exact instance/document/revision/snapshot and native context/frame target. Bounded whole-target pagination and UTF-8 content chunks; no layout/hit bounds fabricated, writable mirror, mutation or receipt retry.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "maxProviderResponseBytes": 3072,
+    "maxTargetsPerPage": 8,
+    "maxTextChunkBytes": 1024,
+    "policy": "Complete encoded response or typed refusal. Escaped text chunks may be shorter with explicit nextOffset; no identity/text loss."
+  },
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "not_found",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Empty exact native text target page (contract example, not an installed receipt)",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "text-targets",
+        "instanceId": "text-fixture",
+        "documentId": "document",
+        "operation": "query.document.object.text",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document:0",
+          "view": {
+            "kind": "targets",
+            "scope": {
+              "contextId": "scene-root",
+              "layerUid": "L0",
+              "frameScope": {
+                "kind": "authored",
+                "frame": 0
+              }
+            },
+            "offset": 0,
+            "limit": 8
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "text-targets",
+        "instanceId": "text-fixture",
+        "documentId": "document",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "text-fixture",
+          "documentId": "document",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document:0",
+          "kind": "targets",
+          "scope": {
+            "contextId": "scene-root",
+            "layerUid": "L0",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 0
+            }
+          },
+          "offset": 0,
+          "total": 0,
+          "items": [],
+          "nextOffset": null
+        }
+      }
+    }
+  ],
+  "supportedContext": "scene-root; exact native authored/reference scope only. No inferred held/interpolated identities or hit bounds."
+}

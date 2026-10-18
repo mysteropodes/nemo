@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.asset.remove",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "unavailable",
+    "reason": "native asset removal host route is not registered"
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.asset.remove"
+  ],
+  "input": {
+    "$ref": "../native-object-item-v1.schema.json#/$defs/AssetRemove"
+  },
+  "output": {
+    "$ref": "../native-object-item-v1.schema.json#/$defs/AssetCommandResult"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document, glyph or pixel payload in either direction."
+  },
+  "semantics": "Remove remains typed unavailable. A PNG placement import does not register or activate catalog removal.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": []
+}

@@ -94,10 +94,10 @@
           expectedRevision: pin.contentRevision, operation, payload: build(pin),
         };
         try { contract.payload(operation, request.payload); } catch (bad) { throw fault('invalid_request', bad.message, { reason: 'local_validation' }); }
-        const size = contract.bytes(JSON.stringify(request));
-        if (size > contract.MAX_REQUEST_BYTES) {
-          throw fault('request_too_large', `Native ${label} request is ${size} encoded bytes; the public transport bound is ${contract.MAX_REQUEST_BYTES}`,
-            { reason: 'request_size', bytes: size, limit: contract.MAX_REQUEST_BYTES });
+        const size = contract.bytes(JSON.stringify(request)), limit = contract.requestByteLimit(operation);
+        if (size > limit) {
+          throw fault('request_too_large', `Native ${label} request is ${size} encoded bytes; the public transport bound is ${limit}`,
+            { reason: 'request_size', bytes: size, limit });
         }
         return settle(ctx, request, key, finish);
       });

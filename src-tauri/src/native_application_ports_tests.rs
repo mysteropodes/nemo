@@ -286,3 +286,111 @@ fn unavailable_destination_parent_keeps_stage_until_explicit_cleanup() {
     assert!(port.stages["job"].path.join("frame_0000.png").exists());
     port.cleanup("job").unwrap();
 }
+
+fn svg_port(scratch: &Scratch) -> DesktopArtifactPort {
+    DesktopArtifactPort::new_svg(
+        scratch.0.join("staging"),
+        [("svg-output".into(), scratch.0.join("output"))],
+    )
+    .unwrap()
+}
+
+#[test]
+fn default_png_port_keeps_its_original_names_and_refuses_svg() {
+    let scratch = Scratch::new();
+    let mut port = scratch.port();
+    port.begin_staging("png", "opaque:output").unwrap();
+    assert!(port
+        .write_frame("png", "frame_0000.svg", b"<svg/>")
+        .is_err());
+    port.write_frame("png", "frame_0000.png", b"original PNG port bytes")
+        .unwrap();
+    assert!(port
+        .publish("png", "opaque:output", &["frame_0000.svg".into()])
+        .is_err());
+    let artifact = port.publish("png", "opaque:output", &names()).unwrap();
+    assert_eq!(artifact.files, ["frame_0000.png"]);
+    assert_eq!(
+        fs::read(scratch.0.join("output/frame_0000.png")).unwrap(),
+        b"original PNG port bytes"
+    );
+    assert!(!scratch.0.join("output/frame_0000.svg").exists());
+}
+
+#[test]
+fn explicit_svg_port_publishes_exact_bytes_and_refuses_cross_format_or_mixed_manifest() {
+    let scratch = Scratch::new();
+    let mut port = svg_port(&scratch);
+    port.begin_staging("svg", "svg-output").unwrap();
+    let stage = port.stages["svg"].path.clone();
+    for name in [
+        "frame_0001.png",
+        "../frame_0001.svg",
+        "/frame_0001.svg",
+        "frame_1.svg",
+        "frame_00001.svg",
+        "frame_00a1.svg",
+        "frame_0001.SVG",
+        "frame_0001.svg/x",
+        "frame_0001.svg\0",
+    ] {
+        assert!(port.write_frame("svg", name, b"refused").is_err(), "{name}");
+    }
+    assert_eq!(fs::read_dir(&stage).unwrap().count(), 0);
+    let bytes = b"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2\" height=\"3\"><path d=\"M0,0L2,0L2,3Z\"/></svg>";
+    port.write_frame("svg", "frame_0001.svg", bytes).unwrap();
+    assert!(port
+        .write_frame("svg", "frame_0001.svg", b"overwrite")
+        .is_err());
+    assert_eq!(fs::read(stage.join("frame_0001.svg")).unwrap(), bytes);
+    for files in [
+        vec!["frame_0001.svg".into(), "frame_0002.png".into()],
+        vec!["frame_0001.png".into()],
+        vec!["frame_0001.svg".into(), "frame_0001.svg".into()],
+    ] {
+        assert!(port.publish("svg", "svg-output", &files).is_err());
+    }
+    assert!(!scratch.0.join("output").exists());
+    assert_eq!(fs::read_dir(&stage).unwrap().count(), 1);
+    let artifact = port
+        .publish("svg", "svg-output", &["frame_0001.svg".into()])
+        .unwrap();
+    assert_eq!(artifact.target, "svg-output");
+    assert_eq!(artifact.files, ["frame_0001.svg"]);
+    assert_eq!(
+        fs::read(scratch.0.join("output/frame_0001.svg")).unwrap(),
+        bytes
+    );
+    assert_eq!(fs::read_dir(scratch.0.join("output")).unwrap().count(), 1);
+    port.cleanup("svg").unwrap();
+    assert_eq!(fs::read_dir(scratch.0.join("staging")).unwrap().count(), 0);
+    assert_eq!(
+        fs::read(scratch.0.join("output/frame_0001.svg")).unwrap(),
+        bytes
+    );
+}
+
+#[test]
+fn svg_publication_collision_preserves_foreign_output_and_requires_owned_cleanup() {
+    let scratch = Scratch::new();
+    let mut port = svg_port(&scratch);
+    port.begin_staging("svg", "svg-output").unwrap();
+    port.write_frame("svg", "frame_0001.svg", b"<svg/>")
+        .unwrap();
+    fs::create_dir(scratch.0.join("output")).unwrap();
+    fs::write(scratch.0.join("output/original"), b"preserve").unwrap();
+    assert!(port
+        .publish("svg", "svg-output", &["frame_0001.svg".into()])
+        .is_err());
+    assert_eq!(
+        fs::read(port.stages["svg"].path.join("frame_0001.svg")).unwrap(),
+        b"<svg/>"
+    );
+    port.cleanup("svg").unwrap();
+    assert_eq!(fs::read_dir(scratch.0.join("staging")).unwrap().count(), 0);
+    assert_eq!(
+        fs::read(scratch.0.join("output/original")).unwrap(),
+        b"preserve"
+    );
+    assert!(!scratch.0.join("output/frame_0001.svg").exists());
+}

@@ -190,3 +190,32 @@ fn identities_are_bounded_in_utf8_bytes() {
     assert!(request(&op, &write("data:opaque authored layer".into())));
     assert!(!request(&op, &write(String::new())));
 }
+
+#[test]
+fn malformed_or_partial_table_keeps_known_operations_on_the_closed_validator() {
+    for source in ["not json", "[]", "null", "{}"] {
+        let empty = parse_table(source);
+        assert!(empty.is_empty());
+        for row in corpus()["valid"].as_array().unwrap() {
+            let op = row["operation"].as_str().unwrap();
+            assert!(
+                admitted(op),
+                "known family must not fall through generic admission"
+            );
+            assert!(!request_with_table(&empty, op, &row["payload"]));
+        }
+    }
+    let mut partial = parse_table(SPEC);
+    partial.remove("rig.pose");
+    let op = "command.document.object.rig.pose";
+    let cases = corpus();
+    let pose = cases["valid"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["operation"] == op)
+        .unwrap();
+    assert!(admitted(op));
+    assert!(request(op, &pose["payload"]));
+    assert!(!request_with_table(&partial, op, &pose["payload"]));
+}

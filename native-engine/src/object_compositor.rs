@@ -11,6 +11,9 @@ use crate::render_scene::ScheduledFrameIdentity;
 use vello::kurbo::Affine;
 use vello::peniko::Color;
 
+#[path = "object_raster_compositor.rs"]
+mod raster;
+
 const MAX_DIMENSION: u32 = 4096;
 const MAX_PIXELS: u64 = 16_777_216;
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
@@ -214,6 +217,17 @@ impl Compositor {
         for command in plan.commands() {
             prepare_command(command)?;
         }
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if prepared.has_raster_images() {
+            return Err(CompositorError::new(
+                "native raster layered effects are unavailable",
+            ));
+        }
+        if plan.has_text() {
+            return Err(CompositorError::new(
+                "native Text layered effects are unavailable",
+            ));
+        }
         if !stack.covers_plan(plan) {
             return Err(CompositorError::new(
                 "layer stack does not cover the composition plan",
@@ -271,6 +285,8 @@ impl Compositor {
             prepare_command(command)?;
         }
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        self.retire_raster_cache(prepared, (output.width, output.height))?;
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
         let reference_image = prepared
             .reference_image()
             .map(|(image, _, _)| image.data.id());
@@ -296,7 +312,7 @@ impl Compositor {
             let brush = vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
             self.scene.draw_image(&brush, transform);
         }
-        self.emit_object_commands(plan.commands())?;
+        self.emit_object_paint_sequence(prepared)?;
         let background = if output.project_background {
             Color::new(
                 prepared

@@ -15,6 +15,9 @@ mod font_assets;
 #[path = "object_layer_policy_history.rs"]
 mod layer_policy;
 // L06-L (#2112): raster-item / text-block edits use the same history and receipt owner.
+#[cfg(feature = "project_media_codec")]
+#[path = "object_raster_image_import_history.rs"]
+mod image_import;
 #[path = "object_raster_asset_history.rs"]
 mod item_history;
 #[path = "object_command_dispatch.rs"]

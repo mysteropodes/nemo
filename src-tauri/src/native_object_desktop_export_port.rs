@@ -8,6 +8,7 @@ pub(super) struct LazyDesktopArtifactPort {
     handle: String,
     destination: PathBuf,
     inner: Option<DesktopArtifactPort>,
+    svg: bool,
 }
 
 impl LazyDesktopArtifactPort {
@@ -17,6 +18,14 @@ impl LazyDesktopArtifactPort {
             handle,
             destination,
             inner: None,
+            svg: false,
+        }
+    }
+
+    pub(super) fn new_svg(root: PathBuf, handle: String, destination: PathBuf) -> Self {
+        Self {
+            svg: true,
+            ..Self::new(root, handle, destination)
         }
     }
 
@@ -33,10 +42,12 @@ impl StagedArtifactPort for LazyDesktopArtifactPort {
             return Err("object artifact target is not bound".into());
         }
         if self.inner.is_none() {
-            self.inner = Some(DesktopArtifactPort::new(
-                self.root.clone(),
-                [(self.handle.clone(), self.destination.clone())],
-            )?);
+            let bindings = [(self.handle.clone(), self.destination.clone())];
+            self.inner = Some(if self.svg {
+                DesktopArtifactPort::new_svg(self.root.clone(), bindings)
+            } else {
+                DesktopArtifactPort::new(self.root.clone(), bindings)
+            }?);
         }
         self.started()?.begin_staging(job_id, target)
     }

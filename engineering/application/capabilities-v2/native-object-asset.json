@@ -5,26 +5,18 @@
   "version": 1,
   "status": "active",
   "availability": {
-    "state": "unavailable",
-    "reason": "host byte-source route for asset import is not registered"
+    "state": "available",
+    "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
-    "command.document.object.asset.attach",
-    "command.document.object.asset.remove"
+    "command.document.object.asset.attach"
   ],
   "input": {
-    "oneOf": [
-      {
-        "$ref": "../native-object-item-v1.schema.json#/$defs/AssetAttach"
-      },
-      {
-        "$ref": "../native-object-item-v1.schema.json#/$defs/AssetRemove"
-      }
-    ]
+    "$ref": "../native-object-item-v1.schema.json#/$defs/ImageImportAttach"
   },
   "output": {
-    "$ref": "../native-object-item-v1.schema.json#/$defs/AssetCommandResult"
+    "$ref": "../native-object-item-v1.schema.json#/$defs/ImageImportResult"
   },
   "authority": {
     "document": "native-engine::history::NativeObjectHistory",
@@ -36,7 +28,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal; no document, glyph or pixel payload in either direction."
   },
-  "semantics": "Attach one embedded image to, or remove one from, the project asset catalog. Attach names a file source; the host (never the page, never MCP-supplied bytes) reads the bytes and the one native owner admits them: typed container check, charged decode, SHA-256 content identity and de-duplication. An exact duplicate is applied=false with no revision, history or redo change. A new asset id is minted by the owner as asset-<requestId>; the receipt does not echo it. Remove refuses a non-image record and an asset a placement, item or the viewport reference still names. Unavailable until the host byte-source route is registered by its owner; until then every caller receives typed unavailability and no fallback writer exists.",
+  "semantics": "Bounded PNG resource and placement import only. A required placement intent creates a still layer or places on an authored frame atomically, with one revision/history entry and canonical native asset ID/dimensions/target. Catalog-only attach retains compatibility validation but refuses unavailable before source I/O. Removal, other codecs, sequences, DOM drop handles and video remain unavailable. This declaration covers only the bounded PNG placement route; installed acceptance and full media parity are recorded separately.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

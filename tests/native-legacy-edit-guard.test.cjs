@@ -218,6 +218,7 @@ test('idle pointer events and brush-resize gestures do not request native releas
     isEnabled: () => true, screenToWorld: () => [0, 0], suspend() {}, setPressureCursor() {}, renderNow() {}, nativeEditGuard: guard,
   };
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/draw-bridge.js'), 'utf8'), context);
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters/native-object-shape-tool.js'), 'utf8'), context);
   const resize = event(); resize.altKey = true; resize.clientX = 1;
   handlers.pointerdown(resize);
   assert.equal(releases, 0, 'Alt brush resize is not a document edit');
@@ -277,6 +278,7 @@ test('a retained draw gesture cannot finish after native authority activates', (
   context.window = context;
   context.SMEngineBridge = bridge;
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/draw-bridge.js'), 'utf8'), context);
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters/native-object-shape-tool.js'), 'utf8'), context);
 
   const down = event(); down.clientX = 10; down.clientY = 20; down.pressure = 0.5;
   handlers.pointerdown(down);
@@ -327,7 +329,7 @@ test('every owned callback and commit helper contains the pre-mutation guard', (
     'src/js/draw-bridge.js': ['function onDown(e) {', 'if (!allowLegacyEdit(e)) return;', 'function onUp(e) {', 'function commitStroke() { if (!allowLegacyEdit()) return;'],
     'src/js/fill-bridge.js': ['function onDown(e) {\n    if (!shouldIntercept()) return;\n    if (!allowLegacyEdit(e)) return;', 'function onUp(e) {\n    if (!_fillCloseDrag) return;\n    if (!allowLegacyEdit(e)) return;', 'function onPropagateClick() {\n    if (!allowLegacyEdit()) return;'],
     'src/js/pen-bridge.js': ['function onDown(e) {\n    if (!shouldIntercept()) return;\n    if (!allowLegacyEdit(e)) return;', 'function onMove(e) {\n    if (!shouldIntercept()) return;\n    if (draggingHandle && !allowLegacyEdit(e)) return;', 'if (!draggingHandle) return;\n    if (!allowLegacyEdit(e)) return;'],
-    'src/js/shape-bridge.js': ['function onDown(e) {\n    if (!shouldIntercept()) return;\n    if (!allowLegacyEdit(e)) return;', 'function onUp(e) {\n    if (!dragging) return;\n    if (!allowLegacyEdit(e)) return;', 'function commitShape(ex, ey) {\n    if (!allowLegacyEdit()) return;'],
+    'src/js/shape-bridge.js': ["function onDown(e) {\n    if (nativeEvent('down', e)) return;\n    if (!shouldIntercept()) return;\n    if (!allowLegacyEdit(e)) return;", "function onUp(e) {\n    if (nativeEvent('up', e)) return;\n    if (!dragging) return;\n    if (!allowLegacyEdit(e)) return;", 'function commitShape(ex, ey) {\n    if (!allowLegacyEdit()) return;'],
     'src/js/eraser-bridge.js': ['function eraseAt(pt, radius) {\n    if (!allowLegacyEdit()) return;', 'function onDown(e) {', 'if (!allowLegacyEdit(e)) return;', 'if (pointerIsDown && !allowLegacyEdit(e)) return;', 'function onUp(e) {'],
   };
   for (const [file, snippets] of Object.entries(expectations)) {

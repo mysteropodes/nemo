@@ -730,15 +730,15 @@
     var zone = document.getElementById('media-grid'); if (!zone) return;
     zone.addEventListener('dragover', function (e) { if (e.dataTransfer && e.dataTransfer.types.indexOf('Files') >= 0) { e.preventDefault(); zone.classList.add('drop-hover'); } });
     zone.addEventListener('dragleave', function () { zone.classList.remove('drop-hover'); });
-    zone.addEventListener('drop', function (e) {
+    zone.addEventListener('drop', async function (e) {
       e.preventDefault(); zone.classList.remove('drop-hover');
       var files = Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.files) || []);
       if (!files.length) return;
-      var images = files.filter(function (f) { return f.type.indexOf('image/') === 0; });
-      var videos = files.filter(function (f) { return f.type.indexOf('video/') === 0; });
-      if (images.length && window.SM && window.SM.importImageFiles) window.SM.importImageFiles(images);
-      videos.forEach(function (f) { if (window.SM && window.SM.importVideoFile) window.SM.importVideoFile(f); });
-      if (!images.length && !videos.length && window.showToast) showToast(SM.t('toastFormatNotRecognizedDropHint'));
+      var router = window.NemoNativeImportDrop;
+      if (!router) return { status: 'unavailable', reason: 'native_media_route_absent' };
+      return await router.libraryMedia(window, files,
+        window.SM && SM.importImageFiles && SM.importImageFiles.bind(SM),
+        window.SM && SM.importVideoFile && SM.importVideoFile.bind(SM));
     });
   }
 

@@ -2093,7 +2093,8 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-application.js"
+        "native-application.js",
+        "native-property-contract.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -2478,7 +2479,9 @@
       "dir": "src/js/adapters",
       "files": [
         "native-object-project.js",
-        "native-object-project-desktop.js"
+        "native-object-project-desktop.js",
+        "native-object-project-properties.js",
+        "native-object-open-exposure.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -2615,6 +2618,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-media-export-adapter.js"
+      ]
+    },
+    {
+      "id": "app.native.main.svg.export.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-main-svg-export.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-main-svg-export.js"
       ]
     },
     {
@@ -2828,7 +2843,9 @@
       "files": [
         "native-motion-property-view.js",
         "native-motion-property-panel.js",
-        "native-motion-property-binding.js"
+        "native-motion-property-binding.js",
+        "native-motion-property-keys.js",
+        "native-motion-property-value.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -3054,6 +3071,18 @@
       ]
     },
     {
+      "id": "app.native.object.shape.tool",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-shape-tool.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-shape-tool.js"
+      ]
+    },
+    {
       "id": "app.settings.preferences.ui.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -3063,6 +3092,66 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "settings-preferences-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.font.panel.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-font-panel.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-font-panel.js"
+      ]
+    },
+    {
+      "id": "app.native.text.read.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-read-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-text-read-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.text.read.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-read.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-read.js"
+      ]
+    },
+    {
+      "id": "app.native.text.tool",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-tool.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-tool.js"
+      ]
+    },
+    {
+      "id": "app.native.text.tool.desktop",
+      "layer": "bootstrap",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-tool-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-tool-desktop.js"
       ]
     }
   ],

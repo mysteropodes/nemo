@@ -3,9 +3,9 @@
 use super::{ProjectMetadata, ProjectMetadataError as Error};
 
 #[test]
-fn supplied_metadata_keeps_copy_and_fractional_storage_fps_without_defaults() {
-    fn assert_copy<T: Copy>() {}
-    assert_copy::<ProjectMetadata>();
+fn supplied_metadata_keeps_clone_and_fractional_storage_fps_without_defaults() {
+    fn assert_clone<T: Clone>() {}
+    assert_clone::<ProjectMetadata>();
     for fps in [0.5, 29.97, 61.0, f64::MAX] {
         let value = ProjectMetadata::new(320, 180, fps).unwrap();
         assert_eq!(value.canvas_dimensions(), (320, 180));
@@ -69,7 +69,7 @@ fn exact_hex_spelling_and_literal_straight_rgba_oracles_survive() {
         "#ééé",
     ] {
         assert_eq!(
-            old.with_canvas_background(Some(text)).unwrap_err(),
+            old.clone().with_canvas_background(Some(text)).unwrap_err(),
             Error::InvalidCanvasBackground
         );
         assert_eq!(old.canvas_background(), None);
@@ -88,19 +88,29 @@ fn work_area_is_independent_optional_finite_storage_not_a_ui_clamp() {
         (Some(f64::MAX), Some(-f64::MAX)),
     ] {
         assert_eq!(
-            old.with_work_area(bounds.0, bounds.1).unwrap().work_area(),
+            old.clone()
+                .with_work_area(bounds.0, bounds.1)
+                .unwrap()
+                .work_area(),
             bounds
         );
     }
-    assert_ne!(old, old.with_work_area(Some(0.0), None).unwrap());
-    assert_ne!(old, old.with_canvas_background(Some("#fff")).unwrap());
+    assert_ne!(old, old.clone().with_work_area(Some(0.0), None).unwrap());
+    assert_ne!(
+        old,
+        old.clone().with_canvas_background(Some("#fff")).unwrap()
+    );
     for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert_eq!(
-            old.with_work_area(Some(bad), Some(0.0)).unwrap_err(),
+            old.clone()
+                .with_work_area(Some(bad), Some(0.0))
+                .unwrap_err(),
             Error::InvalidWorkArea
         );
         assert_eq!(
-            old.with_work_area(Some(0.0), Some(bad)).unwrap_err(),
+            old.clone()
+                .with_work_area(Some(0.0), Some(bad))
+                .unwrap_err(),
             Error::InvalidWorkArea
         );
     }
@@ -116,6 +126,7 @@ fn immutable_updates_preserve_all_other_supplied_fields_and_refuse_atomically() 
         .with_work_area(Some(30.75), Some(-5.5))
         .unwrap();
     let next = old
+        .clone()
         .with_canvas_dimensions(640, 360)
         .unwrap()
         .with_fps(29.97)
@@ -128,13 +139,18 @@ fn immutable_updates_preserve_all_other_supplied_fields_and_refuse_atomically() 
     assert_eq!(old.fps(), 0.5);
     for (w, h) in [(0, 1), (1, 0), (0, 0)] {
         assert_eq!(
-            old.with_canvas_dimensions(w, h).unwrap_err(),
+            old.clone().with_canvas_dimensions(w, h).unwrap_err(),
             Error::InvalidCanvas
         );
     }
-    assert_eq!(old.with_fps(f64::INFINITY).unwrap_err(), Error::InvalidFps);
     assert_eq!(
-        old.with_work_area(Some(0.0), Some(f64::NAN)).unwrap_err(),
+        old.clone().with_fps(f64::INFINITY).unwrap_err(),
+        Error::InvalidFps
+    );
+    assert_eq!(
+        old.clone()
+            .with_work_area(Some(0.0), Some(f64::NAN))
+            .unwrap_err(),
         Error::InvalidWorkArea
     );
     assert_eq!(old.canvas_background(), Some("#aBcD09eF"));

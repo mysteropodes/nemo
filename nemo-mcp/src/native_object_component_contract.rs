@@ -202,7 +202,26 @@ pub(crate) fn response_matches(
     response.instance_id == request.instance_id
         && response.document_id == request.document_id
         && response.result.as_ref().is_some_and(|value| {
-            revision_matches(request.expected_revision, response.content_revision, value)
+            let convert = request.operation == "command.document.object.component.convert";
+            let shape_matches = !convert
+                || (self::request(&request.operation, &request.payload)
+                    && request.payload["layerUids"]
+                        .as_array()
+                        .is_some_and(|layers| {
+                            if layers
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .collect::<std::collections::HashSet<_>>()
+                                .len()
+                                == 1
+                            {
+                                object::visibility_result(value) && value["applied"] == true
+                            } else {
+                                object::create_result(value)
+                            }
+                        }));
+            shape_matches
+                && revision_matches(request.expected_revision, response.content_revision, value)
         })
 }
 

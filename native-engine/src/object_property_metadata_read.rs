@@ -266,7 +266,7 @@ impl ObjectSnapshot {
         }
         Ok((items, more))
     }
-    fn metadata_holder<'a>(
+    pub(super) fn metadata_holder<'a>(
         &'a self,
         target: &PropertyHolderTarget,
     ) -> Result<Cow<'a, PropertyHolder>, DispatchErrorCode> {

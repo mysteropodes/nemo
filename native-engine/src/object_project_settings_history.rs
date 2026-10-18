@@ -4,6 +4,12 @@ use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::request_receipts::DispatchErrorCode;
 
 impl NativeObjectHistory {
+    pub(crate) fn prepare_composition_metadata_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
+        self.owner.prepare_composition_metadata_json(bytes)
+    }
     pub(crate) fn prepare_project_settings_json(
         &self,
         bytes: &[u8],

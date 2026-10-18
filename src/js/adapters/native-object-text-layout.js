@@ -34,15 +34,23 @@
   function stableTarget(layerUid,strokeId,frame){return {contextId:'scene-root',frameScope:{kind:'authored',frame:frame},layerUid:layerUid,strokeId:strokeId};}
   function create(session){
     var commands=Command.create(session,'item');
-    function send(payload){return commands.execute(Contract.ITEM,function(){return payload;});}
+    function send(payload,origin,guard){
+      var expected=origin&&Object.assign({},origin);
+      return commands.execute(Contract.ITEM,function(pin){
+        if(expected&&['instanceId','documentId','lifecycleGeneration'].some(function(k){return pin[k]!==expected[k];}))throw fault('stale_owner','owner_changed','Native text owner changed before execution');
+        if(expected&&['contentRevision','documentSnapshotId'].some(function(k){return pin[k]!==expected[k];}))throw fault('stale_revision','snapshot_changed','Native text snapshot changed before execution');
+        if(guard&&guard(pin)!==true)throw fault('stale_revision','intent_changed','Native text intent changed before execution');
+        return payload;
+      });
+    }
     return Object.freeze({
-      createBlock:function(layerUid,frame,block){
+      createBlock:function(layerUid,frame,block,origin,guard){
         if(block&&blank(block.text))return skipped();
-        return send({command:'object.text.create',target:stableTarget(layerUid,'',frame),block:block});
+        return send({command:'object.text.create',target:stableTarget(layerUid,'',frame),block:block},origin,guard);
       },
-      editBlock:function(target,patch){
+      editBlock:function(target,patch,origin,guard){
         if(patch&&blank(patch.text))return skipped();
-        return send({command:'object.text.edit',stableTarget:target,patch:patch});
+        return send({command:'object.text.edit',stableTarget:target,patch:patch},origin,guard);
       },
       deleteBlock:function(target){return send({command:'object.text.delete',stableTarget:target});},
     });

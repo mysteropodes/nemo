@@ -157,6 +157,9 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         .expect("advertised command schema is valid Draft 2020-12");
     let validator = jsonschema::draft202012::new(&command_schema)
         .expect("advertised command schema compiles with a standard validator");
+    property_read_schema::check(|value| validator.is_valid(value));
+    property_edit_schema::check(|value| validator.is_valid(value));
+    property_edit_schema::check_track(|value| validator.is_valid(value));
     let metadata_query = json!({
         "apiVersion": 2, "requestId": "metadata-page-0", "instanceId": "instance-a",
         "documentId": "native-object-document-1",
@@ -197,23 +200,6 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         unsupported["operation"] = json!("command.not_registered");
         assert!(!validator.is_valid(&unsupported));
     }
-    // Root projection must not reimpose legacy numeric value on native booleans.
-    let mut policy: Value = serde_json::from_str::<Value>(include_str!(
-        "../../engineering/application/capabilities-v2/native-layer-policy.json"
-    ))
-    .unwrap()["examples"][0]["request"]
-        .clone();
-    for flag in ["locked", "shy"] {
-        policy["payload"]["flag"] = json!(flag);
-        for value in [true, false] {
-            policy["payload"]["value"] = json!(value);
-            assert!(validator.is_valid(&policy));
-        }
-        for invalid in [json!(0), json!(1), json!(null), json!("true")] {
-            policy["payload"]["value"] = invalid;
-            assert!(!validator.is_valid(&policy));
-        }
-    }
     let legacy_request = json!({
         "apiVersion": 1,
         "requestId": "fixture-v1",
@@ -224,9 +210,7 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         "payload": {"layerId": "layer-a", "property": "opacity", "value": 25}
     });
     assert!(validator.is_valid(&legacy_request));
-    let mut legacy_boolean = legacy_request.clone();
-    legacy_boolean["payload"]["value"] = json!(true);
-    assert!(!validator.is_valid(&legacy_boolean));
+    native_layer_policy_schema::check(&validator, &legacy_request);
     for (field, value) in [
         ("operation", json!("property.not_registered")),
         ("payload", json!("{}")),
@@ -479,3 +463,12 @@ fn schema_binary_rejects_unsupported_arguments_without_partial_contract_output()
         assert_eq!(output.stderr, b"usage: nemo-mcp-schema [--api-version 2]\n");
     }
 }
+
+#[path = "support/native_property_read_schema.rs"]
+mod property_read_schema;
+
+#[path = "support/native_layer_policy_schema.rs"]
+mod native_layer_policy_schema;
+
+#[path = "support/native_property_edit_schema.rs"]
+mod property_edit_schema;

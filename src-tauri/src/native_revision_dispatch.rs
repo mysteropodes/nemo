@@ -29,6 +29,39 @@ impl RevisionSync {
         object_client: bool,
         font_phase: FontPhase<'_>,
     ) -> Result<Option<Delivery>, String> {
+        let phase = if request.operation == crate::application_mcp::font_source::IMPORT {
+            ResourcePhase::Font(font_phase)
+        } else {
+            ResourcePhase::Regular
+        };
+        self.dispatch_resource_step(instance, native, request, external, object_client, phase)
+    }
+    pub(super) fn dispatch_image_step(
+        &self,
+        instance: &str,
+        native: &NativeState,
+        request: NativeApplicationRequest,
+        external: bool,
+        phase: ImagePhase<'_>,
+    ) -> Result<Option<Delivery>, String> {
+        self.dispatch_resource_step(
+            instance,
+            native,
+            request,
+            external,
+            false,
+            ResourcePhase::Image(phase),
+        )
+    }
+    pub(super) fn dispatch_resource_step(
+        &self,
+        instance: &str,
+        native: &NativeState,
+        request: NativeApplicationRequest,
+        external: bool,
+        object_client: bool,
+        resource_phase: ResourcePhase<'_>,
+    ) -> Result<Option<Delivery>, String> {
         let mut authority = native
             .lock()
             .map_err(|_| "native application lock unavailable")?;
@@ -52,7 +85,8 @@ impl RevisionSync {
             }
         };
         let application = authority.active_mut(generation)?;
-        if request.operation == crate::application_mcp::font_source::IMPORT
+        if (request.operation == crate::application_mcp::font_source::IMPORT
+            || is_image_import(&request))
             && request
                 .payload
                 .get("lifecycleGeneration")
@@ -64,7 +98,11 @@ impl RevisionSync {
                     &request,
                     instance,
                     application.content_revision(),
-                    "native font lifecycle generation is stale",
+                    if is_image_import(&request) {
+                        "native image lifecycle generation is stale"
+                    } else {
+                        "native font lifecycle generation is stale"
+                    },
                     false,
                 ),
                 notification: None,
@@ -131,13 +169,16 @@ impl RevisionSync {
                 }));
             }
         }
-        let response = if request.operation == crate::application_mcp::font_source::IMPORT {
-            match invoke_font(application, &request, font_phase)? {
+        let response = match resource_phase {
+            ResourcePhase::Font(phase) => match invoke_font(application, &request, phase)? {
                 Some(response) => response,
                 None => return Ok(None),
-            }
-        } else {
-            invoke_dispatch(application, &request)?
+            },
+            ResourcePhase::Image(phase) => match invoke_image(application, &request, phase)? {
+                Some(response) => response,
+                None => return Ok(None),
+            },
+            ResourcePhase::Regular => invoke_dispatch(application, &request)?,
         };
         let after = application.content_revision();
         let notification = if external && response.ok && after > before {
@@ -269,3 +310,15 @@ mod metadata_tests;
 #[cfg(test)]
 #[path = "native_layer_policy_dispatch_tests.rs"]
 mod layer_policy_tests;
+
+#[cfg(test)]
+#[path = "native_property_track_dispatch_tests.rs"]
+mod property_track_tests;
+
+#[cfg(test)]
+#[path = "native_property_read_dispatch_tests.rs"]
+mod property_read_tests;
+
+#[cfg(test)]
+#[path = "native_property_edit_dispatch_tests.rs"]
+mod property_edit_tests;

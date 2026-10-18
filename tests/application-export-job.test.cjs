@@ -23,6 +23,7 @@ const jobSource = fs.readFileSync(jobPath, 'utf8');
 const exportSource = fs.readFileSync(path.join(root, 'src/js/export.js'), 'utf8');
 const adapterPath = path.join(root, 'src/js/adapters/export-svg-sequence.js');
 const adapterSource = fs.readFileSync(adapterPath, 'utf8');
+const mainSvgSource = fs.readFileSync(path.join(root, 'src/js/adapters/native-main-svg-export.js'), 'utf8');
 
 // ---- fake document + filesystem ------------------------------------------
 
@@ -250,16 +251,20 @@ function bindingContext(stubs) {
     saveAllLayerFrames() { context.saved = (context.saved || 0) + 1; },
     NemoOpacityApplication: { meta() { return { documentId: 'doc-1', revision: 3 }; } },
     exportTauriAvailable() { return true; },
+    exportTauri() { return { dialog: { open() { throw new Error('ToDir must not open a folder picker'); } } }; },
     exportFrameSVGString(f) { return '<svg f="' + f + '"/>'; },
   }, stubs);
   context.window = context;
   vm.createContext(context);
   vm.runInContext(jobSource, context, { filename: 'export-job.js' });
   vm.runInContext(adapterSource, context, { filename: 'export-svg-sequence.js' });
+  vm.runInContext(mainSvgSource, context, { filename: 'native-main-svg-export.js' });
   const binding = slice(exportSource, 'var _svgSequenceJob=null;', '\nasync function exportGIFToPath(', 'P18 binding');
   const range = slice(exportSource, 'function exportFrameRange(opts){', '\n// ---- Tauri fs/dialog/shell helpers ----', 'exportFrameRange');
   const pad = slice(exportSource, 'function pad4(n){', '\n', 'pad4');
-  vm.runInContext(binding + '\n' + range + '\n' + pad, context, { filename: 'export-binding.js' });
+  const authority = slice(exportSource, 'function exportNativeOpacity(){', '\nfunction exportEnsureLayer(', 'native authority/release');
+  const picker = slice(exportSource, 'async function exportPickDir(title){', '\nasync function exportPickSaveFile(', 'exportPickDir');
+  vm.runInContext(authority + '\n' + picker + '\n' + binding + '\n' + range + '\n' + pad, context, { filename: 'export-binding.js' });
   return context;
 }
 
@@ -328,7 +333,11 @@ test('T4b: the production binding maps document changes and cancellation to the 
 
 test('routing guard: export.js has exactly one SVG-sequence loop, inside the job binding', () => {
   const dialog = slice(exportSource, '  exportSVGSequence:async function(opts){', '\n  exportPNGSequence:', 'SMExport.exportSVGSequence');
-  assert.match(dialog, /return await exportSVGSequenceToDir\(dir,opts\);/);
+  assert.match(dialog, /return await exportMainSvgWorkflow\(\)\.run\(opts\);/);
+  const binding = slice(exportSource, 'function exportMainSvgWorkflow(){', '\nasync function exportGIFToPath(', 'Main SVG binding');
+  assert.match(binding, /return await exportMainSvgWorkflow\(\)\.toDir\(dir,opts\);/);
+  assert.match(binding, /legacy:exportSvgSequenceJob/, 'Main workflow receives the same memoized job port');
+  assert.match(mainSvgSource, /return ports\.legacy\(\)\.run\(\{/, 'legacy ToDir still delegates to that job');
   assert.doesNotMatch(dialog, /for\(var f=r\.start/, 'the dialog path no longer has its own frame loop');
   assert.equal(exportSource.split("'frame_'+pad4(i)+'.svg'").length, 2, 'one place names the sequence files');
   assert.doesNotMatch(exportSource, /NemoExportJob\b/, 'export.js reaches the job only through the adapter');

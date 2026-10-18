@@ -338,7 +338,18 @@ test('production composition reuses frozen callback identities and resolves sess
   h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){bindings.push(ports);return render(root,info,frameOnly,ports);}};
   await h.open();const first=bindings[0],old=first.currentSession().info(),button=eye(h.root,0);
   h.root.updateUI(true);assert.equal(eye(h.root,0),button);assert.equal(Object.isFrozen(first),true);
-  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','layerPolicy','projectSettings','projectionReady','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','editProperty','editPropertyTrack','fontResources','layerPolicy','projectSettings','projectionReady','readProperty','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.equal(first.fontResources(),null);
+  const fontCalls=[],assetId=' opaque font / 雪 ',source={kind:'google',family:'Poppins',weight:700,italic:false},signal={aborted:false};
+  h.root.SMVectorText={listNativeFontAssets:async()=>{fontCalls.push(['list']);return [{assetId}];},
+    loadNativeFontAsset:async id=>{fontCalls.push(['load',id]);return {loaded:id};},
+    importNativeFontSource:async(value,cancel)=>{fontCalls.push(['import',value,cancel]);return {assetId};}};
+  const fonts=first.fontResources();assert.equal(Object.isFrozen(fonts),true);
+  assert.deepEqual(Object.keys(fonts).sort(),['importSource','list','load']);
+  assert.deepEqual(await fonts.list(),[{assetId}]);assert.deepEqual(await fonts.load(assetId),{loaded:assetId});
+  assert.deepEqual(await fonts.importSource(source,signal),{assetId});
+  assert.deepEqual(fontCalls,[['list'],['load',assetId],['import',source,signal]]);
+  delete h.root.SMVectorText;assert.equal(first.fontResources(),null);
   const generation=first.readTransportGeneration();assert.equal(generation,first.currentSession().readSubscriptionGeneration());
   await h.external([A,B,C]);assert.equal(first.currentSession().info().contentRevision,old.contentRevision+1);
   assert.equal(first.readTransportGeneration(),generation,'content revision does not invent a subscription generation');
@@ -459,4 +470,61 @@ test('admitted native lock and shy booleans preserve authored presence in sessio
     for(const flag of ['locked','shy']){assert.equal(Object.hasOwn(meta.layers[0],flag),Object.hasOwn(flags,flag));if(Object.hasOwn(flags,flag))assert.equal(meta.layers[0][flag],flags[flag]);assert.equal(row[flag],flags[flag]===true);}
     assert.equal(Object.isFrozen(meta.layers[0]),true);assert.equal(Files.projectionReadyForUI(h.root,meta),true);
   }
+});
+
+for(const modifier of ['metaKey','ctrlKey'])test('ordinary native row '+modifier+' toggles selected layers without a document/history write',async()=>{
+  const h=desktop();await h.open();const root=h.root,before=h.meta();
+  const writes=()=>h.calls.filter(c=>c.command==='nemo_native_object_dispatch'||c.command==='nemo_native_dispatch'&&!c.request.operation.startsWith('query.')).length;
+  const count=writes();pick(root,1).dispatch('click',{[modifier]:true,shiftKey:true});
+  assert.deepEqual(root._layerSel,[0,1]);assert.equal(root.state.activeLayerIdx,1);assert.equal(root._layerSelAnchor,1);
+  assert.equal(pick(root,0).attributes['aria-pressed'],'true');assert.equal(pick(root,1).attributes['aria-pressed'],'true');
+  pick(root,0).dispatch('click',{[modifier]:true});assert.deepEqual(root._layerSel,[1]);
+  assert.equal(root.state.activeLayerIdx,0);assert.equal(pick(root,0).attributes['aria-pressed'],'false');
+  pick(root,0).click();assert.deepEqual(root._layerSel,[0]);assert.equal(root._layerSelAnchor,0);
+  assert.equal(writes(),count);assert.deepEqual(h.meta(),before);poisonFrames(root);
+});
+test('ordinary native Shift row clicks retain the range anchor and preserve boolean programmatic selection',async()=>{
+  const h=desktop();await h.open();await h.external([A,B,C]);const root=h.root;
+  root._layerSelAnchor=-1;root._layerSel=[];root.state.activeLayerIdx=0;
+  pick(root,2).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);assert.equal(root._layerSelAnchor,-1);
+  pick(root,1).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1]);assert.equal(root._layerSelAnchor,-1);
+  pick(root,2).click();pick(root,0).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);assert.equal(root._layerSelAnchor,2);
+  root._layerSelAnchor=-1;root._layerSel=[];root.state.activeLayerIdx=2;
+  pick(root,0).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);
+  pick(root,1).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1]);assert.equal(root._layerSelAnchor,-1);
+  const selection=root._layerSel;root.SM.setActiveLayer(1,true);assert.equal(root._layerSel,selection);
+  root.SM.setActiveLayer(1);assert.deepEqual(root._layerSel,[1]);assert.equal(root._layerSelAnchor,1);
+});
+test('native row modifiers reject retired controls and consume post-drag clicks without changing selection',async()=>{
+  const h=desktop();await h.open();const root=h.root,retired=pick(root,0);
+  pick(root,1).dispatch('click',{ctrlKey:true});const selection=root._layerSel;
+  assert.equal(retired.dispatch('click',{shiftKey:true}),false);assert.equal(root._layerSel,selection);
+  root._layerDragJustEnded=true;assert.equal(pick(root,0).dispatch('click',{metaKey:true}),false);
+  assert.equal(root._layerDragJustEnded,false);assert.equal(root._layerSel,selection);
+  pick(root,0).dispatch('click',{metaKey:true});assert.deepEqual(root._layerSel,[1]);
+});
+for(const fault of ['refused','foreign'])test('native modified row refuses '+fault+' presentation before changing selection',async()=>{
+  const h=desktop();await h.open();const root=h.root,selection=root._layerSel,active=root.state.activeLayerIdx,anchor=root._layerSelAnchor;
+  if(fault==='refused')h.fault('preview');
+  else h.root.NemoNativeObjectUI={...UI,select:(r,i,index,preserve,uid,presentation,ports)=>UI.select(r,i,index,preserve,uid,{...presentation,documentId:'foreign'},ports)};
+  if(fault==='refused'){await assert.rejects(h.session.presentPreview(7));assert.equal(h.session.readPresentedObjectSession(),null);}
+  pick(root,1).dispatch('click',{ctrlKey:true});assert.equal(root._layerSel,selection);assert.equal(root.state.activeLayerIdx,active);assert.equal(root._layerSelAnchor,anchor);
+});
+test('native modified row rolls back every selection field when presentation repaint throws',async()=>{
+  const h=desktop();await h.open();const root=h.root;
+  root.selectedPaths=['sentinel'];root.state.selectedStrokeIndices=[3];root._layerActiveExplicit=false;
+  const old={active:root.state.activeLayerIdx,selection:root._layerSel,anchor:root._layerSelAnchor,paths:root.selectedPaths,indices:root.state.selectedStrokeIndices,explicit:root._layerActiveExplicit};
+  const create=root.document.createElement,failure=Error('fixture render refusal');root.document.createElement=()=>{throw failure;};
+  try{assert.throws(()=>pick(root,1).dispatch('click',{metaKey:true}),error=>error===failure);}finally{root.document.createElement=create;}
+  assert.equal(root.state.activeLayerIdx,old.active);assert.equal(root._layerSel,old.selection);assert.equal(root._layerSelAnchor,old.anchor);
+  assert.equal(root.selectedPaths,old.paths);assert.equal(root.state.selectedStrokeIndices,old.indices);assert.equal(root._layerActiveExplicit,old.explicit);
+});
+
+test('native modified row refuses an actual in-flight external revision until final presentation',async()=>{
+  const h=desktop();await h.open();const root=h.root;let release;h.hold(new Promise(resolve=>{release=resolve;}));
+  const change=h.external([A,B,C]);await new Promise(setImmediate);
+  const selection=root._layerSel,active=root.state.activeLayerIdx,anchor=root._layerSelAnchor;
+  try{pick(root,2).dispatch('click',{shiftKey:true});assert.equal(root._layerSel,selection);assert.equal(root.state.activeLayerIdx,active);assert.equal(root._layerSelAnchor,anchor);}
+  finally{release();await change;}
+  pick(root,2).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);
 });

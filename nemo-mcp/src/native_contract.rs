@@ -20,6 +20,8 @@ mod reproduction;
 pub(crate) mod metadata;
 #[path = "native_object_contract.rs"]
 mod object;
+#[path = "native_text_read_contract.rs"]
+pub(crate) mod text_read;
 
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
@@ -40,6 +42,12 @@ pub(crate) mod object_component;
 pub(crate) mod object_edit;
 #[path = "native_object_rig_contract.rs"]
 pub(crate) mod object_rig;
+#[path = "native_property_edit_contract.rs"]
+pub(crate) mod property_edit;
+#[path = "native_property_read_contract.rs"]
+pub(crate) mod property_read;
+#[path = "native_property_track_contract.rs"]
+pub(crate) mod property_track;
 #[path = "native_vector_contract.rs"]
 pub(crate) mod vector;
 use diagnostics::diagnostics_result;
@@ -88,7 +96,9 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
         "query.document.object"
+            | text_read::OP
             | metadata::OP
+            | property_read::OP
             | font::QUERY
             | brush::QUERY
             | "query.document.object.layer.timing"
@@ -108,11 +118,15 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
         "query.document.object" => object::request(payload),
+        text_read::OP => text_read::request(payload),
         metadata::OP => metadata::request(payload),
+        property_read::OP => property_read::request(payload),
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
         layer_policy::OP => layer_policy::request(payload),
+        property_track::OP => property_track::request(payload),
+        property_edit::OP => property_edit::request(payload),
         op if frame_edit::declares(op) => frame_edit::request(op, payload),
         op if object_component::admitted(op) => object_component::request(op, payload),
         op if object_rig::admitted(op) => object_rig::request(op, payload),
@@ -266,8 +280,14 @@ pub(crate) fn validate_result(
     if matches!(operation, font::IMPORT | font::QUERY) {
         return font::result(operation, payload, result);
     }
+    if operation == property_read::OP {
+        return property_read::result(request_document_id, payload, result);
+    }
     if brush::owns(operation) {
         return brush::result(operation, payload, result);
+    }
+    if operation == text_read::OP {
+        return text_read::result(request_document_id, payload, result);
     }
     if operation == metadata::OP {
         return metadata::result(request_document_id, payload, result);
@@ -277,6 +297,12 @@ pub(crate) fn validate_result(
     }
     if operation == "query.document.object.layer.timing" {
         return object::timing_result(request_document_id, payload, result);
+    }
+    if operation == property_edit::OP {
+        return property_edit::result(result);
+    }
+    if operation == property_track::OP {
+        return property_track::result(result);
     }
     if operation == layer_policy::OP {
         return layer_policy::result(result);

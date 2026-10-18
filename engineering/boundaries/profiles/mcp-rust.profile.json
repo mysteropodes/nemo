@@ -27,7 +27,6 @@
         "src/registry.rs",
         "src/schema.rs",
         "src/server.rs",
-        "src/server_command_projection.rs",
         "src/wire.rs",
         "src/wire_failure_tests.rs",
         "src/native_project_settings_contract.rs",
@@ -37,6 +36,19 @@
         "src/native_diagnostics_contract.rs",
         "src/native_layer_policy_contract.rs",
         "src/native_layer_policy_wire_tests.rs",
+        "src/native_property_track_contract.rs",
+        "src/native_property_track_contract_tests.rs",
+        "src/native_property_track_wire_tests.rs",
+        "src/native_contract_tests.rs",
+        "src/native_font_contract.rs",
+        "src/native_font_contract_tests.rs",
+        "src/server_command_projection.rs",
+        "src/native_property_read_contract.rs",
+        "src/native_property_read_contract_tests.rs",
+        "src/native_property_read_wire_tests.rs",
+        "src/native_property_edit_contract.rs",
+        "src/native_property_edit_contract_tests.rs",
+        "src/native_property_edit_wire_tests.rs",
         "src/native_object_rig_contract.rs",
         "src/native_object_rig_contract_tests.rs",
         "src/native_object_rig_receipt_tests.rs",
@@ -54,13 +66,21 @@
         "src/native_object_edit_contract.rs",
         "src/native_object_edit_contract_tests.rs",
         "src/native_object_edit_receipt_tests.rs",
-        "src/native_contract_tests.rs",
-        "src/native_font_contract.rs",
-        "src/native_font_contract_tests.rs",
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
         "src/native_vector_contract.rs",
-        "src/native_vector_contract_tests.rs"
+        "src/native_vector_contract_tests.rs",
+        "src/native_request_bytes.rs",
+        "src/native_request_spans.rs",
+        "src/native_request_bytes_tests.rs",
+        "src/native_request_framing_tests.rs",
+        "src/native_request_limit_tests.rs",
+        "src/native_text_read_contract.rs",
+        "src/native_text_read_contract_tests.rs",
+        "src/native_text_read_wire_tests.rs",
+        "src/native_image_import_contract_tests.rs",
+        "src/native_wire_response_owner.rs",
+        "src/native_image_import_owner_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -80,7 +100,9 @@
         "application_mcp.rs",
         "native_application_reservations.rs",
         "native_revision_sync.rs",
-        "native_font_source.rs"
+        "native_font_source.rs",
+        "native_raster_image_source.rs",
+        "native_raster_image_dispatch.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -96,7 +118,8 @@
         "application_mcp_diagnostics_tests.rs",
         "application_mcp_reproduction_tests.rs",
         "native_revision_sync_tests.rs",
-        "native_font_source_tests.rs"
+        "native_font_source_tests.rs",
+        "native_raster_image_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

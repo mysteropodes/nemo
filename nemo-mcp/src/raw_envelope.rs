@@ -104,7 +104,12 @@ impl<R: AsyncRead> GuardedInput<R> {
     }
     fn finish_frame(&mut self) {
         let view = self.frame.strip_prefix(UTF8_BOM).unwrap_or(&self.frame);
-        if self.discarding || matches!(check_unique(view), Err(RawEnvelopeError::Duplicate)) {
+        let invalid_native = match check_unique(view) {
+            Err(RawEnvelopeError::Duplicate) => true,
+            Ok(()) => super::native_request_bytes::check(view).is_err(),
+            Err(RawEnvelopeError::Malformed(_)) => false,
+        };
+        if self.discarding || invalid_native {
             self.frame.clear();
             self.frame.extend_from_slice(INVALID_FRAME);
         }

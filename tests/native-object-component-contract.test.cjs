@@ -134,7 +134,7 @@ test('the common SDK admits each operation, requires expectedRevision, accepts o
 test('the SDK correlates each receipt: identity, document replacement and the exact revision advance', async () => {
   for (const [suffix, payload] of VALID) {
     const q = envelope(suffix, payload);
-    const creates = ['component.place', 'duplicator.objects'].includes(suffix);
+    const creates = ['component.place', 'duplicator.objects'].includes(suffix) || suffix === 'component.convert' && payload.layerUids.length > 1;
     const result = (applied) => (creates ? { applied: true, historyEntriesAdded: 1, layerUid: 'native-layer:8:0' } : { applied, historyEntriesAdded: applied ? 1 : 0 });
     const reply = (applied, mutate) => () => { const r = { apiVersion: 2, requestId: 'component-1', instanceId: 'instance-A', documentId: 'document-A',
       contentRevision: 7 + (applied ? 1 : 0), ok: true, result: result(applied) }; if (mutate) mutate(r); return r; };
@@ -211,4 +211,17 @@ test('capability descriptors and the closed transport schema declare exactly the
     assert.equal(def.properties.command.const, payload.command);
   }
   assert.equal(schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === 'command.document.object.layer.policy.edit').length, 1, 'F06 branch is untouched');
+});
+
+test('convert success receipt kind matches single or merged selection and never lies about no-op', () => {
+  for(const [layerUids,merged] of [[['a'],false],[['a','a'],false],[['a','b'],true],[['a','b','a'],true]]){
+    const q=envelope('component.convert',{command:'object.component.convert',contextId:'scene-root',layerUids});
+    const compact={applied:true,historyEntriesAdded:1},minted={...compact,layerUid:'native-layer:8:0'},noop={applied:false,historyEntriesAdded:0};
+    for(const result of [compact,minted,noop]){
+      const response={instanceId:q.instanceId,documentId:q.documentId,contentRevision:7+(result.applied?1:0),ok:true,result};
+      const matches=merged?result===minted:result===compact;
+      if(matches)assert.doesNotThrow(()=>contract.correlate(q,response));
+      else assert.throws(()=>contract.correlate(q,response),/selected layer count/);
+    }
+  }
 });

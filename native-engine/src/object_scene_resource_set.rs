@@ -33,6 +33,7 @@ pub type SceneResourceRetention = Arc<dyn Any + Send + Sync>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SceneResourceKind {
     Raster,
+    Font,
     BitmapBrush,
     Media,
 }
@@ -40,6 +41,7 @@ impl SceneResourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Raster => "raster",
+            Self::Font => "font",
             Self::BitmapBrush => "bitmap-brush",
             Self::Media => "media",
         }

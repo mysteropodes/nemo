@@ -7,6 +7,7 @@ use crate::object_snapshot::{
     shared_image_resource_budget, validate_png_in_domain, ObjectSnapshot,
 };
 use crate::request_receipts::DispatchErrorCode;
+use serde::Deserialize;
 use std::sync::Arc;
 
 const ENVELOPE_BYTES: usize = 32 * 1024 * 1024;
@@ -145,7 +146,7 @@ impl ObjectSnapshot {
         Self::from_managed_project_wire(instance, bytes, wire_limits()).map_err(refused)
     }
 
-    pub(crate) fn serialize_project_file(&self) -> Result<Vec<u8>, DispatchErrorCode> {
+    pub fn serialize_project_file(&self) -> Result<Vec<u8>, DispatchErrorCode> {
         let project = self.project().ok_or(DispatchErrorCode::Unavailable)?;
         encode_project_envelope(project, wire_limits()).map_err(refused)
     }
@@ -228,5 +229,148 @@ impl ObjectSnapshot {
             changed: reference != before,
             reference,
         })
+    }
+}
+
+// D26-P1: detached root-composition reads share the original immutable snapshot.
+#[derive(serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+enum CompositionSelector {
+    Settings {},
+    MarkerAt { index: usize },
+    MarkerNamed { name: String },
+    MarkerNearest { frame: f64 },
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct CompositionRead {
+    command: String,
+    instance_id: String,
+    document_id: String,
+    at_revision: u64,
+    document_snapshot_id: String,
+    context_id: String,
+    selector: CompositionSelector,
+}
+impl ObjectSnapshot {
+    /// Original-byte, bounded query only. No dispatcher/public capability activation.
+    pub(crate) fn query_composition_metadata_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<serde_json::Value, DispatchErrorCode> {
+        use DispatchErrorCode::{InvalidRequest, NotFound, StaleRevision, Unavailable};
+        if bytes.len() > 4096 {
+            return Err(InvalidRequest);
+        }
+        let shape: serde_json::Value = serde_json::from_slice(bytes).map_err(|_| InvalidRequest)?;
+        if !shape
+            .get("selector")
+            .is_some_and(serde_json::Value::is_object)
+        {
+            return Err(InvalidRequest);
+        }
+        let query: CompositionRead = serde_json::from_slice(bytes).map_err(|_| InvalidRequest)?;
+        if query.command != "object.project.composition.read" {
+            return Err(InvalidRequest);
+        }
+        if query.instance_id != self.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if query.document_id != self.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if query.at_revision != self.content_revision()
+            || query.document_snapshot_id != self.snapshot_id()
+        {
+            return Err(StaleRevision);
+        }
+        if query.context_id != "scene-root" {
+            return Err(Unavailable);
+        }
+        match &query.selector {
+            CompositionSelector::MarkerAt { index: 0 } => return Err(InvalidRequest),
+            CompositionSelector::MarkerNamed { name }
+                if name.len() > 1024 || name.contains('\0') =>
+            {
+                return Err(InvalidRequest)
+            }
+            CompositionSelector::MarkerNearest { frame } if !frame.is_finite() => {
+                return Err(InvalidRequest);
+            }
+            _ => {}
+        }
+        let metadata = self.project().ok_or(Unavailable)?.project();
+        let markers = metadata.composition_markers();
+        let result = match query.selector {
+            CompositionSelector::Settings {} => {
+                let (bpm, offset, show) = metadata.composition_bpm();
+                let mut value = serde_json::json!({
+                    "markersPresent": markers.is_some(),
+                    "markerCount": markers.map_or(0, |values| values.len()),
+                    "effectiveBpm": bpm.unwrap_or(120.0),
+                    "effectiveBpmOffset": offset.unwrap_or(0.0),
+                    "effectiveBpmShow": show.unwrap_or(false)
+                });
+                if let Some(v) = bpm {
+                    value["bpm"] = v.into();
+                }
+                if let Some(v) = offset {
+                    value["bpmOffset"] = v.into();
+                }
+                if let Some(v) = show {
+                    value["bpmShow"] = v.into();
+                }
+                value
+            }
+            selector => {
+                let values = markers.ok_or(NotFound)?;
+                let index = match selector {
+                    CompositionSelector::MarkerAt { index } => index
+                        .checked_sub(1)
+                        .filter(|i| *i < values.len())
+                        .ok_or(NotFound)?,
+                    CompositionSelector::MarkerNamed { name } => values
+                        .iter()
+                        .position(|m| m.1.as_deref().unwrap_or("") == name)
+                        .ok_or(NotFound)?,
+                    CompositionSelector::MarkerNearest { frame } => {
+                        if values.is_empty() {
+                            return Err(NotFound);
+                        }
+                        // Match first-stored JS ties, including all-overflow distances.
+                        let mut best = 0;
+                        let mut distance = f64::INFINITY;
+                        for (i, marker) in values.iter().enumerate() {
+                            let candidate = (marker.0 - frame).abs();
+                            if candidate < distance {
+                                best = i;
+                                distance = candidate;
+                            }
+                        }
+                        best
+                    }
+                    CompositionSelector::Settings {} => unreachable!(),
+                };
+                let (frame, name, color) = &values[index];
+                let time = frame / metadata.fps();
+                if !time.is_finite() {
+                    return Err(Unavailable);
+                }
+                serde_json::json!({"index": index + 1, "frame": frame, "time": time,
+                    "name": name.as_deref().unwrap_or(""),
+                    "color": color.as_deref().filter(|v| !v.is_empty())})
+            }
+        };
+        let response = serde_json::json!({"instanceId": self.instance_id(),
+            "documentId": self.document_id(), "atRevision": self.content_revision(),
+            "documentSnapshotId": self.snapshot_id(), "contextId": "scene-root", "result": result});
+        if serde_json::to_vec(&response)
+            .map_err(|_| Unavailable)?
+            .len()
+            > 4096
+        {
+            return Err(Unavailable);
+        }
+        Ok(response)
     }
 }

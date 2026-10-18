@@ -95,23 +95,39 @@ impl StyleUnavailable {
 
 /// Resolve the style of one stored record, or say exactly why it has none.
 pub(crate) fn style_of_record(record: &ObjectRecord) -> Result<SceneItemStyle, StyleUnavailable> {
+    style_of_record_with_opacity(record, 1.0)
+}
+
+/// Fold the pinned raw layer factor into each paint before layer effects/composition.
+/// This preserves the existing unquantized native paint convention; no geometry or source write.
+pub(crate) fn style_of_record_with_opacity(
+    record: &ObjectRecord,
+    layer_opacity: f64,
+) -> Result<SceneItemStyle, StyleUnavailable> {
+    if !layer_opacity.is_finite() || layer_opacity < 0.0 {
+        return Err(StyleUnavailable::InvalidOpacity);
+    }
     match record.family.as_str() {
         LEGACY_FAMILY => {
             let fill = record.solid_fill().ok_or(StyleUnavailable::MissingFill)?;
-            Ok(SceneItemStyle::solid_fill(solid_of(fill, 1.0)?))
+            Ok(SceneItemStyle::solid_fill(solid_of(fill, layer_opacity)?))
         }
-        VECTOR_FAMILY => vector_style(record),
+        VECTOR_FAMILY => vector_style(record, layer_opacity),
         _ => Err(StyleUnavailable::UnknownFamily),
     }
 }
 
-fn vector_style(record: &ObjectRecord) -> Result<SceneItemStyle, StyleUnavailable> {
+fn vector_style(
+    record: &ObjectRecord,
+    layer_opacity: f64,
+) -> Result<SceneItemStyle, StyleUnavailable> {
     let body = record.vector().ok_or(StyleUnavailable::MissingVectorBody)?;
     let opacity = body
         .opacity
         .as_f64()
         .filter(|value| value.is_finite() && (0.0..=1.0).contains(value))
-        .ok_or(StyleUnavailable::InvalidOpacity)?;
+        .ok_or(StyleUnavailable::InvalidOpacity)?
+        * layer_opacity;
     let flat = match record.fill.value() {
         None => return Err(StyleUnavailable::MissingFill),
         Some(None) => None,
@@ -142,7 +158,8 @@ fn vector_style(record: &ObjectRecord) -> Result<SceneItemStyle, StyleUnavailabl
     })
 }
 
-/// A solid paint with the item opacity folded into its alpha. Opacity 1 keeps the source numbers untouched.
+/// Fold item/layer opacity into the alpha. One keeps the original numbers untouched.
+/// Baseline cssColorToRgba clamps positive overshoot after multiplying alpha; native keeps float channels.
 fn solid_of(fill: &SolidFill, opacity: f64) -> Result<SceneSolid, StyleUnavailable> {
     if fill.kind != "solid" {
         return Err(StyleUnavailable::NonSolidPaint);
@@ -153,7 +170,7 @@ fn solid_of(fill: &SolidFill, opacity: f64) -> Result<SceneSolid, StyleUnavailab
     }
     let unrepresentable = StyleUnavailable::Paint(ScenePaintError::UnrepresentableStraightRgba);
     let alpha = fill.a.as_f64().ok_or(unrepresentable)?;
-    let folded = Number::from_f64(alpha * opacity).ok_or(unrepresentable)?;
+    let folded = Number::from_f64((alpha * opacity).min(1.0)).ok_or(unrepresentable)?;
     SceneSolid::from_fill(&SolidFill {
         kind: fill.kind.clone(),
         r: fill.r.clone(),

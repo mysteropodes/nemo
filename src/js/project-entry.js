@@ -92,12 +92,19 @@
     admissionMessage.style.fontSize='12px';
     admissionMessage.style.marginTop='8px';
     newPanel.appendChild(admissionMessage);
-    var createGeneration=0,createInFlight=false;
+    var createGeneration=0,createInFlight=false,createSubmitted=false;
     document.getElementById('start-new').addEventListener('click',function(){
+      if(!createInFlight)createSubmitted=false;
       admissionMessage.style.display='none';newPanel.style.display='block';
     });
     document.getElementById('np-cancel').addEventListener('click',function(){
+      var context={submitted:createSubmitted,inFlight:createInFlight};
       ++createGeneration;createInFlight=false;
+      // A native entry can restore only its unchanged ready owner. The
+      // ordinary start-screen form keeps its existing default presentation.
+      if(typeof ports.cancelProjectEntry==='function'){
+        try{if(ports.cancelProjectEntry(context)===false)return false;}catch(_){return false;}
+      }
       admissionMessage.style.display='none';newPanel.style.display='none';
     });
     document.getElementById('np-preset').addEventListener('change',function(){
@@ -105,6 +112,7 @@
     });
     document.getElementById('np-create').addEventListener('click',function(){
       if(createInFlight)return false;
+      createSubmitted=true;
       var preset=document.getElementById('np-preset').value;
       var w,h;
       if(preset==='custom'){

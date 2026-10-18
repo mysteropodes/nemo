@@ -26,6 +26,7 @@ pub fn prepare_object_viewport_composition(
     previous: Option<&ObjectCompositionWitness>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
+    let prior_images = previous;
     let previous = previous.and_then(|witness| witness.reference.as_ref());
     let read = visible_reference(
         plan.packet().snapshot(),
@@ -62,22 +63,32 @@ pub fn prepare_object_viewport_composition(
             opacity: read.opacity as f32,
         }
     });
-    Ok(ObjectCompositionWitness {
+    let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: true,
         resources: None,
         scene_effects: None,
         reference,
-    })
+        rasters: None,
+    };
+    crate::object_render_scene::text_scene::attach(
+        crate::object_render_scene::raster_scene::attach(witness, prior_images)?,
+    )
 }
 
 impl ObjectCompositionWitness {
     /// Compares only the original encoded allocation. Visibility, opacity and
     /// frame changes can reuse it; replacement/removal cannot retain its raster.
     pub fn reference_matches_plan(&self, plan: &ObjectPaintPlan) -> bool {
-        self.reference
+        let reference = self
+            .reference
             .as_ref()
-            .is_some_and(|reference| reference.pixels.matches_image(plan.packet().snapshot()))
+            .is_none_or(|reference| reference.pixels.matches_image(plan.packet().snapshot()));
+        let rasters = self
+            .rasters
+            .as_ref()
+            .is_none_or(|rasters| rasters.matches(plan));
+        self.has_scene_images() && reference && rasters
     }
 
     pub(crate) fn reference_image(&self) -> Option<(&ImageData, Affine, f32)> {

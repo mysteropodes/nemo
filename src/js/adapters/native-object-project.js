@@ -3,10 +3,12 @@
  * this provider or the file adapter. Callback reads retain current native authority. */
 (function(root,factory){
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract);
+  var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
+  var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,FrameEdit){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -15,7 +17,7 @@
   var metadata=Metadata&&Metadata.decode;if(typeof metadata!=='function')throw new Error('Native project metadata parser is unavailable');
   function create(ports){
     var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
-    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null;
+    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){if(typeof ports.openDiagnostic==='function')try{ports.openDiagnostic(event,code);}catch(_){} }
     function openStage(stage){if(openAttempt){openAttempt.stage=stage;openAttempt.invokeErrors=new Set();}}
@@ -66,7 +68,7 @@
       var pin=epoch(info),ticket=++subscriptionTicket;
       var value=await ports.subscribeRevisions(function(event,binding){return synchronizeRevision(event,pin,ticket,binding);},function(error){
         if(ticket===subscriptionTicket&&sameEpoch(pin,epoch(info)))fence(error);
-      },invokeTracked);
+      },invokeTracked,function(){return !openingCancelled&&(!openExposure||!openExposure.isStopped())&&ticket===subscriptionTicket&&active()&&sameEpoch(pin,epoch(info));});
       if(value===null)return;
       if(ticket!==subscriptionTicket||!active()||!sameEpoch(pin,epoch(info))||
         !sameEpoch(value,pin)||value.contentRevision!==info.contentRevision||!id(value.subscriptionId))
@@ -132,22 +134,22 @@
     }
     function enterProject(source,transition){
       if(openingRequested||phase!=='idle'&&phase!=='native')return Promise.reject(new Error('Native project Open is unavailable'));
-      openingRequested=true;wantedFrame=null;
+      openingRequested=true;openingCancelled=false;wantedFrame=null;
       return enqueue(async function(){
-        var previous=info,priorPresentation=presentation,priorBounds=presentationBounds,priorPhase=phase,dispatched=false,inBootstrap=false;
-        function current(){if(transition&&transition.isCurrent&&transition.isCurrent()!==true){
+        var previous=info,priorPresentation=presentation,priorBounds=presentationBounds,priorPhase=phase,dispatched=false,inBootstrap=false,reconciling=false;
+        function current(){if(openingCancelled)throw new Error('Native project Open was cancelled');if(openExposure)openExposure.assertActive();if(!reconciling&&transition&&transition.isCurrent&&transition.isCurrent()!==true){
           if(dispatched)throw new Error('Native project request changed after dispatch');
           throw localRefusal('Native project request was cancelled');}}
         phase='opening';presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);
         try{
-          current();
-          await retireSubscription();
-          if(transition&&transition.confirm&&await transition.confirm(previous)!==true){
-            if(previous)await verifyOwner(previous);phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();
+          openExposure=Exposure.create(ports.subscribeWindowOcclusion,current);current();await openExposure.connect();
+          await openExposure.join(retireSubscription);
+          if(transition&&transition.confirm&&await openExposure.join(function(){return transition.confirm(previous);})!==true){
+            if(previous)await openExposure.join(function(){return verifyOwner(previous);});phase=priorPhase;presentation=priorPresentation;if(previous)await openExposure.join(attachSubscription);
             if(priorPresentation&&ports.surfaceChanged)ports.surfaceChanged(priorPresentation,priorBounds);return false;}
           current();
-          if(transition&&transition.occlude)await transition.occlude();
-          var before=await status();
+          if(transition&&transition.occlude)await openExposure.join(function(){return transition.occlude();});
+          var before=await openExposure.join(status);
           if(!before||before.apiVersion!==2||!id(before.instanceId)||
               (previous?before.available!==true||before.instanceId!==previous.instanceId||before.documentId!==previous.documentId||
                 before.contentRevision!==previous.contentRevision||before.lifecycleGeneration!==previous.lifecycleGeneration:before.available!==false))
@@ -156,48 +158,53 @@
           if(previous)request.replace={documentId:previous.documentId,expectedRevision:previous.contentRevision,
             documentSnapshotId:previous.documentSnapshotId,lifecycleGeneration:previous.lifecycleGeneration};
           current();dispatched=true;inBootstrap=true;
-          var receipt=await raw('nemo_native_object_bootstrap',request);inBootstrap=false;
+          var receipt=await openExposure.join(function(){return raw('nemo_native_object_bootstrap',request);});inBootstrap=false;
           if(typeof ports.openDiagnostic==='function')openAttempt={stage:'receipt',invokeErrors:new Set()};
           if(!receipt||receipt.apiVersion!==2||receipt.requestId!==rid||receipt.instanceId!==before.instanceId||
               !id(receipt.documentId)||receipt.contentRevision!==0||!integer(receipt.resourceCount,0)||
               receipt.resourceCount>1||receipt.viewportAvailable!==false||previous&&receipt.documentId===previous.documentId)
             throw new Error('Native project Open could not be reconciled');
-          openStage('installed-status');var installed=await status();
+          openStage('installed-status');var installed=await openExposure.join(status);
           if(!installed||installed.apiVersion!==2||installed.available!==true||installed.documentId!==receipt.documentId||
               installed.instanceId!==before.instanceId||installed.contentRevision!==0||
               !integer(installed.lifecycleGeneration,previous?previous.lifecycleGeneration+1:1))
             throw new Error('Native project installation is uncorrelated');
-          openStage('metadata');var candidate=await inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
-            contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});
+          openStage('metadata');var candidate=await openExposure.join(function(){return inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
+            contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});});
           if(source.newProject&&(candidate.canvasW!==source.newProject.canvasW||candidate.canvasH!==source.newProject.canvasH||
             candidate.fps!==source.newProject.fps||receipt.resourceCount!==0))throw new Error('Native New Project metadata is uncorrelated');
           info=candidate;current();
-          openStage('first-preview');await present(0,candidate);openStage('first-owner');await verifyOwner(candidate);
+          openStage('first-preview');await present(0,candidate,null,openExposure);openStage('first-owner');await openExposure.join(function(){return verifyOwner(candidate);});
           current();
-          if(transition&&transition.reveal){openStage('reveal');await transition.reveal(candidate);
-            openStage('second-preview');await present(0,candidate);openStage('second-owner');await verifyOwner(candidate);}
+          if(transition&&transition.reveal){openStage('reveal');await openExposure.join(function(){return transition.reveal(candidate);});
+            openStage('second-preview');await present(0,candidate,null,openExposure);openStage('second-owner');await openExposure.join(function(){return verifyOwner(candidate);});}
+          openExposure.detach();
           current();phase='native';
-          openStage('ui-commit');if(transition&&transition.commit)await transition.commit(candidate);
+          openStage('ui-commit');if(transition&&transition.commit)await openExposure.join(function(){return transition.commit(candidate);});
           current();
-          openStage('publication');changed();openStage('subscriber');await attachSubscription();
+          openStage('publication');changed();openStage('subscriber');await openExposure.join(attachSubscription);
           current();
           return candidate;
         }catch(error){
           openFailure(error);
+          if(openingCancelled||openExposure&&openExposure.isStopped())throw fence(error);
           if(!dispatched||inBootstrap&&(disposition(error)==='notDispatched'||!source.newProject&&!previous&&error&&error.code==='unsupported_format')){
+            reconciling=true; // Retired request currency cannot block safe prior-owner reconciliation; explicit stop still fences.
             try{
-              if(previous)await verifyOwner(previous);
-              else{var empty=await status();if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
-              info=previous;phase=priorPhase;presentation=priorPresentation;
-              if(transition&&transition.restore)await transition.restore(previous);
+              if(previous)await openExposure.join(function(){return verifyOwner(previous);});
+              else{var empty=await openExposure.join(status);if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
+              current();info=previous;phase=priorPhase;presentation=priorPresentation;
+              if(transition&&transition.restore)await openExposure.join(function(){return transition.restore(previous);});
               if(priorPresentation&&ports.surfaceChanged)ports.surfaceChanged(priorPresentation,priorBounds);
-              if(previous)await attachSubscription();
+              if(previous)await openExposure.join(attachSubscription);current();
             }catch(unknown){throw fence(unknown);}
-            if(!source.newProject&&!previous&&error&&error.code==='unsupported_format')return null;
+            reconciling=false;
+            if(!source.newProject&&!previous&&error&&error.code==='unsupported_format'){current();return null;}
             throw disposition(error)==='notDispatched'?error:localRefusal(error&&error.message||'Native project Open was not dispatched');
           }
           throw fence(error);
-        }finally{openAttempt=null;openingRequested=false;}
+        }finally{var retiring=openExposure;openExposure=null;openAttempt=null;openingRequested=false;openingCancelled=false;
+          if(retiring)try{retiring.close();}catch(error){throw fence(error);}}
       });
     }
     function previewFailure(detail,error){
@@ -219,28 +226,18 @@
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
         viewport:viewport};
     }
-    function previewReceiptFailure(request,receipt){
-      if(!['opening','native'].includes(phase)||!same(info,request))return 'owner';
-      if(!receipt)return 'receipt';
-      var status=receipt.status;
-      if(status!=='presented')return ['stale-discarded','deferred-timeout','deferred-occluded','failed-validation',
-        'failed-device-lost','failed-retry-lost','failed-retry-outdated','failed-recreate','failed-reconfigure'].includes(status)?'status-'+status:'status';
-      if(!id(receipt.workId))return 'work-id';
-      if(!integer(receipt.viewGeneration,1))return 'view-generation';
-      return null;
-    }
-    async function present(frame,pin,revisionSync){
+    async function present(frame,pin,revisionSync,exposure){
       var request;
       try{request=frameRequest(frame,pin);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      try{receipt=await raw('nemo_native_object_preview',request);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request),allowDeferred);}
+        catch(error){throw previewFailure('receipt-access',error);}}
+      try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),false);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
-      var failure;
-      try{failure=previewReceiptFailure(request,receipt);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure('receipt-access',error);}
-      if(failure){
-        presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(failure,new Error('Native project frame was not presented'));
+      if(receipt.failure){
+        presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented'));
       }
       presentation=freeze({owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
         viewGeneration:receipt.viewGeneration,instanceId:request.instanceId,documentId:request.documentId,
@@ -285,9 +282,19 @@
       await present(ports.frame?ports.frame():0);return receipt;
     });}
     function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
-      var submitted=epoch(info);return enqueue(async function(){guardEpoch(submitted);return action({dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
-        reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
-          changed();await present(ports.frame?ports.frame():0,next);return next;}});});}
+      var submitted=epoch(info),origin=freeze(presentedSession()),ticket=subscriptionTicket;
+      return enqueue(async function(){guardEpoch(submitted);var running=true;
+        try{return await action({
+          // Read-only and action-local: only this operation's own pending entry is exempted.
+          // Captured presentation/subscription identity must survive; the public getter stays fenced.
+          readPresentedObjectSession:function(){return running&&pending===1&&!openingRequested&&!synchronizing&&active()&&origin&&
+            origin.presentation===presentation&&same(info,origin)&&ticket===subscriptionTicket&&
+            (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
+            typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true?origin:null;},
+          dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
+          reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
+            changed();await present(ports.frame?ports.frame():0,next);return next;}});
+        }finally{running=false;}});}
     function reference(action){return mutation(function(pin){return {apiVersion:2,requestId:requestId('reference'),instanceId:pin.instanceId,
       documentId:pin.documentId,lifecycleGeneration:pin.lifecycleGeneration,expectedRevision:pin.contentRevision,
       documentSnapshotId:pin.documentSnapshotId,action:typeof action==='function'?action(pin.reference):action};},'nemo_native_object_reference');}
@@ -369,39 +376,15 @@
         return freeze(Object.assign({},result));
       }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
     }
-    async function readPropertyMetadata(selector){
-      var fields=['instanceId','documentId','atRevision','documentSnapshotId','view'];
-      if(!selector||typeof selector!=='object'||Array.isArray(selector)||
-        Object.keys(selector).length!==fields.length||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(selector,k);}))
-        throw new TypeError('Invalid native metadata selector');
-      var pin=info,ticket=subscriptionTicket,shown=presentation;
-      function ready(){
-        return active()&&!openingRequested&&pending===0&&!synchronizing&&subscription&&
-          ticket===subscriptionTicket&&presentation===shown&&same(info,pin)&&presentedSession()&&
-          typeof ports.dispatchApplication==='function'&&typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true&&
-          typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;
-      }
-      if(!ready()||selector.instanceId!==pin.instanceId||selector.documentId!==pin.documentId||
-        selector.atRevision!==pin.contentRevision||selector.documentSnapshotId!==pin.documentSnapshotId)
-        throw new Error('Native metadata owner or presentation is unavailable');
-      var request={apiVersion:2,requestId:requestId('metadata'),instanceId:selector.instanceId,documentId:selector.documentId,
-        operation:'query.document.object.property.metadata',payload:{atRevision:selector.atRevision,
-          documentSnapshotId:selector.documentSnapshotId,view:selector.view}};
-      // The same subscribed desktop port calls the real SDK before transport.
-      var response=await ports.dispatchApplication(request);
-      if(!ready())throw new Error('Native metadata owner or presentation changed');
-      if(!response||response.apiVersion!==2||response.requestId!==request.requestId||response.instanceId!==pin.instanceId||
-        response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)
-        throw new Error('Native metadata response is uncorrelated');
-      if(response.ok!==true){var error=new Error('Native metadata read unavailable');
-        error.code=response.error&&response.error.code||'unavailable';throw error;}
-      var result=response.result;
-      if(!result||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
-        result.atRevision!==pin.contentRevision||result.documentSnapshotId!==pin.documentSnapshotId)
-        throw new Error('Native metadata result is uncorrelated');
-      return freeze(result);
-    }
-    function exportPng(destination,frames,onProgress,signal){
+    if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
+    var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
+      dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
+      state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
+        synchronizing:synchronizing,subscribed:!!subscription,presentationCurrent:active()&&!synchronizing&&presentation&&same(info,presentation),
+        get presented(){return presentedSession();},dispatchAvailable:typeof ports.dispatchApplication==='function',
+        get projectionReady(){return typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;},
+        get subscriptionActive(){return typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;}};}});
+    function exportFrames(destination,frames,onProgress,signal,format){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
       guardEpoch(submitted);
@@ -411,7 +394,8 @@
       }))throw new Error('Native object export frame range is invalid');
       if(signal&&signal.aborted)return {status:'cancelled'};
       var request=frameRequest(requested[0]);if(requested.length>1)request.frames=requested;
-      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.png';});
+      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.'+format;});
+      if(format==='svg')request.format='svg';
       request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
       var receipt=await raw('nemo_native_object_export',request);
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId||receipt.documentId!==request.documentId||
@@ -420,9 +404,13 @@
         !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
-    return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
+    function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}
+    function exportSvg(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'svg');}
+    return Object.freeze({openPath:openPath,newProject:newProject,cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
-      readPropertyMetadata:readPropertyMetadata,
+      readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
+      get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
+      get editProperty(){return properties.available()?properties.editProperty:undefined;},
       info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
@@ -436,7 +424,7 @@
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?importBatch:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
-      presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,
+      presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
       acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
       identity:requireActive,requestRelease:function(){return false;},releaseCurrent:function(){return false;},
@@ -456,11 +444,15 @@
     ports={
       projectionReady:function(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true;},
       currentSession:function(){return uiSession(root);},
+      fontResources:function(){var f=root.SMVectorText;return f&&['listNativeFontAssets','loadNativeFontAsset','importNativeFontSource'].every(function(k){return typeof f[k]==='function';})?Object.freeze({list:f.listNativeFontAssets,load:f.loadNativeFontAsset,importSource:f.importNativeFontSource}):null;},
       readPropertyMetadata:function(selector){
         var session=uiSession(root);
         if(!session)return Promise.reject(new Error('Native metadata session is unavailable'));
         return session.readPropertyMetadata(selector);
       },
+      readProperty:function(selector){var session=uiSession(root);if(!session)return Promise.reject(new Error('Native property session is unavailable'));return session.readProperty(selector);},
+      get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},
+      get editProperty(){var session=uiSession(root);return session&&session.editProperty;},
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
       projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},
       repaint:function(frameOnly){return paintUI(root,frameOnly);}

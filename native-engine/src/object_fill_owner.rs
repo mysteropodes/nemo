@@ -92,6 +92,9 @@ mod widget_edit;
 pub(crate) use widget_edit::{
     PreparedImageMeshEdit, PreparedRigEdit, PreparedRigPose, PreparedWidgetEdit,
 };
+#[cfg(feature = "project_media_codec")]
+#[path = "object_raster_image_import_owner.rs"]
+pub(crate) mod image_import;
 // L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_asset_owner.rs"]
@@ -210,6 +213,19 @@ impl ObjectFillOwner {
         self.revisions
             .publish_admitted_font(record)
             .map_err(|_| DispatchErrorCode::Unavailable)
+    }
+
+    /// Initial admission only: preserve the already minted inactive identity.
+    #[cfg(feature = "project_media_codec")]
+    pub(crate) fn from_admitted_snapshot(
+        snapshot: ObjectSnapshot,
+    ) -> Result<Self, DispatchErrorCode> {
+        if snapshot.content_revision() != 0 || snapshot.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        Ok(Self {
+            revisions: ObjectRevisionOwner::from_admitted(snapshot),
+        })
     }
 
     #[cfg(feature = "project_media_codec")]

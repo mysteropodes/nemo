@@ -195,20 +195,94 @@ impl NativeObjectHistory {
         &self,
         prepared: &PreparedProjectReplacement,
     ) -> Result<(), DispatchErrorCode> {
+        self.validate_project_origin(&prepared.origin)
+    }
+
+    fn validate_project_origin(&self, origin: &ObjectSnapshot) -> Result<(), DispatchErrorCode> {
         let current = self
             .acquire_snapshot(self.content_revision())
             .ok_or(DispatchErrorCode::Unavailable)?;
-        if prepared.origin.instance_id() != current.instance_id() {
+        if origin.instance_id() != current.instance_id() {
             return Err(DispatchErrorCode::WrongInstance);
         }
-        if prepared.origin.document_id() != current.document_id() {
+        if origin.document_id() != current.document_id() {
             return Err(DispatchErrorCode::WrongDocument);
         }
-        if prepared.origin.snapshot_id() != current.snapshot_id()
-            || prepared.origin.content_revision() != current.content_revision()
+        if origin.snapshot_id() != current.snapshot_id()
+            || origin.content_revision() != current.content_revision()
         {
             return Err(DispatchErrorCode::StaleRevision);
         }
+        Ok(())
+    }
+
+    /// Host reservation/quiescence must precede activation. The caller privately
+    /// parks the returned non-Clone A history; only this value stays routed.
+    /// Refusal never consumes B. Admission provenance permits later edits in A,
+    /// while the supplied live origin and exact target pin control this switch.
+    pub fn activate_inactive_project(
+        &mut self,
+        origin: &ObjectSnapshot,
+        target_snapshot_id: &str,
+        incoming: &mut Option<InactiveProject>,
+    ) -> Result<Self, DispatchErrorCode> {
+        self.validate_project_origin(origin)?;
+        if origin.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        let project = incoming.as_ref().ok_or(DispatchErrorCode::Unavailable)?;
+        if project.snapshot.instance_id() != self.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if project.origin_document != self.document_id()
+            || project.snapshot.document_id() == self.document_id()
+        {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if project.snapshot.snapshot_id() != target_snapshot_id {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        // Clone only the already immutable admitted value, retaining its charge.
+        // Every fallible step finishes before taking B or moving either history.
+        let owner = ObjectFillOwner::from_admitted_snapshot(project.snapshot.clone())?;
+        let next = Self {
+            owner,
+            undo: Vec::new(),
+            redo: Vec::new(),
+            receipts: StageReceipts::default(),
+        };
+        drop(incoming.take());
+        Ok(std::mem::replace(self, next))
+    }
+
+    /// Swap two complete existing histories under the same host authority.
+    /// No snapshot store, redo stack or request receipt is reset or duplicated.
+    pub fn swap_project_history(
+        &mut self,
+        origin: &ObjectSnapshot,
+        target_snapshot_id: &str,
+        parked: &mut Self,
+    ) -> Result<(), DispatchErrorCode> {
+        self.validate_project_origin(origin)?;
+        if origin.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        if parked.instance_id() != self.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if parked.document_id() == self.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        let target = parked
+            .acquire_snapshot(parked.content_revision())
+            .ok_or(DispatchErrorCode::Unavailable)?;
+        if target.snapshot_id() != target_snapshot_id {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        if target.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        std::mem::swap(self, parked);
         Ok(())
     }
 

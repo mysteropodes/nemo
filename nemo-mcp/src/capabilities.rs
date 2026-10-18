@@ -32,6 +32,10 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     ),
     include_str!("../../engineering/application/capabilities-v2/native-project-settings.json"),
     include_str!("../../engineering/application/capabilities-v2/native-layer-policy.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-property-track-edit.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-property-read.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-text-read.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-property-edit.json"),
     include_str!(
         "../../engineering/application/capabilities-v2/native-object-layer-lifecycle.json"
     ),
@@ -40,6 +44,7 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-object-boolean.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-item.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-asset.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-asset-remove.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-vector.json"),
     include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
     include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),

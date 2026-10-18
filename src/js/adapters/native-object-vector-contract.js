@@ -15,9 +15,10 @@
   const EFFECTS = 'command.document.object.path.effects.edit';
   const OPS = new Set([VECTOR, PARAMETRIC, EFFECTS]);
   const FAMILY = 'editable-vector-path';
-  // The common SDK, the MCP and the host bound a request at 4096 encoded bytes; the engine accepts 65536 for the vector
-  // edit only. The wider bound is a lead decision (HANDOFF), so the public bound is the single constant below.
+  // Full encoded request envelopes: vector edits may carry a complete 256-anchor record;
+  // every other operation keeps the default bound. Replies remain bounded separately.
   const MAX_REQUEST_BYTES = 4096, ENGINE_VECTOR_REQUEST_BYTES = 65536;
+  const requestByteLimit = (operation) => operation === VECTOR ? ENGINE_VECTOR_REQUEST_BYTES : MAX_REQUEST_BYTES;
   const MAX_ANCHORS = 256, MAX_FRAME = 4294967295;
   const CAPS = ['butt', 'round', 'square'], JOINS = ['miter', 'round', 'bevel'], ORDERS = ['fillFirst', 'strokeFirst'];
   const PROFILES = ['taper-in', 'taper-out', 'taper-both', 'bulge', 'even'];
@@ -195,6 +196,8 @@
     if (edit) { oneOf(value.operation, ['create', 'replace', 'delete'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
   }
   function correlate(request, response) {
+    // Native refusals report the actual owner; no successful or unrelated reply gains this exception.
+    if (OPS.has(request.operation) && response.ok === false && response.error && response.error.code === 'wrong_instance') return;
     if (response.instanceId !== request.instanceId) fail('vector response owner mismatch');
     const replaced = response.ok === false && response.error && response.error.code === 'wrong_document';
     if (response.documentId !== request.documentId && !replaced) fail('vector response document mismatch');
@@ -205,7 +208,8 @@
     if (response.result.operation !== ran) fail('vector receipt operation mismatch');
     const stroke = response.result.strokeId;
     // A create reports the id the owner allocated; replace and delete report the stable target they named.
-    if (command === 'object.vector.create' ? !(response.result.applied === true && stroke.startsWith('native-stroke:'))
+    const allocation = 'native-stroke:' + (request.expectedRevision + 1) + ':';
+    if (command === 'object.vector.create' ? !(response.result.applied === true && stroke.startsWith(allocation) && /^(0|[1-9][0-9]*)$/.test(stroke.slice(allocation.length)))
       : stroke !== (command === 'object.vector.replace' ? request.payload.record.target.strokeId : request.payload.stableTarget.strokeId)) fail('vector receipt stroke mismatch');
   }
   // Authored identities may legitimately start with data: or blob:; the SDK only inspects them as text.
@@ -230,7 +234,7 @@
   const bytes = (text) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : unescape(encodeURIComponent(text)).length);
   return Object.freeze(Object.assign({
     compose, record, target, operationOf, members, bytes, FAMILY, VECTOR, PARAMETRIC, EFFECTS,
-    MAX_REQUEST_BYTES, ENGINE_VECTOR_REQUEST_BYTES, FX_TYPES, SHAPE_MEMBERS,
+    MAX_REQUEST_BYTES, ENGINE_VECTOR_REQUEST_BYTES, requestByteLimit, FX_TYPES, SHAPE_MEMBERS,
     OPERATIONS: Object.freeze([VECTOR, PARAMETRIC, EFFECTS]),
   }, own));
 }));

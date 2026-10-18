@@ -2196,7 +2196,8 @@ test('L09-D native SVG frame serializer stays a private export-job aggregator ch
   assert.match(coreText, /#\[path = "native_vector_export_svg\.rs"\]\s*pub\(crate\) mod native_vector_export_svg;/);
   const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/native_vector_export_svg.rs'), 'utf8');
   for (const [name, mod] of [['native_vector_export_svg', 'tests'], ['native_vector_export_svg_controls', 'controls'], ['native_vector_export_svg_fixture', 'fixture'], ['native_vector_export_svg_oracle', 'oracle'], ['native_vector_export_svg_reader', 'reader']]) {
-    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+    const visibility = mod === 'reader' ? 'pub\\(crate\\) ' : '';
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*${visibility}mod ${mod};`));
   }
   for (const [id, file] of [
     ['rust.native.engine.export-job', 'native-engine/src/native_vector_export_core.rs'],

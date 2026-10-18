@@ -212,6 +212,8 @@ pub(crate) struct CompactFailure {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum CompactResult {
+    #[cfg(feature = "project_media_codec")]
+    ImageImported(crate::commands::ImageImportResult),
     #[cfg(feature = "font_asset_wire")]
     FontImported {
         asset_id: String,
@@ -268,6 +270,8 @@ impl RetainedDisposition {
                         "applied": true, "historyEntriesAdded": 1, "layerUid": layer_uid
                     }),
                     CompactResult::VectorEdit(vector) => vector.result(),
+                    #[cfg(feature = "project_media_codec")]
+                    CompactResult::ImageImported(image) => image.result(),
                     CompactResult::ItemEdit(item) => item.result(),
                     CompactResult::ImportBatch(batch) => batch.result(),
                     CompactResult::Transaction(record) => record.result(),

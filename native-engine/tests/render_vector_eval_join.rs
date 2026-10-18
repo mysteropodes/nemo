@@ -156,7 +156,7 @@ fn the_holder_predicate_admits_only_what_the_join_consumes() {
         .expect("holders")
         .push(
             json!({"target": {"contextId": "scene-root", "layerUid": "L1"},
-               "properties": [{"property": "opacity", "static": [50]}]}),
+               "properties": [{"property": "position", "static": [50, 0]}]}),
         );
     assert!(!consumed(&layer), "a layer holder is not consumed");
 

@@ -73,6 +73,34 @@ struct RetainedAsset {
 #[derive(Debug, Clone)]
 pub(crate) struct AssetPixels(Arc<RetainedAsset>);
 impl AssetPixels {
+    /// Scene consumers use the same PNG operating bounds as project/reference admission.
+    /// This port owns only immutable reads and delegates to the existing shared charge/cache.
+    pub(crate) fn retain_for_scene(
+        snapshot: &ObjectSnapshot,
+        asset_id: &str,
+        held: &[AssetPixels],
+    ) -> Result<Self, AssetPixelsError> {
+        let limits = ImageAssetLimits::new(
+            16 * 1024 * 1024,
+            256 * 1024 * 1024,
+            64 * 1024 * 1024,
+            8192,
+            8192,
+        )?;
+        Self::retain_reusing(snapshot, asset_id, limits, held)
+    }
+    /// Digest the encoded allocation resolved from this exact snapshot and typed PNG catalog.
+    /// A linked, missing or other-kind source is refused before hashing or decoding.
+    pub(crate) fn version_for(
+        snapshot: &ObjectSnapshot,
+        asset_id: &str,
+    ) -> Result<String, AssetPixelsError> {
+        Ok(encoded_digest(&resolve(snapshot, asset_id)?))
+    }
+    /// Version of this handle's pinned allocation, including after the active owner changes.
+    pub(crate) fn encoded_version(&self) -> String {
+        encoded_digest(self.encoded_png())
+    }
     /// Decode one asset of `snapshot` under the shared budget.
     pub(crate) fn retain(
         snapshot: &ObjectSnapshot,
@@ -146,6 +174,13 @@ impl AsRef<[u8]> for AssetPixels {
     fn as_ref(&self) -> &[u8] {
         self.rgba8()
     }
+}
+
+fn encoded_digest(bytes: &[u8]) -> String {
+    crate::request_receipts::sha256(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// Inventory lookup. The kind is checked before the source, so a linked audio

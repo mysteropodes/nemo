@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.property-read",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.property.read"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPropertyReadPayload"
+  },
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPropertyReadResult"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "Existing sole native owner selects the current immutable revision/snapshot. rawSample reuses native raw self sampling and deliberately ignores active expressions. authoredKeys returns admitted OrderKey DTOs with authored missing/null/empty fields unchanged; fixed-count pinned pages or unavailable, never a JS evaluator, mirror, default curve substitution, publication or ACK.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "maxProviderResponseBytes": 3072,
+    "policy": "Original bounded request and complete correlated response; oversized authored pages refuse unavailable without dynamic truncation or partial keys."
+  },
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "not_found",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned literal native linear oracle: frame-1.5 between authored -2:[10] and2:[90]",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "property-raw",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.read",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "view": {
+            "kind": "rawSample",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0"
+            },
+            "property": "opacity",
+            "frame": -1.5
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "property-raw",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "d11-read-fixture",
+          "documentId": "native-object-document-1",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "kind": "rawSample",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "property": "opacity",
+          "dimension": 1,
+          "frame": -1.5,
+          "value": [
+            20
+          ]
+        }
+      }
+    },
+    {
+      "label": "Original authored keys preserve an empty curve and an absent curve distinctly",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "property-authored",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.read",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "view": {
+            "kind": "authoredKeys",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0"
+            },
+            "property": "opacity",
+            "offset": 0,
+            "limit": 2
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "property-authored",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "d11-read-fixture",
+          "documentId": "native-object-document-1",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "kind": "authoredKeys",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "property": "opacity",
+          "dimension": 1,
+          "trackPresent": true,
+          "items": [
+            {
+              "frame": -2,
+              "v": [
+                10
+              ],
+              "curvePoints": []
+            },
+            {
+              "frame": 2,
+              "v": [
+                90
+              ]
+            }
+          ],
+          "nextOffset": null
+        }
+      }
+    }
+  ]
+}

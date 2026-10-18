@@ -172,7 +172,8 @@
         "image_resource_budget.rs",
         "project_asset_admission.rs",
         "object_project_settings_revision.rs",
-        "object_media_link_revision.rs"
+        "object_media_link_revision.rs",
+        "object_raster_image_import_revision.rs"
       ],
       "publicApi": [
         "revision.rs"
@@ -247,7 +248,9 @@
         "object_frame_clipboard_tracks_context.rs",
         "object_frame_edit_range_join.rs",
         "object_parametric_edit.rs",
-        "object_path_effects_edit.rs"
+        "object_path_effects_edit.rs",
+        "object_raster_image_import_owner.rs",
+        "object_raster_image_import_wire.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -309,7 +312,8 @@
         "object_rig_pose_history.rs",
         "object_component_convert_history.rs",
         "object_frame_clipboard_tracks_history.rs",
-        "object_parametric_edit_history.rs"
+        "object_parametric_edit_history.rs",
+        "object_raster_image_import_history.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -334,6 +338,7 @@
         "motion_parent_chain.rs",
         "property_expression_runtime.rs",
         "property_transform_eval.rs",
+        "property_text_animator.rs",
         "property_follow_path_sample.rs",
         "object_property_sampling.rs",
         "property_expression_views.rs",
@@ -441,7 +446,8 @@
         "object_scene_producer_brush_anchor.rs",
         "object_scene_producer_brush_slot.rs",
         "object_scene_producer_brush.rs",
-        "object_parametric_transform.rs"
+        "object_parametric_transform.rs",
+        "object_text_frame.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -505,7 +511,12 @@
         "render_image_mesh_scene_replay.rs",
         "object_scene_producer_brush_ink.rs",
         "scene_effect_scene_join.rs",
-        "scene_effect_scene_join_resources.rs"
+        "scene_effect_scene_join_resources.rs",
+        "object_raster_paint_join.rs",
+        "object_raster_scene_join.rs",
+        "object_text_scene_join.rs",
+        "object_text_scene_fonts.rs",
+        "object_text_scene_bundled.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -534,7 +545,8 @@
         "scene_effect_gpu_fx.rs",
         "scene_effect_gpu_fx_bounds.rs",
         "scene_effect_gpu_fx_frame.rs",
-        "scene_effect_scene_join_stack.rs"
+        "scene_effect_scene_join_stack.rs",
+        "object_raster_compositor.rs"
       ],
       "publicApi": [
         "compositor.rs"
@@ -647,7 +659,9 @@
         "object_image_mesh_edit_read.rs",
         "object_rig_edit_read.rs",
         "object_rig_pose_read.rs",
-        "object_parametric_edit_read.rs"
+        "object_parametric_edit_read.rs",
+        "object_text_read.rs",
+        "object_text_font_resources.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -694,6 +708,7 @@
         "object_properties.rs",
         "object_timing.rs",
         "object_project_replacement.rs",
+        "object_project_retained_history.rs",
         "project_media_workflow.rs",
         "object_reference_dispatch.rs",
         "render_geometry.rs",
@@ -731,6 +746,7 @@
         "property_expression_runtime_controls.rs",
         "property_transform_eval.rs",
         "property_transform_eval_controls.rs",
+        "property_text_animator.rs",
         "property_follow_path_sample.rs",
         "property_follow_path_sample_controls.rs",
         "property_expression_views.rs",
@@ -748,6 +764,9 @@
         "project_asset_join.rs",
         "project_asset_wire.rs",
         "project_settings.rs",
+        "project_composition_metadata.rs",
+        "project_composition_metadata_owner.rs",
+        "project_composition_metadata_budget.rs",
         "object_project_settings.rs",
         "object_project_background.rs",
         "object_property_curve_edits.rs",
@@ -975,6 +994,7 @@
         "object_vector_edit_limits.rs",
         "object_vector_edit_lock.rs",
         "object_vector_edit_support.rs",
+        "object_property_public_read.rs",
         "rig_pose_deform.rs",
         "rig_pose_deform_mesh.rs",
         "rig_pose_deform_rows.rs",
@@ -1423,7 +1443,17 @@
         "object_path_effects_edit.rs",
         "object_path_effects_edit_parity.rs",
         "object_parametric_transform.rs",
-        "object_parametric_transform_controls.rs"
+        "object_parametric_transform_controls.rs",
+        "object_text_read.rs",
+        "object_raster_image_import.rs",
+        "object_raster_scene_join.rs",
+        "object_layer_opacity_scene.rs",
+        "object_layer_opacity_gpu.rs",
+        "object_layer_opacity_raster.rs",
+        "object_text_scene_join.rs",
+        "object_text_scene_gpu.rs",
+        "object_text_scene_history.rs",
+        "object_text_scene_svg.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1479,7 +1509,6 @@
         "src/registry.rs",
         "src/schema.rs",
         "src/server.rs",
-        "src/server_command_projection.rs",
         "src/wire.rs",
         "src/native_project_settings_contract.rs",
         "src/native_project_settings_wire_tests.rs",
@@ -1490,6 +1519,19 @@
         "src/native_diagnostics_contract.rs",
         "src/native_layer_policy_contract.rs",
         "src/native_layer_policy_wire_tests.rs",
+        "src/native_property_track_contract.rs",
+        "src/native_property_track_contract_tests.rs",
+        "src/native_property_track_wire_tests.rs",
+        "src/native_contract_tests.rs",
+        "src/native_font_contract.rs",
+        "src/native_font_contract_tests.rs",
+        "src/server_command_projection.rs",
+        "src/native_property_read_contract.rs",
+        "src/native_property_read_contract_tests.rs",
+        "src/native_property_read_wire_tests.rs",
+        "src/native_property_edit_contract.rs",
+        "src/native_property_edit_contract_tests.rs",
+        "src/native_property_edit_wire_tests.rs",
         "src/native_object_rig_contract.rs",
         "src/native_object_rig_contract_tests.rs",
         "src/native_object_rig_receipt_tests.rs",
@@ -1507,13 +1549,21 @@
         "src/native_object_edit_contract.rs",
         "src/native_object_edit_contract_tests.rs",
         "src/native_object_edit_receipt_tests.rs",
-        "src/native_contract_tests.rs",
-        "src/native_font_contract.rs",
-        "src/native_font_contract_tests.rs",
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
         "src/native_vector_contract.rs",
-        "src/native_vector_contract_tests.rs"
+        "src/native_vector_contract_tests.rs",
+        "src/native_request_bytes.rs",
+        "src/native_request_spans.rs",
+        "src/native_request_bytes_tests.rs",
+        "src/native_request_framing_tests.rs",
+        "src/native_request_limit_tests.rs",
+        "src/native_text_read_contract.rs",
+        "src/native_text_read_contract_tests.rs",
+        "src/native_text_read_wire_tests.rs",
+        "src/native_image_import_contract_tests.rs",
+        "src/native_wire_response_owner.rs",
+        "src/native_image_import_owner_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1546,7 +1596,10 @@
         "native_catalog.rs",
         "native_status.rs",
         "native_contract_boundaries.rs",
-        "server_failure_paths.rs"
+        "server_failure_paths.rs",
+        "support/native_property_read_schema.rs",
+        "support/native_layer_policy_schema.rs",
+        "support/native_property_edit_schema.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1563,7 +1616,9 @@
         "native_revision_dispatch.rs",
         "native_object_client.rs",
         "native_font_dispatch.rs",
-        "native_font_source.rs"
+        "native_font_source.rs",
+        "native_raster_image_source.rs",
+        "native_raster_image_dispatch.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -1742,6 +1797,8 @@
         "native_object_desktop_preview_test_support.rs",
         "native_object_export_tests.rs",
         "native_object_desktop_export_tests.rs",
+        "native_object_svg_export_tests.rs",
+        "native_object_svg_desktop_export_tests.rs",
         "native_object_desktop_preview_extent_tests.rs",
         "native_object_desktop_export_extent_tests.rs",
         "native_object_project_tests.rs",
@@ -1749,9 +1806,16 @@
         "native_object_reference_tests.rs",
         "native_object_reference_preview_tests.rs",
         "native_object_inactive_project_tests.rs",
+        "native_object_retained_tabs_tests.rs",
         "native_project_settings_public_tests.rs",
         "native_property_metadata_dispatch_tests.rs",
-        "native_layer_policy_dispatch_tests.rs"
+        "native_property_track_dispatch_tests.rs",
+        "native_layer_policy_dispatch_tests.rs",
+        "native_property_read_dispatch_tests.rs",
+        "native_text_read_dispatch_tests.rs",
+        "native_property_edit_dispatch_tests.rs",
+        "native_raster_image_dispatch_tests.rs",
+        "native_raster_image_preview_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1768,7 +1832,9 @@
         "native_dispatch_replacement.rs",
         "native_dispatch_tests.rs",
         "native_object_inactive_requests.rs",
-        "native_object_font.rs"
+        "native_object_retained_tabs.rs",
+        "native_object_font.rs",
+        "native_object_image.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"

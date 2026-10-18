@@ -7,6 +7,9 @@ use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
 pub use crate::revision::ObjectSnapshot;
+#[cfg(feature = "font_asset_admission")]
+#[path = "object_text_font_resources.rs"]
+pub(crate) mod object_text_font_resources;
 // L03-O (#2109): rig weight / nearest-location / IK kernels for the rig edit transaction (same layering reason).
 #[path = "object_rig_edit_read.rs"]
 #[allow(dead_code)]
@@ -31,8 +34,22 @@ mod property_metadata_read;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_read.rs"]
 mod property_metadata_tests;
+#[cfg(all(test, feature = "test-commands"))]
+#[path = "../tests/object_property_public_read.rs"]
+mod property_public_read_tests;
 #[path = "object_property_read.rs"]
 mod property_read;
+#[path = "object_text_read.rs"]
+mod text_read;
+#[cfg(all(
+    test,
+    feature = "test-commands",
+    feature = "history",
+    feature = "project_media_codec",
+    feature = "font_asset_admission"
+))]
+#[path = "../tests/object_text_read.rs"]
+mod text_read_tests;
 #[path = "object_timing_snapshot.rs"]
 mod timing;
 // L03-M (#2109): widget write planning through the evaluation kernel (commands may not import it).
@@ -255,6 +272,9 @@ impl ObjectSnapshot {
                 "Only pinned object reads without expectedRevision are supported.",
             );
         }
+        if request.operation == "query.document.object.text" {
+            return self.dispatch_text_read(&request);
+        }
         if request.operation == "query.document.object.serialize" {
             return self.serialize_response(&request);
         }
@@ -263,6 +283,9 @@ impl ObjectSnapshot {
         }
         if request.operation == "query.document.object.property.metadata" {
             return self.dispatch_property_metadata(&request);
+        }
+        if request.operation == "query.document.object.property.read" {
+            return self.dispatch_property_read(&request);
         }
         if request.operation != "query.document.object" {
             return failure(

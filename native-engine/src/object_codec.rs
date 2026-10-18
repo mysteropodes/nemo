@@ -3,7 +3,7 @@
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
 pub use crate::object_document::{
-    FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
+    FrameScope, FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
 };
 #[cfg(feature = "font_asset_admission")]
 #[path = "font_asset_admission.rs"]

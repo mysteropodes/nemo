@@ -1,3 +1,5 @@
+// Native Draw first uses the shared pinned gesture controller; the existing legacy route
+// described below remains reachable only while native authority is inactive.
 // ---- C7 CUTOVER STEP 2: Draw + Fillbrush tools fully on the Rust engine (when enabled) ----
 // Fillbrush (tools.js's 'fillbrush') is mechanically the exact same
 // pressure-brush centerline capture as Draw's vector-brush mode (same
@@ -140,57 +142,11 @@
     for (var i = 0; i < stabQueue.length; i++) { ax += stabQueue[i][0]; ay += stabQueue[i][1]; }
     return [ax / stabQueue.length, ay / stabQueue.length];
   }
-  // Raw per-sample pressure (especially the speed-fallback formula, and
-  // some stylus hardware) is noisy enough to visibly bump the variable-
-  // width outline's edge — needs smoothing, but a single FIXED-factor
-  // exponential moving average (the previous 0.45-alpha version) forces
-  // one compromise value for every drawing speed: tuned to kill jitter
-  // during a slow, careful line, it visibly LAGS behind a fast, deliberate
-  // press/release (exactly the "moins naturel qu'un vrai logiciel pro
-  // comme Moho" feedback — a real pen's weight should register close to
-  // instantly, not smear across several samples). 2026-07: replaced with a
-  // One Euro Filter (Casiez/Roussel/Vogel, https://gery.casiez.net/1euro/
-  // — the industry-standard answer to exactly this "filter now, tau
-  // later" tradeoff, used across stylus/motion-tracking software): cutoff
-  // frequency adapts to how FAST pressure is currently changing, so a slow
-  // stroke gets heavy smoothing (kills jitter) while a fast press/release
-  // gets a high cutoff (near-zero lag). mincutoff/beta below are a
-  // reasonable starting point for a 0..1 pressure signal (as opposed to
-  // pixel-position tuning, where beta is usually two orders of magnitude
-  // smaller) — real tuning needs a physical stylus to feel right, adjust
-  // here if it still reads too smoothed/too jittery.
-  function makeOneEuroFilter(mincutoff, beta, dcutoff) {
-    var xPrev = null, dxPrev = 0, tPrev = null;
-    function alpha(cutoff, dt) { var tau = 1 / (2 * Math.PI * cutoff); return 1 / (1 + tau / dt); }
-    return function (x, tMs) {
-      if (xPrev == null) { xPrev = x; tPrev = tMs; dxPrev = 0; return x; }
-      var dt = Math.max(0.001, (tMs - tPrev) / 1000); // seconds; floored so a duplicate-timestamp sample can't divide by zero
-      tPrev = tMs;
-      var dx = (x - xPrev) / dt;
-      dxPrev = dxPrev + alpha(dcutoff, dt) * (dx - dxPrev);
-      var cutoff = mincutoff + beta * Math.abs(dxPrev);
-      var result = xPrev + alpha(cutoff, dt) * (x - xPrev);
-      xPrev = result;
-      return result;
-    };
-  }
-  // Tuned empirically (no physical stylus available in this environment —
-  // simulated jitter [0.18-0.25] + press-to-0.9 sample sequences at
-  // realistic ~10-16ms event spacing): beta needs to be ~30x larger than
-  // typical 2D-position One Euro presets, since a 0..1 pressure signal's
-  // derivative is numerically tiny compared to pixel-position deltas.
-  // Result: reaches target within 2 samples on a real press (was 6+ samples
-  // with the old fixed-0.45 filter) while holding a TIGHTER jitter band
-  // than that old filter too — verify/retune live with a real tablet if it
-  // ever reads too twitchy or too smoothed.
-  var PRESSURE_MINCUTOFF = 1.0, PRESSURE_BETA = 20, PRESSURE_DCUTOFF = 1.0;
-  var pressureFilter = makeOneEuroFilter(PRESSURE_MINCUTOFF, PRESSURE_BETA, PRESSURE_DCUTOFF);
-  // Reset every stroke (new filter instance) so it snaps straight to the
-  // first real reading instead of ramping up from a previous stroke's
-  // state — a real pressed-down pen should register full weight
-  // immediately, not fade in.
-  function resetPressureFilter() { pressureFilter = makeOneEuroFilter(PRESSURE_MINCUTOFF, PRESSURE_BETA, PRESSURE_DCUTOFF); }
-  function smoothPressure(p) { return pressureFilter(p, Date.now()); }
+  // One shared, unchanged pressure filter for native and legacy sampling. The
+  // classic helper resolves lazily after the ordinary synchronous bootstrap.
+  var pressureFilter = null;
+  function resetPressureFilter() { pressureFilter = window.NemoNativeObjectShapeTool.createPressureFilter(); }
+  function smoothPressure(p) { if (!pressureFilter) resetPressureFilter(); return pressureFilter(p, Date.now()); }
 
   function shouldIntercept() {
     return (
@@ -573,7 +529,31 @@
     return r;
   }
 
+
+  var nativeDraw = null;
+  function nativeOwnsDraw() {
+    try { var owner = window.NemoNativeObjectProject && window.NemoNativeObjectProject.desktop(window);
+      return !!owner && owner.blocksLegacy(); } catch (_) { return true; }
+  }
+  function nativeEvent(kind,event) {
+    if(!nativeDraw&&window.NemoNativeObjectShapeTool){
+      var ports=window.NemoNativeObjectShapeTool.freehandPorts(window,{
+        reset:function(){lastMoveT=0;lastWorldPt=null;lastPenPressure=null;stabQueue=[];resetPressureFilter();},
+        pressure:function(e,w){return smoothPressure(wantsPressure()?pressureOf(e,w):1);},
+        width:widthFor,stabilize:stabilizePoint,angle:angledSamples
+      });
+      nativeDraw=window.NemoNativeObjectShapeTool.create(window,ports);
+      window.NemoNativeFreehandToolController=nativeDraw;
+    }
+    if(nativeDraw&&nativeDraw.handle(kind,event))return true;
+    if(nativeOwnsDraw()&&['draw','fillbrush'].includes(state.tool)){
+      if(event.target===document.getElementById('drawing-canvas')||event.target===document.getElementById('canvas-area')){event.stopImmediatePropagation();event.preventDefault();}
+      return true;
+    }
+    return false;
+  }
   function onDown(e) {
+    if (nativeEvent('down',e)) return;
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
@@ -625,6 +605,7 @@
     }
   }
   function onMove(e) {
+    if (nativeEvent('move',e)) return;
     if (sizing) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -691,6 +672,7 @@
     window.SMEngineBridge.renderWithOverlayItem(previewItems);
   }
   function onUp(e) {
+    if (nativeEvent('up',e)) return;
     if (sizing) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -750,6 +732,7 @@
   // while `dragging` so it never fights onMove's live pressure-driven size
   // during an actual stroke).
   function onHoverMove(e) {
+    if(nativeOwnsDraw())return;
     if (dragging || !window.SMEngineBridge || !window.SMEngineBridge.isEnabled() || state.playing) return;
     // Feedback ("une vraie sensation de dessin comme sur Flash/Animate"):
     // this brush-footprint preview used to be vectorBrush-only — Fill
@@ -767,6 +750,7 @@
     window.SMEngineBridge.renderNow();
   }
   function clearHoverCursor() {
+    if(nativeOwnsDraw())return;
     if (window.SMEngineBridge) { window.SMEngineBridge.setPressureCursor(null, 0); window.SMEngineBridge.renderNow(); }
   }
 
@@ -1087,7 +1071,8 @@
     target.addEventListener('pointerdown', onDown, { capture: true });
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });
-    target.addEventListener('pointercancel', onUp, { capture: true });
+    target.addEventListener('pointercancel', function(e){if(!nativeEvent('cancel',e))onUp(e);}, { capture: true });
+    target.addEventListener('lostpointercapture',function(e){nativeEvent('cancel',e);},{capture:true});
     document.addEventListener('keydown', onKeyDown);
     // Bubble phase (not capture) and gated on `!dragging` inside the handler
     // itself, so this never races the capture-phase onMove above during an

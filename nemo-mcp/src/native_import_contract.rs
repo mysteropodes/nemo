@@ -290,6 +290,42 @@ pub(crate) fn result(value: &Value) -> bool {
     })
 }
 
+// Native planning maps every declared row or refuses the entire transaction.
+fn mapped_rows_match(input: &[Value], mapped: &[Value], native_id: &str) -> bool {
+    input.len() == mapped.len()
+        && distinct(source_ids(mapped))
+        && distinct(
+            mapped
+                .iter()
+                .map(|row| row.get(native_id).and_then(Value::as_str)),
+        )
+        && input.iter().all(|row| {
+            mapped
+                .iter()
+                .any(|item| item["sourceId"] == row["sourceId"])
+        })
+}
+fn receipt_matches(payload: &Value, value: &Value) -> bool {
+    if !request(payload) || !result(value) {
+        return false;
+    }
+    let layers = payload["layers"].as_array().unwrap();
+    let records = payload["records"].as_array().unwrap();
+    let empty = Vec::new();
+    let skipped = payload
+        .get("skipped")
+        .and_then(Value::as_array)
+        .unwrap_or(&empty);
+    payload
+        .get("unavailable")
+        .is_none_or(|v| v.as_array().is_some_and(|rows| rows.is_empty()))
+        && distinct(source_ids(layers).chain(skip_ids(skipped, "layer")))
+        && value["applied"].as_bool() == Some(!layers.is_empty() || !records.is_empty())
+        && mapped_rows_match(layers, value["layers"].as_array().unwrap(), "layerUid")
+        && mapped_rows_match(records, value["objects"].as_array().unwrap(), "strokeId")
+        && value["skipped"].as_array() == Some(skipped)
+}
+
 /// A changing batch advances the revision by one, a batch that creates nothing by none.
 pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Value) -> bool {
     result(value)
@@ -307,7 +343,8 @@ pub(crate) fn response_matches(
     response.instance_id == request.instance_id
         && response.document_id == request.document_id
         && response.result.as_ref().is_some_and(|value| {
-            revision_matches(request.expected_revision, response.content_revision, value)
+            receipt_matches(&request.payload, value)
+                && revision_matches(request.expected_revision, response.content_revision, value)
         })
 }
 

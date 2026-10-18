@@ -84,7 +84,7 @@ fn every_other_holder_keeps_the_packet_unavailable() {
         .expect("holders")
         .push(
             json!({"target": {"contextId": "scene-root", "layerUid": "L1"},
-               "properties": [{"property": "opacity", "static": [50]}]}),
+               "properties": [{"property": "position", "static": [50, 0]}]}),
         );
     let mut legacy = base.clone();
     let record = legacy["objects"][0].as_object_mut().expect("record");

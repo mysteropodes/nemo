@@ -182,6 +182,9 @@
       }catch(error){show('Inactive project remains visible, but switching is unavailable: '+(error&&error.message||'retention is unconfirmed'));return {status:'indeterminate'};}
     }
     return Object.freeze({openPath:openPath,close:close,activateClick:activateClick,reconcile:reconcile,
+      // Replacement drops this owner's retained project; uncertainty is not
+      // absence, even when a lost reply has not produced a visible row.
+      canReplaceActiveProject:function(){return !busy&&!held&&!uncertain;},
       held:function(){return held;},isBusy:function(){return busy;}});
   }
   return Object.freeze({create:create});

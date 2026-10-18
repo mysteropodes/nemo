@@ -42,7 +42,7 @@ test('the three operations are admitted by the SDK and the font, item and edit c
   assert.throws(() => SDK.validateRequest(request('command.document.object.vector.create', {})), /operation is not admitted/);
 });
 
-test('a vector request is closed, revisioned and bounded by the public 4096 bytes', () => {
+test('a vector request stays closed and revisioned while admitting complete records above 4096 bytes', () => {
   const q = createRequest();
   const noRevision = clone(q); delete noRevision.expectedRevision;
   assert.throws(() => SDK.validateRequest(noRevision), /expectedRevision presence/);
@@ -52,7 +52,10 @@ test('a vector request is closed, revisioned and bounded by the public 4096 byte
   const named = clone(q); named.payload.record.target.strokeId = 'native-stroke:1:0';
   assert.throws(() => SDK.validateRequest(named), /empty for a create/);
   const big = clone(q); big.payload.record.geometry.segments = Array.from({ length: 200 }, (_, i) => seg(i, i));
-  assert.throws(() => SDK.validateRequest(big), /request exceeds 4096 encoded bytes/);
+  assert.ok(Contract.bytes(JSON.stringify(big)) > 4096);
+  assert.equal(SDK.validateRequest(big), big);
+  const excessive = clone(q); excessive.payload.record.target.layerUid = 'L'.repeat(65536);
+  assert.throws(() => SDK.validateRequest(excessive), /request exceeds 65536 encoded bytes/);
   // identities may legitimately start with data:/blob:, everything else keeps the raw-payload guard
   const opaque = request(Contract.VECTOR, { command: 'object.vector.delete', stableTarget: Object.assign(target('data:stroke'), { layerUid: 'blob:layer' }) });
   assert.equal(SDK.validateRequest(opaque), opaque);

@@ -11627,6 +11627,7 @@ window.updateCombinePanel=updateCombinePanel;
   var cancelBtn=document.getElementById('exp-cancel'),nativePngAbort=null;
   cancelBtn.addEventListener('click',function(){
     if(nativePngAbort){cancelBtn.disabled=true;nativePngAbort.abort();return;}
+    var nativeAuthority=window.NemoNativeOpacityCutover;if(nativeAuthority&&nativeAuthority.blocksLegacy())return;
     var s=window.SMExport.svgSequenceJob(),id=s&&s.meta().running;
     if(!id)return; // the directory picker is still open — no job exists yet
     cancelBtn.disabled=true;s.cancel(id);progEl.style.display='block';progEl.textContent=SM.t('exportCancelled');
@@ -11645,14 +11646,15 @@ window.updateCombinePanel=updateCombinePanel;
       onProgress:function(i,n){progEl.style.display='block';progEl.textContent=SM.t('exportRenderingFrame').replace('{i}',i).replace('{n}',n);},
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
-    var nativePng=fmtSel.value==='png'&&window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy();
+    var nativeAuthority=window.NemoNativeOpacityCutover;
+    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeAuthority&&nativeAuthority.blocksLegacy();
+    var nativePng=fmtSel.value==='png'&&nativeExport;
     nativePngAbort=nativePng?new AbortController():null;if(nativePngAbort)opts.signal=nativePngAbort.signal;
-    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&window.SMExport.isAvailable())?'':'none';
+    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&!nativeExport&&window.SMExport.isAvailable())?'':'none';
     try{
-      // The native PNG job reads a pinned Rust revision. Saving Paper frames
+      // Native PNG/SVG read a pinned Rust revision. Saving Paper frames
       // here would either be denied or create a second document writer.
-      var nativeOpacity=window.NemoNativeOpacityCutover;
-      if(fmtSel.value!=='png'||!nativeOpacity||!nativeOpacity.blocksLegacy())saveAllLayerFrames();
+      if(!nativeExport)saveAllLayerFrames();
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent=SM.t('exportCancelled');}

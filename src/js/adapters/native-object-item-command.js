@@ -22,7 +22,7 @@
     function refusal(response,request){
       var error=response.error||{};
       return fault(typeof error.code==='string'?error.code:'unavailable','Native '+label+' command refused: '+(error.code||'unavailable'),
-        {reason:error.details&&error.details.reason||null,requestId:request.requestId,contentRevision:response.contentRevision});
+        {reason:error.details&&error.details.reason||null,requestId:request.requestId,contentRevision:response.contentRevision,details:error.details||null});
     }
     async function send(ctx,request,key,finish,sent){
       try{return await ctx.dispatch(request);}catch(first){
@@ -91,7 +91,7 @@
       return run(function(ctx){
         var pin=owner(),key=ownerKey(pin);
         var request={apiVersion:2,requestId:session.requestId(label),instanceId:pin.instanceId,documentId:pin.documentId,
-          expectedRevision:pin.contentRevision,operation:operation,payload:build(pin)};
+          expectedRevision:pin.contentRevision,operation:operation,payload:build(pin,ctx)};
         try{contract.payload(operation,request.payload);}catch(bad){throw fault('invalid_request',bad.message,{reason:'local_validation'});}
         if(size(request)>4096)throw fault('invalid_request','Native '+label+' request exceeds 4096 encoded bytes',{reason:'request_size'});
         return settle(ctx,request,key,finish);

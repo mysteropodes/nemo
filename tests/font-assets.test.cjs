@@ -183,7 +183,7 @@ test('actual native bridge retains eight choices and public entry points without
   const b = bridge();
   await settle();
   assert.deepEqual(Object.keys(b.api).sort(), ['VECTOR_FONTS', 'addGoogleFont', 'buildVectorTextGroup',
-    'listNativeFontAssets', 'loadNativeFontAsset', 'loadVectorFont', 'vectorTextGroupMembers'].sort());
+    'importNativeFontSource', 'listNativeFontAssets', 'loadNativeFontAsset', 'loadVectorFont', 'vectorTextGroupMembers'].sort());
   assert.deepEqual(Object.keys(b.api.VECTOR_FONTS), ['Roboto-Regular', 'Roboto-Bold', 'DejaVuSans-Regular',
     'DejaVuSans-Bold', 'DejaVuSerif-Regular', 'DejaVuSerif-Bold', 'Manrope-Regular', 'Inter-Regular']);
   assert.deepEqual(b.nativeImports,[]);
