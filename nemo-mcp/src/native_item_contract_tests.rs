@@ -1,6 +1,5 @@
 //! Common validator cases for the lane-6 object operations, authored UNRUN (no compiler by rule).
 use super::*;
-use crate::contract::RequestError;
 use serde_json::json;
 
 fn stable() -> Value {
@@ -345,7 +344,7 @@ fn a_response_advances_the_revision_by_its_own_disposition_and_stays_in_the_enve
 const OVERFLOWING_REVISION: u64 = u64::MAX;
 
 #[test]
-fn registration_declares_item_and_png_attach_available_but_asset_remove_unavailable() {
+fn registration_declares_item_png_attach_and_asset_remove_available() {
     let catalog = crate::capabilities::native_catalog();
     assert_eq!(
         catalog.capability_for_operation(ITEM).unwrap()["id"],
@@ -365,15 +364,12 @@ fn registration_declares_item_and_png_attach_available_but_asset_remove_unavaila
     );
     let remove_descriptor = catalog.capability_for_operation(REMOVE).unwrap();
     assert_eq!(remove_descriptor["id"], "native.object.asset.remove");
-    assert_eq!(remove_descriptor["availability"]["state"], "unavailable");
-    let remove_reason = remove_descriptor["availability"]["reason"]
-        .as_str()
-        .unwrap();
-    assert!(!remove_reason.is_empty());
+    assert_eq!(remove_descriptor["availability"]["state"], "available");
+    assert_eq!(remove_descriptor["operations"], json!([REMOVE]));
+    assert_eq!(remove_descriptor["authority"]["fallback"], "none");
     assert!(crate::capabilities::validate_native_operation(ITEM).is_ok());
     assert!(crate::capabilities::validate_native_operation(ATTACH).is_ok());
-    let refused = crate::capabilities::validate_native_operation(REMOVE).unwrap_err();
-    assert!(matches!(refused, RequestError::Unavailable(reason) if reason == remove_reason));
+    assert!(crate::capabilities::validate_native_operation(REMOVE).is_ok());
 }
 
 #[test]
@@ -403,10 +399,7 @@ fn the_envelope_requires_a_revision_and_the_closed_payload() {
     placed_png["placement"] = json!({"kind":"newLayer"});
     placed_png["lifecycleGeneration"] = json!(1);
     assert!(envelope(ATTACH, placed_png, Some(7)).validate().is_ok());
-    assert!(matches!(
-        envelope(REMOVE, remove(), Some(7)).validate(),
-        Err(RequestError::Unavailable(_))
-    ));
+    assert!(envelope(REMOVE, remove(), Some(7)).validate().is_ok());
 }
 
 #[test]

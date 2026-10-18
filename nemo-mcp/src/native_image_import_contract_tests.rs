@@ -1,6 +1,5 @@
 //! L06-M2 actual registered wire/shape/correlation controls. Authored UNRUN until compiler slot.
 use super::*;
-use crate::contract::RequestError;
 use crate::wire::decode_native_request;
 use serde_json::json;
 fn pair(placement: Value) -> (NativeApplicationRequest, NativeApplicationResponse) {
@@ -36,17 +35,14 @@ fn both_registered_placement_forms_cross_original_byte_shape_admission_with_opaq
     }
 }
 #[test]
-fn png_placement_activation_keeps_remove_unavailable_and_catalog_shape_compatibility() {
+fn png_placement_and_remove_activation_keep_catalog_shape_compatibility() {
     let (q, _) = pair(json!({"kind":"newLayer"}));
     assert!(q.validate().is_ok());
     let mut remove = q.clone();
     remove.operation = REMOVE.into();
     remove.payload = json!({"documentSnapshotId":"native-object:document:7","assetId":"asset-a"});
     assert!(remove.validate_input().is_ok());
-    assert!(matches!(
-        remove.validate(),
-        Err(RequestError::Unavailable(_))
-    ));
+    assert!(remove.validate().is_ok());
     let mut catalog = q;
     catalog.payload.as_object_mut().unwrap().remove("placement");
     catalog

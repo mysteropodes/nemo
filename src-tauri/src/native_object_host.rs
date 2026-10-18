@@ -2,7 +2,7 @@
 use crate::native_dispatch::{NativeDispatch, NativeReleaseProgress};
 use native_engine::{
     application::ApplicationReleaseReceipt,
-    commands::{OpacityRequest, ResponseEnvelope},
+    commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope},
     document::OpacityDocument,
     export_job::{ExportReleaseReconciliation, JobReceipt, PendingFrame, ReconciliationStage},
     history::{InactiveProject, NativeObjectHistory, PreparedProjectReplacement},
@@ -71,6 +71,23 @@ impl NativeObjectHost {
             return Err("native inactive project snapshot is stale".into());
         }
         Ok(())
+    }
+
+    /// Catalog removal delegates to the existing sealed asset/history owner.
+    /// Keep preflight codes typed for the common API, including changed-body replay.
+    pub(crate) fn remove_asset(
+        &mut self,
+        request: &OpacityRequest,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        if self.released.is_some() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        let before = self.history.content_revision();
+        let response = self.history.dispatch_asset_command(request, None);
+        if self.history.content_revision() != before {
+            self.preview.invalidate();
+        }
+        response
     }
 
     pub(crate) fn matches_project_snapshot(&self, snapshot: &str) -> bool {
@@ -264,6 +281,11 @@ impl NativeDispatch for NativeObjectHost {
         if self.released.is_some() {
             return Err("native object host was released".into());
         }
+        if request.operation == "command.document.object.asset.remove" {
+            return self
+                .remove_asset(&request)
+                .map_err(|_| "native asset removal correlation is invalid".into());
+        }
         let before = self.history.content_revision();
         let command = self.history.try_dispatch_object_command(&request);
         if self.history.content_revision() != before {
@@ -361,3 +383,7 @@ mod history_tests;
 #[cfg(test)]
 #[path = "native_object_export_tests.rs"]
 mod export_tests;
+
+#[cfg(test)]
+#[path = "native_asset_remove_dispatch_tests.rs"]
+mod asset_remove_tests;
