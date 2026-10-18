@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "53b8d04b09cdb8bb183ee1a5e319ad86e3d1a07b",
-  "describe": "v0.7.0-alpha.4-2283-g53b8d04b"
+  "head": "6f2d4a434123e65c7ff2a7e63b926d135613a8a1",
+  "describe": "v0.7.0-alpha.4-2291-g6f2d4a43"
  },
- "inputsDigest": "0a96f71cb7f7c3e8fb2e18f0ee5ffcfe9b3cc452cd78f3a4fb646dff132f5e83",
+ "inputsDigest": "1404384d7773f1ccdfa47cddabc6b932db406084f566c2f340cd286199e3222e",
  "states": [
   "inventoried",
   "characterized",
@@ -181,7 +181,7 @@
   },
   "SM": {
    "file": "src/js/timeline.js",
-   "line": 11783,
+   "line": 11785,
    "members": 0
   },
   "SMKitsu": {
@@ -271,12 +271,12 @@
   },
   "SMProjectEntry": {
    "file": "src/js/project-entry.js",
-   "line": 189,
+   "line": 197,
    "members": 0
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 378,
+   "line": 396,
    "members": 2
   },
   "SMAgPsdLoader": {
@@ -2472,7 +2472,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:698 initStartScreen()"
+    "src/js/project.js:732 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3343,7 +3343,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:695 initStartScreen()"
+    "src/js/project.js:729 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3424,7 +3424,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:694 initStartScreen()"
+    "src/js/project.js:728 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4638,7 +4638,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:692 initStartScreen()"
+    "src/js/project.js:726 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4678,7 +4678,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:693 initStartScreen()"
+    "src/js/project.js:727 initStartScreen()"
    ],
    "events": [
     "click"
@@ -7141,7 +7141,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11638"
+     "src/js/timeline.js:11639"
     ]
    },
    "fixtures": [
@@ -7181,7 +7181,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 19,
+    "functionsVisited": 20,
     "via": "variable cancelBtn",
     "references": []
    },
@@ -7303,7 +7303,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11643"
+     "src/js/timeline.js:11644"
     ]
    },
    "fixtures": [
@@ -7360,7 +7360,7 @@
    "capability": "Export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11635"
+    "src/js/timeline.js:11636"
    ],
    "events": [
     "click"
@@ -7816,7 +7816,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:699 initStartScreen()"
+    "src/js/project.js:733 initStartScreen()"
    ],
    "events": [
     "change"
@@ -7837,7 +7837,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 56,
+    "functionsVisited": 57,
     "via": "chain",
     "references": [
      "src/js/project.js:214 openDialog()"
@@ -9154,7 +9154,7 @@
    "capability": "Cancel",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project-entry.js:99 bindNewProjectForm()"
+    "src/js/project-entry.js:100 bindNewProjectForm()"
    ],
    "events": [
     "click"
@@ -9175,7 +9175,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 0,
+    "functionsVisited": 1,
     "via": "chain",
     "references": []
    },
@@ -9191,7 +9191,7 @@
    "capability": "Create",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project-entry.js:106 bindNewProjectForm()"
+    "src/js/project-entry.js:113 bindNewProjectForm()"
    ],
    "events": [
     "click"
@@ -9237,7 +9237,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:116 bindNewProjectForm())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:124 bindNewProjectForm())",
    "source": "src/index.html:81",
    "meta": {
     "data": {},
@@ -9247,7 +9247,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project-entry.js:116 bindNewProjectForm()"
+     "src/js/project-entry.js:124 bindNewProjectForm()"
     ]
    },
    "fixtures": [
@@ -9271,7 +9271,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:112 bindNewProjectForm())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:120 bindNewProjectForm())",
    "source": "src/index.html:80",
    "meta": {
     "data": {
@@ -9283,7 +9283,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project-entry.js:112 bindNewProjectForm()"
+     "src/js/project-entry.js:120 bindNewProjectForm()"
     ]
    },
    "fixtures": [
@@ -9309,7 +9309,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:117 bindNewProjectForm())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:125 bindNewProjectForm())",
    "source": "src/index.html:72",
    "meta": {
     "data": {},
@@ -9319,7 +9319,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project-entry.js:117 bindNewProjectForm()"
+     "src/js/project-entry.js:125 bindNewProjectForm()"
     ]
    },
    "fixtures": [
@@ -9334,7 +9334,7 @@
    "capability": "np preset",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project-entry.js:103 bindNewProjectForm()"
+    "src/js/project-entry.js:110 bindNewProjectForm()"
    ],
    "events": [
     "change"
@@ -9358,7 +9358,7 @@
     "functionsVisited": 1,
     "via": "chain",
     "references": [
-     "src/js/project-entry.js:108 bindNewProjectForm()"
+     "src/js/project-entry.js:116 bindNewProjectForm()"
     ]
    },
    "fixtures": [
@@ -9382,7 +9382,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:111 bindNewProjectForm())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project-entry.js:119 bindNewProjectForm())",
    "source": "src/index.html:80",
    "meta": {
     "data": {
@@ -9394,7 +9394,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project-entry.js:111 bindNewProjectForm()"
+     "src/js/project-entry.js:119 bindNewProjectForm()"
     ]
    },
    "fixtures": [
@@ -14669,7 +14669,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:633"
+    "src/js/project.js:667"
    ],
    "events": [
     "click"
@@ -14696,10 +14696,11 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 187,
+    "functionsVisited": 214,
     "via": "chain",
     "references": [
-     "src/js/project.js:633",
+     "src/js/project.js:644 renderTabBar()",
+     "src/js/project.js:667",
      "src/js/timeline.js:9070 action()"
     ]
    },
@@ -14749,7 +14750,7 @@
    "capability": "Collapse panel",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11782 initPropsPanelCollapse()"
+    "src/js/timeline.js:11784 initPropsPanelCollapse()"
    ],
    "events": [
     "click"
@@ -14773,7 +14774,7 @@
     "functionsVisited": 24,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:11775 syncPropsPanelCollapseTitle()"
+     "src/js/timeline.js:11777 syncPropsPanelCollapseTitle()"
     ]
    },
    "fixtures": [
@@ -15721,7 +15722,9 @@
     "hiddenAtLoad": false,
     "functionsVisited": 0,
     "via": "chain",
-    "references": []
+    "references": [
+     "src/js/project.js:588 addTab()"
+    ]
    },
    "fixtures": [
     "media",
@@ -15735,9 +15738,9 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project-entry.js:171 bindStartScreen()",
-    "src/js/project-entry.js:172 bindStartScreen()",
-    "src/js/project-entry.js:173 bindStartScreen()"
+    "src/js/project-entry.js:179 bindStartScreen()",
+    "src/js/project-entry.js:180 bindStartScreen()",
+    "src/js/project-entry.js:181 bindStartScreen()"
    ],
    "events": [
     "keydown",
@@ -15776,7 +15779,7 @@
    "capability": "start resume",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project-entry.js:164 bindStartScreen()"
+    "src/js/project-entry.js:172 bindStartScreen()"
    ],
    "events": [
     "click"
