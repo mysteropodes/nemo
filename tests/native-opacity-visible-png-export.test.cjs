@@ -72,7 +72,8 @@ function harness(native, options = {}) {
     between(exportSource, 'function exportNativeOpacity(){', '\nfunction exportEnsureLayer(') + '\n' +
     between(exportSource, 'async function exportRenderPNGsToDir(', '\n// ---- Browser-compatible video export') + '\n' +
     between(exportSource, 'function exportMainSvgWorkflow(){', '\nasync function exportGIFToPath(') + '\n' +
-    'window.SMExport={exportSVGSequenceToDir:exportSVGSequenceToDir,svgSequenceJob:function(){throw Error("legacy SVG job must not be read");},' +
+    between(exportSource, 'window.SMExport={', '\n  previewFrame:') +
+    'exportSVGSequenceToDir:exportSVGSequenceToDir,svgSequenceJob:function(){throw Error("legacy SVG job must not be read");},' +
     between(exportSource, '  exportSVGSequence:async function(opts){', '\n  exportTIFFSequence:') + '\n};',
     ctx, { filename: 'visible-export.js' });
   vm.runInContext(between(timelineSource, "  var cancelBtn=document.getElementById('exp-cancel')", '\n})();'),

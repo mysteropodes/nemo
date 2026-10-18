@@ -678,7 +678,9 @@ test('SVG sees current native history revision and refuses submission once Open 
     if(command==='nemo_native_object_export'&&!waiting){waiting=true;await first.promise;}
     return value;};
   const session=await presented(blocked),one=session.exportPng('/first',[0]);
-  await turn();const opening=session.openPath('/other.json'),two=session.exportSvg('/stale',[0]);
-  await assert.rejects(two,/Open is in progress/);first.resolve();await one;await opening;
+  await turn();const opening=session.openPath('/other.json',{confirm:async()=>false}),two=session.exportSvg('/stale',[0]);
+  await assert.rejects(two,/Open is in progress/);first.resolve();await one;assert.equal(await opening,false);
   assert.equal(blocked.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
+  assert.equal(blocked.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1);
+  assert.equal(session.isActive(),true);assert.equal(session.info().documentId,'document');
 });

@@ -1,6 +1,7 @@
 //! Real original-owner SVG publication; independent literal scene/manifest checks.
 use super::*;
 use crate::native_application_ports::DesktopArtifactPort;
+use crate::native_dispatch::NativeDispatch;
 use native_engine::{
     export_job::{ExportArtifact, ExternalEffectDisposition, JobStatus, StagedArtifactPort},
     object_codec::decode_storage_project,
