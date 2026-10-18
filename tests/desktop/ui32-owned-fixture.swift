@@ -249,6 +249,7 @@ func ui32FixtureSelfTest() throws {
 // These injected AX ports exercise the SAME certificate and unchanged strict
 // walker used by production. No native app/AX read is part of this self-test.
 func ui32ContentScopeSelfTest() throws {
+  try ui32WebAreaCountSelfTest()
   let faults=["none","no-web","multiple","nested","replaced","foreign","owner-error","unreadable",
     "role-error","timeout","parent-unreadable","parent-outside","root-path","inside-edge","sheet","modal",
     "inside-sheet","inside-html-dialog","window","alias","children-limit","depth","nodes","deadline","changed","root-path-changed"]
