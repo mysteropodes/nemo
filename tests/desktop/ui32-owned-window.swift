@@ -243,7 +243,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       role:attr(node,kAXRoleAttribute) as? String ?? "",ancestors:try ancestors(node))
   }
   func signature(_ rule:UI32Rule, _ node:AXUIElement) throws -> Bool {
-    guard let role=try text(node,kAXRoleAttribute) else { throw Refusal(code:"adapter-refused") }
+    let role=try ui32ContentReadStep("resolve-role"){guard let role=try text(node,kAXRoleAttribute) else {throw Refusal(code:"adapter-refused")};return role}
     if !rule.roles.contains(role) { return false }
     if let id=rule.identifier,try ui32DOMIdentifiers(node,pid).resolved != id { return false }
     if rule.labels.isEmpty { return true }
@@ -254,16 +254,16 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     return !names.isDisjoint(with:rule.labels)
   }
   func resolve(_ rule:UI32Rule) throws -> AXUIElement {
-    _ = try tree();guard let certificate=latest else { throw Refusal(code:"adapter-refused") }
+    _ = try ui32ContentReadStep("resolve-tree"){try tree()};let certificate=try ui32ContentReadStep("resolve-certificate"){guard let certificate=latest else {throw Refusal(code:"adapter-refused")};return certificate}
     var inside=[Int](),outside=[Int]()
     for i in certificate.nodes.indices {
       let node=certificate.nodes[i]
-      if try signature(rule,node) {
-        if certificate.inside.contains(i) { if try match(rule,node) {inside.append(i)} }
+      if try ui32ContentReadStep("resolve-signature",{try signature(rule,node)}) {
+        if certificate.inside.contains(i) { if try ui32ContentReadStep("resolve-match",{try match(rule,node)}) {inside.append(i)} }
         else { outside.append(i) }
       }
     }
-    return certificate.nodes[try ui32ScopedCandidate(inside,outside)]
+    return certificate.nodes[try ui32ContentReadStep("resolve-candidate-unique"){try ui32ScopedCandidate(inside,outside)}]
   }
   func motionContent(_ focused:AXUIElement) throws {
     _ = try tree();guard let certificate=latest else { throw Refusal(code:"adapter-refused") }
@@ -381,13 +381,13 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       result.merge(try fixture.perform(command)) { _,new in new }; try emit(result); continue
     }
     if command == "fixture.open" {
-      try check(request["option"] == nil && request["value"] == nil && fixture == nil)
-      fixture=try UI32Fixture(pinned,environment,afterDismissal:{ _ = try tree() })
+      try ui32ContentReadStep("fixture-open-arguments"){try check(request["option"] == nil && request["value"] == nil && fixture == nil)}
+      fixture=try ui32ContentReadStep("fixture-open-init"){try UI32Fixture(pinned,environment,afterDismissal:{ _ = try tree() })}
     }
     let restoring=command.hasSuffix(".restore"), base=restoring ? String(command.dropLast(8)) : command
-    try newContext(command)
-    let nextSettingsOpen=try ui32NewSettingsNext(base,entryEnabled,newSettingsOpen)
-    let option=request["option"] as? String, rule=try ui32NewSemanticRule(base,option,entryEnabled), selected=try resolve(rule)
+    try ui32ContentReadStep("pre-action-new-context"){try newContext(command)}
+    let nextSettingsOpen=try ui32ContentReadStep("pre-action-settings-phase"){try ui32NewSettingsNext(base,entryEnabled,newSettingsOpen)}
+    let option=request["option"] as? String, rule=try ui32ContentReadStep("pre-action-rule"){try ui32NewSemanticRule(base,option,entryEnabled)}, selected=try ui32ContentReadStep("pre-action-resolve"){try resolve(rule)}
     if base.hasPrefix("selection.") || base.hasPrefix("frame.") {
       try check(fixture?.completed == true && fixture?.confirmed == true)
     }
@@ -400,7 +400,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     var posted=false, attempted=false
     do {
       try ui32GuardedAction(identity,{
-        let current=try resolve(rule); try check(CFEqual(current,selected)); try newContext(command); try enabledVisible(selected)
+        let current=try resolve(rule); try check(CFEqual(current,selected)); try ui32ContentReadStep("guarded-new-context"){try newContext(command)}; try enabledVisible(selected)
         if entryEnabled && !base.hasPrefix("entry.") {
           var overlays=[String:Set<String>]()
           for node in try tree() {

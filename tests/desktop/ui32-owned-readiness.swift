@@ -37,6 +37,16 @@ func ui32NewContentComparison(_ error:Error) -> Bool {
   guard kind == "node-order",forward == strict,let offset=integer("mismatchIndex") else {return false}
   return offset >= 0 && offset < forward
 }
+// Local DiagnosticText CopyAttributeValue producer only; never recursive queryError matching.
+func ui32NewNativeReadInvalidation(_ error:Error) -> Bool {
+  guard let d=(error as? ActionRefusal)?.diagnostics,
+    Set(d.keys) == ["purpose","stage","proofStep","facts"],d["purpose"] as? String == "UI32",
+    d["stage"] as? String == "read-proof",d["proofStep"] as? String == "text-query",
+    let facts=d["facts"] as? [String:Any],Set(facts.keys) == ["attribute","queryError"],
+    let attribute=facts["attribute"] as? String,["role","subrole","value","other"].contains(attribute),
+    let raw=facts["queryError"],type(of:raw) == Int.self else {return false}
+  return raw as? Int == Int(AXError.invalidUIElement.rawValue)
+}
 // Immediate posted New/Create only: one fresh complete read, same absolute budget.
 func ui32NewPostCreateRead(_ command:String, _ enabled:Bool, _ attempted:Bool, _ posted:Bool, _ stage:Int,
   now:()->UInt64, identity:() throws -> Void, read:(UInt64) throws -> Void) throws -> [String:Any] {
@@ -46,13 +56,23 @@ func ui32NewPostCreateRead(_ command:String, _ enabled:Bool, _ attempted:Bool, _
   for slot in 1...2 {
     do {
       try check(now() < deadline);try identity();try check(now() < deadline)
-      reads += 1;try read(deadline);try identity();try check(now() < deadline)
+      reads += 1
+      let outcome:Result<Void,Error>
+      do {try read(deadline);outcome = .success(())}catch{outcome = .failure(error)}
+      // Only the whole read probe can restart; identity/deadline callbacks cannot.
+      if case .failure(let error)=outcome {
+        if slot == 1 && reads == 1 && now() < deadline &&
+          (ui32NewInvalidReference(error) || ui32NewContentComparison(error) || ui32NewNativeReadInvalidation(error)) {
+          first=ui32ActionCause(error);continue
+        }
+        throw error
+      }
+      try check(now() < deadline);try identity();try check(now() < deadline)
       var proof:[String:Any]=["completeStrictContent":true,"readAttempts":reads,"attemptSlots":slot,
         "oneCreateActionOnly":true,"scope":"later complete read; no cause or paint claim"]
       if let first {proof["firstReadFailure"]=first};return proof
     } catch {
       let cause=ui32ActionCause(error)
-      if slot == 1 && reads == 1 && (ui32NewInvalidReference(error) || ui32NewContentComparison(error)) && now() < deadline {first=cause;continue}
       throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"new-postcreate-content","readAttempts":reads,
         "attemptSlots":slot,"firstReadFailure":first ?? cause,"lastReadFailure":cause,
         "note":"No action retry or further content read; retain both outcomes."])
@@ -110,7 +130,7 @@ func ui32NewPostCreateReadSelfTest() throws {
     if scenario == "second-pass" {try check(proof["readAttempts"] as? Int == 2 && proof["firstReadFailure"] != nil)}
     if scenario == "first-pass" {try check(proof["firstReadFailure"] == nil)}
   }
-  try ui32NewContentComparisonSelfTest()
+  try ui32NewContentComparisonSelfTest();try ui32NewNativeReadInvalidationSelfTest()
 }
 
 // Actual certificate producer feeds the actual finite post-Create reader.
@@ -155,6 +175,50 @@ func ui32NewContentComparisonSelfTest() throws {
     else {var d=source;d["strictContentCount"]=d["forwardContentCount"];try check(!ui32NewContentComparison(ActionRefusal(diagnostics:d)))}
   }
   try check(!ui32NewContentComparison(ActionRefusal(diagnostics:["stage":"content-scope","reason":"content-changed"])))
+}
+
+func ui32NewNativeReadInvalidationSelfTest() throws {
+  for attribute in ["role","subrole","value","other"] {
+    let native:[String:Any]=["purpose":"UI32","stage":"read-proof","proofStep":"text-query",
+      "facts":["attribute":attribute,"queryError":Int(AXError.invalidUIElement.rawValue)]]
+    try check(ui32NewNativeReadInvalidation(ActionRefusal(diagnostics:native)))
+    for fault in ["none","second-fail","identity-before","identity-after","identity-budget","late-success","deadline","wrong-stage","wrong-step","wrong-purpose","extra","nested","missing","communication","unsupported","mapped-error","status-type","attribute","owner","generic"] {
+      var d=native,facts=native["facts"] as! [String:Any],clock:UInt64=0,reads=0,ids=0,deadlines=[UInt64](),refused=false,answer=[String:Any]()
+      switch fault {
+      case "wrong-stage":d["stage"]="identity"
+      case "wrong-step":d["proofStep"]="file-read-postconditions"
+      case "wrong-purpose":d["purpose"]="other"
+      case "extra":d["unknown"]=true
+      case "nested":d=["underlying":["facts":native]]
+      case "missing":facts.removeValue(forKey:"attribute")
+      case "communication":facts["queryError"]=Int(AXError.cannotComplete.rawValue)
+      case "unsupported":facts["queryError"]=Int(AXError.attributeUnsupported.rawValue)
+      case "mapped-error":facts["queryError"] = -1
+      case "status-type":facts["queryError"]=true
+      case "attribute":facts["attribute"]="unknown"
+      case "owner":d["proofStep"]="text-owner-timeout"
+      default:break
+      }
+      if !["nested"].contains(fault) {d["facts"]=facts}
+      do {answer=try ui32NewPostCreateRead("entry.create.default",true,true,true,2,now:{clock},identity:{
+        ids += 1;if fault == "identity-budget" && ids == 1 {clock=750_000_000}
+        if (fault == "identity-before" && ids == 1) || (fault == "identity-after" && ids == 2) {throw ActionRefusal(diagnostics:native)}
+      },read:{deadline in
+        reads += 1;deadlines.append(deadline)
+        if fault == "late-success" {clock=deadline;return}
+        if fault == "identity-after" || (reads == 2 && fault != "second-fail") {return}
+        if fault == "deadline" {clock=deadline}
+        if fault == "generic" {throw Refusal(code:"adapter-refused")}
+        throw ActionRefusal(diagnostics:d)
+      })}catch{refused=true}
+      try check(refused == (fault != "none"))
+      let expected=["identity-before","identity-budget"].contains(fault) ? 0 : ["none","second-fail"].contains(fault) ? 2 : 1
+      try check(reads == expected && Set(deadlines).count <= 1 && deadlines.allSatisfy{$0 == 750_000_000})
+      if fault == "none" {try check(answer["readAttempts"] as? Int == 2 && answer["firstReadFailure"] != nil && ids == 3)}
+      if fault == "identity-after" {try check(reads == 1 && ids == 2)}
+      if fault == "late-success" || fault == "identity-budget" {try check(ids == 1)}
+    }
+  }
 }
 
 // First observation only; every success still comes from the existing FULL strict read.
