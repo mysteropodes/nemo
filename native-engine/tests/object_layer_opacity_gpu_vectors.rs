@@ -36,8 +36,17 @@ fn gpu_absent_default_and_empty_track_preserve_original_alpha() {
     let mut absent = source(json!([]));
     absent.as_object_mut().unwrap().remove("propertyHolders");
     sample_pixels(&mut gpu, absent, 7, 1.0, 0.75, 16);
+    let mut empty_table = source(json!([]));
+    // An empty holder is currently unconsumed; it is not an empty holder table.
+    let unconsumed = owner(&empty_table);
+    let snapshot = unconsumed.acquire_snapshot(0).unwrap();
+    assert!(matches!(
+        crate::object_frame_packet::prepare_object_exposure_frame(&snapshot, &pins(&snapshot, 7)),
+        Err(crate::object_frame_packet::ObjectFrameError::Unavailable)
+    ));
+    empty_table["propertyHolders"] = json!([]);
+    sample_pixels(&mut gpu, empty_table, 7, 1.0, 0.75, 16);
     for properties in [
-        json!([]),
         json!([{"property":"opacity"}]),
         json!([{"property":"opacity","track":{"keys":[]}}]),
     ] {
