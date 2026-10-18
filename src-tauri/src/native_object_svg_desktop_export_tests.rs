@@ -1,9 +1,15 @@
 //! Private desktop SVG routing: strict admission, original owner and real artifacts.
-use super::*;
-use native_engine::export_job::StagedArtifactPort;
-use native_engine::object_codec::decode_storage_project;
+use crate::application_mcp::ApplicationMcp;
+use crate::native_application_contract::host_error;
+use crate::native_dispatch::NativeObjectHost;
+use crate::native_object_desktop_export::{
+    admit_request, export_with_target, port::LazyDesktopArtifactPort, ObjectExportFormat, MAX_PNG_BYTES,
+};
+use native_engine::{
+    compositor::Compositor, export_job::StagedArtifactPort, object_codec::decode_storage_project,
+};
 use serde_json::{json, Value};
-use std::cell::Cell;
+use std::{cell::Cell, fs, path::PathBuf};
 
 struct Scratch(PathBuf);
 impl Scratch {

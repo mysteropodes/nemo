@@ -1,11 +1,12 @@
 //! Real original-owner SVG publication; independent literal scene/manifest checks.
-use super::*;
 use crate::native_application_ports::DesktopArtifactPort;
-use crate::native_dispatch::NativeDispatch;
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{
     export_job::{ExportArtifact, ExternalEffectDisposition, JobStatus, StagedArtifactPort},
     object_codec::decode_storage_project,
     object_document::FrameScopeKind,
+    object_frame_packet::ObjectFrameSelector,
+    scheduler::OutputSpec,
 };
 use serde_json::{json, Value};
 use std::{fs, path::PathBuf};
