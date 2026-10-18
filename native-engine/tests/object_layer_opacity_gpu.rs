@@ -493,3 +493,6 @@ fn gpu_raster_opacity_preserves_encoded_resource_charge_old_witness_and_reopened
     drop(r);
     assert_eq!(held.as_ref(), &[0, 0, 255, 255, 255, 255, 255, 255]);
 }
+
+#[path = "object_layer_opacity_gpu_vectors.rs"]
+mod vectors;
