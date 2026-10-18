@@ -366,7 +366,9 @@ fn registration_declares_item_and_png_attach_available_but_asset_remove_unavaila
     let remove_descriptor = catalog.capability_for_operation(REMOVE).unwrap();
     assert_eq!(remove_descriptor["id"], "native.object.asset.remove");
     assert_eq!(remove_descriptor["availability"]["state"], "unavailable");
-    let remove_reason = remove_descriptor["availability"]["reason"].as_str().unwrap();
+    let remove_reason = remove_descriptor["availability"]["reason"]
+        .as_str()
+        .unwrap();
     assert!(!remove_reason.is_empty());
     assert!(crate::capabilities::validate_native_operation(ITEM).is_ok());
     assert!(crate::capabilities::validate_native_operation(ATTACH).is_ok());
