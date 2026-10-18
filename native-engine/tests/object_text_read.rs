@@ -1,5 +1,5 @@
 //! Actual native owner transactions and immutable reads, not a JavaScript owner imitation.
-use crate::history::object_history::NativeObjectHistory;
+use crate::history::NativeObjectHistory;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest};

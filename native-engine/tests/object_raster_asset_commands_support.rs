@@ -1,7 +1,7 @@
 //! Shared fixtures of the L06-L transaction tests: a project owner over a real asset inventory, the strict item
 //! payloads and the state fingerprint used to prove "no partial publication".
 use crate::commands::PreparedItemEdit;
-use crate::history::object_history::NativeObjectHistory;
+use crate::history::NativeObjectHistory;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_document::{
     AssetId, AssetInventory, AssetKind, AssetRecord, AssetSource, ProjectEnvelope, ProjectMetadata,
