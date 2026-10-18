@@ -1777,6 +1777,7 @@
         "native_property_track_dispatch_tests.rs",
         "native_layer_policy_dispatch_tests.rs",
         "native_property_read_dispatch_tests.rs",
+        "native_text_read_dispatch_tests.rs",
         "native_property_edit_dispatch_tests.rs"
       ],
       "publicApi": [],

@@ -283,3 +283,6 @@ fn property_read_oversized_authored_page_refuses_without_truncation_or_mutation(
     assert_eq!(saved(&state, &id), before);
     assert_eq!(state.native_project_info(&id).unwrap(), info);
 }
+
+#[path = "native_text_read_dispatch_tests.rs"]
+mod text_read_tests;
