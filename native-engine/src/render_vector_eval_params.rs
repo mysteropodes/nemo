@@ -146,8 +146,9 @@ fn track_value(
 
 /// True when every property holder of the document is one this join consumes: an element holder of a stroke whose every
 /// authored record is a vector record with a `paramShape`, holding only keys of that shape's kind, no enabled expression
-/// and no expression controls. An absent or empty table is trivially consumed. Any other holder (layer holders, transform
-/// or paint properties, other families) is still unconsumed, so a packet over it must stay unavailable.
+/// and no expression controls. Layer holders are consumed only for raw opacity in scene-root: no controls,
+/// no other property and no enabled expression. An absent or empty table is trivially consumed.
+/// Transform/effective evaluation and all other holders still keep the packet unavailable.
 pub(crate) fn holders_fully_consumed(document: &ObjectDocument) -> bool {
     document.property_holders().is_none_or(|holders| {
         holders
@@ -158,9 +159,6 @@ pub(crate) fn holders_fully_consumed(document: &ObjectDocument) -> bool {
 
 fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     let target = holder.target();
-    let Some(stroke_id) = target.stroke_id() else {
-        return false;
-    };
     if holder
         .controls
         .value()
@@ -168,6 +166,24 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     {
         return false;
     }
+    let Some(stroke_id) = target.stroke_id() else {
+        return target.context_id() == "scene-root"
+            && document.layers().iter().any(|layer| {
+                layer.layer_uid() == target.layer_uid()
+                    && !layer.is_effect_layer()
+                    && !layer.is_folder_layer()
+                    && layer.widget.value().is_none()
+                    && layer
+                        .parent_layer_uid
+                        .value()
+                        .is_none_or(|parent| parent.is_none())
+            })
+            && !holder.properties().is_empty()
+            && holder.properties().iter().all(|property| {
+                property.property() == "opacity"
+                    && !property.expression.value().is_some_and(|code| code.enabled)
+            });
+    };
     let mut matched = false;
     for record in document.objects() {
         let owner = &record.target;

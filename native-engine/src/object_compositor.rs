@@ -223,6 +223,11 @@ impl Compositor {
                 "native raster layered effects are unavailable",
             ));
         }
+        if plan.has_text() {
+            return Err(CompositorError::new(
+                "native Text layered effects are unavailable",
+            ));
+        }
         if !stack.covers_plan(plan) {
             return Err(CompositorError::new(
                 "layer stack does not cover the composition plan",

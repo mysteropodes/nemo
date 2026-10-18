@@ -176,7 +176,7 @@ impl NativeObjectHost {
             expected.frame,
             "final",
             output,
-            plan.raster_resource_versions()
+            plan.scene_resource_versions()
                 .map_err(|error| format!("preview raster resources: {error:?}"))?,
         )
         .map_err(|e| e.to_string())?;

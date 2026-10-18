@@ -140,7 +140,7 @@ pub(crate) fn fill_rgba(color: &str, opacity: f64) -> Result<[u8; 4], TextProduc
     }
 }
 
-fn prepare_block(
+pub(super) fn prepare_block(
     fonts: Option<TextFontProvider<'_>>,
     target: &TextBlockTarget<'_>,
 ) -> Result<TextSceneItem, TextProducerError> {

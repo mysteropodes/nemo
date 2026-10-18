@@ -12,12 +12,31 @@ use crate::object_render_scene::{
 pub(crate) enum PaintIndex {
     Contour(usize),
     Raster(usize),
+    Text(usize),
 }
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
     Raster(usize),
+    Text(&'a crate::object_render_scene::text_scene::TextSource),
 }
 impl ObjectPaintPlan {
+    pub(crate) fn has_text(&self) -> bool {
+        !self.scene.texts.entries.is_empty()
+    }
+    pub(crate) fn text_resources(
+        &self,
+    ) -> &std::sync::Arc<crate::object_render_scene::ObjectSceneResourceSet> {
+        &self.scene.texts.resources
+    }
+    /// Every retained native paint resource, including fonts, for the scheduler key.
+    pub fn scene_resource_versions(
+        &self,
+    ) -> Result<Vec<(String, String)>, crate::object_render_scene::ObjectSceneError> {
+        let mut declared = self.raster_resource_versions()?;
+        declared.extend(self.scene.texts.resources.declared_versions());
+        Ok(declared)
+    }
+
     pub(crate) fn raster_sources(&self) -> &[RasterSource] {
         &self.scene.rasters
     }
@@ -28,6 +47,7 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
             entry: plan.scene.entry(*index).expect("pinned contour index"),
         }),
         PaintIndex::Raster(index) => PaintEntry::Raster(*index),
+        PaintIndex::Text(index) => PaintEntry::Text(&plan.scene.texts.entries[*index]),
     })
 }
 pub(super) fn prepare(
@@ -53,15 +73,26 @@ pub(super) fn prepare(
     }
     let selected: std::collections::HashMap<_, _> =
         scene.packet().selected_source_indices().collect();
-    let mut rasters = ProducerOutput::new("raster-image", pin);
+    let mut rasters = ProducerOutput::new("raster-image", pin.clone());
     for (index, source) in scene.rasters.iter().enumerate() {
         if selected.get(&source.source_index) != Some(&source.layer_index) {
             return Err(ObjectPaintPlanError::InvalidOrder);
         }
         rasters = rasters.with_item(source.source_index, PaintIndex::Raster(index));
     }
-    let joined = join_scene(scene.packet(), &expected_pin, vec![contours, rasters])
-        .map_err(|_| ObjectPaintPlanError::InvalidOrder)?;
+    let mut texts = ProducerOutput::new("text-block", pin);
+    for (index, source) in scene.texts.entries.iter().enumerate() {
+        if selected.get(&source.source_index) != Some(&source.layer_index) {
+            return Err(ObjectPaintPlanError::InvalidOrder);
+        }
+        texts = texts.with_item(source.source_index, PaintIndex::Text(index));
+    }
+    let joined = join_scene(
+        scene.packet(),
+        &expected_pin,
+        vec![contours, rasters, texts],
+    )
+    .map_err(|_| ObjectPaintPlanError::InvalidOrder)?;
     if !joined.is_complete() {
         return Err(ObjectPaintPlanError::Unavailable);
     }

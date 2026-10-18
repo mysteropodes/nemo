@@ -71,7 +71,9 @@ pub fn prepare_object_viewport_composition(
         reference,
         rasters: None,
     };
-    crate::object_render_scene::raster_scene::attach(witness, prior_images)
+    crate::object_render_scene::text_scene::attach(
+        crate::object_render_scene::raster_scene::attach(witness, prior_images)?,
+    )
 }
 
 impl ObjectCompositionWitness {

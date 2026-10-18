@@ -98,6 +98,7 @@ fn real_import_joins_vector_and_raster_in_one_pinned_order_and_keeps_contour_api
                     format!("vector:{}", command.source().record().target().stroke_id())
                 }
                 PaintEntry::Raster(index) => format!("raster:{index}"),
+                PaintEntry::Text(_) => panic!("PNG-only fixture gained unexpected Text"),
             })
             .collect();
         assert_eq!(sequence, ["vector:red-square", "raster:0"]);

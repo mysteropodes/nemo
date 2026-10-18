@@ -277,8 +277,7 @@ where
         }
     }
     if let Some(items) = doc.item_records() {
-        for (index, entry) in items.raster_entries().iter().enumerate() {
-            let target = &entry.target;
+        for (index, target) in items.targets().enumerate() {
             let key = (
                 target.context_id.as_str(),
                 &target.frame_scope,

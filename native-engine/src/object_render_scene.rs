@@ -49,6 +49,8 @@ pub(crate) mod object_scene_style_emit;
 #[path = "object_scene_producer_text.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_scene_producer_text;
+#[path = "object_text_scene_join.rs"]
+pub(crate) mod text_scene;
 // L08-A (#2144): lane-8 scene composition/effect family aggregator.
 #[path = "scene_effect_kernels.rs"]
 #[allow(dead_code)]
@@ -106,7 +108,7 @@ pub fn prepare_object_composition(
     };
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     {
-        return raster_scene::attach(witness, None);
+        return text_scene::attach(raster_scene::attach(witness, None)?);
     }
     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     {
@@ -116,7 +118,7 @@ pub fn prepare_object_composition(
                 "native raster resources require project media support",
             ));
         }
-        Ok(witness)
+        text_scene::attach(witness)
     }
 }
 
@@ -165,6 +167,7 @@ impl ObjectCompositionWitness {
         if let Some(rasters) = &self.rasters {
             rasters.verify(declared)?;
         }
+        text_scene::verify(self, declared)?;
         match &self.resources {
             Some(set) => set.verify_declared(declared),
             None => ObjectSceneResourceSet::empty().verify_declared(declared),
@@ -245,6 +248,9 @@ impl<'a> ObjectRenderEntry<'a> {
             .as_ref()
             .unwrap_or_else(|| compiled.contour.path())
     }
+    pub(crate) fn layer_opacity(&self) -> f64 {
+        self.compiled.layer_opacity
+    }
     /// Typed straight-RGBA paint admitted with the contour (L07-A `SceneSolid`).
     pub(crate) fn solid(&self) -> &'a SceneSolid {
         &self.compiled.solid
@@ -257,6 +263,7 @@ pub struct ObjectRenderScene {
     packet: ObjectFramePacket,
     contours: Arc<[CompiledContour]>,
     rasters: Arc<[raster_scene::RasterSource]>,
+    texts: text_scene::TextSources,
 }
 impl ObjectRenderScene {
     pub fn packet(&self) -> &ObjectFramePacket {
@@ -290,6 +297,7 @@ pub fn prepare_object_render_scene(
         packet: packet.clone(),
         contours: contours.into(),
         rasters: raster_scene::sources(packet)?.into(),
+        texts: text_scene::prepare(packet)?,
     })
 }
 

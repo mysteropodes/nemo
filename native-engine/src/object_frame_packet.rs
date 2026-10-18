@@ -1,12 +1,16 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
-use crate::object_document::{AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord};
+use crate::object_document::{
+    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, Presence, PropertyHolderTarget,
+};
 use crate::revision::ObjectSnapshot;
 use std::collections::HashMap;
 
 #[path = "object_order_evaluation.rs"]
 mod order;
+#[path = "object_text_frame.rs"]
+mod text;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
 #[path = "object_property_sampling.rs"]
 mod property_sampling;
@@ -89,8 +93,7 @@ pub(crate) fn raw_expression_order<'a>(
                     && target.stroke_id() == stroke_id
             });
             let matching_item = document.item_records().is_some_and(|items| {
-                items.raster_entries().iter().any(|entry| {
-                    let target = &entry.target;
+                items.targets().any(|target| {
                     target.context_id() == context_id
                         && target.scope_kind() == scope_kind
                         && target.frame() == source_frame
@@ -182,6 +185,7 @@ pub struct ObjectFramePacket {
     frame: u32,
     records: Vec<ObjectFrameIndices>,
     raster_records: Vec<ObjectFrameRasterIndex>,
+    text_records: Vec<text::TextIndex>,
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
 }
@@ -210,6 +214,10 @@ impl ObjectFramePacket {
             .map(|record| (record.source_object_index(), record.source_layer_index()))
             .chain(
                 self.raster_records()
+                    .map(|record| (record.source_index(), record.layer_index())),
+            )
+            .chain(
+                self.text_records()
                     .map(|record| (record.source_index(), record.layer_index())),
             )
     }
@@ -249,6 +257,25 @@ impl ObjectFramePacket {
     }
     pub fn frame(&self) -> u32 {
         self.frame
+    }
+    /// Raw layer opacity at evaluation time, never the held drawing's source frame.
+    /// Packet admission has already refused unconsumed holders and enabled expressions.
+    pub(crate) fn layer_opacity(&self, index: usize) -> Result<f64, ObjectFrameError> {
+        let layer = self
+            .source_layers()
+            .get(index)
+            .ok_or(ObjectFrameError::InvalidSource)?;
+        let target = PropertyHolderTarget {
+            context_id: self.context_id.clone(),
+            layer_uid: layer.layer_uid().to_owned(),
+            stroke_id: Presence::Missing,
+        };
+        let values = sample_property_raw(&self.snapshot, &target, "opacity", self.frame as f64)
+            .map_err(|_| ObjectFrameError::Unavailable)?;
+        match values.as_slice() {
+            [value] if value.is_finite() => Ok((value / 100.0).max(0.0)),
+            _ => Err(ObjectFrameError::Unavailable),
+        }
     }
     /// Selected authored source for this layer; packet.frame() remains evaluation time.
     /// An unexposed layer (or invalid index) has no selected source.
@@ -381,8 +408,8 @@ where
     // The typed holder table is admitted for persistence and native reads.
     // Until its sampled values reach this producer, never paint unmodified
     // geometry while silently ignoring authored Motion properties. L01-H consumes exactly
-    // the parametric-shape tracks of vector records (holders_fully_consumed); any other
-    // holder still keeps the packet unavailable.
+    // parametric-shape tracks and raw layer opacity (holders_fully_consumed); every
+    // other holder still keeps the packet unavailable.
     if !holders_fully_consumed(document) {
         return Err(ObjectFrameError::Unavailable.into());
     }
@@ -463,7 +490,9 @@ where
             }
         }
     }
+    let text_records = text::select(snapshot, selector, &source_frames)?;
     Ok(ObjectFramePacket {
+        text_records,
         raster_records,
         snapshot: snapshot.clone(),
         context_id: selector.context_id.to_owned(),
@@ -481,3 +510,11 @@ mod exposure_tests;
 #[cfg(test)]
 #[path = "../tests/render_vector_eval_guard.rs"]
 mod render_vector_eval_guard;
+
+#[cfg(all(test, feature = "history", feature = "compositor"))]
+#[path = "../tests/object_layer_opacity_scene.rs"]
+mod layer_opacity_tests;
+
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_layer_opacity_raster.rs"]
+mod layer_opacity_raster_tests;

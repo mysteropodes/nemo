@@ -41,6 +41,16 @@ pub(super) fn sources(packet: &ObjectFramePacket) -> Result<Vec<RasterSource>, O
                     "raster path effects are unavailable",
                 ));
             }
+            let opacity = item.opacity()
+                * packet.layer_opacity(record.layer_index()).map_err(|_| {
+                    unavailable(record.source_index(), "raw layer opacity is unavailable")
+                })?;
+            if !(opacity as f32).is_finite() {
+                return Err(unavailable(
+                    record.source_index(),
+                    "raster opacity is not representable",
+                ));
+            }
             let rect = item.display_rect();
             Ok(RasterSource {
                 source_index: record.source_index(),
@@ -54,7 +64,7 @@ pub(super) fn sources(packet: &ObjectFramePacket) -> Result<Vec<RasterSource>, O
                         height: rect.height,
                         rotation: rect.rotation,
                     },
-                    opacity: item.opacity(),
+                    opacity,
                 },
             })
         })

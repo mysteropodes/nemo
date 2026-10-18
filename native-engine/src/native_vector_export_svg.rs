@@ -10,7 +10,9 @@
 //!
 //! Output is detached (owned bytes and pin strings). The byte cap is checked by
 //! an exact counting pass BEFORE the output buffer is allocated.
-use crate::object_render_scene::{ObjectPaintCommand, ObjectPaintPlan};
+use crate::object_render_scene::{
+    ordered_entries, ObjectPaintCommand, ObjectPaintPlan, PaintEntry,
+};
 use crate::scheduler::OutputSpec;
 
 pub(crate) const XML_PREAMBLE: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -30,6 +32,9 @@ pub(crate) enum SvgExportError {
         source_object_index: usize,
         reason: &'static str,
     },
+    /// Text paint is not represented by this contour-only SVG encoder yet.
+    /// Refuse the entire frame before counting or emitting its document header.
+    TextUnsupported { source_object_index: usize },
     /// A straight RGBA channel is not a finite number in 0..=1.
     UnrepresentablePaint { source_object_index: usize },
     /// The exact serialized size exceeds the caller's cap.
@@ -280,6 +285,14 @@ fn emit_frame(
     spec: &SvgFrameSpec,
     sink: &mut Sink,
 ) -> Result<usize, SvgExportError> {
+    if let Some(source_object_index) = ordered_entries(plan).find_map(|entry| match entry {
+        PaintEntry::Text(text) => Some(text.source_index),
+        _ => None,
+    }) {
+        return Err(SvgExportError::TextUnsupported {
+            source_object_index,
+        });
+    }
     sink.put(&document_head(spec.width, spec.height))?;
     let mut count = 0;
     for command in plan.commands() {

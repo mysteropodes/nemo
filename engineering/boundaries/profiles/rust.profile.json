@@ -445,7 +445,8 @@
         "object_scene_producer_brush_anchor.rs",
         "object_scene_producer_brush_slot.rs",
         "object_scene_producer_brush.rs",
-        "object_parametric_transform.rs"
+        "object_parametric_transform.rs",
+        "object_text_frame.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -511,7 +512,10 @@
         "scene_effect_scene_join.rs",
         "scene_effect_scene_join_resources.rs",
         "object_raster_paint_join.rs",
-        "object_raster_scene_join.rs"
+        "object_raster_scene_join.rs",
+        "object_text_scene_join.rs",
+        "object_text_scene_fonts.rs",
+        "object_text_scene_bundled.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -655,7 +659,8 @@
         "object_rig_edit_read.rs",
         "object_rig_pose_read.rs",
         "object_parametric_edit_read.rs",
-        "object_text_read.rs"
+        "object_text_read.rs",
+        "object_text_font_resources.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1435,7 +1440,12 @@
         "object_parametric_transform_controls.rs",
         "object_text_read.rs",
         "object_raster_image_import.rs",
-        "object_raster_scene_join.rs"
+        "object_raster_scene_join.rs",
+        "object_layer_opacity_scene.rs",
+        "object_layer_opacity_raster.rs",
+        "object_text_scene_join.rs",
+        "object_text_scene_history.rs",
+        "object_text_scene_svg.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

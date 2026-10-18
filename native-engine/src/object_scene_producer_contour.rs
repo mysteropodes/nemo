@@ -16,14 +16,14 @@
 //!   record all stay typed errors; `ObjectPaintPlan`'s own `join` then re-validates
 //!   targets and coverage exactly as before.
 //!
-//! Behavior is unchanged for admitted snapshots. `SceneSolid` keeps the four original
-//! `serde_json::Number`s of the source fill, and the compositor converts them with the
-//! same `[0, 1]` rule through `SceneSolid::rgba_f32`.
+//! Existing factor-one paint keeps its source numbers. A raw layer-opacity holder
+//! folds the pinned factor into each retained paint before layer effects; source
+//! records stay unchanged. `SceneSolid::rgba_f32` keeps the same `[0, 1]` admission.
 
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, PinField, ProducerEntry, ProducerOutput, SceneJoinError, ScenePin,
 };
-use crate::evaluation::object_scene_style_kernels::object_scene_style_item::style_of_record;
+use crate::evaluation::object_scene_style_kernels::object_scene_style_item::style_of_record_with_opacity;
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_record, is_vector_record, record_layer_has_active_path_fx,
@@ -50,6 +50,7 @@ pub(crate) struct CompiledContour {
     pub(crate) contour: ClosedCubicPath,
     pub(crate) envelope: [f64; 4],
     pub(crate) solid: SceneSolid,
+    pub(crate) layer_opacity: f64,
     pub(crate) drawn: Option<BezPath>,
 }
 
@@ -151,14 +152,17 @@ fn compile(
         .collect::<Result<Vec<_>, &'static str>>()?;
     let contour = ClosedCubicPath::new(segments)?;
     let envelope = contour.transformed_envelope([1., 0., 0., 1., 0., 0.])?;
-    let fill = record
-        .solid_fill()
-        .ok_or("packet record carries no solid fill")?;
-    let solid = SceneSolid::from_fill(fill).map_err(|error| error.message())?;
+    let layer_opacity = packet
+        .layer_opacity(source.source_layer_index())
+        .map_err(|_| "raw layer opacity is unavailable")?;
+    let style =
+        style_of_record_with_opacity(record, layer_opacity).map_err(|error| error.message())?;
+    let solid = primary_solid(&style).map_err(|error| error.message())?;
     Ok(CompiledContour {
         contour,
         envelope,
         solid,
+        layer_opacity,
         drawn: None,
     })
 }
@@ -176,7 +180,11 @@ fn compile_vector(
     packet: &ObjectFramePacket,
     source: ObjectFrameRecord<'_>,
 ) -> Result<CompiledContour, &'static str> {
-    let style = style_of_record(source.record()).map_err(|error| error.message())?;
+    let layer_opacity = packet
+        .layer_opacity(source.source_layer_index())
+        .map_err(|_| "raw layer opacity is unavailable")?;
+    let style = style_of_record_with_opacity(source.record(), layer_opacity)
+        .map_err(|error| error.message())?;
     prepare_item(&style).map_err(|error| error.message())?;
     let evaluated = evaluate_record(packet, source).map_err(|error| error.message())?;
     let segments = evaluated
@@ -194,6 +202,7 @@ fn compile_vector(
         contour: shape.contour,
         envelope: shape.envelope,
         solid,
+        layer_opacity,
         drawn: Some(shape.path),
     })
 }

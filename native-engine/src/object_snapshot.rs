@@ -7,6 +7,9 @@ use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
 pub use crate::revision::ObjectSnapshot;
+#[cfg(feature = "font_asset_admission")]
+#[path = "object_text_font_resources.rs"]
+pub(crate) mod object_text_font_resources;
 // L03-O (#2109): rig weight / nearest-location / IK kernels for the rig edit transaction (same layering reason).
 #[path = "object_rig_edit_read.rs"]
 #[allow(dead_code)]
