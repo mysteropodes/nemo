@@ -265,7 +265,7 @@ final class UI32Fixture {
          "value":String((attr(node,kAXValueAttribute) as? String ?? "").prefix(120))]
       }]
     }
-    var attemptedAction=false
+    var attemptedAction=false, acknowledgedAction=false
     do {
       if command == "fixture.choose" {
         try check(selected == nil)
@@ -275,7 +275,8 @@ final class UI32Fixture {
         var writable=DarwinBoolean(false)
         try check(AXUIElementIsAttributeSettable(row,kAXSelectedAttribute as CFString,&writable) == .success && writable.boolValue)
         try fileProof();attemptedAction=true
-        try check(AXUIElementSetAttributeValue(row,kAXSelectedAttribute as CFString,kCFBooleanTrue) == .success)
+        let query=AXUIElementSetAttributeValue(row,kAXSelectedAttribute as CFString,kCFBooleanTrue);acknowledgedAction=query == .success
+        try ui32ProofCheck(query == .success,"fixture-row-selection-post",["queryError":Int(query.rawValue)])
         selected=row;let (fresh,freshPID)=try actionPanel(command);try check(freshPID == pid)
         try fileBind(row,pid);try singleSelectedFile(fresh,pid,row)
       } else {
@@ -298,12 +299,16 @@ final class UI32Fixture {
           try fileBind(selected,pid);try singleSelectedFile(latest,pid,selected)
         }
         try fileProof();attemptedAction=true
-        try check(AXUIElementPerformAction(freshButtons[0],kAXPressAction as CFString) == .success)
+        let query=AXUIElementPerformAction(freshButtons[0],kAXPressAction as CFString);acknowledgedAction=query == .success
+        try ui32ProofCheck(query == .success,"fixture-button-post",["queryError":Int(query.rawValue)])
         if command == "fixture.confirm" { confirmed=true }
-        try verifyOwnedWindow(pinned)
+        try ui32ProofStep("fixture-post-window-identity"){try verifyOwnedWindow(pinned)}
       }
       return ["actionAttempted":attemptedAction,"actionPosted":true,"panelOwner":pid]
-    } catch { throw ActionRefusal(diagnostics:["purpose":"UI32","command":command,"actionAttempted":attemptedAction,"stage":"fixture-guard-or-action","retry":false,"underlying":ui32ActionCause(error)]) }
+    } catch {
+      var facts:[String:Any]=["purpose":"UI32","command":command,"actionAttempted":attemptedAction,"stage":"fixture-guard-or-action","retry":false,"underlying":ui32ActionCause(error)]
+      if acknowledgedAction {facts["actionPosted"]=true};throw ActionRefusal(diagnostics:facts)
+    }
   }
 }
 
