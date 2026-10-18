@@ -18,6 +18,7 @@ final class UI32PanelTrace<Node> {
   let kind:String, expected:Int, equal:(Node,Node)->Bool
   var nodes:[Node], routes:[[String]], declared:[[Int]], owners:[String]
   var entered=Set<Int>(), current:Int?, phase="none", reported:Node?, query=0, foreignRoots=0, truncated=false
+  var parentRead=[String:Any]()
   init(_ kind:String, _ root:Node, _ expected:Int, equal:@escaping (Node,Node)->Bool) {
     self.kind=kind;self.expected=expected;self.equal=equal
     nodes=[root];routes=[[""]];declared=[[]];owners=["not-queried"]
@@ -70,7 +71,8 @@ final class UI32PanelTrace<Node> {
         context["reportedMatchesDeclared"]=reported.map {p in declared[i].contains {equal(p,nodes[$0])}} ?? false
       }
     }
-    record("reportedParent",reported);context["references"]=references;facts["panelTraversal"]=context
+    record("reportedParent",reported);context["references"]=references
+    if !parentRead.isEmpty {context["lastParentRead"]=parentRead};facts["panelTraversal"]=context
     return ActionRefusal(diagnostics:facts)
   }
 }
@@ -169,18 +171,17 @@ final class UI32Fixture {
   func panel() throws -> ([AXUIElement],pid_t) {
     attachmentProof=[:];observedOwnedNodes=[];observedOwnedRoutes=[];let outer=try attachedSheet();var foreign=[Int]()
     let trace=UI32PanelTrace("attached-candidate-certificate",outer,Int(pinned.pid),equal:{CFEqual($0,$1)})
+    let parentDeadline=DispatchTime.now().uptimeNanoseconds+1_000_000_000
     var currentRoot=outer, currentParent=pinned.main, currentOwner=pinned.pid, currentStart=pinned.start
     do {
-      let found=try ui32AttachedRootCertificate(outer,owner:Int(pinned.pid),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
+      let found=try ui32AttachedRootCertificate(outer,owner:Int(pinned.pid),deadline:parentDeadline,
         now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:{ node in
           var actual:pid_t=0;let q=AXUIElementGetPid(node,&actual)
           return trace.ownership(node,(Int(q.rawValue),q == .success && actual == self.pinned.pid,Int(actual)))
         },children:{ node in
           trace.children(node,ui32Children(node,self.pinned.pid))
         },parent:{ node in
-          guard AXUIElementSetMessagingTimeout(node,0.03) == .success else { return trace.parent(node,(-1,nil)) }
-          var raw:CFTypeRef?;let q=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
-          return trace.parent(node,(Int(q.rawValue),axElement(raw)))
+          trace.parent(node,ui32OwnedParentAX(node,self.pinned.pid,parentDeadline,{trace.parentRead=$0}))
         },foreignChild:{ _,pid in foreign.append(pid);trace.foreignRoots += 1 },
         completedOwnedCensus:{nodes,routes in self.observedOwnedNodes=nodes;self.observedOwnedRoutes=routes})
       attachmentProof=["ownedSearchComplete":true,"ownedNodeCount":found.ownedNodeCount,"foreignRootCount":1,

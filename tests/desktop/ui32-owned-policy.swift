@@ -108,7 +108,8 @@ func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, 
   try identity(); try scope(); try identity(); try action(); posted(); try identity(); try postScope()
 }
 func ui32SelfTest() throws {
-  try ui32IdentityPhaseSelfTest()
+  let profileFocusCases=try ui32ProfileFocusSelfTest()
+  try ui32IdentityPhaseSelfTest();try ui32Phase2ReadSelfTest()
   try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()
   try ui32ZeroForeignFallbackSelfTest();try ui32OwnedSheetReadSelfTest();try ui32ContentWalkSelfTest();try ui32OwnedCandidatePathSelfTest();try ui32FileDomainSelfTest();try ui32RowSelectionProofSelfTest();try ui32NewPostCreateReadSelfTest();try ui32InitialOwnedReadinessSelfTest()
@@ -151,7 +152,7 @@ func ui32SelfTest() throws {
     try check(refused == (fault != 0))
     try check(events == ((fault == 0 || fault == 3 || fault == 5) ? ["ax","posted"] : []))
   }
-  try emit(["status":"ui32-static-model-pass","runtimeAX":false,"foreignReads":0,"purpose":"UI32"])
+  try emit(["status":"ui32-static-model-pass","runtimeAX":false,"foreignReads":0,"purpose":"UI32","profileFocusCases":profileFocusCases])
 }
 
 // Keep the existing child-array/count witness contract exactly; no nil-as-empty.
@@ -449,4 +450,13 @@ func ui32PostedNewContentReadSelfTest() throws {
     try check(reads == 1 && published == (fault == "none") && refused == (fault != "none"))
     try check(nativeCalls == (fault == "late-certificate" ? 2 : 4))
   }
+}
+
+func ui32ZeroForeignFallback(_ observed:Int, _ facts:[String:Any]) -> Bool {
+  observed == 0 && facts["stage"] as? String == "candidate-count" && facts["ownedSearchComplete"] as? Bool == true &&
+    facts["foreignRootCount"] as? Int == 0 && facts["ownedParentMismatchCount"] as? Int == 0
+}
+func ui32FileBinding<Node>(_ actual:Node, _ certified:Node?, equal:(Node,Node)->Bool, owned:(Node)->Bool) throws {
+  guard let certified else {throw Refusal(code:"adapter-refused")}
+  try check(owned(actual) && owned(certified) && equal(actual,certified))
 }

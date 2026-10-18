@@ -67,6 +67,7 @@ func ui32AttachedRootCertificate<Node>(_ root:Node, owner expectedOwner:Int, dea
 
 // Pure ports execute the exact discovery function above, not a copied walker.
 func ui32AttachedRootCertificateSelfTest() throws {
+  try ui32OwnedParentReadSelfTest()
   for fault in ["none","outside-edge","path-edge","path-unknown","outside-parent-unknown","outside-owner","outside-parent","outside-children",
     "alias","two","zero","zero-edge","zero-incomplete","foreign-owner","foreign-pid"] {
     var childReads=[Int](),parentReads=[Int](),ownerReads=[Int](),observed=[Int](),facts:[String:Any]?,admitted=false
@@ -109,10 +110,6 @@ func ui32AttachedRootCertificateSelfTest() throws {
   }
 }
 
-func ui32ZeroForeignFallback(_ observed:Int, _ facts:[String:Any]) -> Bool {
-  observed == 0 && facts["stage"] as? String == "candidate-count" && facts["ownedSearchComplete"] as? Bool == true &&
-    facts["foreignRootCount"] as? Int == 0 && facts["ownedParentMismatchCount"] as? Int == 0
-}
 func ui32ZeroForeignFallbackSelfTest() throws {
   let complete:[String:Any]=["stage":"candidate-count","ownedSearchComplete":true,"foreignRootCount":0,"ownedParentMismatchCount":0]
   try check(ui32ZeroForeignFallback(0,complete) && !ui32ZeroForeignFallback(1,complete))
@@ -397,7 +394,53 @@ extension UI32Fixture {
     _ = try ui32ProofStep("final-sheet"){try attachedSheet()};try ui32ProofCheck(processStart(pid) == start && authenticatedPanelService(pid),"final-service-identity");return (chosenRows,chosenPID)
   }
 }
-func ui32FileBinding<Node>(_ actual:Node, _ certified:Node?, equal:(Node,Node)->Bool, owned:(Node)->Bool) throws {
-  guard let certified else {throw Refusal(code:"adapter-refused")}
-  try check(owned(actual) && owned(certified) && equal(actual,certified))
+
+func ui32OwnedParentRead<Node>(_ node:Node, deadline:UInt64, now:()->UInt64,
+  owned:(Node)->Bool, prepare:(Float)->Int, read:()->(Int,Node?), record:([String:Any])->Void) -> (Int,Node?) {
+  let begin=now();var last=begin, setup:Int?, query:Int?, value:Node?, reason="deadline", timeout:Float?
+  func live() -> Bool {let t=now();let valid=t >= last && t < deadline;last=t;return valid}
+  defer {
+    let end=now()
+    record(["setupStatus":setup as Any? ?? NSNull(),"parentStatus":query as Any? ?? NSNull(),
+      "elapsedNs":end >= begin ? end-begin as Any : NSNull(),"remainingAtStartNs":begin < deadline ? deadline-begin : 0,
+      "timeoutSeconds":timeout as Any? ?? NSNull(),"typedParent":value != nil,"reason":reason])
+  }
+  guard live(),owned(node),live() else {return (-1,nil)}
+  let ns=min(UInt64(100_000_000),deadline-last), seconds=Double(ns)/1_000_000_000
+  var bounded=Float(seconds);if Double(bounded) > seconds {bounded=bounded.nextDown}
+  guard bounded.isFinite && bounded > 0 else {return (-1,nil)};timeout=bounded
+  setup=prepare(bounded)
+  guard setup == 0,live(),owned(node),live() else {reason="setup-owner-or-deadline";return (-1,nil)}
+  let result=read();query=result.0;value=result.1
+  guard live(),owned(node),live() else {reason="owner-or-deadline";return (query ?? -1,nil)}
+  guard result.0 == 0,let parent=result.1 else {reason="parent-query-or-shape";return (result.0,nil)}
+  guard live(),owned(parent),live() else {reason="parent-owner-or-deadline";return (-1,nil)}
+  reason="returned";return (0,parent)
+}
+func ui32OwnedParentAX(_ node:AXUIElement, _ pid:pid_t, _ deadline:UInt64, _ record:([String:Any])->Void) -> (Int,AXUIElement?) {
+  ui32OwnedParentRead(node,deadline:deadline,now:{DispatchTime.now().uptimeNanoseconds},owned:{owns($0,pid)},
+    prepare:{Int(AXUIElementSetMessagingTimeout(node,$0).rawValue)},read:{
+      var raw:CFTypeRef?;let status=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
+      return (Int(status.rawValue),axElement(raw))
+    },record:record)
+}
+func ui32OwnedParentReadSelfTest() throws {
+  for fault in ["none","clamp","expired","owner-budget","setup-budget","read-budget","owner-loss","cannot-complete","nil","foreign","setup-error","clock"] {
+    var tick:UInt64=1,owners=0,setups=0,reads=0,facts=[String:Any](),bounded:Float=0
+    let end:UInt64=fault == "expired" ? 0 : fault == "clamp" ? 10 : 1_000_000_000
+    let result=ui32OwnedParentRead(1,deadline:end,now:{tick},owned:{node in
+      owners += 1;if fault == "owner-budget" {tick=end}
+      return !(fault == "owner-loss" && owners == 3) && !(fault == "foreign" && node == 0)
+    },prepare:{seconds in
+      setups += 1;bounded=seconds
+      if fault == "setup-budget" {tick=end};return fault == "setup-error" ? -1 : 0
+    },read:{reads += 1;if fault == "read-budget" {tick=end};if fault == "clock" {tick=0}
+      return (fault == "cannot-complete" ? -25204 : 0,fault == "nil" ? nil : 0)
+    },record:{facts=$0})
+    try check((result.1 != nil) == ["none","clamp"].contains(fault) && reads <= 1)
+    let noSetup=["expired","owner-budget"],noRead=noSetup+["setup-budget","setup-error"]
+    try check(setups == (noSetup.contains(fault) ? 0 : 1) && reads == (noRead.contains(fault) ? 0 : 1))
+    try check(setups == 0 || bounded > 0 && Double(bounded) <= min(0.1,Double(end-1)/1e9))
+    try check(facts["parentStatus"] as? Int == (reads == 0 ? nil : fault == "cannot-complete" ? -25204 : 0))
+  }
 }
