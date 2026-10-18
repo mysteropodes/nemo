@@ -221,12 +221,26 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     match operation {
         ITEM => item_request(payload),
         ATTACH => {
-            exact(
-                payload,
-                &["documentSnapshotId", "name", "mediaType", "source"],
-                &[],
-            )
-            .is_some()
+            let placed = payload.get("placement").is_some();
+            let required = if placed {
+                vec![
+                    "documentSnapshotId",
+                    "name",
+                    "mediaType",
+                    "source",
+                    "placement",
+                    "lifecycleGeneration",
+                ]
+            } else {
+                vec!["documentSnapshotId", "name", "mediaType", "source"]
+            };
+            exact(payload, &required, &[]).is_some()
+                && (!placed
+                    || (image_placement(&payload["placement"])
+                        && payload["mediaType"] == "image/png"
+                        && payload["lifecycleGeneration"]
+                            .as_u64()
+                            .is_some_and(|n| (1..=9_007_199_254_740_991).contains(&n))))
                 && snapshot(&payload["documentSnapshotId"])
                 && opaque(&payload["name"])
                 && payload["mediaType"]
@@ -254,6 +268,75 @@ fn command_receipt(value: &Value) -> bool {
 
 /// The receipt of an item edit names the operation it ran and the stroke it touched: the stable target for
 /// an edit or delete, an owner-allocated id (`native-raster:` / `native-text:`) for a create.
+fn image_placement(value: &Value) -> bool {
+    match value["kind"].as_str() {
+        Some("newLayer") => exact(value, &["kind"], &[]).is_some(),
+        Some("authoredFrame") => {
+            exact(value, &["kind", "layerUid", "frame"], &[]).is_some()
+                && opaque(&value["layerUid"])
+                && frame(value.get("frame")).is_some()
+        }
+        _ => false,
+    }
+}
+fn image_result(value: &Value) -> bool {
+    exact(
+        value,
+        &[
+            "applied",
+            "historyEntriesAdded",
+            "assetId",
+            "naturalWidth",
+            "naturalHeight",
+            "displayWidth",
+            "displayHeight",
+            "target",
+            "newLayer",
+        ],
+        &[],
+    )
+    .is_some()
+        && value["applied"] == true
+        && value["historyEntriesAdded"] == 1
+        && opaque(&value["assetId"])
+        && ["naturalWidth", "naturalHeight"].iter().all(|key| {
+            value[*key]
+                .as_u64()
+                .is_some_and(|n| (1..=8192).contains(&n))
+        })
+        && ["displayWidth", "displayHeight"]
+            .iter()
+            .zip(["naturalWidth", "naturalHeight"])
+            .all(|(display, natural)| {
+                value[*display].as_f64().is_some_and(|n| {
+                    n.is_finite() && n > 0. && n <= value[natural].as_f64().unwrap_or(0.)
+                })
+            })
+        && target(&value["target"], false)
+        && value["target"]["frameScope"]["kind"] == "authored"
+        && value["newLayer"].is_boolean()
+}
+fn image_matches(request: &NativeApplicationRequest, value: &Value) -> bool {
+    let Some(next) = request.expected_revision.and_then(|n| n.checked_add(1)) else {
+        return false;
+    };
+    let placement = &request.payload["placement"];
+    let target = &value["target"];
+    let new_layer = placement["kind"] == "newLayer";
+    value["newLayer"] == new_layer
+        && target["strokeId"]
+            .as_str()
+            .is_some_and(|id| id.starts_with(&format!("native-raster:{next}:")))
+        && if new_layer {
+            target["layerUid"]
+                .as_str()
+                .is_some_and(|id| id.starts_with(&format!("native-layer:{next}:")))
+                && target["frameScope"]["frame"] == 0
+        } else {
+            target["layerUid"] == placement["layerUid"]
+                && target["frameScope"]["frame"] == placement["frame"]
+        }
+}
 pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
     match operation {
         ITEM => {
@@ -287,6 +370,7 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
                 && value["operation"].as_str() == Some(ran)
                 && stroke_matches
         }
+        ATTACH if payload.get("placement").is_some() => image_result(value),
         ATTACH | REMOVE => {
             exact(value, &["applied", "historyEntriesAdded"], &[]).is_some()
                 && command_receipt(value)
@@ -297,6 +381,41 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
 
 /// A successful receipt belongs to the request owner and advances the revision by exactly its own
 /// disposition: one when applied, none for an exact no-op. Complete responses stay within 4096 bytes.
+fn placed_png(request: &NativeApplicationRequest) -> bool {
+    request.operation == ATTACH
+        && request.payload.get("placement").is_some()
+        && self::request(ATTACH, &request.payload)
+}
+pub(crate) fn placed_png_wrong_instance_refusal(
+    request: &NativeApplicationRequest,
+    response: &NativeApplicationResponse,
+) -> bool {
+    placed_png(request)
+        && !response.ok
+        && response.result.is_none()
+        && response.instance_id != request.instance_id
+        && response
+            .error
+            .as_ref()
+            .is_some_and(|error| error.code == "wrong_instance")
+}
+pub(crate) fn placed_png_owner_matches(
+    request: &NativeApplicationRequest,
+    response: &NativeApplicationResponse,
+) -> Option<bool> {
+    if !placed_png(request) {
+        return None;
+    }
+    let exact =
+        response.instance_id == request.instance_id && response.document_id == request.document_id;
+    let refused = !response.ok
+        && response.result.is_none()
+        && response.error.as_ref().is_some_and(|error| {
+            error.code == "wrong_instance" && response.instance_id != request.instance_id
+                || error.code == "wrong_document" && response.instance_id == request.instance_id
+        });
+    Some(exact || refused)
+}
 pub(crate) fn response_matches(
     request: &NativeApplicationRequest,
     response: &NativeApplicationResponse,
@@ -314,9 +433,16 @@ pub(crate) fn response_matches(
             .expected_revision
             .and_then(|before| before.checked_add(u64::from(value["applied"] == true)))
             == Some(response.content_revision)
+        && (request.operation != ATTACH
+            || request.payload.get("placement").is_none()
+            || image_matches(request, value))
         && serde_json::to_vec(response).is_ok_and(|bytes| bytes.len() <= NATIVE_MAX_MESSAGE_BYTES)
 }
 
 #[cfg(test)]
 #[path = "native_item_contract_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_image_import_contract_tests.rs"]
+mod image_tests;

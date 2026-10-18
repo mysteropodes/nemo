@@ -192,7 +192,12 @@
       detach.push(() => doc.removeEventListener('paste', onPaste));
       return () => detach.forEach((fn) => fn());
     }
-    return Object.freeze({ drop, media, onDragOver, onDragLeave, onDrop, onPaste, attach, availability, openSvg: (opts) => (ports.svg ? ports.svg.openFile(opts) : Promise.resolve({ status: 'unavailable', reason: 'vector_import_absent' })) });
+    function openMedia(kind) {
+      const provider = slot(kind);
+      return provider && typeof provider.openFile === 'function'
+        ? provider.openFile() : Promise.resolve({ status: 'unavailable', reason: 'native_media_picker_absent' });
+    }
+    return Object.freeze({ drop, media, openMedia, onDragOver, onDragLeave, onDrop, onPaste, attach, availability, openSvg: (opts) => (ports.svg ? ports.svg.openFile(opts) : Promise.resolve({ status: 'unavailable', reason: 'vector_import_absent' })) });
   }
   // null means this is not a native-owned action. Every native-owned outcome is a Promise,
   // including unavailable/refused states, so callers cannot fall through into legacy writers.
@@ -211,7 +216,8 @@
     };
     return (async () => {
       if (!controller || !controller.drop || typeof controller.drop.media !== 'function') return { status: 'unavailable', reason: 'native_media_route_absent' };
-      if (files === null) return { status: 'unavailable', reason: 'native_media_picker_absent', blocked: [{ group: kind, reason: 'provider-unavailable' }], applied: [] };
+      if (files === null) return typeof controller.drop.openMedia === 'function'
+        ? controller.drop.openMedia(kind) : { status: 'unavailable', reason: 'native_media_picker_absent', blocked: [{ group: kind, reason: 'provider-unavailable' }], applied: [] };
       const keys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
       const info = session.info();
       const origin = info && Object.fromEntries(keys.map((key) => [key, info[key]]));

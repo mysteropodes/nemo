@@ -159,7 +159,13 @@ pub async fn nemo_native_dispatch(
     request: NativeApplicationRequest,
 ) -> Result<NativeApplicationResponse, String> {
     require_main(&window)?;
-    state.dispatch_native_async(request).await
+    use tauri_plugin_fs::FsExt;
+    let permission = std::sync::Arc::new(move |path: &std::path::Path| {
+        window
+            .try_fs_scope()
+            .is_some_and(|scope| scope.is_allowed(path))
+    });
+    state.dispatch_native_scoped(request, permission).await
 }
 
 #[tauri::command]

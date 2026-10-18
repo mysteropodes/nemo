@@ -522,51 +522,14 @@
       ]
     },
     "AssetAttach": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "documentSnapshotId",
-        "name",
-        "mediaType",
-        "source"
-      ],
-      "properties": {
-        "documentSnapshotId": {
-          "$ref": "#/$defs/Identifier"
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AssetCatalogAttach"
         },
-        "name": {
-          "$ref": "#/$defs/Opaque"
-        },
-        "mediaType": {
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/gif",
-            "image/webp",
-            "image/bmp",
-            "image/svg+xml",
-            "image/avif"
-          ]
-        },
-        "source": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kind",
-            "path"
-          ],
-          "properties": {
-            "kind": {
-              "const": "file"
-            },
-            "path": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 4096
-            }
-          }
+        {
+          "$ref": "#/$defs/ImageImportAttach"
         }
-      }
+      ]
     },
     "AssetRemove": {
       "type": "object",
@@ -658,8 +621,233 @@
         },
         {
           "$ref": "#/$defs/AssetCommandResult"
+        },
+        {
+          "$ref": "#/$defs/ImageImportResult"
         }
       ]
+    },
+    "AssetCatalogAttach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "name",
+        "mediaType",
+        "source"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "mediaType": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "image/bmp",
+            "image/svg+xml",
+            "image/avif"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
+    "ImageImportAttach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentSnapshotId",
+        "name",
+        "mediaType",
+        "source",
+        "placement",
+        "lifecycleGeneration"
+      ],
+      "properties": {
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "mediaType": {
+          "const": "image/png"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        },
+        "lifecycleGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "placement": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "newLayer"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "layerUid",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "authoredFrame"
+                },
+                "layerUid": {
+                  "$ref": "#/$defs/Opaque"
+                },
+                "frame": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ImageImportResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "assetId",
+        "naturalWidth",
+        "naturalHeight",
+        "displayWidth",
+        "displayHeight",
+        "target",
+        "newLayer"
+      ],
+      "properties": {
+        "applied": {
+          "const": true
+        },
+        "historyEntriesAdded": {
+          "const": 1
+        },
+        "assetId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "naturalWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "naturalHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "displayWidth": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 8192
+        },
+        "displayHeight": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 8192
+        },
+        "target": {
+          "$ref": "#/$defs/ImageImportTarget"
+        },
+        "newLayer": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ImageImportTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frameScope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "authored"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        },
+        "layerUid": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/Opaque"
+        }
+      }
     }
   },
   "examples": [

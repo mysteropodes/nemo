@@ -88,7 +88,17 @@ pub(crate) fn raw_expression_order<'a>(
                     && target.layer_uid() == layer_uid
                     && target.stroke_id() == stroke_id
             });
-            if !matching_record {
+            let matching_item = document.item_records().is_some_and(|items| {
+                items.raster_entries().iter().any(|entry| {
+                    let target = &entry.target;
+                    target.context_id() == context_id
+                        && target.scope_kind() == scope_kind
+                        && target.frame() == source_frame
+                        && target.layer_uid() == layer_uid
+                        && target.stroke_id() == stroke_id
+                })
+            });
+            if !matching_record && !matching_item {
                 return Err(ObjectFrameError::InvalidSource);
             }
             context
@@ -141,6 +151,29 @@ struct ObjectFrameIndices {
 }
 
 /// No mutable fields, renderer resources, jobs or publication identities.
+#[derive(Debug, Clone, Copy)]
+struct ObjectFrameRasterIndex {
+    layer: usize,
+    entry: usize,
+}
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ObjectFrameRasterRecord<'a> {
+    layer: usize,
+    global_index: usize,
+    entry: &'a crate::object_document::RasterEntry,
+}
+impl<'a> ObjectFrameRasterRecord<'a> {
+    pub(crate) fn layer_index(&self) -> usize {
+        self.layer
+    }
+    pub(crate) fn source_index(&self) -> usize {
+        self.global_index
+    }
+    pub(crate) fn entry(&self) -> &'a crate::object_document::RasterEntry {
+        self.entry
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ObjectFramePacket {
     snapshot: ObjectSnapshot,
@@ -148,11 +181,39 @@ pub struct ObjectFramePacket {
     scope_kind: FrameScopeKind,
     frame: u32,
     records: Vec<ObjectFrameIndices>,
+    raster_records: Vec<ObjectFrameRasterIndex>,
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
 }
 
 impl ObjectFramePacket {
+    pub(crate) fn raster_records(
+        &self,
+    ) -> impl ExactSizeIterator<Item = ObjectFrameRasterRecord<'_>> + '_ {
+        let entries = self
+            .snapshot
+            .document()
+            .item_records()
+            .map(|items| items.raster_entries())
+            .unwrap_or(&[]);
+        let offset = self.snapshot.document().objects().len();
+        self.raster_records
+            .iter()
+            .map(move |index| ObjectFrameRasterRecord {
+                layer: index.layer,
+                global_index: offset + index.entry,
+                entry: &entries[index.entry],
+            })
+    }
+    pub(crate) fn selected_source_indices(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.records()
+            .map(|record| (record.source_object_index(), record.source_layer_index()))
+            .chain(
+                self.raster_records()
+                    .map(|record| (record.source_index(), record.layer_index())),
+            )
+    }
+
     /// Read-side consumers borrow the same retained source that passed selection.
     pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
         &self.snapshot
@@ -384,7 +445,26 @@ where
             });
         }
     }
+    let mut raster_records = Vec::new();
+    if let Some(items) = document.item_records() {
+        for (entry, record) in items.raster_entries().iter().enumerate() {
+            let target = &record.target;
+            if target.context_id() == selector.context_id
+                && target.scope_kind() == &selector.scope_kind
+            {
+                let layer = *layers
+                    .get(target.layer_uid())
+                    .ok_or(ObjectFrameError::InvalidSource)?;
+                if source_frames[layer] == Some(target.frame())
+                    && document.layers()[layer].visible()
+                {
+                    raster_records.push(ObjectFrameRasterIndex { layer, entry });
+                }
+            }
+        }
+    }
     Ok(ObjectFramePacket {
+        raster_records,
         snapshot: snapshot.clone(),
         context_id: selector.context_id.to_owned(),
         scope_kind: selector.scope_kind.clone(),

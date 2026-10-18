@@ -276,6 +276,21 @@ where
             return Err(ObjectFrameError::InvalidSource.into());
         }
     }
+    if let Some(items) = doc.item_records() {
+        for (index, entry) in items.raster_entries().iter().enumerate() {
+            let target = &entry.target;
+            let key = (
+                target.context_id.as_str(),
+                &target.frame_scope,
+                target.layer_uid.as_str(),
+                target.stroke_id.as_str(),
+            );
+            if sources.insert(key, doc.objects().len() + index).is_some() {
+                return Err(ObjectFrameError::InvalidSource.into());
+            }
+        }
+    }
+
     let mut entries: Vec<_> = context.layers.iter().collect();
     entries.sort_by_key(|l| l.natural_position);
     let mut layers = Vec::new();

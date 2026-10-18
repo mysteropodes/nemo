@@ -18,6 +18,8 @@ use inactive_requests::InactiveRequest;
 
 #[path = "native_object_font.rs"]
 mod font_assets;
+#[path = "native_object_image.rs"]
+mod image_import;
 
 #[path = "native_object_export.rs"]
 mod export;

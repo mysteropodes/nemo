@@ -6742,6 +6742,9 @@
             },
             {
               "$ref": "#/$defs/ObjectTextReadResult"
+            },
+            {
+              "$ref": "native-object-item-v1.schema.json#/$defs/ImageImportResult"
             }
           ]
         },

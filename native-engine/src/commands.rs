@@ -509,3 +509,6 @@ impl NativeOpacityApplication {
         }
     }
 }
+
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use object_fill_owner::image_import::{wire::ImageImport, ImageImportResult};

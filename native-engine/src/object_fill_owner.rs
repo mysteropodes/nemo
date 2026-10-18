@@ -92,6 +92,9 @@ mod widget_edit;
 pub(crate) use widget_edit::{
     PreparedImageMeshEdit, PreparedRigEdit, PreparedRigPose, PreparedWidgetEdit,
 };
+#[cfg(feature = "project_media_codec")]
+#[path = "object_raster_image_import_owner.rs"]
+pub(crate) mod image_import;
 // L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_asset_owner.rs"]

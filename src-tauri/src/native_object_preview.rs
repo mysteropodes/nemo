@@ -176,7 +176,8 @@ impl NativeObjectHost {
             expected.frame,
             "final",
             output,
-            [],
+            plan.raster_resource_versions()
+                .map_err(|error| format!("preview raster resources: {error:?}"))?,
         )
         .map_err(|e| e.to_string())?;
         Ok(PreparedObjectPreview {
@@ -326,8 +327,10 @@ impl NativeObjectHost {
             self.preview.reference_cache = None;
         }
         let composition = decode(self.preview.reference_cache.as_ref())?;
-        if composition.has_viewport_reference() {
+        if composition.has_scene_images() {
             self.preview.reference_cache = Some(composition.clone());
+        } else {
+            self.preview.reference_cache = None;
         }
         Ok(composition)
     }
@@ -343,3 +346,7 @@ mod lifecycle_tests;
 #[cfg(test)]
 #[path = "native_object_preview_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_raster_image_preview_tests.rs"]
+mod raster_tests;

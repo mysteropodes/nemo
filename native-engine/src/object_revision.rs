@@ -21,6 +21,10 @@ mod project_settings;
 #[path = "object_reference_revision.rs"]
 mod reference_attachment;
 
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_raster_image_import_revision.rs"]
+mod image_import;
+
 static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]
 const MAX_CONTENT_REVISION: u64 = 9_007_199_254_740_991;

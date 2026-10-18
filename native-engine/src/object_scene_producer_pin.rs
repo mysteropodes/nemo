@@ -265,10 +265,7 @@ pub(crate) fn join_scene<T>(
         .numeric_order()
         .ok_or(SceneJoinError::NoNumericOrder)?;
     // Selected provenance: source object index -> source layer index.
-    let selected: HashMap<usize, usize> = packet
-        .records()
-        .map(|record| (record.source_object_index(), record.source_layer_index()))
-        .collect();
+    let selected: HashMap<usize, usize> = packet.selected_source_indices().collect();
     let mut claims: HashMap<usize, SceneOutcome<T>> = HashMap::new();
     let mut names = HashSet::new();
     let mut resources: BTreeMap<String, String> = BTreeMap::new();

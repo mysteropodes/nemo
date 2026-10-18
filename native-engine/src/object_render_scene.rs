@@ -28,6 +28,10 @@ pub use scheduled::{
     LiveObjectComposition, ScheduledObjectSceneError,
 };
 
+#[path = "object_raster_scene_join.rs"]
+pub(crate) mod raster_scene;
+pub(crate) use paint::raster::{ordered_entries, PaintEntry, PaintIndex};
+pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
 #[path = "object_paint_plan.rs"]
 mod paint;
 // L07-F (#2113): contour scene producer joined through the L07-C pin registry.
@@ -80,6 +84,8 @@ pub struct ObjectCompositionWitness {
     /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
     scene_effects: Option<Arc<SceneEffectPlan>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    rasters: Option<Arc<raster_scene::RasterResources>>,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
     reference: Option<reference::ReferenceScene>,
 }
 
@@ -88,14 +94,30 @@ pub fn prepare_object_composition(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
-    Ok(ObjectCompositionWitness {
+    let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: false,
         resources: None,
         scene_effects: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         reference: None,
-    })
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        rasters: None,
+    };
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    {
+        return raster_scene::attach(witness, None);
+    }
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+    {
+        if !plan.raster_sources().is_empty() {
+            return Err(raster_scene::unavailable(
+                0,
+                "native raster resources require project media support",
+            ));
+        }
+        Ok(witness)
+    }
 }
 
 impl ObjectCompositionWitness {
@@ -139,6 +161,10 @@ impl ObjectCompositionWitness {
         &self,
         declared: &std::collections::BTreeMap<String, String>,
     ) -> Result<(), SceneResourceMismatch> {
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if let Some(rasters) = &self.rasters {
+            rasters.verify(declared)?;
+        }
         match &self.resources {
             Some(set) => set.verify_declared(declared),
             None => ObjectSceneResourceSet::empty().verify_declared(declared),
@@ -230,6 +256,7 @@ impl<'a> ObjectRenderEntry<'a> {
 pub struct ObjectRenderScene {
     packet: ObjectFramePacket,
     contours: Arc<[CompiledContour]>,
+    rasters: Arc<[raster_scene::RasterSource]>,
 }
 impl ObjectRenderScene {
     pub fn packet(&self) -> &ObjectFramePacket {
@@ -262,6 +289,7 @@ pub fn prepare_object_render_scene(
     Ok(ObjectRenderScene {
         packet: packet.clone(),
         contours: contours.into(),
+        rasters: raster_scene::sources(packet)?.into(),
     })
 }
 
@@ -292,3 +320,12 @@ fn validate_pins(
     }
     Ok(())
 }
+
+#[cfg(all(
+    test,
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_raster_scene_join.rs"]
+mod raster_join_tests;

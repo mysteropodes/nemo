@@ -329,3 +329,67 @@ fn the_public_entries_decode_under_the_shared_budget_and_reuse_by_identity() {
     assert!(first.matches_asset(&snapshot, "second"));
     // The shared domain's `used()` is deliberately not asserted: other tests charge it too.
 }
+
+#[test]
+fn scene_ports_use_the_native_png_digest_and_existing_shared_allocation_cache() {
+    let bytes = png("rgba-3x1");
+    let source = snapshot(shared_trio(&bytes));
+    let original = AssetPixels::retain_for_scene(&source, "first", &[]).unwrap();
+    let alias = AssetPixels::retain_for_scene(&source, "second", &[original.clone()]).unwrap();
+    let separate = AssetPixels::retain_for_scene(&source, "third", &[original.clone()]).unwrap();
+    assert!(original.same_allocation_as(&alias));
+    assert!(!original.same_allocation_as(&separate));
+    assert_eq!(original.rgba8(), expected_rgba(&row("rgba-3x1")));
+    let expected = "bdf75b68c49f74dafe3c94438fbdfd3dba93a28c93f6cf676157e50641104e27";
+    for id in ["first", "second", "third"] {
+        assert_eq!(AssetPixels::version_for(&source, id).unwrap(), expected);
+    }
+    assert_eq!(original.encoded_version(), expected);
+    assert_eq!(separate.encoded_version(), expected);
+}
+#[test]
+fn scene_ports_refuse_unresolved_and_other_kind_sources_without_decoding_or_resolving_paths() {
+    use super::oracle::linked;
+    let source = snapshot(vec![
+        linked("offline", AssetKind::Image, "never-open://asset"),
+        linked("audio", AssetKind::Audio, "never-open://audio"),
+    ]);
+    for (id, error) in [
+        ("missing", AssetPixelsError::Missing),
+        ("offline", AssetPixelsError::Unavailable),
+        ("audio", AssetPixelsError::WrongKind),
+    ] {
+        assert_eq!(AssetPixels::version_for(&source, id), Err(error));
+        assert_eq!(
+            AssetPixels::retain_for_scene(&source, id, &[]).unwrap_err(),
+            error
+        );
+    }
+}
+#[test]
+fn scene_ports_reject_a_replaced_same_id_and_keep_the_old_snapshot_and_digest_pinned() {
+    let first_source = snapshot(vec![embedded(
+        "same",
+        "image/png",
+        AssetKind::Image,
+        Arc::new(png("rgba-3x1")),
+    )]);
+    let held = AssetPixels::retain_for_scene(&first_source, "same", &[]).unwrap();
+    let old_pixels = held.rgba8().to_vec();
+    let old_version = held.encoded_version();
+    // Equal identity spelling and even equal bytes in a distinct allocation cannot reuse a handle.
+    let replacement = snapshot(vec![embedded(
+        "same",
+        "image/png",
+        AssetKind::Image,
+        Arc::new(png("rgba-3x1")),
+    )]);
+    let current = AssetPixels::retain_for_scene(&replacement, "same", &[held.clone()]).unwrap();
+    assert!(!held.same_allocation_as(&current));
+    assert_eq!(current.encoded_version(), old_version);
+    assert!(!held.matches_asset(&replacement, "same"));
+    drop((first_source, replacement, current));
+    assert_eq!(held.rgba8(), old_pixels);
+    assert_eq!(held.encoded_version(), old_version);
+    assert!(held.snapshot().project().is_some());
+}

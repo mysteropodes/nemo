@@ -54,6 +54,8 @@ type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>
 
 #[path = "native_font_source.rs"]
 mod font_source;
+#[path = "native_raster_image_source.rs"]
+pub(crate) mod image_source;
 pub(crate) use font_source::fetch_google_font;
 
 #[path = "native_revision_sync.rs"]
@@ -146,7 +148,24 @@ impl ApplicationMcp {
         request: NativeApplicationRequest,
     ) -> Result<NativeApplicationResponse, String> {
         self.revisions
-            .dispatch_async(&self.instance_id, &self.native, request, false)
+            .dispatch_scoped(&self.instance_id, &self.native, request, false, None)
+            .await
+            .map(|delivery| delivery.response)
+    }
+
+    pub(crate) async fn dispatch_native_scoped(
+        &self,
+        request: NativeApplicationRequest,
+        allowed: image_source::ImageReadPermission,
+    ) -> Result<NativeApplicationResponse, String> {
+        self.revisions
+            .dispatch_scoped(
+                &self.instance_id,
+                &self.native,
+                request,
+                false,
+                Some(allowed),
+            )
             .await
             .map(|delivery| delivery.response)
     }
@@ -396,7 +415,14 @@ async fn serve_connection(
             let window = app
                 .get_webview_window("main")
                 .ok_or("application window unavailable")?;
-            revision_sync::serve_native(
+            use tauri_plugin_fs::FsExt;
+            let source_window = window.clone();
+            let permission = Arc::new(move |path: &std::path::Path| {
+                source_window
+                    .try_fs_scope()
+                    .is_some_and(|scope| scope.is_allowed(path))
+            });
+            revision_sync::serve_native_scoped(
                 &mut stream,
                 &endpoint.instance_id,
                 &native,
@@ -408,6 +434,7 @@ async fn serve_connection(
                         .map_err(|error| error.to_string())
                 },
                 Duration::from_secs(5),
+                Some(permission),
             )
             .await
         }

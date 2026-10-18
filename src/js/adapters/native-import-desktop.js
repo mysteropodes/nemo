@@ -97,8 +97,112 @@
       importText: (text, opts) => svgRaw.importText(text, opts).then(surface), importFiles: (files, opts) => svgRaw.importFiles(files, opts).then(surface),
       importTexts: (items, opts) => svgRaw.importTexts(items, opts).then(surface), openFile: (opts) => svgRaw.openFile(opts).then(surface),
     });
+    // L06-M2: the ordinary image menu has a native path picker. DOM Files have no admitted native handle.
+    // Activation remains false until the actual source/resource/scene/host proof is accepted by Root.
+    const imageDeclared = overrides.imageRoute === true;
+    let imagePending = false, imageRetired = false, imageUncertain = null;
+    const pinKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
+    const samePins = (a, b) => !!a && !!b && pinKeys.every((key) => a[key] === b[key]);
+    const sameSelection = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((uid, i) => uid === b[i]);
+    const sameImageOwner = (a, b) => !!a && !!b && pinKeys.slice(0, 3).every((key) => a[key] === b[key]);
+    function uncertainImageStatus() {
+      if (!imageUncertain) return null;
+      try {
+        const session = current(), now = session && session.info();
+        // Absence, temporary unavailability or an ordinary revision/frame change never proves a reopen.
+        if (session && session.isActive() && now && typeof now.instanceId === 'string' && now.instanceId.length > 0 && typeof now.documentId === 'string' && now.documentId.length > 0 &&
+          Number.isSafeInteger(now.lifecycleGeneration) && now.lifecycleGeneration > 0 && !sameImageOwner(now, imageUncertain.ctx.before)) imageUncertain = null;
+      } catch (_) { /* preserve the unresolved native disposition */ }
+      if (!imageUncertain) return null;
+      const { ctx, error, receipt, lastFailure } = imageUncertain;
+      return { status: 'unconfirmed', code: error && error.code || 'image_presentation_unconfirmed',
+        requestId: error && error.requestId || receipt && receipt.requestId || null,
+        owner: Object.fromEntries(pinKeys.slice(0, 3).map((key) => [key, ctx.before[key]])),
+        receipt: receipt || null, details: lastFailure && lastFailure.details || error && error.details || null,
+        recovery: error && typeof error.replay === 'function' ? 'exact-request' : receipt ? 'presentation' : 'reopen-owner' };
+    }
+    function uncertainImageError(error) {
+      const details = error && error.details, code = error && error.code;
+      const disposition = details && (Object.prototype.hasOwnProperty.call(details, 'disposition') || Object.prototype.hasOwnProperty.call(details, 'committed'));
+      return !!(error && typeof error.replay === 'function') || code === 'asset_command_indeterminate' || code === 'uncorrelated' ||
+        error && error.reason === 'reconcile_failed' || !code || !!(disposition &&
+          !(details.disposition === 'notDispatched' && details.committed === false));
+    }
+    function finishImage(ctx, state, receipt, recovering) {
+      const after = ctx.session.info();
+      const shown = !imageRetired && current() === ctx.session && ctx.session.isActive() && sameImageOwner(after, ctx.before) &&
+        after.contentRevision === receipt.contentRevision && receipt.contentRevision === ctx.before.contentRevision + 1 &&
+        root.state === state && state.currentFrame === ctx.frame &&
+        root.NemoNativeObjectProjectFile.projectionReadyForUI(root, after) === true && m.core.presented(ctx.session, after, ctx.frame);
+      if (!shown || !after.layers.some((row) => row.layerUid === receipt.target.layerUid)) {
+        imageUncertain = { ctx, state, receipt, error: null };
+        return uncertainImageStatus() || { status: 'unconfirmed', code: 'image_owner_changed', receipt };
+      }
+      imageUncertain = null;
+      const out = { status: 'imported', readback: 'confirmed', receipt, selected: false };
+      // A late recovery resolves the receipt without taking the user's current selection.
+      if (!recovering && sameSelection(selection(), ctx.selection)) {
+        const index = after.layers.findIndex((row) => row.layerUid === receipt.target.layerUid);
+        const consumed = root.NemoNativeObjectProject.selectLayerUI(root, index, false, receipt.target.layerUid, after) === true;
+        out.selected = consumed && current() === ctx.session && samePins(ctx.session.info(), after) && state.currentFrame === ctx.frame &&
+          sameSelection(selection(), [receipt.target.layerUid]) && m.core.presented(ctx.session, after, ctx.frame);
+      }
+      return out;
+    }
+    const image = Object.freeze({
+      available: () => false,
+      importFiles: async () => ({ status: 'unavailable', reason: 'native_drop_handle_absent' }),
+      status: uncertainImageStatus,
+      async recover() {
+        if (imageRetired) return { status: 'unavailable', reason: 'retired' };
+        if (imagePending) return { status: 'busy' };
+        const unresolved = uncertainImageStatus();
+        if (!unresolved) return { status: 'nothing' };
+        const held = imageUncertain;
+        if (!held.receipt && !(held.error && typeof held.error.replay === 'function')) return unresolved;
+        imagePending = true;
+        try {
+          const receipt = held.receipt || await held.error.replay();
+          return finishImage(held.ctx, held.state, receipt, true);
+        } catch (error) {
+          // Even a later refusal cannot erase the earlier unknown commit or its exact-request recovery.
+          held.lastFailure = error;
+          return uncertainImageStatus() || { status: 'unavailable', reason: 'owner_reopened' };
+        } finally { imagePending = false; }
+      },
+      async openFile() {
+        if (imageRetired || !imageDeclared) return { status: 'unavailable', reason: 'native_image_route_absent' };
+        if (imagePending) return { status: 'busy' };
+        const unresolved = uncertainImageStatus();
+        if (unresolved) return unresolved;
+        const started = core.begin();
+        if (!started.ok) return { status: started.status, reason: started.reason };
+        const ctx = started.ctx, state = root.state;
+        const currentIntent = () => !imageRetired && current() === ctx.session && ctx.session.isActive() && root.state === state &&
+          state.currentFrame === ctx.frame && samePins(ctx.session.info(), ctx.before) && sameSelection(selection(), ctx.selection) &&
+          root.NemoNativeObjectProjectFile.projectionReadyForUI(root, ctx.before) === true && m.core.presented(ctx.session, ctx.before, ctx.frame);
+        const api = root.NemoNativeObjectRasterAsset;
+        const client = api && api.desktop(root, { imageRoute: () => !imageRetired && imageDeclared });
+        if (!client) return { status: 'unavailable', reason: 'native_image_client_absent' };
+        imagePending = true;
+        try {
+          const receipt = await client.importStillPicked({ kind: 'newLayer' }, { origin: ctx.before, current: currentIntent });
+          return receipt ? finishImage(ctx, state, receipt, false) : { status: 'cancelled' };
+        } catch (error) {
+          const code = error && error.code;
+          if (uncertainImageError(error)) {
+            imageUncertain = { ctx, state, error, receipt: null };
+            return uncertainImageStatus() || { status: 'unconfirmed', code: code || 'native_image_failed', requestId: error && error.requestId };
+          }
+          if (code === 'stale_revision' || code === 'stale_owner') return { status: 'stale', code };
+          if (code === 'unavailable') return { status: 'unavailable', code };
+          if (code === 'invalid_request') return { status: 'invalid', code };
+          return { status: 'refused', code };
+        } finally { imagePending = false; }
+      },
+    });
     const drop = m.drop.create({
-      svg, svgAvailable: () => core.begin().ok === true, notify, surface,
+      svg, svgAvailable: () => core.begin().ok === true, providers: { image }, notify, surface,
       cancelPasteFallback: () => { if (root._svgPasteFallback) { root.clearTimeout(root._svgPasteFallback); root._svgPasteFallback = null; } },
     });
     const figma = m.figma.create({ paper: paper(), core, t, notify, resizeCanvas, fetch: (...a) => root.fetch(...a) });
@@ -148,10 +252,10 @@
       importFiles: (files, opts) => svg.importFiles(files, opts), isSvgFile: m.drop.isSvgFile,
     });
     const controller = Object.freeze({
-      svg, drop, figma, psd, montage, core, attach, noticeFor, surface,
+      svg, drop, image, figma, psd, montage, core, attach, noticeFor, surface,
       openSvg: facade.openFile, importPsd: (file) => psd.importFile(file).then(surface),
       importFigma: (url, token, opts) => figma.run(url, token, opts).then(surface),
-      dispose() { core.dispose(); },
+      dispose() { imageRetired = true; core.dispose(); },
     });
     root.SMSvgImport = facade;
     root.NemoNativeImportController = controller;

@@ -17,6 +17,15 @@ use tokio::{io::AsyncReadExt, net::TcpStream, sync::oneshot};
 mod font_dispatch;
 use font_dispatch::{invoke_font, FontPhase};
 
+#[path = "native_raster_image_dispatch.rs"]
+mod image_dispatch;
+use image_dispatch::{invoke_image, is_image_import, ImagePhase};
+enum ResourcePhase<'a> {
+    Regular,
+    Font(FontPhase<'a>),
+    Image(ImagePhase<'a>),
+}
+
 #[path = "native_revision_dispatch.rs"]
 mod dispatch_core;
 
@@ -267,6 +276,19 @@ fn invoke_dispatch(
     application: &mut dyn NativeDispatch,
     request: &NativeApplicationRequest,
 ) -> Result<NativeApplicationResponse, String> {
+    if is_image_import(request) {
+        return invoke_image(application, request, ImagePhase::Regular)?
+            .ok_or_else(|| "native image source requires async scoped dispatch".into());
+    }
+    if request.operation == "command.document.object.asset.attach" {
+        return Ok(unavailable(
+            request,
+            &request.instance_id,
+            application.content_revision(),
+            "catalog-only image attach source route is unavailable",
+            false,
+        ));
+    }
     if request.operation == crate::application_mcp::font_source::IMPORT {
         return invoke_font(application, request, FontPhase::Regular)?
             .ok_or_else(|| "font source requires async application dispatch".into());
@@ -321,6 +343,19 @@ pub(super) async fn serve_native(
     emit: impl FnOnce(RevisionEvent) -> Result<(), String>,
     timeout: Duration,
 ) -> Result<(), String> {
+    serve_native_scoped(stream, instance, native, sync, request, emit, timeout, None).await
+}
+
+pub(super) async fn serve_native_scoped(
+    stream: &mut TcpStream,
+    instance: &str,
+    native: &NativeState,
+    sync: &RevisionSync,
+    request: NativeApplicationRequest,
+    emit: impl FnOnce(RevisionEvent) -> Result<(), String>,
+    timeout: Duration,
+    allowed: Option<crate::application_mcp::image_source::ImageReadPermission>,
+) -> Result<(), String> {
     let mut byte = [0u8; 1];
     match stream.try_read(&mut byte) {
         Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
@@ -329,7 +364,7 @@ pub(super) async fn serve_native(
     let mut delivery = tokio::select! {
         biased;
         _ = stream.read(&mut byte) => return Err("native connection cancelled before publication".into()),
-        result = sync.dispatch_async(instance, native, request.clone(), true) => result?,
+        result = sync.dispatch_scoped(instance, native, request.clone(), true, allowed) => result?,
     };
     if let Some((event, receiver)) = delivery.notification {
         let acknowledged = if emit(event.clone()).is_ok() {

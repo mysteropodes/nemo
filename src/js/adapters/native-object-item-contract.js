@@ -74,22 +74,56 @@
     if('item' in p)rasterItem(p.item);if('block' in p)textBlock(p.block);if('patch' in p)textPatch(p.patch);
     ['x','y','width','height','rotation','opacity'].forEach(k=>{if(k in p)num(p[k]);});
   }
+  function imagePlacement(v){
+    if(v&&v.kind==='newLayer'){exact(v,['kind'],[],'image placement');return;}
+    exact(v,['kind','layerUid','frame'],[],'image placement');
+    if(v.kind!=='authoredFrame')fail('image placement kind invalid');
+    opaque(v.layerUid);int(v.frame,0,4294967295);
+  }
+  function imageResult(v){
+    exact(v,['applied','historyEntriesAdded','assetId','naturalWidth','naturalHeight','displayWidth','displayHeight','target','newLayer'],[],'image result');
+    if(v.applied!==true||v.historyEntriesAdded!==1)fail('image placement must apply once');
+    opaque(v.assetId);int(v.naturalWidth,1,8192);int(v.naturalHeight,1,8192);
+    num(v.displayWidth);num(v.displayHeight);
+    if(v.displayWidth<=0||v.displayWidth>v.naturalWidth||v.displayHeight<=0||v.displayHeight>v.naturalHeight)fail('image fit invalid');
+    target(v.target,false);if(v.target.frameScope.kind!=='authored')fail('image scope invalid');bool(v.newLayer);
+  }
   function payload(op,p){
     if(op===ITEM)return itemPayload(p);
     if(op===ATTACH){
-      exact(p,['documentSnapshotId','name','mediaType','source'],[],'asset attach');id(p.documentSnapshotId);opaque(p.name);oneOf(p.mediaType,MEDIA);
+      const placed=plain(p)&&Object.prototype.hasOwnProperty.call(p,'placement');
+      exact(p,['documentSnapshotId','name','mediaType','source'].concat(placed?['placement','lifecycleGeneration']:[]),[],'asset attach');
+      id(p.documentSnapshotId);opaque(p.name);oneOf(p.mediaType,MEDIA);
+      if(placed){imagePlacement(p.placement);int(p.lifecycleGeneration,1);if(p.mediaType!=='image/png')fail('native image placement supports PNG only');}
       exact(p.source,['kind','path'],[],'asset source');if(p.source.kind!=='file')fail('asset source kind invalid');opaque(p.source.path,4096,true);return;
     }
     exact(p,['documentSnapshotId','assetId'],[],'asset remove');id(p.documentSnapshotId);opaque(p.assetId);
   }
   function result(op,v){
+    if(op===ATTACH&&plain(v)&&Object.prototype.hasOwnProperty.call(v,'assetId'))return imageResult(v);
     exact(v,op===ITEM?['applied','historyEntriesAdded','operation','strokeId']:['applied','historyEntriesAdded'],[],'result');
     bool(v.applied);if(v.historyEntriesAdded!==(v.applied?1:0))fail('history disposition invalid');
     if(op===ITEM){oneOf(v.operation,RASTER.concat(TEXT));opaque(v.strokeId);}
   }
   function correlate(q,r){
-    if(r.instanceId!==q.instanceId||r.documentId!==q.documentId)fail('response owner mismatch');if(!r.ok)return;
+    if(r.requestId!==q.requestId)fail('response request mismatch');
+    const placed=q.operation===ATTACH&&plain(q.payload)&&q.payload.mediaType==='image/png'&&plain(q.payload.placement)&&
+      ['newLayer','authoredFrame'].includes(q.payload.placement.kind);
+    const refusal=placed&&r.ok===false&&r.result===undefined&&plain(r.error);
+    const ownerRefusal=refusal&&(r.error.code==='wrong_instance'&&r.instanceId!==q.instanceId||r.error.code==='wrong_document'&&r.instanceId===q.instanceId);
+    if((r.instanceId!==q.instanceId||r.documentId!==q.documentId)&&!ownerRefusal)fail('response owner mismatch');if(!r.ok)return;
     if(r.contentRevision!==q.expectedRevision+(r.result.applied?1:0))fail('receipt revision mismatch');
+    if(q.operation===ATTACH){
+      const placed=Object.prototype.hasOwnProperty.call(q.payload,'placement');
+      if(!placed){if(Object.prototype.hasOwnProperty.call(r.result,'assetId'))fail('catalog receipt cannot carry a placement');return;}
+      imageResult(r.result);
+      const placement=q.payload.placement,t=r.result.target,next=q.expectedRevision+1;
+      if(r.result.newLayer!==(placement.kind==='newLayer')||!t.strokeId.startsWith('native-raster:'+next+':'))fail('image target disposition mismatch');
+      if(placement.kind==='newLayer'){
+        if(!t.layerUid.startsWith('native-layer:'+next+':')||t.frameScope.frame!==0)fail('image layer target mismatch');
+      }else if(t.layerUid!==placement.layerUid||t.frameScope.frame!==placement.frame)fail('image authored target mismatch');
+      return;
+    }
     if(q.operation!==ITEM)return;
     const p=q.payload,created=p.command.endsWith('.create');
     if(r.result.operation!==p.command.slice('object.'.length))fail('item receipt operation mismatch');
@@ -100,7 +134,7 @@
   function paths(op){
     if(op===ITEM)return new Set(['payload.target.layerUid','payload.stableTarget.layerUid','payload.target.strokeId','payload.stableTarget.strokeId','payload.item.assetId',
       'payload.item.brushGroupId','payload.item.meshId','payload.block.text','payload.block.font.assetId','payload.patch.text','payload.patch.font.assetId','result.strokeId']);
-    return op===ATTACH?new Set(['payload.name','payload.source.path']):new Set(['payload.assetId']);
+    return op===ATTACH?new Set(['payload.name','payload.source.path','payload.placement.layerUid','result.assetId','result.target.layerUid','result.target.strokeId']):new Set(['payload.assetId']);
   }
   const own=Object.freeze({admitted:op=>OPS.has(op),requiresRevision:op=>OPS.has(op),payload:payload,result:result,correlate:correlate,paths:paths});
   // The common SDK consumes one contract object; this composes it in front of the font contract without a second SDK seam.

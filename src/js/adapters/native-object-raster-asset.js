@@ -44,6 +44,37 @@
         return Object.freeze(Object.assign({},receipt,{assetId:receipt.applied?mintedAssetId(receipt.requestId):null}));
       });
     }
+    function imageRouted(){var route=ports.imageRoute;return (typeof route==='function'?route():route)===true;}
+    function imageGate(){return imageRouted()?null:Promise.reject(fault('unavailable','image_host_route_unavailable','Image import is unavailable'));}
+    function originPin(){
+      var value=session.info();
+      if(!session.isActive()||!value)throw fault('unavailable','no_native_project','Image import is unavailable');
+      return ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].reduce(function(out,key){out[key]=value[key];return out;},{});
+    }
+    function sameOrigin(a,b){return !!a&&!!b&&['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(key){return a[key]===b[key];});}
+    function importStillPath(path,placement,options){
+      var blocked=imageGate();if(blocked)return blocked;
+      options=options||{};
+      var before,disposition;
+      try{
+        describePath(path);
+        if(extOf(path)!=='png')throw fault('unavailable','image_codec_unavailable','This image format is unavailable');
+        before=options.origin||originPin();disposition=JSON.parse(JSON.stringify(placement));
+      }catch(error){return Promise.reject(error);}
+      return commands.execute(Contract.ATTACH,function(pin){
+        if(!imageRouted())throw fault('unavailable','image_host_route_unavailable','Image import is unavailable');
+        if(!sameOrigin(pin,before)||(options.current&&options.current()!==true))throw fault('stale_revision','image_origin_changed','Image import context changed');
+        return {documentSnapshotId:pin.documentSnapshotId,lifecycleGeneration:pin.lifecycleGeneration,name:baseName(path),
+          mediaType:'image/png',source:{kind:'file',path:path},placement:disposition};
+      });
+    }
+    async function importStillPicked(placement,options){
+      var blocked=imageGate();if(blocked)return blocked;
+      options=Object.assign({},options||{});options.origin=options.origin||originPin();
+      if(typeof ports.pickImage!=='function')throw fault('unavailable','picker_unavailable','Image import is unavailable');
+      var path=await ports.pickImage();
+      return path==null?null:importStillPath(path,placement,options);
+    }
     async function importPicked(){
       if(typeof ports.pick!=='function')throw fault('unavailable','picker_unavailable','No image picker is bound');
       var path=await ports.pick();
@@ -59,7 +90,8 @@
       return item(function(){return {command:'object.raster.create',target:{contextId:'scene-root',frameScope:{kind:'authored',frame:frame},layerUid:layerUid,strokeId:''},item:raster};});
     }
     function edit(command,members){return function(target,a,b){return item(function(){return Object.assign({command:command,stableTarget:target},members(a,b));});};}
-    return Object.freeze({describePath:describePath,attachPath:attachPath,importPicked:importPicked,remove:remove,createItem:createItem,
+    return Object.freeze({describePath:describePath,attachPath:attachPath,importPicked:importPicked,
+      importStillPath:importStillPath,importStillPicked:importStillPicked,remove:remove,createItem:createItem,
       moveItem:edit('object.raster.move',function(x,y){return {x:x,y:y};}),resizeItem:edit('object.raster.resize',function(width,height){return {width:width,height:height};}),
       rotateItem:edit('object.raster.rotate',function(rotation){return {rotation:rotation};}),opacityItem:edit('object.raster.opacity',function(opacity){return {opacity:opacity};}),
       deleteItem:edit('object.raster.delete',function(){return {};})});
@@ -70,15 +102,19 @@
   function desktop(host,options){
     var module=host.NemoNativeObjectProject,session=module&&module.desktop(host);
     if(!session||!session.blocksLegacy())return null;
+    var pin=session.info(),key=JSON.stringify([pin.instanceId,pin.documentId,pin.lifecycleGeneration]);
     var entry=bindings.get(host);
-    if(!entry){
-      entry={route:false};
-      entry.binding=create(session,{assetRoute:function(){var route=entry.route;return (typeof route==='function'?route():route)===true;},pick:function(){
+    if(!entry||entry.ownerKey!==key){
+      entry={ownerKey:key,route:false,imageRoute:false};
+      entry.binding=create(session,{assetRoute:function(){var route=entry.route;return (typeof route==='function'?route():route)===true;},
+        imageRoute:function(){var route=entry.imageRoute;return (typeof route==='function'?route():route)===true;},
+        pickImage:function(){return host.__TAURI__.dialog.open({title:'Import Image',multiple:false,filters:[{name:'PNG Image',extensions:['png']}]});},pick:function(){
         return host.__TAURI__.dialog.open({title:'Import Image',multiple:false,filters:[{name:'Images',extensions:IMAGE_EXTENSIONS.slice()},{name:'All files',extensions:['*']}]});
       }});
       bindings.set(host,entry);
     }
     if(options&&Object.prototype.hasOwnProperty.call(options,'assetRoute'))entry.route=options.assetRoute;
+    if(options&&Object.prototype.hasOwnProperty.call(options,'imageRoute'))entry.imageRoute=options.imageRoute;
     return entry.binding;
   }
   return Object.freeze({create:create,desktop:desktop,describePath:describePath,mintedAssetId:mintedAssetId,IMAGE_EXTENSIONS:IMAGE_EXTENSIONS});

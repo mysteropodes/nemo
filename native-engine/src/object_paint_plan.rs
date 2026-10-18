@@ -67,8 +67,13 @@ impl<'a> ObjectPaintCommand<'a> {
 pub struct ObjectPaintPlan {
     scene: Arc<ObjectRenderScene>,
     indices: Arc<[usize]>,
+    mixed: Arc<[PaintIndex]>,
 }
 impl ObjectPaintPlan {
+    /// Encoded-source versions retained by this immutable plan, in stable asset order.
+    pub fn raster_resource_versions(&self) -> Result<Vec<(String, String)>, ObjectSceneError> {
+        crate::object_render_scene::raster_scene::declared_versions(self)
+    }
     pub fn packet(&self) -> &ObjectFramePacket {
         self.scene.packet()
     }
@@ -83,6 +88,10 @@ impl ObjectPaintPlan {
     }
 }
 
+#[path = "object_raster_paint_join.rs"]
+pub(crate) mod raster;
+use raster::PaintIndex;
+
 type LayerSequence = Vec<(usize, Vec<usize>)>;
 
 pub fn prepare_object_paint_plan(
@@ -94,11 +103,18 @@ pub fn prepare_object_paint_plan(
     // Authored v2. v1/no-plan and all Reference/nonroot inputs are unavailable.
     // L07-F: the retained scene is reported as the contour producer output and joined
     // through the pinned registry (pin check once, NumericOrderPlan order).
-    let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
-    let indices = join(scene, &sequence)?;
+    let (indices, mixed) = if scene.rasters.is_empty() {
+        let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
+        let indices = join(scene, &sequence)?;
+        let mixed = indices.iter().copied().map(PaintIndex::Contour).collect();
+        (indices, mixed)
+    } else {
+        raster::prepare(scene, expected)?
+    };
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),
         indices: indices.into(),
+        mixed: mixed.into(),
     })
 }
 

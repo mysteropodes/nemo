@@ -1,5 +1,5 @@
 //! Real public owner/transport text reads; no installed client acceptance.
-use super::{invoke, saved};
+use crate::application_mcp::revision_sync::dispatch_core::property_read_tests::{invoke, saved};
 use crate::{application_mcp::ApplicationMcp, native_object_bootstrap::bootstrap_raw};
 use nemo_mcp::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use serde_json::{json, Value};
