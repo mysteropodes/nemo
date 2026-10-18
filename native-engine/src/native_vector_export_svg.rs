@@ -1,9 +1,10 @@
 //! Native SVG frame serializer over the pinned `ObjectPaintPlan` (G43 kernel).
 //!
-//! One `<path>` per paint command, in the plan's paint order, from the SAME plan
-//! the PNG compositor consumes. Path data is the retained closed cubic contour
-//! (absolute `M` + one `C` per segment, the closing curve included, then `Z`);
-//! fill is the original straight RGBA, never quantized to 8 bits. The document
+//! One `<path>` per retained contour in the SAME mixed paint order the PNG
+//! compositor consumes, including Text glyphs and decorations. Path data is the
+//! retained closed cubic contour (absolute `M`, every closing `C`, then `Z`).
+//! Vector straight RGBA stays unquantized; Text uses the provider's already
+//! composed straight RGBA8, without applying its opacity a second time. The document
 //! wrapper is byte-identical to `svgDocument` in baseline
 //! `src/js/adapters/export-svg-frame.js`. Plan geometry/paint outside what the
 //! plan can carry today is a typed `Unsupported`, never dropped, never Paper.
@@ -13,6 +14,7 @@
 use crate::object_render_scene::{
     ordered_entries, ObjectPaintCommand, ObjectPaintPlan, PaintEntry,
 };
+use crate::render_geometry::ClosedCubicPath;
 use crate::scheduler::OutputSpec;
 
 pub(crate) const XML_PREAMBLE: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -32,9 +34,6 @@ pub(crate) enum SvgExportError {
         source_object_index: usize,
         reason: &'static str,
     },
-    /// Text paint is not represented by this contour-only SVG encoder yet.
-    /// Refuse the entire frame before counting or emitting its document header.
-    TextUnsupported { source_object_index: usize },
     /// A straight RGBA channel is not a finite number in 0..=1.
     UnrepresentablePaint { source_object_index: usize },
     /// The exact serialized size exceeds the caller's cap.
@@ -246,7 +245,16 @@ fn emit_command(
         },
     )?;
     let rgba = straight_rgba(source_object_index, command)?;
-    let segments = command.contour().segments();
+    emit_contour(sink, source_object_index, command.contour(), rgba)
+}
+
+fn emit_contour(
+    sink: &mut Sink,
+    source_object_index: usize,
+    contour: &ClosedCubicPath,
+    rgba: [f64; 4],
+) -> Result<(), SvgExportError> {
+    let segments = contour.segments();
     let first = segments.first().ok_or(SvgExportError::Unsupported {
         source_object_index,
         reason: "empty contour",
@@ -280,27 +288,52 @@ fn emit_command(
     sink.put("\" fill-rule=\"nonzero\"/>")
 }
 
+fn unsupported_raster(plan: &ObjectPaintPlan, index: usize) -> SvgExportError {
+    // The sealed mixed plan validates every index when it joins its producers.
+    SvgExportError::Unsupported {
+        source_object_index: plan.raster_sources()[index].source_index,
+        reason: "retained raster paint has no SVG representation",
+    }
+}
+
 fn emit_frame(
     plan: &ObjectPaintPlan,
     spec: &SvgFrameSpec,
     sink: &mut Sink,
 ) -> Result<usize, SvgExportError> {
-    if let Some(source_object_index) = ordered_entries(plan).find_map(|entry| match entry {
-        PaintEntry::Text(text) => Some(text.source_index),
+    // Unsupported mixed content must refuse the whole frame before even the
+    // document header is counted, never disappear behind a successful subset.
+    if let Some(index) = ordered_entries(plan).find_map(|entry| match entry {
+        PaintEntry::Raster(index) => Some(index),
         _ => None,
     }) {
-        return Err(SvgExportError::TextUnsupported {
-            source_object_index,
-        });
+        return Err(unsupported_raster(plan, index));
     }
     sink.put(&document_head(spec.width, spec.height))?;
     let mut count = 0;
-    for command in plan.commands() {
-        if count > 0 {
-            sink.put("\n")?;
+    for entry in ordered_entries(plan) {
+        match entry {
+            PaintEntry::Contour(command) => {
+                if count > 0 {
+                    sink.put("\n")?;
+                }
+                emit_command(sink, command.source().source_object_index(), command)?;
+                count += 1;
+            }
+            PaintEntry::Text(text) => {
+                for (contour, rgba8) in text.item.painted() {
+                    if count > 0 {
+                        sink.put("\n")?;
+                    }
+                    // The shared provider already applies glyph/layer opacity
+                    // and rounds the straight color to RGBA8 for native paint.
+                    let rgba = rgba8.map(|channel| f64::from(channel) / 255.0);
+                    emit_contour(sink, text.source_index, &contour.contour, rgba)?;
+                    count += 1;
+                }
+            }
+            PaintEntry::Raster(index) => return Err(unsupported_raster(plan, index)),
         }
-        emit_command(sink, command.source().source_object_index(), command)?;
-        count += 1;
     }
     sink.put(DOCUMENT_TAIL)?;
     Ok(count)
@@ -359,7 +392,7 @@ mod fixture;
 mod oracle;
 #[cfg(test)]
 #[path = "../tests/native_vector_export_svg_reader.rs"]
-mod reader;
+pub(crate) mod reader;
 #[cfg(test)]
 #[path = "../tests/native_vector_export_svg.rs"]
 mod tests;

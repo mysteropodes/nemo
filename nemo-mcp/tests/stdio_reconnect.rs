@@ -276,3 +276,161 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         .expect("reconnect scenario timed out")
         .expect("reconnect scenario failed");
 }
+
+// Real TCP + compiled stdio regression for the native object owner's refusal of
+// the legacy document API. The original v1-only reconnect fixture above is intact.
+async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) -> Value {
+    use tokio::io::AsyncReadExt;
+    let registry = tempfile::tempdir().unwrap();
+    let listener = bounded(TcpListener::bind("127.0.0.1:0")).await.unwrap();
+    let endpoint = Endpoint {
+        instance_id: SELECTED.into(),
+        port: listener.local_addr().unwrap().port(),
+        secret: uuid::Uuid::new_v4().to_string(),
+        build_id: "native-only-build".into(),
+    };
+    let _registration = Registration::create(registry.path(), &endpoint).unwrap();
+    let expected = endpoint.clone();
+    let host = tokio::spawn(async move {
+        let (mut legacy, _) = bounded(listener.accept()).await.unwrap();
+        let message: wire::WireRequest = bounded(wire::read_json(&mut legacy)).await.unwrap();
+        assert_eq!(message.secret, expected.secret);
+        assert_eq!(message.request.operation, Operation::Capabilities);
+        assert_eq!(message.request.api_version, 1);
+        assert_eq!(message.request.instance_id.as_deref(), Some(SELECTED));
+        assert_eq!(message.request.document_id, None);
+        assert_eq!(message.request.expected_revision, None);
+        assert_eq!(message.request.payload, json!({}));
+        if !legacy_silent {
+            bounded(wire::write_json(&mut legacy, &json!({
+                "apiVersion":1,"requestId":message.request.request_id,
+                "instanceId":SELECTED,"documentId":"legacy-decoy","revision":999,
+                "ok":false,"error":{"code":"unavailable","message":"native object owns document"}
+            }))).await.unwrap();
+        }
+        // Keep an unanswered legacy connection OPEN while native discovery is
+        // attempted. Admission must survive the real legacy timeout, not EOF.
+        let (mut native, _) = bounded(listener.accept()).await.unwrap();
+        let native_message: wire::AuthenticatedWireRequest =
+            bounded(wire::read_json(&mut native)).await.unwrap();
+        let wire::AuthenticatedWireRequest::NativeStatus(native_message) = native_message else {
+            panic!("discovery must use the existing native-status request");
+        };
+        assert_eq!(native_message.secret, expected.secret);
+        let request = native_message.native_status;
+        assert_eq!(request.api_version, 2);
+        assert_eq!(request.instance_id, SELECTED);
+        assert!(uuid::Uuid::parse_str(&request.request_id).is_ok());
+        if native_reply == "silent" {
+            let mut byte = [0u8; 1];
+            assert_eq!(bounded(native.read(&mut byte)).await.unwrap(), 0);
+        } else {
+            let mut status = json!({"apiVersion":2,"requestId":request.request_id,
+                "instanceId":SELECTED,"available":true,
+                "documentId":"native-document","contentRevision":23});
+            match native_reply {
+                "available" => {}
+                "unavailable" => {
+                    status["available"] = json!(false);
+                    status["reason"] = json!("native authority inactive");
+                    // The closed status DTO permits optional pins when unavailable;
+                    // discovery must still expose no active document/revision.
+                    status["documentId"] = json!("inactive-decoy");
+                    status["contentRevision"] = json!(777);
+                }
+                "wrong-request" => status["requestId"] = json!("foreign-request"),
+                "wrong-instance" => status["instanceId"] = json!(OTHER),
+                "missing-document" => {
+                    status.as_object_mut().unwrap().remove("documentId");
+                }
+                "unknown-member" => status["injected"] = json!(true),
+                "unsafe-revision" => status["contentRevision"] = json!(9_007_199_254_740_992u64),
+                "oversized" => status["reason"] = json!("x".repeat(4096)),
+                other => panic!("unknown fixture {other}"),
+            }
+            bounded(wire::write_json(&mut native, &status))
+                .await
+                .unwrap();
+        }
+        drop(legacy);
+    });
+    let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_nemo-mcp"));
+    command
+        .env("NEMO_MCP_REGISTRY", registry.path())
+        .kill_on_drop(true);
+    let client = bounded(().serve(TokioChildProcess::new(command).unwrap()))
+        .await
+        .unwrap();
+    let result = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
+        .await
+        .unwrap();
+    assert_ne!(result.is_error, Some(true));
+    let body = result.structured_content.unwrap();
+    bounded(client.cancel()).await.unwrap();
+    bounded(host)
+        .await
+        .expect("native discovery fixture must complete its two requests");
+    body
+}
+
+#[tokio::test]
+async fn executable_discovers_real_native_status_after_unanswered_or_refused_legacy_capabilities() {
+    for silent in [true, false] {
+        let mut body = native_only_discovery(silent, "available").await;
+        normalize_status_request_ids(&mut body);
+        assert_eq!(body["apiVersion"], 1);
+        assert_eq!(body["nativeApiVersion"], 2);
+        assert_eq!(
+            body["instances"],
+            json!([{
+                "instanceId":SELECTED,"buildId":"native-only-build",
+                "documentId":"native-document","revision":23,"capabilities":null,
+                "nativeHostStatus":{"apiVersion":2,"instanceId":SELECTED,"available":true,
+                    "documentId":"native-document","contentRevision":23}
+            }])
+        );
+        let legacy: Value =
+            serde_json::to_value(nemo_mcp::capabilities::catalog().descriptors()).unwrap();
+        let native: Value =
+            serde_json::to_value(nemo_mcp::capabilities::native_catalog().descriptors()).unwrap();
+        assert_eq!(body["registeredCapabilities"], legacy);
+        assert_eq!(body["registeredNativeCapabilities"], native);
+    }
+}
+
+#[tokio::test]
+async fn executable_native_only_discovery_keeps_authenticated_unavailable_host_without_active_pins()
+{
+    let mut body = native_only_discovery(false, "unavailable").await;
+    normalize_status_request_ids(&mut body);
+    assert_eq!(
+        body["instances"],
+        json!([{
+            "instanceId":SELECTED,"buildId":"native-only-build",
+            "documentId":null,"revision":null,"capabilities":null,
+            "nativeHostStatus":{"apiVersion":2,"instanceId":SELECTED,"available":false,
+                "documentId":"inactive-decoy","contentRevision":777,"reason":"native authority inactive"}
+        }])
+    );
+}
+
+#[tokio::test]
+async fn executable_native_only_discovery_rejects_uncorrelated_malformed_oversized_or_silent_status(
+) {
+    for reply in [
+        "wrong-request",
+        "wrong-instance",
+        "missing-document",
+        "unknown-member",
+        "unsafe-revision",
+        "oversized",
+        "silent",
+    ] {
+        let body = native_only_discovery(false, reply).await;
+        assert_eq!(
+            body["instances"],
+            json!([]),
+            "{reply} cannot invent an authenticated owner"
+        );
+    }
+}

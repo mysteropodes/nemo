@@ -356,56 +356,56 @@ impl NemoServer {
                 operation: Operation::Capabilities,
                 payload: json!({}),
             };
-            if let Ok(Ok(response)) = tokio::time::timeout(
-                std::time::Duration::from_secs(2),
+            let wait = std::time::Duration::from_secs(2);
+            let legacy = tokio::time::timeout(
+                wait,
                 wire::call(&endpoint, request, context.ct.child_token()),
             )
             .await
-            {
-                if response.ok {
-                    let status_request = NativeStatusRequest {
-                        api_version: NATIVE_API_VERSION,
-                        request_id: uuid::Uuid::new_v4().to_string(),
-                        instance_id: endpoint.instance_id.clone(),
-                    };
-                    let advertises_native = response.result.as_ref().is_some_and(|result| {
-                        result.get("nativeApiVersion").and_then(Value::as_u64)
-                            == Some(NATIVE_API_VERSION.into())
-                    });
-                    let native_status = if advertises_native {
-                        match tokio::time::timeout(
-                            std::time::Duration::from_secs(2),
-                            wire::native_status(
-                                &endpoint,
-                                status_request.clone(),
-                                context.ct.child_token(),
-                            ),
-                        )
-                        .await
-                        {
-                            Ok(Ok(status)) => status,
-                            Ok(Err(error)) => NativeHostStatus::unavailable(
-                                &status_request,
-                                format!("native host status unavailable: {error}"),
-                            ),
-                            Err(_) => NativeHostStatus::unavailable(
-                                &status_request,
-                                "native host status timed out",
-                            ),
-                        }
-                    } else {
-                        NativeHostStatus::unavailable(
-                            &status_request,
-                            "endpoint does not advertise nativeApiVersion 2",
-                        )
-                    };
-                    instances.push(
-                        json!({"instanceId": endpoint.instance_id, "buildId": endpoint.build_id,
-                        "documentId": response.document_id, "revision": response.revision,
-                        "capabilities": response.result, "nativeHostStatus": native_status}),
-                    );
+            .ok()
+            .and_then(Result::ok)
+            .filter(|response| response.ok);
+            let status_request = NativeStatusRequest {
+                api_version: NATIVE_API_VERSION,
+                request_id: uuid::Uuid::new_v4().to_string(),
+                instance_id: endpoint.instance_id.clone(),
+            };
+            let probe_native = legacy.as_ref().is_none_or(|response| {
+                response.result.as_ref().is_some_and(|result| {
+                    result.get("nativeApiVersion").and_then(Value::as_u64)
+                        == Some(NATIVE_API_VERSION.into())
+                })
+            });
+            let status = if probe_native {
+                let token = context.ct.child_token();
+                let probe = wire::native_status(&endpoint, status_request.clone(), token);
+                match tokio::time::timeout(wait, probe).await {
+                    Ok(status) => {
+                        status.map_err(|error| format!("native host status unavailable: {error}"))
+                    }
+                    Err(_) => Err("native host status timed out".to_owned()),
                 }
-            }
+            } else {
+                Err("endpoint does not advertise nativeApiVersion 2".to_owned())
+            };
+            let instance = if let Some(response) = legacy {
+                let native_status = status.unwrap_or_else(|reason| {
+                    NativeHostStatus::unavailable(&status_request, reason)
+                });
+                json!({"instanceId": endpoint.instance_id, "buildId": endpoint.build_id,
+                    "documentId": response.document_id, "revision": response.revision,
+                    "capabilities": response.result, "nativeHostStatus": native_status})
+            } else {
+                let Ok(native_status) = status else {
+                    continue;
+                };
+                let active = native_status.available.then_some(&native_status);
+                json!({"instanceId": endpoint.instance_id, "buildId": endpoint.build_id,
+                    "documentId": active.and_then(|s| s.document_id.as_deref()),
+                    "revision": active.and_then(|s| s.content_revision),
+                    "capabilities": null, "nativeHostStatus": native_status})
+            };
+            instances.push(instance);
         }
         // These embedded declarations are transport-owned contract metadata, not a
         // second application registry. They are present even when no desktop instance
