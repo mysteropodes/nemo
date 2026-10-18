@@ -270,6 +270,7 @@
         projectSelection: function(){if(objectProject())return [];return lifecycle.projectSelection.apply(null,arguments);},
         persistenceJSON: routed('persistenceJSON',lifecycle.persistenceJSON), renderPreview: routed('renderPreview',viewport.renderPreview),
         presentPreview: routed('presentPreview',viewport.presentPreview),
+        get exportSvg(){var p=objectProject();return p?p.exportSvg:undefined;},
         exportPng: routed('exportPng',lifecycle.exportPng), releaseCurrent: routed('releaseCurrent',lifecycle.releaseCurrent),
         historyFromUi: function (action, requestId) { var p=objectProject();return p?p.historyFromUi(action,requestId):history(action, requestId, 'ui'); }
       }), Object.freeze({ importJSON: importJSON, finishOpenAfterReveal: finishOpenAfterReveal,

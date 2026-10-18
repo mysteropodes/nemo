@@ -179,6 +179,7 @@ test('single-frame native export preserves pinned host route; invalid ranges do 
   await assert.rejects(s.exportPng('/new-output',[1,0]),/frame range is invalid/);
   const r=h.calls.find(c=>c.command==='nemo_native_object_export').r;
   assert.equal(r.documentSnapshotId,'snapshot-0');assert.equal(r.maximumEncodedBytes,4*1024*1024);
+  assert.equal(Object.hasOwn(r,'format'),false,'PNG remains the omitted-format default');
   assert.equal('reference' in r,false);
 });
 test('native export reports no success for contradictory or malformed Rust receipts',async()=>{
@@ -613,4 +614,71 @@ test('inclusive 32-frame bound is admitted and pre-cancelled sequences never dis
   assert.deepEqual(progress,[[32,32]]);
   assert.deepEqual(await s.exportPng('/cancel',[0,1],()=>assert.fail('cancelled progress'),{aborted:true}),{status:'cancelled'});
   assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
+});
+
+function svgHost(){
+  const h=host(),invoke=h.invoke;
+  h.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export'&&JSON.parse(args.requestJson).format==='svg'){
+      const request=JSON.parse(args.requestJson),frames=request.frames||[request.frame];
+      value.artifactFiles=frames.map((_,i)=>'frame_'+String(i+1).padStart(4,'0')+'.svg');
+    }return value;};
+  return h;
+}
+test('SVG shares the real Project queue and pin while PNG keeps its omitted format',async()=>{
+  const h=svgHost(),invoke=h.invoke,first=deferred();let exports=0;
+  h.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export'&&++exports===1)await first.promise;return value;};
+  const s=await presented(h),before=JSON.stringify(s.info()),progress=[],frames=[0,10];
+  const png=s.exportPng('/png',[0]),svg=s.exportSvg('/svg',frames,(...v)=>progress.push(v));
+  frames[1]=20;await turn();assert.equal(exports,1);assert.deepEqual(progress,[]);
+  first.resolve();const [one,two]=await Promise.all([png,svg]);
+  const requests=h.calls.filter(c=>c.command==='nemo_native_object_export').map(c=>c.r);
+  assert.equal(Object.hasOwn(requests[0],'format'),false);
+  assert.equal(requests[1].format,'svg');assert.deepEqual(requests[1].frames,[0,10]);
+  assert.equal(requests[1].frame,0);assert.notEqual(one.requestId,two.requestId);
+  assert.deepEqual(two.artifactFiles,['frame_0001.svg','frame_0002.svg']);
+  for(const request of requests){assert.equal(request.instanceId,'instance');assert.equal(request.documentId,'document');
+    assert.equal(request.contentRevision,0);assert.equal(request.documentSnapshotId,'snapshot-0');
+    assert.equal(request.lifecycleGeneration,1);assert.equal(request.contextId,'scene-root');
+    assert.equal(request.maximumEncodedBytes,4*1024*1024);}
+  assert.deepEqual(progress,[[2,2]]);assert.equal(JSON.stringify(s.info()),before);
+});
+test('SVG rejects wrong extension, count, order and every terminal receipt correlation drift',async()=>{
+  const invalid=[{artifactFiles:['frame_0001.png','frame_0002.png']},
+    {artifactFiles:['frame_0002.svg','frame_0001.svg']},{artifactFiles:['frame_0001.svg']},
+    {artifactFiles:['frame_0001.svg','frame_0001.svg']},{artifactFiles:['../frame_0001.svg','frame_0002.svg']},
+    {requestId:'foreign'},{instanceId:'foreign'},{documentId:'foreign'},{contentRevision:1},
+    {documentSnapshotId:'stale'},{status:'running'},{cleanupComplete:false},{published:false},
+    {cleanupStatus:'pending'},{externalEffectDisposition:'indeterminate'},{errorCode:'publish_failed'}];
+  for(const patch of invalid){const h=svgHost(),invoke=h.invoke,progress=[];
+    h.invoke=async(command,args)=>{const value=await invoke(command,args);return command==='nemo_native_object_export'?{...value,...patch}:value;};
+    const s=await presented(h),before=JSON.stringify(s.info());
+    await assert.rejects(s.exportSvg('/svg',[0,10],(...v)=>progress.push(v)),/publication is unconfirmed/);
+    assert.deepEqual(progress,[]);assert.equal(JSON.stringify(s.info()),before);
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
+  }
+});
+test('SVG range bounds and predispatch cancellation never invoke a legacy or native writer',async()=>{
+  const h=svgHost(),s=await presented(h),before=JSON.stringify(s.info());
+  for(const frames of [null,[],[0,0],[1,0],[0,21],[-1],[0,0.5],Array.from({length:33},(_,i)=>i)])
+    await assert.rejects(s.exportSvg('/invalid',frames),/frame range is invalid/);
+  assert.deepEqual(await s.exportSvg('/cancel',[0],()=>assert.fail('no cancelled progress'),{aborted:true}),{status:'cancelled'});
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,0);
+  assert.equal(JSON.stringify(s.info()),before);
+});
+test('SVG sees current native history revision and refuses submission once Open begins',async()=>{
+  const h=svgHost(),s=await presented(h);
+  await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});
+  await s.exportSvg('/after-edit',[0]);
+  const request=h.calls.find(c=>c.command==='nemo_native_object_export').r;
+  assert.equal(request.contentRevision,1);assert.equal(request.documentSnapshotId,'snapshot-1');
+  const blocked=svgHost(),invoke=blocked.invoke,first=deferred();let waiting=false;
+  blocked.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export'&&!waiting){waiting=true;await first.promise;}
+    return value;};
+  const session=await presented(blocked),one=session.exportPng('/first',[0]);
+  await turn();const opening=session.openPath('/other.json'),two=session.exportSvg('/stale',[0]);
+  await assert.rejects(two,/Open is in progress/);first.resolve();await one;await opening;
+  assert.equal(blocked.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
 });

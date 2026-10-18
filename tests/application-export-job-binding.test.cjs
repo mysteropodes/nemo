@@ -27,6 +27,7 @@ const read = (p) => fs.readFileSync(p, 'utf8');
 
 const jobSource = read(src('application/export-job.js'));
 const adapterSource = read(src('adapters/export-svg-sequence.js'));
+const mainSvgSource = read(src('adapters/native-main-svg-export.js'));
 const exportSource = read(src('export.js'));
 const timelineSource = read(src('timeline.js'));
 const renderManagerSource = read(src('render-manager.js'));
@@ -59,7 +60,7 @@ function sessionContext(stubs) {
     NemoOpacityApplication: { meta() { return { documentId: 'doc-1', revision: 3 }; } },
     exportTauriAvailable() { return true; },
     exportFrameSVGString(f) { return '<svg f="' + f + '"/>'; },
-    exportTauri() { return { fs: { async exists() { return false; }, async remove(p) { removed.push(p); files.delete(p); } } }; },
+    exportTauri() { return { dialog: { open() { throw new Error('ToDir must not open a folder picker'); } }, fs: { async exists() { return false; }, async remove(p) { removed.push(p); files.delete(p); } } }; },
     async exportMkdir() {},
     async exportRemoveDir(dir) { removed.push(dir + '/'); },
     async exportWriteText(p, text) { files.set(p, text); },
@@ -70,8 +71,11 @@ function sessionContext(stubs) {
   vm.createContext(ctx);
   vm.runInContext(jobSource, ctx, { filename: 'export-job.js' });
   vm.runInContext(adapterSource, ctx, { filename: 'export-svg-sequence.js' });
+  vm.runInContext(mainSvgSource, ctx, { filename: 'native-main-svg-export.js' });
   vm.runInContext(
-    slice(exportSource, 'var _svgSequenceJob=null;', '\nasync function exportGIFToPath(', 'P18 binding') + '\n'
+    slice(exportSource, 'function exportNativeOpacity(){', '\nfunction exportEnsureLayer(', 'native authority/release') + '\n'
+    + slice(exportSource, 'async function exportPickDir(title){', '\nasync function exportPickSaveFile(', 'exportPickDir') + '\n'
+    + slice(exportSource, 'var _svgSequenceJob=null;', '\nasync function exportGIFToPath(', 'P18 binding') + '\n'
     + slice(exportSource, 'function exportFrameRange(opts){', '\n// ---- Tauri fs/dialog/shell helpers ----', 'exportFrameRange') + '\n'
     + slice(exportSource, 'function pad4(n){', '\n', 'pad4'),
     ctx, { filename: 'export-binding.js' });

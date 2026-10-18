@@ -31,6 +31,7 @@ use crate::revision::DocumentSnapshot;
 use crate::scheduler::{
     EvaluationKey, FrameFailure, FrameFailureKind, FrameScheduler, OutputSpec, WorkId,
 };
+pub use native_vector_export::native_vector_export_job::export_object_svg_frames;
 pub(crate) use object::{ObjectExportBegin, ObjectExportJob, PendingObjectFrame};
 pub use object_host::{
     export_object_frames, export_one_object_frame, ObjectHostExportOutcome,

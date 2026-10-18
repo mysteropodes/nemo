@@ -2621,6 +2621,18 @@
       ]
     },
     {
+      "id": "app.native.main.svg.export.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-main-svg-export.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-main-svg-export.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.preview.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

@@ -3,7 +3,7 @@ use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
     export_job::{
-        export_object_frames, CleanupStatus, ExportReleaseReconciliation,
+        export_object_frames, export_object_svg_frames, CleanupStatus, ExportReleaseReconciliation,
         ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, ObjectHostExportRequest,
         StagedArtifactPort,
     },
@@ -32,6 +32,11 @@ impl ObjectExportSession {
                 && receipt.error.is_none()
                 && receipt.artifact.is_some())
     }
+}
+
+enum ObjectExportFormat<'c> {
+    Png(&'c mut Compositor),
+    Svg,
 }
 
 impl NativeObjectHost {
@@ -76,6 +81,49 @@ impl NativeObjectHost {
         maximum_encoded_bytes: usize,
         port: &mut P,
         compositor: &mut Compositor,
+    ) -> Result<ObjectHostExportOutcome, String> {
+        self.export_pinned_object_frames(
+            expected,
+            frames,
+            request_id,
+            target,
+            output,
+            maximum_encoded_bytes,
+            port,
+            ObjectExportFormat::Png(compositor),
+        )
+    }
+    pub(crate) fn export_pinned_object_svg_frames<P: StagedArtifactPort>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        frames: &[u32],
+        request_id: String,
+        target: String,
+        output: OutputSpec,
+        maximum_encoded_bytes: usize,
+        port: &mut P,
+    ) -> Result<ObjectHostExportOutcome, String> {
+        self.export_pinned_object_frames(
+            expected,
+            frames,
+            request_id,
+            target,
+            output,
+            maximum_encoded_bytes,
+            port,
+            ObjectExportFormat::Svg,
+        )
+    }
+    fn export_pinned_object_frames<P: StagedArtifactPort>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        frames: &[u32],
+        request_id: String,
+        target: String,
+        output: OutputSpec,
+        maximum_encoded_bytes: usize,
+        port: &mut P,
+        format: ObjectExportFormat<'_>,
     ) -> Result<ObjectHostExportOutcome, String> {
         if self.released.is_some()
             || self
@@ -122,29 +170,35 @@ impl NativeObjectHost {
         };
         let scheduler = self.preview.scheduler_for_export()?;
         let session_request_id = request_id.clone();
-        let outcome = export_object_frames(
-            &self.history,
-            scheduler,
-            port,
-            compositor,
-            ObjectHostExportRequest {
-                request_id,
-                target,
-                pins: ObjectSchedulePins {
-                    instance_id: expected.instance_id.into(),
-                    document_id: expected.document_id.into(),
-                    content_revision: expected.content_revision,
-                    document_snapshot_id: expected.document_snapshot_id.into(),
-                    context_id: expected.context_id.into(),
-                    frame: expected.frame,
-                    scope: ObjectScheduleScope::Authored,
-                },
-                output,
-                maximum_encoded_bytes,
+        let request = ObjectHostExportRequest {
+            request_id,
+            target,
+            pins: ObjectSchedulePins {
+                instance_id: expected.instance_id.into(),
+                document_id: expected.document_id.into(),
+                content_revision: expected.content_revision,
+                document_snapshot_id: expected.document_snapshot_id.into(),
+                context_id: expected.context_id.into(),
+                frame: expected.frame,
+                scope: ObjectScheduleScope::Authored,
             },
-            frames,
-            witnesses,
-        );
+            output,
+            maximum_encoded_bytes,
+        };
+        let outcome = match format {
+            ObjectExportFormat::Png(compositor) => export_object_frames(
+                &self.history,
+                scheduler,
+                port,
+                compositor,
+                request,
+                frames,
+                witnesses,
+            ),
+            ObjectExportFormat::Svg => {
+                export_object_svg_frames(&self.history, scheduler, port, request, frames, witnesses)
+            }
+        };
         if !outcome.release.receipts.is_empty() || !outcome.release.cleanup_complete {
             self.object_export = Some(ObjectExportSession {
                 request_id: session_request_id,
@@ -154,3 +208,7 @@ impl NativeObjectHost {
         Ok(outcome)
     }
 }
+
+#[cfg(test)]
+#[path = "native_object_svg_export_tests.rs"]
+mod svg_tests;

@@ -154,7 +154,7 @@ pub(crate) fn encode_scheduled_object_svg(
 
 /// SVG counterpart of `export_object_frames`: the same host lifecycle with the
 /// SVG encoder, so no compositor (and no GPU) is needed.
-pub(crate) fn export_object_svg_frames<P: StagedArtifactPort>(
+pub fn export_object_svg_frames<P: StagedArtifactPort>(
     history: &NativeObjectHistory,
     scheduler: &mut FrameScheduler,
     port: &mut P,

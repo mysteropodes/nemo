@@ -374,7 +374,7 @@
         get presented(){return presentedSession();},dispatchAvailable:typeof ports.dispatchApplication==='function',
         get projectionReady(){return typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;},
         get subscriptionActive(){return typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;}};}});
-    function exportPng(destination,frames,onProgress,signal){
+    function exportFrames(destination,frames,onProgress,signal,format){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
       guardEpoch(submitted);
@@ -384,7 +384,8 @@
       }))throw new Error('Native object export frame range is invalid');
       if(signal&&signal.aborted)return {status:'cancelled'};
       var request=frameRequest(requested[0]);if(requested.length>1)request.frames=requested;
-      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.png';});
+      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.'+format;});
+      if(format==='svg')request.format='svg';
       request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
       var receipt=await raw('nemo_native_object_export',request);
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId||receipt.documentId!==request.documentId||
@@ -393,6 +394,8 @@
         !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
+    function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}
+    function exportSvg(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'svg');}
     return Object.freeze({openPath:openPath,newProject:newProject,cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
@@ -411,7 +414,7 @@
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?importBatch:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
-      presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,
+      presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
       acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
       identity:requireActive,requestRelease:function(){return false;},releaseCurrent:function(){return false;},

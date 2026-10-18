@@ -3260,6 +3260,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   const events = [], invokes = [], imports = [], deniedEntries = [], toasts = [];
   let ports, nativeBlocked = false, pluginOpen = 0, panelOpen = 0;
   let delayedScript = null, delayedPlugin = null, delayedArchive = null;
+  let svgObjectOwner = null; const svgObjectCalls = [];
   const serializedDocument = { totalFrames: 21, layers: [{ opacity: 25 }] };
   const paperProject = { activeLayer: { opacity: 1 }, itemCount: 1 };
   const activity = { scriptRuns: 0, pluginLoads: 0 };
@@ -3312,6 +3313,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
       if (value === 'unsupported') throw new Error('unsupported');
       return { projection: { format: 'nemo.native-opacity-document' }, resources: [{ resourceId: 'geometry/r08/0' }] };
     } },
+    NemoNativeObjectProject: { desktop() { return svgObjectOwner; } },
     NemoApplication: { handle() { return 'legacy'; }, setInstanceId() {}, capabilities() { return []; } },
     NemoOpacityApplication: { meta() { return { instanceId: 'legacy', documentId: 'legacy', revision: 0 }; }, legacy() { return 'legacy'; } },
     NemoApplicationMcpTransport: { createNativeTauriTransport(received) {
@@ -3351,9 +3353,16 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.strictEqual(desktop.SMEngineBridge.nativeEditGuard, desktop.SMNativeEditGuard);
   assert.equal(Object.isFrozen(desktop.NemoNativeOpacityCutover), true);
   assert.deepEqual(Object.keys(desktop.NemoNativeOpacityCutover).sort(), [
-    'blocksLegacy', 'exportPng', 'getNativeIdentity', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
+    'blocksLegacy', 'exportPng', 'exportSvg', 'getNativeIdentity', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
     'prepared', 'presentPreview', 'projectSelection', 'releaseCurrent', 'renderPreview',
   ]);
+  assert.equal(desktop.NemoNativeOpacityCutover.exportSvg, undefined, 'older opacity owner does not advertise the object SVG route');
+  svgObjectOwner = { blocksLegacy: () => true, exportSvg: (...args) => { svgObjectCalls.push(args); return 'native-svg-receipt'; } };
+  assert.equal(desktop.NemoNativeOpacityCutover.exportSvg('/svg', [0, 7], null, null), 'native-svg-receipt');
+  assert.deepEqual(svgObjectCalls, [['/svg', [0, 7], null, null]]);
+  svgObjectOwner = { blocksLegacy: () => false, exportSvg: () => assert.fail('idle object owner must not be routed') };
+  assert.equal(desktop.NemoNativeOpacityCutover.exportSvg, undefined);
+  svgObjectOwner = null;
   for (const authorityKey of ['activate', 'requestRelease', 'handleV1',
     'legacyIntent', 'setOpacity', 'history']) {
     assert.equal(desktop.NemoNativeOpacityCutover[authorityKey], undefined, authorityKey);
