@@ -239,6 +239,7 @@ function ordinary(h,deferFrames=false){
     root.document.documentElement={clientWidth:1280,clientHeight:900,
       classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
       style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}};
+    root.stageLayer={visible:true};root.paper={view:{update(){}}};
     root.NemoNativeViewportUnderlay=require('../src/js/adapters/native-viewport-underlay.js');
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
     root.NemoNativeObjectInactiveProjectTabs=require('../src/js/adapters/native-object-inactive-project-tabs.js');
