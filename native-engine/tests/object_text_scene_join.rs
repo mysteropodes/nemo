@@ -432,3 +432,7 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
     let o = owner(&disabled);
     require_text_alpha(&plan(&support::head(&o), 7), 64);
 }
+
+#[cfg(feature = "font_asset_wire")]
+#[path = "object_text_scene_gpu.rs"]
+mod gpu;

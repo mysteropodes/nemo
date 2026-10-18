@@ -329,3 +329,12 @@ fn fractional_authored_key_times_survive_the_integer_presentation_clock() {
     assert_eq!(alpha(&plan(&s, 2)), [0.1875, 0.1875]);
     assert_eq!(plan(&s, 2).packet().source_frame_for_layer(0), Some(0));
 }
+
+#[cfg(all(
+    feature = "viewport",
+    feature = "export_job",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "object_layer_opacity_gpu.rs"]
+mod gpu;

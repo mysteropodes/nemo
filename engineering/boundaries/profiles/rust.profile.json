@@ -1448,8 +1448,10 @@
         "object_raster_image_import.rs",
         "object_raster_scene_join.rs",
         "object_layer_opacity_scene.rs",
+        "object_layer_opacity_gpu.rs",
         "object_layer_opacity_raster.rs",
         "object_text_scene_join.rs",
+        "object_text_scene_gpu.rs",
         "object_text_scene_history.rs",
         "object_text_scene_svg.rs"
       ],
