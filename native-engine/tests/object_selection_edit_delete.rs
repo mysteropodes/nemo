@@ -276,7 +276,8 @@ fn a_motion_hold_before_every_key_stores_nothing_and_says_so() {
             "delete",
             &delete("L0", 0, "animation2d", &["a"])
         ),
-        Err(DispatchErrorCode::Unavailable)
+        Err(DispatchErrorCode::NotFound),
+        "the real provider promotes an empty cell; stroke a exists only at future key 2"
     );
     assert_eq!(frozen(&owner), before);
 }

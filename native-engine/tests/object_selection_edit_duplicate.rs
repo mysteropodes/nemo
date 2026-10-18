@@ -7,7 +7,6 @@ use super::object_selection_edit_tests::{
     apply, base, bytes, corners, delete, document, duplicate, elements_at, frozen, layer, owner_of,
     prepare, record_at, shape, strokes_at, timed, value,
 };
-use super::*;
 use serde_json::{json, Value};
 
 fn ids(values: &[&str]) -> Vec<String> {
