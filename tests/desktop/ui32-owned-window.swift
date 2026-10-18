@@ -114,7 +114,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   let pid=pinned.pid, main=pinned.main
   var ordinal=0, originals=[String:String](), observed=false, menuOpened=false
   var currentCommand:String?
-  let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0
+  let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0,sourceCaptureStage = -1,newSettingsOpen=false
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
   var retainedWebArea:AXUIElement?, latest:UI32ContentCertificate<AXUIElement>?
   func nativeIdentity() throws { try verifyOwnedWindow(pinned) }
@@ -186,6 +186,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       })
     try nativeIdentity();retainedWebArea=certificate.nodes[certificate.web];latest=certificate
     return certificate.nodes.indices.filter {certificate.inside.contains($0)}.map {certificate.nodes[$0]}
+  }
+  func newContext(_ command:String) throws {
+    guard entryEnabled else {return};_ = try tree()
+    guard let certificate=latest else {throw Refusal(code:"adapter-refused")}
+    try ui32NewContextProof(command,entryStage,sourceCaptureStage,newSettingsOpen,certificate,pid)
   }
   func labels(_ node:AXUIElement) -> Set<String> {
     Set([kAXTitleAttribute,kAXDescriptionAttribute,kAXHelpAttribute,kAXValueAttribute].compactMap { attr(node,$0) as? String })
@@ -341,6 +346,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       case .deadline(let complete): throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"capture-child-deadline","childPID":childPID,"cleanupComplete":complete])
       }
       try identity()
+      if entryEnabled {sourceCaptureStage=entryStage}
       result["capture"]=name; try emit(result); continue
     }
     try ui32RequireObserved(observed)
@@ -373,7 +379,9 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       fixture=try UI32Fixture(pinned,environment,afterDismissal:{ _ = try tree() })
     }
     let restoring=command.hasSuffix(".restore"), base=restoring ? String(command.dropLast(8)) : command
-    let option=request["option"] as? String, rule=try ui32Rule(base,option), selected=try resolve(rule)
+    try newContext(command)
+    let nextSettingsOpen=try ui32NewSettingsNext(base,entryEnabled,newSettingsOpen)
+    let option=request["option"] as? String, rule=try ui32NewSemanticRule(base,option,entryEnabled), selected=try resolve(rule)
     if base.hasPrefix("selection.") || base.hasPrefix("frame.") {
       try check(fixture?.completed == true && fixture?.confirmed == true)
     }
@@ -386,7 +394,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     var posted=false, attempted=false
     do {
       try ui32GuardedAction(identity,{
-        let current=try resolve(rule); try check(CFEqual(current,selected)); try enabledVisible(selected)
+        let current=try resolve(rule); try check(CFEqual(current,selected)); try newContext(command); try enabledVisible(selected)
         if entryEnabled && !base.hasPrefix("entry.") {
           var overlays=[String:Set<String>]()
           for node in try tree() {
@@ -396,12 +404,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
           try ui32EntrySurface(base,true,overlays)
         }
         if base == "entry.create.default" {
-          var fields=[String:String]()
-          for (id,role) in [("np-name","AXTextField"),("np-fps","AXPopUpButton"),("np-preset","AXPopUpButton")] {
-            let node=try resolve(UI32Rule(identifier:id,region:"start-newpanel",labels:[],roles:[role],operation:"observe",values:[]))
-            guard let value=attr(node,kAXValueAttribute) as? String else {throw Refusal(code:"adapter-refused")};fields[id]=value
-          }
-          try ui32NewDefaults(fields)
+          try ui32NewDefaultProof(pid,resolve)
         }
         if base == "settings.menu.entry" { try check(menuOpened) }
         if base == "motion.cancel-pending" {
@@ -423,6 +426,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
           let axAction=rule.operation == "menu" ? kAXShowMenuAction : kAXPressAction
           var names:CFArray?; try check(AXUIElementCopyActionNames(selected,&names) == .success &&
             (names as? [String] ?? []).contains(axAction as String))
+          if entryEnabled {
+            try check(owns(selected,pid))
+            try ui32NewSemanticPress(base,true,try ui32DOMIdentifiers(selected,pid).resolved ?? "",labels(selected),
+              attr(selected,kAXRoleAttribute) as? String ?? "",Set(names as? [String] ?? []));try check(owns(selected,pid))
+          }
           attempted=true
           try check(AXUIElementPerformAction(selected,axAction as CFString) == .success)
         } else if rule.operation == "focus" {
@@ -443,7 +451,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
           result["requestedValue"]=wanted
         }
       },postScope:{ if base == "fixture.open" || base == "sync.open-cancel" { try identity() } else { _ = try tree() } },posted:{
-        posted=true;entryStage=nextEntryStage
+        posted=true;entryStage=nextEntryStage;newSettingsOpen=nextSettingsOpen
         if base == "fixture.open" { fixture?.attempted=true }
         if base == "sync.open-cancel" { syncPanel?.attempted=true }
       })

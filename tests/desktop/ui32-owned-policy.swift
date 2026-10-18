@@ -108,7 +108,7 @@ func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, 
 }
 func ui32SelfTest() throws {
   try ui32IdentityPhaseSelfTest()
-  try ui32EntrySelfTest()
+  try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()
   try ui32ZeroForeignFallbackSelfTest()
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
@@ -252,51 +252,6 @@ func ui32NewDefaults(_ values:[String:String]) throws {
   try check(values.count == 3 && values["np-name"] == "Untitled" && values["np-fps"] == "24" &&
     ["1920x1080","1920 × 1080 (Full HD)"].contains(values["np-preset"] ?? ""))
 }
-func ui32EntrySelfTest() throws {
-  try check(try ui32EntryMode(nil) == false && ui32EntryMode("ordinary-new-default"))
-  for mode in ["","new","arbitrary"] {var refused=false;do {_ = try ui32EntryMode(mode)}catch{refused=true};try check(refused)}
-  var stage=0
-  for command in ["entry.new.default","entry.create.default","entry.tutorial.close"] {stage=try ui32EntryNext(command,true,stage)}
-  try check(stage == 3 && ui32EntryNext("profile.name",true,stage) == stage)
-  for (command,enabled,state) in [("entry.new.default",false,0),("entry.create.default",true,0),
-    ("entry.new.default",true,1),("entry.tutorial.close",true,1),("entry.tutorial.close",true,3),
-    ("entry.create.default.restore",true,1),("entry.unknown",true,2),("profile.name",true,0),("settings.open",true,1)] {
-    var effects=0,refused=false;do {_ = try ui32EntryNext(command,enabled,state);effects += 1}catch{refused=true}
-    try check(refused && effects == 0)
-  }
-  for command in ["observe","capture","quit"] {try check(try ui32EntryNext(command,true,0) == 0)}
-  for state in [2,3] {
-    for command in ["motion.focus","motion.shortcut","motion.guard-typing","selection.toggle.B","fixture.confirm","sync.cancel-only","frame.next","grid.step.value"] {
-      var effects=0,refused=false;do {_ = try ui32EntryNext(command,true,state);effects += 1}catch{refused=true};try check(refused && effects == 0)
-      try check(try ui32EntryNext(command,false,state) == state)
-    }
-    for command in ["settings.open","settings.close","settings.tab","profile.name","profile.name.restore","profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select","tool.brush"] {
-      try check(try ui32EntryNext(command,true,state) == state)
-    }
-  }
-  for (id,classes) in [("start-screen",Set<String>()),("start-newpanel",[]),("tut-tooltip",["on"]),("tut-spotlight",["on"]),("tut-tooltip",["unknown"]),("other",[])] {
-    var effects=0,refused=false;do {try ui32EntrySurface("settings.open",true,[id:classes]);effects += 1}catch{refused=true}
-    try check(refused && effects == 0)
-  }
-  var overlayFacts:[String:Any]=[:]
-  do {try ui32EntrySurface("settings.open",true,["tut-tooltip":["on"]])}catch let error as ActionRefusal {overlayFacts=error.diagnostics}
-  try check(overlayFacts["overlay"] as? String == "tut-tooltip" && overlayFacts["reason"] as? String == "active-overlay" && overlayFacts["classes"] as? [String] == ["on"])
-  try ui32EntrySurface("settings.open",true,[:])
-  try ui32EntrySurface("settings.open",true,["start-screen":["hid"],"tut-tooltip":["tutorial-native-card"],"tut-spotlight":["no-target"]])
-  try check(try ui32EntryClassTokens(0,["on"]) == ["on"] && ui32EntryClassTokens(0,[]) == [])
-  for (status,raw) in [(0,nil),(1,[String]()),(0,["on","on"]),(0,[""]),(0,[String(repeating:"a",count:65)]),(0,Array(repeating:"a",count:9))] {
-    var refused=false;do {_ = try ui32EntryClassTokens(status,raw)}catch{refused=true};try check(refused)
-  }
-  let brush=try ui32Rule("tool.brush",nil)
-  try check(ui32Matches(brush,identifier:"",labels:["Brush (B)"],role:"AXButton",ancestors:["tools-panel"]))
-  let defaults=["np-name":"Untitled","np-fps":"24","np-preset":"1920 × 1080 (Full HD)"]
-  try ui32NewDefaults(defaults)
-  for key in defaults.keys {var changed=defaults;changed[key]="other";var refused=false;do {try ui32NewDefaults(changed)}catch{refused=true};try check(refused)}
-  for command in ["entry.new.default","entry.create.default","entry.tutorial.close"] {
-    let rule=try ui32Rule(command,nil);try check(rule.operation == "press" && rule.region != nil && rule.values.isEmpty)
-    try check(!ui32Matches(rule,identifier:rule.identifier ?? "",labels:rule.labels,role:"AXTextField",ancestors:[rule.region!]))
-  }
-}
 
 // UI32-only discovery certificate. Service authentication and strict service walk follow unchanged.
 func ui32AttachedRootCertificate<Node>(_ root:Node, owner expectedOwner:Int, deadline:UInt64,
@@ -413,4 +368,76 @@ func ui32ZeroForeignFallbackSelfTest() throws {
   for (key,bad) in [("stage","parent-edge" as Any),("ownedSearchComplete",false),("foreignRootCount",1),("ownedParentMismatchCount",1)] {
     var facts=complete;facts[key]=bad;try check(!ui32ZeroForeignFallback(0,facts));facts.removeValue(forKey:key);try check(!ui32ZeroForeignFallback(0,facts))
   }
+}
+
+// New preparation mode only. The original-mode rule and action guards remain unchanged.
+func ui32NewSemanticRule(_ command:String, _ option:String?, _ enabled:Bool) throws -> UI32Rule {
+  let old=try ui32Rule(command,option)
+  guard enabled else {return old}
+  let allowed=["entry.new.default","entry.create.default","entry.tutorial.close","settings.open","settings.close",
+    "profile.name","profile.email","locale.choose","tool.hand","tool.select","tool.brush"]
+  try check(allowed.contains(command))
+  if command == "entry.new.default" {
+    return UI32Rule(identifier:nil,region:nil,labels:["New Project","Nouveau projet","新規プロジェクト","Nuevo proyecto"],
+      roles:["AXStaticText"],operation:"press",values:[])
+  }
+  if command == "entry.tutorial.close" {
+    return UI32Rule(identifier:nil,region:nil,labels:["Quitter le tutoriel","Exit tutorial","Salir del tutorial","チュートリアルを終了"],
+      roles:["AXButton"],operation:"press",values:[])
+  }
+  let global=["entry.create.default","settings.close","profile.name","profile.email","locale.choose","tool.hand","tool.select","tool.brush"]
+  if global.contains(command) {
+    return UI32Rule(identifier:old.identifier,region:nil,labels:old.labels,roles:old.roles,operation:old.operation,values:old.values)
+  }
+  return old
+}
+func ui32NewSemanticPress(_ command:String, _ enabled:Bool, _ identifier:String, _ labels:Set<String>,
+  _ role:String, _ advertised:Set<String>) throws {
+  guard enabled else {return}
+  let rule=try ui32NewSemanticRule(command,nil,true)
+  try check(rule.operation == "press" && ui32Matches(rule,identifier:identifier,labels:labels,role:role,ancestors:[]) && advertised.contains(kAXPressAction))
+}
+// Counts are from the entire pinned certificate: matching outside nodes are conflicts.
+// Capture stage records a real completed owned capture, not a visual acceptance result.
+func ui32NewSemanticContext(_ command:String, _ enabled:Bool, _ stage:Int, _ sourceCaptureStage:Int,
+  _ settingsOpen:Bool, _ inside:[String:Int], _ outside:Set<String>) throws {
+  guard enabled else {return}
+  if ["observe","capture","quit"].contains(command) {return}
+  let effects=["settings.open","settings.close","profile.name","profile.name.restore","profile.email","profile.email.restore",
+    "locale.choose","locale.choose.restore","tool.hand","tool.select","tool.brush"]
+  try check(effects.contains(command) || ["entry.new.default","entry.create.default","entry.tutorial.close"].contains(command))
+  let ids:Set<String>=["start-open","np-create","np-name","np-fps","np-preset","tools-panel-handle","project-tabs-settings",
+    "settings-close","profile-name","profile-email","settings-language"]
+  try check(outside.isDisjoint(with:ids) && inside.values.allSatisfy {$0 >= 0 && $0 <= 512})
+  func count(_ id:String) -> Int {inside[id] ?? 0}
+  switch command {
+  case "entry.new.default":try check(stage == 0 && sourceCaptureStage == 0 && !settingsOpen && count("start-open") == 1 && count("settings-close") == 0)
+  case "entry.create.default":try check(stage == 1 && !settingsOpen && ["np-create","np-name","np-fps","np-preset"].allSatisfy {count($0) == 1})
+  case "entry.tutorial.close":try check(stage == 2 && sourceCaptureStage == 2 && !settingsOpen && count("start-open") == 0 && count("np-create") == 0 && count("settings-close") == 0)
+  default:
+    try check(stage == 3 && sourceCaptureStage == 3 && count("start-open") == 0 && count("np-create") == 0)
+    if command == "settings.open" {try check(!settingsOpen && count("settings-close") == 0 && count("project-tabs-settings") == 1 && count("tools-panel-handle") == 1)}
+    else if command.hasPrefix("tool.") {try check(!settingsOpen && count("settings-close") == 0 && count("tools-panel-handle") == 1)}
+    else {
+      try check(settingsOpen && count("settings-close") == 1)
+      if command != "settings.close" {
+        let id=command.hasPrefix("profile.name") ? "profile-name" : command.hasPrefix("profile.email") ? "profile-email" : "settings-language"
+        try check(count(id) == 1)
+      }
+    }
+  }
+}
+func ui32NewSettingsNext(_ command:String, _ enabled:Bool, _ settingsOpen:Bool) throws -> Bool {
+  guard enabled else {return settingsOpen}
+  if command == "settings.open" {try check(!settingsOpen);return true}
+  if command == "settings.close" {try check(settingsOpen);return false}
+  return settingsOpen
+}
+func ui32NewDefaultProof(_ pid:pid_t, _ resolve:(UI32Rule) throws -> AXUIElement) throws {
+  try ui32ReadNewDefaults(resolve:{ id,role in
+    try resolve(UI32Rule(identifier:id,region:nil,labels:[],roles:[role],operation:"observe",values:[]))
+  },owned:{owns($0,pid)},prepare:{AXUIElementSetMessagingTimeout($0,0.03) == .success},read:{node in
+    var raw:CFTypeRef?;let status=AXUIElementCopyAttributeValue(node,kAXValueAttribute as CFString,&raw)
+    return (Int(status.rawValue),raw)
+  })
 }

@@ -256,3 +256,155 @@ func ui32IdentifierSelfTest() throws {
     try check(refused && prepares == failure && reads == failure-1)
   }
 }
+
+func ui32EntrySelfTest() throws {
+  try check(try ui32EntryMode(nil) == false && ui32EntryMode("ordinary-new-default"))
+  for mode in ["","new","arbitrary"] {var refused=false;do {_ = try ui32EntryMode(mode)}catch{refused=true};try check(refused)}
+  var stage=0
+  for command in ["entry.new.default","entry.create.default","entry.tutorial.close"] {stage=try ui32EntryNext(command,true,stage)}
+  try check(stage == 3 && ui32EntryNext("profile.name",true,stage) == stage)
+  for (command,enabled,state) in [("entry.new.default",false,0),("entry.create.default",true,0),
+    ("entry.new.default",true,1),("entry.tutorial.close",true,1),("entry.tutorial.close",true,3),
+    ("entry.create.default.restore",true,1),("entry.unknown",true,2),("profile.name",true,0),("settings.open",true,1)] {
+    var effects=0,refused=false;do {_ = try ui32EntryNext(command,enabled,state);effects += 1}catch{refused=true}
+    try check(refused && effects == 0)
+  }
+  for command in ["observe","capture","quit"] {try check(try ui32EntryNext(command,true,0) == 0)}
+  for state in [2,3] {
+    for command in ["motion.focus","motion.shortcut","motion.guard-typing","selection.toggle.B","fixture.confirm","sync.cancel-only","frame.next","grid.step.value"] {
+      var effects=0,refused=false;do {_ = try ui32EntryNext(command,true,state);effects += 1}catch{refused=true};try check(refused && effects == 0)
+      try check(try ui32EntryNext(command,false,state) == state)
+    }
+    for command in ["settings.open","settings.close","settings.tab","profile.name","profile.name.restore","profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select","tool.brush"] {
+      try check(try ui32EntryNext(command,true,state) == state)
+    }
+  }
+  for (id,classes) in [("start-screen",Set<String>()),("start-newpanel",[]),("tut-tooltip",["on"]),("tut-spotlight",["on"]),("tut-tooltip",["unknown"]),("other",[])] {
+    var effects=0,refused=false;do {try ui32EntrySurface("settings.open",true,[id:classes]);effects += 1}catch{refused=true}
+    try check(refused && effects == 0)
+  }
+  var overlayFacts:[String:Any]=[:]
+  do {try ui32EntrySurface("settings.open",true,["tut-tooltip":["on"]])}catch let error as ActionRefusal {overlayFacts=error.diagnostics}
+  try check(overlayFacts["overlay"] as? String == "tut-tooltip" && overlayFacts["reason"] as? String == "active-overlay" && overlayFacts["classes"] as? [String] == ["on"])
+  try ui32EntrySurface("settings.open",true,[:])
+  try ui32EntrySurface("settings.open",true,["start-screen":["hid"],"tut-tooltip":["tutorial-native-card"],"tut-spotlight":["no-target"]])
+  try check(try ui32EntryClassTokens(0,["on"]) == ["on"] && ui32EntryClassTokens(0,[]) == [])
+  for (status,raw) in [(0,nil),(1,[String]()),(0,["on","on"]),(0,[""]),(0,[String(repeating:"a",count:65)]),(0,Array(repeating:"a",count:9))] {
+    var refused=false;do {_ = try ui32EntryClassTokens(status,raw)}catch{refused=true};try check(refused)
+  }
+  let brush=try ui32Rule("tool.brush",nil)
+  try check(ui32Matches(brush,identifier:"",labels:["Brush (B)"],role:"AXButton",ancestors:["tools-panel"]))
+  let defaults=["np-name":"Untitled","np-fps":"24","np-preset":"1920 × 1080 (Full HD)"]
+  try ui32NewDefaults(defaults)
+  for key in defaults.keys {var changed=defaults;changed[key]="other";var refused=false;do {try ui32NewDefaults(changed)}catch{refused=true};try check(refused)}
+  for command in ["entry.new.default","entry.create.default","entry.tutorial.close"] {
+    let rule=try ui32Rule(command,nil);try check(rule.operation == "press" && rule.region != nil && rule.values.isEmpty)
+    try check(!ui32Matches(rule,identifier:rule.identifier ?? "",labels:rule.labels,role:"AXTextField",ancestors:[rule.region!]))
+  }
+}
+
+// Shared typed default proof: only the three fixed New fields are queried.
+func ui32ReadNewDefaults<Node>(resolve:(String,String) throws -> Node, owned:(Node)->Bool,
+  prepare:(Node)->Bool, read:(Node)->(Int,Any?)) throws {
+  var values=[String:String]()
+  for (id,role) in [("np-name","AXTextField"),("np-fps","AXPopUpButton"),("np-preset","AXPopUpButton")] {
+    let node=try resolve(id,role)
+    try check(owned(node) && prepare(node) && owned(node))
+    let (status,raw)=read(node);try check(owned(node) && status == Int(AXError.success.rawValue))
+    guard let value=raw as? String else {throw Refusal(code:"adapter-refused")};values[id]=value
+  }
+  try ui32NewDefaults(values)
+}
+// Caller obtains a fresh strict certificate first; this adds no alternative traversal.
+func ui32NewContextProof(_ command:String, _ stage:Int, _ capture:Int, _ settingsOpen:Bool,
+  _ certificate:UI32ContentCertificate<AXUIElement>, _ pid:pid_t) throws {
+  var inside=[String:Int](),outside=Set<String>()
+  for i in certificate.nodes.indices {
+    guard let id=try ui32DOMIdentifiers(certificate.nodes[i],pid).resolved else {continue}
+    if certificate.inside.contains(i) {inside[id,default:0] += 1} else {outside.insert(id)}
+  }
+  try ui32NewSemanticContext(command,true,stage,capture,settingsOpen,inside,outside)
+}
+
+// Append to existing keys source; call from existing New self-test after moving it intact.
+func ui32NewSemanticSelfTest() throws {
+  for name in ["New Project","Nouveau projet","新規プロジェクト","Nuevo proyecto"] {
+    try ui32NewSemanticPress("entry.new.default",true,"",[name],"AXStaticText",[kAXPressAction])
+  }
+  for title in ["Quitter le tutoriel","Exit tutorial","Salir del tutorial","チュートリアルを終了"] {
+    try ui32NewSemanticPress("entry.tutorial.close",true,"",[title,"×"],"AXButton",[kAXPressAction])
+  }
+  for (command,label,role,actions) in [("entry.new.default","New Project","AXButton",Set([kAXPressAction])),
+    ("entry.new.default","New Project extra","AXStaticText",[kAXPressAction]),("entry.new.default","New Project","AXStaticText",[]),
+    ("entry.tutorial.close","×","AXButton",[kAXPressAction])] {
+    var refused=false;do {try ui32NewSemanticPress(command,true,"",[label],role,actions)}catch{refused=true};try check(refused)
+  }
+  let start=["start-open":1,"tools-panel-handle":1],create=["np-create":1,"np-name":1,"np-fps":1,"np-preset":1]
+  let editor=["tools-panel-handle":1,"project-tabs-settings":1]
+  let modal=["tools-panel-handle":1,"project-tabs-settings":1,"settings-close":1,"profile-name":1,"profile-email":1,"settings-language":1]
+  // Ignored container IDs are deliberately absent; positive exposed sentinels remain mandatory.
+  try ui32NewSemanticContext("entry.new.default",true,0,0,false,start,[])
+  try ui32NewSemanticContext("entry.create.default",true,1,0,false,create,[])
+  try ui32NewDefaults(["np-name":"Untitled","np-fps":"24","np-preset":"1920 × 1080 (Full HD)"])
+  try ui32NewSemanticContext("entry.tutorial.close",true,2,2,false,editor,[])
+  try ui32NewSemanticContext("settings.open",true,3,3,false,editor,[])
+  try ui32NewSemanticContext("profile.name",true,3,3,true,modal,[])
+  try ui32NewSemanticContext("locale.choose.restore",true,3,3,true,modal,[])
+  try ui32NewSemanticContext("tool.hand",true,3,3,false,editor,[])
+  for fault in ["startup-capture","postcreate-capture","postclose-capture","early-prefs","settings-phase","settings-sentinel",
+    "outside-field","duplicate-field","covered-tools","missing-handle","active-create","tab"] {
+    var command="profile.name",stage=3,capture=3,open=true,counts=modal,outside=Set<String>()
+    switch fault {
+    case "startup-capture":command="entry.new.default";stage=0;capture = -1;open=false;counts=start
+    case "postcreate-capture":command="entry.tutorial.close";stage=2;capture=0;open=false;counts=editor
+    case "postclose-capture":capture=2
+    case "early-prefs":stage=2;capture=2
+    case "settings-phase":open=false
+    case "settings-sentinel":counts["settings-close"]=0
+    case "outside-field":outside=["profile-name"]
+    case "duplicate-field":counts["profile-name"]=2
+    case "covered-tools":command="tool.hand";open=false;counts=start
+    case "missing-handle":command="tool.brush";open=false;counts=[:]
+    case "active-create":counts["np-create"]=1
+    default:command="settings.tab"
+    }
+    var effects=0,refused=false
+    do {try ui32NewSemanticContext(command,true,stage,capture,open,counts,outside);effects += 1}catch{refused=true}
+    try check(refused && effects == 0)
+  }
+  let old=try ui32NewSemanticRule("settings.tab","General",false)
+  try check(old.region == "settings-tabs" && old.labels == ["General"])
+  try ui32NewSemanticContext("settings.tab",false,0,-1,false,[:],[])
+  var refused=false;do {_ = try ui32NewSemanticRule("settings.tab","General",true)}catch{refused=true};try check(refused)
+  let opened=try ui32NewSettingsNext("settings.open",true,false),closed=try ui32NewSettingsNext("settings.close",true,true)
+  try check(opened && !closed)
+  try check(try ui32NewSettingsNext("settings.open",false,true))
+  for command in ["settings.menu.entry","playback.pause","motion.cancel-pending"] {
+    var denied=false;do {_ = try ui32NewSemanticRule(command,nil,true)}catch{denied=true};try check(denied)
+  }
+  for command in ["tool.hand","tool.select","tool.brush"] {
+    let original=try ui32Rule(command,nil),next=try ui32NewSemanticRule(command,nil,true)
+    try check(next.region == nil && next.labels == original.labels && next.roles == original.roles)
+  }
+  for fault in ["none","resolve","owner-before","timeout","owner-after","status","type","wrong-default"] {
+    var reads=0,ownerCalls=0,refused=false,requested=[String]()
+    do {
+      try ui32ReadNewDefaults(resolve:{ id,role in
+        requested.append(id+":"+role);if fault == "resolve" {throw Refusal(code:"adapter-refused")};return id
+      },owned:{ _ in
+        ownerCalls += 1
+        return !((fault == "owner-before" && ownerCalls == 1) || (fault == "owner-after" && ownerCalls == 3))
+      },prepare:{_ in fault != "timeout"},read:{ id in
+        reads += 1
+        let defaults=["np-name":"Untitled","np-fps":"24","np-preset":"1920 × 1080 (Full HD)"]
+        if fault == "status" {return (-25205,nil)}
+        if fault == "type" {return (0,24)}
+        return (0,fault == "wrong-default" ? "other" : defaults[id])
+      })
+    }catch{refused=true}
+    try check(refused == (fault != "none"))
+    if ["resolve","owner-before","timeout"].contains(fault) {try check(reads == 0)}
+    if ["owner-after","status","type"].contains(fault) {try check(reads == 1)}
+    if fault == "none" {try check(reads == 3 && requested == ["np-name:AXTextField","np-fps:AXPopUpButton","np-preset:AXPopUpButton"])}
+  }
+}
