@@ -1,5 +1,6 @@
 //! Private desktop SVG routing: strict admission, original owner and real artifacts.
 use super::*;
+use native_engine::export_job::StagedArtifactPort;
 use native_engine::object_codec::decode_storage_project;
 use serde_json::{json, Value};
 use std::cell::Cell;
@@ -283,4 +284,37 @@ fn svg_main_route_publishes_ordinal_sequence_through_the_same_owner_and_keeps_pn
         .starts_with(b"\x89PNG\r\n\x1a\n"));
     assert_eq!(fs::read_dir(second.destination()).unwrap().count(), 1);
     assert_eq!(fs::read_dir(second.stage()).unwrap().count(), 0);
+}
+
+#[test]
+fn svg_lazy_setup_refuses_early_calls_without_filesystem_effects_and_keeps_svg_format() {
+    let scratch = Scratch::new();
+    let mut port = LazyDesktopArtifactPort::new_svg(
+        scratch.stage(),
+        "svg-output".into(),
+        scratch.destination(),
+    );
+    assert!(port
+        .write_frame("svg", "frame_0001.svg", b"<svg/>")
+        .is_err());
+    assert!(port
+        .publish("svg", "svg-output", &["frame_0001.svg".into()])
+        .is_err());
+    assert!(port.begin_staging("svg", "foreign-output").is_err());
+    port.cleanup("svg").unwrap();
+    assert!(!scratch.stage().exists() && !scratch.destination().exists());
+    port.begin_staging("svg", "svg-output").unwrap();
+    assert!(port
+        .write_frame("svg", "frame_0001.png", b"refused")
+        .is_err());
+    port.write_frame("svg", "frame_0001.svg", b"<svg/>")
+        .unwrap();
+    assert!(port
+        .publish("svg", "svg-output", &["frame_0001.png".into()])
+        .is_err());
+    assert!(!scratch.destination().exists());
+    port.cleanup("svg").unwrap();
+    assert!(scratch.stage().is_dir());
+    assert_eq!(fs::read_dir(scratch.stage()).unwrap().count(), 0);
+    assert!(!scratch.destination().exists());
 }

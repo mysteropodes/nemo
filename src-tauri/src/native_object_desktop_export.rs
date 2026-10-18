@@ -247,8 +247,15 @@ struct ObjectExportConsumer<'a> {
 }
 impl ObjectExportConsumer<'_> {
     fn run(self, compositor: &mut Compositor) -> Result<ObjectHostExportOutcome, String> {
-        let mut port =
-            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination);
+        let mut port = if self.format == ObjectExportFormat::Svg {
+            LazyDesktopArtifactPort::new_svg(
+                self.staging_root,
+                OUTPUT_HANDLE.into(),
+                self.destination,
+            )
+        } else {
+            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination)
+        };
         if self.format == ObjectExportFormat::Svg {
             return self.owner.export_pinned_object_svg_frames(
                 &self.selector,

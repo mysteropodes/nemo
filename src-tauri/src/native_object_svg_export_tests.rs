@@ -18,11 +18,19 @@ impl Scratch {
         Self(path.canonicalize().unwrap())
     }
     fn port(&self) -> DesktopArtifactPort {
-        DesktopArtifactPort::new(
+        DesktopArtifactPort::new_svg(
             self.0.join("stage"),
             [("object-output".into(), self.0.join("published"))],
         )
         .unwrap()
+    }
+    fn assert_empty_initialized_cache(&self) {
+        assert!(
+            self.0.join("stage").is_dir(),
+            "the direct fixture initializes its cache before the owner call"
+        );
+        assert_eq!(fs::read_dir(self.0.join("stage")).unwrap().count(), 0);
+        assert!(!self.0.join("published").exists());
     }
 }
 impl Drop for Scratch {
@@ -141,7 +149,7 @@ fn svg_owned_vector_and_real_bundled_text_publish_exact_frames_without_document_
             &mut second.port()
         )
         .is_err());
-    assert!(!second.0.join("stage").exists() && !second.0.join("published").exists());
+    second.assert_empty_initialized_cache();
     let result = owner
         .export_pinned_object_svg_frames(
             &expected,
@@ -202,7 +210,7 @@ fn svg_stale_owner_snapshot_and_invalid_range_never_publish_or_rearm_a_request()
                 &mut scratch.port()
             )
             .is_err());
-        assert!(!scratch.0.join("stage").exists() && !scratch.0.join("published").exists());
+        scratch.assert_empty_initialized_cache();
     }
     for frames in [vec![], vec![7, 0], vec![0, 0], (0..33).collect()] {
         let scratch = Scratch::new();
