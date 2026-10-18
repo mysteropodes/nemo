@@ -52,14 +52,18 @@ test('the Rust contract and its two test children are members of the MCP transpo
   const profile = JSON.parse(read('engineering/boundaries/profiles/mcp-rust.profile.json'));
   const transport = profile.modules.filter((module) => module.id === 'mcp.transport');
   assert.equal(transport.length, 1);
-  for (const file of RUST) {
+  assert.equal(transport[0].dir, 'nemo-mcp');
+  assert.equal(transport[0].layer, 'adapters');
+  for (const file of RUST.concat('src/native_wire_response_owner.rs')) {
     assert.equal(transport[0].files.filter((member) => member === file).length, 1, file);
     assert.ok(nonblank(read('nemo-mcp/' + file)) <= 500, file + ' stays under the hard maximum');
   }
   const census = JSON.parse(read('engineering/boundaries/profiles/rust.profile.json'));
   const censusTransport = census.modules.filter((module) => module.id === 'rust.mcp.transport');
   assert.equal(censusTransport.length, 1);
-  for (const file of RUST) {
+  assert.equal(censusTransport[0].dir, 'nemo-mcp');
+  assert.equal(censusTransport[0].layer, 'adapters');
+  for (const file of RUST.concat('src/native_wire_response_owner.rs')) {
     assert.equal(censusTransport[0].files.filter((member) => member === file).length, 1, 'rust.profile.json rust.mcp.transport lists ' + file);
     assert.equal(census.modules.filter((module) => module.files.includes(file)).length, 1, file + ' has one census declaration');
     assert.equal((censusTransport[0].publicApi || []).includes(file), false, file + ' stays private');
@@ -70,10 +74,31 @@ test('the Rust contract and its two test children are members of the MCP transpo
   assert.equal(/\bsuper::/.test(production), false, 'the production contract imports through crate paths (ruling R5 style)');
   const contract = read('nemo-mcp/src/native_contract.rs');
   assert.equal(contract.split('pub(crate) mod object_rig;').length - 1, 1);
+  assert.match(contract, /#\[path = "native_object_rig_contract\.rs"\]\s*pub\(crate\) mod object_rig;/);
   assert.match(contract, /op if object_rig::admitted\(op\) => object_rig::request\(op, payload\)/);
   assert.match(contract, /if object_rig::admitted\(operation\) \{\s+return object_rig::result\(operation, result\);/);
-  assert.match(read('nemo-mcp/src/wire.rs'), /object_rig::response_matches\(request, response\)/);
-  assert.match(read('nemo-mcp/src/wire.rs'), /object_rig::admitted\(&request\.operation\)/);
+  const wire = read('nemo-mcp/src/wire.rs');
+  assert.match(wire, /object_rig::response_matches\(request, response\)/);
+  assert.match(wire, /#\[path = "native_wire_response_owner\.rs"\]\s*mod response_owner;/);
+  assert.equal(wire.split('let correlated_identity = response_owner::correlated(request, response);').length, 2);
+  assert.match(wire, /let identity_is_valid = correlated_identity\s*&& response\.api_version == NATIVE_API_VERSION/);
+  assert.match(wire, /if identity_is_valid && disposition_is_valid/);
+  const responseOwner = read('nemo-mcp/src/native_wire_response_owner.rs');
+  const correlatedOperation = responseOwner.match(/let correlated_operation = ([^;]+);/);
+  assert.ok(correlatedOperation, 'the response owner declares the correlated operation set');
+  assert.match(correlatedOperation[1], /(?:^|\|\|)\s*crate::native_contract::object_rig::admitted\(&request\.operation\)\s*(?:\|\||$)/);
+  const correlatedIdentity = responseOwner.match(/let correlated_identity = ([\s\S]*?);\s*correlated_identity/);
+  assert.ok(correlatedIdentity, 'the correlated operation set gates the returned identity');
+  assert.match(correlatedIdentity[1], /^!correlated_operation\s*\|\| \(response\.request_id == request\.request_id\s*&&/);
+  assert.match(correlatedIdentity[1], /\.unwrap_or\(\s*response\.instance_id == request\.instance_id\s*&& \(response\.document_id == request\.document_id/);
+  assert.match(correlatedIdentity[1], /\|\| \(!response\.ok\s*&& response[\s\S]*?e\.code == "wrong_document"\)/);
+  assert.match(correlatedIdentity[1], /&& serde_json::to_vec\(response\)\.is_ok_and\(\|b\| b\.len\(\) <= NATIVE_MAX_MESSAGE_BYTES\)\)$/);
+  const nativeCallStart = wire.indexOf('pub async fn call_native(');
+  const nativeCallEnd = wire.indexOf('\nfn validate_native_response(');
+  assert.ok(nativeCallStart >= 0 && nativeCallEnd > nativeCallStart);
+  const nativeCall = wire.slice(nativeCallStart, nativeCallEnd);
+  assert.match(nativeCall, /validate_native_response\(&response, &response_contract\)\?;/);
+  assert.match(nativeCall, /response\.request_id != request_id\s*\|\| response\.instance_id != endpoint\.instance_id/);
   assert.match(read('nemo-mcp/src/native_request_input.rs'), /native object rig command requires expectedRevision/);
 });
 

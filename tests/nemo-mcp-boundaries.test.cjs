@@ -26,6 +26,9 @@ test('all MCP transport and desktop-host Rust modules have actual size enforceme
     'src-tauri/src/native_application_reservations.rs',
     'src-tauri/src/native_font_source.rs',
     'src-tauri/src/native_font_source_tests.rs',
+    'src-tauri/src/native_raster_image_dispatch.rs',
+    'src-tauri/src/native_raster_image_dispatch_tests.rs',
+    'src-tauri/src/native_raster_image_source.rs',
     'src-tauri/src/native_revision_sync.rs',
     'src-tauri/src/native_revision_sync_tests.rs',
   ].sort();

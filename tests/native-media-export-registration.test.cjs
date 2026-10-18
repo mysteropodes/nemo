@@ -76,8 +76,19 @@ test('the SDK seam is the single composition point and replaces one line', () =>
   assert.equal((sdk.match(/NemoNativeMediaExportContract/g) || []).length, 1);
   assert.match(sdk, /\[[^\]]*require\('\.\/native-media-export-contract\.js'\)[^\]]*\]\.reduce\(\(base, lane\) => \(lane \? lane\.compose\(base\) : base\)/, 'composed in the lane reduce of the single SDK line');
   const lines = sdk.split('\n');
-  assert.match(lines[2], /^  const (?:vectorContract = [^;]*?, )?fontContract = \[/, 'line 3 is the composed binding (net zero lines: the file is at its ceiling)');
-  assert.match(lines[3], /^  const api = factory\(.*\.join\(fontContract\)(?:, vectorContract)?\);$/, 'line 4 hands the composed contract to the factory (the frame-edit join of L05-K wraps it)');
+  assert.match(lines[2], /^  const vectorContract = typeof module === 'object' && module\.exports \? require\('\.\/native-object-vector-contract\.js'\) : root\.NemoNativeObjectVectorContract, fontContract = \[/);
+  const lanes = lines[2].match(/fontContract = \[([^\]]+)\]\.reduce\(\(base, lane\) => \(lane \? lane\.compose\(base\) : base\)/);
+  assert.ok(lanes, 'the media lane is composed before the frame-edit join');
+  assert.match(lanes[1], /require\('\.\/native-media-export-contract\.js'\) : root\.NemoNativeMediaExportContract/);
+  assert.match(lanes[1], /, vectorContract$/, 'the vector lane is the last composed lane');
+  assert.match(lines[2], /require\('\.\/native-object-edit-seam\.js'\) : root\.NemoNativeObjectEditSeam, typeof module === 'object' && module\.exports \? require\('\.\/native-object-item-contract\.js'\) : root\.NemoNativeObjectItemContract\)\);$/);
+  const fontSeam = read('src', 'js', 'adapters', 'native-object-edit-seam.js');
+  assert.match(fontSeam, /const font = commonjs \? require\('\.\/native-font-contract\.js'\) : root\.NemoNativeFontContract;/);
+  assert.match(fontSeam, /return edit\.compose\(font\);/, 'the base seam retains the font contract');
+  assert.equal(lines[3], "  const propertyContract = typeof module === 'object' && module.exports ? require('./native-property-contract.js') : root.NemoNativePropertyContract;");
+  assert.equal(lines[4], "  const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract);");
+  assert.match(sdk, /function \(fontContract, vectorContract, propertyContract\) \{/);
+  assert.match(sdk, /const property = propertyContract && propertyContract\.create\(/);
 });
 
 test('the MCP validators are listed once in both Rust profiles (mcp.transport / rust.mcp.transport) and dispatched by native_contract.rs', () => {
@@ -91,7 +102,13 @@ test('the MCP validators are listed once in both Rust profiles (mcp.transport / 
     const module = find(JSON.parse(read('engineering', 'boundaries', 'profiles', profile)), moduleId);
     assert.ok(module, profile);
     for (const file of files) assert.equal(module.files.filter((f) => f === file).length, 1, `${profile} ${file}`);
-    assert.ok(module.files.indexOf(files[0]) < module.files.indexOf('src/native_contract_tests.rs'), 'listed beside the other contract files');
+    assert.equal(module.dir, 'nemo-mcp');
+    assert.equal(module.layer, 'adapters');
+    const policy = JSON.parse(read('engineering', 'boundaries', 'profiles', profile));
+    for (const file of files) {
+      assert.equal(policy.modules.filter((owner) => owner.dir === 'nemo-mcp' && owner.files.includes(file)).length, 1, `${file} has exactly one owner`);
+      assert.equal(module.publicApi.includes(file), false, `${file} stays private`);
+    }
   }
   const dispatcher = read('nemo-mcp', 'src', 'native_contract.rs');
   assert.equal((dispatcher.match(/native_media_export_contract\.rs/g) || []).length, 1);

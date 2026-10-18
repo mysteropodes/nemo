@@ -13,6 +13,7 @@ const read = (file) => JSON.parse(fs.readFileSync(path.join(root, 'engineering/a
 const schema = read('native-object-item-v1.schema.json');
 const item = read('capabilities-v2/native-object-item.json');
 const asset = read('capabilities-v2/native-object-asset.json');
+const assetRemove = read('capabilities-v2/native-object-asset-remove.json');
 const ITEM = Contract.ITEM, ATTACH = Contract.ATTACH, REMOVE = Contract.REMOVE;
 
 const stable = () => ({ contextId: 'scene-root', frameScope: { kind: 'authored', frame: 0 }, layerUid: 'legacy layer:alpha', strokeId: 'native-raster:3:0' });
@@ -243,11 +244,15 @@ test('a no-op receipt keeps the revision and a refusal is a plain typed error', 
   assert.equal((await adapter.dispatch(q)).error.code, 'unavailable');
 });
 
-test('descriptors: the item capability is available, the asset capability is declared unavailable, neither has a fallback', () => {
+test('descriptors: item and bounded PNG attach are available, asset removal stays unavailable, none has a fallback', () => {
   assert.deepEqual([item.id, item.operations, item.availability], ['native.object.item', [ITEM], { state: 'available', reason: null }]);
-  assert.deepEqual([asset.id, asset.operations, asset.availability.state], ['native.object.asset', [ATTACH, REMOVE], 'unavailable']);
-  assert.match(asset.availability.reason, /byte-source route/);
-  for (const d of [item, asset]) {
+  assert.deepEqual([asset.id, asset.operations, asset.availability], ['native.object.asset', [ATTACH], { state: 'available', reason: null }]);
+  assert.deepEqual([assetRemove.id, assetRemove.operations, assetRemove.availability], ['native.object.asset.remove', [REMOVE],
+    { state: 'unavailable', reason: 'native asset removal host route is not registered' }]);
+  // Common catalog shape compatibility does not admit host execution before source I/O.
+  assert.match(asset.semantics, /Catalog-only attach retains compatibility validation but refuses unavailable before source I\/O/);
+  assert.match(assetRemove.semantics, /Remove remains typed unavailable/);
+  for (const d of [item, asset, assetRemove]) {
     assert.deepEqual([d.schemaVersion, d.apiVersion, d.version, d.status], [2, 2, 1, 'active']);
     assert.deepEqual(d.authority, { document: 'native-engine::history::NativeObjectHistory', adapterOwnsWritableMirror: false, fallback: 'none' });
     assert.equal(d.resourceBoundary.maxRequestBytes, 4096);
@@ -264,13 +269,15 @@ test('descriptors: the item capability is available, the asset capability is dec
     assert.doesNotThrow(() => Contract.correlate(e.request, e.response), e.label);
   }
   assert.deepEqual(item.input, { $ref: '../native-object-item-v1.schema.json#/$defs/ItemEdit' });
-  assert.deepEqual(asset.input.oneOf.map((v) => v.$ref), ['../native-object-item-v1.schema.json#/$defs/AssetAttach', '../native-object-item-v1.schema.json#/$defs/AssetRemove']);
-  assert.deepEqual([item.output.$ref, asset.output.$ref], ['../native-object-item-v1.schema.json#/$defs/ItemEditResult', '../native-object-item-v1.schema.json#/$defs/AssetCommandResult']);
+  assert.deepEqual(asset.input, { $ref: '../native-object-item-v1.schema.json#/$defs/ImageImportAttach' });
+  assert.deepEqual(assetRemove.input, { $ref: '../native-object-item-v1.schema.json#/$defs/AssetRemove' });
+  assert.deepEqual([item.output.$ref, asset.output.$ref, assetRemove.output.$ref], ['../native-object-item-v1.schema.json#/$defs/ItemEditResult',
+    '../native-object-item-v1.schema.json#/$defs/ImageImportResult', '../native-object-item-v1.schema.json#/$defs/AssetCommandResult']);
 });
 
 test('the v2 request union declares each operation exactly once and the receipt union stays exclusive', () => {
   const transport = read('native-transport-v2.schema.json');
-  const declared = [item, asset].flatMap((d) => d.operations);
+  const declared = [item, asset, assetRemove].flatMap((d) => d.operations);
   const branches = transport.$defs.Request.oneOf;
   for (const [operation, ref] of [[ITEM, 'ItemEdit'], [ATTACH, 'AssetAttach'], [REMOVE, 'AssetRemove']]) {
     const found = branches.filter((b) => b.allOf[1].properties.operation.const === operation);
@@ -283,6 +290,7 @@ test('the v2 request union declares each operation exactly once and the receipt 
   assert.equal(results.filter((ref) => ref === 'native-object-item-v1.schema.json#/$defs/ItemEditResult').length, 1);
   assert.equal(results.filter((ref) => /AssetCommandResult/.test(ref)).length, 0, 'the asset receipt is CommandResult; its twin would make oneOf ambiguous');
   assert.equal(results.filter((ref) => ref === '#/$defs/CommandResult').length, 1);
+  assert.equal(results.filter((ref) => ref === 'native-object-item-v1.schema.json#/$defs/ImageImportResult').length, 1);
   // The asset receipt really is the existing CommandResult shape, and the item receipt really is not.
   const command = transport.$defs.CommandResult;
   assert.deepEqual(Object.keys(command.properties), Object.keys(schema.$defs.AssetCommandResult.properties));
@@ -304,11 +312,50 @@ test('schema: every object is closed and the enumerations are the contract table
   const d = schema.$defs;
   assert.deepEqual(d.ItemEdit.oneOf.map((v) => v.properties.command.const), COMMANDS.map(([, p]) => p.command));
   assert.deepEqual(d.Font.oneOf[0].properties.fontKey.enum, Contract.FONTS);
-  assert.deepEqual(d.AssetAttach.properties.mediaType.enum, Contract.MEDIA);
+  assert.deepEqual(d.AssetAttach.oneOf.map((v) => v.$ref), ['#/$defs/AssetCatalogAttach', '#/$defs/ImageImportAttach']);
+  assert.deepEqual(d.AssetCatalogAttach.properties.mediaType.enum, Contract.MEDIA);
+  assert.deepEqual(d.ImageImportAttach.properties.mediaType, { const: 'image/png' });
+  assert.deepEqual(d.ImageImportAttach.required, ['documentSnapshotId', 'name', 'mediaType', 'source', 'placement', 'lifecycleGeneration']);
+  assert.deepEqual(d.ImageImportAttach.properties.source, d.AssetCatalogAttach.properties.source);
+  assert.deepEqual(d.ImageImportAttach.properties.lifecycleGeneration, { type: 'integer', minimum: 1, maximum: 9007199254740991 });
+  const placements = d.ImageImportAttach.properties.placement.oneOf;
+  assert.deepEqual(placements.map((v) => v.properties.kind.const), ['newLayer', 'authoredFrame']);
+  assert.deepEqual(placements.map((v) => v.required), [['kind'], ['kind', 'layerUid', 'frame']]);
+  assert.deepEqual(placements[1].properties.layerUid, { $ref: '#/$defs/Opaque' });
+  assert.deepEqual(placements[1].properties.frame, { type: 'integer', minimum: 0, maximum: 4294967295 });
+  // Retain catalog-only schema admission; the descriptor/host still refuses its execution.
+  assert.ok(valid(d.AssetCatalogAttach, ATTACH_PAYLOAD()));
+  assert.equal(valid(d.ImageImportAttach, ATTACH_PAYLOAD()), false);
+  for (const placement of [{ kind: 'newLayer' }, { kind: 'authoredFrame', layerUid: 'legacy layer:alpha', frame: 3 }]) {
+    const png = Object.assign(ATTACH_PAYLOAD(), { placement, lifecycleGeneration: 1 });
+    assert.ok(valid(d.ImageImportAttach, png));
+    assert.ok(valid(d.Input, png));
+    assert.doesNotThrow(() => Contract.payload(ATTACH, png));
+    for (const [label, bad] of flaws(png)) {
+      assert.equal(valid(d.Input, bad), false, 'PNG schema refuses ' + label);
+      assert.throws(() => Contract.payload(ATTACH, bad), TypeError, 'PNG contract refuses ' + label);
+    }
+    for (const mutate of [
+      (p) => { p.mediaType = 'image/jpeg'; }, (p) => { p.mediaType = 'video/mp4'; },
+      (p) => { p.source.kind = 'url'; }, (p) => { p.source.bytes = 'QUJD'; },
+      (p) => { p.placement.extra = true; }, (p) => { p.placement.kind = 'reference'; },
+      (p) => { p.lifecycleGeneration = 0; }, (p) => { p.lifecycleGeneration = 9007199254740992; },
+    ]) {
+      const bad = structuredClone(png); mutate(bad);
+      assert.equal(valid(d.Input, bad), false, 'PNG schema refuses nested/type/lifecycle flaw');
+      assert.throws(() => Contract.payload(ATTACH, bad), TypeError);
+    }
+  }
+  assert.deepEqual(d.ImageImportResult.properties.applied, { const: true });
+  assert.deepEqual(d.ImageImportResult.properties.historyEntriesAdded, { const: 1 });
+  assert.deepEqual(d.ImageImportResult.properties.target, { $ref: '#/$defs/ImageImportTarget' });
+  assert.deepEqual(d.ImageImportTarget.properties.contextId, { const: 'scene-root' });
+  assert.deepEqual(d.ImageImportTarget.properties.frameScope.properties.kind, { const: 'authored' });
+  assert.deepEqual(d.ImageImportTarget.properties.frameScope.properties.frame, { type: 'integer', minimum: 0, maximum: 4294967295 });
   assert.deepEqual(d.ItemEditResult.properties.operation.enum, COMMANDS.map(([name]) => name));
   assert.equal(d.CreateTarget.properties.strokeId.const, '');
   assert.equal(d.TextPatch.minProperties, 1);
   assert.equal('anchorTopLeft' in d.TextPatch.properties, false);
   assert.equal('anchorTopLeft' in d.TextBlock.properties, true);
-  assert.deepEqual(d.Output.oneOf.map((v) => v.$ref), ['#/$defs/ItemEditResult', '#/$defs/AssetCommandResult']);
+  assert.deepEqual(d.Output.oneOf.map((v) => v.$ref), ['#/$defs/ItemEditResult', '#/$defs/AssetCommandResult', '#/$defs/ImageImportResult']);
 });

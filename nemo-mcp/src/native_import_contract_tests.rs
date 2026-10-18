@@ -461,3 +461,39 @@ fn import_success_maps_every_declared_source_once_and_preserves_skips() {
     unavailable["unavailable"] = json!([{"sourceId":"raster","need":"raster-asset"}]);
     assert!(!receipt_matches(&unavailable, &receipt()));
 }
+
+#[test]
+fn missing_paint_is_not_the_explicit_null_paint() {
+    assert!(solid_or_null(Some(&Value::Null)));
+    let solid = json!({"kind":"solid","r":0,"g":0.5,"b":1,"a":1});
+    assert!(solid_or_null(Some(&solid)));
+    assert!(!solid_or_null(None));
+    let mut incomplete = solid.clone();
+    incomplete.as_object_mut().unwrap().remove("a");
+    assert!(!solid_or_null(Some(&incomplete)));
+}
+
+#[test]
+fn receipt_correlation_refuses_malformed_payload_or_result_before_mapping() {
+    let (payload, value) = (valid(), receipt());
+    assert!(request(&payload));
+    assert!(result(&value));
+    assert!(receipt_matches(&payload, &value));
+    let mut missing_layers = payload.clone();
+    missing_layers.as_object_mut().unwrap().remove("layers");
+    assert!(!request(&missing_layers));
+    assert!(!receipt_matches(&missing_layers, &value));
+    let mut missing_objects = value.clone();
+    missing_objects.as_object_mut().unwrap().remove("objects");
+    assert!(!result(&missing_objects));
+    assert!(!receipt_matches(&payload, &missing_objects));
+    let ok = response(
+        json!({"apiVersion":2,"requestId":"import-1","instanceId":"instance-A","documentId":"document-A",
+        "contentRevision":8,"ok":true,"result":value}),
+    );
+    assert!(response_matches(&envelope(payload.clone()), &ok));
+    assert!(!response_matches(&envelope(missing_layers), &ok));
+    let mut malformed = ok.clone();
+    malformed.result = Some(missing_objects);
+    assert!(!response_matches(&envelope(payload), &malformed));
+}
