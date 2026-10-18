@@ -109,6 +109,8 @@ func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, 
 func ui32SelfTest() throws {
   try ui32IdentityPhaseSelfTest()
   try ui32EntrySelfTest()
+  try ui32AttachedRootCertificateSelfTest()
+  try ui32ZeroForeignFallbackSelfTest()
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
     try check(!ui32ModeAllowed(mode))
     var refused=false
@@ -293,5 +295,122 @@ func ui32EntrySelfTest() throws {
   for command in ["entry.new.default","entry.create.default","entry.tutorial.close"] {
     let rule=try ui32Rule(command,nil);try check(rule.operation == "press" && rule.region != nil && rule.values.isEmpty)
     try check(!ui32Matches(rule,identifier:rule.identifier ?? "",labels:rule.labels,role:"AXTextField",ancestors:[rule.region!]))
+  }
+}
+
+// UI32-only discovery certificate. Service authentication and strict service walk follow unchanged.
+func ui32AttachedRootCertificate<Node>(_ root:Node, owner expectedOwner:Int, deadline:UInt64,
+  now:()->UInt64, equal:(Node,Node)->Bool, owner:(Node)->(Int,Bool,Int), children:(Node)->(Int,[Node]?),
+  parent:(Node)->(Int,Node?), foreignChild:(String,Int)->Void = {_,_ in}) throws
+  -> (root:Node,parent:Node,pid:Int,route:String,ownedNodeCount:Int,ownedPathRoutes:[String],outsideMismatches:[[String:Any]]) {
+  var nodes=[Node](), routes=[String](), declared=[Int?](), mismatches=[(Int,Int,Node)](), foreign=[(Node,Int,Int,String)]()
+  func walk(_ current:Node, _ ancestor:Int?, _ reported:Node?, _ route:String, _ depth:Int) throws {
+    try locationCheck(now() < deadline,"walk-deadline")
+    try locationCheck(depth <= 12,"depth-limit");try locationCheck(nodes.count < 512,"node-limit")
+    let (error,owned,actual)=owner(current)
+    try locationCheck(error == 0,"node-owner-query")
+    try locationCheck(owned && actual == expectedOwner,"node-owner-mismatch")
+    try locationCheck(!nodes.contains {equal($0,current)},"cycle")
+    let index=nodes.count;nodes.append(current);routes.append(route);declared.append(ancestor)
+    if let ancestor,let reported,!equal(reported,nodes[ancestor]) {mismatches.append((index,ancestor,reported))}
+    let (query,rows)=children(current)
+    try locationCheck(query == 0 && rows != nil,"children-query")
+    guard let rows else {throw ActionRefusal(diagnostics:["stage":"goto-discovery","gotoReason":"children-shape"])}
+    try locationCheck(rows.count <= 512,"children-limit")
+    for (offset,child) in rows.enumerated() {
+      try locationCheck(now() < deadline,"walk-deadline")
+      let (childError,childOwned,childPID)=owner(child)
+      try locationCheck(childError == 0,"child-owner-query")
+      let childRoute=route.isEmpty ? String(offset) : route+"."+String(offset)
+      if !childOwned || childPID != expectedOwner {
+        // No foreign parent, role, children or value read before caller authentication.
+        foreignChild(childRoute,childPID);foreign.append((child,index,childPID,childRoute));continue
+      }
+      let (parentError,observed)=parent(child)
+      try locationCheck(parentError == 0 && observed != nil,"parent-query")
+      try walk(child,index,observed,childRoute,depth+1)
+    }
+  }
+  try walk(root,nil,nil,"",0);try locationCheck(now() < deadline,"walk-deadline")
+  for (child,_,reported) in mismatches where !nodes.contains(where:{equal($0,reported)}) {
+    throw ActionRefusal(diagnostics:["stage":"parent-outside-owned-census","ownedSearchComplete":true,"childRoute":routes[child]])
+  }
+  if foreign.isEmpty && !mismatches.isEmpty {
+    throw ActionRefusal(diagnostics:["stage":"parent-edge","ownedSearchComplete":true,
+      "foreignRootCount":0,"ownedParentMismatchCount":mismatches.count,"candidatePathKnown":false])
+  }
+  guard foreign.count == 1 else {
+    throw ActionRefusal(diagnostics:["stage":"candidate-count","ownedSearchComplete":true,
+      "foreignRootCount":foreign.count,"ownedParentMismatchCount":mismatches.count,"ownedNodeCount":nodes.count])
+  }
+  let (candidate,ancestor,pid,route)=foreign[0]
+  try locationCheck(pid > 0 && !equal(candidate,nodes[ancestor]),"context-identity")
+  var path=Set<Int>(), cursor:Int?=ancestor
+  while let index=cursor {path.insert(index);cursor=declared[index]}
+  for (child,parent,_) in mismatches where path.contains(child) {
+    throw ActionRefusal(diagnostics:["stage":"parent-edge","ownedSearchComplete":true,"candidatePathKnown":true,
+      "candidatePathMismatch":true,"childRoute":routes[child],"declaredParentRoute":routes[parent],"foreignRootCount":1])
+  }
+  let outside=mismatches.map {child,parent,reported -> [String:Any] in
+    let known=nodes.firstIndex {equal($0,reported)}
+    return ["childRoute":routes[child],"declaredParentRoute":routes[parent],"reportedParentKnownIndex":known ?? -1,
+      "reportedParentKnownRoute":known.map {routes[$0]} ?? "unknown","outsideCandidatePath":true]
+  }
+  return (candidate,nodes[ancestor],pid,route,nodes.count,path.sorted().map {routes[$0]},outside)
+}
+
+// Pure ports execute the exact discovery function above, not a copied walker.
+func ui32AttachedRootCertificateSelfTest() throws {
+  for fault in ["none","outside-edge","path-edge","path-unknown","outside-parent-unknown","outside-owner","outside-parent","outside-children",
+    "alias","two","zero","zero-edge","zero-incomplete","foreign-owner","foreign-pid"] {
+    var childReads=[Int](),parentReads=[Int](),ownerReads=[Int](),observed=[Int](),facts:[String:Any]?,admitted=false
+    let owner:(Int)->(Int,Bool,Int)={node in
+      ownerReads.append(node)
+      return ((fault == "outside-owner" && node == 4) || (fault == "foreign-owner" && node == 9) ? -1 : 0,
+        node != 8 && node != 9,node == 9 && fault == "foreign-pid" ? 0 : node == 8 || node == 9 ? 8 : 7)
+    }
+    do {
+      let result=try ui32AttachedRootCertificate(0,owner:7,deadline:10,now:{0},equal:==,owner:owner,children:{node in
+        childReads.append(node)
+        if node == 3 && ["outside-children","zero-incomplete"].contains(fault) {return (-1,nil)}
+        let graph=[0:[1,3],1:[2],2:fault.hasPrefix("zero") ? [] : [9],3:fault == "alias" ? [1] : fault == "two" ? [4,8] : [4],4:[]]
+        return (0,graph[node] ?? [])
+      },parent:{node in
+        parentReads.append(node)
+        if node == 4 && fault == "outside-parent" {return (-1,nil)}
+        if (node == 2 && fault == "path-unknown") || (node == 4 && fault == "outside-parent-unknown") {return (0,77)}
+        return (0,node == 1 || node == 3 || (node == 2 && fault == "path-edge") ||
+          (node == 4 && ["outside-edge","zero-edge"].contains(fault)) ? 0 : node == 2 ? 1 : 3)
+      },foreignChild:{_,pid in observed.append(pid)})
+      admitted=true
+      try check(result.root == 9 && result.parent == 2 && result.pid == 8 && result.route == "0.0.0")
+      try check(result.ownedNodeCount == 5 && result.ownedPathRoutes == ["","0","0.0"] && childReads == [0,1,2,3,4])
+      try check(result.outsideMismatches.count == (fault == "outside-edge" ? 1 : 0))
+      if fault == "outside-edge" {try check(result.outsideMismatches[0]["childRoute"] as? String == "1.0")}
+    } catch let error as ActionRefusal {facts=error.diagnostics}
+    try check(admitted == ["none","outside-edge"].contains(fault))
+    try check(!childReads.contains(9) && !parentReads.contains(9) && !childReads.contains(8) && !parentReads.contains(8) && !ownerReads.contains(77))
+    if fault == "path-edge" {try check(facts?["candidatePathMismatch"] as? Bool == true)}
+    if ["path-unknown","outside-parent-unknown"].contains(fault) {try check(facts?["stage"] as? String == "parent-outside-owned-census")}
+    if fault == "alias" {try check(facts?["stage"] as? String == "cycle")}
+    if fault == "two" {try check(facts?["stage"] as? String == "candidate-count" && facts?["foreignRootCount"] as? Int == 2)}
+    if fault == "foreign-pid" {try check(facts?["stage"] as? String == "context-identity")}
+    if fault == "zero" {try check(facts?["stage"] as? String == "candidate-count" && facts?["ownedSearchComplete"] as? Bool == true && observed.isEmpty)}
+    if fault == "zero-edge" {try check(facts?["stage"] as? String == "parent-edge" && observed.isEmpty)}
+    if ["outside-children","outside-parent","outside-owner","zero-incomplete","foreign-owner"].contains(fault) {
+      try check(facts?["ownedSearchComplete"] as? Bool != true && facts?["stage"] as? String != "candidate-count")
+    }
+  }
+}
+
+func ui32ZeroForeignFallback(_ observed:Int, _ facts:[String:Any]) -> Bool {
+  observed == 0 && facts["stage"] as? String == "candidate-count" && facts["ownedSearchComplete"] as? Bool == true &&
+    facts["foreignRootCount"] as? Int == 0 && facts["ownedParentMismatchCount"] as? Int == 0
+}
+func ui32ZeroForeignFallbackSelfTest() throws {
+  let complete:[String:Any]=["stage":"candidate-count","ownedSearchComplete":true,"foreignRootCount":0,"ownedParentMismatchCount":0]
+  try check(ui32ZeroForeignFallback(0,complete) && !ui32ZeroForeignFallback(1,complete))
+  for (key,bad) in [("stage","parent-edge" as Any),("ownedSearchComplete",false),("foreignRootCount",1),("ownedParentMismatchCount",1)] {
+    var facts=complete;facts[key]=bad;try check(!ui32ZeroForeignFallback(0,facts));facts.removeValue(forKey:key);try check(!ui32ZeroForeignFallback(0,facts))
   }
 }

@@ -52,7 +52,7 @@ final class UI32PanelTrace<Node> {
   func failure(_ error:ActionRefusal, describe:(Node)->[String:Any] = {_ in [:]}) -> ActionRefusal {
     var facts=error.diagnostics, context:[String:Any]=["basis":"last-shared-walk-port-result","walk":kind,"phase":phase,"knownNodeCount":nodes.count,
       "enteredNodeCount":entered.count,"queryError":query,"metadataTruncated":truncated,"foreignRootCount":foreignRoots,
-      "completedForeignSearch":kind == "attached-foreign-root" && error.diagnostics["stage"] as? String == "candidate-count"]
+      "completedForeignSearch":error.diagnostics["ownedSearchComplete"] as? Bool == true || (kind == "attached-foreign-root" && error.diagnostics["stage"] as? String == "candidate-count")]
     var references:[String:Any]=[:]
     func record(_ name:String, _ node:Node?) {
       guard let node else {references[name]=["relation":"unavailable"];return}
@@ -84,6 +84,7 @@ final class UI32Fixture {
   let afterDismissal:() throws -> Void
   var sheet:AXUIElement?, root:AXUIElement?, parent:AXUIElement?, owner:pid_t?, start:ProcessStart?
   var selected:AXUIElement?
+  var attachmentProof=[String:Any]()
   init(_ pinned:OwnedInitialWindow, _ environment:[String:String], cancelOnly:Bool=false, afterDismissal:@escaping () throws -> Void) throws {
     self.pinned=pinned;self.cancelOnly=cancelOnly;self.afterDismissal=afterDismissal
     self.f03Original=try ui32UsesF03Fixture(environment["NEMO_UI32_FIXTURE_KIND"])
@@ -139,7 +140,7 @@ final class UI32Fixture {
     context["reportedParentMatchesRetainedSheet"]=trace.reported.map {node in sheet.map {CFEqual(node,$0)} ?? false} ?? false
     context["rootMatchesPinnedMain"]=CFEqual(trace.nodes[0],pinned.main)
     context["rootMatchesRetainedSheet"]=sheet.map {CFEqual(trace.nodes[0],$0)} ?? false
-    facts["panelTraversal"]=context;return ActionRefusal(diagnostics:facts)
+    facts["panelTraversal"]=context;if !attachmentProof.isEmpty {facts["attachmentCertificate"]=attachmentProof};return ActionRefusal(diagnostics:facts)
   }
   func attachedSheet() throws -> AXUIElement {
     try verifyOwnedWindow(pinned)
@@ -165,11 +166,11 @@ final class UI32Fixture {
     return found[0]
   }
   func panel() throws -> ([AXUIElement],pid_t) {
-    let outer=try attachedSheet();var foreign=[Int]()
-    let trace=UI32PanelTrace("attached-foreign-root",outer,Int(pinned.pid),equal:{CFEqual($0,$1)})
+    attachmentProof=[:];let outer=try attachedSheet();var foreign=[Int]()
+    let trace=UI32PanelTrace("attached-candidate-certificate",outer,Int(pinned.pid),equal:{CFEqual($0,$1)})
     var currentRoot=outer, currentParent=pinned.main, currentOwner=pinned.pid, currentStart=pinned.start
     do {
-      let found=try attachedForeignRoot(outer,owner:Int(pinned.pid),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
+      let found=try ui32AttachedRootCertificate(outer,owner:Int(pinned.pid),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
         now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:{ node in
           var actual:pid_t=0;let q=AXUIElementGetPid(node,&actual)
           return trace.ownership(node,(Int(q.rawValue),q == .success && actual == self.pinned.pid,Int(actual)))
@@ -180,6 +181,9 @@ final class UI32Fixture {
           var raw:CFTypeRef?;let q=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
           return trace.parent(node,(Int(q.rawValue),axElement(raw)))
         },foreignChild:{ _,pid in foreign.append(pid);trace.foreignRoots += 1 })
+      attachmentProof=["ownedSearchComplete":true,"ownedNodeCount":found.ownedNodeCount,"foreignRootCount":1,
+        "candidateRoute":found.route,"ownedPathRoutes":found.ownedPathRoutes,"outsideMismatches":found.outsideMismatches,
+        "scope":"Discovery only; service authentication and strict panel/effect guards still required."]
       let pid=pid_t(found.pid)
       guard let stamp=processStart(pid), authenticatedPanelService(pid), processStart(pid) == stamp else { throw Refusal(code:"sheet-owner") }
       try check(AXUIElementSetMessagingTimeout(found.root,0.03) == .success)
@@ -190,7 +194,8 @@ final class UI32Fixture {
       currentRoot=found.root;currentParent=observedParent;currentOwner=pid;currentStart=stamp
     } catch let error as ActionRefusal {
       // Only a completed walk proving ZERO foreign roots may use same-PID AX.
-      guard foreign.isEmpty && error.diagnostics["stage"] as? String == "candidate-count" else { throw panelFailure(error,trace,pinned.pid) }
+      guard ui32ZeroForeignFallback(foreign.count,error.diagnostics) else { throw panelFailure(error,trace,pinned.pid) }
+      attachmentProof=["ownedSearchComplete":true,"foreignRootCount":0,"ownedParentMismatchCount":0,"samePIDFallback":true]
     }
     if let root, let parent, let owner, let start {
       try check(CFEqual(root,currentRoot) && CFEqual(parent,currentParent) && owner == currentOwner && start == currentStart)
@@ -250,7 +255,7 @@ final class UI32Fixture {
     }
     let (rows,pid)=try panel()
     if command == "fixture.observe" {
-      return ["panelOwner":pid,"nodes":rows.map { node -> [String:Any] in
+      return ["panelOwner":pid,"attachmentCertificate":attachmentProof,"nodes":rows.map { node -> [String:Any] in
         ["role":attr(node,kAXRoleAttribute) as? String ?? "", "title":String((attr(node,kAXTitleAttribute) as? String ?? "").prefix(120)),
          "value":String((attr(node,kAXValueAttribute) as? String ?? "").prefix(120))]
       }]
