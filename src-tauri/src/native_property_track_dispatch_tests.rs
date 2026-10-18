@@ -67,7 +67,7 @@ fn history(
     redo: bool,
 ) -> NativeApplicationResponse {
     // Public history remains undeclared: use only the existing bounded desktop route.
-    crate::native_object_client::dispatch_raw(
+    crate::application_mcp::object_client::dispatch_raw(
         state,
         &json!({"apiVersion":2,"requestId":rid,
         "instanceId":state.instance_id(),"documentId":id,"expectedRevision":revision,
