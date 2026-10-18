@@ -87,7 +87,17 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.match(contract, /if frame_edit::declares\(operation\) \{\s*return frame_edit::result\(result\);/);
   assert.match(text('nemo-mcp/src/native_request_input.rs'), /frame_edit::declares\(&self\.operation\)[\s\S]{0,200}requires expectedRevision/);
   const wire = text('nemo-mcp/src/wire.rs');
-  assert.match(wire, /let correlated_operation = request\.operation == crate::native_contract::metadata::OP\s*\|\| policy_command\s*\|\| frame_edit_command(?:\s*\|\|\s*crate::native_contract::\w+::admitted\(&request\.operation\))*;/);
+  assert.match(wire, /#\[path = "native_wire_response_owner\.rs"\]\s*mod response_owner;/);
+  assert.equal(count(wire, 'let correlated_identity = response_owner::correlated(request, response);'), 1);
+  assert.match(wire, /let identity_is_valid = correlated_identity\s*&& response\.api_version == NATIVE_API_VERSION/);
+  const responseOwner = text('nemo-mcp/src/native_wire_response_owner.rs');
+  assert.match(responseOwner, /let frame_edit_command = crate::native_contract::frame_edit::declares\(&request\.operation\);/);
+  const correlatedOperation = responseOwner.match(/let correlated_operation = ([^;]+);/);
+  assert.ok(correlatedOperation, 'the response owner declares its correlated operation set');
+  assert.match(correlatedOperation[1], /(?:^|\|\|)\s*frame_edit_command\s*(?:\|\||$)/);
+  assert.match(correlatedOperation[1], /(?:^|\|\|)\s*request\.operation == crate::native_contract::metadata::OP\s*(?:\|\||$)/);
+  assert.match(correlatedOperation[1], /(?:^|\|\|)\s*policy_command\s*(?:\|\||$)/);
+  assert.match(responseOwner, /let correlated_identity = !correlated_operation\s*\|\| \(response\.request_id == request\.request_id\s*&&/);
   assert.match(wire, /frame_edit::revision_matches\(\s*request\.expected_revision,\s*response\.content_revision,/);
   const rust = text('nemo-mcp/src/native_frame_edit_contract.rs');
   assert.doesNotMatch(rust.split('#[cfg(test)]')[0], /\bsuper::/, 'no relative import in production code');
