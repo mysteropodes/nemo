@@ -31,6 +31,7 @@ func ui32Rule(_ command:String, _ option:String?) throws -> UI32Rule {
   case "sync.open-cancel": return rule("sync-choose-folder","settings-modal",[],button)
   case "sync.check-empty": return rule("sync-check","settings-modal",[],button)
   case "fixture.open": return rule("start-open",nil,[],button)
+  case "tutorial.close": return try ui32NewSemanticRule("entry.tutorial.close",nil,true)
   case "entry.new.default": return rule("start-new","start-screen",[],["AXGroup","AXButton"])
   case "entry.create.default": return rule("np-create","start-newpanel",[],button)
   case "entry.tutorial.close": return rule(nil,"tut-tooltip",["×"],button)

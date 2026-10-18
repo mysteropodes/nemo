@@ -394,7 +394,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     try ui32ContentReadStep("pre-action-new-context"){try newContext(command)}
     let nextSettingsOpen=try ui32ContentReadStep("pre-action-settings-phase"){try ui32NewSettingsNext(base,entryEnabled,newSettingsOpen)}
     let option=request["option"] as? String, rule=try ui32ContentReadStep("pre-action-rule"){try ui32NewSemanticRule(base,option,entryEnabled)}, selected=try ui32ContentReadStep("pre-action-resolve"){try resolve(rule)}
-    if base.hasPrefix("selection.") || base.hasPrefix("frame.") {
+    if base.hasPrefix("selection.") || base.hasPrefix("frame.") || base == "tutorial.close" {
       try check(fixture?.completed == true && fixture?.confirmed == true)
     }
     let value=request["value"] as? String
