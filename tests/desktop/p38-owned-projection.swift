@@ -112,6 +112,36 @@ func discoverOwnedInitialWindow(_ args: [String], _ environment: [String:String]
 }
 
 // Ordered public controls; the semantic region marker is inspection-only.
+// Shared unchanged retained-window predicate sequence; no rediscovery.
+func verifyOwnedWindow(_ initial: OwnedInitialWindow) throws {
+    let pid=initial.pid, pinnedProcessStart=initial.start, number=initial.number
+    let main=initial.main, application=initial.application, cg=initial.cg
+    guard processStart(pid) == pinnedProcessStart else {
+      throw IdentityRefusal(stage:"process-start",facts:["processStartMatches":false])
+    }
+    var actualPID: pid_t = 0
+    let ownerError = AXUIElementGetPid(main,&actualPID)
+    var rawWindows: CFTypeRef?
+    let windowsError = AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&rawWindows)
+    let windows = windowsError == .success ? rawWindows as? [AXUIElement] : nil
+    let pinnedAXMember = windows?.contains { CFEqual($0,main) } ?? false
+    var rawMinimized: CFTypeRef?
+    let minimizedError = AXUIElementCopyAttributeValue(main,kAXMinimizedAttribute as CFString,&rawMinimized)
+    let minimizedValue = minimizedError == .success ? (rawMinimized as? Bool) : nil
+    let minimizedReadable = minimizedValue != nil, minimized = minimizedValue ?? false
+    let cgRows = cg(true), identities = cgRows?.filter { $0[kCGWindowNumber as String] as? UInt32 == number } ?? []
+    let stage = identityFailureStage(Int(ownerError.rawValue),ownerError == .success && actualPID == pid,
+      Int(windowsError.rawValue),windows != nil,pinnedAXMember,Int(minimizedError.rawValue),minimizedReadable,minimized,cgRows != nil,identities.count)
+    guard let stage else { return }
+    // Keep the pinned AX object and original CGWindowID; record facts without rediscovery.
+    var facts: [String:Any] = ["axPidQueryError":Int(ownerError.rawValue),"axPidMatches":ownerError == .success && actualPID == pid,
+      "applicationWindowsQueryError":Int(windowsError.rawValue),"applicationWindowsReadable":windows != nil,
+      "pinnedAXWindowMember":pinnedAXMember,"minimizedQueryError":Int(minimizedError.rawValue),
+      "minimizedReadable":minimizedReadable,"minimized":minimized,"pinnedCGWindowListReadable":cgRows != nil]
+    if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
+    throw IdentityRefusal(stage:stage,facts:facts)
+  }
+
 func ownedControl(_ reference: Bool, _ title: String, _ value: String, _ description: ()->String?, inspection: Bool = false) -> String? {
   var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
   if inspection { labels.insert("Project tabs") }
@@ -324,33 +354,3 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
   }
   return result
 }
-
-// Shared unchanged retained-window predicate sequence; no rediscovery.
-func verifyOwnedWindow(_ initial: OwnedInitialWindow) throws {
-    let pid=initial.pid, pinnedProcessStart=initial.start, number=initial.number
-    let main=initial.main, application=initial.application, cg=initial.cg
-    guard processStart(pid) == pinnedProcessStart else {
-      throw IdentityRefusal(stage:"process-start",facts:["processStartMatches":false])
-    }
-    var actualPID: pid_t = 0
-    let ownerError = AXUIElementGetPid(main,&actualPID)
-    var rawWindows: CFTypeRef?
-    let windowsError = AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&rawWindows)
-    let windows = windowsError == .success ? rawWindows as? [AXUIElement] : nil
-    let pinnedAXMember = windows?.contains { CFEqual($0,main) } ?? false
-    var rawMinimized: CFTypeRef?
-    let minimizedError = AXUIElementCopyAttributeValue(main,kAXMinimizedAttribute as CFString,&rawMinimized)
-    let minimizedValue = minimizedError == .success ? (rawMinimized as? Bool) : nil
-    let minimizedReadable = minimizedValue != nil, minimized = minimizedValue ?? false
-    let cgRows = cg(true), identities = cgRows?.filter { $0[kCGWindowNumber as String] as? UInt32 == number } ?? []
-    let stage = identityFailureStage(Int(ownerError.rawValue),ownerError == .success && actualPID == pid,
-      Int(windowsError.rawValue),windows != nil,pinnedAXMember,Int(minimizedError.rawValue),minimizedReadable,minimized,cgRows != nil,identities.count)
-    guard let stage else { return }
-    // Keep the pinned AX object and original CGWindowID; record facts without rediscovery.
-    var facts: [String:Any] = ["axPidQueryError":Int(ownerError.rawValue),"axPidMatches":ownerError == .success && actualPID == pid,
-      "applicationWindowsQueryError":Int(windowsError.rawValue),"applicationWindowsReadable":windows != nil,
-      "pinnedAXWindowMember":pinnedAXMember,"minimizedQueryError":Int(minimizedError.rawValue),
-      "minimizedReadable":minimizedReadable,"minimized":minimized,"pinnedCGWindowListReadable":cgRows != nil]
-    if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
-    throw IdentityRefusal(stage:stage,facts:facts)
-  }
