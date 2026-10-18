@@ -20,6 +20,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     // Reject native sheets/popups in other windows, even when they share the PID.
     guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement], windows.count == 1,
       owns(windows[0],pid), CFEqual(windows[0],main) else { throw Refusal(code:"sheet-active") }
+    // Diagnostic only: retain the child edges already authenticated by this walk.
+    // A mismatch still refuses before observation or any effectful command succeeds.
+    var declaredEdges=[(child:AXUIElement,parent:AXUIElement)]()
+    var refusedEdge:(child:AXUIElement,declaredParent:AXUIElement,reportedParent:AXUIElement)?
+    do {
     return try boundedOwnedTree(main,owner:Int(pid),deadline:DispatchTime.now().uptimeNanoseconds+750_000_000,
       now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:{ node in
         var actual:pid_t=0; let error=AXUIElementGetPid(node,&actual)
@@ -33,11 +38,44 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
           guard owns(child,pid), AXUIElementSetMessagingTimeout(child,0.03) == .success else { return (-1,nil) }
           guard attr(child,kAXRoleAttribute) as? String != kAXWindowRole else { return (-1,nil) }
         }
+        for child in rows { declaredEdges.append((child:child,parent:node)) }
         return (0,rows)
       },parent:{ node in
         var raw:CFTypeRef?; let q=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
-        return (Int(q.rawValue),axElement(raw))
+        let actual=axElement(raw)
+        if q == .success, let actual,
+          let edge=declaredEdges.last(where:{CFEqual($0.child,node)}), !CFEqual(actual,edge.parent) {
+          // Retain references only; the original walk still makes its refusal.
+          refusedEdge=(child:node,declaredParent:edge.parent,reportedParent:actual)
+        }
+        return (Int(q.rawValue),actual)
       })
+    } catch let error as ActionRefusal {
+      var diagnostics=error.diagnostics
+      if diagnostics["stage"] as? String == "parent-edge", let refusedEdge {
+        var identityCurrent=false
+        do { try identity(); identityCurrent=true } catch { }
+        func facts(_ element:AXUIElement) -> [String:Any] {
+          guard identityCurrent else { return ["identityCurrent":false] }
+          guard owns(element,pid) else { return ["owned":false] }
+          guard AXUIElementSetMessagingTimeout(element,0.03) == .success else {
+            return ["owned":true,"timeoutReady":false]
+          }
+          return ["owned":true,"timeoutReady":true,"isPinnedMain":CFEqual(element,main),
+            "role":attr(element,kAXRoleAttribute) as? String ?? "",
+            "identifier":attr(element,kAXIdentifierAttribute) as? String ?? ""]
+        }
+        // Attribute reads happen only after the unchanged parent-edge refusal,
+        // and only after owner/lifetime and per-element timeout authentication.
+        diagnostics["ui32OwnedEdge"]=["identityCurrent":identityCurrent,
+          "child":facts(refusedEdge.child),"declaredParent":facts(refusedEdge.declaredParent),
+          "reportedParent":facts(refusedEdge.reportedParent),"declaredEdgeCount":declaredEdges.count,
+          "matchingDeclaredParents":declaredEdges.filter{CFEqual($0.child,refusedEdge.child)}.count,
+          "reportedParentIsApplication":CFEqual(refusedEdge.reportedParent,pinned.application),
+          "reportedParentMatchesAnyDeclaredNode":declaredEdges.contains{CFEqual($0.parent,refusedEdge.reportedParent)}]
+      }
+      throw ActionRefusal(diagnostics:diagnostics)
+    }
   }
   func labels(_ node:AXUIElement) -> Set<String> {
     Set([kAXTitleAttribute,kAXDescriptionAttribute,kAXHelpAttribute,kAXValueAttribute].compactMap { attr(node,$0) as? String })
