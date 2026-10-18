@@ -25,3 +25,40 @@ test('correlated native presentation clears only the Paper backdrop and preserve
  expect(await pixel(page,112,112),'Paper guide survives owner cleanup').toEqual([10,30,200,255]);
  expect(await page.evaluate(()=>stageLayer.visible)).toBe(true);
 });
+
+
+test('correlated native presentation hides the existing and late legacy WASM plane while retaining Paper and DOM overlays',async({page})=>{
+ await page.setViewportSize({width:500,height:350});
+ await page.setContent(`<style>:root{--gutter:#202020}html,body{margin:0;background:#202020}#native-reference{position:absolute;left:40px;top:40px;width:320px;height:180px;background:rgb(20,150,80);z-index:0}#app{position:absolute;inset:0;z-index:1;background:#202020}#canvas-area{position:absolute;inset:0;background:#202020}#drawing-canvas{position:absolute;left:40px;top:40px;width:320px;height:180px}#overlay{all:unset;position:absolute;left:60px;top:60px;width:32px;height:32px;background:rgb(220,30,40);z-index:2}</style><div id="native-reference"></div><div id="app"><div id="canvas-area"><canvas id="drawing-canvas" width="320" height="180"></canvas><button id="overlay" aria-label="Native overlay control"></button></div></div>`);
+ await page.addStyleTag({content:fs.readFileSync(path.join(root,'src/css/native-viewport-underlay.css'),'utf8')});
+ await page.addScriptTag({content:fs.readFileSync(path.join(root,'src/paper-full.min.js'),'utf8')});
+ await page.addScriptTag({content:fs.readFileSync(path.join(root,'src/js/adapters/native-viewport-underlay.js'),'utf8')});
+ await page.evaluate(()=>{
+  const c=document.getElementById('drawing-canvas');paper.setup(c);window.stageLayer=new paper.Layer({name:'stage'});
+  new paper.Path.Rectangle({point:[0,0],size:[320,180],fillColor:'#ffffff'});
+  window.guideLayer=new paper.Layer({name:'ui-guide'});new paper.Path.Rectangle({point:[70,70],size:[16,16],fillColor:'#0a1ec8'});paper.view.update();
+  // Match engine-bridge's real sibling identity, inline stacking and noninteractive plane.
+  window.attachLegacy=()=>{const legacy=document.createElement('canvas');legacy.id='rust-canvas';legacy.width=500;legacy.height=350;
+   legacy.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:block;';
+   const ctx=legacy.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,500,350);ctx.fillStyle='#0a1ec8';ctx.fillRect(110,110,16,16);
+   c.parentNode.insertBefore(legacy,c.nextSibling);return legacy;};window.legacy=attachLegacy();window.originalLegacyStyle=legacy.getAttribute('style');
+  window.canvasHits=0;window.overlayHits=0;c.addEventListener('pointerdown',()=>window.canvasHits++);document.getElementById('overlay').onclick=()=>window.overlayHits++;
+  window.pin={instanceId:'owned-instance',documentId:'owned-document',lifecycleGeneration:1};window.desktop=NemoNativeViewportUnderlay.desktop(window);window.bounds={x:40,y:40,width:320,height:180};
+ });
+ expect(await pixel(page,300,150),'ordinary legacy plane remains visible before native presentation').toEqual([255,255,255,255]);
+ expect(await pixel(page,112,112),'ordinary mirrored guide exists before native presentation').toEqual([10,30,200,255]);
+ await page.evaluate(()=>desktop.surfaceChanged(pin,bounds));
+ expect(await pixel(page,300,150),'legacy WASM canvas must not mask the correlated native plane').toEqual([20,150,80,255]);
+ expect(await pixel(page,112,112),'Paper guide survives while the legacy mirror is hidden').toEqual([10,30,200,255]);
+ expect(await pixel(page,65,65),'DOM overlays remain visible above native and Paper planes').toEqual([220,30,40,255]);
+ await page.mouse.click(300,150);expect(await page.evaluate(()=>canvasHits)).toBe(1);
+ await page.getByRole('button',{name:'Native overlay control'}).click();expect(await page.evaluate(()=>overlayHits)).toBe(1);
+ await page.evaluate(()=>{legacy.remove();window.legacy=attachLegacy();});
+ expect(await pixel(page,300,150),'a late auto-enabled legacy plane cannot cover active native pixels').toEqual([20,150,80,255]);
+ expect(await pixel(page,112,112),'late mirror creation cannot erase the live Paper guide').toEqual([10,30,200,255]);
+ expect(await page.evaluate(()=>legacy.getAttribute('style')===originalLegacyStyle),'presentation never mutates the legacy inline style').toBe(true);
+ await page.evaluate(()=>desktop.surfaceChanged(null));
+ expect(await pixel(page,300,150),'clearing the owner restores the original legacy plane').toEqual([255,255,255,255]);
+ expect(await pixel(page,112,112),'ordinary mirrored guide is restored with the legacy plane').toEqual([10,30,200,255]);
+ expect(await page.evaluate(()=>({visible:stageLayer.visible,visibility:getComputedStyle(legacy).visibility,display:getComputedStyle(legacy).display,style:legacy.getAttribute('style')===originalLegacyStyle}))).toEqual({visible:true,visibility:'visible',display:'block',style:true});
+});
