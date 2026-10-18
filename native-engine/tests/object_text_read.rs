@@ -83,6 +83,16 @@ fn created_native_identity_and_presence_survive_edit_undo_redo_and_storage_reope
     );
     assert_eq!(page["items"], json!([{"target":support::target("L0",id)}]));
     assert_eq!(page["nextOffset"], Value::Null);
+    // Absent -> null is an effective no-op in the existing patch contract.
+    // Exercise a real authored width -> explicit null transition instead.
+    assert_eq!(
+        support::run(
+            &mut o,
+            &json!({"command":"object.text.edit", "stableTarget":support::target("L0",id), "patch":{"fixedWidth":128}})
+        ),
+        Ok(2)
+    );
+    assert_eq!(inspect(&pin(&o), id)["block"]["fixedWidth"], 128);
     support::run(&mut o,&json!({"command":"object.text.edit","stableTarget":support::target("L0",id),
         "patch":{"text":"Changed","font":{"kind":"bundled","fontKey":"Roboto-Bold"},"fixedWidth":null}})).unwrap();
     let after = inspect(&pin(&o), id);
@@ -92,9 +102,9 @@ fn created_native_identity_and_presence_survive_edit_undo_redo_and_storage_reope
         after["block"]["anchorTopLeft"],
         before["block"]["anchorTopLeft"]
     );
-    assert_eq!(o.undo(2), Ok(3));
+    assert_eq!(o.undo(3), Ok(4));
     assert_eq!(text(&pin(&o), id), "Hello 雪");
-    assert_eq!(o.redo(3), Ok(4));
+    assert_eq!(o.redo(4), Ok(5));
     assert_eq!(text(&pin(&o), id), "Changed");
     let stored = encode_storage_project(pin(&o).document()).unwrap();
     let reopened =
@@ -272,6 +282,7 @@ fn escaped_chunks_shrink_with_explicit_progress_instead_of_breaking_the_reply_ca
     assert_eq!(joined, authored);
     assert!(count > 1);
 }
+#[cfg(feature = "font_asset_wire")]
 #[test]
 fn document_asset_font_identity_and_actual_encoded_font_survive_bind_undo_redo_and_project_reopen()
 {
@@ -293,23 +304,68 @@ fn document_asset_font_identity_and_actual_encoded_font_survive_bind_undo_redo_a
         .unwrap(),
     );
     let inventory = AssetInventory::new(vec![font], vec![], 1024, 0).unwrap();
+    // A MIME label is not native font admission: the actual owner must refuse it.
+    let invalid = NativeObjectHistory::from_admitted_project(
+        "unadmitted-font-text",
+        support::project(&support::drawing(json!({})), inventory),
+    );
+    assert_eq!(invalid.unwrap_err(), "asset media codec unavailable");
     let mut o = NativeObjectHistory::from_admitted_project(
         "font-text",
-        support::project(&support::drawing(json!({})), inventory),
+        support::project(
+            &support::drawing(json!({})),
+            AssetInventory::new(vec![], vec![], 1024, 0).unwrap(),
+        ),
     )
     .unwrap();
     support::run(&mut o,&json!({"command":"object.text.create","target":support::target("L0",""),"block":block("Font")})).unwrap();
     let id = "native-text:1:0";
-    support::run(&mut o,&json!({"command":"object.text.edit","stableTarget":support::target("L0",id),"patch":{"font":{"kind":"asset","assetId":"document-font"}}})).unwrap();
+    let mut request = OpacityRequest::command(
+        "text-font-import",
+        o.instance_id(),
+        o.document_id(),
+        o.content_revision(),
+        json!({"command":"object.asset.font.import", "documentSnapshotId":pin(&o).snapshot_id(),
+            "lifecycleGeneration":1, "source":{"kind":"bundled", "fontKey":"Roboto-Regular"}}),
+    );
+    request.operation = "command.document.object.asset.font.import".into();
+    assert!(o.font_import_status(&request).unwrap().is_none());
+    let imported = o.dispatch_font_import(&request, font_bytes).unwrap();
+    assert!(imported.ok, "{:?}", imported.error);
+    let result = imported.result.unwrap();
+    assert_eq!(result["historyEntriesAdded"], 1);
+    assert_eq!(result["encodedBytes"], font_bytes.len());
+    let asset_id = result["assetId"].as_str().unwrap().to_owned();
+    assert_eq!(o.content_revision(), 2);
+    let admitted = pin(&o);
+    let stored_font = admitted
+        .project()
+        .unwrap()
+        .asset_inventory()
+        .unwrap()
+        .records()
+        .iter()
+        .find(|record| record.id().as_str() == asset_id)
+        .unwrap();
+    assert!(stored_font.source().has_font_admission());
+    assert_eq!(
+        stored_font
+            .source()
+            .encoded_allocation()
+            .unwrap()
+            .as_slice(),
+        font_bytes
+    );
+    support::run(&mut o,&json!({"command":"object.text.edit","stableTarget":support::target("L0",id),"patch":{"font":{"kind":"asset","assetId":asset_id}}})).unwrap();
     assert_eq!(
         inspect(&pin(&o), id)["block"]["font"],
-        json!({"kind":"asset","assetId":"document-font"})
+        json!({"kind":"asset","assetId":asset_id})
     );
-    o.undo(2).unwrap();
+    o.undo(3).unwrap();
     assert_eq!(inspect(&pin(&o), id)["block"]["font"]["kind"], "bundled");
-    o.redo(3).unwrap();
+    o.redo(4).unwrap();
     let h = pin(&o);
-    let file = o.serialize_project_file(4, h.snapshot_id()).unwrap();
+    let file = o.serialize_project_file(5, h.snapshot_id()).unwrap();
     let reopened = NativeObjectHistory::from_project_file("font-text-reopen", &file).unwrap();
     assert_eq!(
         inspect(&pin(&reopened), id)["block"],

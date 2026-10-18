@@ -3116,6 +3116,30 @@
       "publicApi": [
         "native-text-read.js"
       ]
+    },
+    {
+      "id": "app.native.text.tool",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-tool.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-tool.js"
+      ]
+    },
+    {
+      "id": "app.native.text.tool.desktop",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-tool-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-tool-desktop.js"
+      ]
     }
   ],
   "layerRules": {
