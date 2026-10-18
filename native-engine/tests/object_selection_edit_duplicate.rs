@@ -267,7 +267,7 @@ fn a_reference_to_a_dropped_group_is_settled_so_the_table_stays_admissible() {
 }
 
 #[test]
-fn a_hold_is_duplicated_into_its_key_in_motion_and_refused_in_animation_2d() {
+fn a_hold_is_promoted_in_animation_2d_and_duplicated_into_its_key_in_motion() {
     let mut owner = owner_of(&base(2));
     let before = frozen(&owner);
     assert_eq!(
@@ -276,9 +276,22 @@ fn a_hold_is_duplicated_into_its_key_in_motion_and_refused_in_animation_2d() {
             "duplicate",
             &duplicate("L0", 4, "animation2d", &["d"])
         ),
-        Err(DispatchErrorCode::Unavailable)
+        Ok(true)
     );
-    assert_eq!(frozen(&owner), before);
+    let promoted = value(&owner);
+    assert_eq!(
+        strokes_at(&promoted, "L0", 4),
+        ["a", "d", "native-stroke:1:0"]
+    );
+    assert_eq!(strokes_at(&promoted, "L0", 3), ["a", "d"]);
+    assert_eq!(
+        elements_at(&promoted, "L0", 4),
+        [pair("a", 0), pair("d", 1), pair("native-stroke:1:0", 2)]
+    );
+    owner.undo(1).unwrap();
+    assert_eq!(frozen(&owner).0, before.0);
+    // A fresh owner keeps the original Motion identity/revision oracle.
+    let mut owner = owner_of(&base(2));
     let candidate = prepare(&owner, "duplicate", &duplicate("L0", 4, "motion", &["d"])).unwrap();
     assert_eq!(candidate.content_frame(), 3);
     owner.commit_selection_edit(candidate).unwrap();

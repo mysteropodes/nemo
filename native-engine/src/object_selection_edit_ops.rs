@@ -12,11 +12,14 @@
 //! a plan that changes nothing publishes nothing. No history, receipt or clock
 //! lives here: fresh identities are named after the revision the edit publishes
 //! and the one history entry comes from `NativeObjectHistory`. The Animation 2D
-//! hold promotion is the L05 kernel's, reached through a port the owner cannot
-//! satisfy yet, so that one case is a typed `Unavailable`.
+//! hold promotion uses the existing L05 frame kernel inside the same detached
+//! candidate, so promotion and the selected edit publish together.
+use super::object_frame_edit_document::{promote_cells, DocumentEdit, FrameEditError};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_selection_edit_clones::RevisionIds;
-use crate::object_document::object_group_kernels::object_selection_edit_frames::UnavailablePromotion;
+use crate::object_document::object_group_kernels::object_selection_edit_frames::{
+    HeldFramePromotion, PromotionRefusal,
+};
 use crate::object_document::object_group_kernels::object_selection_edit_plan::{
     plan_delete, plan_duplicate, SelectionError, SelectionPlan, SelectionRequest, MAX_REVISION,
 };
@@ -44,6 +47,27 @@ pub(crate) enum SelectionEditKind {
     Split,
     Paste,
     Cut,
+}
+
+/// The real frame provider; it prepares content and timing without publishing.
+/// The selection plan and the existing revision/history owner commit both once.
+struct RealHeldFramePromotion;
+
+impl HeldFramePromotion for RealHeldFramePromotion {
+    fn promote(
+        &self,
+        document: &ObjectDocument,
+        layer_uid: &str,
+        frame: u32,
+    ) -> Result<ObjectDocument, PromotionRefusal> {
+        match promote_cells(document, layer_uid, &[frame]) {
+            Ok(DocumentEdit::Changed(document)) => Ok(document),
+            Err(FrameEditError::Unsupported | FrameEditError::MissingTiming) => {
+                Err(PromotionRefusal::Unavailable)
+            }
+            Ok(DocumentEdit::NoChange) | Err(_) => Err(PromotionRefusal::Invalid),
+        }
+    }
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this
@@ -143,7 +167,7 @@ impl ObjectFillOwner {
             stroke_ids: &payload.stroke_ids,
         };
         let origin = self.current_snapshot();
-        let plan = plan_delete(origin.document(), &request, &UnavailablePromotion);
+        let plan = plan_delete(origin.document(), &request, &RealHeldFramePromotion);
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Delete, plan)
     }
 
@@ -168,7 +192,12 @@ impl ObjectFillOwner {
         };
         let origin = self.current_snapshot();
         let mut ids = RevisionIds::new(next_revision(&origin)?, origin.document());
-        let plan = plan_duplicate(origin.document(), &request, &UnavailablePromotion, &mut ids);
+        let plan = plan_duplicate(
+            origin.document(),
+            &request,
+            &RealHeldFramePromotion,
+            &mut ids,
+        );
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Duplicate, plan)
     }
 

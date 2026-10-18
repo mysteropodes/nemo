@@ -219,7 +219,7 @@ fn a_nested_group_promotes_its_child_when_the_outer_one_falls_below_two() {
 }
 
 #[test]
-fn a_hold_is_edited_in_its_key_in_motion_and_refused_in_animation_2d() {
+fn a_hold_is_promoted_in_animation_2d_and_edited_in_its_key_in_motion() {
     // Frame 5 holds key 3; frame 1 holds key 0.
     let mut owner = owner_of(&base(2));
     let before = frozen(&owner);
@@ -229,10 +229,14 @@ fn a_hold_is_edited_in_its_key_in_motion_and_refused_in_animation_2d() {
             "delete",
             &delete("L0", 5, "animation2d", &["d"])
         ),
-        Err(DispatchErrorCode::Unavailable),
-        "promotion is the L05 kernel's: a typed port, never an invented default"
+        Ok(true)
     );
-    assert_eq!(frozen(&owner), before);
+    let promoted = value(&owner);
+    assert_eq!(strokes_at(&promoted, "L0", 5), ["a"]);
+    assert_eq!(strokes_at(&promoted, "L0", 3), ["a", "d"]);
+    assert_eq!(owner.history_depths(), (1, 0));
+    owner.undo(1).unwrap();
+    assert_eq!(frozen(&owner).0, before.0);
     assert_eq!(
         apply(&mut owner, "delete", &delete("L0", 5, "motion", &["d"])),
         Ok(true)
