@@ -110,7 +110,7 @@ func ui32SelfTest() throws {
   try ui32IdentityPhaseSelfTest()
   try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()
-  try ui32ZeroForeignFallbackSelfTest()
+  try ui32ZeroForeignFallbackSelfTest();try ui32OwnedSheetReadSelfTest();try ui32ContentWalkSelfTest()
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
     try check(!ui32ModeAllowed(mode))
     var refused=false
@@ -256,8 +256,9 @@ func ui32NewDefaults(_ values:[String:String]) throws {
 // UI32-only discovery certificate. Service authentication and strict service walk follow unchanged.
 func ui32AttachedRootCertificate<Node>(_ root:Node, owner expectedOwner:Int, deadline:UInt64,
   now:()->UInt64, equal:(Node,Node)->Bool, owner:(Node)->(Int,Bool,Int), children:(Node)->(Int,[Node]?),
-  parent:(Node)->(Int,Node?), foreignChild:(String,Int)->Void = {_,_ in}) throws
-  -> (root:Node,parent:Node,pid:Int,route:String,ownedNodeCount:Int,ownedPathRoutes:[String],outsideMismatches:[[String:Any]]) {
+  parent:(Node)->(Int,Node?), foreignChild:(String,Int)->Void = {_,_ in},
+  completedOwnedCensus:([Node],[String])->Void = {_,_ in}) throws
+  -> (root:Node,parent:Node,pid:Int,route:String,ownedNodeCount:Int,ownedPathRoutes:[String],outsideMismatches:[[String:Any]],ownedNodes:[Node],ownedRoutes:[String]) {
   var nodes=[Node](), routes=[String](), declared=[Int?](), mismatches=[(Int,Int,Node)](), foreign=[(Node,Int,Int,String)]()
   func walk(_ current:Node, _ ancestor:Int?, _ reported:Node?, _ route:String, _ depth:Int) throws {
     try locationCheck(now() < deadline,"walk-deadline")
@@ -290,6 +291,7 @@ func ui32AttachedRootCertificate<Node>(_ root:Node, owner expectedOwner:Int, dea
   for (child,_,reported) in mismatches where !nodes.contains(where:{equal($0,reported)}) {
     throw ActionRefusal(diagnostics:["stage":"parent-outside-owned-census","ownedSearchComplete":true,"childRoute":routes[child]])
   }
+  completedOwnedCensus(nodes,routes)
   if foreign.isEmpty && !mismatches.isEmpty {
     throw ActionRefusal(diagnostics:["stage":"parent-edge","ownedSearchComplete":true,
       "foreignRootCount":0,"ownedParentMismatchCount":mismatches.count,"candidatePathKnown":false])
@@ -311,7 +313,7 @@ func ui32AttachedRootCertificate<Node>(_ root:Node, owner expectedOwner:Int, dea
     return ["childRoute":routes[child],"declaredParentRoute":routes[parent],"reportedParentKnownIndex":known ?? -1,
       "reportedParentKnownRoute":known.map {routes[$0]} ?? "unknown","outsideCandidatePath":true]
   }
-  return (candidate,nodes[ancestor],pid,route,nodes.count,path.sorted().map {routes[$0]},outside)
+  return (candidate,nodes[ancestor],pid,route,nodes.count,path.sorted().map {routes[$0]},outside,nodes,routes)
 }
 
 // Pure ports execute the exact discovery function above, not a copied walker.
@@ -440,4 +442,17 @@ func ui32NewDefaultProof(_ pid:pid_t, _ resolve:(UI32Rule) throws -> AXUIElement
     var raw:CFTypeRef?;let status=AXUIElementCopyAttributeValue(node,kAXValueAttribute as CFString,&raw)
     return (Int(status.rawValue),raw)
   })
+}
+
+func ui32ContentWalk<Node>(_ root:Node, owner expected:Int, deadline:UInt64,
+  now:()->UInt64, equal:@escaping (Node,Node)->Bool, owner:(Node)->(Int,Bool,Int),
+  children:(Node)->(Int,[Node]?), parent:(Node)->(Int,Node?)) throws -> [Node] {
+  let trace=UI32PanelTrace("strict-content",root,expected,equal:equal)
+  do {return try boundedOwnedTree(root,owner:expected,deadline:deadline,now:now,equal:equal,
+    owner:{trace.ownership($0,owner($0))},children:{trace.children($0,children($0))},parent:{trace.parent($0,parent($0))})}
+  catch let error as ActionRefusal {
+    var facts=trace.failure(error).diagnostics
+    facts["contentTraversal"]=facts.removeValue(forKey:"panelTraversal")
+    throw ActionRefusal(diagnostics:facts)
+  }
 }

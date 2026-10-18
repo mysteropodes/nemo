@@ -408,3 +408,99 @@ func ui32NewSemanticSelfTest() throws {
     if fault == "none" {try check(reads == 3 && requested == ["np-name:AXTextField","np-fps:AXPopUpButton","np-preset:AXPopUpButton"])}
   }
 }
+
+// Observation only: opaque nodes/routes come from the completed owned attachment census.
+func ui32OwnedSheetRead<Node>(_ nodes:[Node], _ routes:[String], _ expected:URL, deadline:UInt64, limit:Int,
+  now:()->UInt64, owned:(Node)->Bool, prepare:(Node)->Bool, read:(Node,String)->(Int,Any?)) throws -> [String:Any] {
+  try check(!nodes.isEmpty && nodes.count <= 512 && nodes.count == routes.count && limit >= 0 && limit <= 5120)
+  let categories=["AXSheet","AXWindow","AXGroup","AXButton","AXSplitGroup","AXScrollArea","AXOutline","AXRow","AXCell","AXTextField","AXStaticText"]
+  var rows=[[String:Any]](), queries=0,failed=0,matched=0,completed=0,stopped=false,reason="none",calls=0
+  func permit() -> Bool {
+    if now() >= deadline || calls >= limit {stopped=true;reason="budget";return false}
+    calls += 1;return true
+  }
+  func owner(_ node:Node) -> Bool {permit() && owned(node)}
+  var roles=Dictionary(uniqueKeysWithValues:(categories+["other","unreadable"]).map {($0,0)})
+  for i in nodes.indices {
+    var row:[String:Any]=["index":i,"route":routes[i]],started=0,valid=0
+    for key in ["AXRole","AXURL"] {
+      guard owner(nodes[i]),permit(),prepare(nodes[i]),owner(nodes[i]),permit() else {
+        if !stopped {reason="owner-or-timeout"};stopped=true;break
+      }
+      let (status,raw)=read(nodes[i],key);queries += 1;started += 1
+      guard owner(nodes[i]) else {failed += 1;if !stopped {reason="owner-changed"};stopped=true;break}
+      row[key == "AXRole" ? "roleStatus" : "urlStatus"]=status
+      if key == "AXRole" {
+        if status == 0,let role=raw as? String,!role.isEmpty {
+          let category=categories.contains(role) ? role : "other";row["role"]=category;roles[category,default:0] += 1;valid += 1
+        } else {row["role"]="unreadable";roles["unreadable",default:0] += 1;failed += 1}
+      } else if status == 0,let url=raw as? URL {
+        let match=ui32FixtureURLMatches(url,expected);row["urlPresence"]="present";row["expectedURLMatch"]=match
+        if match {matched += 1};valid += 1
+      } else if [Int(AXError.attributeUnsupported.rawValue),Int(AXError.noValue.rawValue)].contains(status) && raw == nil {
+        row["urlPresence"]="absent";row["expectedURLMatch"]=false;valid += 1
+      } else {row["urlPresence"]="unproven";row["expectedURLMatch"]=NSNull();failed += 1}
+    }
+    if started > 0 {row["queriesStarted"]=started;rows.append(row)}
+    if valid == 2 {completed += 1}
+    if stopped {break}
+  }
+  let complete = !stopped && completed == nodes.count && queries == nodes.count*2 && failed == 0 && now() < deadline
+  return ["scope":"completed-owned-sheet-census-only; not the service subtree","structuralCensusComplete":true,"ownedNodeCount":nodes.count,"queriesStarted":queries,"nativeCallsStarted":calls,"nativeCallLimit":limit,
+    "unqueriedQueries":nodes.count*2-queries,"queriedNodes":rows.count,"unqueriedNodes":nodes.count-rows.count,
+    "completedNodes":completed,"failedQueries":failed,"truncated":stopped,"complete":complete,"stopReason":reason,
+    "observedExpectedURLMatches":matched,"expectedURLAbsenceProven":complete && matched == 0,"roleCounts":roles,"nodes":rows]
+}
+func ui32OwnedSheetAXRead(_ nodes:[AXUIElement], _ routes:[String], _ pid:pid_t, _ expected:URL) throws -> [String:Any] {
+  try ui32OwnedSheetRead(nodes,routes,expected,deadline:DispatchTime.now().uptimeNanoseconds+750_000_000,limit:5120,
+    now:{DispatchTime.now().uptimeNanoseconds},owned:{owns($0,pid)},
+    prepare:{AXUIElementSetMessagingTimeout($0,0.03) == .success},read:{node,key in
+      var raw:CFTypeRef?;let status=AXUIElementCopyAttributeValue(node,key as CFString,&raw)
+      return (Int(status.rawValue),raw)
+    })
+}
+
+// Call from the existing UI32 self-test chain; no AX, process, or file operations.
+func ui32OwnedSheetReadSelfTest() throws {
+  let expected=URL(fileURLWithPath:"/private/fixed-fixture.json")
+  for fault in ["none","no-match","unsupported","no-value","bad-role","bad-url","status","status-payload","foreign","stale","timeout","deadline","budget"] {
+    var reads=[String](),owners=0
+    let result=try ui32OwnedSheetRead([0],["0.2"],expected,deadline:10,limit:fault == "budget" ? 4 : 10,
+      now:{fault == "deadline" ? 10 : 0},owned:{_ in
+        owners += 1;return fault != "foreign" && !(fault == "stale" && owners == 3)
+      },prepare:{_ in fault != "timeout"},read:{node,key in
+        reads.append(key)
+        if key == "AXRole" {if fault == "bad-role" {return (0,1)};return (0,"AXRow")}
+        if fault == "unsupported" {return (Int(AXError.attributeUnsupported.rawValue),nil)}
+        if fault == "no-value" {return (Int(AXError.noValue.rawValue),nil)}
+        if fault == "status-payload" {return (Int(AXError.noValue.rawValue),expected)}
+        if fault == "status" {return (-1,nil)}
+        if fault == "bad-url" {return (0,"file:///private/fixed-fixture.json")}
+        return (0,fault == "no-match" ? URL(fileURLWithPath:"/private/other.json") : expected)
+      })
+    let complete=["none","no-match","unsupported","no-value"].contains(fault)
+    try check(result["complete"] as? Bool == complete)
+    try check(result["expectedURLAbsenceProven"] as? Bool == ["no-match","unsupported","no-value"].contains(fault))
+    if ["foreign","timeout","deadline"].contains(fault) {try check(reads.isEmpty)}
+    if ["stale","budget"].contains(fault) {try check(reads == ["AXRole"])}
+    if fault == "none" {try check(result["observedExpectedURLMatches"] as? Int == 1 && result["queriesStarted"] as? Int == 2)}
+    try check(result["unqueriedQueries"] as? Int == 2-reads.count)
+  }
+}
+func ui32ContentWalkSelfTest() throws {
+  for fault in 0...2 {
+    var calls=[String](),facts=[String:Any](),rows=[Int]()
+    do {rows=try ui32ContentWalk(0,owner:7,deadline:10,now:{0},equal:==,
+      owner:{calls.append("o\($0)");return (0,true,7)},
+      children:{calls.append("c\($0)");return (0,$0 < 2 ? [$0+1] : [])},
+      parent:{calls.append("p\($0)");return $0 == 2 && fault == 1 ? (-1,nil) : (0,$0 == 2 && fault == 2 ? 0 : $0-1)})}
+    catch let error as ActionRefusal {facts=error.diagnostics}
+    try check(calls == ["o0","c0","o1","p1","o1","c1","o2","p2"]+(fault == 0 ? ["o2","c2"] : []))
+    if fault == 0 {try check(rows == [0,1,2] && facts.isEmpty)}
+    else {
+      let trace=facts["contentTraversal"] as? [String:Any]
+      try check(facts["stage"] as? String == (fault == 1 ? "parent-query" : "parent-edge"))
+      try check(trace?["routes"] as? [String] == ["0.0"] && trace?["queryError"] as? Int == (fault == 1 ? -1 : 0))
+    }
+  }
+}

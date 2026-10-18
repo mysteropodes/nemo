@@ -181,7 +181,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
         let subrole=try text(node,kAXSubroleAttribute)
         return (role,modal || subrole == kAXDialogSubrole)
       },children:{ui32Children($0,pid)},parent:parent,strict:{ web,deadline in
-        try boundedOwnedTree(web,owner:Int(pid),deadline:deadline,now:{DispatchTime.now().uptimeNanoseconds},
+        try ui32ContentWalk(web,owner:Int(pid),deadline:deadline,now:{DispatchTime.now().uptimeNanoseconds},
           equal:{CFEqual($0,$1)},owner:owner,children:strictChildren,parent:parent)
       })
     try nativeIdentity();retainedWebArea=certificate.nodes[certificate.web];latest=certificate

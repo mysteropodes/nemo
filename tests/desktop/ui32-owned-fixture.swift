@@ -85,6 +85,7 @@ final class UI32Fixture {
   var sheet:AXUIElement?, root:AXUIElement?, parent:AXUIElement?, owner:pid_t?, start:ProcessStart?
   var selected:AXUIElement?
   var attachmentProof=[String:Any]()
+  var observedOwnedNodes=[AXUIElement](),observedOwnedRoutes=[String]()
   init(_ pinned:OwnedInitialWindow, _ environment:[String:String], cancelOnly:Bool=false, afterDismissal:@escaping () throws -> Void) throws {
     self.pinned=pinned;self.cancelOnly=cancelOnly;self.afterDismissal=afterDismissal
     self.f03Original=try ui32UsesF03Fixture(environment["NEMO_UI32_FIXTURE_KIND"])
@@ -166,7 +167,7 @@ final class UI32Fixture {
     return found[0]
   }
   func panel() throws -> ([AXUIElement],pid_t) {
-    attachmentProof=[:];let outer=try attachedSheet();var foreign=[Int]()
+    attachmentProof=[:];observedOwnedNodes=[];observedOwnedRoutes=[];let outer=try attachedSheet();var foreign=[Int]()
     let trace=UI32PanelTrace("attached-candidate-certificate",outer,Int(pinned.pid),equal:{CFEqual($0,$1)})
     var currentRoot=outer, currentParent=pinned.main, currentOwner=pinned.pid, currentStart=pinned.start
     do {
@@ -180,7 +181,8 @@ final class UI32Fixture {
           guard AXUIElementSetMessagingTimeout(node,0.03) == .success else { return trace.parent(node,(-1,nil)) }
           var raw:CFTypeRef?;let q=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
           return trace.parent(node,(Int(q.rawValue),axElement(raw)))
-        },foreignChild:{ _,pid in foreign.append(pid);trace.foreignRoots += 1 })
+        },foreignChild:{ _,pid in foreign.append(pid);trace.foreignRoots += 1 },
+        completedOwnedCensus:{nodes,routes in self.observedOwnedNodes=nodes;self.observedOwnedRoutes=routes})
       attachmentProof=["ownedSearchComplete":true,"ownedNodeCount":found.ownedNodeCount,"foreignRootCount":1,
         "candidateRoute":found.route,"ownedPathRoutes":found.ownedPathRoutes,"outsideMismatches":found.outsideMismatches,
         "scope":"Discovery only; service authentication and strict panel/effect guards still required."]
@@ -255,7 +257,10 @@ final class UI32Fixture {
     }
     let (rows,pid)=try panel()
     if command == "fixture.observe" {
-      return ["panelOwner":pid,"attachmentCertificate":attachmentProof,"nodes":rows.map { node -> [String:Any] in
+      _ = try attachedSheet()
+      let ownedSheet=try ui32OwnedSheetAXRead(observedOwnedNodes,observedOwnedRoutes,pinned.pid,fixture)
+      _ = try attachedSheet()
+      return ["panelOwner":pid,"attachmentCertificate":attachmentProof,"ownedSheetDiagnostic":ownedSheet,"nodes":rows.map { node -> [String:Any] in
         ["role":attr(node,kAXRoleAttribute) as? String ?? "", "title":String((attr(node,kAXTitleAttribute) as? String ?? "").prefix(120)),
          "value":String((attr(node,kAXValueAttribute) as? String ?? "").prefix(120))]
       }]
