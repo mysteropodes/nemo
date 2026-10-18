@@ -4,6 +4,52 @@ import ApplicationServices
 import CoreGraphics
 import Darwin
 
+// HTML rule IDs are DOM identifiers; native IDs remain an unambiguous compatibility source.
+struct UI32Identifiers {
+  let dom:String?, native:String?, domStatus:Int, nativeStatus:Int
+  var resolved:String? {
+    if let dom,!dom.isEmpty { return dom }
+    if let native,!native.isEmpty { return native }
+    return nil
+  }
+  var source:String {
+    let d = !(dom ?? "").isEmpty, n = !(native ?? "").isEmpty
+    return d ? (n ? "dom+native" : "dom") : (n ? "native" : "none")
+  }
+  var observation:[String:Any] {
+    ["dom":dom ?? "","native":native ?? "","resolved":resolved ?? "","source":source,
+      "domStatus":domStatus,"nativeStatus":nativeStatus]
+  }
+}
+// Production and pure controls share owner-before/after, typed status and conflict checks.
+func ui32ReadIdentifiers<Node>(_ node:Node, owned:(Node)->Bool, prepare:(Node)->Bool,
+  read:(Node,String)->(Int,Any?)) throws -> UI32Identifiers {
+  func value(_ key:String) throws -> (String?,Int) {
+    try check(owned(node));try check(prepare(node));try check(owned(node))
+    let (status,raw)=read(node,key)
+    try check(owned(node))
+    if status == Int(AXError.attributeUnsupported.rawValue) || status == Int(AXError.noValue.rawValue) {
+      try check(raw == nil);return (nil,status)
+    }
+    try check(status == Int(AXError.success.rawValue))
+    guard let text=raw as? String else { throw Refusal(code:"adapter-refused") }
+    return (text,status)
+  }
+  let (dom,domStatus)=try value("AXDOMIdentifier"), (native,nativeStatus)=try value(kAXIdentifierAttribute)
+  if let dom,!dom.isEmpty,let native,!native.isEmpty {
+    try check(Array(dom.utf8) == Array(native.utf8))
+  }
+  return UI32Identifiers(dom:dom,native:native,domStatus:domStatus,nativeStatus:nativeStatus)
+}
+func ui32DOMIdentifiers(_ node:AXUIElement, _ pid:pid_t) throws -> UI32Identifiers {
+  try ui32ReadIdentifiers(node,owned:{owns($0,pid)},
+    prepare:{AXUIElementSetMessagingTimeout($0,0.03) == .success},read:{node,key in
+      var raw:CFTypeRef?
+      let status=AXUIElementCopyAttributeValue(node,key as CFString,&raw)
+      return (Int(status.rawValue),raw)
+    })
+}
+
 func ui32Key(_ option:String) throws -> (code:CGKeyCode,text:String,shift:Bool) {
   let shifted=option.hasPrefix("shift+"), label=shifted ? String(option.dropFirst(6)) : option
   let keys:[String:CGKeyCode]=["P":35,"A":0,"R":15,"S":1,"T":17,"U":32,"E":14,"M":46]
@@ -43,7 +89,7 @@ func ui32MotionFocus(_ pinned:OwnedInitialWindow, _ expected:AXUIElement?, _ tex
   var current=node,visited=[AXUIElement](), inMotion=false
   for _ in 0..<20 {
     try check(owns(current,pinned.pid) && !visited.contains {CFEqual($0,current)});visited.append(current)
-    if attr(current,kAXIdentifierAttribute) as? String == "motion-props-body" { inMotion=true }
+    if try ui32DOMIdentifiers(current,pinned.pid).resolved == "motion-props-body" { inMotion=true }
     if CFEqual(current,pinned.main) { try check(inMotion);try contentScope(node);return }
     guard let parent=axElement(attr(current,kAXParentAttribute)),owns(parent,pinned.pid),
       let rows=ownedAXChildren(parent,expectedOwner:Int(pinned.pid)).values,rows.contains(where:{CFEqual($0,current)}) else { throw Refusal(code:"child-owner") }
@@ -114,6 +160,7 @@ func ui32ToggleB(_ pinned:OwnedInitialWindow, resolve:(UI32Rule) throws -> AXUIE
   } catch { throw ActionRefusal(diagnostics:["purpose":"UI32","command":"selection.toggle.B","buttonDownPosted":downPosted,"buttonUpPosted":upPosted,"retry":false]) }
 }
 func ui32KeysSelfTest() throws {
+  try ui32IdentifierSelfTest()
   try ui32MotionScopeSelfTest()
   let first=try ui32Key("P"), shifted=try ui32Key("shift+T")
   try check(first.code == 35 && shifted.shift)
@@ -154,5 +201,58 @@ func ui32MotionScopeSelfTest() throws {
     else if fault == "move-after-down" {try check(down == 1 && up == 0 && calls == 2)}
     else if fault == "move-after-up" {try check(down == 1 && up == 1 && calls == 3)}
     else {try check(down == 0 && up == 0 && calls == 1)}
+  }
+}
+
+// No AX/process calls: inject the same reader used by all DOM ID routes.
+func ui32IdentifierSelfTest() throws {
+  let ok=Int(AXError.success.rawValue),absent=Int(AXError.attributeUnsupported.rawValue),none=Int(AXError.noValue.rawValue)
+  let cases:[(Int,String?,Int,String?,String?,String)]=[
+    (ok,"motion-props-body",ok,"","motion-props-body","dom"),
+    (absent,nil,ok,"motion-props-body","motion-props-body","native"),
+    (ok,"motion-props-body",none,nil,"motion-props-body","dom"),
+    (ok,"same",ok,"same","same","dom+native"),
+    (ok,"",ok,"",nil,"none"),(none,nil,absent,nil,nil,"none"),
+    (ok,"",ok," untouched "," untouched ","native")]
+  for (ds,dom,ns,native,resolved,source) in cases {
+    var owners=0,prepares=0,keys=[String]()
+    let result=try ui32ReadIdentifiers(7,owned:{node in owners += 1;return node == 7},
+      prepare:{_ in prepares += 1;return true},read:{_,key in
+        keys.append(key);return key == "AXDOMIdentifier" ? (ds,dom) : (ns,native)
+      })
+    try check(result.dom == dom && result.native == native && result.resolved == resolved && result.source == source)
+    try check(result.domStatus == ds && result.nativeStatus == ns)
+    try check(keys == ["AXDOMIdentifier",kAXIdentifierAttribute] && owners == 6 && prepares == 2)
+    try check(result.observation["dom"] as? String == (dom ?? "") && result.observation["native"] as? String == (native ?? ""))
+  }
+  for pair in [("a","b"),("a","a "),("\u{e9}","e\u{301}")] {
+    var refused=false
+    do { _ = try ui32ReadIdentifiers(7,owned:{_ in true},prepare:{_ in true},
+      read:{_,key in (ok,key == "AXDOMIdentifier" ? pair.0 : pair.1)}) } catch { refused=true }
+    try check(refused)
+  }
+  let malformed:[(Int,Any?)]=[(ok,nil),(ok,true),(ok,7),(ok,["id"]),(ok,NSNull()),
+    (Int(AXError.cannotComplete.rawValue),nil),(absent,"unexpected"),(none,"unexpected")]
+  for bad in malformed {
+    for badDOM in [true,false] {
+      var refused=false,reads=0
+      do { _ = try ui32ReadIdentifiers(7,owned:{_ in true},prepare:{_ in true},read:{_,key in
+        reads += 1;return (key == "AXDOMIdentifier") == badDOM ? bad : (ok,"same")
+      }) } catch { refused=true }
+      try check(refused && reads == (badDOM ? 1 : 2))
+    }
+  }
+  for failure in 1...6 {
+    var owners=0,prepares=0,reads=0,refused=false
+    do { _ = try ui32ReadIdentifiers(7,owned:{_ in owners += 1;return owners != failure},
+      prepare:{_ in prepares += 1;return true},read:{_,_ in reads += 1;return (ok,"same")}) } catch { refused=true }
+    try check(refused && owners == failure && reads == [0,0,1,1,1,2][failure-1])
+    try check(prepares == [0,1,1,1,2,2][failure-1])
+  }
+  for failure in 1...2 {
+    var prepares=0,reads=0,refused=false
+    do { _ = try ui32ReadIdentifiers(7,owned:{_ in true},prepare:{_ in prepares += 1;return prepares != failure},
+      read:{_,_ in reads += 1;return (ok,"same")}) } catch { refused=true }
+    try check(refused && prepares == failure && reads == failure-1)
   }
 }

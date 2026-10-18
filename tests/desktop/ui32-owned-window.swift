@@ -186,7 +186,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     var result=Set<String>(), current=node, visited=[AXUIElement]()
     for _ in 0..<20 {
       try check(owns(current,pid) && !visited.contains { CFEqual($0,current) }); visited.append(current)
-      if let id=attr(current,kAXIdentifierAttribute) as? String { result.insert(id) }
+      if let id=try ui32DOMIdentifiers(current,pid).resolved { result.insert(id) }
       if CFEqual(current,main) { return result }
       guard let parent=axElement(attr(current,kAXParentAttribute)), owns(parent,pid),
         let siblings=attr(parent,kAXChildrenAttribute) as? [AXUIElement], siblings.contains(where:{CFEqual($0,current)}) else { throw Refusal(code:"child-owner") }
@@ -205,7 +205,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
         var found=Set<String>(), ids=Set<String>()
         for row in rows {
           try check(owns(row,pid))
-          if let id=attr(row,kAXIdentifierAttribute) as? String { ids.insert(id) }
+          if let id=try ui32DOMIdentifiers(row,pid).resolved { ids.insert(id) }
           found.formUnion(labels(row).intersection(modes))
           guard let cells=ownedAXChildren(row,expectedOwner:Int(pid)).values,cells.count <= 16 else { throw Refusal(code:"children-unavailable") }
           for cell in cells { try check(owns(cell,pid));found.formUnion(labels(cell).intersection(modes)) }
@@ -226,13 +226,13 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       }
       if !stepLabel || numbers != 1 { return false }
     }
-    return ui32Matches(rule,identifier:attr(node,kAXIdentifierAttribute) as? String ?? "",labels:labels(node),
+    return ui32Matches(rule,identifier:try ui32DOMIdentifiers(node,pid).resolved ?? "",labels:labels(node),
       role:attr(node,kAXRoleAttribute) as? String ?? "",ancestors:try ancestors(node))
   }
   func signature(_ rule:UI32Rule, _ node:AXUIElement) throws -> Bool {
     guard let role=try text(node,kAXRoleAttribute) else { throw Refusal(code:"adapter-refused") }
     if !rule.roles.contains(role) { return false }
-    if let id=rule.identifier,try text(node,kAXIdentifierAttribute) != id { return false }
+    if let id=rule.identifier,try ui32DOMIdentifiers(node,pid).resolved != id { return false }
     if rule.labels.isEmpty { return true }
     var names=Set<String>()
     for key in [kAXTitleAttribute,kAXDescriptionAttribute,kAXHelpAttribute,kAXValueAttribute] {
@@ -254,7 +254,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   }
   func motionContent(_ focused:AXUIElement) throws {
     _ = try tree();guard let certificate=latest else { throw Refusal(code:"adapter-refused") }
-    try ui32MotionContent(certificate,focused,equal:{CFEqual($0,$1)},identifier:{try text($0,kAXIdentifierAttribute)})
+    try ui32MotionContent(certificate,focused,equal:{CFEqual($0,$1)},identifier:{try ui32DOMIdentifiers($0,pid).resolved})
     guard let current=axElement(attr(pinned.application,kAXFocusedUIElementAttribute)),owns(current,pid),
       CFEqual(current,focused) else { throw Refusal(code:"adapter-refused") }
   }
@@ -281,10 +281,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       let nodes=try tree(); var facts=[[String:Any]]()
       for node in nodes {
         try check(owns(node,pid))
-        let role=attr(node,kAXRoleAttribute) as? String ?? "", id=attr(node,kAXIdentifierAttribute) as? String ?? ""
+        let role=attr(node,kAXRoleAttribute) as? String ?? "", ids=try ui32DOMIdentifiers(node,pid)
         let rawValue=attr(node,kAXValueAttribute)
         let value=rawValue as? String
-        var fact:[String:Any]=["role":role,"identifier":String(id.prefix(100)),"labels":labels(node).map {String($0.prefix(240))}.sorted()]
+        var fact:[String:Any]=["role":role,"identifier":String((ids.native ?? "").prefix(100)),"labels":labels(node).map {String($0.prefix(240))}.sorted()]
+        fact["identifiers"]=ids.observation
         if let value { fact["value"]=String(value.prefix(240)) }
         else if let numeric=rawValue as? NSNumber { fact["value"]=numeric }
         if let enabled=attr(node,kAXEnabledAttribute) as? Bool { fact["enabled"]=enabled }
