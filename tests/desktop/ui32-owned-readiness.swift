@@ -1,3 +1,73 @@
+func ui32ContentMembers<Node>(_ certificate:UI32ContentCertificate<Node>) -> [Node] {
+  certificate.nodes.indices.filter {certificate.inside.contains($0)}.map {certificate.nodes[$0]}
+}
+
+// Immediate posted New re-proves content from pinned main, never from a rebound WebArea.
+// The caller's original complete certificate retains exact-one AXWindows, full census,
+// same-Web root path/modal checks and the complete strict reciprocal content walk.
+func ui32PostedNewContentReproof<Node>(_ command:String, _ enabled:Bool, _ attempted:Bool, _ posted:Bool, _ stage:Int,
+  expected:Node, deadline:UInt64, now:()->UInt64, retained:()->Node?, equal:(Node,Node)->Bool, native:() throws -> Void,
+  certificate:(Node) throws -> UI32ContentCertificate<Node>) throws -> UI32ContentCertificate<Node> {
+  try check(command == "entry.create.default" && enabled && attempted && posted && stage == 2)
+  func fence() throws {
+    try check(now() < deadline);try native();try check(now() < deadline)
+    guard let current=retained(),equal(current,expected) else {throw Refusal(code:"child-owner")}
+  }
+  try fence();let proof=try certificate(expected)
+  try check(proof.nodes.indices.contains(proof.web) && equal(proof.nodes[proof.web],expected))
+  try fence();return proof
+}
+
+// Return a certificate only after the existing outer reader's final fences/budget.
+func ui32PostedNewContentRead<Node>(_ command:String, _ enabled:Bool, _ attempted:Bool, _ posted:Bool, _ stage:Int,
+  expected:Node, now:()->UInt64, retained:()->Node?, equal:(Node,Node)->Bool, native:() throws -> Void,
+  certificate:(UInt64,Node) throws -> UI32ContentCertificate<Node>) throws -> (diagnostics:[String:Any],certificate:UI32ContentCertificate<Node>) {
+  var accepted:UI32ContentCertificate<Node>?
+  let diagnostics=try ui32NewPostCreateRead(command,enabled,attempted,posted,stage,now:now,identity:{
+    try native();guard let current=retained(),equal(current,expected) else {throw Refusal(code:"child-owner")}
+  },read:{deadline in
+    accepted=try ui32PostedNewContentReproof(command,enabled,attempted,posted,stage,expected:expected,deadline:deadline,now:now,
+      retained:retained,equal:equal,native:native,certificate:{try certificate(deadline,$0)})
+  })
+  guard let accepted else {throw Refusal(code:"adapter-refused")}
+  return (diagnostics,accepted)
+}
+
+func ui32PostedNewContentReproofSelfTest() throws {
+  for fault in ["none","command","disabled","unattempted","unposted","stage","native-before","native-after","native-budget","certificate-budget","final-native-budget","retained-before","retained-after","foreign","parent-query","parent-foreign","root-replaced","web-ambiguous","modal","unknown-parent","root-path","strict-parent","strict-count","strict-order"] {
+    var clock:UInt64=0,nativeCalls=0,reads=0,published=false,refused=false
+    do {
+      let proof=try ui32PostedNewContentReproof(fault == "command" ? "observe" : "entry.create.default",fault != "disabled",fault != "unattempted",fault != "unposted",fault == "stage" ? 1 : 2,
+        expected:1,deadline:10,now:{clock},retained:{fault == "retained-before" || (fault == "retained-after" && reads > 0) ? 9 : 1},equal:==,native:{
+          nativeCalls += 1;if (fault == "native-before" && nativeCalls == 1) || (fault == "native-after" && nativeCalls == 2) {throw Refusal(code:"child-owner")}
+          if (fault == "native-budget" && nativeCalls == 1) || (fault == "final-native-budget" && nativeCalls == 2) {clock=10}
+        },certificate:{expected in
+          reads += 1
+          let proof=try ui32ContentCertificate(0,pid:7,retained:fault == "root-replaced" ? 9 : expected,deadline:10,
+            now:{0},equal:==,owner:{node in (0,true,fault == "foreign" && node == 2 || fault == "parent-foreign" && node == 99 ? 8 : 7)},prepare:{_ in true},
+            traits:{node in (node == 0 ? "AXWindow" : node == 1 || fault == "web-ambiguous" ? "AXWebArea" : "AXGroup",fault == "modal" && node == 0)},
+            children:{(0,$0 == 0 ? [1] : $0 == 1 ? [2] : [])},parent:{node in
+              if fault == "parent-query" {return (-25202,nil)}
+              if fault == "unknown-parent" || (fault == "parent-foreign" && node == 2) {return (0,99)}
+              return (0,node == 1 ? (fault == "root-path" ? 2 : 0) : 1)
+            },strict:{web,deadline in
+              if fault == "strict-parent" {
+                return try ui32ContentWalk(web,owner:7,deadline:deadline,now:{0},equal:==,owner:{_ in (0,true,7)},children:{(0,$0 == 1 ? [2] : [])},parent:{(0,$0 == 1 ? 0 : 0)})
+              }
+              return fault == "strict-count" ? [1] : fault == "strict-order" ? [2,1] : [1,2]
+            })
+          if fault == "certificate-budget" {clock=10};return proof
+        })
+      try check(proof.nodes[proof.web] == 1 && ui32ContentMembers(proof) == [1,2]);published=true
+    }catch{refused=true}
+    try check((fault == "none") == published && refused == (fault != "none"))
+    if ["command","disabled","unattempted","unposted","stage","native-before","native-budget","retained-before"].contains(fault) {try check(reads == 0)}
+    else {try check(reads == 1)}
+    if ["none","native-after","final-native-budget","retained-after"].contains(fault) {try check(nativeCalls == 2)}
+    if fault == "certificate-budget" {try check(nativeCalls == 1)}
+  }
+}
+
 // Cohesive initial and posted-New owned readiness; no input or product authority.
 import Foundation
 import ApplicationServices
@@ -130,7 +200,7 @@ func ui32NewPostCreateReadSelfTest() throws {
     if scenario == "second-pass" {try check(proof["readAttempts"] as? Int == 2 && proof["firstReadFailure"] != nil)}
     if scenario == "first-pass" {try check(proof["firstReadFailure"] == nil)}
   }
-  try ui32NewContentComparisonSelfTest();try ui32NewNativeReadInvalidationSelfTest()
+  try ui32NewContentComparisonSelfTest();try ui32NewNativeReadInvalidationSelfTest();try ui32PostedNewContentReproofSelfTest();try ui32PostedNewContentReadSelfTest()
 }
 
 // Actual certificate producer feeds the actual finite post-Create reader.

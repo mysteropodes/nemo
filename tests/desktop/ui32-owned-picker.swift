@@ -261,6 +261,37 @@ func ui32DiagnosticText(_ node:AXUIElement, _ pid:pid_t, _ key:String) throws ->
   if key == kAXValueAttribute && raw is NSNumber {return nil}
   throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"text-shape","attribute":category,"rawPresent":raw != nil])
 }
+// Operation-specific row selection proof; does not synthesize an Enabled value.
+func ui32RowSelectionProof<Node>(_ row:Node, deadline:UInt64, now:()->UInt64,
+  owned:(Node)->Bool, prepare:(Node)->Bool, read:(Node,String)->(Int,CFTypeRef?),
+  selectedSettable:(Node)->(Int,Bool)) throws -> [String:Any] {
+  func guarded<T>(_ query:()->T) throws -> T {
+    try ui32ProofCheck(now() < deadline && owned(row) && now() < deadline && prepare(row) && now() < deadline && owned(row) && now() < deadline,"row-selection-preconditions")
+    let result=query()
+    try ui32ProofCheck(now() < deadline && owned(row) && now() < deadline,"row-selection-postconditions")
+    return result
+  }
+  func boolean(_ raw:CFTypeRef?) -> Bool? {
+    guard let raw,CFGetTypeID(raw) == CFBooleanGetTypeID() else {return nil}
+    return raw as? Bool
+  }
+  let (status,raw)=try guarded {read(row,kAXEnabledAttribute)}
+  let enabled=boolean(raw)
+  let facts:[String:Any]=["queryError":status,"boolTyped":enabled != nil]
+  if status == 0 {
+    try ui32ProofCheck(enabled == true,"row-enabled",facts)
+    return ["basis":"row-enabled","enabled":true]
+  }
+  try ui32ProofCheck(status == Int(AXError.attributeUnsupported.rawValue) && raw == nil,"row-enabled",facts)
+  let (query,selected)=try guarded {read(row,kAXSelectedAttribute)}
+  guard query == 0,let selectedValue=boolean(selected) else {
+    throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"row-selected-capability","queryError":query,"boolTyped":boolean(selected) != nil])
+  }
+  let (settable,writable)=try guarded {selectedSettable(row)}
+  try ui32ProofCheck(settable == 0 && writable,"row-selection-settable",["queryError":settable,"rawSettableBool":writable])
+  return ["basis":"row-selection-capability","enabledQueryError":status,"selected":selectedValue,"selectedSettable":true]
+}
+
 extension UI32Fixture {
   func fileRead(_ node:AXUIElement, _ pid:pid_t, _ key:String, _ deadline:UInt64) throws -> (Int,CFTypeRef?) {
     try ui32ProofCheck(DispatchTime.now().uptimeNanoseconds < deadline && owns(node,pid) &&
@@ -300,32 +331,15 @@ extension UI32Fixture {
       if role == kAXOutlineRole {try ui32ProofCheck(row != nil && outline == nil,"outline-order-unique");outline=node}
     }
     guard let row,outline != nil else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"row-outline-present"])}
-    let (enabled,value)=try fileRead(row,pinned.pid,kAXEnabledAttribute,deadline)
-    var enabledFacts:[String:Any]=["queryError":enabled,"boolTyped":value is Bool]
-    if enabled == Int(AXError.attributeUnsupported.rawValue) && value == nil {
-      var diagnostic:[String:Any]=["selectionReadInvoked":false,"settableQueryInvoked":false]
-      let indices=observedOwnedNodes.indices.filter {CFEqual(observedOwnedNodes[$0],row)}
-      diagnostic["censusMatches"]=indices.count
-      if indices.count == 1,observedOwnedRoutes.indices.contains(indices[0]) {
-        diagnostic["rowIndex"]=indices[0];diagnostic["rowRoute"]=observedOwnedRoutes[indices[0]]
-      }
-      do {
-        diagnostic["selectionReadInvoked"]=true
-        let (query,selected)=try fileRead(row,pinned.pid,kAXSelectedAttribute,deadline)
-        diagnostic["selectedQueryError"]=query;diagnostic["selectedBoolTyped"]=selected is Bool
-        if let flag=selected as? Bool {diagnostic["selectedBool"]=flag}
-        try ui32ProofCheck(DispatchTime.now().uptimeNanoseconds < deadline && owns(row,pinned.pid) &&
-          AXUIElementSetMessagingTimeout(row,0.03) == .success && owns(row,pinned.pid),"row-capability-preconditions")
-        var writable=DarwinBoolean(false);diagnostic["settableQueryInvoked"]=true
-        let status=AXUIElementIsAttributeSettable(row,kAXSelectedAttribute as CFString,&writable)
-        try ui32ProofCheck(owns(row,pinned.pid) && DispatchTime.now().uptimeNanoseconds < deadline,
-          "row-capability-postconditions",["queryError":Int(status.rawValue)])
-        diagnostic["selectedSettableQueryError"]=Int(status.rawValue)
-        diagnostic["selectedSettableRawBool"]=writable.boolValue
-      }catch {diagnostic["underlying"]=ui32ActionCause(error)}
-      enabledFacts["capabilityDiagnostic"]=diagnostic
-    }
-    try ui32ProofCheck(enabled == 0 && value as? Bool == true,"row-enabled",enabledFacts)
+    _ = try ui32RowSelectionProof(row,deadline:deadline,now:{DispatchTime.now().uptimeNanoseconds},
+      owned:{owns($0,self.pinned.pid)},prepare:{AXUIElementSetMessagingTimeout($0,0.03) == .success},read:{node,key in
+        var raw:CFTypeRef?;let status=AXUIElementCopyAttributeValue(node,key as CFString,&raw)
+        return (Int(status.rawValue),raw)
+      },selectedSettable:{node in
+        var writable=DarwinBoolean(false)
+        let status=AXUIElementIsAttributeSettable(node,kAXSelectedAttribute as CFString,&writable)
+        return (Int(status.rawValue),writable.boolValue)
+      })
     let (status,raw)=try fileRead(urlNode,pinned.pid,kAXURLAttribute,deadline)
     try ui32ProofCheck(status == 0 && ui32FixtureURLMatches(raw as? URL,fixture),"row-url-reread",["queryError":status,"urlTyped":raw is URL]);try ui32ProofStep("row-file-hash"){try fileProof()};return row
   }
@@ -386,44 +400,4 @@ extension UI32Fixture {
 func ui32FileBinding<Node>(_ actual:Node, _ certified:Node?, equal:(Node,Node)->Bool, owned:(Node)->Bool) throws {
   guard let certified else {throw Refusal(code:"adapter-refused")}
   try check(owned(actual) && owned(certified) && equal(actual,certified))
-}
-func ui32FileDomainSelfTest() throws {
-  for typed in [false,true] {
-    var calls=0,facts=[String:Any]()
-    do {_ = try ui32ProofStep("nemo-audit"){() throws -> Void in calls += 1;if typed {throw ActionRefusal(diagnostics:["stage":"original","gotoReason":"original-reason"])};throw Refusal(code:"adapter-refused")}}catch let error as ActionRefusal{facts=error.diagnostics}
-    let cause=facts["underlying"] as? [String:Any],nested=cause?["facts"] as? [String:Any]
-    try check(calls == 1 && facts["proofStep"] as? String == "nemo-audit" && facts["actionAttempted"] == nil && facts["actionPosted"] == nil)
-    try check(typed ? nested?["stage"] as? String == "original" && nested?["gotoReason"] as? String == "original-reason" : cause?["code"] as? String == "adapter-refused")
-  }
-  var content=[String:Any]()
-  do {_ = try ui32ContentReadStep("tree-identity"){() throws -> Void in throw ActionRefusal(diagnostics:["stage":"parent-query","insideContent":true])}}catch let error as ActionRefusal{content=error.diagnostics}
-  try check(content["stage"] as? String == "parent-query" && content["insideContent"] as? Bool == true && content["proofStep"] == nil)
-
-  for fault in ["none","missing","substituted","foreign","stale-certified-owner"] {
-    var reads=0,refused=false
-    do {try ui32FileBinding(fault == "substituted" ? 2 : 1,fault == "missing" ? nil : 1,equal:==,owned:{_ in
-      reads += 1;return fault != "foreign" && !(fault == "stale-certified-owner" && reads == 2)
-    })}catch{refused=true}
-    try check(refused == (fault != "none"))
-  }
-  func facts(_ match:Bool) -> [String:Any] {[
-    "complete":true,"truncated":false,"unqueriedQueries":0,"failedQueries":0,"ownedNodeCount":1,
-    "observedExpectedURLMatches":match ? 1 : 0,"nodes":[["index":0,"queriesStarted":2,"expectedURLMatch":match]]]}
-  try check(try ui32FileDomain(facts(true),facts(false),nil) == "nemo-owned-sheet")
-  try check(try ui32FileDomain(facts(false),facts(true),"authenticated-service") == "authenticated-service")
-  for fault in ["partial","truncated","unqueried","failed","zero","duplicate","switch","mismatch","missing-match"] {
-    var own=facts(true),service=facts(false),retained:String?=nil
-    switch fault {
-    case "partial":own["complete"]=false
-    case "truncated":own["truncated"]=true
-    case "unqueried":own["unqueriedQueries"]=1
-    case "failed":own["failedQueries"]=1
-    case "zero":own=facts(false)
-    case "duplicate":service=facts(true)
-    case "switch":retained="authenticated-service"
-    case "mismatch":own["observedExpectedURLMatches"]=0
-    default:own["nodes"]=[["index":0,"queriesStarted":2]]
-    }
-    var refused=false;do {_ = try ui32FileDomain(own,service,retained)}catch{refused=true};try check(refused)
-  }
 }

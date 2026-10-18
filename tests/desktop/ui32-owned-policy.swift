@@ -110,7 +110,7 @@ func ui32SelfTest() throws {
   try ui32IdentityPhaseSelfTest()
   try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()
-  try ui32ZeroForeignFallbackSelfTest();try ui32OwnedSheetReadSelfTest();try ui32ContentWalkSelfTest();try ui32OwnedCandidatePathSelfTest();try ui32FileDomainSelfTest();try ui32NewPostCreateReadSelfTest();try ui32InitialOwnedReadinessSelfTest()
+  try ui32ZeroForeignFallbackSelfTest();try ui32OwnedSheetReadSelfTest();try ui32ContentWalkSelfTest();try ui32OwnedCandidatePathSelfTest();try ui32FileDomainSelfTest();try ui32RowSelectionProofSelfTest();try ui32NewPostCreateReadSelfTest();try ui32InitialOwnedReadinessSelfTest()
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
     try check(!ui32ModeAllowed(mode))
     var refused=false
@@ -339,3 +339,113 @@ func ui32ContentWalk<Node>(_ root:Node, owner expected:Int, deadline:UInt64,
 }
 
 // Only the observed invalid passed-element failure, never a missing parent or cause claim.
+
+func ui32FileDomainSelfTest() throws {
+  for typed in [false,true] {
+    var calls=0,facts=[String:Any]()
+    do {_ = try ui32ProofStep("nemo-audit"){() throws -> Void in calls += 1;if typed {throw ActionRefusal(diagnostics:["stage":"original","gotoReason":"original-reason"])};throw Refusal(code:"adapter-refused")}}catch let error as ActionRefusal{facts=error.diagnostics}
+    let cause=facts["underlying"] as? [String:Any],nested=cause?["facts"] as? [String:Any]
+    try check(calls == 1 && facts["proofStep"] as? String == "nemo-audit" && facts["actionAttempted"] == nil && facts["actionPosted"] == nil)
+    try check(typed ? nested?["stage"] as? String == "original" && nested?["gotoReason"] as? String == "original-reason" : cause?["code"] as? String == "adapter-refused")
+  }
+  var content=[String:Any]()
+  do {_ = try ui32ContentReadStep("tree-identity"){() throws -> Void in throw ActionRefusal(diagnostics:["stage":"parent-query","insideContent":true])}}catch let error as ActionRefusal{content=error.diagnostics}
+  try check(content["stage"] as? String == "parent-query" && content["insideContent"] as? Bool == true && content["proofStep"] == nil)
+
+  for fault in ["none","missing","substituted","foreign","stale-certified-owner"] {
+    var reads=0,refused=false
+    do {try ui32FileBinding(fault == "substituted" ? 2 : 1,fault == "missing" ? nil : 1,equal:==,owned:{_ in
+      reads += 1;return fault != "foreign" && !(fault == "stale-certified-owner" && reads == 2)
+    })}catch{refused=true}
+    try check(refused == (fault != "none"))
+  }
+  func facts(_ match:Bool) -> [String:Any] {[
+    "complete":true,"truncated":false,"unqueriedQueries":0,"failedQueries":0,"ownedNodeCount":1,
+    "observedExpectedURLMatches":match ? 1 : 0,"nodes":[["index":0,"queriesStarted":2,"expectedURLMatch":match]]]}
+  try check(try ui32FileDomain(facts(true),facts(false),nil) == "nemo-owned-sheet")
+  try check(try ui32FileDomain(facts(false),facts(true),"authenticated-service") == "authenticated-service")
+  for fault in ["partial","truncated","unqueried","failed","zero","duplicate","switch","mismatch","missing-match"] {
+    var own=facts(true),service=facts(false),retained:String?=nil
+    switch fault {
+    case "partial":own["complete"]=false
+    case "truncated":own["truncated"]=true
+    case "unqueried":own["unqueriedQueries"]=1
+    case "failed":own["failedQueries"]=1
+    case "zero":own=facts(false)
+    case "duplicate":service=facts(true)
+    case "switch":retained="authenticated-service"
+    case "mismatch":own["observedExpectedURLMatches"]=0
+    default:own["nodes"]=[["index":0,"queriesStarted":2]]
+    }
+    var refused=false;do {_ = try ui32FileDomain(own,service,retained)}catch{refused=true};try check(refused)
+  }
+}
+
+func ui32RowSelectionProofSelfTest() throws {
+  for fault in ["enabled","selectable","already-selected","disabled","enabled-number","enabled-string","enabled-error","enabled-nil",
+    "unsupported-payload","no-value","selected-error","selected-number","selected-nil","settable-error","not-settable",
+    "foreign","stale","timeout","deadline","expired-after-read","expired-before-read","changed-after-settable","owner-consumes-budget"] {
+    var calls=[String](),owners=0,clock:UInt64=fault == "deadline" ? 10 : 0,refused=false,proof=[String:Any]()
+    do {
+      proof=try ui32RowSelectionProof(7,deadline:10,now:{clock},owned:{node in
+        owners += 1;calls.append("owner");if fault == "owner-consumes-budget" {clock=10};return node == 7 && fault != "foreign" && !(fault == "stale" && owners == 3) && !(fault == "changed-after-settable" && calls.contains("settable"))
+      },prepare:{node in
+        calls.append("prepare");if fault == "expired-before-read" {clock=10};return node == 7 && fault != "timeout"
+      },read:{node,key in
+        calls.append(key);if fault == "expired-after-read" {clock=10}
+        if key == kAXEnabledAttribute {
+          if fault == "enabled" {return (0,kCFBooleanTrue)}
+          if fault == "disabled" {return (0,kCFBooleanFalse)}
+          if fault == "enabled-number" {return (0,NSNumber(value:1))}
+          if fault == "enabled-string" {return (0,"true" as CFString)}
+          if fault == "enabled-error" {return (-1,nil)}
+          if fault == "enabled-nil" {return (0,nil)}
+          if fault == "unsupported-payload" {return (Int(AXError.attributeUnsupported.rawValue),kCFBooleanTrue)}
+          if fault == "no-value" {return (Int(AXError.noValue.rawValue),nil)}
+          return (Int(AXError.attributeUnsupported.rawValue),nil)
+        }
+        if fault == "selected-error" {return (-1,nil)}
+        if fault == "selected-number" {return (0,NSNumber(value:1))}
+        if fault == "selected-nil" {return (0,nil)}
+        return (0,fault == "already-selected" ? kCFBooleanTrue : kCFBooleanFalse)
+      },selectedSettable:{node in
+        calls.append("settable");return (fault == "settable-error" ? -1 : 0,fault != "not-settable")
+      })
+    }catch is ActionRefusal {refused=true}
+    let positive=["enabled","selectable","already-selected"].contains(fault)
+    try check(refused == !positive)
+    let attributes=calls.filter {$0 == kAXEnabledAttribute || $0 == kAXSelectedAttribute || $0 == "settable"}
+    try check(attributes.count <= 3)
+    if fault == "enabled" {try check(attributes == [kAXEnabledAttribute] && owners == 3 && calls.filter {$0 == "prepare"}.count == 1 && proof["basis"] as? String == "row-enabled")}
+    if fault == "selectable" || fault == "already-selected" {
+      try check(attributes == [kAXEnabledAttribute,kAXSelectedAttribute,"settable"] && proof["basis"] as? String == "row-selection-capability" && proof["enabled"] == nil)
+      try check(proof["selected"] as? Bool == (fault == "already-selected") && owners == 9 && calls.filter {$0 == "prepare"}.count == 3)
+    }
+    if ["disabled","enabled-number","enabled-string","enabled-error","enabled-nil","unsupported-payload","no-value","stale","expired-after-read"].contains(fault) {try check(attributes == [kAXEnabledAttribute])}
+    if ["selected-error","selected-number","selected-nil"].contains(fault) {try check(attributes == [kAXEnabledAttribute,kAXSelectedAttribute])}
+    if ["foreign","timeout","deadline","expired-before-read"].contains(fault) {try check(attributes.isEmpty)}
+    if fault == "deadline" {try check(calls.isEmpty)}
+    if fault == "owner-consumes-budget" {try check(calls == ["owner"] && owners == 1 && attributes.isEmpty)}
+  }
+}
+
+// Actual New orchestration must not publish on its final outer identity/budget failure.
+func ui32PostedNewContentReadSelfTest() throws {
+  for fault in ["none","outer-native","late-certificate"] {
+    var clock:UInt64=0,nativeCalls=0,reads=0,published=false,refused=false
+    do {
+      let accepted=try ui32PostedNewContentRead("entry.create.default",true,true,true,2,expected:1,now:{clock},retained:{1},equal:==,native:{
+        nativeCalls += 1;if fault == "outer-native" && nativeCalls == 4 {throw Refusal(code:"child-owner")}
+      },certificate:{deadline,expected in
+        reads += 1
+        let proof=try ui32ContentCertificate(0,pid:7,retained:expected,deadline:deadline,now:{clock},equal:==,
+          owner:{_ in (0,true,7)},prepare:{_ in true},traits:{($0 == 0 ? "AXWindow" : $0 == 1 ? "AXWebArea" : "AXGroup",false)},
+          children:{(0,$0 == 0 ? [1] : $0 == 1 ? [2] : [])},parent:{(0,$0 == 1 ? 0 : 1)},strict:{_,_ in [1,2]})
+        if fault == "late-certificate" {clock=deadline};return proof
+      })
+      try check(ui32ContentMembers(accepted.certificate) == [1,2]);published=true
+    }catch{refused=true}
+    try check(reads == 1 && published == (fault == "none") && refused == (fault != "none"))
+    try check(nativeCalls == (fault == "late-certificate" ? 2 : 4))
+  }
+}

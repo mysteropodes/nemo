@@ -165,12 +165,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     }
     return (0,rows)
   }
-  func tree(_ suppliedDeadline:UInt64? = nil) throws -> [AXUIElement] {
-    try ui32ContentReadStep("tree-identity"){try identity()}
+  func readContentCertificate(_ suppliedDeadline:UInt64?, _ expected:AXUIElement?) throws -> UI32ContentCertificate<AXUIElement> {
     guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement],windows.count == 1,
       owns(windows[0],pid),CFEqual(windows[0],main) else { throw Refusal(code:"sheet-active") }
     let deadline=suppliedDeadline ?? (DispatchTime.now().uptimeNanoseconds+750_000_000)
-    let certificate=try ui32ContentCertificate(main,pid:Int(pid),retained:retainedWebArea,deadline:deadline,
+    let certificate=try ui32ContentCertificate(main,pid:Int(pid),retained:expected,deadline:deadline,
       now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:owner,
       prepare:{AXUIElementSetMessagingTimeout($0,0.03) == .success},traits:{ node in
         guard let role=try text(node,kAXRoleAttribute) else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"content-role-missing"])}
@@ -184,8 +183,15 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
         try ui32ContentWalk(web,owner:Int(pid),deadline:deadline,now:{DispatchTime.now().uptimeNanoseconds},
           equal:{CFEqual($0,$1)},owner:owner,children:strictChildren,parent:parent)
       })
-    try ui32ContentReadStep("tree-final-native-identity"){try nativeIdentity()};retainedWebArea=certificate.nodes[certificate.web];latest=certificate
-    return certificate.nodes.indices.filter {certificate.inside.contains($0)}.map {certificate.nodes[$0]}
+    try ui32ContentReadStep("tree-final-native-identity"){try nativeIdentity()};return certificate
+  }
+  func publishContent(_ certificate:UI32ContentCertificate<AXUIElement>) -> [AXUIElement] {
+    retainedWebArea=certificate.nodes[certificate.web];latest=certificate
+    return ui32ContentMembers(certificate)
+  }
+  func tree(_ suppliedDeadline:UInt64? = nil) throws -> [AXUIElement] {
+    try ui32ContentReadStep("tree-identity"){try identity()}
+    return publishContent(try readContentCertificate(suppliedDeadline,retainedWebArea))
   }
   func newContext(_ command:String) throws {
     guard entryEnabled else {return};_ = try tree()
@@ -459,8 +465,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       },postScope:{
         if entryEnabled && base == "entry.create.default" {
           guard let web=retainedWebArea else {throw Refusal(code:"adapter-refused")}
-          result["entryContentRead"]=try ui32NewPostCreateRead(base,entryEnabled,attempted,posted,entryStage,
-            now:{DispatchTime.now().uptimeNanoseconds},identity:{try identity();try check(retainedWebArea.map {CFEqual($0,web)} ?? false)},read:{_ = try tree($0)})
+          let accepted=try ui32PostedNewContentRead(base,entryEnabled,attempted,posted,entryStage,expected:web,
+            now:{DispatchTime.now().uptimeNanoseconds},retained:{retainedWebArea},equal:{CFEqual($0,$1)},native:nativeIdentity,
+            certificate:{try readContentCertificate($0,$1)})
+          _ = publishContent(accepted.certificate)
+          result["entryContentRead"]=accepted.diagnostics
         } else if base == "fixture.open" || base == "sync.open-cancel" {try identity()} else {_ = try tree()}
       },posted:{
         posted=true;entryStage=nextEntryStage;newSettingsOpen=nextSettingsOpen
