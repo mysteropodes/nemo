@@ -13,6 +13,68 @@ func ui32UsesF03Fixture(_ raw:String?) throws -> Bool {
 func ui32FixtureURLMatches(_ observed:URL?, _ expected:URL) -> Bool {
   observed?.isFileURL == true && observed?.standardizedFileURL == expected
 }
+// Records only results already returned to the unchanged shared walkers.
+final class UI32PanelTrace<Node> {
+  let kind:String, expected:Int, equal:(Node,Node)->Bool
+  var nodes:[Node], routes:[[String]], declared:[[Int]], owners:[String]
+  var entered=Set<Int>(), current:Int?, phase="none", reported:Node?, query=0, foreignRoots=0, truncated=false
+  init(_ kind:String, _ root:Node, _ expected:Int, equal:@escaping (Node,Node)->Bool) {
+    self.kind=kind;self.expected=expected;self.equal=equal
+    nodes=[root];routes=[[""]];declared=[[]];owners=["not-queried"]
+  }
+  func index(_ node:Node) -> Int? { nodes.firstIndex {equal($0,node)} }
+  func ownership(_ node:Node, _ value:(Int,Bool,Int)) -> (Int,Bool,Int) {
+    current=index(node);phase="owner";reported=nil;query=value.0
+    if let i=current {owners[i]=value.0 != 0 ? "query-error" : value.1 && value.2 == expected ? "owned" : "foreign"}
+    return value
+  }
+  func children(_ node:Node, _ value:(Int,[Node]?)) -> (Int,[Node]?) {
+    current=index(node);phase="children";reported=nil;query=value.0
+    if let i=current {
+      entered.insert(i)
+      if value.0 == 0,let rows=value.1 {
+        for (offset,child) in rows.prefix(512).enumerated() {
+          let route=(routes[i].first ?? "").isEmpty ? String(offset) : routes[i][0]+"."+String(offset)
+          if let j=index(child) {
+            if routes[j].count < 2 {routes[j].append(route)} else {truncated=true}
+            if !declared[j].contains(i) {declared[j].append(i)}
+          } else if nodes.count < 513 {
+            nodes.append(child);routes.append([route]);declared.append([i]);owners.append("not-queried")
+          } else {truncated=true}
+        }
+      }
+    }
+    return value
+  }
+  func parent(_ node:Node, _ value:(Int,Node?)) -> (Int,Node?) {
+    current=index(node);phase="parent";reported=value.1;query=value.0;return value
+  }
+  func failure(_ error:ActionRefusal, describe:(Node)->[String:Any] = {_ in [:]}) -> ActionRefusal {
+    var facts=error.diagnostics, context:[String:Any]=["basis":"last-shared-walk-port-result","walk":kind,"phase":phase,"knownNodeCount":nodes.count,
+      "enteredNodeCount":entered.count,"queryError":query,"metadataTruncated":truncated,"foreignRootCount":foreignRoots,
+      "completedForeignSearch":kind == "attached-foreign-root" && error.diagnostics["stage"] as? String == "candidate-count"]
+    var references:[String:Any]=[:]
+    func record(_ name:String, _ node:Node?) {
+      guard let node else {references[name]=["relation":"unavailable"];return}
+      let i=index(node);var value:[String:Any]=["knownIndex":i ?? -1,"owner":i.map {owners[$0]} ?? "not-queried"]
+      if let i {value["routes"]=routes[i];if owners[i] == "owned" {value["categories"]=describe(node)}}
+      references[name]=value
+    }
+    record("root",nodes[0]);record("child",current.map {nodes[$0]})
+    if let i=current {
+      context["routes"]=routes[i];context["depths"]=routes[i].map {$0.isEmpty ? 0 : $0.split(separator:".").count}
+      context["declaredParentIndices"]=declared[i]
+      record("declaredParent",declared[i].count == 1 ? nodes[declared[i][0]] : nil)
+      if phase == "parent" {
+        context["reportedMatchesChild"]=reported.map {equal($0,nodes[i])} ?? false
+        context["reportedMatchesDeclared"]=reported.map {p in declared[i].contains {equal(p,nodes[$0])}} ?? false
+      }
+    }
+    record("reportedParent",reported);context["references"]=references;facts["panelTraversal"]=context
+    return ActionRefusal(diagnostics:facts)
+  }
+}
+
 final class UI32Fixture {
   let pinned:OwnedInitialWindow
   let fixture:URL
@@ -43,17 +105,41 @@ final class UI32Fixture {
     let bytes=try Data(contentsOf:fixture); try check(SHA256.hash(data:bytes).map {String(format:"%02x",$0)}.joined() == ui32FixtureHash)
   }
   func ownedTree(_ root:AXUIElement, _ pid:pid_t) throws -> [AXUIElement] {
-    try boundedOwnedTree(root,owner:Int(pid),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
+    let trace=UI32PanelTrace("bounded-owned-tree",root,Int(pid),equal:{CFEqual($0,$1)})
+    do { return try boundedOwnedTree(root,owner:Int(pid),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
       now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:{ node in
         var actual:pid_t=0;let q=AXUIElementGetPid(node,&actual)
-        return (Int(q.rawValue),q == .success && actual == pid,Int(actual))
+        return trace.ownership(node,(Int(q.rawValue),q == .success && actual == pid,Int(actual)))
       },children:{ node in
-        ui32Children(node,pid)
+        trace.children(node,ui32Children(node,pid))
       },parent:{ node in
-        guard AXUIElementSetMessagingTimeout(node,0.03) == .success else { return (-1,nil) }
+        guard AXUIElementSetMessagingTimeout(node,0.03) == .success else { return trace.parent(node,(-1,nil)) }
         var raw:CFTypeRef?;let q=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
-        return (Int(q.rawValue),axElement(raw))
-      })
+        return trace.parent(node,(Int(q.rawValue),axElement(raw)))
+      }) } catch let error as ActionRefusal { throw panelFailure(error,trace,pid) }
+  }
+  func panelFailure(_ error:ActionRefusal, _ trace:UI32PanelTrace<AXUIElement>, _ pid:pid_t) -> ActionRefusal {
+    let deadline=DispatchTime.now().uptimeNanoseconds+250_000_000
+    let enriched=trace.failure(error,describe:{node in
+      var facts:[String:Any]=[:]
+      for key in [kAXRoleAttribute,kAXSubroleAttribute] {
+        guard DispatchTime.now().uptimeNanoseconds < deadline,owns(node,pid),
+          AXUIElementSetMessagingTimeout(node,0.03) == .success,owns(node,pid) else {facts["status"]="unreadable-or-owner-changed";return facts}
+        var raw:CFTypeRef?;let q=AXUIElementCopyAttributeValue(node,key as CFString,&raw)
+        guard owns(node,pid) else {facts["status"]="owner-changed";return facts}
+        let allowed=key == kAXRoleAttribute ? ["AXSheet","AXWindow","AXGroup","AXButton","AXSplitGroup","AXScrollArea","AXOutline","AXRow","AXCell","AXTextField","AXStaticText"] : ["AXDialog","AXSystemDialog","AXStandardWindow"]
+        let value=raw as? String
+        facts[key == kAXRoleAttribute ? "role" : "subrole"]=q == .success && value != nil ? (allowed.contains(value!) ? value! : "other") : "unreadable"
+        facts[key == kAXRoleAttribute ? "roleQuery" : "subroleQuery"]=Int(q.rawValue)
+      }
+      return facts
+    })
+    var facts=enriched.diagnostics, context=facts["panelTraversal"] as? [String:Any] ?? [:]
+    context["reportedParentMatchesPinnedMain"]=trace.reported.map {CFEqual($0,pinned.main)} ?? false
+    context["reportedParentMatchesRetainedSheet"]=trace.reported.map {node in sheet.map {CFEqual(node,$0)} ?? false} ?? false
+    context["rootMatchesPinnedMain"]=CFEqual(trace.nodes[0],pinned.main)
+    context["rootMatchesRetainedSheet"]=sheet.map {CFEqual(trace.nodes[0],$0)} ?? false
+    facts["panelTraversal"]=context;return ActionRefusal(diagnostics:facts)
   }
   func attachedSheet() throws -> AXUIElement {
     try verifyOwnedWindow(pinned)
@@ -80,19 +166,20 @@ final class UI32Fixture {
   }
   func panel() throws -> ([AXUIElement],pid_t) {
     let outer=try attachedSheet();var foreign=[Int]()
+    let trace=UI32PanelTrace("attached-foreign-root",outer,Int(pinned.pid),equal:{CFEqual($0,$1)})
     var currentRoot=outer, currentParent=pinned.main, currentOwner=pinned.pid, currentStart=pinned.start
     do {
       let found=try attachedForeignRoot(outer,owner:Int(pinned.pid),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
         now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:{ node in
           var actual:pid_t=0;let q=AXUIElementGetPid(node,&actual)
-          return (Int(q.rawValue),q == .success && actual == self.pinned.pid,Int(actual))
+          return trace.ownership(node,(Int(q.rawValue),q == .success && actual == self.pinned.pid,Int(actual)))
         },children:{ node in
-          ui32Children(node,self.pinned.pid)
+          trace.children(node,ui32Children(node,self.pinned.pid))
         },parent:{ node in
-          guard AXUIElementSetMessagingTimeout(node,0.03) == .success else { return (-1,nil) }
+          guard AXUIElementSetMessagingTimeout(node,0.03) == .success else { return trace.parent(node,(-1,nil)) }
           var raw:CFTypeRef?;let q=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
-          return (Int(q.rawValue),axElement(raw))
-        },foreignChild:{ _,pid in foreign.append(pid) })
+          return trace.parent(node,(Int(q.rawValue),axElement(raw)))
+        },foreignChild:{ _,pid in foreign.append(pid);trace.foreignRoots += 1 })
       let pid=pid_t(found.pid)
       guard let stamp=processStart(pid), authenticatedPanelService(pid), processStart(pid) == stamp else { throw Refusal(code:"sheet-owner") }
       try check(AXUIElementSetMessagingTimeout(found.root,0.03) == .success)
@@ -103,7 +190,7 @@ final class UI32Fixture {
       currentRoot=found.root;currentParent=observedParent;currentOwner=pid;currentStart=stamp
     } catch let error as ActionRefusal {
       // Only a completed walk proving ZERO foreign roots may use same-PID AX.
-      guard foreign.isEmpty && error.diagnostics["stage"] as? String == "candidate-count" else { throw error }
+      guard foreign.isEmpty && error.diagnostics["stage"] as? String == "candidate-count" else { throw panelFailure(error,trace,pinned.pid) }
     }
     if let root, let parent, let owner, let start {
       try check(CFEqual(root,currentRoot) && CFEqual(parent,currentParent) && owner == currentOwner && start == currentStart)
@@ -206,7 +293,7 @@ final class UI32Fixture {
         try verifyOwnedWindow(pinned)
       }
       return ["actionAttempted":attemptedAction,"actionPosted":true,"panelOwner":pid]
-    } catch { throw ActionRefusal(diagnostics:["purpose":"UI32","command":command,"actionAttempted":attemptedAction,"stage":"fixture-guard-or-action","retry":false]) }
+    } catch { throw ActionRefusal(diagnostics:["purpose":"UI32","command":command,"actionAttempted":attemptedAction,"stage":"fixture-guard-or-action","retry":false,"underlying":ui32ActionCause(error)]) }
   }
 }
 
@@ -225,6 +312,7 @@ func ui32FinishAfterDismissal(_ windowAbsent:Bool, certificate:() throws -> Void
   try ui32ScopeCheck(windowAbsent,"native-window-present");try certificate();finish()
 }
 func ui32FixtureSelfTest() throws {
+  try ui32PanelTraceSelfTest()
   try check(try ui32UsesF03Fixture(nil) == false)
   try check(try ui32UsesF03Fixture("initial-text") == false)
   try check(try ui32UsesF03Fixture("f03-original") == true)
@@ -325,5 +413,51 @@ func ui32ContentScopeSelfTest() throws {
   try check(try ui32ScopedCandidate([2],[]) == 2)
   for values in [([Int](),[Int]()),([1,2],[]),([2],[3])] {
     var refused=false;do { _ = try ui32ScopedCandidate(values.0,values.1) } catch { refused=true };try check(refused)
+  }
+}
+
+// Exercise the actual shared walks; no copied traversal or native AX access.
+func ui32PanelTraceSelfTest() throws {
+  for kind in ["attached-foreign-root","bounded-owned-tree"] {
+    for fault in ["edge","children","zero","foreign","owner-error","parent-query","parent-outside"] {
+      let trace=UI32PanelTrace(kind,0,7,equal:==)
+      var readNodes=[Int](),parentNodes=[Int](),described=[Int](),facts:[String:Any]?,succeeded=false
+      let owner:(Int)->(Int,Bool,Int)={node in
+        trace.ownership(node,(fault == "owner-error" && node == 2 ? -1 : 0,
+          !(fault == "foreign" && node == 2),fault == "foreign" && node == 2 ? 8 : 7))
+      }
+      let children:(Int)->(Int,[Int]?)={node in
+        readNodes.append(node)
+        return trace.children(node,fault == "children" && node == 1 ? (-1,nil) : (0,node < 2 ? [node+1] : []))
+      }
+      let parent:(Int)->(Int,Int?)={node in
+        parentNodes.append(node)
+        return trace.parent(node,fault == "parent-query" && node == 2 ? (-1,nil) : (0,fault == "parent-outside" && node == 2 ? 99 : fault == "edge" && node == 2 ? 0 : node-1))
+      }
+      do {
+        if kind == "attached-foreign-root" {
+          let found=try attachedForeignRoot(0,owner:7,deadline:10,now:{0},equal:==,owner:owner,children:children,parent:parent,
+            foreignChild:{_,_ in trace.foreignRoots += 1})
+          try check(found.root == 2 && fault == "foreign")
+        } else {try check(try boundedOwnedTree(0,owner:7,deadline:10,now:{0},equal:==,owner:owner,children:children,parent:parent) == [0,1,2])}
+        succeeded=true
+      } catch let error as ActionRefusal {
+        facts=trace.failure(error,describe:{node in described.append(node);return ["injectedNode":node]}).diagnostics
+      }
+      try check(succeeded == ((kind == "attached-foreign-root" && fault == "foreign") || (kind == "bounded-owned-tree" && fault == "zero")))
+      if let facts,let context=facts["panelTraversal"] as? [String:Any] {
+        try check(context["walk"] as? String == kind)
+        let complete=kind == "attached-foreign-root" && fault == "zero"
+        try check(context["completedForeignSearch"] as? Bool == complete)
+        if fault == "edge" {
+          try check(facts["stage"] as? String == "parent-edge" && context["routes"] as? [String] == ["0.0"])
+          try check(context["enteredNodeCount"] as? Int == 2 && context["declaredParentIndices"] as? [Int] == [1])
+          try check(context["reportedMatchesDeclared"] as? Bool == false)
+        }
+        if fault == "children" {try check(facts["stage"] as? String == "children-query" && !complete)}
+      }
+      if fault == "foreign" || fault == "owner-error" {try check(!readNodes.contains(2) && !parentNodes.contains(2) && !described.contains(2))}
+      try check(!described.contains(99))
+    }
   }
 }
