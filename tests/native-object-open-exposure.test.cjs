@@ -18,6 +18,7 @@ function harness(options={}){
     if(command==='nemo_native_object_reference')return {...info(),requestId:request.requestId};
     if(command==='nemo_native_object_preview'){
       if(options.duringPreview)options.duringPreview(hint);
+      if(options.previewError)throw options.previewError;
       if(options.previewGate)await options.previewGate.promise;
       return receipts.shift()||{status:'presented',workId:'later',viewGeneration:3};
     }
@@ -29,6 +30,7 @@ function harness(options={}){
       if(options.initialHint)onHint(options.initialHint);
       let removed=false;const detach=()=>{if(!removed){removed=true;removes++;effects.push('remove');if(options.badDetach)throw Error('unsubscribe failed');}};
       return {detach,close:()=>{closes++;detach();if(options.badClose)throw Error('close cleanup failed');}};}};
+  if(options.openDiagnostic)ports.openDiagnostic=options.openDiagnostic;
   if(options.revisionGate)Object.assign(ports,{projectionReady:()=>true,publishRevision:()=>true,unsubscribeRevisions:async()=>{},
     subscribeRevisions:async(a,b,c,isCurrent)=>{await options.revisionGate.promise;if(isCurrent())options.onSubscriptionStart();return {...info(),subscriptionId:'revision-sub'};}});
   const session=Project.create(ports);
@@ -167,4 +169,55 @@ test('retired transition during unsupported reconciliation cannot fall through t
   const gate=deferred();let current=true;const h=harness({current:()=>current,bootstrapError:{code:'unsupported_format'},reconcileGate:gate});
   const pending=h.open();await turn();current=false;gate.resolve();await assert.rejects(pending);assert.equal(h.previews(),0);
   assert.equal(h.session.isIndeterminate(),false);assert.equal(h.session.blocksLegacy(),false);assert.equal(h.effects.includes('commit'),false);
+});
+
+
+test('connected deferred recovery samples every receipt accessor once and publishes only inspected identities',async()=>{
+  const counts=[{status:0,workId:0,viewGeneration:0},{status:0,workId:0,viewGeneration:0},{status:0,workId:0,viewGeneration:0}];
+  const receipts=['deferred-occluded','presented','presented'].map((status,i)=>Object.defineProperties({},{
+    status:{get(){assert.equal(++counts[i].status,1,'status accessor must not be sampled again');return status;}},
+    workId:{get(){assert.equal(++counts[i].workId,1);return i===2?'work-2':'work-1';}},
+    viewGeneration:{get(){assert.equal(++counts[i].viewGeneration,1);return i===2?2:1;}}
+  }));
+  const h=harness({receipts}),pending=h.open();await turn();assert.equal(h.previews(),1);
+  assert.deepEqual(counts,[{status:1,workId:1,viewGeneration:1},{status:0,workId:0,viewGeneration:0},{status:0,workId:0,viewGeneration:0}]);
+  h.hint({visible:true});await pending;assert.equal(h.previews(),3);assert.equal(h.session.isActive(),true);
+  assert.deepEqual(counts,Array.from({length:3},()=>({status:1,workId:1,viewGeneration:1})));
+  assert.deepEqual(h.effects,['listen','reveal','remove','commit']);assert.equal(h.removes(),1);
+  assert.equal(h.session.readPresentedObjectSession().presentation.workId,'work-2');
+});
+for(const resumed of [false,true])test('connected '+(resumed?'resumed':'initial')+' status refusal never reads later receipt identity',async()=>{
+  for(const status of ['stale-discarded','deferred-timeout','failed-validation','deferred-PRIVATE','deferred-occluded:PRIVATE',{},null]){
+    let reads=0;const diagnostics=[],receipt=Object.defineProperties({},{status:{get(){reads++;return status;}},
+      workId:{get(){assert.fail('status refusal read work identity');}},viewGeneration:{get(){assert.fail('status refusal read view identity');}}});
+    const receipts=resumed?[{status:'deferred-occluded',workId:'work-1',viewGeneration:1},receipt]:[receipt];
+    const h=harness({receipts,openDiagnostic:(event,code)=>diagnostics.push({event,code})}),pending=h.open();
+    const rejection=assert.rejects(pending,/frame was not presented/);if(resumed){await turn();assert.equal(h.previews(),1);h.hint({visible:true});}await rejection;
+    const known=['stale-discarded','deferred-timeout','failed-validation'].includes(status);
+    assert.equal(diagnostics.find(e=>e.event==='post-bootstrap-failed').code,'post-bootstrap-first-preview-'+(known?'status-'+status:'status')+':local-refusal:unknown:other');
+    assert.equal(reads,1);assert.equal(h.previews(),resumed?2:1);assert.equal(h.effects.includes('reveal'),false);
+    assert.equal(h.session.readPresentedObjectSession(),null);assert.equal(h.removes(),1);assert.doesNotMatch(JSON.stringify(diagnostics),/PRIVATE/);
+  }
+});
+for(const resumed of [false,true])test('connected '+(resumed?'resumed':'initial')+' accessor throw retains original object and receipt-access witness',async()=>{
+  for(const field of ['status','workId','viewGeneration']){
+    const original={message:'PRIVATE document bytes'},diagnostics=[],reads={status:0,workId:0,viewGeneration:0};
+    Object.defineProperty(original,'code',{get(){throw Error('PRIVATE error code');}});
+    const values={status:resumed?'presented':'deferred-occluded',workId:'work-1',viewGeneration:1};
+    const receipt=Object.defineProperties({},Object.fromEntries(Object.keys(values).map(key=>[key,{get(){reads[key]++;if(key===field)throw original;return values[key];}}])));
+    const receipts=resumed?[{status:'deferred-occluded',workId:'work-1',viewGeneration:1},receipt]:[receipt];
+    const h=harness({receipts,openDiagnostic:(event,code)=>diagnostics.push({event,code})}),pending=h.open();
+    const rejection=assert.rejects(pending,error=>error===original);if(resumed){await turn();h.hint({visible:true});}await rejection;
+    assert.equal(reads.status,1);assert.equal(reads.workId,field==='status'?0:1);assert.equal(reads.viewGeneration,field==='viewGeneration'?1:0);
+    assert.equal(diagnostics.find(e=>e.event==='post-bootstrap-failed').code,'post-bootstrap-first-preview-receipt-access:local-refusal:unknown:other');
+    assert.doesNotMatch(JSON.stringify(diagnostics),/PRIVATE|bytes/);assert.equal(h.previews(),resumed?2:1);
+    assert.equal(h.effects.includes('reveal'),false);assert.equal(h.session.isIndeterminate(),true);assert.equal(h.removes(),1);
+  }
+});
+test('connected invoke rejection remains invoke-rejected rather than receipt-access and retains original object',async()=>{
+  const original={message:'PRIVATE native rejection'},diagnostics=[];Object.defineProperty(original,'code',{get(){throw Error('PRIVATE error code');}});
+  const h=harness({previewError:original,openDiagnostic:(event,code)=>diagnostics.push({event,code})});
+  await assert.rejects(h.open(),error=>error===original);
+  assert.equal(diagnostics.find(e=>e.event==='post-bootstrap-failed').code,'post-bootstrap-first-preview:invoke-rejected:unknown:other');
+  assert.doesNotMatch(JSON.stringify(diagnostics),/PRIVATE/);assert.equal(h.previews(),1);assert.equal(h.effects.includes('reveal'),false);assert.equal(h.removes(),1);
 });
