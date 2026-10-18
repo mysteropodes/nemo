@@ -5,8 +5,8 @@
   "version": 1,
   "status": "active",
   "availability": {
-    "state": "unavailable",
-    "reason": "atomic PNG placement source, production raster resources and scene joins are pending"
+    "state": "available",
+    "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
@@ -28,7 +28,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal; no document, glyph or pixel payload in either direction."
   },
-  "semantics": "Bounded PNG resource and placement import only. A required placement intent creates a still layer or places on an authored frame atomically, with one revision/history entry and canonical native asset ID/dimensions/target. Catalog-only attach retains compatibility validation but refuses unavailable before source I/O. Removal, other codecs, sequences, DOM drop handles and video remain unavailable. Availability remains pending until actual host, owner, resource and scene ports are integrated and validated.",
+  "semantics": "Bounded PNG resource and placement import only. A required placement intent creates a still layer or places on an authored frame atomically, with one revision/history entry and canonical native asset ID/dimensions/target. Catalog-only attach retains compatibility validation but refuses unavailable before source I/O. Removal, other codecs, sequences, DOM drop handles and video remain unavailable. This declaration covers only the bounded PNG placement route; installed acceptance and full media parity are recorded separately.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

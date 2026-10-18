@@ -42,7 +42,7 @@ function fixture(options={}) {
  ['image-input','video-input','btn-import-img','btn-import-video'].forEach(node);
  const document={readyState:'loading',getElementById:id=>nodes.get(id)||null,addEventListener:(t,f)=>events.set('document:'+t,f),removeEventListener(){}};
  root.document=document;root.paper={project:{}};
- const controller=Desktop.install(root,options.declared===false?{}:{imageRoute:true});
+ const controller=Desktop.install(root,options.declared===false?{imageRoute:false}:undefined);
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/js/images.js'),'utf8'),vm.createContext({window:root,document,state,SM:root.SM,showToast:root.showToast,console,
   FileReader:function(){assert.fail('no JS decoder');},Image:function(){assert.fail('no JS decoder');},
   saveAllLayerFrames:()=>assert.fail('no legacy save'),pushUndoLayers:()=>assert.fail('no legacy undo'),createUserLayer:()=>assert.fail('no legacy writer'),
@@ -53,7 +53,7 @@ function fixture(options={}) {
   select:()=>{root._layerSel=[];},show:()=>{projected=true;},
  };
 }
-test('production default refuses before picker until native route activation',async()=>{
+test('explicitly disabled image route refuses before picker',async()=>{
  const h=fixture({declared:false});assert.equal((await h.menu()).status,'unavailable');assert.equal(h.picks.length,0);assert.equal(h.requests.length,0);
 });
 test('ordinary menu uses one scoped PNG picker, actual command/SDK and verified presented selection',async()=>{

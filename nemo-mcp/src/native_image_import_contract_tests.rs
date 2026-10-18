@@ -36,10 +36,28 @@ fn both_registered_placement_forms_cross_original_byte_shape_admission_with_opaq
     }
 }
 #[test]
-fn private_preparation_has_no_public_execution_activation() {
+fn png_placement_activation_keeps_remove_unavailable_and_catalog_shape_compatibility() {
     let (q, _) = pair(json!({"kind":"newLayer"}));
-    assert!(matches!(q.validate(), Err(RequestError::Unavailable(_))));
+    assert!(q.validate().is_ok());
+    let mut remove = q.clone();
+    remove.operation = REMOVE.into();
+    remove.payload = json!({"documentSnapshotId":"native-object:document:7","assetId":"asset-a"});
+    assert!(remove.validate_input().is_ok());
+    assert!(matches!(
+        remove.validate(),
+        Err(RequestError::Unavailable(_))
+    ));
+    let mut catalog = q;
+    catalog.payload.as_object_mut().unwrap().remove("placement");
+    catalog
+        .payload
+        .as_object_mut()
+        .unwrap()
+        .remove("lifecycleGeneration");
+    // Old catalog input stays syntactically valid; the host refuses it before source I/O.
+    assert!(catalog.validate_input().is_ok());
 }
+
 #[test]
 fn duplicate_members_and_oversized_original_bytes_are_refused_before_shape_admission() {
     let (q, _) = pair(json!({"kind":"newLayer"}));

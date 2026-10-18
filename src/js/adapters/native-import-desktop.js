@@ -98,8 +98,8 @@
       importTexts: (items, opts) => svgRaw.importTexts(items, opts).then(surface), openFile: (opts) => svgRaw.openFile(opts).then(surface),
     });
     // L06-M2: the ordinary image menu has a native path picker. DOM Files have no admitted native handle.
-    // Activation remains false until the actual source/resource/scene/host proof is accepted by Root.
-    const imageDeclared = overrides.imageRoute === true;
+    // PNG placement uses the declared native route; tests may explicitly disable it.
+    const imageDeclared = overrides.imageRoute === undefined || overrides.imageRoute === true;
     let imagePending = false, imageRetired = false, imageUncertain = null;
     const pinKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
     const samePins = (a, b) => !!a && !!b && pinKeys.every((key) => a[key] === b[key]);
