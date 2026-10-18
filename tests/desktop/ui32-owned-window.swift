@@ -165,11 +165,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     }
     return (0,rows)
   }
-  func tree() throws -> [AXUIElement] {
+  func tree(_ suppliedDeadline:UInt64? = nil) throws -> [AXUIElement] {
     try identity()
     guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement],windows.count == 1,
       owns(windows[0],pid),CFEqual(windows[0],main) else { throw Refusal(code:"sheet-active") }
-    let deadline=DispatchTime.now().uptimeNanoseconds+750_000_000
+    let deadline=suppliedDeadline ?? (DispatchTime.now().uptimeNanoseconds+750_000_000)
     let certificate=try ui32ContentCertificate(main,pid:Int(pid),retained:retainedWebArea,deadline:deadline,
       now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:owner,
       prepare:{AXUIElementSetMessagingTimeout($0,0.03) == .success},traits:{ node in
@@ -450,7 +450,13 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
           try check(AXUIElementSetAttributeValue(selected,kAXValueAttribute as CFString,wanted as CFString) == .success)
           result["requestedValue"]=wanted
         }
-      },postScope:{ if base == "fixture.open" || base == "sync.open-cancel" { try identity() } else { _ = try tree() } },posted:{
+      },postScope:{
+        if entryEnabled && base == "entry.create.default" {
+          guard let web=retainedWebArea else {throw Refusal(code:"adapter-refused")}
+          result["entryContentRead"]=try ui32NewPostCreateRead(base,entryEnabled,attempted,posted,entryStage,
+            now:{DispatchTime.now().uptimeNanoseconds},identity:{try identity();try check(retainedWebArea.map {CFEqual($0,web)} ?? false)},read:{_ = try tree($0)})
+        } else if base == "fixture.open" || base == "sync.open-cancel" {try identity()} else {_ = try tree()}
+      },posted:{
         posted=true;entryStage=nextEntryStage;newSettingsOpen=nextSettingsOpen
         if base == "fixture.open" { fixture?.attempted=true }
         if base == "sync.open-cancel" { syncPanel?.attempted=true }

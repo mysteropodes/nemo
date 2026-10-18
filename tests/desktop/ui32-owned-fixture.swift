@@ -83,7 +83,7 @@ final class UI32Fixture {
   let f03Original:Bool
   let afterDismissal:() throws -> Void
   var sheet:AXUIElement?, root:AXUIElement?, parent:AXUIElement?, owner:pid_t?, start:ProcessStart?
-  var selected:AXUIElement?
+  var selected:AXUIElement?;var fileDomain:String?, fileCertifiedRow:AXUIElement?, fileCertifiedButton:AXUIElement?
   var attachmentProof=[String:Any]()
   var observedOwnedNodes=[AXUIElement](),observedOwnedRoutes=[String]()
   init(_ pinned:OwnedInitialWindow, _ environment:[String:String], cancelOnly:Bool=false, afterDismissal:@escaping () throws -> Void) throws {
@@ -255,7 +255,7 @@ final class UI32Fixture {
       try ui32FinishAfterDismissal(absent,certificate:afterDismissal,finish:{completed=true})
       return ["complete":true,"fixtureConfirmed":confirmed,"note":"Requires actual native SDK fixture baseline; not acceptance."]
     }
-    let (rows,pid)=try panel()
+    let (rows,pid)=try actionPanel(command)
     if command == "fixture.observe" {
       _ = try attachedSheet()
       let ownedSheet=try ui32OwnedSheetAXRead(observedOwnedNodes,observedOwnedRoutes,pinned.pid,fixture)
@@ -269,33 +269,33 @@ final class UI32Fixture {
     do {
       if command == "fixture.choose" {
         try check(selected == nil)
-        let before=try exactRow(rows,pid)
-        let (latest,latestPID)=try panel();try check(latestPID == pid)
-        let row=try exactRow(latest,pid);try check(CFEqual(row,before))
+        let before=try exactRow(rows,pid);try fileBind(before,pid)
+        let (latest,latestPID)=try actionPanel(command);try check(latestPID == pid)
+        let row=try exactRow(latest,pid);try fileBind(row,pid);try check(CFEqual(row,before))
         var writable=DarwinBoolean(false)
         try check(AXUIElementIsAttributeSettable(row,kAXSelectedAttribute as CFString,&writable) == .success && writable.boolValue)
         try fileProof();attemptedAction=true
         try check(AXUIElementSetAttributeValue(row,kAXSelectedAttribute as CFString,kCFBooleanTrue) == .success)
-        selected=row;let (fresh,freshPID)=try panel();try check(freshPID == pid)
-        try singleSelectedFile(fresh,pid,row)
+        selected=row;let (fresh,freshPID)=try actionPanel(command);try check(freshPID == pid)
+        try fileBind(row,pid);try singleSelectedFile(fresh,pid,row)
       } else {
         try check(command == "fixture.confirm" || command == "fixture.cancel")
         if command == "fixture.confirm" {
           guard let selected else { throw Refusal(code:"adapter-refused") }
-          try check(CFEqual(try exactRow(rows,pid),selected) && attr(selected,kAXSelectedAttribute) as? Bool == true)
+          try fileBind(selected,pid);try check(CFEqual(try exactRow(rows,pid),selected) && attr(selected,kAXSelectedAttribute) as? Bool == true)
         }
         let labels:Set<String> = command == "fixture.confirm" ? ["Open","Ouvrir","開く","Abrir"] : ["Cancel","Annuler","キャンセル","Cancelar"]
         let buttons=rows.filter { attr($0,kAXRoleAttribute) as? String == kAXButtonRole && labels.contains(attr($0,kAXTitleAttribute) as? String ?? "") && attr($0,kAXEnabledAttribute) as? Bool == true }
-        try check(buttons.count == 1);var actions:CFArray?
+        try check(buttons.count == 1);try fileBind(buttons[0],pid,button:true);var actions:CFArray?
         try check(AXUIElementCopyActionNames(buttons[0],&actions) == .success && (actions as? [String] ?? []).contains(kAXPressAction as String))
-        let (latest,latestPID)=try panel();try check(latestPID == pid)
+        let (latest,latestPID)=try actionPanel(command);try check(latestPID == pid)
         let freshButtons=latest.filter { attr($0,kAXRoleAttribute) as? String == kAXButtonRole && labels.contains(attr($0,kAXTitleAttribute) as? String ?? "") && attr($0,kAXEnabledAttribute) as? Bool == true }
-        try check(freshButtons.count == 1 && CFEqual(freshButtons[0],buttons[0]))
+        try check(freshButtons.count == 1 && CFEqual(freshButtons[0],buttons[0]));try fileBind(freshButtons[0],pid,button:true)
         var freshActions:CFArray?
         try check(AXUIElementCopyActionNames(freshButtons[0],&freshActions) == .success && (freshActions as? [String] ?? []).contains(kAXPressAction as String))
         if command == "fixture.confirm" {
           guard let selected else { throw Refusal(code:"adapter-refused") }
-          try singleSelectedFile(latest,pid,selected)
+          try fileBind(selected,pid);try singleSelectedFile(latest,pid,selected)
         }
         try fileProof();attemptedAction=true
         try check(AXUIElementPerformAction(freshButtons[0],kAXPressAction as CFString) == .success)
