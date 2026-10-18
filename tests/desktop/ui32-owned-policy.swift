@@ -221,9 +221,29 @@ func ui32EntryNext(_ command:String, _ enabled:Bool, _ stage:Int) throws -> Int 
   }
   return stage
 }
-func ui32EntrySurface(_ command:String, _ enabled:Bool, _ ids:Set<String>) throws {
-  if enabled && !command.hasPrefix("entry.") {
-    try check(ids.isDisjoint(with:["start-screen","start-newpanel","tut-tooltip","tut-spotlight"]))
+let ui32EntryOverlayIDs:Set<String>=["start-screen","start-newpanel","tut-tooltip","tut-spotlight"]
+func ui32EntryClassTokens(_ query:Int, _ raw:[String]?) throws -> Set<String> {
+  guard query == 0,let raw,raw.count <= 8,raw.allSatisfy({!$0.isEmpty && $0.utf8.count <= 64}),Set(raw).count == raw.count else {
+    throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"entry-overlay-class-query","queryError":query])
+  }
+  return Set(raw)
+}
+func ui32EntryDOMClasses(_ node:AXUIElement, _ pid:pid_t) throws -> Set<String> {
+  try check(owns(node,pid) && AXUIElementSetMessagingTimeout(node,0.03) == .success && owns(node,pid))
+  var raw:CFTypeRef?;let query=AXUIElementCopyAttributeValue(node,"AXDOMClassList" as CFString,&raw)
+  try check(owns(node,pid));return try ui32EntryClassTokens(Int(query.rawValue),raw as? [String])
+}
+// Known class target-state only; visible/native-readiness oracles remain mandatory.
+func ui32EntrySurface(_ command:String, _ enabled:Bool, _ states:[String:Set<String>]) throws {
+  guard enabled && !command.hasPrefix("entry.") else {return}
+  let allowed:[String:Set<String>]=["start-screen":["hid"],"start-newpanel":[],
+    "tut-tooltip":["on","tutorial-native-card","tutorial-native-pending"],"tut-spotlight":["on","no-target"]]
+  for (id,classes) in states {
+    var reason:String?
+    if !ui32EntryOverlayIDs.contains(id) || !classes.isSubset(of:allowed[id] ?? []) {reason="unknown-classes"}
+    else if id == "start-newpanel" {reason="new-panel-present"}
+    else if id == "start-screen" ? !classes.contains("hid") : classes.contains("on") {reason="active-overlay"}
+    if let reason {throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"entry-overlay-state","overlay":id,"reason":reason,"classes":Array(classes.sorted().prefix(8)).map {String($0.prefix(64))}])}
   }
 }
 func ui32NewDefaults(_ values:[String:String]) throws {
@@ -252,11 +272,19 @@ func ui32EntrySelfTest() throws {
       try check(try ui32EntryNext(command,true,state) == state)
     }
   }
-  for hidden in ["start-screen","start-newpanel","tut-tooltip","tut-spotlight"] {
-    var effects=0,refused=false;do {try ui32EntrySurface("settings.open",true,[hidden]);effects += 1}catch{refused=true}
+  for (id,classes) in [("start-screen",Set<String>()),("start-newpanel",[]),("tut-tooltip",["on"]),("tut-spotlight",["on"]),("tut-tooltip",["unknown"]),("other",[])] {
+    var effects=0,refused=false;do {try ui32EntrySurface("settings.open",true,[id:classes]);effects += 1}catch{refused=true}
     try check(refused && effects == 0)
   }
-  try ui32EntrySurface("settings.open",true,["project-tabs-settings"])
+  var overlayFacts:[String:Any]=[:]
+  do {try ui32EntrySurface("settings.open",true,["tut-tooltip":["on"]])}catch let error as ActionRefusal {overlayFacts=error.diagnostics}
+  try check(overlayFacts["overlay"] as? String == "tut-tooltip" && overlayFacts["reason"] as? String == "active-overlay" && overlayFacts["classes"] as? [String] == ["on"])
+  try ui32EntrySurface("settings.open",true,[:])
+  try ui32EntrySurface("settings.open",true,["start-screen":["hid"],"tut-tooltip":["tutorial-native-card"],"tut-spotlight":["no-target"]])
+  try check(try ui32EntryClassTokens(0,["on"]) == ["on"] && ui32EntryClassTokens(0,[]) == [])
+  for (status,raw) in [(0,nil),(1,[String]()),(0,["on","on"]),(0,[""]),(0,[String(repeating:"a",count:65)]),(0,Array(repeating:"a",count:9))] {
+    var refused=false;do {_ = try ui32EntryClassTokens(status,raw)}catch{refused=true};try check(refused)
+  }
   let defaults=["np-name":"Untitled","np-fps":"24","np-preset":"1920 × 1080 (Full HD)"]
   try ui32NewDefaults(defaults)
   for key in defaults.keys {var changed=defaults;changed[key]="other";var refused=false;do {try ui32NewDefaults(changed)}catch{refused=true};try check(refused)}

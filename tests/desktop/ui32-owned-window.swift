@@ -388,7 +388,12 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       try ui32GuardedAction(identity,{
         let current=try resolve(rule); try check(CFEqual(current,selected)); try enabledVisible(selected)
         if entryEnabled && !base.hasPrefix("entry.") {
-          let ids=try Set(tree().compactMap {try ui32DOMIdentifiers($0,pid).resolved});try ui32EntrySurface(base,true,ids)
+          var overlays=[String:Set<String>]()
+          for node in try tree() {
+            guard let id=try ui32DOMIdentifiers(node,pid).resolved,ui32EntryOverlayIDs.contains(id) else {continue}
+            try check(overlays[id] == nil);overlays[id]=try ui32EntryDOMClasses(node,pid)
+          }
+          try ui32EntrySurface(base,true,overlays)
         }
         if base == "entry.create.default" {
           var fields=[String:String]()
