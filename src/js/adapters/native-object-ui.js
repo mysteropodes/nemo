@@ -212,7 +212,7 @@
           var view=views.get(root);
           if(!nativeObjectUiPortsReady(ports)||row.parentNode!==list||!view||view.rows[i]!==row)return false;
           if(root._layerDragJustEnded){root._layerDragJustEnded=false;return false;}
-          var mode=event.metaKey||event.ctrlKey?'toggle':event.shiftKey?'range':null;
+          var mode=event&&(event.metaKey||event.ctrlKey)?'toggle':event&&event.shiftKey?'range':null;
           return ports.selectLayer(i,mode?{mode:mode}:false,layer.layerUid,info);
         });
         var eye=createNativeObjectUiText(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';

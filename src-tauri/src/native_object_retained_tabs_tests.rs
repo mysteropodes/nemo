@@ -1,12 +1,18 @@
 //! Actual host/history and native desktop artifact controls; no UI acceptance.
-use super::*;
 use crate::native_application_ports::DesktopArtifactPort;
+use crate::native_dispatch::object_host::retained_tabs::{
+    settled_export, PreparedRetainedActivation,
+};
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{
-    export_job::{ExportArtifact, StagedArtifactPort},
+    commands::OpacityRequest,
+    export_job::{ExportArtifact, JobStatus, StagedArtifactPort},
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
+    object_snapshot::ObjectSnapshot,
     scheduler::OutputSpec,
 };
+use serde_json::{json, Value};
 use std::{cell::Cell, fs, path::PathBuf};
 
 fn host() -> NativeObjectHost {

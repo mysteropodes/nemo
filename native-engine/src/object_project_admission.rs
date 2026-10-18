@@ -241,6 +241,8 @@ enum CompositionSelector {
     MarkerNamed { name: String },
     MarkerNearest { frame: f64 },
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct CompositionRead {
     command: String,
     instance_id: String,
@@ -250,15 +252,6 @@ struct CompositionRead {
     context_id: String,
     selector: CompositionSelector,
 }
-crate::object_document::object_deserialize!(CompositionRead {
-    command: String,
-    instance_id: String,
-    document_id: String,
-    at_revision: u64,
-    document_snapshot_id: String,
-    context_id: String,
-    selector: CompositionSelector
-});
 impl ObjectSnapshot {
     /// Original-byte, bounded query only. No dispatcher/public capability activation.
     pub(crate) fn query_composition_metadata_json(
