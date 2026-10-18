@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "54b945d0f8a5440dd02a00b1aa3f54da7ee4e34d",
-  "describe": "v0.7.0-alpha.4-2256-g54b945d0"
+  "head": "31c49ffd5f8d6a48b860ebc36f386727f6c3c55d",
+  "describe": "v0.7.0-alpha.4-2253-g31c49ffd"
  },
- "inputsDigest": "831fc9755c0e400585c9456f20b9716c6d6957f364b4848a297177811ccea003",
+ "inputsDigest": "4c4a3adc54daee4aed7a53ac93b98bb648c5d1aeb952a800cef811447b53934a",
  "states": [
   "inventoried",
   "characterized",
@@ -421,7 +421,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 37,
     "via": "variable btn",
     "references": [
      "src/js/updater-bridge.js:90 checkForUpdate()"
@@ -16148,7 +16148,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 569,
+    "functionsVisited": 565,
     "via": "variable save",
     "references": []
    },
