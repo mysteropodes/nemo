@@ -298,6 +298,7 @@ final class UI32Fixture {
           guard let selected else { throw Refusal(code:"adapter-refused") }
           try fileBind(selected,pid);try singleSelectedFile(latest,pid,selected)
         }
+        if command == "fixture.confirm" { try check(owns(freshButtons[0],pid) && AXUIElementSetMessagingTimeout(freshButtons[0],0.5) == .success && owns(freshButtons[0],pid)) }
         try fileProof();attemptedAction=true
         let query=AXUIElementPerformAction(freshButtons[0],kAXPressAction as CFString);acknowledgedAction=query == .success
         try ui32ProofCheck(query == .success,"fixture-button-post",["queryError":Int(query.rawValue)])
