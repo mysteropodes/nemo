@@ -345,7 +345,7 @@ fn a_response_advances_the_revision_by_its_own_disposition_and_stays_in_the_enve
 const OVERFLOWING_REVISION: u64 = u64::MAX;
 
 #[test]
-fn registration_declares_the_item_capability_available_and_the_asset_capability_unavailable() {
+fn registration_declares_item_and_png_attach_available_but_asset_remove_unavailable() {
     let catalog = crate::capabilities::native_catalog();
     assert_eq!(
         catalog.capability_for_operation(ITEM).unwrap()["id"],
@@ -355,18 +355,23 @@ fn registration_declares_the_item_capability_available_and_the_asset_capability_
         catalog.capability_for_operation(ITEM).unwrap()["authority"]["fallback"],
         "none"
     );
-    for operation in [ATTACH, REMOVE] {
-        let descriptor = catalog.capability_for_operation(operation).unwrap();
-        assert_eq!(descriptor["id"], "native.object.asset");
-        assert_eq!(descriptor["availability"]["state"], "unavailable");
-    }
+    let attach_descriptor = catalog.capability_for_operation(ATTACH).unwrap();
+    assert_eq!(attach_descriptor["id"], "native.object.asset");
+    assert_eq!(attach_descriptor["availability"]["state"], "available");
+    assert_eq!(attach_descriptor["operations"], json!([ATTACH]));
+    assert_eq!(
+        attach_descriptor["input"]["$ref"],
+        "../native-object-item-v1.schema.json#/$defs/ImageImportAttach"
+    );
+    let remove_descriptor = catalog.capability_for_operation(REMOVE).unwrap();
+    assert_eq!(remove_descriptor["id"], "native.object.asset.remove");
+    assert_eq!(remove_descriptor["availability"]["state"], "unavailable");
+    let remove_reason = remove_descriptor["availability"]["reason"].as_str().unwrap();
+    assert!(!remove_reason.is_empty());
     assert!(crate::capabilities::validate_native_operation(ITEM).is_ok());
-    for operation in [ATTACH, REMOVE] {
-        let refused = crate::capabilities::validate_native_operation(operation).unwrap_err();
-        assert!(
-            matches!(refused, RequestError::Unavailable(reason) if reason.contains("byte-source"))
-        );
-    }
+    assert!(crate::capabilities::validate_native_operation(ATTACH).is_ok());
+    let refused = crate::capabilities::validate_native_operation(REMOVE).unwrap_err();
+    assert!(matches!(refused, RequestError::Unavailable(reason) if reason == remove_reason));
 }
 
 #[test]
@@ -389,8 +394,15 @@ fn the_envelope_requires_a_revision_and_the_closed_payload() {
     assert!(envelope(ITEM, commands()[1].clone(), Some(7))
         .validate()
         .is_ok());
+    // Common shape/declaration admission only; catalog-only host execution
+    // remains unavailable and refuses before source I/O.
+    assert!(envelope(ATTACH, attach(), Some(7)).validate().is_ok());
+    let mut placed_png = attach();
+    placed_png["placement"] = json!({"kind":"newLayer"});
+    placed_png["lifecycleGeneration"] = json!(1);
+    assert!(envelope(ATTACH, placed_png, Some(7)).validate().is_ok());
     assert!(matches!(
-        envelope(ATTACH, attach(), Some(7)).validate(),
+        envelope(REMOVE, remove(), Some(7)).validate(),
         Err(RequestError::Unavailable(_))
     ));
 }
