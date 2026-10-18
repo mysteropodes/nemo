@@ -31,6 +31,9 @@ func ui32Rule(_ command:String, _ option:String?) throws -> UI32Rule {
   case "sync.open-cancel": return rule("sync-choose-folder","settings-modal",[],button)
   case "sync.check-empty": return rule("sync-check","settings-modal",[],button)
   case "fixture.open": return rule("start-open",nil,[],button)
+  case "entry.new.default": return rule("start-new","start-screen",[],["AXGroup","AXButton"])
+  case "entry.create.default": return rule("np-create","start-newpanel",[],button)
+  case "entry.tutorial.close": return rule(nil,"tut-tooltip",["×"],button)
   case "selection.A": return rule(nil,"layer-list",["F06 absent flags (F06-A)"],button)
   case "selection.B": return rule(nil,"layer-list",["F06 explicit false (F06-B)"],button)
   case "frame.first": return rule("btn-ff",nil,[],button)
@@ -105,6 +108,7 @@ func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, 
 }
 func ui32SelfTest() throws {
   try ui32IdentityPhaseSelfTest()
+  try ui32EntrySelfTest()
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
     try check(!ui32ModeAllowed(mode))
     var refused=false
@@ -192,4 +196,72 @@ func ui32IdentityPhaseSelfTest() throws {
   let action=ui32ActionCause(ActionRefusal(diagnostics:["stage":"parent-edge"]))
   try check((action["facts"] as? [String:String])?["stage"] == "parent-edge")
   try check(ui32ActionCause(Refusal(code:"child-owner"))["code"] as? String == "child-owner")
+}
+
+// A finite preparation mode, never a caller-selected document or input route.
+func ui32EntryMode(_ raw:String?) throws -> Bool {
+  if raw == nil { return false }
+  try check(raw == "ordinary-new-default");return true
+}
+func ui32EntryNext(_ command:String, _ enabled:Bool, _ stage:Int) throws -> Int {
+  if command.hasPrefix("entry.") {
+    try check(enabled)
+    switch command {
+    case "entry.new.default":try check(stage == 0);return 1
+    case "entry.create.default":try check(stage == 1);return 2
+    case "entry.tutorial.close":try check(stage == 2);return 3
+    default:throw Refusal(code:"adapter-refused")
+    }
+  }
+  if enabled {
+    let readOnly=["observe","capture","quit"]
+    let effects=["settings.open","settings.close","settings.tab","profile.name","profile.name.restore",
+      "profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select"]
+    try check(readOnly.contains(command) || (stage >= 2 && effects.contains(command)))
+  }
+  return stage
+}
+func ui32EntrySurface(_ command:String, _ enabled:Bool, _ ids:Set<String>) throws {
+  if enabled && !command.hasPrefix("entry.") {
+    try check(ids.isDisjoint(with:["start-screen","start-newpanel","tut-tooltip","tut-spotlight"]))
+  }
+}
+func ui32NewDefaults(_ values:[String:String]) throws {
+  try check(values.count == 3 && values["np-name"] == "Untitled" && values["np-fps"] == "24" &&
+    ["1920x1080","1920 × 1080 (Full HD)"].contains(values["np-preset"] ?? ""))
+}
+func ui32EntrySelfTest() throws {
+  try check(try ui32EntryMode(nil) == false && ui32EntryMode("ordinary-new-default"))
+  for mode in ["","new","arbitrary"] {var refused=false;do {_ = try ui32EntryMode(mode)}catch{refused=true};try check(refused)}
+  var stage=0
+  for command in ["entry.new.default","entry.create.default","entry.tutorial.close"] {stage=try ui32EntryNext(command,true,stage)}
+  try check(stage == 3 && ui32EntryNext("profile.name",true,stage) == stage)
+  for (command,enabled,state) in [("entry.new.default",false,0),("entry.create.default",true,0),
+    ("entry.new.default",true,1),("entry.tutorial.close",true,1),("entry.tutorial.close",true,3),
+    ("entry.create.default.restore",true,1),("entry.unknown",true,2),("profile.name",true,0),("settings.open",true,1)] {
+    var effects=0,refused=false;do {_ = try ui32EntryNext(command,enabled,state);effects += 1}catch{refused=true}
+    try check(refused && effects == 0)
+  }
+  for command in ["observe","capture","quit"] {try check(try ui32EntryNext(command,true,0) == 0)}
+  for state in [2,3] {
+    for command in ["motion.focus","motion.shortcut","motion.guard-typing","selection.toggle.B","fixture.confirm","sync.cancel-only","frame.next","grid.step.value"] {
+      var effects=0,refused=false;do {_ = try ui32EntryNext(command,true,state);effects += 1}catch{refused=true};try check(refused && effects == 0)
+      try check(try ui32EntryNext(command,false,state) == state)
+    }
+    for command in ["settings.open","settings.close","settings.tab","profile.name","profile.name.restore","profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select"] {
+      try check(try ui32EntryNext(command,true,state) == state)
+    }
+  }
+  for hidden in ["start-screen","start-newpanel","tut-tooltip","tut-spotlight"] {
+    var effects=0,refused=false;do {try ui32EntrySurface("settings.open",true,[hidden]);effects += 1}catch{refused=true}
+    try check(refused && effects == 0)
+  }
+  try ui32EntrySurface("settings.open",true,["project-tabs-settings"])
+  let defaults=["np-name":"Untitled","np-fps":"24","np-preset":"1920 × 1080 (Full HD)"]
+  try ui32NewDefaults(defaults)
+  for key in defaults.keys {var changed=defaults;changed[key]="other";var refused=false;do {try ui32NewDefaults(changed)}catch{refused=true};try check(refused)}
+  for command in ["entry.new.default","entry.create.default","entry.tutorial.close"] {
+    let rule=try ui32Rule(command,nil);try check(rule.operation == "press" && rule.region != nil && rule.values.isEmpty)
+    try check(!ui32Matches(rule,identifier:rule.identifier ?? "",labels:rule.labels,role:"AXTextField",ancestors:[rule.region!]))
+  }
 }

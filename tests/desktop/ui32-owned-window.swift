@@ -114,6 +114,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   let pid=pinned.pid, main=pinned.main
   var ordinal=0, originals=[String:String](), observed=false, menuOpened=false
   var currentCommand:String?
+  let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
   var retainedWebArea:AXUIElement?, latest:UI32ContentCertificate<AXUIElement>?
   func nativeIdentity() throws { try verifyOwnedWindow(pinned) }
@@ -280,7 +281,8 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       Set(request.keys).isSubset(of:["purpose","pid","windowId","command","option","value"]),
       request["purpose"] as? String == "UI32", request["pid"] as? Int32 == pid,
       request["windowId"] as? UInt32 == pinned.number, let command=request["command"] as? String else { throw Refusal(code:"adapter-refused") }
-    currentCommand=command; ordinal += 1; try identity()
+    currentCommand=command
+    let nextEntryStage=try ui32EntryNext(command,entryEnabled,entryStage); ordinal += 1; try identity()
     var result:[String:Any]=["purpose":"UI32","pid":pid,"windowId":pinned.number,"ordinal":ordinal,"command":command,"status":"ok","actionPosted":false]
     if command == "quit" { try check(request["option"] == nil && request["value"] == nil); try emit(result); return }
     if command == "observe" {
@@ -385,6 +387,17 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     do {
       try ui32GuardedAction(identity,{
         let current=try resolve(rule); try check(CFEqual(current,selected)); try enabledVisible(selected)
+        if entryEnabled && !base.hasPrefix("entry.") {
+          let ids=try Set(tree().compactMap {try ui32DOMIdentifiers($0,pid).resolved});try ui32EntrySurface(base,true,ids)
+        }
+        if base == "entry.create.default" {
+          var fields=[String:String]()
+          for (id,role) in [("np-name","AXTextField"),("np-fps","AXPopUpButton"),("np-preset","AXPopUpButton")] {
+            let node=try resolve(UI32Rule(identifier:id,region:"start-newpanel",labels:[],roles:[role],operation:"observe",values:[]))
+            guard let value=attr(node,kAXValueAttribute) as? String else {throw Refusal(code:"adapter-refused")};fields[id]=value
+          }
+          try ui32NewDefaults(fields)
+        }
         if base == "settings.menu.entry" { try check(menuOpened) }
         if base == "motion.cancel-pending" {
           let currentTree=try tree();try check(currentTree.contains { labels($0).contains("Loading properties…") })
@@ -425,7 +438,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
           result["requestedValue"]=wanted
         }
       },postScope:{ if base == "fixture.open" || base == "sync.open-cancel" { try identity() } else { _ = try tree() } },posted:{
-        posted=true
+        posted=true;entryStage=nextEntryStage
         if base == "fixture.open" { fixture?.attempted=true }
         if base == "sync.open-cancel" { syncPanel?.attempted=true }
       })
