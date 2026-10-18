@@ -17,6 +17,10 @@ use crate::object_frame_packet::sample_property_raw;
 use crate::revision::ObjectSnapshot;
 use serde_json::json;
 
+#[cfg(feature = "compositor")]
+#[path = "render_vector_eval_motion.rs"]
+mod motion;
+
 #[path = "render_vector_eval_controls.rs"]
 mod controls;
 #[path = "render_vector_eval_join.rs"]
