@@ -18,7 +18,7 @@ function fixture(){
     getElementById:id=>{assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId,contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,lifecycleGeneration:generation,
     documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:[{layerUid:'drawing',visible:true}],reference:null});
-  const root={document,state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
+  const root={document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
     NemoNativeObjectProjectFile:{...Files,refreshLayerTable:(r,i)=>{log.push('project');return !projectionRefused&&Files.refreshLayerTable(r,i);}},
     NemoNativeApplicationAdapter:Application,NemoNativeObjectUI:{refreshTiming:r=>{assert.equal(r,root);log.push('timing');},refreshPolicy:r=>{assert.equal(r,root);log.push('policy');}},
     NemoNativeProjectSettingsController:{willProject:i=>{assert.equal(i.documentId,documentId);log.push('willProject');},presented:()=>log.push('presented')},

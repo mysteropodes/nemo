@@ -20,3 +20,6 @@ html.nemo-native-underlay body::before {
     linear-gradient(var(--gutter), var(--gutter)) var(--nemo-native-left) bottom /
       calc(var(--nemo-native-right) - var(--nemo-native-left)) calc(100% - var(--nemo-native-bottom)) no-repeat;
 }
+
+/* The retired WASM mirror remains an opaque sibling above Paper's overlay canvas. */
+html.nemo-native-underlay #rust-canvas { visibility: hidden; }
