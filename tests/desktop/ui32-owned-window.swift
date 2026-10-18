@@ -85,10 +85,16 @@ func ui32ContentCertificate<Node>(_ main:Node, pid:Int, retained:Node?, deadline
   catch let error as ActionRefusal {
     var facts=error.diagnostics;facts["insideContent"]=true;throw ActionRefusal(diagnostics:facts)
   }
-  try ui32ScopeCheck(content.count == expected.count,"content-changed")
-  for (node,index) in zip(content,expected) {
-    try ui32ScopeCheck(now() < deadline,"deadline")
-    try ui32ScopeCheck(equal(node,nodes[index]),"content-changed");try owned(node)
+  func changed(_ comparison:String, _ offset:Int? = nil) -> ActionRefusal {
+    var facts:[String:Any]=["stage":"content-scope","reason":"content-changed","comparison":comparison,
+      "forwardContentCount":expected.count,"strictContentCount":content.count,"ownedWindowNodeCount":nodes.count,
+      "fullStrictReadComplete":true,"retainedWebAreaMatched":retained != nil]
+    if let offset {facts["mismatchIndex"]=offset};return ActionRefusal(diagnostics:facts)
+  }
+  if content.count != expected.count {throw changed("count")}
+  for (offset,pair) in zip(content,expected).enumerated() {
+    let (node,index)=pair;try ui32ScopeCheck(now() < deadline,"deadline")
+    if !equal(node,nodes[index]) {throw changed("node-order",offset)};try owned(node)
     let (query,ref)=parent(node)
     try ui32ScopeCheck(query == 0 && ref != nil,"content-parent-query");try owned(ref!)
     try ui32ScopeCheck(equal(ref!,nodes[declared[index]!]),"content-parent-changed")

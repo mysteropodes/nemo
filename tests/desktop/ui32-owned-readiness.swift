@@ -22,6 +22,21 @@ func ui32NewInvalidReference(_ error:Error) -> Bool {
     child["routes"] as? [String] == routes else {return false}
   return true
 }
+// Same-probe complete census/strict-walk disagreement; never an owner/root waiver.
+func ui32NewContentComparison(_ error:Error) -> Bool {
+  guard let d=(error as? ActionRefusal)?.diagnostics,let kind=d["comparison"] as? String else {return false}
+  var keys:Set<String>=["stage","reason","comparison","forwardContentCount","strictContentCount","ownedWindowNodeCount","fullStrictReadComplete","retainedWebAreaMatched"]
+  if kind == "node-order" {keys.insert("mismatchIndex")}
+  guard Set(d.keys) == keys,d["stage"] as? String == "content-scope",d["reason"] as? String == "content-changed",
+    let complete=d["fullStrictReadComplete"],type(of:complete) == Bool.self,complete as? Bool == true,
+    let retained=d["retainedWebAreaMatched"],type(of:retained) == Bool.self,retained as? Bool == true else {return false}
+  func integer(_ key:String) -> Int? {guard let raw=d[key],type(of:raw) == Int.self else {return nil};return raw as? Int}
+  guard let forward=integer("forwardContentCount"),let strict=integer("strictContentCount"),let owned=integer("ownedWindowNodeCount"),
+    forward > 0,strict > 0,owned > forward,owned <= 512,strict <= 512 else {return false}
+  if kind == "count" {return forward != strict}
+  guard kind == "node-order",forward == strict,let offset=integer("mismatchIndex") else {return false}
+  return offset >= 0 && offset < forward
+}
 // Immediate posted New/Create only: one fresh complete read, same absolute budget.
 func ui32NewPostCreateRead(_ command:String, _ enabled:Bool, _ attempted:Bool, _ posted:Bool, _ stage:Int,
   now:()->UInt64, identity:() throws -> Void, read:(UInt64) throws -> Void) throws -> [String:Any] {
@@ -37,7 +52,7 @@ func ui32NewPostCreateRead(_ command:String, _ enabled:Bool, _ attempted:Bool, _
       if let first {proof["firstReadFailure"]=first};return proof
     } catch {
       let cause=ui32ActionCause(error)
-      if slot == 1 && reads == 1 && ui32NewInvalidReference(error) && now() < deadline {first=cause;continue}
+      if slot == 1 && reads == 1 && (ui32NewInvalidReference(error) || ui32NewContentComparison(error)) && now() < deadline {first=cause;continue}
       throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"new-postcreate-content","readAttempts":reads,
         "attemptSlots":slot,"firstReadFailure":first ?? cause,"lastReadFailure":cause,
         "note":"No action retry or further content read; retain both outcomes."])
@@ -95,6 +110,51 @@ func ui32NewPostCreateReadSelfTest() throws {
     if scenario == "second-pass" {try check(proof["readAttempts"] as? Int == 2 && proof["firstReadFailure"] != nil)}
     if scenario == "first-pass" {try check(proof["firstReadFailure"] == nil)}
   }
+  try ui32NewContentComparisonSelfTest()
+}
+
+// Actual certificate producer feeds the actual finite post-Create reader.
+func ui32NewContentComparisonSelfTest() throws {
+  for kind in ["count","node-order"] {
+    var produced:Error?
+    do {let _:UI32ContentCertificate<Int>=try ui32ContentCertificate(0,pid:7,retained:1,deadline:10,
+      now:{0},equal:==,owner:{_ in (0,true,7)},prepare:{_ in true},traits:{($0 == 0 ? "AXWindow" : $0 == 1 ? "AXWebArea" : "AXGroup",false)},
+      children:{(0,$0 == 0 ? [1] : $0 == 1 ? [2] : [])},parent:{(0,$0 == 1 ? 0 : 1)},strict:{_,_ in kind == "count" ? [1] : [2,1]})
+    }catch{produced=error}
+    guard let produced,let source=(produced as? ActionRefusal)?.diagnostics else {throw Refusal(code:"adapter-refused")}
+    try check(ui32NewContentComparison(produced) && source["comparison"] as? String == kind)
+    for fault in ["none","second-fail","deadline","identity","phase","command","enabled","attempted","posted","stage","reason","kind","retained","complete","forward","strict","owned","type","extra","missing"] {
+      var facts=source,clock:UInt64=0,reads=0,ids=0,deadlines=[UInt64](),refused=false,answer=[String:Any]()
+      switch fault {
+      case "stage":facts["stage"]="other"
+      case "reason":facts["reason"]="webarea-replaced"
+      case "kind":facts["comparison"]="unknown"
+      case "retained":facts["retainedWebAreaMatched"]=false
+      case "complete":facts["fullStrictReadComplete"]=false
+      case "forward":facts["forwardContentCount"]=0
+      case "strict":facts["strictContentCount"]=0
+      case "owned":facts["ownedWindowNodeCount"]=512+1
+      case "type":facts["forwardContentCount"]=true
+      case "extra":facts["unknown"]=true
+      case "missing":facts.removeValue(forKey:"comparison")
+      default:break
+      }
+      do {answer=try ui32NewPostCreateRead(fault == "command" ? "observe" : "entry.create.default",fault != "enabled",fault != "attempted",fault != "posted",fault == "phase" ? 1 : 2,
+        now:{clock},identity:{ids += 1;if fault == "identity" && ids == 2 {throw Refusal(code:"owner-control")}},read:{deadline in
+          reads += 1;deadlines.append(deadline)
+          if reads == 2 && fault != "second-fail" {return}
+          if fault == "deadline" {clock=deadline};throw ActionRefusal(diagnostics:facts)
+        })}catch{refused=true}
+      try check(refused == (fault != "none"))
+      let blocked=["phase","command","enabled","attempted","posted"].contains(fault)
+      let expected=blocked ? 0 : ["none","second-fail"].contains(fault) ? 2 : 1
+      try check(reads == expected && Set(deadlines).count <= 1 && deadlines.allSatisfy{$0 == 750_000_000})
+      if fault == "none" {try check(answer["readAttempts"] as? Int == 2 && answer["oneCreateActionOnly"] as? Bool == true && answer["firstReadFailure"] != nil)}
+    }
+    if kind == "node-order" {for offset in [-1,2] {var d=source;d["mismatchIndex"]=offset;try check(!ui32NewContentComparison(ActionRefusal(diagnostics:d)))}}
+    else {var d=source;d["strictContentCount"]=d["forwardContentCount"];try check(!ui32NewContentComparison(ActionRefusal(diagnostics:d)))}
+  }
+  try check(!ui32NewContentComparison(ActionRefusal(diagnostics:["stage":"content-scope","reason":"content-changed"])))
 }
 
 // First observation only; every success still comes from the existing FULL strict read.

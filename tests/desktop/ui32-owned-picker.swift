@@ -301,7 +301,31 @@ extension UI32Fixture {
     }
     guard let row,outline != nil else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"row-outline-present"])}
     let (enabled,value)=try fileRead(row,pinned.pid,kAXEnabledAttribute,deadline)
-    try ui32ProofCheck(enabled == 0 && value as? Bool == true,"row-enabled",["queryError":enabled,"boolTyped":value is Bool])
+    var enabledFacts:[String:Any]=["queryError":enabled,"boolTyped":value is Bool]
+    if enabled == Int(AXError.attributeUnsupported.rawValue) && value == nil {
+      var diagnostic:[String:Any]=["selectionReadInvoked":false,"settableQueryInvoked":false]
+      let indices=observedOwnedNodes.indices.filter {CFEqual(observedOwnedNodes[$0],row)}
+      diagnostic["censusMatches"]=indices.count
+      if indices.count == 1,observedOwnedRoutes.indices.contains(indices[0]) {
+        diagnostic["rowIndex"]=indices[0];diagnostic["rowRoute"]=observedOwnedRoutes[indices[0]]
+      }
+      do {
+        diagnostic["selectionReadInvoked"]=true
+        let (query,selected)=try fileRead(row,pinned.pid,kAXSelectedAttribute,deadline)
+        diagnostic["selectedQueryError"]=query;diagnostic["selectedBoolTyped"]=selected is Bool
+        if let flag=selected as? Bool {diagnostic["selectedBool"]=flag}
+        try ui32ProofCheck(DispatchTime.now().uptimeNanoseconds < deadline && owns(row,pinned.pid) &&
+          AXUIElementSetMessagingTimeout(row,0.03) == .success && owns(row,pinned.pid),"row-capability-preconditions")
+        var writable=DarwinBoolean(false);diagnostic["settableQueryInvoked"]=true
+        let status=AXUIElementIsAttributeSettable(row,kAXSelectedAttribute as CFString,&writable)
+        try ui32ProofCheck(owns(row,pinned.pid) && DispatchTime.now().uptimeNanoseconds < deadline,
+          "row-capability-postconditions",["queryError":Int(status.rawValue)])
+        diagnostic["selectedSettableQueryError"]=Int(status.rawValue)
+        diagnostic["selectedSettableRawBool"]=writable.boolValue
+      }catch {diagnostic["underlying"]=ui32ActionCause(error)}
+      enabledFacts["capabilityDiagnostic"]=diagnostic
+    }
+    try ui32ProofCheck(enabled == 0 && value as? Bool == true,"row-enabled",enabledFacts)
     let (status,raw)=try fileRead(urlNode,pinned.pid,kAXURLAttribute,deadline)
     try ui32ProofCheck(status == 0 && ui32FixtureURLMatches(raw as? URL,fixture),"row-url-reread",["queryError":status,"urlTyped":raw is URL]);try ui32ProofStep("row-file-hash"){try fileProof()};return row
   }
