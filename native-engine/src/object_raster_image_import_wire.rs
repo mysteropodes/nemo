@@ -50,7 +50,9 @@ impl<'de> Deserialize<'de> for ImageImport {
                     lifecycle_generation: u64,
                     name: String,
                     media_type: String,
+                    #[serde(deserialize_with = "closed_map")]
                     source: ImageSource,
+                    #[serde(deserialize_with = "closed_map")]
                     placement: ImagePlacement,
                 }
                 let fields = Fields::deserialize(MapAccessDeserializer::new(map))?;
@@ -67,6 +69,26 @@ impl<'de> Deserialize<'de> for ImageImport {
         // No visit_seq or intermediate Value: original bytes retain duplicate/unknown member checks.
         deserializer.deserialize_map(ClosedMap)
     }
+}
+
+// Tagged enums accept sequence representations by default. These wire fields are objects only.
+// Deserialize from the original map so duplicate and unknown members remain visible to the DTO.
+fn closed_map<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct ObjectOnly<T>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for ObjectOnly<T> {
+        type Value = T;
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("an image source or placement object")
+        }
+        fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<T, A::Error> {
+            T::deserialize(MapAccessDeserializer::new(map))
+        }
+    }
+    deserializer.deserialize_map(ObjectOnly(std::marker::PhantomData))
 }
 
 impl ImageImport {
