@@ -110,7 +110,7 @@ func ui32SelfTest() throws {
   try ui32IdentityPhaseSelfTest()
   try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()
-  try ui32ZeroForeignFallbackSelfTest();try ui32OwnedSheetReadSelfTest();try ui32ContentWalkSelfTest();try ui32OwnedCandidatePathSelfTest();try ui32FileDomainSelfTest();try ui32NewPostCreateReadSelfTest()
+  try ui32ZeroForeignFallbackSelfTest();try ui32OwnedSheetReadSelfTest();try ui32ContentWalkSelfTest();try ui32OwnedCandidatePathSelfTest();try ui32FileDomainSelfTest();try ui32NewPostCreateReadSelfTest();try ui32InitialOwnedReadinessSelfTest()
   for mode in ["--persistent","--reference-persistent","--png-persistent","--p38-cg-sample"] {
     try check(!ui32ModeAllowed(mode))
     var refused=false
@@ -339,97 +339,3 @@ func ui32ContentWalk<Node>(_ root:Node, owner expected:Int, deadline:UInt64,
 }
 
 // Only the observed invalid passed-element failure, never a missing parent or cause claim.
-func ui32NewInvalidReference(_ error:Error) -> Bool {
-  guard let refusal=error as? ActionRefusal else {return false}
-  let d=refusal.diagnostics
-  guard d["stage"] as? String == "parent-query",d["insideContent"] as? Bool == true,
-    let t=d["contentTraversal"] as? [String:Any],t["walk"] as? String == "strict-content",
-    t["phase"] as? String == "parent",t["queryError"] as? Int == Int(AXError.invalidUIElement.rawValue),
-    t["metadataTruncated"] as? Bool == false,t["foreignRootCount"] as? Int == 0,
-    t["declaredParentIndices"] as? [Int] == [0],t["depths"] as? [Int] == [1],
-    t["reportedMatchesChild"] as? Bool == false,t["reportedMatchesDeclared"] as? Bool == false,
-    let routes=t["routes"] as? [String],routes.count == 1,
-    let route=routes.first,let ordinal=Int(route),ordinal >= 0,ordinal < 512,String(ordinal) == route,route.range(of:"^[0-9]{1,3}$",options:.regularExpression) != nil,
-    let refs=t["references"] as? [String:[String:Any]],
-    let root=refs["root"],let parent=refs["declaredParent"],let child=refs["child"],
-    refs["reportedParent"]?["relation"] as? String == "unavailable",
-    root["owner"] as? String == "owned",root["knownIndex"] as? Int == 0,root["routes"] as? [String] == [""],
-    parent["owner"] as? String == "owned",parent["knownIndex"] as? Int == 0,parent["routes"] as? [String] == [""],
-    child["owner"] as? String == "owned",let index=child["knownIndex"] as? Int,index > 0,index < 512,
-    child["routes"] as? [String] == routes else {return false}
-  return true
-}
-// Immediate posted New/Create only: one fresh complete read, same absolute budget.
-func ui32NewPostCreateRead(_ command:String, _ enabled:Bool, _ attempted:Bool, _ posted:Bool, _ stage:Int,
-  now:()->UInt64, identity:() throws -> Void, read:(UInt64) throws -> Void) throws -> [String:Any] {
-  try check(command == "entry.create.default" && enabled && attempted && posted && stage == 2)
-  let began=now();try check(began <= UInt64.max-750_000_000);let deadline=began+750_000_000
-  var first:[String:Any]?,reads=0
-  for slot in 1...2 {
-    do {
-      try check(now() < deadline);try identity();try check(now() < deadline)
-      reads += 1;try read(deadline);try identity();try check(now() < deadline)
-      var proof:[String:Any]=["completeStrictContent":true,"readAttempts":reads,"attemptSlots":slot,
-        "oneCreateActionOnly":true,"scope":"later complete read; no cause or paint claim"]
-      if let first {proof["firstReadFailure"]=first};return proof
-    } catch {
-      let cause=ui32ActionCause(error)
-      if slot == 1 && reads == 1 && ui32NewInvalidReference(error) && now() < deadline {first=cause;continue}
-      throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"new-postcreate-content","readAttempts":reads,
-        "attemptSlots":slot,"firstReadFailure":first ?? cause,"lastReadFailure":cause,
-        "note":"No action retry or further content read; retain both outcomes."])
-    }
-  }
-  throw Refusal(code:"adapter-refused")
-}
-
-func ui32NewPostCreateReadSelfTest() throws {
-  let root:[String:Any]=["owner":"owned","knownIndex":0,"routes":[""]]
-  let facts:[String:Any]=["insideContent":true,"stage":"parent-query","contentTraversal":[
-    "walk":"strict-content","phase":"parent","queryError":Int(AXError.invalidUIElement.rawValue),
-    "metadataTruncated":false,"foreignRootCount":0,"declaredParentIndices":[0],"depths":[1],"routes":["76"],
-    "reportedMatchesChild":false,"reportedMatchesDeclared":false,"references":["root":root,"declaredParent":root,
-      "child":["owner":"owned","knownIndex":77,"routes":["76"]],"reportedParent":["relation":"unavailable"]]]]
-  try check(ui32NewInvalidReference(ActionRefusal(diagnostics:facts)))
-  for fault in ["stage","inside","query","walk","phase","truncated","foreign","depth","route","leading-zero","parent","owner","reported"] {
-    var changed=facts,t=facts["contentTraversal"] as! [String:Any]
-    switch fault {
-    case "stage":changed["stage"]="parent-edge"
-    case "inside":changed["insideContent"]=false
-    case "query":t["queryError"]=Int(AXError.noValue.rawValue)
-    case "walk":t["walk"]="attached-candidate-certificate"
-    case "phase":t["phase"]="children"
-    case "truncated":t["metadataTruncated"]=true
-    case "foreign":t["foreignRootCount"]=1
-    case "depth":t["depths"]=[2]
-    case "route":t["routes"]=["0.1"]
-    case "leading-zero":
-      t["routes"]=["076"];var refs=t["references"] as! [String:[String:Any]];refs["child"]?["routes"]=["076"];t["references"]=refs
-    case "parent":t["declaredParentIndices"]=[1]
-    default:
-      var refs=t["references"] as! [String:[String:Any]]
-      if fault == "owner" {refs["child"]?["owner"]="foreign"} else {refs["reportedParent"]=["knownIndex":0]}
-      t["references"]=refs
-    }
-    changed["contentTraversal"]=t;try check(!ui32NewInvalidReference(ActionRefusal(diagnostics:changed)))
-  }
-  for scenario in ["first-pass","second-pass","second-fail","other-fail","deadline","identity","wrong-phase"] {
-    var clock:UInt64=0,reads=0,identities=0,deadlines=[UInt64](),refused=false,proof=[String:Any]()
-    do {
-      proof=try ui32NewPostCreateRead("entry.create.default",true,true,true,scenario == "wrong-phase" ? 1 : 2,now:{clock},identity:{
-        identities += 1;if scenario == "identity" && identities == 2 {throw Refusal(code:"child-owner")}
-      },read:{deadline in
-        reads += 1;deadlines.append(deadline)
-        if scenario == "first-pass" || (scenario == "second-pass" && reads == 2) {return}
-        if scenario == "deadline" {clock=deadline}
-        if scenario == "other-fail" {throw Refusal(code:"child-owner")}
-        throw ActionRefusal(diagnostics:facts)
-      })
-    }catch{refused=true}
-    try check(refused == !["first-pass","second-pass"].contains(scenario))
-    let expected=["second-pass","second-fail"] .contains(scenario) ? 2 : scenario == "wrong-phase" ? 0 : 1
-    try check(reads == expected && Set(deadlines).count <= 1)
-    if scenario == "second-pass" {try check(proof["readAttempts"] as? Int == 2 && proof["firstReadFailure"] != nil)}
-    if scenario == "first-pass" {try check(proof["firstReadFailure"] == nil)}
-  }
-}

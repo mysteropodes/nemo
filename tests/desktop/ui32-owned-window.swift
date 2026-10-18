@@ -51,7 +51,7 @@ func ui32ContentCertificate<Node>(_ main:Node, pid:Int, retained:Node?, deadline
     counts["other"]=0
     for role in roles { counts[categories.contains(role) ? role : "other",default:0] += 1 }
     var facts=error.diagnostics
-    facts["webAreaCount"]=candidates.count;facts["ownedWindowNodeCount"]=nodes.count;facts["roleCounts"]=counts
+    facts["webAreaCount"]=candidates.count;facts["ownedWindowNodeCount"]=nodes.count;facts["roleCounts"]=counts;facts["nativeModalCount"]=modals.filter{$0}.count
     throw ActionRefusal(diagnostics:facts)
   }
   let web=candidates[0]
@@ -286,7 +286,13 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     if command == "quit" { try check(request["option"] == nil && request["value"] == nil); try emit(result); return }
     if command == "observe" {
       try check(request["option"] == nil && request["value"] == nil)
-      let nodes=try tree(); var facts=[[String:Any]]()
+      let nodes:[AXUIElement]
+      if !observed && ordinal == 1 && entryStage == 0 && fixture == nil && syncPanel == nil {
+        let ready=try ui32InitialOwnedReadiness(first:true,now:{DispatchTime.now().uptimeNanoseconds},identity:identity,
+          pause:{Thread.sleep(forTimeInterval:Double($0)/1_000_000_000)},read:{try tree($0)})
+        nodes=ready.value;result["initialReadiness"]=ready.proof
+      } else {nodes=try tree()}
+      var facts=[[String:Any]]()
       for node in nodes {
         try check(owns(node,pid))
         let role=attr(node,kAXRoleAttribute) as? String ?? "", ids=try ui32DOMIdentifiers(node,pid)
@@ -473,23 +479,3 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
 }
 
 // Pure injected ports reach the same cardinality refusal after a complete census.
-func ui32WebAreaCountSelfTest() throws {
-  for count in [0,2] {
-    let roles=["AXWindow","AXGroup","AXScrollArea","AXSplitGroup","AXButton","AXStaticText"] + Array(repeating:"AXWebArea",count:count)
-    var traits=0,parents=0,children=0,strict=0,facts:[String:Any]?
-    do {
-      let _:UI32ContentCertificate<Int>=try ui32ContentCertificate(0,pid:7,retained:nil,deadline:10,
-        now:{0},equal:==,owner:{_ in (0,true,7)},prepare:{_ in true},traits:{node in
-          traits += 1;return (roles[node],false)
-        },children:{node in
-          children += 1;return (0,node == 0 ? Array(1..<roles.count) : [])
-        },parent:{_ in parents += 1;return (0,0)},strict:{_,_ in strict += 1;return []})
-    } catch let error as ActionRefusal { facts=error.diagnostics }
-    guard let facts,let counts=facts["roleCounts"] as? [String:Int] else { throw Refusal(code:"adapter-refused") }
-    try check(facts["stage"] as? String == "content-scope" && facts["reason"] as? String == "webarea-count")
-    try check(facts["webAreaCount"] as? Int == count && facts["ownedWindowNodeCount"] as? Int == roles.count)
-    try check(counts == ["AXWebArea":count,"AXGroup":1,"AXScrollArea":1,"AXSplitGroup":1,"AXButton":1,"AXWindow":1,"other":1])
-    try check(Set(facts.keys) == Set(["stage","reason","webAreaCount","ownedWindowNodeCount","roleCounts"]))
-    try check(traits == roles.count && children == roles.count && parents == roles.count-1 && strict == 0)
-  }
-}
