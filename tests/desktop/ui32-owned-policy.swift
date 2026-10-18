@@ -59,7 +59,7 @@ func ui32Rule(_ command:String, _ option:String?) throws -> UI32Rule {
   case "mode.animation": return rule(nil,"app-mode-switch",["Animation 2D"],button)
   case "tool.hand": return rule(nil,"tools-panel",["Hand","Main","手のひら","Mano","Hand — pan the canvas (H or Space)"],button)
   case "tool.select": return rule(nil,"tools-panel",["Select","Sélection","選択","Selección","Selection / Transform (V)"],button)
-  case "tool.brush": return rule(nil,"tools-panel",["Brush","Pinceau","ブラシ","Pincel"],button)
+  case "tool.brush": return rule(nil,"tools-panel",["Brush","Pinceau","ブラシ","Pincel","Brush (B)"],button)
   case "motion.cancel-pending": return rule(nil,"motion-props-body",["Cancel"],button)
   case "motion.header-menu": return rule(nil,"motion-props-sec",["Layer properties","Propriétés du calque","レイヤープロパティ","Propiedades de capa"],["AXGroup","AXStaticText"],"menu")
   case "motion.filter":
@@ -216,7 +216,7 @@ func ui32EntryNext(_ command:String, _ enabled:Bool, _ stage:Int) throws -> Int 
   if enabled {
     let readOnly=["observe","capture","quit"]
     let effects=["settings.open","settings.close","settings.tab","profile.name","profile.name.restore",
-      "profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select"]
+      "profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select","tool.brush"]
     try check(readOnly.contains(command) || (stage >= 2 && effects.contains(command)))
   }
   return stage
@@ -268,7 +268,7 @@ func ui32EntrySelfTest() throws {
       var effects=0,refused=false;do {_ = try ui32EntryNext(command,true,state);effects += 1}catch{refused=true};try check(refused && effects == 0)
       try check(try ui32EntryNext(command,false,state) == state)
     }
-    for command in ["settings.open","settings.close","settings.tab","profile.name","profile.name.restore","profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select"] {
+    for command in ["settings.open","settings.close","settings.tab","profile.name","profile.name.restore","profile.email","profile.email.restore","locale.choose","locale.choose.restore","tool.hand","tool.select","tool.brush"] {
       try check(try ui32EntryNext(command,true,state) == state)
     }
   }
@@ -285,6 +285,8 @@ func ui32EntrySelfTest() throws {
   for (status,raw) in [(0,nil),(1,[String]()),(0,["on","on"]),(0,[""]),(0,[String(repeating:"a",count:65)]),(0,Array(repeating:"a",count:9))] {
     var refused=false;do {_ = try ui32EntryClassTokens(status,raw)}catch{refused=true};try check(refused)
   }
+  let brush=try ui32Rule("tool.brush",nil)
+  try check(ui32Matches(brush,identifier:"",labels:["Brush (B)"],role:"AXButton",ancestors:["tools-panel"]))
   let defaults=["np-name":"Untitled","np-fps":"24","np-preset":"1920 × 1080 (Full HD)"]
   try ui32NewDefaults(defaults)
   for key in defaults.keys {var changed=defaults;changed[key]="other";var refused=false;do {try ui32NewDefaults(changed)}catch{refused=true};try check(refused)}
