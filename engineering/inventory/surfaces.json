@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "6f2d4a434123e65c7ff2a7e63b926d135613a8a1",
-  "describe": "v0.7.0-alpha.4-2291-g6f2d4a43"
+  "head": "b4104e2498820feb68d42f3b0aa24141c875ded3",
+  "describe": "v0.7.0-alpha.4-2300-gb4104e24"
  },
- "inputsDigest": "1404384d7773f1ccdfa47cddabc6b932db406084f566c2f340cd286199e3222e",
+ "inputsDigest": "e255a2cc357da7ccf4df9028c4607d302b0023e7904957d493ed6c50abe4da26",
  "states": [
   "inventoried",
   "characterized",
@@ -4827,7 +4827,7 @@
     "functionsVisited": 142,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:294 setShyMode()",
+     "src/js/adapters/native-object-ui.js:300 setShyMode()",
      "src/js/motion.js:13197 setAppMode()",
      "src/js/timeline.js:1226 toggleLayerShy()"
     ]
@@ -9946,7 +9946,7 @@
     "functionsVisited": 25,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:246 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:252 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -14696,7 +14696,7 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 214,
+    "functionsVisited": 217,
     "via": "chain",
     "references": [
      "src/js/project.js:644 renderTabBar()",
@@ -16377,7 +16377,7 @@
     "functionsVisited": 143,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:237 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:243 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:220 updatePlayhead()",
      "src/js/timeline.js:2813 updateUI()"
