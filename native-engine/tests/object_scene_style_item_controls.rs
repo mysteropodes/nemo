@@ -284,8 +284,11 @@ fn source_guards_pin_the_layering_and_the_retained_legacy_style() {
     assert!(ITEM_SOURCE.contains(
         "use crate::evaluation::object_scene_style_kernels::object_scene_style_stroke::{"
     ));
-    // The paint plan keeps the L07-F retained typed solid for the legacy family and routes every other family
-    // through the one style function.
+    // The legacy family keeps its retained typed solid, which already carries raw layer opacity.
+    // Other families use the style entry that consumes the pinned layer factor.
     assert!(PAINT_PLAN.contains("SceneItemStyle::solid_fill(self.solid().clone())"));
-    assert!(PAINT_PLAN.contains("style_of_record("));
+    assert!(PAINT_PLAN.contains(
+        "style_of_record_with_opacity(record, self.entry.layer_opacity())"
+    ));
+    assert!(!PAINT_PLAN.contains("style_of_record("));
 }
