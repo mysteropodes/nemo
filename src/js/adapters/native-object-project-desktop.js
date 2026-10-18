@@ -64,11 +64,22 @@
       return true;
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
-      subscribeRevisions:async function(synchronize,disconnected,trackedInvoke){
+      subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
+        var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
+        var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';
+        function close(){if(observesClose)root.removeEventListener('pagehide',closing);detach();}
+        function detach(){if(!detached){detached=true;if(typeof remove==='function')remove();}}
+        if(observesClose)root.addEventListener('pagehide',closing,{once:true});
+        try{remove=await root.__TAURI__.event.listen('nemo-native-window-occlusion',function(event){hint(event&&event.payload);});
+          if(typeof remove!=='function')throw new Error('Native window exposure unsubscribe is unavailable');}
+        catch(error){if(observesClose)root.removeEventListener('pagehide',closing);throw error;}
+        return Object.freeze({detach:detach,close:close});
+      }:undefined,
+      subscribeRevisions:async function(synchronize,disconnected,trackedInvoke,isCurrent){
         if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
           return null; // Private file Open remains usable; no toggle/subscriber is advertised.
         var call=trackedInvoke||invoke;
-        transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(function(command,args){
+        var ownTransport=transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(function(command,args){
           var response=call(command,args);
           if(command==='nemo_native_revision_sync'&&args&&args.request.action==='acknowledge')
             return Promise.resolve(response).then(function(value){
@@ -79,7 +90,11 @@
             });
           return response;
         });
-        await transport.connect();return transport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize,disconnected);
+        await ownTransport.connect();
+        if(transport!==ownTransport||isCurrent&&!isCurrent()){await ownTransport.disconnect();throw new Error('Native project subscription was cancelled');}
+        var result=await ownTransport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize,disconnected);
+        if(transport!==ownTransport||isCurrent&&!isCurrent()){await ownTransport.disconnect();throw new Error('Native project subscription was cancelled');}
+        return result;
       },
       unsubscribeRevisions:function(){return transport?transport.disconnect():Promise.resolve();},
       subscriptionActive:function(){return !!transport&&!!transport.status()&&!transport.isSynchronizing();},
