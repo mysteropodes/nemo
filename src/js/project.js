@@ -375,8 +375,29 @@
     return report;
   }
 
+  function nativeNewAllowed(){
+    try{return nativeInactiveTabs.canReplaceActiveProject()===true&&
+      typeof nativeSavedUI.nativeObject.canOpen==='function'&&nativeSavedUI.nativeObject.canOpen()===true;}catch(_){return false;}
+  }
+  function nativeNewPin(){
+    var p=window.NemoNativeObjectProject.desktop(window).readPresentedObjectSession();if(!p)throw new Error('Native editor return is unavailable');
+    return Object.freeze({tabId:activeTabId,instanceId:p.instanceId,documentId:p.documentId,contentRevision:p.contentRevision,documentSnapshotId:p.documentSnapshotId,lifecycleGeneration:p.lifecycleGeneration});
+  }
+  function cancelNativeNew(context){
+    if(!nativeNewReturn)return;
+    try{
+      var current=nativeNewPin();
+      if(!context.submitted&&!context.inFlight&&nativeNewAllowed()&&Object.keys(nativeNewReturn).every(function(k){return current[k]===nativeNewReturn[k];})){
+        nativeNewReturn=null;hideStartScreen();SMProjectEntry.repaint();return true;
+      }
+    }catch(_){}
+    showStartScreen();return false;
+  }
   var newProjectGeneration=0;window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){
-    if(nativeSavedUI&&nativeSavedUI.nativeObject)return typeof nativeSavedUI.nativeObject.newProject==='function'?nativeSavedUI.nativeObject.newProject(cfg,isCurrent,onCreationFailure):false;
+    if(nativeSavedUI&&nativeSavedUI.nativeObject){
+      if(!nativeNewAllowed())return tabAddNotice('New project unavailable — close the inactive project or finish the pending project operation first.');
+      return typeof nativeSavedUI.nativeObject.newProject==='function'?nativeSavedUI.nativeObject.newProject(cfg,isCurrent,onCreationFailure):false;
+    }
     if(tauriOk()||window.NemoNativeObjectProject)return false;
     var generation=++newProjectGeneration;return afterMaybe(newProject(cfg,function(){return generation===newProjectGeneration&&(!isCurrent||isCurrent());},onCreationFailure),function(admitted){if(admitted===false)return false;try{hideStartScreen();ensureInitialTab();}catch(e){if(onCreationFailure)onCreationFailure(e);return false;}});},
     // "A project is now open, show the editor" — hideStartScreen +
@@ -553,11 +574,22 @@
       if(admitted===false)return false;activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:target.name});entered();
     }); // markSaved belongs to the new tab
   }
-  var tabAddGeneration=0,tabAdmissionMessage=null;
+  var tabAddGeneration=0,tabAdmissionMessage=null,nativeNewReturn=null;
   function tabAddNotice(message){
     if(!tabAdmissionMessage){var bar=document.getElementById('project-tabs-bar');tabAdmissionMessage=document.createElement('div');tabAdmissionMessage.setAttribute('role','alert');
       Object.assign(tabAdmissionMessage.style,{marginLeft:'auto',minWidth:'0',maxWidth:'60%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#ffb5a8',fontSize:'12px'});bar.appendChild(tabAdmissionMessage);}tabAdmissionMessage.textContent=message;tabAdmissionMessage.style.display=message?'block':'none';return false;}
-  function addTab(){var generation=++tabAddGeneration,initialTab=activeTabId,initialName=currentName,initialPath=currentPath;function denied(){return generation===tabAddGeneration&&activeTabId===initialTab&&currentName===initialName&&currentPath===initialPath?tabAddNotice('New project unavailable — native admission was denied.'):false;}
+  function addTab(){
+    if(nativeSavedUI&&nativeSavedUI.nativeObject){
+      if(!nativeNewAllowed())
+        return tabAddNotice('New project unavailable — close the inactive project or finish the pending project operation first.');
+      // Native New replaces the active project through its existing form and
+      // confirmation; it never snapshots the document into a JavaScript tab.
+      try{if(document.getElementById('start-screen').classList.contains('hid')&&nativeSavedUI.nativeObject.isActive())nativeNewReturn=nativeNewPin();}catch(_){return tabAddNotice('New project unavailable — the native editor is not ready.');}
+      tabAddNotice('');showStartScreen();document.getElementById('start-new').click();
+      if(nativeSavedUI.nativeObject.isActive())showToast('Creating a new project replaces the current project.');
+      return true;
+    }
+    var generation=++tabAddGeneration,initialTab=activeTabId,initialName=currentName,initialPath=currentPath;function denied(){return generation===tabAddGeneration&&activeTabId===initialTab&&currentName===initialName&&currentPath===initialPath?tabAddNotice('New project unavailable — native admission was denied.'):false;}
     function admitted(ok){
       if(generation!==tabAddGeneration||activeTabId!==initialTab||currentName!==initialName||currentPath!==initialPath)return false;if(ok===false||typeof window.n20AllowLegacyWrite==='function'&&window.n20AllowLegacyWrite('create-layer')!==true)return denied();
       tabAddNotice('');snapshotActiveIntoTab();var n=tabs.length+1,id=makeTabId();
@@ -609,6 +641,8 @@
     return t.id===activeTabId?isDirty():!!t.dirty;
   }
   function renderTabBar(){
+    var add=document.getElementById('project-tab-add');
+    if(add&&nativeSavedUI&&nativeSavedUI.nativeObject){add.setAttribute('data-i18n-title','newProjectHdr');add.title=SM.t('newProjectHdr');}
     SMProjectEntry.renderTabs(document,{
       readRows:function(){
         return tabs.map(function(t){
@@ -685,7 +719,7 @@
       readResumePresenceAsync:function(publish){if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){publish(!!v);}).catch(function(){});},
       renderRecents:renderRecents,resume:resumeAutosave,open:openDialog,
       createProject:function(config,current,onCreationFailure){return window.SMProject.newProject(config,current,onCreationFailure);},
-      showStartScreen:showStartScreen,notice:showToast
+      showStartScreen:showStartScreen,cancelProjectEntry:cancelNativeNew,notice:showToast
     });
 
     // Project panel buttons (right-hand Project section)

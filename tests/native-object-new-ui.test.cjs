@@ -7,13 +7,14 @@ const Project=require('../src/js/adapters/native-object-project.js');
 const Files=require('../src/js/adapters/native-object-project-file.js');
 const Workflow=require('../src/js/application/native-object-save-as-workflow.js');
 const Ack=require('../src/js/application/native-object-saved-acknowledgement.js');
+const InactiveTabs=require('../src/js/adapters/native-object-inactive-project-tabs.js');
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};}
 const intent={canvasW:640,canvasH:360,fps:30};
 function host(){
-  let installed=false,number=0,meta=null;
+  let installed=false,number=0,meta=null,inactive=null;
   const calls=[],events=[];
-  const h={calls,events,before:null,after:null,info:()=>meta};
+  const h={calls,events,before:null,after:null,info:()=>meta,inactive:()=>inactive};
   h.invoke=async(command,args)=>{
     const r=args?JSON.parse(args.requestJson):null;calls.push({command,r});
     if(h.before)await h.before(command,r);
@@ -27,7 +28,7 @@ function host(){
       if(r.newProject){assert.deepEqual(Object.keys(r).sort(),['apiVersion','instanceId','newProject','requestId',...(installed?['replace']:[])].sort());
         assert.deepEqual(Object.keys(r.newProject).sort(),['canvasH','canvasW','fps']);}
       else{assert.equal(r.projectOnly,true);assert.equal(typeof r.sourcePath,'string');}
-      installed=true;number++;
+      installed=true;number++;inactive=null;
       meta={apiVersion:2,instanceId:'instance',documentId:'document-'+number,contentRevision:0,
         documentSnapshotId:'snapshot-'+number,lifecycleGeneration:number,documentDigest:String(number).repeat(64),byteCount:1000,
         ...cfg,totalFrames:Math.round(cfg.fps*5),layers:[{layerUid:'layer-1',name:'Layer 1',visible:true}],reference:null,undoDepth:0,redoDepth:0};
@@ -37,7 +38,19 @@ function host(){
     else if(command==='nemo_native_object_preview'){events.push('present:'+meta.documentId);result={status:'presented',workId:'work-'+calls.length,viewGeneration:number};}
     else if(command==='nemo_native_object_save_as')result={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
       atRevision:r.atRevision,documentSnapshotId:r.documentSnapshotId,byteCount:meta.byteCount,published:true,cleanupPending:false};
-    else throw Error('Unexpected native route: '+command);
+    else if(command==='nemo_native_object_inactive_project'){
+      if(r.action.kind==='prepare')inactive={instanceId:r.instanceId,contentRevision:0,
+        documentSnapshotId:'snapshot-B',documentDigest:'b'.repeat(64),byteCount:128,
+        canvasW:320,canvasH:180,fps:24,totalFrames:2,layers:[{layerUid:'layer-B'}],
+        preparationToken:'inactive-B',preparationRequestId:r.requestId,
+        origin:{documentId:r.documentId,contentRevision:r.expectedRevision,documentSnapshotId:r.documentSnapshotId}};
+      if(r.action.kind==='close')inactive=null;
+      result={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
+        contentRevision:r.expectedRevision,documentSnapshotId:r.documentSnapshotId,lifecycleGeneration:r.lifecycleGeneration,
+        state:r.action.kind==='prepare'?'inactive-prepared':r.action.kind==='close'?'inactive-closed':inactive?'inactive-retained':'inactive-absent',
+        preparationToken:r.action.kind==='close'?r.action.preparationToken:inactive&&inactive.preparationToken,
+        project:inactive,retryExecution:false};
+    }else throw Error('Unexpected native route: '+command);
     return h.after?await h.after(command,r,result):result;
   };
   return h;
@@ -66,6 +79,9 @@ function ordinary(h,extra={}){
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;
     root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
     root.NemoNativeOpacityCutover={blocksLegacy:()=>true,requestRelease:()=>assert.fail('legacy release')};
+    root.crypto={randomUUID:require('node:crypto').randomUUID};
+    // Match DOM click dispatch rather than the older harness's click marker.
+    for(const id of ['project-tab-add','start-new'])root.document.getElementById(id).click=function(){return this.listeners.click();};
     root.SM.exportJSON=()=>assert.fail('legacy serialization');
     root.__TAURI__={core:{invoke:h.invoke},dialog:{save:async()=>'/ordinary-new.json',ask:async()=>true},
       fs:{readTextFile:()=>assert.fail('project bytes in JS'),writeTextFile:()=>assert.fail('legacy file write')}};
@@ -77,6 +93,179 @@ function form(app){
   app.element('np-fps').value='30';app.element('np-name').value='Named blank';
   return ()=>app.element('np-create').listeners.click();
 }
+function nativeNewEntry(app,route){
+  if(route==='plus')return app.element('project-tab-add').click();
+  // Execute the production burger entry and its real click delegate.
+  const lines=fs.readFileSync('src/js/timeline.js','utf8').split('\n');
+  const click=lines.find(line=>line.startsWith('function clickEl('));
+  const entry=lines.find(line=>line.includes("label:tt('menuNewProject')"));
+  assert.ok(click&&entry,'ordinary New menu entry exists');
+  return vm.runInNewContext(click+'\n('+entry.trim().replace(/,$/,'')+').action()',
+    {document:app.window.document,tt:key=>key});
+}
+function blank64(app){
+  app.element('np-preset').value='custom';app.element('np-w').value='64';app.element('np-h').value='64';
+  app.element('np-fps').value='24';app.element('np-name').value='PNG baseline';
+  return ()=>app.element('np-create').listeners.click();
+}
+function observedInactive(h){
+  let controller;
+  const app=ordinary(h,{NemoNativeObjectInactiveProjectTabs:{create(root,ports){controller=InactiveTabs.create(root,ports);return controller;}}});
+  return {app,tabs:()=>controller};
+}
+for(const route of ['plus','burger'])test('ordinary native '+route+' New opens the replacement form then submits exact64x64 intent',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');
+  const beforeCalls=h.calls.length,beforeWrites=JSON.stringify(app.writes);
+  nativeNewEntry(app,route);
+  assert.equal(app.element('start-newpanel').style.display,'block');assert.equal(app.startScreen.classList.contains('hid'),false);
+  assert.equal(h.calls.length,beforeCalls,'opening the form cannot replace the owner');
+  assert.equal(app.project.getCurrentLabel(),'old — /old.json');assert.equal(app.element('project-tab-add').title,'newProjectHdr');
+  assert.equal(app.element('project-tab-add').getAttribute('data-i18n-title'),'newProjectHdr');
+  assert.ok(app.toasts.includes('Creating a new project replaces the current project.'));
+  assert.equal(await blank64(app)(),true);
+  const request=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').at(-1).r;
+  assert.deepEqual(request.newProject,{canvasW:64,canvasH:64,fps:24});assert.equal(request.replace.documentId,'document-1');
+  assert.equal(app.project.getCurrentLabel(),'PNG baseline (not saved)');assert.equal(app.project.isDirty(),true);
+  assert.equal(app.element('project-tabs-list').children.length,1,'no second native tab is fabricated');
+  assert.equal(app.mutations,0);assert.equal(JSON.stringify(app.writes),beforeWrites);
+});
+test('native New form Cancel and dirty confirmation decline preserve the owner without legacy work',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');
+  let before=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
+  nativeNewEntry(app,'plus');app.element('np-cancel').listeners.click();
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,before);
+  assert.equal(app.project.getCurrentLabel(),'old — /old.json');
+  assert.equal(app.startScreen.classList.contains('hid'),true,'safe Cancel restores the existing editor');
+  assert.equal(app.element('start-newpanel').style.display,'none');
+  assert.equal(Project.desktop(app.window).identity().documentId,'document-1');
+  assert.equal(app.element('project-tabs-list').children.length,1);
+  nativeNewEntry(app,'plus');await blank64(app)();const owner=h.info().documentId;
+  let confirmations=0;app.window.__TAURI__.dialog.ask=async()=>{confirmations++;return false;};
+  before=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
+  nativeNewEntry(app,'burger');assert.equal(await blank64(app)(),false);
+  assert.equal(confirmations,1);assert.equal(h.info().documentId,owner);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,before);
+  assert.equal(Project.desktop(app.window).isActive(),true);assert.equal(app.mutations,0);
+});
+test('original start-screen form Cancel retains its default presentation',()=>{
+  const app=ordinary(host());form(app);app.element('np-cancel').listeners.click();
+  assert.equal(app.startScreen.classList.contains('hid'),false);
+  assert.equal(app.element('start-newpanel').style.display,'none');
+  assert.equal(app.mutations,0);assert.equal(app.writes.length,0);
+});
+for(const drift of ['revision','snapshot','owner','missing-readiness'])test('native entry Cancel refuses '+drift+' drift without revealing an old editor',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');nativeNewEntry(app,'plus');
+  const s=Project.desktop(app.window),old=s.identity(),gate=deferred();let pending;
+  if(drift==='owner')await s.newProject({canvasW:64,canvasH:64,fps:24});
+  else if(drift==='missing-readiness'){
+    h.before=async command=>{if(command==='nemo_native_object_preview')await gate.promise;};
+    pending=s.presentPreview(0);await turn();assert.equal(s.readPresentedObjectSession(),null);
+  }else{
+    if(drift==='revision')h.info().contentRevision++;
+    h.info().documentSnapshotId+='-changed';
+    await s.acquirePin({operation:'query.document.project.info',requestId:'read-new-pin',instanceId:old.instanceId,
+      documentId:old.documentId,payload:{atRevision:h.info().contentRevision}});
+    await s.presentPreview(0);assert.ok(s.readPresentedObjectSession(),'drift is presented, not merely pending');
+    assert.equal(old.contentRevision,0);assert.equal(old.documentSnapshotId,'snapshot-1','captured metadata cannot follow host aliases');
+  }
+  assert.equal(app.element('np-cancel').listeners.click(),false);
+  assert.equal(app.startScreen.classList.contains('hid'),false);
+  assert.equal(app.element('start-newpanel').style.display,'block');
+  if(pending){gate.resolve();await pending;}
+  assert.equal(app.mutations,0);assert.equal(app.writes.length,0);
+});
+for(const stage of ['status','bootstrap','final-preview'])test('native entry late Cancel during '+stage+' keeps the editor covered',async()=>{
+  const h=host(),app=ordinary(h),gate=deferred();await app.project.openPath('/old.json');nativeNewEntry(app,'plus');
+  let previews=0;h.before=async command=>{
+    if(stage==='status'&&command==='nemo_native_object_client_status'||stage==='bootstrap'&&command==='nemo_native_object_bootstrap'||
+      stage==='final-preview'&&command==='nemo_native_object_preview'&&++previews===2)await gate.promise;
+  };
+  const creating=blank64(app)();await turn();assert.equal(app.element('np-cancel').listeners.click(),false);
+  assert.equal(app.startScreen.classList.contains('hid'),false);
+  assert.equal(app.element('start-newpanel').style.display,'block');gate.resolve();assert.equal(await creating,false);
+  assert.equal(app.startScreen.classList.contains('hid'),false);assert.equal(app.toasts.includes('New project created'),false);
+  if(stage==='status')assert.equal(Project.desktop(app.window).identity().documentId,'document-1');
+  else assert.equal(Project.desktop(app.window).isActive(),false);
+  assert.equal(app.mutations,0);assert.equal(app.writes.length,0);
+});
+test('obsolete native entry Cancel cannot restore the old editor after completed Create',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');nativeNewEntry(app,'plus');
+  assert.equal(await blank64(app)(),true);assert.equal(h.info().documentId,'document-2');
+  assert.equal(app.element('np-cancel').listeners.click(),false);assert.equal(app.startScreen.classList.contains('hid'),false);
+  assert.equal(Project.desktop(app.window).identity().documentId,'document-2');assert.equal(app.project.getCurrentLabel(),'PNG baseline (not saved)');
+});
+test('native entry failure overlay survives Cancel after an unconfirmed final frame',async()=>{
+  const h=host(),app=ordinary(h);await app.project.openPath('/old.json');nativeNewEntry(app,'plus');let previews=0;
+  h.after=async(command,r,v)=>command==='nemo_native_object_preview'&&++previews===2?{status:'deferred-occluded'}:v;
+  assert.equal(await blank64(app)(),false);const alert=app.element('start-newpanel').children.at(-1),message=alert.textContent;
+  assert.match(message,/creation failed.*may have changed/i);assert.equal(app.element('np-cancel').listeners.click(),false);
+  assert.equal(app.startScreen.classList.contains('hid'),false);assert.equal(app.element('start-newpanel').style.display,'block');
+  assert.equal(alert.style.display,'block');assert.equal(alert.textContent,message);assert.equal(Project.desktop(app.window).isActive(),false);
+});
+test('retained inactive project blocks New entry and a form submitted after preparation; terminal close re-enables',async()=>{
+  const h=host(),f=observedInactive(h),app=f.app;await app.project.openPath('/old.json');
+  nativeNewEntry(app,'plus');const submit=blank64(app),before=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
+  assert.equal((await app.project.openPath('/B.json')).status,'prepared');const held=f.tabs().held(),owner=h.info().documentId;
+  assert.equal(nativeNewEntry(app,'plus'),false);assert.equal(await submit(),false);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,before);
+  assert.equal(h.info().documentId,owner);assert.strictEqual(f.tabs().held(),held);assert.ok(h.inactive());
+  assert.equal(app.element('project-tabs-list').children.length,2);assert.equal(app.mutations,0);
+  assert.equal(app.element('np-cancel').listeners.click(),false);assert.equal(app.startScreen.classList.contains('hid'),false);
+  assert.equal(app.element('start-newpanel').style.display,'block');assert.strictEqual(f.tabs().held(),held);
+  assert.equal((await f.tabs().close(held)).status,'closed');nativeNewEntry(app,'plus');
+  assert.equal(await blank64(app)(),true);assert.equal(h.inactive(),null);
+});
+test('busy and unknown inactive preparation block ordinary New even without a parked row',async()=>{
+  for(const state of ['busy','unknown']){
+    const h=host(),f=observedInactive(h),app=f.app;await app.project.openPath('/old.json');
+    nativeNewEntry(app,'plus');const gate=deferred();h.before=async(command,r)=>{
+      if(command!=='nemo_native_object_inactive_project')return;
+      if(state==='busy')await gate.promise;
+      else if(r.action.kind==='prepare'||r.action.recoverRequestId)throw Error('unknown retained outcome');
+    };
+    const preparing=app.project.openPath('/B.json');await turn();
+    if(state==='unknown')await preparing;
+    const before=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
+    assert.equal(nativeNewEntry(app,'plus'),false);
+    assert.equal(await app.project.newProject({w:64,h:64,fps:24,name:'Unsafe'}),false);
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,before);
+    assert.equal(h.info().documentId,'document-1');assert.equal(app.mutations,0);
+    assert.equal(app.element('np-cancel').listeners.click(),false);assert.equal(app.startScreen.classList.contains('hid'),false);
+    assert.equal(app.element('start-newpanel').style.display,'block');
+    if(state==='unknown'){assert.equal(f.tabs().held(),null);assert.equal(f.tabs().isBusy(),false);}
+    else{gate.resolve();await preparing;}
+  }
+});
+test('native New form snapshots scalar fields before pending admission and cannot follow mutable UI aliases',async()=>{
+  const h=host(),gate=deferred(),app=ordinary(h);await app.project.openPath('/old.json');
+  nativeNewEntry(app,'burger');const submit=blank64(app);
+  h.before=async command=>{if(command==='nemo_native_object_client_status')await gate.promise;};
+  const creating=submit();await turn();
+  app.element('np-w').value='999';app.element('np-name').value='Changed after submit';gate.resolve();
+  assert.equal(await creating,true);
+  assert.deepEqual(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').at(-1).r.newProject,{canvasW:64,canvasH:64,fps:24});
+  assert.equal(app.project.getCurrentLabel(),'PNG baseline (not saved)');assert.equal(app.mutations,0);
+});
+test('pending native replacement cannot be superseded by another New entry or inactive Open',async()=>{
+  const h=host(),gate=deferred(),app=ordinary(h);await app.project.openPath('/old.json');
+  nativeNewEntry(app,'plus');h.before=async command=>{if(command==='nemo_native_object_client_status')await gate.promise;};
+  const creating=blank64(app)();await turn();
+  assert.equal(nativeNewEntry(app,'plus'),false);assert.equal(await app.project.openPath('/B.json'),false);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_inactive_project').length,0);
+  gate.resolve();assert.equal(await creating,true);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,2);
+  assert.equal(app.project.getCurrentLabel(),'PNG baseline (not saved)');assert.equal(app.mutations,0);
+});
+test('missing or throwing inactive eligibility never falls back to legacy New',async()=>{
+  for(const predicate of [undefined,()=>{throw Error('unavailable inactive ownership');}]){
+    const h=host(),app=ordinary(h,{NemoNativeObjectInactiveProjectTabs:{create(root,ports){
+      return Object.freeze({...InactiveTabs.create(root,ports),canReplaceActiveProject:predicate});
+    }}});await app.project.openPath('/old.json');
+    assert.equal(nativeNewEntry(app,'plus'),false);assert.equal(await app.project.newProject({w:64,h:64,fps:24}),false);
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1);
+    assert.equal(h.info().documentId,'document-1');assert.equal(app.project.getCurrentLabel(),'old — /old.json');assert.equal(app.mutations,0);
+  }
+});
 test('ordinary New form uses the real native session, remains unsaved, then Save As acknowledges the actual file',async()=>{
   const h=host(),app=ordinary(h),create=form(app);
   assert.equal(await create(),true);
