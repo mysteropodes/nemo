@@ -155,3 +155,28 @@ test('browser Text bootstrap injects actual existing reader and writer modules i
    assert.equal(refused.get('native-text-controls'),null);
  }
 });
+
+
+test('temporary pointer diagnostics eagerly retain the actual rejected scalars without opening or mutating',async()=>{
+ const f=await fixture(),rows=[];f.root.console={info:line=>rows.push(line)};
+ const e=f.canvas.fire('pointerdown',{buttons:0,isTrusted:true,pointerType:'mouse'});e.buttons=1;
+ const rejected=rows.map(line=>JSON.parse(line.slice('[nemo-native-text-input] '.length))).find(row=>row.decision==='reject.buttons.down');
+ assert.ok(rejected);assert.equal(rejected.buttons,0);assert.equal(rejected.isPrimary,true);assert.equal(rejected.button,0);assert.equal('isTrusted' in rejected,false);assert.equal('targetId' in rejected,false);
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
+ assert.ok(rows.every(line=>typeof line==='string'&&!line.includes('Native point')));
+});
+test('unavailable or throwing diagnostic output cannot alter ordinary Text draft and commit behavior',async()=>{
+ const f=await fixture();f.root.console={info(){throw new Error('diagnostic sink unavailable');}};
+ await f.click(100,110);assert.equal(f.get('text-popover').style.display,'block');f.input('text-input','Actual point');f.apply();await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.equal(f.logs.legacy,0);assert.equal(f.owner.items.size,1);
+});
+
+test('diagnostics preserve original short-circuit reads for rejected stage and nonprimary input',async()=>{
+ const f=await fixture(),rows=[];f.root.console={info:line=>rows.push(line)};let untouched=0;
+ const e={target:f.canvas,pointerId:19,isPrimary:false,stopImmediatePropagation(){},preventDefault(){}};
+ for(const key of ['buttons','button','clientX','clientY','altKey','isTrusted','pointerType','timeStamp'])Object.defineProperty(e,key,{get(){untouched++;throw new Error('original guard must not read '+key);}});
+ assert.equal(Desktop.handle(f.root,'down',e),true);assert.equal(untouched,0);assert.equal(f.binding.core.snapshot().draft,null);
+ const other={get id(){untouched++;throw new Error('foreign target id');}};
+ assert.equal(Desktop.handle(f.root,'down',{target:other,stopImmediatePropagation(){},preventDefault(){}}),true);assert.equal(untouched,0);
+ assert.ok(rows.some(line=>line.includes('reject.primary')));assert.ok(rows.some(line=>line.includes('reject.stage')));assert.equal(f.owner.log.executed.length,0);
+});

@@ -40,7 +40,7 @@ impl ProjectEnvelope {
     /// Replacement drawing has already passed the existing command admission.
     pub(crate) fn with_drawing(&self, drawing: ObjectDocument) -> Self {
         Self {
-            project: self.project,
+            project: self.project.clone(),
             drawing: Arc::new(drawing),
             reference: self.reference.clone(),
             asset_inventory: self.asset_inventory.clone(),
@@ -50,7 +50,7 @@ impl ProjectEnvelope {
     /// It does not publish a revision, mutate history or activate media.
     pub(crate) fn with_reference(&self, reference: ProjectReferenceState) -> Self {
         Self {
-            project: self.project,
+            project: self.project.clone(),
             drawing: Arc::clone(&self.drawing),
             reference,
             asset_inventory: self.asset_inventory.clone(),
@@ -61,7 +61,7 @@ impl ProjectEnvelope {
     }
     pub(crate) fn with_asset_inventory(&self, assets: Option<AssetInventory>) -> Self {
         Self {
-            project: self.project,
+            project: self.project.clone(),
             drawing: Arc::clone(&self.drawing),
             reference: self.reference.clone(),
             asset_inventory: assets,

@@ -215,6 +215,19 @@ impl ObjectFillOwner {
             .map_err(|_| DispatchErrorCode::Unavailable)
     }
 
+    /// Initial admission only: preserve the already minted inactive identity.
+    #[cfg(feature = "project_media_codec")]
+    pub(crate) fn from_admitted_snapshot(
+        snapshot: ObjectSnapshot,
+    ) -> Result<Self, DispatchErrorCode> {
+        if snapshot.content_revision() != 0 || snapshot.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        Ok(Self {
+            revisions: ObjectRevisionOwner::from_admitted(snapshot),
+        })
+    }
+
     #[cfg(feature = "project_media_codec")]
     pub(crate) fn from_project_file(
         instance: String,

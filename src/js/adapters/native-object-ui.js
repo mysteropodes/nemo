@@ -206,9 +206,15 @@
         var row=createNativeObjectUiText(root,'div',''),pick=createNativeObjectUiText(root,'button',label+' — '+(layer.visible===false?'Hidden':'Visible'));
         row.className='native-object-layer';row.dataset.layerUid=layer.layerUid;row.style.display='flex';
         pick.type='button';pick.style.flex='1';pick.style.textAlign='left';
-        pick.setAttribute('aria-pressed',String(i===root.state.activeLayerIdx));
+        pick.setAttribute('aria-pressed',String(selection.indexOf(i)>=0));
         pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
-        pick.addEventListener('click',function(){if(!nativeObjectUiPortsReady(ports))return false;return ports.selectLayer(i,false,layer.layerUid,info);});
+        pick.addEventListener('click',function(event){
+          var view=views.get(root);
+          if(!nativeObjectUiPortsReady(ports)||row.parentNode!==list||!view||view.rows[i]!==row)return false;
+          if(root._layerDragJustEnded){root._layerDragJustEnded=false;return false;}
+          var mode=event.metaKey||event.ctrlKey?'toggle':event.shiftKey?'range':null;
+          return ports.selectLayer(i,mode?{mode:mode}:false,layer.layerUid,info);
+        });
         var eye=createNativeObjectUiText(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
         eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
         // Availability is checked at CLICK time: this render can precede preview/ACK.
@@ -362,14 +368,36 @@
       return Promise.resolve(toggle(uid)).catch(refused);
     }catch(_){return Promise.resolve(refused());}
   }
+  function rowSelection(root,count,index,mode){
+    function valid(value){return Number.isInteger(value)&&value>=0&&value<count;}
+    var prior=Array.isArray(root._layerSel)?root._layerSel:[],selection=prior.filter(function(value,i){return valid(value)&&prior.indexOf(value)===i;});
+    var anchor=root._layerSelAnchor,active=root.state.activeLayerIdx;
+    if(mode==='toggle'){
+      if(valid(active)&&selection.indexOf(active)<0)selection.push(active);
+      var position=selection.indexOf(index);
+      if(position>=0)selection.splice(position,1);else selection.push(index);
+      anchor=index;
+    }else{
+      var start=valid(anchor)?anchor:selection.length?selection[0]:valid(active)?active:index;
+      selection=[];
+      for(var i=Math.min(start,index);i<=Math.max(start,index);i++)selection.push(i);
+    }
+    return {selection:selection,anchor:anchor};
+  }
   function select(root,info,index,preserveLayerSel,uid,presented,ports){
     checked(root,info,ports);
     if(!Number.isInteger(index)||index<0||index>=info.layers.length||uid!==undefined&&info.layers[index].layerUid!==uid)return false;
     if(!confirmed(root,info,presented))return false;
+    var selection=null;
+    if(preserveLayerSel&&typeof preserveLayerSel==='object'){
+      if(!['toggle','range'].includes(preserveLayerSel.mode))return false;
+      selection=rowSelection(root,info.layers.length,index,preserveLayerSel.mode);
+    }
     var old={active:root.state.activeLayerIdx,selection:root._layerSel,anchor:root._layerSelAnchor,paths:root.selectedPaths,
       indices:root.state.selectedStrokeIndices,explicit:root._layerActiveExplicit};
     root.state.activeLayerIdx=index;
-    if(!preserveLayerSel){root._layerSel=[index];root._layerSelAnchor=index;}
+    if(selection){root._layerSel=selection.selection;root._layerSelAnchor=selection.anchor;}
+    else if(!preserveLayerSel){root._layerSel=[index];root._layerSelAnchor=index;}
     root.selectedPaths=[];root.state.selectedStrokeIndices=[];root._layerActiveExplicit=true;
     try{return renderNativeObjectUiMetadata(root,info,false,ports);}
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;

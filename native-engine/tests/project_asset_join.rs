@@ -271,7 +271,7 @@ fn typed_embedded_kind_and_media_refuse_before_any_ticket_or_identity() {
         panic!()
     };
     let original_allocation = Arc::clone(reference.encoded_allocation());
-    let original_metadata = *base.project();
+    let original_metadata = base.project().clone();
     // These PNG sources really passed the existing PNG codec in project().
     // Changing AssetRecord.kind does not change that valid source precondition.
     for (kind, media) in [

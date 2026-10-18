@@ -252,7 +252,7 @@ mod tests {
             let bare = drawing(version);
             let before = serde_json::to_vec(&bare).unwrap();
             let metadata = ProjectMetadata::new(320, 180, 24.).unwrap();
-            let project = ProjectEnvelope::no_media(metadata, bare.clone());
+            let project = ProjectEnvelope::no_media(metadata.clone(), bare.clone());
             assert_eq!(project.project(), &metadata);
             assert_eq!(project.reference_state(), ProjectReferenceState::NoMedia);
             assert_eq!(project.drawing().format_version(), version);
