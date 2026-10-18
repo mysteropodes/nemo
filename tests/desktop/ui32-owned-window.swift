@@ -129,23 +129,17 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     guard let web=retainedWebArea else { return }
     var current=web,seen=[AXUIElement]()
     for _ in 0..<13 {
-      try check(owns(current,pid) && !seen.contains {CFEqual($0,current)})
-      try check(AXUIElementSetMessagingTimeout(current,0.03) == .success);seen.append(current)
+      try ui32ProofCheck(owns(current,pid) && !seen.contains {CFEqual($0,current)},"retained-web-owner-cycle")
+      try ui32ProofCheck(AXUIElementSetMessagingTimeout(current,0.03) == .success,"retained-web-timeout");seen.append(current)
       if CFEqual(current,main) { return }
       guard let parent=axElement(attr(current,kAXParentAttribute)),owns(parent,pid) else { throw Refusal(code:"child-owner") }
       let (query,rows)=ui32Children(parent,pid)
-      try check(query == 0 && rows != nil && rows!.contains {CFEqual($0,current)});current=parent
+      try ui32ProofCheck(query == 0 && rows != nil && rows!.contains {CFEqual($0,current)},"retained-web-children",["queryError":query,"childCount":rows?.count ?? -1]);current=parent
     }
     throw Refusal(code:"adapter-refused")
   }
   func text(_ node:AXUIElement, _ key:String) throws -> String? {
-    try check(owns(node,pid) && AXUIElementSetMessagingTimeout(node,0.03) == .success)
-    var raw:CFTypeRef?;let query=AXUIElementCopyAttributeValue(node,key as CFString,&raw)
-    if query == .attributeUnsupported || query == .noValue { return nil }
-    try check(query == .success)
-    if let value=raw as? String { return value }
-    if key == kAXValueAttribute && raw is NSNumber { return nil }
-    throw Refusal(code:"adapter-refused")
+    try ui32DiagnosticText(node,pid,key)
   }
   func parent(_ node:AXUIElement) -> (Int,AXUIElement?) {
     var raw:CFTypeRef?;let query=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
@@ -166,25 +160,25 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     return (0,rows)
   }
   func tree(_ suppliedDeadline:UInt64? = nil) throws -> [AXUIElement] {
-    try identity()
+    try ui32ContentReadStep("tree-identity"){try identity()}
     guard let windows=attr(pinned.application,kAXWindowsAttribute) as? [AXUIElement],windows.count == 1,
       owns(windows[0],pid),CFEqual(windows[0],main) else { throw Refusal(code:"sheet-active") }
     let deadline=suppliedDeadline ?? (DispatchTime.now().uptimeNanoseconds+750_000_000)
     let certificate=try ui32ContentCertificate(main,pid:Int(pid),retained:retainedWebArea,deadline:deadline,
       now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owner:owner,
       prepare:{AXUIElementSetMessagingTimeout($0,0.03) == .success},traits:{ node in
-        guard let role=try text(node,kAXRoleAttribute) else { throw Refusal(code:"adapter-refused") }
+        guard let role=try text(node,kAXRoleAttribute) else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"content-role-missing"])}
         var raw:CFTypeRef?;let query=AXUIElementCopyAttributeValue(node,kAXModalAttribute as CFString,&raw)
         var modal=false
-        if query == .success { guard let value=raw as? Bool else { throw Refusal(code:"adapter-refused") };modal=value }
-        else { try check(query == .attributeUnsupported || query == .noValue) }
+        if query == .success {guard let value=raw as? Bool else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"content-modal-shape"])};modal=value}
+        else {try ui32ProofCheck(query == .attributeUnsupported || query == .noValue,"content-modal-query",["queryError":Int(query.rawValue)])}
         let subrole=try text(node,kAXSubroleAttribute)
         return (role,modal || subrole == kAXDialogSubrole)
       },children:{ui32Children($0,pid)},parent:parent,strict:{ web,deadline in
         try ui32ContentWalk(web,owner:Int(pid),deadline:deadline,now:{DispatchTime.now().uptimeNanoseconds},
           equal:{CFEqual($0,$1)},owner:owner,children:strictChildren,parent:parent)
       })
-    try nativeIdentity();retainedWebArea=certificate.nodes[certificate.web];latest=certificate
+    try ui32ContentReadStep("tree-final-native-identity"){try nativeIdentity()};retainedWebArea=certificate.nodes[certificate.web];latest=certificate
     return certificate.nodes.indices.filter {certificate.inside.contains($0)}.map {certificate.nodes[$0]}
   }
   func newContext(_ command:String) throws {

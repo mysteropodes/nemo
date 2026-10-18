@@ -233,30 +233,56 @@ func ui32FileDomain(_ nemo:[String:Any], _ service:[String:Any], _ retained:Stri
     }
     try check(facts["observedExpectedURLMatches"] as? Int == actual);return actual
   }
-  let own=try matches(nemo),remote=try matches(service);try check(own+remote == 1)
+  let own=try ui32ProofStep("nemo-domain-facts"){try matches(nemo)},remote=try ui32ProofStep("service-domain-facts"){try matches(service)};try ui32ProofCheck(own+remote == 1,"combined-url-cardinality",["nemoMatches":own,"serviceMatches":remote])
   let domain=own == 1 ? "nemo-owned-sheet" : "authenticated-service"
-  try check(retained == nil || retained == domain);return domain
+  try ui32ProofCheck(retained == nil || retained == domain,"retained-file-domain");return domain
+}
+// Shared UI32 metadata only. A proof failure never asserts the state of prior effects.
+func ui32ProofCheck(_ ok:Bool, _ step:String, _ facts:[String:Any]=[:]) throws {
+  if !ok {throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"read-proof","proofStep":step,"facts":facts])}
+}
+func ui32ProofStep<T>(_ step:String, _ body:() throws -> T) throws -> T {
+  do {return try body()} catch {
+    throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"read-proof","proofStep":step,"underlying":ui32ActionCause(error)])
+  }
+}
+func ui32ContentReadStep<T>(_ step:String, _ body:() throws -> T) throws -> T {
+  do {return try body()} catch let error as ActionRefusal {throw error} catch {
+    throw ActionRefusal(diagnostics:["purpose":"UI32","stage":"content-read-proof","proofStep":step,"underlying":ui32ActionCause(error)])
+  }
+}
+func ui32DiagnosticText(_ node:AXUIElement, _ pid:pid_t, _ key:String) throws -> String? {
+  let category=key == kAXRoleAttribute ? "role" : key == kAXSubroleAttribute ? "subrole" : key == kAXValueAttribute ? "value" : "other"
+  try ui32ProofCheck(owns(node,pid) && AXUIElementSetMessagingTimeout(node,0.03) == .success,"text-owner-timeout",["attribute":category])
+  var raw:CFTypeRef?;let query=AXUIElementCopyAttributeValue(node,key as CFString,&raw)
+  if query == .attributeUnsupported || query == .noValue {return nil}
+  try ui32ProofCheck(query == .success,"text-query",["attribute":category,"queryError":Int(query.rawValue)])
+  if let value=raw as? String {return value}
+  if key == kAXValueAttribute && raw is NSNumber {return nil}
+  throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"text-shape","attribute":category,"rawPresent":raw != nil])
 }
 extension UI32Fixture {
   func fileRead(_ node:AXUIElement, _ pid:pid_t, _ key:String, _ deadline:UInt64) throws -> (Int,CFTypeRef?) {
-    try check(DispatchTime.now().uptimeNanoseconds < deadline && owns(node,pid) &&
-      AXUIElementSetMessagingTimeout(node,0.03) == .success && owns(node,pid))
+    try ui32ProofCheck(DispatchTime.now().uptimeNanoseconds < deadline && owns(node,pid) &&
+      AXUIElementSetMessagingTimeout(node,0.03) == .success && owns(node,pid),"file-read-preconditions")
     var raw:CFTypeRef?;let status=AXUIElementCopyAttributeValue(node,key as CFString,&raw)
-    try check(owns(node,pid) && DispatchTime.now().uptimeNanoseconds < deadline);return (Int(status.rawValue),raw)
+    try ui32ProofCheck(owns(node,pid) && DispatchTime.now().uptimeNanoseconds < deadline,"file-read-postconditions",["queryError":Int(status.rawValue)]);return (Int(status.rawValue),raw)
   }
   func fileRole(_ node:AXUIElement, _ pid:pid_t, _ deadline:UInt64) throws -> String {
     let (status,raw)=try fileRead(node,pid,kAXRoleAttribute,deadline)
-    guard status == 0,let role=raw as? String,!role.isEmpty else {throw Refusal(code:"adapter-refused")};return role
+    guard status == 0,let role=raw as? String,!role.isEmpty else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"file-role-query-shape","queryError":status])};return role
   }
   func filePath(_ candidate:AXUIElement, _ deadline:UInt64) throws -> [AXUIElement] {
-    let outer=try attachedSheet();let external=owner != pinned.pid ? root.map {[$0]} ?? [] : []
-    let proof=try ui32OwnedCandidatePath(candidate,outer,observedOwnedNodes,observedOwnedRoutes,
+    let outer=try ui32ProofStep("path-attached-sheet"){try attachedSheet()};let external=owner != pinned.pid ? root.map {[$0]} ?? [] : []
+    var parentCause:[String:Any]?
+    do {let proof=try ui32OwnedCandidatePath(candidate,outer,observedOwnedNodes,observedOwnedRoutes,
       deadline:deadline,now:{DispatchTime.now().uptimeNanoseconds},equal:{CFEqual($0,$1)},owned:{owns($0,self.pinned.pid)},
       parent:{node in
         do {let (status,raw)=try self.fileRead(node,self.pinned.pid,kAXParentAttribute,deadline);return (status,axElement(raw))}
-        catch {return (-1,nil)}
+        catch {if parentCause == nil {parentCause=ui32ActionCause(error)};return (-1,nil)}
       },children:{ui32Children($0,self.pinned.pid)},knownExternalOpaque:external)
-    _ = try attachedSheet();return proof.nodes
+    _ = try ui32ProofStep("path-final-sheet"){try attachedSheet()};return proof.nodes
+    }catch{var facts:[String:Any]=["stage":"read-proof","proofStep":"candidate-path","underlying":ui32ActionCause(error)];if let parentCause {facts["parentReadFailure"]=parentCause};throw ActionRefusal(diagnostics:facts)}
   }
   func fileAudit(_ nodes:[AXUIElement], _ pid:pid_t, _ deadline:UInt64, _ limit:Int) throws -> [String:Any] {
     try ui32OwnedSheetRead(nodes,nodes.indices.map {String($0)},fixture,deadline:deadline,limit:limit,
@@ -266,18 +292,18 @@ extension UI32Fixture {
       })
   }
   func fileNemoRow(_ urlNode:AXUIElement, _ deadline:UInt64) throws -> AXUIElement {
-    try check(observedOwnedNodes.contains {CFEqual($0,urlNode)});let path=try filePath(urlNode,deadline)
+    try ui32ProofCheck(observedOwnedNodes.contains {CFEqual($0,urlNode)},"url-candidate-membership");let path=try filePath(urlNode,deadline)
     var row:AXUIElement?,outline:AXUIElement?
     for node in path {
       let role=try fileRole(node,pinned.pid,deadline)
-      if role == kAXRowRole {try check(row == nil);row=node}
-      if role == kAXOutlineRole {try check(row != nil && outline == nil);outline=node}
+      if role == kAXRowRole {try ui32ProofCheck(row == nil,"row-unique");row=node}
+      if role == kAXOutlineRole {try ui32ProofCheck(row != nil && outline == nil,"outline-order-unique");outline=node}
     }
-    guard let row,outline != nil else {throw Refusal(code:"adapter-refused")}
+    guard let row,outline != nil else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"row-outline-present"])}
     let (enabled,value)=try fileRead(row,pinned.pid,kAXEnabledAttribute,deadline)
-    try check(enabled == 0 && value as? Bool == true)
+    try ui32ProofCheck(enabled == 0 && value as? Bool == true,"row-enabled",["queryError":enabled,"boolTyped":value is Bool])
     let (status,raw)=try fileRead(urlNode,pinned.pid,kAXURLAttribute,deadline)
-    try check(status == 0 && ui32FixtureURLMatches(raw as? URL,fixture));try fileProof();return row
+    try ui32ProofCheck(status == 0 && ui32FixtureURLMatches(raw as? URL,fixture),"row-url-reread",["queryError":status,"urlTyped":raw is URL]);try ui32ProofStep("row-file-hash"){try fileProof()};return row
   }
   func fileButton(_ labels:Set<String>, _ scopes:[([AXUIElement],pid_t,[String:Any])], _ expectedPID:pid_t, _ deadline:UInt64) throws -> AXUIElement {
     var matches=[(AXUIElement,pid_t)]()
@@ -305,32 +331,32 @@ extension UI32Fixture {
   }
   func actionPanel(_ command:String) throws -> ([AXUIElement],pid_t) {
     fileCertifiedRow=nil;fileCertifiedButton=nil
-    let (remote,pid)=try panel()
+    let (remote,pid)=try ui32ProofStep("base-panel"){try panel()}
     if cancelOnly || command == "fixture.observe" {return (remote,pid)}
     try check(["fixture.choose","fixture.confirm","fixture.cancel"].contains(command))
     if pid == pinned.pid {
       try check(fileDomain == nil || fileDomain == "same-pid-original");fileDomain="same-pid-original";return (remote,pid)
     }
     let deadline=DispatchTime.now().uptimeNanoseconds+750_000_000
-    _ = try attachedSheet();try fileProof()
-    let own=try fileAudit(observedOwnedNodes,pinned.pid,deadline,5120)
-    guard let used=own["nativeCallsStarted"] as? Int,used >= 0,used <= 5120 else {throw Refusal(code:"adapter-refused")}
-    let service=try fileAudit(remote,pid,deadline,5120-used)
-    try check(DispatchTime.now().uptimeNanoseconds < deadline && processStart(pid) == start && authenticatedPanelService(pid))
-    _ = try attachedSheet()
+    _ = try ui32ProofStep("sheet-before-audit"){try attachedSheet()};try ui32ProofStep("file-before-audit"){try fileProof()}
+    let own=try ui32ProofStep("nemo-audit"){try fileAudit(observedOwnedNodes,pinned.pid,deadline,5120)}
+    guard let used=own["nativeCallsStarted"] as? Int,used >= 0,used <= 5120 else {throw ActionRefusal(diagnostics:["stage":"read-proof","proofStep":"shared-call-budget"])}
+    let service=try ui32ProofStep("service-audit"){try fileAudit(remote,pid,deadline,5120-used)}
+    try ui32ProofCheck(DispatchTime.now().uptimeNanoseconds < deadline && processStart(pid) == start && authenticatedPanelService(pid),"audit-deadline-service-identity")
+    _ = try ui32ProofStep("sheet-after-audit"){try attachedSheet()}
     let domain=try ui32FileDomain(own,service,fileDomain);fileDomain=domain
     let owned=domain == "nemo-owned-sheet",chosenPID=owned ? pinned.pid : pid,chosenRows=owned ? observedOwnedNodes : remote
     if owned {
       guard let facts=own["nodes"] as? [[String:Any]],let index=facts.firstIndex(where:{$0["expectedURLMatch"] as? Bool == true}) else {throw Refusal(code:"adapter-refused")}
       let row=try fileNemoRow(observedOwnedNodes[index],deadline);fileCertifiedRow=row
-      if let selected {try check(CFEqual(selected,row))}
-    } else {fileCertifiedRow=try exactRow(remote,pid)}
+      if let selected {try ui32ProofCheck(CFEqual(selected,row),"retained-selected-row")}
+    } else {fileCertifiedRow=try ui32ProofStep("service-exact-row"){try exactRow(remote,pid)}}
     if command != "fixture.choose" {
       let labels:Set<String> = command == "fixture.confirm" ? ["Open","Ouvrir","開く","Abrir"] : ["Cancel","Annuler","キャンセル","Cancelar"]
       let button=try fileButton(labels,[(observedOwnedNodes,pinned.pid,own),(remote,pid,service)],chosenPID,deadline)
       try check(chosenRows.contains {CFEqual($0,button)});fileCertifiedButton=button
     }
-    _ = try attachedSheet();try check(processStart(pid) == start && authenticatedPanelService(pid));return (chosenRows,chosenPID)
+    _ = try ui32ProofStep("final-sheet"){try attachedSheet()};try ui32ProofCheck(processStart(pid) == start && authenticatedPanelService(pid),"final-service-identity");return (chosenRows,chosenPID)
   }
 }
 func ui32FileBinding<Node>(_ actual:Node, _ certified:Node?, equal:(Node,Node)->Bool, owned:(Node)->Bool) throws {
@@ -338,6 +364,17 @@ func ui32FileBinding<Node>(_ actual:Node, _ certified:Node?, equal:(Node,Node)->
   try check(owned(actual) && owned(certified) && equal(actual,certified))
 }
 func ui32FileDomainSelfTest() throws {
+  for typed in [false,true] {
+    var calls=0,facts=[String:Any]()
+    do {_ = try ui32ProofStep("nemo-audit"){() throws -> Void in calls += 1;if typed {throw ActionRefusal(diagnostics:["stage":"original","gotoReason":"original-reason"])};throw Refusal(code:"adapter-refused")}}catch let error as ActionRefusal{facts=error.diagnostics}
+    let cause=facts["underlying"] as? [String:Any],nested=cause?["facts"] as? [String:Any]
+    try check(calls == 1 && facts["proofStep"] as? String == "nemo-audit" && facts["actionAttempted"] == nil && facts["actionPosted"] == nil)
+    try check(typed ? nested?["stage"] as? String == "original" && nested?["gotoReason"] as? String == "original-reason" : cause?["code"] as? String == "adapter-refused")
+  }
+  var content=[String:Any]()
+  do {_ = try ui32ContentReadStep("tree-identity"){() throws -> Void in throw ActionRefusal(diagnostics:["stage":"parent-query","insideContent":true])}}catch let error as ActionRefusal{content=error.diagnostics}
+  try check(content["stage"] as? String == "parent-query" && content["insideContent"] as? Bool == true && content["proofStep"] == nil)
+
   for fault in ["none","missing","substituted","foreign","stale-certified-owner"] {
     var reads=0,refused=false
     do {try ui32FileBinding(fault == "substituted" ? 2 : 1,fault == "missing" ? nil : 1,equal:==,owned:{_ in
