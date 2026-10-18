@@ -375,3 +375,56 @@ fn skipped_component_and_unselected_motion_and_order_tracks_remain_exact() {
         "all-component growth never cycles collision-bearing Motion/order tracks"
     );
 }
+
+#[test]
+fn typed_repeat_outcome_distinguishes_real_cycles_from_component_only_growth() {
+    use crate::history::object_history::NativeObjectHistory;
+    use crate::object_codec::encode_storage_project;
+    for (from, to, cycled, skipped) in [(0, 1, 1, 1), (1, 1, 0, 1)] {
+        let input = with_component(doc("K=a.1.10;.;.|.;.;.", Build::V2));
+        let before = encode_storage_project(&input).unwrap();
+        let mut owner = NativeObjectHistory::new("repeat-outcome", input).unwrap();
+        let candidate = owner
+            .prepare_frame_repeat(&request(from, to, 0, 0, 3))
+            .unwrap();
+        assert_eq!(
+            (
+                candidate.cycled_layers(),
+                candidate.skipped_component_layers()
+            ),
+            (cycled, skipped)
+        );
+        assert_eq!(
+            (owner.content_revision(), owner.history_depths()),
+            (0, (0, 0))
+        );
+        owner.commit_frame_repeat(candidate).unwrap();
+        assert_eq!(
+            (owner.content_revision(), owner.history_depths()),
+            (1, (1, 0))
+        );
+        let after = encode_storage_project(owner.acquire_snapshot(1).unwrap().document()).unwrap();
+        owner.undo(1).unwrap();
+        assert_eq!(
+            encode_storage_project(owner.acquire_snapshot(2).unwrap().document()).unwrap(),
+            before
+        );
+        owner.redo(2).unwrap();
+        assert_eq!(
+            encode_storage_project(owner.acquire_snapshot(3).unwrap().document()).unwrap(),
+            after
+        );
+    }
+    let input = with_component(doc("K=a.1.10;.;.|.;.;.", Build::V2));
+    let mut owner = NativeObjectHistory::new("repeat-no-cycle", input).unwrap();
+    let candidate = owner.prepare_frame_repeat(&request(1, 1, 0, 0, 1)).unwrap();
+    assert_eq!(
+        (
+            candidate.cycled_layers(),
+            candidate.skipped_component_layers()
+        ),
+        (0, 1)
+    );
+    assert_eq!(owner.commit_frame_repeat(candidate).unwrap(), 0);
+    assert_eq!(owner.history_depths(), (0, 0));
+}

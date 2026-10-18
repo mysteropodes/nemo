@@ -238,6 +238,21 @@ pub(crate) fn repeat_cells(
 pub(crate) struct PreparedFrameRepeat {
     origin: ObjectSnapshot,
     document: Option<ObjectDocument>,
+    cycled_layers: usize,
+    skipped_component_layers: usize,
+}
+
+// Typed preparation outcome for the native caller port. The compact/UI result
+// still needs its separately owned composition; applied alone means a document
+// changed, including global growth when every selected layer is a component.
+#[allow(dead_code)]
+impl PreparedFrameRepeat {
+    pub(crate) fn cycled_layers(&self) -> usize {
+        self.cycled_layers
+    }
+    pub(crate) fn skipped_component_layers(&self) -> usize {
+        self.skipped_component_layers
+    }
 }
 
 impl ObjectFillOwner {
@@ -250,7 +265,22 @@ impl ObjectFillOwner {
             DocumentEdit::Changed(next) => Some(next),
             DocumentEdit::NoChange => None,
         };
-        Ok(PreparedFrameRepeat { origin, document })
+        // repeat_cells validated these bounds before preparing the detached result.
+        let source = origin.document();
+        let first =
+            layer_position(source, &request.from_layer).ok_or(DispatchErrorCode::NotFound)?;
+        let last = layer_position(source, &request.to_layer).ok_or(DispatchErrorCode::NotFound)?;
+        let skipped_component_layers = source.layers[first..=last]
+            .iter()
+            .filter(|layer| is_component_layer(source, &layer.layer_uid))
+            .count();
+        let cycled_layers = last - first + 1 - skipped_component_layers;
+        Ok(PreparedFrameRepeat {
+            origin,
+            document,
+            cycled_layers,
+            skipped_component_layers,
+        })
     }
 
     pub(crate) fn prepare_frame_repeat_json(
