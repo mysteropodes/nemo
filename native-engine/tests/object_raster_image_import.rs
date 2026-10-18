@@ -149,7 +149,7 @@ fn stale_prepared_candidate_cannot_commit_after_another_owner_edit() {
         &blank_project_file(),
     )
     .unwrap();
-    let before = owner.current_snapshot();
+    let before = owner.acquire_snapshot(owner.content_revision()).unwrap();
     let payload=ImageImport::parse(&serde_json::to_vec(&json!({"documentSnapshotId":before.snapshot_id(),"name":"still.png","lifecycleGeneration":1,"mediaType":"image/png",
         "source":{"kind":"file","path":"/admitted/still.png"},"placement":{"kind":"newLayer"}})).unwrap()).unwrap();
     let prepared = owner
@@ -165,7 +165,8 @@ fn stale_prepared_candidate_cannot_commit_after_another_owner_edit() {
     );
     assert_eq!(
         owner
-            .current_snapshot()
+            .acquire_snapshot(owner.content_revision())
+            .unwrap()
             .project()
             .unwrap()
             .asset_inventory()
@@ -195,8 +196,7 @@ fn placement_wire_rejects_duplicate_unknown_and_untrusted_source_members() {
 
 #[test]
 fn held_authored_cell_and_early_cancellation_refuse_without_decoding_or_publication() {
-    let mut owner =
-        NativeObjectHistory::new_blank_project("held-image".into(), 320, 180, 24.).unwrap();
+    let mut owner = NativeObjectHistory::new_blank_project("held-image", 320, 180, 24.).unwrap();
     let before = owner.acquire_snapshot(0).unwrap();
     let uid = before.document().layers()[0].layer_uid().to_owned();
     let held = request(
