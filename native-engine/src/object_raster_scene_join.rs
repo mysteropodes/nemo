@@ -41,12 +41,19 @@ pub(super) fn sources(packet: &ObjectFramePacket) -> Result<Vec<RasterSource>, O
                     "raster path effects are unavailable",
                 ));
             }
+            let rect = item.display_rect();
             Ok(RasterSource {
                 source_index: record.source_index(),
                 layer_index: record.layer_index(),
                 source: RasterSceneSource {
                     asset_id: item.asset_id().as_str().to_owned(),
-                    rect: item.display_rect(),
+                    rect: crate::evaluation::motion_parent_chain::ImageRect {
+                        x: rect.x,
+                        y: rect.y,
+                        width: rect.width,
+                        height: rect.height,
+                        rotation: rect.rotation,
+                    },
                     opacity: item.opacity(),
                 },
             })
