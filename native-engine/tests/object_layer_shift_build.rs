@@ -1,7 +1,10 @@
 //! Literal original bar-gesture fixtures; no expected value comes from the Shift implementation.
 use super::{build, rows};
+#[cfg(feature = "history")]
 use crate::commands::ObjectFillOwner;
-use crate::object_codec::{decode_storage_project, encode_storage_project};
+use crate::object_codec::decode_storage_project;
+#[cfg(feature = "history")]
+use crate::object_codec::encode_storage_project;
 use crate::object_document::ObjectDocument;
 use serde_json::{json, Value};
 
@@ -32,18 +35,22 @@ pub(super) fn selected() -> Value {
     json!([{"target":{"kind":"property","target":{"contextId":"scene-root","layerUid":"L0"},
         "property":"rotation"},"frame":1}])
 }
+#[cfg(feature = "history")]
 pub(super) fn owner(d: ObjectDocument) -> ObjectFillOwner {
     ObjectFillOwner::new("atomic-layer", d).unwrap()
 }
+#[cfg(feature = "history")]
 pub(super) fn head(o: &ObjectFillOwner) -> ObjectDocument {
     o.acquire_snapshot(o.content_revision())
         .unwrap()
         .document()
         .clone()
 }
+#[cfg(feature = "history")]
 pub(super) fn bytes(o: &ObjectFillOwner) -> Vec<u8> {
     encode_storage_project(&head(o)).unwrap()
 }
+#[cfg(feature = "history")]
 pub(super) fn apply(o: &mut ObjectFillOwner, payload: Value) -> ObjectDocument {
     let candidate = o
         .prepare_layer_shift_json(payload.to_string().as_bytes())

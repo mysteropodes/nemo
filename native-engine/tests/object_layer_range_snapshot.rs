@@ -1,6 +1,5 @@
 //! Range projection through the actual immutable reader and existing timing-query dispatcher.
 use super::*;
-use crate::commands::ObjectFillOwner;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_document::ObjectDocument;
 #[path = "object_frame_edit_document_build.rs"]
@@ -16,8 +15,8 @@ fn selector(s: &ObjectSnapshot) -> Value {
     json!({"atRevision":s.content_revision(),"documentSnapshotId":s.snapshot_id(),
         "contextId":"scene-root","layerUid":"L0","frame":1,"view":"range"})
 }
-fn owner(d: ObjectDocument) -> ObjectFillOwner {
-    ObjectFillOwner::new("range-read", d).unwrap()
+fn snapshot(d: ObjectDocument) -> ObjectSnapshot {
+    ObjectSnapshot::from_admitted("range-read".into(), d).unwrap()
 }
 fn read(s: &ObjectSnapshot, q: &Value) -> Result<Value, DispatchErrorCode> {
     s.query_layer_range_json(q.to_string().as_bytes())
@@ -27,8 +26,7 @@ fn no_timing_layer_has_exact_real_raw_and_clamped_edges_without_a_fabricated_exp
     let mut v = fixture::value(&fixture::document());
     v["layers"][0].as_object_mut().unwrap().remove("timing");
     v["layers"][0]["range"] = json!({"inPoint":-2,"outPoint":9});
-    let o = owner(decode_storage_project(v.to_string().as_bytes()).unwrap());
-    let s = o.acquire_snapshot(0).unwrap();
+    let s = snapshot(decode_storage_project(v.to_string().as_bytes()).unwrap());
     let before = encode_storage_project(s.document()).unwrap();
     let q = selector(&s);
     let value = read(&s, &q).unwrap();
@@ -49,8 +47,7 @@ fn no_timing_layer_has_exact_real_raw_and_clamped_edges_without_a_fabricated_exp
 }
 #[test]
 fn original_timing_selector_and_range_view_are_closed_separate_reads_with_same_snapshot_identity() {
-    let o = owner(fixture::document());
-    let s = o.acquire_snapshot(0).unwrap();
+    let s = snapshot(fixture::document());
     let q = selector(&s);
     let mut old = q.clone();
     old.as_object_mut().unwrap().remove("view");
@@ -86,8 +83,7 @@ fn original_timing_selector_and_range_view_are_closed_separate_reads_with_same_s
 }
 #[test]
 fn range_query_rejects_stale_unknown_duplicate_extra_context_and_encoded_bounds_without_mutation() {
-    let o = owner(fixture::document());
-    let s = o.acquire_snapshot(0).unwrap();
+    let s = snapshot(fixture::document());
     let before = encode_storage_project(s.document()).unwrap();
     for (field, bad, expected) in [
         ("atRevision", json!(1), DispatchErrorCode::StaleRevision),
@@ -129,8 +125,7 @@ fn range_query_rejects_stale_unknown_duplicate_extra_context_and_encoded_bounds_
 fn range_query_preserves_inverted_edges_and_its_complete_reply_guard() {
     let mut v = fixture::value(&fixture::document());
     v["layers"][0]["range"] = json!({"inPoint":4,"outPoint":1,"timeLink":null});
-    let o = owner(fixture::admit(v));
-    let s = o.acquire_snapshot(0).unwrap();
+    let s = snapshot(fixture::admit(v));
     let q = selector(&s);
     let value = read(&s, &q).unwrap();
     assert_eq!(

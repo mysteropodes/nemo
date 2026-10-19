@@ -13,7 +13,7 @@ function matches(node,selector){
  return selector[0]==='.'&&selector.slice(1).split('.').every(name=>String(node.className||'').split(' ').includes(name));
 }
 async function captured(options={}){
- const h=await makeHarness(),Node=h.grid.constructor;
+ const h=await makeHarness(options),Node=h.grid.constructor;
  Node.prototype.closest=function(selectors){for(let n=this;n;n=n.parentNode)if(selectors.split(',').some(s=>matches(n,s.trim())))return n;return null;};
  const wrap=new Node('div');wrap.id='fg-wrap';wrap.clientWidth=500;wrap.clientHeight=100;
  wrap.getBoundingClientRect=()=>({left:0,top:0,right:500,bottom:100});h.doc.body.appendChild(wrap);wrap.appendChild(h.grid);
@@ -93,4 +93,18 @@ test('captured native marquee fences UI frame/FC/owner changes without old selec
   const c=await captured();c.down(c.h.rows()[0]);drift(c.h);c.h.doc.fire('mousemove',{clientX:115,clientY:43});
   assert.equal(c.legacyStarts(),0);assert.deepEqual(c.h.root.SMLayerInOut.getBarSelection(),[]);assert.equal(c.h.commands().length,0);
  }
+});
+
+
+test('actual Motion capture uses the same rectangle for real inspector property keys and native bar handles',async()=>{
+ const c=await captured({propertyKeys:[9,10,11]}),h=c.h;
+ c.down(h.keyNodes()[1],{clientX:105});assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[10]);
+ assert.equal(c.legacyStarts(),0);assert.equal(h.commands().length,0);
+ h.keyNodes().forEach(n=>{const x=(Number(n.dataset.frame)+0.5)*h.root.FC;n.getBoundingClientRect=()=>({left:x-4.5,top:6,width:9,height:9});});
+ c.down(c.wrap,{clientX:95,clientY:0});h.doc.fire('mousemove',{clientX:115,clientY:43});h.doc.fire('mouseup',{clientX:115,clientY:43});
+ assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[9,10,11]);
+ assert.deepEqual(h.root.SMLayerInOut.getBarSelection(),[{li:0,part:'in'},{li:1,part:'out'}]);
+ assert.equal(c.legacyStarts(),0);assert.equal(h.legacy(),0);assert.equal(h.commands().length,0);
+ c.down(h.bar(0).querySelector('.layer-inout-handle.left'),{clientX:100});h.move(120);h.up(120);await h.settle();
+ assert.deepEqual(h.commands()[0].q.payload.selectedKeys.map(k=>k.frame),[9,10,11]);
 });

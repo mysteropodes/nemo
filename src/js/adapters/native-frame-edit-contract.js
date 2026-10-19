@@ -10,7 +10,22 @@
   'use strict';
   var MAX_U32 = 4294967295, MAX_LIST = 4096, MAX_EXTEND = 999;
   var DATA_BYTES = 4 * 1024 * 1024, MAX_DATA_ITEMS = DATA_BYTES / 32, MESSAGE_BYTES = DATA_BYTES + MAX_LIST * 256 + 4096;
-  function bytes(value) { return new TextEncoder().encode(JSON.stringify(value)).length; }
+  function bytes(value) {
+    var text = JSON.stringify(value), count = 0;
+    // UTF-8 of the same USVString TextEncoder would consume, without requiring
+    // browser globals in classic/bare VM loaders. Unpaired surrogates become U+FFFD.
+    for (var i = 0; i < text.length; i++) {
+      var code = text.charCodeAt(i);
+      if (code < 0x80) count += 1;
+      else if (code < 0x800) count += 2;
+      else if (code >= 0xD800 && code <= 0xDBFF && i + 1 < text.length &&
+          text.charCodeAt(i + 1) >= 0xDC00 && text.charCodeAt(i + 1) <= 0xDFFF) {
+        count += 4;
+        i += 1;
+      } else count += 3;
+    }
+    return count;
+  }
   function clipboardOperation(op) { return [PREFIX + 'frames.clipboard.copy', PREFIX + 'frames.clipboard.cut', PREFIX + 'frames.clipboard.paste'].indexOf(op) >= 0; }
   function requestByteLimit(op) { return clipboardOperation(op) ? MESSAGE_BYTES : 4096; }
   function responseByteLimit(op) { return packetResult(op) ? MESSAGE_BYTES : 4096; }

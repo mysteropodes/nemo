@@ -126,6 +126,18 @@ test('every mapped writer uses the actual signature and reaches exactly its expe
   }
 });
 
+test('moving a key on another layer preserves the active-layer prefix in the exact payload',async()=>{
+  const h=harness();await h.open();
+  assert.equal(h.root.state.activeLayerIdx,1);
+  const route=h.controller.routeWriter('timeline','moveKeyframe',[0,1,4]);
+  assert.equal(route.handled,true);
+  assert.equal((await route.result).status,'applied-presented');
+  assert.equal(h.commands().length,1);
+  assert.equal(h.commands()[0].q.operation,P+'layer.key.move');
+  assert.deepEqual({...h.commands()[0].q.payload},{command:'object.layer.key.move',layerUid:'alpha',activeLayerUid:'beta',from:1,to:4});
+  assert.equal(h.root.state.activeLayerIdx,1);
+});
+
 test('public Shift stays unavailable without any legacy or native write',async()=>{
   const h=harness();await h.open();
   for(const name of ['shiftLayerFrames']){

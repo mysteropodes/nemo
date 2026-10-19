@@ -36,7 +36,7 @@
   }
   function create(container,ports){
     if(!View||!container||!ports||!ports.document||typeof ports.readContext!=='function'||typeof ports.readProperty!=='function')throw TypeError('Native key inspector ports unavailable');
-    var doc=ports.document,serial=0,retired=false,accepted=null,busy=false,selected=new Set(),bindings=[],rowBindings=[],actionNodes=[];
+    var doc=ports.document,serial=0,retired=false,accepted=null,busy=false,selected=new Set(),selectionEpoch=0,notifying=false,checks=[],bindings=[],rowBindings=[],actionNodes=[];
     var element=make('section',''),title=make('div',''),status=make('div',''),rows=make('div',''),toolbar=make('div','');
     element.className='native-motion-property-keys';element.hidden=true;element.setAttribute('aria-label','Authored property keys');
     status.setAttribute('role','status');toolbar.setAttribute('role','toolbar');
@@ -47,9 +47,13 @@
     function mounted(){return !retired&&element.parentNode===container&&(!('isConnected'in container)||container.isConnected);}
     function current(value,ticket){try{var c=ports.readContext();return mounted()&&ticket===serial&&View.isCurrentContext(value.token,c)&&c.frame===value.frame;}catch(_){return false;}}
     function ownerCurrent(value,ticket){try{var c=ports.readContext(),p=c&&c.pin;return mounted()&&ticket===serial&&View.captureContext(c)&&c.frame===value.frame&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return p[k]===value.token.pin[k];});}catch(_){return false;}}
-    function clearRows(){unbind(rowBindings);rows.replaceChildren();}
+    function timelineChanged(reason){
+      if(notifying||typeof ports.keyTimelineChanged!=='function')return;
+      notifying=true;try{ports.keyTimelineChanged(reason);}catch(_){}finally{notifying=false;}
+    }
+    function clearRows(){unbind(rowBindings);checks=[];rows.replaceChildren();}
     function controls(){var enable=!!accepted&&!busy&&current(accepted,serial)&&typeof ports.editPropertyTrack==='function';actionNodes.forEach(function(n){n.disabled=!enable||!selected.size;});if(percent)percent.disabled=!enable;rowBindings.forEach(function(b){b[0].disabled=!enable;});}
-    function reset(message,hide){++serial;accepted=null;selected.clear();busy=false;clearRows();element.hidden=!!hide;status.textContent=message||'';controls();}
+    function reset(message,hide){++serial;accepted=null;selected.clear();busy=false;clearRows();element.hidden=!!hide;status.textContent=message||'';controls();timelineChanged('reset');}
     function refuse(message){reset(message,false);return false;}
     function receipt(value){return exact(value,['applied','historyEntriesAdded'])&&typeof value.applied==='boolean'&&value.historyEntriesAdded===(value.applied?1:0);}
     async function apply(action){
@@ -58,7 +62,7 @@
       var selections=value.items.filter(function(k){return selected.has(k.frame);}).map(function(k){return {target:value.target,property:value.property,frame:k.frame};});
       if(!selections.length||selections.length>32)return refuse('Select between 1 and 32 native keys.');
       var payload=freeze({command:'object.property.track.edit',selections:selections,action:action});
-      busy=true;controls();status.textContent='Waiting for native key edit…';
+      busy=true;controls();status.textContent='Waiting for native key edit…';timelineChanged('busy');
       try{
         // Queue entry suppresses presentedSession while pending. Binding guards
         // owner/frame/selection there; this predicate owns local UI lifetime.
@@ -87,9 +91,9 @@
         listen(check,'change',function(){
           if(accepted!==value||!current(value,ticket)||busy||typeof ports.editPropertyTrack!=='function'){check.checked=false;return refuse('Native key selection is unavailable or stale.');}
           if(check.checked){if(selected.size>=32){check.checked=false;status.textContent='Select at most 32 native keys.';return;}selected.add(k.frame);}else selected.delete(k.frame);
-          status.textContent=selected.size+' native key(s) selected.';controls();
+          selectionEpoch++;status.textContent=selected.size+' native key(s) selected.';controls();timelineChanged('selection');
         },rowBindings);
-        label.appendChild(check);label.appendChild(text);rows.appendChild(label);
+        checks.push({frame:k.frame,node:check});label.appendChild(check);label.appendChild(text);rows.appendChild(label);
       });
       status.textContent=!value.trackPresent?'No authored track.':!value.items.length?'Authored track is empty.':typeof ports.editPropertyTrack!=='function'?'Authored keys are read-only; native track editor unavailable.':value.items.length+' authored key(s). Select up to 32.';
       controls();
@@ -118,8 +122,31 @@
           if(!current(value,ticket))throw Error('Stale native key read.');
         }
         if(!current(value,ticket))throw Error('Stale native key read.');
-        accepted=value;render(value,ticket);return true;
+        accepted=value;render(value,ticket);timelineChanged('read');return true;
       }catch(error){if(ticket!==serial||retired)return false;return refuse('Native key read refused: '+String(error&&error.message||error));}
+    }
+    function readKeyTimeline(){
+      try{
+        var value=accepted,ticket=serial,epoch=selectionEpoch;
+        if(retired||busy||!value||!current(value,ticket))return null;
+        function isCurrent(){return accepted===value&&selectionEpoch===epoch&&!busy&&current(value,ticket);}
+        function selectFrames(frames){
+          try{
+            if(!isCurrent()||typeof ports.editPropertyTrack!=='function'||!Array.isArray(frames)||frames.length>32)return false;
+            var values=Array.from(frames),seen=new Set(),available=new Set(value.items.map(function(k){return k.frame;}));
+            if(!values.every(function(frame){if(!Number.isFinite(frame)||!available.has(frame)||seen.has(frame))return false;seen.add(frame);return true;}))return false;
+            if(!isCurrent())return false;
+            if(selected.size===seen.size&&Array.from(selected).every(function(frame){return seen.has(frame);}))return true;
+            selected.clear();values.forEach(function(frame){selected.add(frame);});selectionEpoch++;
+            checks.forEach(function(check){check.node.checked=selected.has(check.frame);});
+            status.textContent=selected.size+' native key(s) selected.';controls();timelineChanged('selection');return true;
+          }catch(_){return false;}
+        }
+        var projection={pin:Object.assign({},value.token.pin),frame:value.frame,viewGeneration:value.token.viewGeneration,
+          target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){return {frame:k.frame,selected:selected.has(k.frame)};})};
+        Object.defineProperties(projection,{isCurrent:{value:isCurrent},selectFrames:{value:selectFrames}});
+        return freeze(projection);
+      }catch(_){return null;}
     }
     function captureSelectedKeys(){
       try{
@@ -137,7 +164,7 @@
     }
     function cancel(){reset('Native key read cancelled.',false);return true;}
     controls();
-    return Object.freeze({element:element,open:open,captureSelectedKeys:captureSelectedKeys,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);}});
+    return Object.freeze({element:element,open:open,readKeyTimeline:readKeyTimeline,captureSelectedKeys:captureSelectedKeys,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);timelineChanged('dispose');}});
   }
   return Object.freeze({create:create});
 }));

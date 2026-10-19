@@ -79,3 +79,29 @@ test('native-shaped arrays above4096 records remain paired while the4096 cell bo
   const cell={relLayer:0,relFrame:0,keyframe:false,records:[]};req.payload.cells=Array.from({length:4097},()=>structuredClone(cell));
   assert.throws(()=>SDK.validateRequest(req),/bounded/);
 });
+
+// Source regressions for the actual bare-VM failure; no TextEncoder shim or
+// changed font-only/bare-client oracle. Node Buffer is the independent UTF-8 oracle.
+test('clipboard data bytes stay exact without browser globals for Unicode and surrogate JSON',()=>{
+  const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+  const context={};vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-frame-edit-contract.js'),'utf8'),context);
+  assert.equal(vm.runInContext('typeof TextEncoder',context),'undefined');
+  const op=P+'frames.clipboard.paste';
+  for(const sample of ['ascii','雪','\u{1F600}','\ud800','\udc00','\ud800a\udc00','\ud800\udc00','\0"\\/\n']){
+    // ASCII delimiters prevent new surrogate pairs across repeated sample units.
+    const unit='x'+sample+'x',overhead=count({padding:''})+count([]);
+    const unitBytes=count({padding:unit})-count({padding:''});
+    const available=Contract.DATA_BYTES-overhead;
+    const padding=unit.repeat(Math.floor(available/unitBytes))+'x'.repeat(available%unitBytes);
+    const cell={relLayer:0,relFrame:0,keyframe:true,records:[{padding}],orderElements:[]};
+    assert.equal(count(cell.records[0])+count(cell.orderElements),Contract.DATA_BYTES);
+    const payload={command:'object.frames.clipboard.paste',instanceId:'instance-A',documentId:'document-A',layerUid:'L0',frame:0,cells:[cell]};
+    context.packetJson=JSON.stringify(payload);
+    const invoke='NemoNativeFrameEditContract.payload('+JSON.stringify(op)+',JSON.parse(packetJson))';
+    assert.doesNotThrow(()=>vm.runInContext(invoke,context));
+    cell.records[0].padding+='x';context.packetJson=JSON.stringify(payload);
+    assert.equal(count(cell.records[0])+count(cell.orderElements),Contract.DATA_BYTES+1);
+    assert.throws(()=>vm.runInContext(invoke,context),/4MiB/);
+  }
+});

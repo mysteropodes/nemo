@@ -113,3 +113,12 @@ test('actual ordinary Drawing paint retires native keys and exposes only a curre
  assert.ok(snapshot);assert.deepEqual(snapshot.keys,[]);assert.equal(snapshot.isCurrent(),true);
  h.root.state.appMode='motion';assert.equal(snapshot.isCurrent(),false);h.retire();
 });
+
+test('ordinary key timeline observer is dynamic safe and detachable without manufacturing an unopened property projection',()=>{
+ const h=host(),events=[],ordinary=Binding.createOrdinary(h.root,{keyTimelineChanged:reason=>events.push(reason)});
+ assert.equal(ordinary.readKeyTimeline(),null);let notified=0;
+ assert.equal(ordinary.setKeyTimelineListener(()=>{notified++;throw Error('observer');}),true);
+ assert.equal(notified,1);assert.ok(events.includes('listener'));assert.equal(ordinary.readKeyTimeline(),null);
+ assert.equal(ordinary.setKeyTimelineListener(3),false);assert.equal(ordinary.setKeyTimelineListener(null),true);
+ const n=notified;ordinary.dispose();assert.equal(notified,n);assert.equal(ordinary.readKeyTimeline(),null);assert.equal(ordinary.setKeyTimelineListener(()=>{}),false);h.retire();
+});

@@ -11,6 +11,7 @@ class Node {
  replaceChildren(...nodes){this.children.forEach(n=>n.parentNode=null);this.children=[];nodes.forEach(n=>this.appendChild(n));}
  setAttribute(k,v){this.attrs[k]=String(v);}
  addEventListener(k,fn){this.events.set(k,[...(this.events.get(k)||[]),fn]);}
+ removeEventListener(k,fn){this.events.set(k,(this.events.get(k)||[]).filter(f=>f!==fn));}
  get parentElement(){return this.parentNode;}
  querySelectorAll(selector){return this.children.flatMap(n=>(selector[0]==='.'&&selector.slice(1).split('.').every(k=>n.className.split(' ').includes(k))?[n]:[]).concat(n.querySelectorAll(selector)));}
  querySelector(selector){for(const n of this.children){if(selector[0]==='.'&&selector.slice(1).split('.').every(k=>n.className.split(' ').includes(k)))return n;const found=n.querySelector(selector);if(found)return found;}return null;}
@@ -28,7 +29,7 @@ function actualHandlers(root,legacy){
  return {onDown:context.onDown,buildBar:context.buildBar,marqueeSelect:context.applyMarqueeSelection,readBars:()=>context._barSel,writeBars:v=>{context._barSel=v;}};
 }
 async function harness(options={}){
- let active=false,revision=0,gate=null,legacyKeys=[],localKeys=[],keyEpoch=0,barSel=[],legacy=0;
+ let active=false,revision=0,gate=null,legacyKeys=[],localKeys=[],keyEpoch=0,barSel=[],legacy=0,keyEditor=null;
  const doc=new Node('document');doc.createElement=tag=>new Node(tag);doc.body=doc.createElement('body');doc.appendChild(doc.body);const grid=doc.createElement('div');doc.body.appendChild(grid);grid.appendChild(doc.createElement('div'));
  const root={document:doc,NemoLayerInOutSelection:Selection,FC:10,state:{currentFrame:2,activeLayerIdx:0,totalFrames:12,appMode:'motion',activeSymbolId:null,activeCompositionId:null,layers:[{layerUid:'alpha'},{layerUid:'beta'}]},_layerSel:[],_sel:{frames:[]},events:new Map(),notices:[]};
  root.addEventListener=(k,f)=>root.events.set(k,f);root.showToast=m=>root.notices.push(m);
@@ -55,13 +56,22 @@ async function harness(options={}){
   subscribeRevisions:async()=>({instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,subscriptionId:'ranges'}),
   dispatchApplication:q=>SDK.createNativeApplicationAdapter('range-test',{dispatch:value=>invoke('nemo_native_dispatch',{request:value})}).dispatch(q)});
  Object.assign(root,{NemoNativeObjectProject:{desktop:()=>s},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>true},NemoNativeLayerRangeDesktop:Range,NemoNativeFrameEditDesktop:Desktop,NemoNativeFrameEditIntent:Intent,NemoNativeApplicationAdapter:SDK,
-  NemoNativeObjectUI:{readSelectedMotionKeys(r,pin){if(options.staleKeys)return null;const epoch=keyEpoch,v={pin,frame:root.state.currentFrame,viewGeneration:epoch,keys:structuredClone(localKeys)};Object.defineProperty(v,'isCurrent',{value:()=>epoch===keyEpoch});return Object.freeze(v);}},
+  NemoNativeObjectUI:{readSelectedMotionKeys(r,pin){if(keyEditor)return keyEditor.captureSelectedKeys();if(options.staleKeys)return null;const epoch=keyEpoch,v={pin,frame:root.state.currentFrame,viewGeneration:epoch,keys:structuredClone(localKeys)};Object.defineProperty(v,'isCurrent',{value:()=>epoch===keyEpoch});return Object.freeze(v);}},
   SMMotion:{getKeySelection:()=>legacyKeys}});
  const legacyFn=()=>{legacy++;throw Error('LEGACY WRITER');},actual=actualHandlers(root,legacyFn);
  root.SMLayerInOut={...actual,getBarSelection:()=>Array.from(actual.readBars(),v=>({...v})),setBarSelection(v){barSel=v.slice();actual.writeBars(v.slice());}};
- const ports={barUi:root.SMLayerInOut,readLegacyMotionSelection:()=>root.SMMotion.getKeySelection(),readSelectedMotionKeys:pin=>root.NemoNativeObjectUI.readSelectedMotionKeys(root,pin),selectLayer(i,choice){root.state.activeLayerIdx=i;root._layerSel=choice&&choice.mode==='toggle'?(root._layerSel.includes(i)?root._layerSel.filter(v=>v!==i):root._layerSel.concat(i)):[i];return true;}};
+ const ports={readMotionKeyTimeline:()=>keyEditor?keyEditor.readKeyTimeline():null,barUi:root.SMLayerInOut,readLegacyMotionSelection:()=>root.SMMotion.getKeySelection(),readSelectedMotionKeys:pin=>root.NemoNativeObjectUI.readSelectedMotionKeys(root,pin),selectLayer(i,choice){root.state.activeLayerIdx=i;root._layerSel=choice&&choice.mode==='toggle'?(root._layerSel.includes(i)?root._layerSel.filter(v=>v!==i):root._layerSel.concat(i)):[i];return true;}};
  const controller=Desktop.install(root);await s.openPath('/range.json');await s.presentPreview(2);Range.mount(root,grid,s.info(),ports);await turn();await turn();
- return {root,doc,grid,s,controller,calls,info,ports,commands:()=>calls.filter(c=>c.q?.operation===OP),legacy:()=>legacy,
+ if(options.propertyKeys){
+  const Keys=require('../src/js/adapters/native-motion-property-keys.js'),container=doc.createElement('div');doc.body.appendChild(container);
+  keyEditor=Keys.create(container,{document:doc,readContext:()=>({pin:info(),frame:root.state.currentFrame,viewGeneration:1,presented:s.readPresentedObjectSession()}),
+   readProperty:async q=>({instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:'authoredKeys',target:q.view.target,property:q.view.property,dimension:1,trackPresent:true,
+    items:options.propertyKeys.slice(q.view.offset,q.view.offset+8).map(frame=>({frame,v:[50]})),nextOffset:q.view.offset+8<options.propertyKeys.length?q.view.offset+8:null}),
+   editPropertyTrack:()=>{throw Error('UNEXPECTED KEY WRITE');},keyTimelineChanged:()=>Range.refreshKeys(root)});
+  await keyEditor.open({contextId:'scene-root',layerUid:options.propertyLayer||'alpha'},'opacity');Range.refreshKeys(root);
+ }
+
+ return {root,doc,grid,s,controller,calls,info,ports,keyEditor,keyNodes:()=>grid.querySelectorAll('.native-motion-property-key'),commands:()=>calls.filter(c=>c.q?.operation===OP),legacy:()=>legacy,
   rows:()=>grid.children[1].children,bar:i=>grid.children[1].children[i].querySelector('.layer-inout-bar'),
   down(i=0,part='both',event={}){actual.onDown(i,this.rows()[i],part,{clientX:100,preventDefault(){},stopPropagation(){},...event});},
   move:x=>doc.fire('mousemove',{clientX:x}),up:x=>doc.fire('mouseup',{clientX:x}),
@@ -130,4 +140,72 @@ test('actual native row marquee authors mixed in/out handle selection and group 
  assert.deepEqual(h.commands()[0].q.payload.barSelection,[{layerUid:'alpha',part:'in'},{layerUid:'beta',part:'out'}]);assert.equal(h.legacy(),0);
  const drift=await harness();drift.rows()[0].fire('mousedown',{clientY:0});drift.root.FC=11;drift.doc.fire('mousemove',{clientX:200,clientY:30});
  assert.deepEqual(drift.root.SMLayerInOut.getBarSelection(),[]);assert.equal(drift.commands().length,0);assert.ok(drift.root.notices.length);
+});
+
+
+test('actual native property inspector projects fractional keys into the matching grid row and click selection reaches Shift unchanged',async()=>{
+ const h=await harness({propertyKeys:[2.25,7,10.5]});
+ assert.equal(h.keyNodes().length,3);assert.equal(h.keyNodes()[0].parentNode,h.rows()[0]);assert.equal(h.keyNodes()[0].style.left,'23px');
+ assert.equal(h.keyNodes()[0].attrs['aria-label'],'opacity key at frame 2.25');
+ h.keyNodes()[0].fire('mousedown',{button:0});h.keyNodes()[1].fire('mousedown',{button:0,ctrlKey:true});
+ assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[2.25,7]);
+ h.down(0,'both');h.move(120);h.up(120);await h.settle();
+ assert.equal(h.commands().length,1);assert.deepEqual(h.commands()[0].q.payload.selectedKeys,[
+  {target:{kind:'property',target:{contextId:'scene-root',layerUid:'alpha'},property:'opacity'},frame:2.25},
+  {target:{kind:'property',target:{contextId:'scene-root',layerUid:'alpha'},property:'opacity'},frame:7}]);
+ assert.equal(h.legacy(),0);
+});
+
+test('one native rectangle center-tests actual property diamonds and bar parts without document/history writes',async()=>{
+ const h=await harness({propertyKeys:[2.25,7,10.5]});
+ function geometry(){h.keyNodes().forEach(n=>{const x=(Number(n.dataset.frame)+0.5)*h.root.FC;n.getBoundingClientRect=()=>({left:x-4.5,top:6,width:9,height:9});});}
+ geometry();const bar=h.bar(0);bar.getBoundingClientRect=()=>({left:20,right:150,top:0,bottom:20});
+ bar.querySelector('.layer-inout-handle.left').getBoundingClientRect=()=>({left:20,right:24});
+ bar.querySelector('.layer-inout-handle.right').getBoundingClientRect=()=>({left:146,right:150});
+ h.bar(1).getBoundingClientRect=()=>({left:200,right:300,top:22,bottom:42});
+ Range.startMarquee(h.root,{clientX:20,clientY:0});h.doc.fire('mousemove',{clientX:28,clientY:20});geometry();
+ assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[2.25]);assert.deepEqual(h.root.SMLayerInOut.getBarSelection(),[{li:0,part:'in'}]);
+ h.doc.fire('mousemove',{clientX:80,clientY:20});geometry();h.doc.fire('mouseup',{clientX:80,clientY:20});
+ assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[2.25,7]);
+ assert.equal(h.commands().length,0);assert.equal(h.info().contentRevision,0);assert.equal(h.legacy(),0);
+ h.down(0,'both');h.move(120);h.up(120);await h.settle();assert.deepEqual(h.commands()[0].q.payload.selectedKeys.map(k=>k.frame),[2.25,7]);
+});
+
+test('native key timeline refuses stale detached/frame/FC scopes and never trims over32 marquee selection',async()=>{
+ for(const change of [h=>h.root.state.currentFrame++,h=>h.root.FC++,h=>h.keyEditor.cancel(),h=>h.keyEditor.dispose()]){
+  const h=await harness({propertyKeys:[2.25,7]});const node=h.keyNodes()[0];change(h);node.fire('mousedown',{button:0});
+  const captured=h.keyEditor.captureSelectedKeys();assert.ok(captured===null||captured.keys.length===0);assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+ }
+ const h=await harness({propertyKeys:Array.from({length:33},(_,i)=>i)});h.keyNodes().forEach((n,i)=>{n.getBoundingClientRect=()=>({left:i*10,top:6,width:9,height:9});});
+ Range.startMarquee(h.root,{clientX:0,clientY:0});h.doc.fire('mousemove',{clientX:400,clientY:20});
+ assert.deepEqual(h.keyEditor.captureSelectedKeys().keys,[]);assert.equal(h.commands().length,0);assert.ok(h.root.notices.length);
+});
+
+
+test('native property timeline keyboard activation selects through the same current UI callback',async()=>{
+ const h=await harness({propertyKeys:[2.25,7]});h.keyNodes()[1].fire('click',{detail:0});
+ assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[7]);assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+});
+
+
+test('native key timeline preflights finite computed coordinates for all keys before publishing any node',async()=>{
+ const h=await harness({propertyKeys:[2.25,1e308]});
+ assert.equal(h.keyEditor.readKeyTimeline().items[1].frame,1e308,'finite authored frame is preserved without clamp or rewrite');
+ assert.equal(h.keyNodes().length,0,'later overflow refuses the whole projection, including its finite first key');
+ assert.ok(h.root.notices.some(v=>/coordinates/.test(v)));assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+ const scale=await harness({propertyKeys:[2.25,7]});assert.equal(scale.keyNodes().length,2);scale.root.FC=1e308;Range.refreshKeys(scale.root);
+ assert.equal(scale.keyNodes().length,0,'finite FC multiplication overflow removes the prior projection');
+ assert.equal(scale.keyEditor.readKeyTimeline().items[0].frame,2.25);assert.equal(scale.commands().length,0);assert.equal(scale.legacy(),0);
+});
+
+
+test('native key click provenance uses the layer row independently from key ordinal with Shift/Ctrl selection preserved',async()=>{
+ for(const [layer,index,first] of [['alpha',0,1],['beta',1,0]]){
+  const h=await harness({propertyKeys:[2.25,7],propertyLayer:layer});
+  assert.equal(h.keyNodes()[first].parentNode,h.rows()[index]);h.keyNodes()[first].fire('mousedown',{button:0});
+  assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[[2.25,7][first]]);
+  h.keyNodes()[1-first].fire('mousedown',{button:0,shiftKey:true});assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[2.25,7]);
+  h.keyNodes()[first].fire('mousedown',{button:0,ctrlKey:true});assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[[2.25,7][1-first]]);
+  assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+ }
 });

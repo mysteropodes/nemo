@@ -237,7 +237,7 @@ test('clipboard shells preserve native ownership, records/order presence and eve
     assert.doesNotThrow(()=>SDK.validateRequest(request(op,{command:'object.frames.clipboard.'+kind,selection:[]})));
     for(const selection of [null,[{layerUid:'a',frame:0},{layerUid:'a',frame:0}],[{layerUid:'a',frame:0,extra:1}]])
       assert.throws(()=>SDK.validateRequest(request(op,{command:'object.frames.clipboard.'+kind,selection})),TypeError);
-    for(const fault of ['inner-instance','inner-document','extra-packet','missing-packet','bad-offset','bad-records','bad-order','overflow']){
+    for(const fault of ['inner-instance','inner-document','extra-packet','missing-packet','bad-offset','bad-records','bad-order','overflow','message-overflow']){
       const value=reply(q,kind==='cut');value.result.clipboard.cells=[{relLayer:0,relFrame:0,keyframe:true,records:[],orderElements:[]}];
       if(fault==='inner-instance')value.result.clipboard.instanceId='foreign';
       if(fault==='inner-document')value.result.clipboard.documentId='foreign';
@@ -246,10 +246,17 @@ test('clipboard shells preserve native ownership, records/order presence and eve
       if(fault==='bad-offset')value.result.clipboard.cells[0].relLayer=-1;
       if(fault==='bad-records')value.result.clipboard.cells[0].records=null;
       if(fault==='bad-order')value.result.clipboard.cells[0].orderElements=null;
-      if(fault==='overflow')value.result.clipboard.cells[0].records=[{large:'x'.repeat(5000)}];
+      if(fault==='overflow')value.result.clipboard.cells[0].records=[{large:'x'.repeat(Contract.DATA_BYTES)}];
+      if(fault==='message-overflow')value.result.clipboard.instanceId='x'.repeat(Contract.MESSAGE_BYTES);
       const adapter=SDK.createNativeApplicationAdapter('clipboard',{dispatch:()=>value});
       await assert.rejects(adapter.dispatch(q),fault);
     }
+    // The original5000-byte packet is now a positive: clipboard has its own
+    // complete-envelope ceiling, while native record/order data still caps at4MiB.
+    assert.equal(Contract.responseByteLimit(op), 5246976);
+    const large=reply(q,kind==='cut');
+    large.result.clipboard.cells=[{relLayer:0,relFrame:0,keyframe:true,records:[{large:'x'.repeat(5000)}]}];
+    assert.deepEqual(await SDK.createNativeApplicationAdapter('clipboard',{dispatch:()=>large}).dispatch(q),large);
     const empty=reply(q,false);empty.result.clipboard=null;
     assert.deepEqual(await SDK.createNativeApplicationAdapter('clipboard',{dispatch:()=>empty}).dispatch(q),empty);
   }

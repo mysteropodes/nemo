@@ -435,7 +435,8 @@ fn outer_component_range_uses_same_snapshot_without_gating_placed_inner_ranges()
         let ComponentFrame::Scene(expected) = baseline.query(SCENE, frame).unwrap() else {
             panic!("scene baseline");
         };
-        for entry in actual.slots() {
+        for slot in actual.slots() {
+            let entry = slot.entry();
             let prior = entry_of(&expected, &entry.layer_uid);
             if entry.layer_uid == "ly_comp_loop" && !(2..=4).contains(&frame) {
                 assert_eq!(entry.outcome, ComponentOutcome::Blank);

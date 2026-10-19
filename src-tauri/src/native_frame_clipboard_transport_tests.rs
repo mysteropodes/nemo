@@ -1,5 +1,5 @@
 //! Real ApplicationMcp active object authority; no app/window/GPU or fake document sink.
-use super::ApplicationMcp;
+use crate::application_mcp::ApplicationMcp;
 use native_engine::object_codec::decode_storage_project;
 use nemo_mcp::{
     contract::{NativeApplicationRequest, NativeApplicationResponse},

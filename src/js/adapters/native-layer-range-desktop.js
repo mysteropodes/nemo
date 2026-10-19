@@ -48,8 +48,70 @@
       return root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true;
     }catch(_){return false;}
   }
+  // A correlated read projection, never another key-selection or document owner.
+  function keyView(root,w){
+    if(root.state.appMode!=='motion'||!w||!w.ports||typeof w.ports.readMotionKeyTimeline!=='function')return null;
+    var value=w.ports.readMotionKeyTimeline(w.info);
+    if(value===null)return null;
+    if(!value||!same(value.pin,w.info)||value.frame!==root.state.currentFrame||!value.target||
+       value.target.contextId!=='scene-root'||typeof value.target.layerUid!=='string'||typeof value.property!=='string'||!value.property||
+       !Array.isArray(value.items)||typeof value.isCurrent!=='function'||typeof value.selectFrames!=='function'||value.isCurrent()!==true)throw Error('Native key projection unavailable');
+    var previous=-Infinity;
+    value.items.forEach(function(k){if(!k||!Number.isFinite(k.frame)||k.frame<=previous||typeof k.selected!=='boolean')throw Error('Invalid native key projection');previous=k.frame;});
+    return value;
+  }
+  function keyIdentity(value){return value&&JSON.stringify([pins.map(function(k){return value.pin[k];}),value.frame,value.viewGeneration,
+    value.target.contextId,value.target.layerUid,value.target.strokeId,value.property,value.items.map(function(k){return k.frame;})]);}
+  function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];}
+  function refreshKeys(root){
+    var w=works.get(root);if(!w)return;clearKeys(w);
+    try{
+      if(!w.node||root.state.appMode!=='motion'||!ready(root,session(root),w.info))return;
+      var value=keyView(root,w),fc=root.FC;if(!value||!Number.isFinite(fc)||fc<=0)return;
+      var index=w.info.layers.findIndex(function(l){return l.layerUid===value.target.layerUid;}),row=w.rows[index];
+      if(!row||row.hidden)return;
+      // Preflight the complete projection before publishing even its first node.
+      var offsets=value.items.map(function(key){
+        var left=(key.frame+0.5)*fc-4.5;
+        if(!Number.isFinite(left))throw Error('Native key coordinate overflow');
+        return left;
+      });
+      value.items.forEach(function(key,keyIndex){
+        var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
+        Object.assign(node.style,{position:'absolute',left:offsets[keyIndex]+'px',top:'6px',padding:'0',cursor:'pointer',zIndex:'7'});
+        node.dataset.frame=String(key.frame);node.classList.toggle('sel',key.selected);
+        node.setAttribute('aria-label',value.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
+        function choose(event){
+          event.preventDefault();event.stopPropagation();
+          if(event.button!==undefined&&event.button!==0)return;
+          try{
+            if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!value.isCurrent())throw Error('Stale native key selection');
+            var frames=event.ctrlKey||event.metaKey||event.shiftKey?value.items.filter(function(k){return k.selected;}).map(function(k){return k.frame;}):[];
+            var at=frames.indexOf(key.frame);if(at>=0&&(event.ctrlKey||event.metaKey))frames.splice(at,1);else if(at<0)frames.push(key.frame);
+            if(value.selectFrames(frames)!==true)throw Error('Native key selection refused');refreshKeys(root);
+          }catch(_){notice(root,'Native key selection is unavailable or stale.');}
+        }
+        node.addEventListener('mousedown',choose);
+        node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
+        row.appendChild(node);w.keyNodes.push(node);
+      });
+    }catch(_){clearKeys(w);notice(root,'Native key timeline coordinates are unavailable.');}
+  }
+  function marqueeKeys(root,w,m,x0,y0,x1,y1){
+    var value=keyView(root,w);
+    if(keyIdentity(value)!==m.keyIdentity||m.keyView&&m.keyView.isCurrent()!==true)throw Error('Native key view changed');
+    if(!value)return;
+    var frames=[];
+    (w.keyNodes||[]).forEach(function(node){
+      if(!node.parentNode||node.parentNode.hidden)return;
+      var b=node.getBoundingClientRect(),cx=b.left+b.width/2,cy=b.top+b.height/2;
+      if(cx>=x0&&cx<=x1&&cy>=y0&&cy<=y1)frames.push(Number(node.dataset.frame));
+    });
+    if(value.selectFrames(frames)!==true)throw Error('Native key marquee refused');
+    m.keyView=keyView(root,w);if(keyIdentity(m.keyView)!==m.keyIdentity)throw Error('Native key marquee changed view');refreshKeys(root);
+  }
   function cancel(root){var w=works.get(root);if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
-  function retire(root){var w=works.get(root);if(!w)return;cancel(root);w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
+  function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
   function selection(root,w,li,part,event){
     var info=w.info,uid=info.layers[li].layerUid,values=bars(root,info)||[];
     if(event.metaKey||event.ctrlKey){var i=values.findIndex(function(v){return v.layerUid===uid;});if(i>=0)values.splice(i,1);else values.push({layerUid:uid,part:'both'});w.anchor=uid;}
@@ -85,8 +147,9 @@
     var w=works.get(root),s=session(root),info=s&&s.info();
     if(!w||!w.barUiReady||w.capture||w.marquee||root.state.activeSymbolId!=null||root.state.activeCompositionId!=null||!Number.isFinite(root.FC)||root.FC<=0||!ready(root,s,info)||!same(w.info,info)||!signature(root,info)||
       !Number.isFinite(event.clientX)||!Number.isFinite(event.clientY)||root.NemoNativeFrameEditDesktop.install(root).isPending()){notice(root);return true;}
+    var keys;try{keys=keyView(root,w);}catch(_){notice(root);return true;}
     var rect=root.document.createElement('div');rect.className='layer-inout-marquee-rect';root.document.body.appendChild(rect);
-    w.marquee={rect:rect,x:event.clientX,y:event.clientY,info:info,ui:signature(root,info),fc:root.FC,moved:false};return true;
+    w.marquee={rect:rect,x:event.clientX,y:event.clientY,info:info,ui:signature(root,info),fc:root.FC,moved:false,keyView:keys,keyIdentity:keyIdentity(keys)};return true;
   }
   function marquee(root,event,end){
     var w=works.get(root),m=w&&w.marquee;if(!m)return false;
@@ -95,8 +158,15 @@
       m.moved=m.moved||Math.abs(event.clientX-m.x)>3||Math.abs(event.clientY-m.y)>3;
       var x0=Math.min(m.x,event.clientX),x1=Math.max(m.x,event.clientX),y0=Math.min(m.y,event.clientY),y1=Math.max(m.y,event.clientY);
       Object.assign(m.rect.style,{left:x0+'px',top:y0+'px',width:(x1-x0)+'px',height:(y1-y0)+'px'});
-      if(m.moved)w.ports.barUi.marqueeSelect(x0,y0,x1,y1);
-    }else{if(!m.moved)w.ports.barUi.setBarSelection([]);w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}
+      if(m.moved){try{marqueeKeys(root,w,m,x0,y0,x1,y1);}catch(_){cancel(root);notice(root,'Native key marquee is unavailable or stale.');return true;}w.ports.barUi.marqueeSelect(x0,y0,x1,y1);}
+    }else{
+      try{
+        var keys=keyView(root,w);
+        if(keyIdentity(keys)!==m.keyIdentity||m.keyView&&m.keyView.isCurrent()!==true)throw Error('Stale native key view');
+        if(!m.moved){if(keys&&keys.selectFrames([])!==true)throw Error('Native key selection refused');w.ports.barUi.setBarSelection([]);}
+      }catch(_){cancel(root);notice(root);return true;}
+      w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);
+    }
     return true;
   }
   function move(root,event){if(marquee(root,event,false))return;var w=works.get(root),c=w&&w.capture;if(!w||!w.down||!c)return;
@@ -140,16 +210,16 @@
     if(!w){w={serial:0,rows:[],capture:null,down:false};works.set(root,w);
       root.document.addEventListener('mousemove',function(e){move(root,e);});root.document.addEventListener('mouseup',function(e){up(root,e);});
       if(root.addEventListener){root.addEventListener('blur',function(){cancel(root);});root.addEventListener('pagehide',function(){cancel(root);});}}
-    if(w.node&&w.node.parentNode===grid&&same(w.info,info)&&w.frame===frame&&w.rows.length===info.layers.length){w.ports=ports;w.barUiReady=barUiReady;return;}
+    if(w.node&&w.node.parentNode===grid&&same(w.info,info)&&w.frame===frame&&w.rows.length===info.layers.length){w.ports=ports;w.barUiReady=barUiReady;refreshKeys(root);return;}
     var ownPending=w.capture&&owner(w.capture.info,info)&&info.contentRevision===w.capture.info.contentRevision+1&&!w.down;
     if(!ownPending)cancel(root);
     w.serial++;var ticket=w.serial;w.info=info;w.frame=frame;w.grid=grid;w.ports=ports;w.barUiReady=barUiReady;
-    if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);
+    clearKeys(w);if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);
     var node=root.document.createElement('div');node.className='native-layer-range-rows';w.node=node;
     w.rows=info.layers.map(function(layer,li){var row=root.document.createElement('div');row.className='frow native-layer-range-row';row.dataset.layer=String(li);row.dataset.layerUid=layer.layerUid;
       row.style.position='relative';row.style.height='22px';row.style.width=(info.totalFrames*root.FC)+'px';row.hidden=!!(root.state.hideShy&&layer.shy);
       return row;});
-    w.rows.forEach(function(row,li){node.appendChild(row);if(w.barUiReady)w.ports.barUi.buildBar(row,li);});grid.appendChild(node);
+    w.rows.forEach(function(row,li){node.appendChild(row);if(w.barUiReady)w.ports.barUi.buildBar(row,li);});grid.appendChild(node);refreshKeys(root);
     if(!s||typeof s.readLayerRange!=='function')return;
     w.rows.forEach(function(row,li){Promise.resolve(s.readLayerRange(info.layers[li].layerUid,frame,info)).then(function(result){
       if(ticket!==w.serial||w.rows[li]!==row||row.parentNode!==node||!ready(root,s,info)||!result||result.kind!=='layerRange'||
@@ -161,5 +231,5 @@
       row.nativeRange=freeze({pin:Object.assign({},info),range:JSON.parse(JSON.stringify(range))});paint(root,row,li);
     }).catch(function(){});});
   }
-  return Object.freeze({active:active,mount:mount,retire:retire,owns:owns,buildBar:buildBar,paint:paint,down:down,startMarquee:startMarquee,isGestureCurrent:isGestureCurrent});
+  return Object.freeze({active:active,mount:mount,refreshKeys:refreshKeys,retire:retire,owns:owns,buildBar:buildBar,paint:paint,down:down,startMarquee:startMarquee,isGestureCurrent:isGestureCurrent});
 }));

@@ -142,7 +142,7 @@
     function labelTarget(t,pin){var v=scope();if(!v||!same(v.identity,pin)||t.contextId!==v.contextId)throw new Error('Stale native label');if(t.strokeId!==undefined)return t.strokeId;var matches=v.info.layers.filter(function(l){return l.layerUid===t.layerUid;});return matches.length===1&&typeof matches[0].name==='string'?matches[0].name:t.layerUid;}
     var caller=Panel.createCaller({document:root.document,container:options.container,pageBudget:options.pageBudget,yieldControl:options.yieldControl,
       isMotion:function(){return !retired&&root.state.appMode==='motion';},readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,
-      query:query,readProperty:readProperty,
+      query:query,readProperty:readProperty,keyTimelineChanged:options.keyTimelineChanged,
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
       selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});
@@ -154,7 +154,7 @@
     var actionScopes=new WeakMap();
     function captureShortcutScope(){var value=baseScope();if(!value)return null;var token=Object.freeze({});actionScopes.set(token,{session:value.session,signature:value.uiSignature,identity:value.identity,frame:value.context.frame});return token;}
     function isShortcutScopeCurrent(token){var before=token&&actionScopes.get(token),after=baseScope();return !!before&&!!after&&before.session===after.session&&before.signature===after.uiSignature&&same(before.identity,after.identity)&&before.frame===after.context.frame;}
-    return Object.freeze({captureSelectedKeys:function(){return scope()?caller.captureSelectedKeys():null;},update:update,shortcut:shortcut,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
+    return Object.freeze({readKeyTimeline:function(){return scope()?caller.readKeyTimeline():null;},captureSelectedKeys:function(){return scope()?caller.captureSelectedKeys():null;},update:update,shortcut:shortcut,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
   }
   var owners=new WeakMap();
   var revealKeys=['p','a','r','s','t','u','e','m'];
@@ -188,7 +188,11 @@
   // One ordinary inspector binding per installed Motion renderer. Ports and
   // final presentation remain owned by Project; this object owns UI disposal.
   function createOrdinary(root,options){
-    options=options||{};var active=null,retired=false;
+    options=options||{};var active=null,retired=false,keyTimelineListener=null,notifyingTimeline=false;
+    function keyTimelineChanged(reason){
+      if(notifyingTimeline)return;notifyingTimeline=true;
+      try{[keyTimelineListener,options.keyTimelineChanged].forEach(function(fn){try{if(typeof fn==='function')fn(reason);}catch(_){}});}finally{notifyingTimeline=false;}
+    }
     function retire(){var old=active;active=null;if(!old)return;old.keyboard.dispose();old.header.removeEventListener('contextmenu',old.menu);old.binding.dispose();}
     function unavailable(){if(active&&options.unavailable)options.unavailable();}
     function paint(ports,container,header){
@@ -196,7 +200,7 @@
       if(!ports||typeof ports.readPropertyMetadata!=='function'||!container||!header){retire();return false;}
       if(active&&(active.ports!==ports||active.container!==container||active.header!==header||!active.binding.isMounted()))retire();
       if(!active){
-        var binding=create(root,ports,function(selector){return ports.readPropertyMetadata(selector);},Object.assign({},options,{container:container,readTransportGeneration:ports.readTransportGeneration}));
+        var binding=create(root,ports,function(selector){return ports.readPropertyMetadata(selector);},Object.assign({},options,{container:container,readTransportGeneration:ports.readTransportGeneration,keyTimelineChanged:keyTimelineChanged}));
         var menu=function(event){event.preventDefault();event.stopPropagation();var scope=binding.captureShortcutScope();if(active&&active.binding===binding&&scope&&options.openFilterMenu)options.openFilterMenu(event,function(mode){if(active&&active.binding===binding&&binding.isShortcutScopeCurrent(scope))return binding.setFilter(mode);return false;});};
         header.addEventListener('contextmenu',menu);
         var keyboard=installForBinding(root.document,root,ports,binding,{acceptsTarget:options.acceptsTarget,modalOpen:options.modalOpen,unavailable:unavailable});
@@ -204,13 +208,15 @@
       }
       Promise.resolve(active.binding.update(false)).catch(unavailable);return true;
     }
-    return Object.freeze({captureSelectedKeys:function(info){
+    return Object.freeze({setKeyTimelineListener:function(fn){
+      if(retired||fn!==null&&typeof fn!=='function')return false;keyTimelineListener=fn;keyTimelineChanged('listener');return true;
+    },readKeyTimeline:function(){return !retired&&active?active.binding.readKeyTimeline():null;},captureSelectedKeys:function(info){
       if(retired)return null;
       if(active)return active.binding.captureSelectedKeys();
       if(!info||!root.state||root.state.appMode==='motion')return null;
       var value={pin:clonePin(info),frame:root.state.currentFrame,viewGeneration:0,keys:Object.freeze([])};
       Object.defineProperty(value,'isCurrent',{value:function(){return !retired&&!active&&root.state.appMode!=='motion';}});return Object.freeze(value);
-    },paint:paint,retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},dispose:function(){if(retired)return;retire();retired=true;}});
+    },paint:paint,retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},dispose:function(){if(retired)return;retire();retired=true;keyTimelineChanged('dispose');keyTimelineListener=null;}});
   }
   return Object.freeze({create:create,createOrdinary:createOrdinary});
 }));

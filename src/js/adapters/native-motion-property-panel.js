@@ -25,7 +25,7 @@
     var keyEditor=null;
     if(Keys&&typeof Keys.create==='function'&&typeof ports.readProperty==='function'){
       keyEditor=Keys.create(section,{document:doc,readContext:ports.readContext,
-        readProperty:ports.readProperty,
+        readProperty:ports.readProperty,keyTimelineChanged:ports.keyTimelineChanged,
         get editPropertyTrack(){return ports.editPropertyTrack;},
         refresh:function(){return refresh(true);}});
     }
@@ -170,11 +170,11 @@
     button('E',function(){notify('Effect reveal is unavailable.');});button('M',function(){notify('Matte reveal is unavailable.');});button('Cancel',cancel);
     var searchInput=make('input','');searchInput.type='search';searchInput.setAttribute('aria-label','Search properties');function onSearch(){search=String(searchInput.value||'').toLowerCase();paint();}searchInput.addEventListener('input',onSearch);toolbar.appendChild(searchInput);
     container.addEventListener('keydown',onKey);readPreference();
-    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,captureSelectedKeys:function(){return !retired&&keyEditor?keyEditor.captureSelectedKeys():null;}});
+    return Object.freeze({refresh:refresh,notice:notify,setFilter:setFilter,reveal:reveal,revealContent:revealContent,refuseReveal:function(){notify('This Motion reveal is unavailable.');return false;},cancel:cancel,dispose:dispose,element:section,readKeyTimeline:function(){return !retired&&validAccepted()&&keyEditor?keyEditor.readKeyTimeline():null;},captureSelectedKeys:function(){return !retired&&keyEditor?keyEditor.captureSelectedKeys():null;}});
   }
   function createCaller(ports){var panel=null,retired=false;
     async function update(force){if(retired)return false;if(!ports.isMotion()){if(panel)panel.dispose();panel=null;return false;}if(!panel)panel=create(ports.container,ports);return panel.refresh(force);}
-    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
+    return Object.freeze({update:update,notice:function(message){if(panel&&!retired)panel.notice(message);},shortcut:function(k,shift){if(retired||!ports.isMotion())return Promise.resolve(false);if(!panel)panel=create(ports.container,ports);k=String(k).toLowerCase();return shortcuts[k]?panel.reveal(shortcuts[k],!!shift):k==='u'?panel.revealContent():['e','m'].includes(k)?Promise.resolve(panel.refuseReveal()):Promise.resolve(false);},readKeyTimeline:function(){return !retired&&ports.isMotion()&&panel?panel.readKeyTimeline():null;},captureSelectedKeys:function(){return !retired&&panel?panel.captureSelectedKeys():null;},isMounted:function(){return !panel||panel.element.parentNode===ports.container;},setFilter:function(mode){return panel?panel.setFilter(mode):false;},cancel:function(){return panel?panel.cancel():false;},dispose:function(){retired=true;if(panel)panel.dispose();panel=null;}});
   }
   return Object.freeze({create:create,createCaller:createCaller});
 }));

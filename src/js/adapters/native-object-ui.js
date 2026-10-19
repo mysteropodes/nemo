@@ -24,7 +24,11 @@
   function bindMotion(root,hooks){
     if(!root||!hooks||typeof hooks.paint!=='function'||typeof hooks.retire!=='function')throw new TypeError('Native Motion UI hooks unavailable');
     if(motionBindings.has(root))throw new Error('Native Motion UI already bound');motionBindings.set(root,hooks);
-    return Object.freeze({dispose:function(){if(motionBindings.get(root)!==hooks)return;retireMotion(root);motionBindings.delete(root);}});
+    if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(function(){
+      var range=root.NemoNativeLayerRangeDesktop;if(range&&typeof range.refreshKeys==='function')range.refreshKeys(root);
+    });
+    return Object.freeze({dispose:function(){if(motionBindings.get(root)!==hooks)return;retireMotion(root);
+      if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(null);motionBindings.delete(root);}});
   }
   function paintMotion(root,ports,prior){
     if(!root.state||root.state.appMode!=='motion'){retireMotion(root);prior.notice.textContent='Native drawing property inspectors are unavailable.';return;}
@@ -47,6 +51,14 @@
       if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
          !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.captureSelectedKeys!=='function')return null;
       return hooks.captureSelectedKeys(info);
+    }catch(_){return null;}
+  }
+  function readMotionKeyTimeline(root,info){
+    try{
+      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
+      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
+         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.readKeyTimeline!=='function')return null;
+      return hooks.readKeyTimeline();
     }catch(_){return null;}
   }
   function paintMotionInspector(root){
@@ -244,7 +256,7 @@
       list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
     }
     if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
-      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
+      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});

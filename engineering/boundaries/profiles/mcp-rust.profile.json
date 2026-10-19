@@ -69,6 +69,7 @@
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
         "src/native_vector_contract.rs",
+        "src/native_vector_contract_shapes.rs",
         "src/native_vector_contract_tests.rs",
         "src/native_request_bytes.rs",
         "src/native_request_spans.rs",

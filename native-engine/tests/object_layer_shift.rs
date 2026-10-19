@@ -10,6 +10,7 @@ mod fixture;
 #[path = "object_exposure_edit_key_rows.rs"]
 #[allow(dead_code)]
 mod rows;
+use fixture::apply;
 use fixture::*;
 
 #[test]

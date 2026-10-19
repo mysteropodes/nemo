@@ -75,6 +75,15 @@ const CANDIDATE_FILES = [
   'engineering/application/examples/native-property-metadata-v1/cases.json',
   'native-engine/src/object_reference_revision.rs',
   'native-engine/src/object_frame_packet.rs',
+  // D27 same-snapshot range-reader dependency closure for the isolated source fixture.
+  'native-engine/src/object_layer_timing.rs',
+  'native-engine/src/object_layer_range_evaluate.rs',
+  'native-engine/tests/object_layer_range_frames.rs',
+  'native-engine/tests/object_layer_range_evaluate.rs',
+  'native-engine/src/object_timing_snapshot.rs',
+  'native-engine/src/object_layer_range_snapshot.rs',
+  'native-engine/tests/object_layer_range_snapshot.rs',
+  'native-engine/src/object_frame_sources.rs',
   'native-engine/src/object_expression_pin.rs',
   'native-engine/tests/object_expression_pin.rs',
   'native-engine/src/object_expression_runtime.rs',
@@ -3401,7 +3410,7 @@ test('L05-E key-retime transaction stays sealed children of the timing owner, th
   const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
   assert.match(read('native-engine/src/object_layer_timing.rs'), /#\[path = "object_exposure_edit_retime_timing\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_exposure_edit_retime_timing;/);
   assert.match(read('native-engine/src/object_document.rs'), /pub\(crate\) use timing::\{RetimeEdit, RetimePair, RetimePlan\};/);
-  assert.match(read('native-engine/src/object_frame_edit_document.rs'), /#\[path = "object_exposure_edit_retime_document\.rs"\]\s*mod object_exposure_edit_retime_document;\s*pub\(crate\) use object_exposure_edit_retime_document::\{retime_key, RetimeOutcome\};/);
+  assert.match(read('native-engine/src/object_frame_edit_document.rs'), /#\[path = "object_exposure_edit_retime_document\.rs"\]\s*mod object_exposure_edit_retime_document;\s*pub\(crate\) use object_exposure_edit_retime_document::\{\s*retime_key, retime_key_with_active, RetimeOutcome,?\s*\};/);
   assert.match(read('native-engine/src/object_fill_owner.rs'), /#\[path = "object_exposure_edit_retime\.rs"\]\s*mod object_exposure_edit_retime;\s*pub\(crate\) use object_exposure_edit_retime::PreparedExposureRetime;/);
   assert.match(read('native-engine/src/commands.rs'), /#\[cfg\(feature = "history"\)\]\s*pub\(crate\) use object_fill_owner::PreparedExposureRetime;/);
   assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_exposure_edit_retime_history\.rs"\]\s*mod object_exposure_edit_retime;/);
@@ -5734,7 +5743,13 @@ test('L05-G layer range records stay a private document child with a codec admis
   for (const file of ['object_frame_edit_range_records.rs', 'object_frame_edit_range_codec.rs', 'object_frame_edit_range_join.rs']) {
     assert.doesNotMatch(read(`native-engine/src/${file}`).split('#[cfg(test)]')[0], /super::/);
   }
-  assert.match(read('native-engine/src/object_frame_packet.rs'), /range_gates_frames\)\s*\{\s*return Err\(ObjectFrameError::Unavailable\.into\(\)\);/);
+  // D27 now consumes admitted ranges through the same snapshot before packet publication.
+  assert.match(read('native-engine/src/object_frame_packet.rs'), /let source_frames = sources::select\(snapshot, selector, exposure\)\?;/);
+  const sources = read('native-engine/src/object_frame_sources.rs');
+  assert.match(sources, /RangeEvaluator::new\(snapshot, selector\.context_id, selector\.frame\)\s*\.map_err\(\|_\| ObjectFrameError::Unavailable\)\?;/);
+  assert.match(sources, /ranges\s*\.gates\(layer\.layer_uid\(\)\)\s*\.map_err\(\|_\| ObjectFrameError::Unavailable\)\?;/);
+  assert.match(sources, /ranges\s*\.resolve\(layer\.layer_uid\(\), true\)\s*\.map_err\(\|_\| ObjectFrameError::Unavailable\)\?\s*\.contains\(selector\.frame\)/);
+  assert.match(sources, /if gated[\s\S]*?Ok\(None\)[\s\S]*?Ok\(source\)/);
   assert.match(read('native-engine/tests/object_frame_edit_range_records_history.rs'),
     /#\[cfg\(feature = "evaluation"\)\]\s*#\[path = "object_frame_edit_range_records_exposure\.rs"\]\s*mod exposure;/);
   const oracleTests = read('native-engine/tests/object_frame_edit_range_records_oracle.rs');
