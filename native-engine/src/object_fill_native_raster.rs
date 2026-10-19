@@ -1,9 +1,11 @@
 //! CPU obstacle-map fallback of tools.js fillVectorFindRaster. The bounded 1400px
 //! map, round wall inflation, four-neighbour flood and largest boundary loop stay
 //! local to one trace. No renderer readback or second document writer is involved.
-use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{area, contains, polygon, StoredWall};
 use crate::object_document::object_group_kernels::object_boolean_ops::{
     simplify_closed, Point, RingSeg,
+};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{
+    area, contains, polygon, StoredWall,
 };
 use crate::object_document::object_group_kernels::object_fill_trace_ops::{TraceFailure, TraceHit};
 use std::collections::{BTreeMap, BTreeSet};

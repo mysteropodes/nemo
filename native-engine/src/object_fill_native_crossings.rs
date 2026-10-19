@@ -1,7 +1,9 @@
 //! Native inputs formerly supplied by tools.js _computeExactCrossings: transverse
 //! intersections, self intersections, endpoint-to-wall projections and0.75px cut
 //! deduplication. The retained graph and curve reconstruction own the resulting face.
-use crate::object_document::object_group_kernels::object_fill_trace_ops::geometry::{segment_crossing, CrossingIn, Wall};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::geometry::{
+    segment_crossing, CrossingIn, Wall,
+};
 use crate::object_document::object_group_kernels::object_fill_trace_ops::native::polygon;
 
 fn distance(a: [f64; 2], b: [f64; 2]) -> f64 {

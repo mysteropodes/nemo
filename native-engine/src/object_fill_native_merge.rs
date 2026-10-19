@@ -1,14 +1,16 @@
 //! Real curved-outline probes and union for the retained same-colour fill policy.
 //! Curves use the retained kurbo adaptive flattener before the existing i_overlay
 //! owner; inputs never discard handles as if the anchors were a straight ring.
-use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{bounds, contains, interior, polygon};
-use crate::object_document::object_group_kernels::object_fill_trace_ops::{RingSeg, UnionProvider};
 use crate::object_document::object_group_kernels::object_boolean_ops::{
     flatten_polygons, fold_multi, BoolOp, Island, MultiPolygon, Point,
 };
 use crate::object_document::object_group_kernels::object_boolean_topology::{
     MergeError, Polygon, ProbeError, TouchProbe,
 };
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{
+    bounds, contains, interior, polygon,
+};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{RingSeg, UnionProvider};
 
 fn cross(a: Point, b: Point, c: Point) -> f64 {
     (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
