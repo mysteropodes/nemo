@@ -2,6 +2,7 @@
 use crate::object_codec::{
     object_deserialize, FrameScopeKind, Presence, PropertyHolder, PropertyHolderTarget,
 };
+use crate::object_document::{ObjectDocument, ObjectLayer, ObjectRecord};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::revision::ObjectSnapshot;
 use serde::Deserialize;
@@ -130,6 +131,21 @@ fn descriptor(
     );
     Ok(value)
 }
+// Borrow the same document's declared component tables. Legacy order-only
+// contexts keep their historical root storage view; a known component NEVER
+// borrows root layers when its own local identity is absent.
+fn metadata_context_parts<'a>(
+    document: &'a ObjectDocument,
+    context: &str,
+) -> (&'a [ObjectLayer], &'a [ObjectRecord]) {
+    document
+        .component_set()
+        .and_then(|set| set.component(context))
+        .map_or((document.layers(), document.objects()), |component| {
+            (component.layers(), component.objects())
+        })
+}
+
 impl ObjectSnapshot {
     /// The existing public dispatcher admits the common envelope and owner.
     /// Original-byte transport admission must precede its typed payload; this
@@ -199,7 +215,7 @@ impl ObjectSnapshot {
         limit: usize,
     ) -> Result<(Vec<Value>, bool), DispatchErrorCode> {
         let document = self.document();
-        let contexts: Vec<&str> = document.composition_order.value().map_or_else(
+        let mut contexts: Vec<&str> = document.composition_order.value().map_or_else(
             || vec!["scene-root"],
             |plan| {
                 plan.contexts
@@ -208,6 +224,13 @@ impl ObjectSnapshot {
                     .collect()
             },
         );
+        if let Some(set) = document.component_set() {
+            for component in &set.components {
+                if !contexts.contains(&component.symbol_id()) {
+                    contexts.push(component.symbol_id());
+                }
+            }
+        }
         let mut index = 0;
         let mut items = Vec::new();
         let mut emit = |item: Value| {
@@ -221,13 +244,13 @@ impl ObjectSnapshot {
             if emit(json!({"kind":"context","contextId":context})) {
                 break;
             }
-            let mut layers: Vec<_> = document.layers.iter().collect();
-            if let Some(plan) = document.composition_order.value() {
-                let c = plan
-                    .contexts
-                    .iter()
-                    .find(|c| c.context_id == context)
-                    .ok_or_else(unavailable)?;
+            let (source_layers, source_records) = metadata_context_parts(document, context);
+            let mut layers: Vec<_> = source_layers.iter().collect();
+            if let Some(c) = document
+                .composition_order
+                .value()
+                .and_then(|plan| plan.contexts.iter().find(|c| c.context_id == context))
+            {
                 layers.sort_by_key(|l| {
                     c.layers
                         .iter()
@@ -243,7 +266,7 @@ impl ObjectSnapshot {
                     break 'contexts;
                 }
                 let mut seen = HashSet::new();
-                for record in &document.objects {
+                for record in source_records {
                     let t = &record.target;
                     if t.context_id == context
                         && t.layer_uid == layer.layer_uid
@@ -279,16 +302,18 @@ impl ObjectSnapshot {
                     .any(|c| c.context_id == target.context_id())
             },
         );
-        if !context_exists
-            || !document
-                .layers
-                .iter()
-                .any(|l| l.layer_uid == target.layer_uid())
+        let component_exists = document
+            .component_set()
+            .and_then(|set| set.component(target.context_id()))
+            .is_some();
+        let (layers, records) = metadata_context_parts(document, target.context_id());
+        if (!context_exists && !component_exists)
+            || !layers.iter().any(|l| l.layer_uid == target.layer_uid())
         {
             return Err(DispatchErrorCode::NotFound);
         }
         if let Some(stroke) = target.stroke_id() {
-            if !document.objects.iter().any(|r| {
+            if !records.iter().any(|r| {
                 r.target.context_id == target.context_id()
                     && r.target.layer_uid == target.layer_uid()
                     && r.target.stroke_id == stroke
@@ -361,14 +386,17 @@ impl ObjectSnapshot {
                 // opt-in Fill row; null default means inherit actual source paint.
                 // No conversion/sampling of that paint is performed here.
                 if target.stroke_id().is_some_and(|stroke| {
-                    self.document().objects.iter().any(|r| {
-                        r.target.context_id == target.context_id()
-                            && r.target.layer_uid == target.layer_uid()
-                            && r.target.stroke_id == stroke
-                            && r.target.frame_scope.kind == FrameScopeKind::Authored
-                            && r.family == "closed-solid-fill-cubic-path"
-                            && r.solid_fill().is_some_and(|fill| fill.kind == "solid")
-                    })
+                    metadata_context_parts(self.document(), target.context_id())
+                        .1
+                        .iter()
+                        .any(|r| {
+                            r.target.context_id == target.context_id()
+                                && r.target.layer_uid == target.layer_uid()
+                                && r.target.stroke_id == stroke
+                                && r.target.frame_scope.kind == FrameScopeKind::Authored
+                                && r.family == "closed-solid-fill-cubic-path"
+                                && r.solid_fill().is_some_and(|fill| fill.kind == "solid")
+                        })
                 }) {
                     keys.push("fillColor");
                 }

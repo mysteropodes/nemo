@@ -414,7 +414,7 @@ where
         exposure,
         context.is_component(),
     )?;
-    let numeric_order = if v2 || context.is_component() {
+    let numeric_order = if v2 {
         Some(prepare_order(
             snapshot,
             selector.context_id,

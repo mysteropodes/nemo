@@ -29,7 +29,17 @@ impl FrameContext {
         if exposure && selector.scope_kind != crate::object_document::FrameScopeKind::Authored {
             return Err(ObjectFrameError::Unavailable);
         }
-        let admitted = admit_frame_context(snapshot, selector)?;
+        let admitted = admit_frame_context(snapshot, selector).map_err(|error| {
+            // Preserve the established public packet refusal. The separate
+            // resolver still reports InvalidContext for undeclared contexts.
+            if error == ObjectFrameError::InvalidContext
+                && (exposure || snapshot.document().format_version() == 2)
+            {
+                ObjectFrameError::Unavailable
+            } else {
+                error
+            }
+        })?;
         if admitted.context.kind() == ContextKind::SceneRoot {
             return Ok(Self::Scene);
         }

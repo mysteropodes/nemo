@@ -291,7 +291,7 @@ fn the_frame_packet_requires_component_timing_and_refuses_undeclared_contexts() 
             &selector(&snap, "symbol-A", FrameScopeKind::Authored, 0)
         )
         .err(),
-        Some(ObjectFrameError::InvalidContext)
+        Some(ObjectFrameError::Unavailable)
     );
     // The resolver admits the declared one and refuses the undeclared one.
     assert!(admit_frame_context(

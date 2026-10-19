@@ -12,6 +12,7 @@ pub(super) fn correlated(
     let image_owner = crate::native_contract::item::placed_png_owner_matches(request, response);
     let correlated_operation = request.operation == crate::native_contract::text_read::OP
         || request.operation == crate::native_contract::metadata::OP
+        || request.operation == crate::native_contract::placement::OP
         || policy_command
         || track_command
         || property_edit
@@ -39,6 +40,15 @@ pub(super) fn correlated(
                 b.len() <= crate::wire::native_response_byte_limit(&request.operation)
             }));
     correlated_identity
+        && (request.operation != crate::native_contract::placement::OP
+            || !response.ok
+            || response.result.as_ref().is_some_and(|result| {
+                crate::native_contract::placement::revision_matches(
+                    request.expected_revision,
+                    response.content_revision,
+                    result,
+                )
+            }))
 }
 pub(super) fn reports_document(
     request: &NativeApplicationRequest,

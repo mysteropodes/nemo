@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-placement",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.project.placement.edit"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectPlacementPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained placement receipt or typed refusal; no raw document, resource or path payload."
+  },
+  "semantics": "Placement edits use the native project asset catalog and existing history/request receipt owner. A changed place/setOffset/shiftOffset/remove publishes one revision and one undo entry; a no-op preserves revision, bytes and redo. Exact request replay returns its retained terminal receipt before stale checking, including after undo. Payload kind place carries the persisted placement DTO without source bytes or paths. Missing targets/asset records and invalid payloads refuse atomically. AudioTrack targets have a declared shape but remain unavailable until the native track-record owner is admitted; this capability does not claim AudioTrack persistence, encodedAudio admission, ordinary UI or installed acceptance.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Video offset edit through shared owner; AudioTrack and installed acceptance remain pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "placement-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.placement.edit",
+        "payload": {
+          "kind": "shiftOffset",
+          "placementId": "placement-1",
+          "deltaFrames": -3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "placement-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

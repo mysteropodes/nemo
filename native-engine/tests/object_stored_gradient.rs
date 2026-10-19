@@ -332,26 +332,27 @@ fn stored_gradient_parametric_translate_scale_and_parameter_set_keep_baseline_en
     r["vectorExt"]["paramShape"] = json!({"kind":"rect","box":{"x1":0,"y1":0,"x2":32,"y2":32}});
     let mut o = owner(&drawing(vec![r.clone()]));
     let old = snapshot(&o);
+    // The finite-f64 native transform serializes floating endpoints, even when integral.
     for (command, fields, from, to, revision) in [
         (
             "object.parametric.translate",
             json!({"delta":[5,-3]}),
-            json!([5, -3]),
-            json!([37, -3]),
+            json!([5.0, -3.0]),
+            json!([37.0, -3.0]),
             1,
         ),
         (
             "object.parametric.scale",
             json!({"scale":[2,0.5],"anchor":[1,2]}),
-            json!([9, -0.5]),
-            json!([73, -0.5]),
+            json!([9.0, -0.5]),
+            json!([73.0, -0.5]),
             2,
         ),
         (
             "object.parametric.set",
             json!({"paramShape":{"kind":"rect","tl":4}}),
-            json!([9, -0.5]),
-            json!([73, -0.5]),
+            json!([9.0, -0.5]),
+            json!([73.0, -0.5]),
             3,
         ),
     ] {

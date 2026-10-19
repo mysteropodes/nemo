@@ -120,6 +120,7 @@ impl ObjectFillOwner {
                 &source.layers,
                 &source.objects,
                 source.composition_order.value(),
+                source.component_tables(),
             )
             .map_err(|_| DispatchErrorCode::NotFound)?;
             let metadata = holder

@@ -23,6 +23,8 @@ mod object;
 #[path = "native_text_read_contract.rs"]
 pub(crate) mod text_read;
 
+#[path = "native_project_placement_contract.rs"]
+pub(crate) mod placement;
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
 
@@ -124,6 +126,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
+        placement::OP => placement::request(payload),
         layer_policy::OP => layer_policy::request(payload),
         property_track::OP => property_track::request(payload),
         property_edit::OP => property_edit::request(payload),
@@ -324,6 +327,9 @@ pub(crate) fn validate_result(
     }
     if vector::owns(operation) {
         return vector::result(operation, payload, result);
+    }
+    if operation == placement::OP {
+        return placement::result(result);
     }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);

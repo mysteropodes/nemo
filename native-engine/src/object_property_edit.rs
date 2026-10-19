@@ -216,6 +216,7 @@ impl ObjectFillOwner {
             &document.layers,
             &document.objects,
             document.composition_order.value(),
+            document.component_tables(),
         )
         .map_err(|_| DispatchErrorCode::NotFound)?;
         let metadata = holder

@@ -296,9 +296,13 @@ fn the_lifted_window_gates_the_root_frame_packet_so_a_merged_block_is_never_pain
     use super::fixture::{decode, uids, windowed_document, wire};
     use super::plan_convert;
     use crate::object_document::FrameScopeKind;
-    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameError, ObjectFrameSelector};
+    use crate::object_frame_packet::{
+        prepare_object_exposure_frame, ObjectFrameError, ObjectFrameSelector,
+    };
     use crate::object_snapshot::ObjectSnapshot;
     // A and B merge; only A's lifted range gates the placing layer.
+    // The fixture authors only frame 0; desktop exposure holds that source while
+    // the lifted range and packet frame still use the requested scene time.
     let packet = |a: Value, b: Value, frame: u32| -> Result<(Option<u32>, f64), ObjectFrameError> {
         let doc = windowed_document(&[
             ("ly_x", "X", "xa", Value::Null),
@@ -318,7 +322,7 @@ fn the_lifted_window_gates_the_root_frame_packet_so_a_merged_block_is_never_pain
             scope_kind: FrameScopeKind::Authored,
             frame,
         };
-        let selected = prepare_object_frame(&snapshot, &selector)?;
+        let selected = prepare_object_exposure_frame(&snapshot, &selector)?;
         let index = selected
             .source_layers()
             .iter()
@@ -338,10 +342,7 @@ fn the_lifted_window_gates_the_root_frame_packet_so_a_merged_block_is_never_pain
         Ok(result)
     };
     for frame in [0, 4, 23] {
-        assert_eq!(
-            packet(Value::Null, Value::Null, frame),
-            Ok((Some(frame), 1.0))
-        );
+        assert_eq!(packet(Value::Null, Value::Null, frame), Ok((Some(0), 1.0)));
     }
     // Inclusive boundaries suppress the merged block outside the lifted window.
     for (range, frames) in [
@@ -358,7 +359,7 @@ fn the_lifted_window_gates_the_root_frame_packet_so_a_merged_block_is_never_pain
         for (frame, visible) in frames {
             assert_eq!(
                 packet(range.clone(), Value::Null, frame),
-                Ok((visible.then_some(frame), 1.0))
+                Ok((visible.then_some(0), 1.0))
             );
         }
     }
@@ -366,13 +367,13 @@ fn the_lifted_window_gates_the_root_frame_packet_so_a_merged_block_is_never_pain
     for frame in [0, 4, 23] {
         assert_eq!(
             packet(json!({"timeLink":{"uid":"ly_x"}}), Value::Null, frame),
-            Ok((Some(frame), 1.0))
+            Ok((Some(0), 1.0))
         );
     }
     // Markers never gate. B's window stays inside and cannot gate the placing layer.
     assert_eq!(
         packet(json!({"markers":[{"frame":2}]}), Value::Null, 23),
-        Ok((Some(23), 1.0))
+        Ok((Some(0), 1.0))
     );
     assert_eq!(
         packet(Value::Null, json!({"inPoint":4}), 0),

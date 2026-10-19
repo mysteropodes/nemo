@@ -38,6 +38,13 @@ fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
     .unwrap();
     let mut scheduler = FrameScheduler::new();
     let work = scheduler.schedule_object(s.clone(), pins, key).unwrap();
+    // Stored gradients are paint: one snapshot lease, no external-resource lease.
+    assert!(scheduler.lease_ids(work.work_id()).unwrap().1.is_empty());
+    let active = scheduler.lease_counters();
+    assert_eq!(
+        (active.acquired(), active.released(), active.live()),
+        (1, 0, 1)
+    );
     let live =
         prepare_scheduled_object_composition_from_witness(&scheduler, &work, witness).unwrap();
     let result = gpu.compose_scheduled_object(&live).unwrap();
@@ -65,7 +72,7 @@ fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
     drop(live);
     scheduler.succeed(work.work_id()).unwrap();
     let c = scheduler.lease_counters();
-    assert_eq!((c.acquired(), c.released(), c.live()), (3, 3, 0));
+    assert_eq!((c.acquired(), c.released(), c.live()), (1, 1, 0));
     bytes
 }
 #[test]

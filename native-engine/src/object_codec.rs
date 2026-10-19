@@ -283,6 +283,7 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.layers,
         &document.objects,
         None,
+        None,
     )?;
     validate_image_meshes(&document.image_meshes)?;
     object_raster_asset_codec::validate_items(document)
@@ -318,10 +319,11 @@ pub(crate) fn validate_property_holders(
     layers: &[ObjectLayer],
     records: &[ObjectRecord],
     plan: Option<&crate::object_document::OrderPlan>,
+    tables: Option<&crate::object_document::ComponentTables>,
 ) -> Result<(), ObjectCodecError> {
     use crate::object_document::PropertyAdmissionError;
-    crate::object_document::validate_property_holders(holders, layers, records, plan).map_err(
-        |error| {
+    crate::object_document::validate_property_holders(holders, layers, records, plan, tables)
+        .map_err(|error| {
             let (kind, message) = match error {
                 PropertyAdmissionError::Invalid(message) => {
                     (ObjectCodecErrorKind::Invalid, message)
@@ -334,8 +336,7 @@ pub(crate) fn validate_property_holders(
                 }
             };
             ObjectCodecError::new(kind, message)
-        },
-    )
+        })
 }
 
 /// Legacy and component-symbol content retain their original parent refusal.

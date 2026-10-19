@@ -31,6 +31,7 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
         "../../engineering/application/capabilities-v2/native-object-property-metadata.json"
     ),
     include_str!("../../engineering/application/capabilities-v2/native-project-settings.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-placement.json"),
     include_str!("../../engineering/application/capabilities-v2/native-layer-policy.json"),
     include_str!("../../engineering/application/capabilities-v2/native-property-track-edit.json"),
     include_str!("../../engineering/application/capabilities-v2/native-property-read.json"),

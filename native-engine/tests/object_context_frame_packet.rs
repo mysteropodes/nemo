@@ -125,7 +125,7 @@ fn all_four_pins_unknown_context_reference_scope_and_local_frame_bounds_stay_clo
         (1, ObjectFrameError::WrongDocument),
         (2, ObjectFrameError::WrongRevision),
         (3, ObjectFrameError::WrongSnapshot),
-        (4, ObjectFrameError::InvalidContext),
+        (4, ObjectFrameError::Unavailable),
         (5, ObjectFrameError::Unavailable),
         (6, ObjectFrameError::FrameOutOfRange),
     ] {
@@ -291,18 +291,19 @@ fn malformed_explicit_component_plans_are_refused_instead_of_falling_back_to_nat
     }
 }
 #[test]
-fn v1_entered_component_natural_order_does_not_change_root_migration_policy() {
+fn v1_component_tables_remain_unsupported_and_root_migration_policy_unchanged() {
     let mut value = source();
     value["formatVersion"] = json!(1);
     value.as_object_mut().unwrap().remove("compositionOrder");
+    // Components are a v2 storage feature; never expand v1 admission to make
+    // a test fixture pass. The original root-only v1 migration stays intact.
+    let error = decode_storage_project(value.to_string().as_bytes()).unwrap_err();
+    assert_eq!(
+        error.kind(),
+        crate::object_codec::ObjectCodecErrorKind::Unsupported
+    );
+    value.as_object_mut().unwrap().remove("componentTables");
     let snapshot = admitted(&value);
-    let packet = prepare_object_frame(&snapshot, &selector(&snapshot, "sym_comp", 7)).unwrap();
-    assert!(packet.numeric_order().is_some());
-    assert!(packet
-        .records()
-        .all(|record| record.record().target().context_id() == "sym_comp"));
-    // Root v1 still has no synthesized OrderPlan. This is the established
-    // entered-component native encounter order only.
     assert!(
         prepare_object_frame(&snapshot, &selector(&snapshot, "scene-root", 0))
             .unwrap()
@@ -329,8 +330,16 @@ fn editable_component_vectors_reach_actual_contours_without_root_index_aliasing(
             record["family"] = json!("editable-vector-path");
             record["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":3,
                 "strokeCap":"round","strokeJoin":"round","opacity":1});
+            // Translate the complete baseline rectangle; moving one anchor
+            // alone would create a self-intersection and alter its contour.
             let x = 40 + (component_index as i64) * 200;
-            record["geometry"]["segments"][0]["point"]["x"] = json!(x);
+            let dx = x - record["geometry"]["segments"][0]["point"]["x"]
+                .as_i64()
+                .unwrap();
+            for segment in record["geometry"]["segments"].as_array_mut().unwrap() {
+                let translated = segment["point"]["x"].as_i64().unwrap() + dx;
+                segment["point"]["x"] = json!(translated);
+            }
         }
     }
     let snapshot = admitted(&value);
@@ -352,7 +361,10 @@ fn editable_component_vectors_reach_actual_contours_without_root_index_aliasing(
         let paint = prepare_object_paint_plan(&scene, &query).unwrap();
         let command = paint.commands().next().unwrap();
         assert_eq!(command.source().record().target().context_id(), context);
-        assert_eq!(command.contour().segments()[0].point[0], first_x);
+        assert_eq!(
+            command.contour().control_bounds(),
+            [first_x, 40.0, first_x + 60.0, 100.0]
+        );
     }
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
 }

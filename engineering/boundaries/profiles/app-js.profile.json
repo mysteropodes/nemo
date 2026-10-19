@@ -2296,6 +2296,18 @@
       ]
     },
     {
+      "id": "app.native.project.placement.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-project-placement-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-project-placement-contract.js"
+      ]
+    },
+    {
       "id": "app.native.import.contract",
       "layer": "domain",
       "dir": "src/js/adapters",

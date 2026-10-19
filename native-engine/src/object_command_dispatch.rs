@@ -21,6 +21,11 @@ use crate::transaction::{CompactFailure, CompactResult, ReceiptLookup, RetainedD
 #[path = "object_command_dispatch_edits.rs"]
 mod edits;
 
+// #2207 staged placement producer; public capability admission remains separate.
+#[path = "object_media_link_command.rs"]
+mod placement;
+use placement::OP_PLACEMENT_EDIT;
+
 const OP_OBJECT_FILL: &str = "command.document.object.fill.set";
 const OP_OBJECT_UNDO: &str = "command.document.object.undo";
 const OP_OBJECT_REDO: &str = "command.document.object.redo";
@@ -101,6 +106,7 @@ impl NativeObjectHistory {
                     | OP_PROPERTY_EDIT
                     | OP_PROPERTY_TRACK_EDIT
                     | OP_PROJECT_SETTINGS
+                    | OP_PLACEMENT_EDIT
                     | OP_OBJECT_VECTOR
                     | OP_IMAGE_MESH_EDIT
                     | OP_WIDGET_CREATE
@@ -146,6 +152,8 @@ impl NativeObjectHistory {
                 OP_WIDGET_CREATE | OP_WIDGET_WRITE | OP_WIDGET_SETTINGS
             ) {
                 "Widget request refused."
+            } else if request.operation == OP_PLACEMENT_EDIT {
+                "Placement edit request refused."
             } else if request.operation == OP_PROJECT_SETTINGS {
                 "Project settings request refused."
             } else if is_frame_structure_operation(request.operation.as_str()) {
@@ -346,6 +354,8 @@ impl NativeObjectHistory {
                 self.dispatch_widget_command(request.operation.as_str(), &payload)
             } else if is_frame_clipboard_operation(request.operation.as_str()) {
                 self.dispatch_frame_clipboard(request)
+            } else if request.operation == OP_PLACEMENT_EDIT {
+                self.dispatch_placement_edit(&request.payload)
             } else if request.operation == OP_PROJECT_SETTINGS {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
