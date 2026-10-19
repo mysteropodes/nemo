@@ -20,17 +20,19 @@ const _speed = function(f) {
 };
 const _sample = function(uid,p,f) { return _shape(_get('value',uid,p,_num(f))); };
 const _control = function(uid,n,f) {
- const p = _get('control',uid,String(n));
+ const p = _get('control',uid,n == null ? '' : String(n));
  return _sample(uid || _get('owner'),p,f === undefined ? frame : _num(f));
 };
 const control = function(n,f) { return _control('',n,f); };
 const layerControl = function(ref,n,f) {
- const uid = _get('layer-uid',String(ref));
+ if (typeof ref !== 'string' || !ref) throw new Error('Unknown layer: '+String(ref));
+ const uid = _get('layer-uid',ref);
  if (uid === null) throw new Error('Unknown layer: '+String(ref));
  return _control(uid,n,f);
 };
 const _layer = function(ref) {
- const uid = _get('layer',String(ref));
+ if (typeof ref !== 'string' || !ref) return null;
+ const uid = _get('layer',ref);
  if (uid === null) return null;
  const info = _get('info',uid), out = {};
  for (const p of ['name','index','hasParent']) out[p] = info[p];
@@ -65,6 +67,7 @@ for (const p of ['width','height','frameDuration','duration','numLayers','name']
  Object.defineProperty(thisComp,p,{get:function() { return _comp()[p]; }});
 thisComp.layer = layer;
 const key = _keys.at;
+const numKeys = _keys.count;
 const nearestKey = function(t) { return _get('nearest-key','','',_num(t)*_fps()); };
 const valueAtFrame = _at;
 const valueAtTime = function(t) { return _at(_num(t)*_fps()); };

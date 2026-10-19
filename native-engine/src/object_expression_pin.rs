@@ -263,9 +263,11 @@ impl PropertyExpressionRequest {
             };
         let mut fallback = evaluate_with_fallback(self.dim, &self.raw, outcome?);
         if fallback.diagnostic.is_none()
-            && dependencies
-                .iter()
-                .any(|d| d.diagnostic == Some(Diagnostic::TooDeep))
+            && dependencies.iter().any(|d| {
+                d.diagnostic == Some(Diagnostic::TooDeep)
+                    && d.target == self.target
+                    && d.property == self.property
+            })
         {
             fallback.diagnostic = Some(Diagnostic::TooDeep);
         }

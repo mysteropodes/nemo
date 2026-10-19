@@ -52,6 +52,11 @@ object_deserialize!(ReadSelector {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum ReadFields {
+    ExpressionContext {
+        target: PropertyHolderTarget,
+        property: String,
+        frame: f64,
+    },
     RawSample {
         target: PropertyHolderTarget,
         property: String,
@@ -112,6 +117,9 @@ impl ObjectSnapshot {
             return Err(StaleRevision);
         }
         let (kind, target, property) = match &selector.view.0 {
+            ReadFields::ExpressionContext {
+                target, property, ..
+            } => ("expressionContext", target, property),
             ReadFields::RawSample {
                 target, property, ..
             } => ("rawSample", target, property),
@@ -135,6 +143,33 @@ impl ObjectSnapshot {
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "kind":kind,"target":target,"property":property,"dimension":dimension});
         match &selector.view.0 {
+            ReadFields::ExpressionContext { frame, .. } => {
+                if !frame.is_finite() {
+                    return Err(InvalidRequest);
+                }
+                #[cfg(feature = "evaluation")]
+                {
+                    let reads =
+                        crate::evaluation::property_expression_snapshot_reads::SnapshotReads::bind(
+                            self, target, property, *frame,
+                        );
+                    result["frame"] = json!(frame);
+                    result["self"] = reads.info("").map_err(|_| Unavailable)?;
+                    result["keyCount"] = json!(reads.key_count().map_err(|_| Unavailable)?);
+                    match reads.comp() {
+                        Ok(comp) => {
+                            result["comp"] = comp;
+                            result["compUnavailable"] = Value::Null;
+                        }
+                        Err(_) => {
+                            result["comp"] = Value::Null;
+                            result["compUnavailable"] = json!("projectMetadata");
+                        }
+                    }
+                }
+                #[cfg(not(feature = "evaluation"))]
+                return Err(Unavailable);
+            }
             ReadFields::RawSample { frame, .. } => {
                 if !frame.is_finite() {
                     return Err(InvalidRequest);

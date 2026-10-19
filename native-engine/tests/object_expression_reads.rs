@@ -160,3 +160,106 @@ fn foreign_owner_and_same_content_different_snapshot_cannot_publish() {
     let candidate = evaluate_property_detached(&request, limits()).unwrap();
     assert!(request.finalize(&b, candidate).is_err());
 }
+
+fn change_drawing(
+    owner: &NativeObjectHistory,
+    edit: impl FnOnce(&mut serde_json::Value),
+) -> NativeObjectHistory {
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let mut drawing = serde_json::to_value(snapshot.document()).unwrap();
+    edit(&mut drawing);
+    let drawing =
+        crate::object_codec::decode_ordered_project(&serde_json::to_vec(&drawing).unwrap())
+            .unwrap();
+    NativeObjectHistory::from_admitted_project(
+        "changed-provider",
+        snapshot
+            .project()
+            .unwrap()
+            .with_drawing(drawing.into_storage()),
+    )
+    .unwrap()
+}
+
+#[test]
+fn nonstring_layer_references_and_nullish_controls_cannot_alias_stored_names() {
+    for (argument, name) in [
+        ("null", "null"),
+        ("undefined", "undefined"),
+        ("false", "false"),
+        ("1", "1"),
+    ] {
+        let code = format!("layer({argument}) === null ? value : 99");
+        let owner = change_drawing(&owner(&code), |d| d["layers"][1]["name"] = json!(name));
+        let snapshot = owner.acquire_snapshot(0).unwrap();
+        let result =
+            evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
+                .unwrap();
+        assert_eq!(
+            (result.value, result.diagnostic),
+            (vec![50.], None),
+            "{argument}"
+        );
+        let code = format!("layerControl({argument},'Gain')");
+        let owner = change_drawing(&self::owner(&code), |d| {
+            d["layers"][1]["layerUid"] = json!(name);
+            d["compositionOrder"]["contexts"][0]["layers"][1]["layerUid"] = json!(name);
+            d["propertyHolders"][1]["target"]["layerUid"] = json!(name);
+        });
+        let snapshot = owner.acquire_snapshot(0).unwrap();
+        let result =
+            evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
+                .unwrap();
+        assert_eq!(result.value, vec![50.]);
+        assert!(result.diagnostic.is_some(), "{argument}");
+    }
+    for name in ["null", "undefined"] {
+        let code = format!("control({name})");
+        let owner = change_drawing(&owner(&code), |d| {
+            d["propertyHolders"][0]["controls"][0]["name"] = json!(name)
+        });
+        let snapshot = owner.acquire_snapshot(0).unwrap();
+        let result =
+            evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
+                .unwrap();
+        assert_eq!(result.value, vec![50.]);
+        assert!(result.diagnostic.is_some());
+    }
+    // Controls deliberately coerce other names, unlike layer references.
+    let owner = change_drawing(&owner("control(false)[0]"), |d| {
+        d["propertyHolders"][0]["controls"][0]["name"] = json!("false")
+    });
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let result =
+        evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
+            .unwrap();
+    assert_eq!((result.value, result.diagnostic), (vec![-5.], None));
+}
+
+#[test]
+fn dependency_depth_warning_is_attributed_only_to_its_actual_property() {
+    use crate::evaluation::property_expression_runtime::Diagnostic;
+    let owner = change_drawing(&owner("layerControl('Ctrl','Gain')"), |d| {
+        d["propertyHolders"][1]["properties"][0]["expression"]["code"] =
+            json!("control('Gain') + 1");
+    });
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let result =
+        evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
+            .unwrap();
+    assert_eq!((result.value, result.diagnostic), (vec![14.], None));
+    assert!(result
+        .dependencies
+        .iter()
+        .any(|d| d.target.layer_uid() == "Ctrl"
+            && d.property == "xc_gain"
+            && d.diagnostic == Some(Diagnostic::TooDeep)));
+    let mut control = target();
+    control.layer_uid = "Ctrl".into();
+    let result =
+        evaluate_property_for_owner(&owner, &snapshot, &control, "xc_gain", 5., 0, limits())
+            .unwrap();
+    assert_eq!(result.value, vec![15.]);
+    assert_eq!(result.diagnostic, Some(Diagnostic::TooDeep));
+    assert_eq!(owner.history_depths(), (0, 0));
+}

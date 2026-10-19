@@ -6,11 +6,11 @@
 //! interrupted runtime into E1's `GuestValue`, and E1's fallback decides the
 //! published value. Same fresh Runtime, limits and retirement as Order.
 //!
-//! Named gaps: builtins beyond `value`/`frame` (`time`, `self`, `comp`, the
-//! helpers), cross-layer re-entry and `_depthTripped` retention, the compile
-//! cache, V8's message/line text (QuickJS words its own), and dimensions
-//! Motion registers at runtime for effector/exposed properties, which D11
-//! refuses as unsupported.
+//! T09 binds stored self/layer/control/key/comp reads through the same native
+//! snapshot, including dependency diagnostics and the shared recursion budget.
+//! Timing is supplied only by real project metadata. Other expression helpers,
+//! compile caching, V8 message/line parity and dynamic effector/exposed dimensions
+//! remain separate named consumers; a provider increment does not accept them.
 #[cfg(all(test, feature = "test-object_expression_runtime"))]
 #[path = "../tests/object_expression_property.rs"]
 mod tests;
@@ -33,8 +33,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 mod bridge;
 #[path = "object_expression_read_runtime.rs"]
 mod read_runtime;
-#[path = "object_expression_reads.rs"]
-mod reads;
+use crate::evaluation::property_expression_snapshot_reads as reads;
 use read_runtime::ReadState;
 
 #[cfg(all(test, feature = "test-object_expression_runtime"))]
@@ -62,9 +61,11 @@ fn compile_property<'js>(
     ctx: &rquickjs::Ctx<'js>,
     code: &str,
     fail: &Fail,
+    has_time: bool,
 ) -> Result<Function<'js>, (ExpressionRefusal, String)> {
+    let time = if has_time { ",time" } else { "" };
     let prefix = format!(
-        "function(value,frame,__read,time){{'use strict';{}",
+        "function(value,frame,__read{time}){{'use strict';{}",
         bridge::PRELUDE
     );
     let expression = format!("{prefix}\nreturn ({code}\n);}}");
@@ -135,7 +136,12 @@ fn evaluate_property_in_context(
     state: ReadState,
 ) -> Result<Outcome, ExpressionRefusal> {
     with_context_budget(rt, limits, Arc::clone(&state.polls), |ctx, fail| {
-        let function = match compile_property(ctx, request.code(), fail) {
+        let time = reads::SnapshotReads::new(request)
+            .comp()
+            .ok()
+            .and_then(|c| c["fps"].as_f64())
+            .map(|fps| request.frame() / fps);
+        let function = match compile_property(ctx, request.code(), fail, time.is_some()) {
             Ok(function) => function,
             Err((ExpressionRefusal::Interrupted, _)) => return Ok(Outcome::Timeout),
             Err((_, message)) => {
@@ -155,11 +161,6 @@ fn evaluate_property_in_context(
             Dim::Undefined => -1,
         };
         let read = read_runtime::bind(ctx, request, limits, state.clone())?;
-        let time = reads::SnapshotReads::new(request)
-            .comp()
-            .ok()
-            .and_then(|c| c["fps"].as_f64())
-            .map(|fps| request.frame() / fps);
         let called: rquickjs::Result<Value> = if raw.len() == 1 {
             function.call((raw[0], request.frame(), read, time))
         } else {

@@ -6,13 +6,14 @@ use crate::evaluation::property_expression_lookup::{
 };
 use crate::evaluation::property_expression_views::ExpressionContextView;
 use crate::object_document::{ObjectLayer, Presence, PropertyHolder, PropertyHolderTarget};
+#[cfg(feature = "object_expression_pin")]
 use crate::object_expression_pin::PropertyExpressionRequest;
 use crate::object_frame_packet::sample_property_raw;
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 
 #[derive(Clone)]
-pub(super) struct SnapshotReads {
+pub(crate) struct SnapshotReads {
     snapshot: ObjectSnapshot,
     target: PropertyHolderTarget,
     property: String,
@@ -20,7 +21,21 @@ pub(super) struct SnapshotReads {
 }
 
 impl SnapshotReads {
-    pub(super) fn new(request: &PropertyExpressionRequest) -> Self {
+    pub(crate) fn bind(
+        snapshot: &ObjectSnapshot,
+        target: &PropertyHolderTarget,
+        property: &str,
+        frame: f64,
+    ) -> Self {
+        Self {
+            snapshot: snapshot.clone(),
+            target: target.clone(),
+            property: property.to_owned(),
+            frame,
+        }
+    }
+    #[cfg(feature = "object_expression_pin")]
+    pub(crate) fn new(request: &PropertyExpressionRequest) -> Self {
         Self {
             snapshot: request.snapshot().clone(),
             target: request.target().clone(),
@@ -28,10 +43,10 @@ impl SnapshotReads {
             frame: request.frame(),
         }
     }
-    pub(super) fn snapshot(&self) -> &ObjectSnapshot {
+    pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
         &self.snapshot
     }
-    pub(super) fn target(&self, uid: &str) -> Result<PropertyHolderTarget, &'static str> {
+    pub(crate) fn target(&self, uid: &str) -> Result<PropertyHolderTarget, &'static str> {
         if uid.is_empty() {
             return Ok(self.target.clone());
         }
@@ -87,7 +102,7 @@ impl SnapshotReads {
             .collect();
         LayerTable::new(layers).map_err(|_| "Expression lookup limit")
     }
-    pub(super) fn layer(
+    pub(crate) fn layer(
         &self,
         reference: &str,
         uid_first: bool,
@@ -108,7 +123,7 @@ impl SnapshotReads {
         };
         Ok(index.and_then(|i| table.layers()[i].layer_uid.clone()))
     }
-    pub(super) fn control(&self, uid: &str, name: &str) -> Result<String, &'static str> {
+    pub(crate) fn control(&self, uid: &str, name: &str) -> Result<String, &'static str> {
         // Shape controls belong to its owning layer, not the shape holder.
         let uid = if uid.is_empty() {
             self.target.layer_uid()
@@ -127,7 +142,7 @@ impl SnapshotReads {
             .map(|c| c.key.clone())
             .ok_or("Unknown expression control")
     }
-    pub(super) fn raw(
+    pub(crate) fn raw(
         &self,
         uid: &str,
         property: &str,
@@ -136,7 +151,7 @@ impl SnapshotReads {
         sample_property_raw(&self.snapshot, &self.target(uid)?, property, frame)
             .map_err(|_| "Unavailable native property")
     }
-    pub(super) fn has_expression(&self, target: &PropertyHolderTarget, property: &str) -> bool {
+    pub(crate) fn has_expression(&self, target: &PropertyHolderTarget, property: &str) -> bool {
         self.holder(target)
             .and_then(|h| h.properties().iter().find(|r| r.property() == property))
             .and_then(|r| r.expression.value())
@@ -180,7 +195,7 @@ impl SnapshotReads {
             })
             .transpose()
     }
-    pub(super) fn info(&self, uid: &str) -> Result<Value, &'static str> {
+    pub(crate) fn info(&self, uid: &str) -> Result<Value, &'static str> {
         let view = self.view(uid)?;
         let Some(me) = view.self_view() else {
             return Ok(Value::Null);
@@ -191,7 +206,7 @@ impl SnapshotReads {
             "parent":me.parent().map(|p|json!({"name":p.name(),"index":p.index()}))}),
         )
     }
-    pub(super) fn parent(&self, uid: &str) -> Result<Value, &'static str> {
+    pub(crate) fn parent(&self, uid: &str) -> Result<Value, &'static str> {
         let target = self.target(uid)?;
         let layers = self.layers()?;
         let layer = layers
@@ -208,7 +223,7 @@ impl SnapshotReads {
             .map(|(index, l)| json!({"name":l.name(),"index":index}))
             .unwrap_or(Value::Null))
     }
-    pub(super) fn comp(&self) -> Result<Value, &'static str> {
+    pub(crate) fn comp(&self) -> Result<Value, &'static str> {
         let view = self.view("")?;
         let c = view.comp().map_err(|_| "Unavailable project metadata")?;
         Ok(
@@ -217,7 +232,7 @@ impl SnapshotReads {
             "duration":c.duration(),"numLayers":c.num_layers()}),
         )
     }
-    pub(super) fn key(&self, at: f64, nearest: bool) -> Result<Value, &'static str> {
+    pub(crate) fn key(&self, at: f64, nearest: bool) -> Result<Value, &'static str> {
         let keys = self.keys()?;
         let fps = self.fps()?;
         let entry = if nearest {
@@ -235,16 +250,16 @@ impl SnapshotReads {
             })
             .unwrap_or(Value::Null))
     }
-    pub(super) fn key_count(&self) -> Result<usize, &'static str> {
+    pub(crate) fn key_count(&self) -> Result<usize, &'static str> {
         Ok(lookup::num_keys(self.keys()?.as_ref()))
     }
-    pub(super) fn frame(&self) -> f64 {
+    pub(crate) fn frame(&self) -> f64 {
         self.frame
     }
-    pub(super) fn property(&self) -> &str {
+    pub(crate) fn property(&self) -> &str {
         &self.property
     }
-    pub(super) fn owner_uid(&self) -> &str {
+    pub(crate) fn owner_uid(&self) -> &str {
         self.target.layer_uid()
     }
 }
