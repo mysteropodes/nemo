@@ -159,7 +159,6 @@ fn evaluate_property_in_context(
         if request.depth() >= EXPR_MAX_DEPTH {
             return Ok(Outcome::TooDeep);
         }
-        let raw = request.raw();
         let dim = match request.dim() {
             Dim::Known(n) => n as i64,
             Dim::Vertex => 2,

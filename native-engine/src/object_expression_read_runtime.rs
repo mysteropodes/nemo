@@ -7,7 +7,7 @@ use crate::object_expression_pin::{
     PropertyExpressionRequest,
 };
 use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
-use rquickjs::{function::Args, Ctx, Exception, Function, Object, Value};
+use rquickjs::{function::Args, Ctx, Exception, Function, Object, Value as JsValue};
 use serde_json::{json, Value};
 use std::{
     cell::RefCell,
@@ -102,7 +102,7 @@ pub(super) fn bind<'js>(
               property: String,
               at: f64|
               -> rquickjs::Result<String> {
-            let property = if property.is_empty() {
+            let property = if op == "raw" && property.is_empty() {
                 reads.property()
             } else {
                 &property
@@ -141,7 +141,7 @@ pub(super) fn call_property<'js>(
     request: &PropertyExpressionRequest,
     read: Function<'js>,
     time: Option<f64>,
-) -> rquickjs::Result<Value<'js>> {
+) -> rquickjs::Result<JsValue<'js>> {
     let source = format!(
         "function(__read,frame){{{}\nreturn{{{}}};}}",
         super::bridge::PRELUDE,
@@ -160,7 +160,7 @@ pub(super) fn call_property<'js>(
         args.push_arg(time)?;
     }
     for name in super::bridge::READ_NAMES {
-        args.push_arg(scope.get::<_, Value>(*name)?)?;
+        args.push_arg(scope.get::<_, JsValue>(*name)?)?;
     }
     function.call_arg(args)
 }

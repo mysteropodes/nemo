@@ -213,8 +213,14 @@ fn nonstring_layer_references_and_nullish_controls_cannot_alias_stored_names() {
         assert_eq!(result.value, vec![50.]);
         assert!(result.diagnostic.is_some(), "{argument}");
     }
-    for name in ["null", "undefined"] {
-        let code = format!("control({name})");
+    for (name, argument) in [
+        ("null", "null"),
+        ("undefined", "undefined"),
+        ("opacity", "null"),
+        ("opacity", "undefined"),
+        ("opacity", "''"),
+    ] {
+        let code = format!("control({argument})");
         let owner = change_drawing(&owner(&code), |d| {
             d["propertyHolders"][0]["controls"][0]["name"] = json!(name)
         });
