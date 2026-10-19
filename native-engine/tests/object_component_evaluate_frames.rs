@@ -259,36 +259,67 @@ fn variants_with_range(symbol: usize, layer: usize, range: serde_json::Value) ->
 }
 
 #[test]
-fn a_visible_inner_layer_with_a_gating_range_makes_the_entered_view_unavailable() {
-    // The entered view shows inner layers as ordinary layers, which obey their own window
-    // (`getEffectiveStrokes` -> `layerHasTimeRange`); until the D27 evaluator reads in points, out points
-    // and time links, painting every frame of such a layer would silently lose the window.
-    let want = Some(ComponentFrameError::Inside(
-        ComponentUnavailable::InnerFeature {
-            layer_uid: "ly_comp_ia".into(),
-            feature: "layer range",
-        },
-    ));
-    for range in [
-        json!({"inPoint": 2}),
-        json!({"outPoint": 0}),
-        json!({"timeLink": {"uid": "ly_comp_ib"}}),
+fn a_visible_inner_layer_range_selects_literal_entered_records_and_preserves_placed_behavior() {
+    let baseline = Prepared::of("variants");
+    for (range, included) in [
+        (json!({"inPoint":2}), [false, true, true]),
+        (json!({"outPoint":0}), [true, false, false]),
+        (json!({"timeLink":{"uid":"ly_comp_ib"}}), [true, true, true]),
     ] {
         let prepared = variants_with_range(0, 0, range.clone());
-        for frame in [0, 3, 11] {
+        for (index, frame) in [0, 3, 11].into_iter().enumerate() {
+            let ComponentFrame::Inside(actual) =
+                prepared.query("sym_comp", frame).expect("range evaluated")
+            else {
+                panic!("entered");
+            };
+            let ComponentFrame::Inside(mut expected) = baseline.query("sym_comp", frame).unwrap()
+            else {
+                panic!("baseline entered");
+            };
+            if !included[index] {
+                expected
+                    .records
+                    .retain(|record| record.target().layer_uid() != "ly_comp_ia");
+            }
             assert_eq!(
-                prepared.query("sym_comp", frame).err(),
-                want,
-                "{range} @{frame}"
+                actual.records, expected.records,
+                "complete source records {range} @{frame}"
             );
+            let targets: Vec<_> = actual
+                .records
+                .iter()
+                .map(|record| {
+                    let target = record.target();
+                    (
+                        target.layer_uid().to_owned(),
+                        target.frame(),
+                        target.stroke_id().to_owned(),
+                    )
+                })
+                .collect();
+            let mut literal = Vec::new();
+            if included[index] {
+                literal.push(("ly_comp_ia".into(), frame, format!("s_comp_a_{frame}")));
+            }
+            literal.push(("ly_comp_ib".into(), 0, "s_comp_b_0".into()));
+            assert_eq!(targets, literal);
         }
-        // The placed instance and the scene are unaffected: the baseline's symbol branch never reads an
-        // inner layer's range, and the root packet gate only looks at scene layers.
-        assert!(prepared.query(SCENE, 3).is_ok(), "{range}");
-        assert!(
-            prepared.query("sym_late", 5).is_ok(),
-            "{range}: another component"
-        );
+        // Placed symbol branch ignores inner ranges, as in the immutable baseline.
+        let ComponentFrame::Scene(actual) = prepared.query(SCENE, 3).unwrap() else {
+            panic!("scene");
+        };
+        let ComponentFrame::Scene(expected) = baseline.query(SCENE, 3).unwrap() else {
+            panic!("scene");
+        };
+        assert_eq!(actual.slots(), expected.slots());
+        let ComponentFrame::Inside(actual) = prepared.query("sym_late", 5).unwrap() else {
+            panic!("late");
+        };
+        let ComponentFrame::Inside(expected) = baseline.query("sym_late", 5).unwrap() else {
+            panic!("late");
+        };
+        assert_eq!(actual.records, expected.records);
     }
 }
 
@@ -306,9 +337,9 @@ fn a_range_that_gates_nothing_or_sits_on_a_hidden_layer_does_not_block_the_enter
     // `sym_hidden`'s second layer is hidden.
     let hidden = variants_with_range(1, 1, json!({"inPoint": 2}));
     assert!(hidden.query("sym_hidden", 3).is_ok());
-    // The same range on a visible layer of that component does block.
+    // A visible range is now evaluated at the requested frame.
     let visible = variants_with_range(1, 0, json!({"inPoint": 2}));
-    assert!(visible.query("sym_hidden", 3).is_err());
+    assert!(visible.query("sym_hidden", 3).is_ok());
 }
 
 #[test]
@@ -384,4 +415,36 @@ fn an_unwired_property_runtime_is_a_typed_slot_per_instance() {
     }
     assert_eq!(unwired.availability_asks, 9);
     assert!(unwired.reads.is_empty());
+}
+
+#[test]
+fn outer_component_range_uses_same_snapshot_without_gating_placed_inner_ranges() {
+    let baseline = Prepared::of("base");
+    let mut source = set("base");
+    let layers = source.document["layers"].as_array_mut().unwrap();
+    let host = layers
+        .iter_mut()
+        .find(|layer| layer["layerUid"] == "ly_comp_loop")
+        .unwrap();
+    host["range"] = json!({"inPoint":2,"outPoint":4});
+    let ranged = Prepared::from_set(source);
+    for frame in [0, 2, 3, 4, 5] {
+        let ComponentFrame::Scene(actual) = ranged.query(SCENE, frame).unwrap() else {
+            panic!("scene");
+        };
+        let ComponentFrame::Scene(expected) = baseline.query(SCENE, frame).unwrap() else {
+            panic!("scene baseline");
+        };
+        for entry in actual.slots() {
+            let prior = entry_of(&expected, &entry.layer_uid);
+            if entry.layer_uid == "ly_comp_loop" && !(2..=4).contains(&frame) {
+                assert_eq!(entry.outcome, ComponentOutcome::Blank);
+            } else {
+                assert_eq!(
+                    entry, prior,
+                    "unaffected slots and in-range playback preserve all source shapes"
+                );
+            }
+        }
+    }
 }

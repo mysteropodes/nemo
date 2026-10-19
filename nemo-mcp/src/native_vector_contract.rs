@@ -207,14 +207,51 @@ fn shape(value: &Value, for_set: bool) -> bool {
     })
 }
 
+fn gradient(value: &Value) -> bool {
+    let number = |v: &Value| {
+        v.as_f64()
+            .is_some_and(|n| n.is_finite() && (n as f32).is_finite())
+    };
+    exact(value, &["kind", "from", "to", "stops"], &[]).is_some()
+        && one_of(&value["kind"], &["linear", "radial"])
+        && ["from", "to"].iter().all(|key| {
+            value[*key]
+                .as_array()
+                .is_some_and(|p| p.len() == 2 && p.iter().all(number))
+        })
+        && (((value["to"][0].as_f64().unwrap() - value["from"][0].as_f64().unwrap()).powi(2)
+            + (value["to"][1].as_f64().unwrap() - value["from"][1].as_f64().unwrap()).powi(2))
+        .sqrt() as f32)
+            .is_finite()
+        && value["stops"].as_array().is_some_and(|stops| {
+            stops.len() == 2
+                && stops.iter().all(|stop| {
+                    exact(stop, &["offset", "color"], &[]).is_some()
+                        && number(&stop["offset"])
+                        && stop["color"].as_str().is_some_and(|c| {
+                            [4, 7, 9].contains(&c.len())
+                                && c.starts_with('#')
+                                && c.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+                        })
+                })
+        })
+}
 fn extension(value: &Value, has_stroke: bool) -> bool {
-    exact(value, &[], &["pressure", "paramShape", "boxAngle"]).is_some_and(|object| {
+    exact(
+        value,
+        &[],
+        &["pressure", "paramShape", "boxAngle", "fillGradient"],
+    )
+    .is_some_and(|object| {
         !object.is_empty()
             && object
                 .get("pressure")
                 .is_none_or(|v| pressure(v) && !has_stroke)
             && object.get("paramShape").is_none_or(|v| shape(v, false))
             && object.get("boxAngle").is_none_or(finite)
+            && object
+                .get("fillGradient")
+                .is_none_or(|v| gradient(v) && !object.contains_key("pressure"))
     })
 }
 

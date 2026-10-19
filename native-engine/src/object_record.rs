@@ -138,6 +138,11 @@ impl ObjectRecord {
         &self.target
     }
     /// The solid fill; `None` for an explicit null (no fill) or an absent slot.
+    pub(crate) fn fill_gradient(&self) -> Option<&crate::object_document::StoredGradient> {
+        self.vector_ext
+            .value()
+            .and_then(|ext| ext.fill_gradient.value())
+    }
     pub(crate) fn solid_fill(&self) -> Option<&SolidFill> {
         self.fill.value().and_then(Option::as_ref)
     }

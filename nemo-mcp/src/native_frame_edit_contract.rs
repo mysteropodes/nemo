@@ -208,8 +208,17 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
         }),
         TWEEN_REMOVE => exact(value, &["command", "layerUid", "from", "to"], &[])
             .is_some_and(|p| command_is(p, "object.layer.tween.remove") && span(p)),
-        KEY_MOVE => exact(value, &["command", "layerUid", "from", "to"], &[])
-            .is_some_and(|p| command_is(p, "object.layer.key.move") && span(p)),
+        KEY_MOVE => exact(
+            value,
+            &["command", "layerUid", "from", "to"],
+            &["activeLayerUid"],
+        )
+        .is_some_and(|p| {
+            command_is(p, "object.layer.key.move")
+                && span(p)
+                && p.get("activeLayerUid")
+                    .is_none_or(|value| name(Some(value)))
+        }),
         SELECTION_DUPLICATE => exact(value, &["command", "layerUid", "selection"], &[])
             .is_some_and(|p| {
                 command_is(p, "object.frames.clipboard.duplicate")

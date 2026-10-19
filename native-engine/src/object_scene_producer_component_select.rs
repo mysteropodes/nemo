@@ -38,6 +38,7 @@ use crate::object_document::object_component_record_kernels::object_component_re
 };
 use crate::object_document::{
     FrameScopeKind, LayerTiming, ObjectLayer, ObjectPoint, ObjectRecord, ObjectTarget,
+    RangeEvaluator,
 };
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
@@ -54,6 +55,8 @@ pub(crate) const NO_FILL: &str = "record carries no solid fill";
 /// placing layer stays in the scene with this reason.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ComponentUnavailable {
+    /// A stored outer/entered range requires a provider the immutable reader lacks.
+    RangeProvider { layer_uid: String },
     /// The instance names a component the table does not hold.
     UnresolvedComponent { symbol_id: String },
     /// Frame keys exist but the placing layer has no authored timing, so a key
@@ -195,6 +198,16 @@ pub(crate) fn select_records(
     component: &ComponentRecord,
     inner_frame: u32,
 ) -> Result<Vec<ObjectRecord>, ComponentUnavailable> {
+    select_records_with_ranges(component, inner_frame, None)
+}
+
+/// Entered-component reader only. Placed instances keep the baseline's separate
+/// symbol branch, which does not apply inner layer ranges.
+pub(crate) fn select_records_with_ranges(
+    component: &ComponentRecord,
+    inner_frame: u32,
+    ranges: Option<&RangeEvaluator<'_>>,
+) -> Result<Vec<ObjectRecord>, ComponentUnavailable> {
     let layers = component.layers();
     let mut sources: Vec<Option<u32>> = Vec::with_capacity(layers.len());
     for layer in layers {
@@ -216,7 +229,25 @@ pub(crate) fn select_records(
                 layer_uid: layer.layer_uid().to_owned(),
             });
         };
-        sources.push(timing.exposure(inner_frame).1);
+        let included = match ranges {
+            None => true,
+            Some(ranges) => {
+                let unavailable = |_| ComponentUnavailable::InnerFeature {
+                    layer_uid: layer.layer_uid().to_owned(),
+                    feature: "layer range provider",
+                };
+                !ranges.gates(layer.layer_uid()).map_err(unavailable)?
+                    || ranges
+                        .resolve(layer.layer_uid(), true)
+                        .map_err(unavailable)?
+                        .contains(inner_frame)
+            }
+        };
+        sources.push(if included {
+            timing.exposure(inner_frame).1
+        } else {
+            None
+        });
     }
     let index: HashMap<&str, usize> = layers
         .iter()

@@ -1,9 +1,10 @@
 //! Text selection from the same immutable source and authored exposure as other families.
 // Borrowed immutable source types for consumers of the retained frame packet.
 // The scene reads these through this port; document publication stays with its owner.
+pub(crate) use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 pub(crate) use crate::object_document::{
-    text_holder_id, ObjectLayer, ObjectPoint, ObjectTarget, Presence, PropertyHolderTarget,
-    TextEntry,
+    text_holder_id, FrameScopeKind, ObjectLayer, ObjectPoint, ObjectTarget, Presence,
+    PropertyHolderTarget, TextEntry,
 };
 use crate::object_frame_packet::{ObjectFrameError, ObjectFramePacket, ObjectFrameSelector};
 use crate::revision::ObjectSnapshot;

@@ -297,6 +297,7 @@ pub fn migrate_ordered_project(
         image_meshes: document.image_meshes.clone(),
         items: document.items.clone(),
         component_tables: document.component_tables.clone(),
+        motion_arcs: document.motion_arcs.clone(),
     };
     ordered(&migrated)?;
     Ok(migrated)

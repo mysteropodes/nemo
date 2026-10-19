@@ -287,8 +287,7 @@ fn source_guards_pin_the_layering_and_the_retained_legacy_style() {
     // The legacy family keeps its retained typed solid, which already carries raw layer opacity.
     // Other families use the style entry that consumes the pinned layer factor.
     assert!(PAINT_PLAN.contains("SceneItemStyle::solid_fill(self.solid().clone())"));
-    assert!(PAINT_PLAN.contains(
-        "style_of_record_with_opacity(record, self.entry.layer_opacity())"
-    ));
+    assert!(PAINT_PLAN
+        .contains("style_of_record_at_frame(record, self.entry.layer_opacity(), self.packet)"));
     assert!(!PAINT_PLAN.contains("style_of_record("));
 }

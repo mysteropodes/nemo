@@ -450,3 +450,32 @@ fn blank_key_success_requires_one_checkpoint_and_revision_even_if_already_blank(
 #[cfg(test)]
 #[path = "native_frame_clipboard_contract_tests.rs"]
 mod clipboard;
+
+#[test]
+fn key_move_optional_active_layer_is_typed_and_operation_specific() {
+    let base = json!({"command":"object.layer.key.move","layerUid":"target","from":0,"to":2});
+    assert!(request(KEY_MOVE, &base));
+    let mut with_active = base.clone();
+    with_active["activeLayerUid"] = json!("different-active");
+    assert!(request(KEY_MOVE, &with_active));
+    assert!(envelope(KEY_MOVE, with_active.clone()).validate().is_ok());
+    for invalid in [
+        Value::Null,
+        json!(""),
+        json!(1),
+        json!(false),
+        json!([]),
+        json!({}),
+    ] {
+        with_active["activeLayerUid"] = invalid;
+        assert!(!request(KEY_MOVE, &with_active));
+        assert!(envelope(KEY_MOVE, with_active.clone()).validate().is_err());
+    }
+    with_active["activeLayerUid"] = json!("x".repeat(257));
+    assert!(request(KEY_MOVE, &with_active));
+    assert!(envelope(KEY_MOVE, with_active).validate().is_ok());
+    let mut other =
+        json!({"command":"object.layer.tween.remove","layerUid":"target","from":0,"to":2});
+    other["activeLayerUid"] = json!("different-active");
+    assert!(!request(TWEEN_REMOVE, &other));
+}

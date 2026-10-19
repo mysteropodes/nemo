@@ -45,6 +45,7 @@ use crate::evaluation::property_camera_eval::CameraKey;
 use crate::object_document::object_component_record_kernels::object_component_records::{
     ComponentInstance, ComponentRecord, ComponentRecordError, ComponentSet, SCENE_CONTEXT,
 };
+use crate::object_document::RangeEvaluator;
 use crate::object_document::{ObjectLayer, ObjectRecord};
 use crate::object_frame_packet::ObjectFramePacket;
 use std::borrow::Cow;
@@ -158,6 +159,19 @@ fn evaluate_instance(
     host: &ObjectLayer,
 ) -> Result<ComponentOutcome, ComponentUnavailable> {
     let frame = packet.frame();
+    let unavailable = |_| ComponentUnavailable::RangeProvider {
+        layer_uid: host.layer_uid().to_owned(),
+    };
+    let ranges =
+        RangeEvaluator::new(packet.snapshot(), packet.context_id(), frame).map_err(unavailable)?;
+    if ranges.gates(host.layer_uid()).map_err(unavailable)?
+        && !ranges
+            .resolve(host.layer_uid(), true)
+            .map_err(unavailable)?
+            .contains(frame)
+    {
+        return Ok(ComponentOutcome::Blank);
+    }
     let Some(component) = inputs.components.component(instance.symbol_id()) else {
         return Err(ComponentUnavailable::UnresolvedComponent {
             symbol_id: instance.symbol_id().to_owned(),

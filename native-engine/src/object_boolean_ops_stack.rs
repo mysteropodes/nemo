@@ -222,13 +222,18 @@ pub(crate) fn island_record(
         paint_order: Presence::Missing,
         opacity: style.opacity.clone(),
     };
-    let ext = match &style.box_angle {
-        Some(angle) => Presence::Present(VectorExt {
-            pressure: Presence::Missing,
-            param_shape: Presence::Missing,
-            box_angle: Presence::Present(angle.clone()),
-        }),
-        None => Presence::Missing,
+    // Baseline BOOL_KEEP_DATA_ALL carries the style source's gradient through Boolean/erase/Flatten.
+    let gradient = style.source.fill_gradient().cloned();
+    let ext = match (&style.box_angle, gradient) {
+        (angle, gradient) if angle.is_some() || gradient.is_some() => {
+            Presence::Present(VectorExt {
+                pressure: Presence::Missing,
+                param_shape: Presence::Missing,
+                box_angle: angle.clone().map_or(Presence::Missing, Presence::Present),
+                fill_gradient: gradient.map_or(Presence::Missing, Presence::Present),
+            })
+        }
+        _ => Presence::Missing,
     };
     Some(ObjectRecord {
         schema_version: 1,

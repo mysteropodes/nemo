@@ -126,7 +126,7 @@ fn isolated_paint(
         fills: paths
             .iter()
             .zip(colors)
-            .map(|(path, rgba)| super::GpuFill { path, rgba: *rgba })
+            .map(|(path, rgba)| super::GpuFill::solid(path, *rgba))
             .collect(),
     };
     let mut target = gpu.make_object_target(8, 8).unwrap();
@@ -251,6 +251,7 @@ fn scene_swatches_are_deduplicated_locally_and_scene_drop_releases_its_own_blob_
             .map(|_| super::GpuFill {
                 path: &path,
                 rgba: [0.2, 0.6, 0.4, 0.8],
+                prepared: None,
             })
             .collect(),
     };

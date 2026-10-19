@@ -203,7 +203,7 @@ test('literal requests for every dense-editor action', async () => {
     [{ kind: 'removeTween', layer: 2, from: 3, to: 7 }, P + 'layer.tween.remove', { command: 'object.layer.tween.remove', layerUid: 'layer-uid-2', from: 3, to: 7 }],
     [{ kind: 'removeFrame' }, P + 'frames.remove', { command: 'object.frames.remove', from: 2, to: 2 }],
     [{ kind: 'removeFrameSpan' }, P + 'frames.remove', { command: 'object.frames.remove', from: 2, to: 2 }],
-    [{ kind: 'moveKey', layer: 0, from: 2, to: 5 }, P + 'layer.key.move', { command: 'object.layer.key.move', layerUid: 'layer-uid-0', from: 2, to: 5 }]
+    [{ kind: 'moveKey', layer: 0, from: 2, to: 5 }, P + 'layer.key.move', { command: 'object.layer.key.move', layerUid: 'layer-uid-0', activeLayerUid: 'layer-uid-1', from: 2, to: 5 }]
   ];
   for (const [action, op, payload] of cases) {
     const r = rig({ active: 1 });

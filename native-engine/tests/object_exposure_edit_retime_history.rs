@@ -12,6 +12,8 @@ use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 
+#[path = "object_exposure_edit_retime_arcs.rs"]
+mod arcs;
 #[path = "object_frame_edit_document_build.rs"]
 #[allow(dead_code)]
 pub(crate) mod build;

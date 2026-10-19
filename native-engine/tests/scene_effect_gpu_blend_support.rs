@@ -216,7 +216,7 @@ pub(super) fn inputs<'a>(case: &'a Case, geometry: &'a Geometry) -> Vec<GpuLayer
                     .fills
                     .iter()
                     .zip(&geometry.fills[i])
-                    .map(|((_, rgba), path)| GpuFill { path, rgba: *rgba })
+                    .map(|((_, rgba), path)| GpuFill::solid(path, *rgba))
                     .collect(),
             },
             masks: layer
@@ -229,6 +229,7 @@ pub(super) fn inputs<'a>(case: &'a Case, geometry: &'a Geometry) -> Vec<GpuLayer
                         fills: vec![GpuFill {
                             path,
                             rgba: [1.0, 1.0, 1.0, 1.0],
+                            prepared: None,
                         }],
                     },
                 })

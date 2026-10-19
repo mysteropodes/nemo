@@ -174,6 +174,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         image_meshes: wire.image_meshes,
         items: wire.items,
         component_tables: Presence::Missing,
+        motion_arcs: wire.motion_arcs,
     };
     validate(&document)?;
     Ok(document)
@@ -190,6 +191,7 @@ struct LegacyDocument {
     layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
     image_meshes: Presence<ImageMeshStore>,
     items: Presence<crate::object_document::ItemRecords>,
+    motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
@@ -197,7 +199,8 @@ crate::object_document::object_deserialize!(LegacyDocument {
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
     #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
-    #[serde(default)] items: Presence<crate::object_document::ItemRecords>
+    #[serde(default)] items: Presence<crate::object_document::ItemRecords>,
+    #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>
 });
 
 /// Explicit core storage admission; both attempts read the original raw bytes.

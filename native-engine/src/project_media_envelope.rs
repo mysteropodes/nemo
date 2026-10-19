@@ -214,6 +214,7 @@ mod tests {
             image_meshes: Presence::Missing,
             items: Presence::Missing,
             component_tables: Presence::Missing,
+            motion_arcs: Presence::Missing,
         }
     }
 

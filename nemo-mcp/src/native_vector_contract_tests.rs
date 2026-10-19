@@ -407,3 +407,35 @@ fn a_receipt_advances_the_revision_by_exactly_its_own_disposition() {
         "other operations are not this hook's"
     );
 }
+
+#[test]
+fn stored_gradient_public_vector_and_read_record_shapes_match_the_closed_native_extension() {
+    let mut value = record(created());
+    let gradient = json!({"kind":"linear","from":[0,0],"to":[8,0],"stops":[
+        {"offset":0,"color":"#11223380"},{"offset":1,"color":"#AAbbCC"}]});
+    value["vectorExt"] = json!({"fillGradient":gradient});
+    let payload = json!({"command":"object.vector.create","record":value});
+    assert!(request(VECTOR, &payload));
+    for key in ["kind", "from", "to", "stops"] {
+        let mut bad = payload.clone();
+        bad["record"]["vectorExt"]["fillGradient"]
+            .as_object_mut()
+            .unwrap()
+            .remove(key);
+        assert!(!request(VECTOR, &bad));
+    }
+    for bad in [
+        json!(null),
+        json!({"kind":"linear","from":[0,0],"to":[8,0],"stops":[]}),
+    ] {
+        let mut wrong = payload.clone();
+        wrong["record"]["vectorExt"]["fillGradient"] = bad;
+        assert!(!request(VECTOR, &wrong));
+    }
+    let mut extra = payload.clone();
+    extra["record"]["vectorExt"]["fillGradient"]["stops"][0]["extra"] = json!(1);
+    assert!(!request(VECTOR, &extra));
+    let mut invalid = payload.clone();
+    invalid["record"]["vectorExt"]["fillGradient"]["stops"][0]["color"] = json!("data:paint");
+    assert!(!request(VECTOR, &invalid));
+}

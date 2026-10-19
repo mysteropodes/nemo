@@ -109,6 +109,7 @@ fn gpu_renderer_drop_releases_actual_retained_swatch_blob_after_completed_work()
         fills: vec![super::super::GpuFill {
             path: &path,
             rgba: [0.2, 0.6, 0.4, 1.0],
+            prepared: None,
         }],
     };
     let swatches = super::super::encode_straight_paints(&mut gpu.scene, &[&paint]);

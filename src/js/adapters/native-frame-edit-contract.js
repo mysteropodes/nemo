@@ -133,7 +133,8 @@
       uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.layer.key.move': function (p) {
-      exact(p, ['command', 'layerUid', 'from', 'to'], [], 'key move');
+      exact(p, ['command', 'layerUid', 'from', 'to'], ['activeLayerUid'], 'key move');
+      if (has(p, 'activeLayerUid')) uid(p.activeLayerUid, 'activeLayerUid');
       uid(p.layerUid, 'layerUid'); u32(p.from, 'from'); u32(p.to, 'to');
     },
     'object.frames.clipboard.duplicate': function (p) {

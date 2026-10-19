@@ -126,7 +126,7 @@
         return { op: P + 'frames.remove', payload: { command: 'object.frames.remove', from: span.minF, to: span.maxF } };
       case 'moveKey':
         if (!whole(intent.layer, 0, info.layers.length - 1) || !whole(intent.from, 0, info.totalFrames - 1) || !whole(intent.to, 0, info.totalFrames - 1)) return { code: CODES.invalid };
-        return { op: P + 'layer.key.move', payload: { command: 'object.layer.key.move', layerUid: uid(intent.layer), from: intent.from, to: intent.to } };
+        return { op: P + 'layer.key.move', payload: { command: 'object.layer.key.move', layerUid: uid(intent.layer), activeLayerUid: uid(state.active), from: intent.from, to: intent.to } };
       case 'duplicateSelection':
         if (!state.cells.length) return { code: CODES.selection };
         return { op: P + 'frames.clipboard.duplicate', payload: { command: 'object.frames.clipboard.duplicate', layerUid: uid(state.active), selection: cellRefs() } };

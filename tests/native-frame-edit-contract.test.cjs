@@ -16,7 +16,7 @@ const P = 'command.document.object.';
 const OPS = Contract.OPERATIONS;
 const request = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'frame-edit-7', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
 const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(q.operation) ? { clipboard: {instanceId:q.instanceId,documentId:q.documentId,cells:[]} } : {}) });
-const OPTIONAL = { 'object.frames.insert': ['layerUids'], 'object.layer.key.promote': ['layerUids'] };
+const OPTIONAL = { 'object.frames.insert': ['layerUids'], 'object.layer.key.promote': ['layerUids'], 'object.layer.key.move': ['activeLayerUid'] };
 
 test('the descriptor, the schema and the contract declare the same fifteen operations', () => {
   assert.equal(OPS.length, 15);
@@ -257,4 +257,17 @@ test('clipboard shells preserve native ownership, records/order presence and eve
   assert.doesNotThrow(()=>SDK.validateRequest(request(op,Contract.example(op))));
   const invalid=Contract.example(op);invalid.cells[0].extra=1;
   assert.throws(()=>SDK.validateRequest(request(op,invalid)),TypeError);
+});
+
+
+test('key move admits only an optional opaque active layer across the closed shared request', () => {
+  const op = P + 'layer.key.move', base = Contract.example(op);
+  assert.doesNotThrow(() => SDK.validateRequest(request(op, base)));
+  assert.doesNotThrow(() => SDK.validateRequest(request(op, {...base, activeLayerUid: 'different-active-layer'})));
+  for (const activeLayerUid of [null, '', 1, false, [], {}]) {
+    assert.throws(() => SDK.validateRequest(request(op, {...base, activeLayerUid})), TypeError);
+  }
+  assert.doesNotThrow(() => SDK.validateRequest(request(op, {...base, activeLayerUid: 'x'.repeat(257)})));
+  const other = Contract.example(P + 'layer.tween.remove');
+  assert.throws(() => SDK.validateRequest(request(P + 'layer.tween.remove', {...other, activeLayerUid: 'active'})), TypeError);
 });

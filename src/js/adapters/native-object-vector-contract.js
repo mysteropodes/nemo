@@ -129,8 +129,22 @@
     members.forEach((key) => { if (has(value, key)) num(value[key], `${label}.${key}`); });
     if (has(value, 'box')) { exact(value.box, ['x1', 'y1', 'x2', 'y2'], [], `${label}.box`); ['x1', 'y1', 'x2', 'y2'].forEach((key) => num(value.box[key], `${label}.box.${key}`)); }
   }
+  function gradient(value, label) {
+    exact(value, ['kind','from','to','stops'], [], label);
+    oneOf(value.kind, ['linear','radial'], label + '.kind');
+    for (const key of ['from','to']) {
+      if (!Array.isArray(value[key]) || value[key].length !== 2) fail(label + '.' + key + ' must be a pair');
+      for (let i=0;i<2;i++) { num(value[key][i], label); if (Math.abs(value[key][i]) > 3.4028234663852886e38) fail(label + ' is not representable'); }
+    }
+    if (!Number.isFinite(Math.fround(Math.hypot(value.to[0]-value.from[0],value.to[1]-value.from[1])))) fail(label + ' extent is not representable');
+    if (!Array.isArray(value.stops) || value.stops.length !== 2) fail(label + ' requires two stops');
+    for (let i=0;i<2;i++) {
+      const stop=value.stops[i]; exact(stop, ['offset','color'], [], label);
+      num(stop.offset, label); if (Math.abs(stop.offset) > 3.4028234663852886e38 || typeof stop.color !== 'string' || !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(stop.color)) fail(label + ' invalid stop');
+    }
+  }
   function ext(value, label, hasStroke) {
-    exact(value, [], ['pressure', 'paramShape', 'boxAngle'], label);
+    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient'], label);
     if (!Object.keys(value).length) fail(`${label} must be omitted when empty`);
     if (has(value, 'pressure')) {
       pressure(value.pressure, `${label}.pressure`);
@@ -138,6 +152,7 @@
     }
     if (has(value, 'paramShape')) shapeBody(value.paramShape, `${label}.paramShape`, false);
     if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`);
+    if (has(value, 'fillGradient')) { gradient(value.fillGradient, label + '.fillGradient'); if (has(value, 'pressure')) fail(label + ' pressure-gradient consumer is unavailable'); }
   }
   // The complete `editable-vector-path` record (create and replace carry it; the read path returns it).
   function record(value, create) {

@@ -20,20 +20,25 @@
 //! folds the pinned factor into each retained paint before layer effects; source
 //! records stay unchanged. `SceneSolid::rgba_f32` keeps the same `[0, 1]` admission.
 
+use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{
+    evaluate_rig_pose, PosedStroke, RigPoseEvaluation, RigPosePin,
+};
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, PinField, ProducerEntry, ProducerOutput, SceneJoinError, ScenePin,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_item::style_of_record_with_opacity;
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
-    evaluate_record, is_vector_record, record_layer_has_active_path_fx,
+    evaluate_record_with_pose, is_vector_record, record_layer_has_active_path_fx,
 };
 use crate::evaluation::object_vector_kernels::render_vector_stroke::{primary_solid, stroke_reach};
+use crate::object_frame_packet::text::{FrameScopeKind, SCENE_CONTEXT};
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
 use crate::object_render_scene::object_scene_style_emit::prepare_item;
 use crate::object_render_scene::render_vector_path::VectorShape;
 use crate::object_render_scene::{ObjectPaintPlanError, ObjectRenderScene, ObjectSceneError};
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
+use std::collections::BTreeMap;
 use vello::kurbo::BezPath;
 
 /// Producer name in the pinned registry.
@@ -65,9 +70,21 @@ pub(crate) struct ContourProduction {
 pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
     let mut output = ProducerOutput::new(PRODUCER, ScenePin::of_packet(packet));
     let mut rejections = Vec::new();
+    let poses = packet_poses(packet);
     for record in packet.records() {
         let index = record.source_object_index();
-        output = match compile(packet, record) {
+        let compiled = (|| {
+            let pose = match poses.get(&record.source_layer_index()) {
+                Some(Ok(evaluation)) => evaluation
+                    .strokes
+                    .iter()
+                    .find(|stroke| stroke.stroke_id == record.record().target.stroke_id),
+                Some(Err(reason)) => return Err(*reason),
+                None => None,
+            };
+            compile(packet, record, pose)
+        })();
+        output = match compiled {
             Ok(compiled) => output.with_item(index, compiled),
             Err(reason) => {
                 rejections.push((index, reason));
@@ -76,6 +93,57 @@ pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
         };
     }
     ContourProduction { output, rejections }
+}
+
+/// Evaluate each selected rigged layer ONCE against this packet's retained snapshot.
+/// Stored bones/binds are the provider. Meshes cannot be admitted here: the real
+/// raster producer still refuses meshed images, so no fake rect/store is supplied.
+fn packet_poses(
+    packet: &ObjectFramePacket,
+) -> BTreeMap<usize, Result<RigPoseEvaluation, &'static str>> {
+    let mut poses = BTreeMap::new();
+    for record in packet.records() {
+        let index = record.source_layer_index();
+        let layer = &packet.source_layers()[index];
+        if layer.rig().is_none() {
+            continue;
+        }
+        poses.entry(index).or_insert_with(|| {
+            let snapshot = packet.snapshot();
+            // The existing provider reads the top-level layer vector, and
+            // resolves only SCENE_CONTEXT/Authored targets. Never imply a
+            // component-context provider by matching opaque layer IDs alone.
+            if packet.context_id() != SCENE_CONTEXT
+                || packet.scope_kind() != &FrameScopeKind::Authored
+                || snapshot
+                    .document()
+                    .layers()
+                    .iter()
+                    .position(|source| source.layer_uid() == layer.layer_uid())
+                    != Some(index)
+            {
+                return Err("rig pose provider scope differs from the selected packet layer");
+            }
+            let evaluation = evaluate_rig_pose(
+                snapshot,
+                &RigPosePin::of(snapshot),
+                layer.layer_uid(),
+                packet.frame(),
+                None,
+            )
+            .map_err(|_| "stored rig pose evaluation refused the pinned frame")?;
+            if Some(evaluation.source_frame) != packet.source_frame_for_layer(index) {
+                return Err("stored rig pose and packet exposure differ");
+            }
+            // Per-bind mesh unavailability does not invalidate independent
+            // paths. If a selected raster actually needs that mesh, the real
+            // raster producer refuses the WHOLE scene before it is retained.
+            // Unlinked binds retain their typed evaluator outcome and leave the
+            // corresponding stored path intact, as baseline relinkRigBinds does.
+            Ok(evaluation)
+        });
+    }
+    poses
 }
 
 impl ContourProduction {
@@ -109,9 +177,10 @@ impl ContourProduction {
 fn compile(
     packet: &ObjectFramePacket,
     source: ObjectFrameRecord<'_>,
+    pose: Option<&PosedStroke>,
 ) -> Result<CompiledContour, &'static str> {
     if is_vector_record(source.record()) {
-        return compile_vector(packet, source);
+        return compile_vector(packet, source, pose);
     }
     // The baseline applies a layer's path effects to every stroke of the layer (app.js:1813); the legacy family
     // does not go through the join, so an active stack must refuse rather than draw the stored geometry.
@@ -150,6 +219,25 @@ fn compile(
             })
         })
         .collect::<Result<Vec<_>, &'static str>>()?;
+    if pose.is_some_and(|pose| {
+        pose.stroke_id != record.target.stroke_id
+            || pose.closed != geometry.closed
+            || pose.segments.len() != geometry.segments.len()
+    }) {
+        return Err("rig pose topology differs from the selected stored path");
+    }
+    let segments = match pose {
+        Some(pose) => pose
+            .segments
+            .iter()
+            .map(|segment| CubicSegment {
+                point: segment.point,
+                handle_in: segment.handle_in,
+                handle_out: segment.handle_out,
+            })
+            .collect(),
+        None => segments,
+    };
     let contour = ClosedCubicPath::new(segments)?;
     let envelope = contour.transformed_envelope([1., 0., 0., 1., 0., 0.])?;
     let layer_opacity = packet
@@ -179,6 +267,7 @@ fn compile(
 fn compile_vector(
     packet: &ObjectFramePacket,
     source: ObjectFrameRecord<'_>,
+    pose: Option<&PosedStroke>,
 ) -> Result<CompiledContour, &'static str> {
     let layer_opacity = packet
         .layer_opacity(source.source_layer_index())
@@ -186,7 +275,8 @@ fn compile_vector(
     let style = style_of_record_with_opacity(source.record(), layer_opacity)
         .map_err(|error| error.message())?;
     prepare_item(&style).map_err(|error| error.message())?;
-    let evaluated = evaluate_record(packet, source).map_err(|error| error.message())?;
+    let evaluated =
+        evaluate_record_with_pose(packet, source, pose).map_err(|error| error.message())?;
     let segments = evaluated
         .segments
         .iter()
@@ -296,3 +386,7 @@ mod rows;
 #[cfg(test)]
 #[path = "../tests/object_scene_producer_contour.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "export_job"))]
+#[path = "../tests/rig_pose_scene_join.rs"]
+mod rig_pose_scene_join_tests;

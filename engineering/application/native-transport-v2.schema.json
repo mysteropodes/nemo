@@ -709,10 +709,19 @@
         },
         "boxAngle": {
           "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "fillGradient": {
+          "$ref": "#/$defs/ObjectVectorFillGradient"
         }
       },
       "minProperties": 1,
-      "description": "Omitted when empty."
+      "description": "Omitted when empty.",
+      "not": {
+        "required": [
+          "pressure",
+          "fillGradient"
+        ]
+      }
     },
     "ObjectVectorRecord": {
       "type": "object",
@@ -3271,6 +3280,10 @@
         },
         "to": {
           "$ref": "#/$defs/ObjectFrame"
+        },
+        "activeLayerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "Captured active layer for the original motionArc prefix default; may differ from dragged layerUid. Required by native when a changed edit has stored Arc entries."
         }
       }
     },
@@ -8501,6 +8514,72 @@
         }
       ],
       "description": "Native retained clipboard result; null means no new packet and preserves the existing UI clipboard. Inner packet instance/document must match the actual invoking owner; complete correlated reply remains bounded to4096 encoded bytes."
+    },
+    "ObjectVectorGradientStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offset",
+        "color"
+      ],
+      "properties": {
+        "offset": {
+          "type": "number",
+          "minimum": -3.4028234663852886e+38,
+          "maximum": 3.4028234663852886e+38
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        }
+      }
+    },
+    "ObjectVectorFillGradient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "from",
+        "to",
+        "stops"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "linear",
+            "radial"
+          ]
+        },
+        "from": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -3.4028234663852886e+38,
+            "maximum": 3.4028234663852886e+38
+          }
+        },
+        "to": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -3.4028234663852886e+38,
+            "maximum": 3.4028234663852886e+38
+          }
+        },
+        "stops": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/ObjectVectorGradientStop"
+          }
+        }
+      },
+      "description": "Bounded stored baseline fillGradient. Document-world coordinates and stop/color order retained; item/layer opacity folds once in native style production. Other stop counts remain unavailable."
     }
   }
 }

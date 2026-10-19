@@ -53,6 +53,7 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
     plan.mixed.iter().map(|index| match index {
         PaintIndex::Contour(index) => PaintEntry::Contour(ObjectPaintCommand {
             entry: plan.scene.entry(*index).expect("pinned contour index"),
+            packet: plan.packet(),
         }),
         PaintIndex::Raster(index) => PaintEntry::Raster(*index),
         PaintIndex::Text(index) => PaintEntry::Text(&plan.scene.texts.entries[*index]),

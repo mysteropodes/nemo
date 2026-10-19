@@ -7,6 +7,9 @@ use crate::object_document::{
 use crate::revision::ObjectSnapshot;
 use std::collections::HashMap;
 
+#[path = "object_frame_sources.rs"]
+mod sources;
+
 #[path = "object_order_evaluation.rs"]
 mod order;
 #[path = "object_text_frame.rs"]
@@ -413,30 +416,7 @@ where
     if !holders_fully_consumed(document) {
         return Err(ObjectFrameError::Unavailable.into());
     }
-    // F11 (L05-G): a stored in/out point or live time link decides which frames a layer shows; until the D27
-    // evaluator consumes them, never paint every frame of such a layer.
-    if document
-        .layers()
-        .iter()
-        .any(ObjectLayer::range_gates_frames)
-    {
-        return Err(ObjectFrameError::Unavailable.into());
-    }
-    let source_frames: Vec<_> = document
-        .layers()
-        .iter()
-        .map(|layer| {
-            if exposure {
-                layer
-                    .timing
-                    .value()
-                    .map(|timing| timing.exposure(selector.frame).1)
-                    .ok_or(ObjectFrameError::Unavailable)
-            } else {
-                Ok(Some(selector.frame))
-            }
-        })
-        .collect::<Result<_, _>>()?;
+    let source_frames = sources::select(snapshot, selector, exposure)?;
     let numeric_order = if v2 {
         Some(prepare_order(
             snapshot,

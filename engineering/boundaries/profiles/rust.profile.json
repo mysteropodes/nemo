@@ -23,6 +23,7 @@
         "project_media_envelope.rs",
         "object_order_document.rs",
         "object_layer_timing.rs",
+        "object_layer_range_evaluate.rs",
         "object_media_timing_core.rs",
         "object_media_timing_video.rs",
         "object_properties.rs",
@@ -106,7 +107,8 @@
         "object_rig_record_admission.rs",
         "object_rig_record_links.rs",
         "object_frame_edit_range_records.rs",
-        "object_frame_edit_ranges.rs"
+        "object_frame_edit_ranges.rs",
+        "object_motion_arcs.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -333,6 +335,7 @@
         "evaluation.rs",
         "animation_curve.rs",
         "object_frame_packet.rs",
+        "object_frame_sources.rs",
         "object_order_evaluation.rs",
         "expression_noise.rs",
         "expression_random.rs",
@@ -1475,7 +1478,16 @@
         "object_blank_key_history.rs",
         "object_blank_key_history_controls.rs",
         "object_parent_links.rs",
-        "object_frame_clipboard_copy_dispatch.rs"
+        "object_frame_clipboard_copy_dispatch.rs",
+        "object_stored_gradient.rs",
+        "object_stored_gradient_gpu.rs",
+        "object_stored_gradient_layered.rs",
+        "rig_pose_scene_join.rs",
+        "rig_pose_scene_join_fixture.rs",
+        "object_layer_range_evaluate.rs",
+        "object_layer_range_frames.rs",
+        "object_motion_arcs.rs",
+        "object_exposure_edit_retime_arcs.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

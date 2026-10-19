@@ -109,6 +109,19 @@ pub(crate) fn retime_key(
     from: u32,
     to: u32,
 ) -> Result<RetimeOutcome, FrameEditError> {
+    retime_key_with_active(document, layer_uid, from, to, None)
+}
+
+/// Legacy moveKeyframe omits the Arc layer argument, selecting the active UI
+/// layer even when another layer's drawing key moves. Keep that captured UID
+/// explicit; without it a nonempty Arc store cannot be safely retimed.
+pub(crate) fn retime_key_with_active(
+    document: &ObjectDocument,
+    layer_uid: &str,
+    from: u32,
+    to: u32,
+    active_layer_uid: Option<&str>,
+) -> Result<RetimeOutcome, FrameEditError> {
     let index = layer_index(document, layer_uid)?;
     let timing = timing_of(document, index)?;
     let RetimePlan {
@@ -119,6 +132,14 @@ pub(crate) fn retime_key(
     } = match timing.retime_key(from, to, document.total_frames)? {
         RetimeEdit::NoChange => return Ok(RetimeOutcome::NoChange),
         RetimeEdit::Changed(plan) => plan,
+    };
+    let arc_layer_uid = match active_layer_uid {
+        Some(uid) => {
+            layer_index(document, uid)?;
+            Some(uid)
+        }
+        None if document.has_motion_arc_entries() => return Err(FrameEditError::Unsupported),
+        None => None,
     };
     let fan = Fan::new(&writes);
     let mut next = document.clone();
@@ -139,6 +160,24 @@ pub(crate) fn retime_key(
     next.objects = moved;
     for context in scene_contexts(&mut next) {
         fan_scopes(context, layer_uid, &fan)?;
+    }
+    // The baseline rekeys every consecutive pair in source order. Apply the
+    // Arc replacement to this same detached content/order candidate, so a bound
+    // failure cannot publish moved content with stale handles or extra history.
+    let arc_pairs: Vec<_> = pairs
+        .iter()
+        .map(|pair| {
+            (
+                i64::from(pair.from_a),
+                i64::from(pair.from_b),
+                i64::from(pair.to_a),
+                i64::from(pair.to_b),
+            )
+        })
+        .collect();
+    if let Some(uid) = arc_layer_uid {
+        next.retime_motion_arcs(uid, &arc_pairs)
+            .map_err(|_| FrameEditError::Invalid)?;
     }
     ObjectSnapshot::validate_drawing(&next).map_err(|_| FrameEditError::Invalid)?;
     Ok(RetimeOutcome::Changed(DocumentRetime {
