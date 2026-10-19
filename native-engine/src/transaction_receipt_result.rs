@@ -37,6 +37,15 @@ impl RetainedDisposition {
                         "applied": applied,
                         "historyEntriesAdded": history_entries_added
                     }),
+                    CompactResult::FrameClipboardCut {
+                        applied,
+                        history_entries_added,
+                        clipboard,
+                    } => json!({
+                        "applied": applied,
+                        "historyEntriesAdded": history_entries_added,
+                        "clipboard": clipboard
+                    }),
                     CompactResult::FrameRepeat {
                         applied,
                         history_entries_added,

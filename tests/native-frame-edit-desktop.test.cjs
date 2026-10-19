@@ -44,6 +44,7 @@ function harness(options={}){
     }
     const reply={apiVersion:2,requestId:q.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,
       ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
+    if(q.operation===P+'frames.repeat')Object.assign(reply.result,{cycledLayers:2,skippedComponentLayers:0});
     if(options.badAck)reply.requestId='foreign-receipt';
     return reply;
   }
@@ -259,4 +260,17 @@ test('typed failures remain visible without changing the returned native status'
   const running=h.controller.run({kind:'insertKey'});await turn();
   assert.equal((await h.controller.run({kind:'insertKey'})).status,'busy');
   assert.match(h.notices.at(-1),/already pending/i);gate.resolve();await running;
+});
+
+
+test('shipped loader installs the desktop consumer once after its actual dependencies',()=>{
+  const html=fs.readFileSync(require('node:path').join(__dirname,'../src/index.html'),'utf8');
+  const tag=name=>'<script src="js/adapters/'+name+'.js"></script>';
+  const own=tag('native-frame-edit-desktop'),at=html.indexOf(own);
+  assert.ok(at>=0);
+  assert.equal(html.indexOf(own,at+1),-1);
+  for(const name of ['native-frame-edit-intent','native-application','native-object-project','native-object-project-file']){
+    const dependency=html.indexOf(tag(name));
+    assert.ok(dependency>=0&&dependency<at,name+' must exist before immediate install');
+  }
 });

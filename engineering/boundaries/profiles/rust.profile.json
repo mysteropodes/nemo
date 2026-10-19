@@ -1464,7 +1464,9 @@
         "object_text_scene_svg.rs",
         "object_scene_parent_chain.rs",
         "object_scene_parent_chain_pixels.rs",
-        "property_expression_lookup.rs"
+        "property_expression_lookup.rs",
+        "object_frame_clipboard_cut_dispatch.rs",
+        "object_frame_clipboard_cut_wire.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1827,7 +1829,8 @@
         "native_text_read_dispatch_tests.rs",
         "native_property_edit_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
-        "native_raster_image_preview_tests.rs"
+        "native_raster_image_preview_tests.rs",
+        "native_asset_remove_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

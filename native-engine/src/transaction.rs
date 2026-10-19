@@ -224,6 +224,11 @@ pub(crate) enum CompactResult {
         applied: bool,
         history_entries_added: u64,
     },
+    FrameClipboardCut {
+        applied: bool,
+        history_entries_added: u64,
+        clipboard: Value,
+    },
     FrameRepeat {
         applied: bool,
         history_entries_added: u64,

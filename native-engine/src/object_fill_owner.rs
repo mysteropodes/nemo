@@ -35,7 +35,7 @@ pub(crate) use object_frame_clipboard_paste::{
 pub(crate) use object_frame_clipboard_paste_plan::{
     packet_paste_cells, FrameClipboardOutcome, PreparedFrameClipboard,
 };
-pub(crate) use object_frame_clipboard_paste_wire::paste_payload;
+pub(crate) use object_frame_clipboard_paste_wire::{cut_clipboard_payload, paste_payload};
 // L04-I (#2110): sealed replacement of the lane-4 component/StoryBoard/duplicator tables.
 #[path = "object_component_commit.rs"]
 #[allow(dead_code)]

@@ -1,7 +1,8 @@
-//! Strict payloads of the frame-clipboard commands (F12), `object.frames.clipboard.paste` and
-//! `object.frames.clipboard.duplicate`, and the wire form of a packet. One field set per command; duplicate, unknown,
-//! missing, null, wrongly typed, negative, fractional, > u32 and over-4096-byte inputs are `InvalidRequest`. Cut has no
-//! payload: its result is the packet, which the compact command reply cannot carry (typed API only).
+//! Strict frame-clipboard payloads (F12): paste, cut and duplicate, plus the detached packet wire form.
+//! One field set per command; duplicate, unknown,
+//! missing, null, wrongly typed, negative, fractional, > u32 and over-4096-byte inputs are `InvalidRequest`. Cut admits
+//! selection only; its detached result uses the same normalized cells as paste. The dispatcher must check the complete
+//! correlated response against4096 bytes BEFORE committing the prepared edit.
 //!
 //! The existing 4096-byte object message bound applies unchanged, so a pasted packet that does not fit refuses; the
 //! ingress bound for large packets is an open Architect decision and nothing here changes it.
@@ -89,6 +90,23 @@ pub(crate) fn parse_clipboard_payload(
     let payload: ClipboardPayload =
         serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
     match payload.command.as_str() {
+        "object.frames.clipboard.cut" => {
+            forbid(&payload.instance_id)?;
+            forbid(&payload.document_id)?;
+            forbid(&payload.layer_uid)?;
+            forbid(&payload.frame)?;
+            forbid(&payload.cells)?;
+            let selection = require(payload.selection)?
+                .into_iter()
+                .map(|cell| {
+                    nonempty(cell.layer_uid).map(|layer_uid| CellRef {
+                        layer_uid,
+                        frame: cell.frame,
+                    })
+                })
+                .collect::<Result<Vec<CellRef>, DispatchErrorCode>>()?;
+            Ok(FrameClipboardOperation::Cut { selection })
+        }
         "object.frames.clipboard.paste" => {
             forbid(&payload.selection)?;
             let cells = require(payload.cells)?
@@ -132,14 +150,9 @@ pub(crate) fn parse_clipboard_payload(
     }
 }
 
-/// The paste payload that carries `packet` to the cell `(anchor_layer, anchor_frame)`: the packet's source identity,
-/// its cells in selection order in paste form, and the target anchor. This is the one definition of the wire form.
-pub(crate) fn paste_payload(
-    packet: &FrameClipboardPacket,
-    anchor_layer: &str,
-    anchor_frame: u32,
-) -> Value {
-    let cells: Vec<Value> = packet_paste_cells(packet)
+/// One definition of the normalized detached cells used by both public Cut and existing paste.
+fn packet_cells_payload(packet: &FrameClipboardPacket) -> Vec<Value> {
+    packet_paste_cells(packet)
         .iter()
         .map(|cell| {
             let mut value = json!({"relLayer":cell.rel_layer,"relFrame":cell.rel_frame,
@@ -149,10 +162,31 @@ pub(crate) fn paste_payload(
             }
             value
         })
-        .collect();
+        .collect()
+}
+
+/// The paste payload that carries `packet` to the cell `(anchor_layer, anchor_frame)`: the packet's source identity,
+/// its cells in selection order in paste form, and the target anchor. Existing paste shape is unchanged.
+pub(crate) fn paste_payload(
+    packet: &FrameClipboardPacket,
+    anchor_layer: &str,
+    anchor_frame: u32,
+) -> Value {
     json!({"command":"object.frames.clipboard.paste",
         "instanceId":packet.instance_id(),"documentId":packet.document_id(),
-        "layerUid":anchor_layer,"frame":anchor_frame,"cells":cells})
+        "layerUid":anchor_layer,"frame":anchor_frame,"cells":packet_cells_payload(packet)})
+}
+
+/// Immutable source identity and existing paste cells, with no invented destination anchor.
+/// Empty Cut has no packet. This is NOT the full response-size admission: the owner must
+/// encode/check the eventual correlated envelope before committing, including its header.
+pub(crate) fn cut_clipboard_payload(packet: Option<&FrameClipboardPacket>) -> Value {
+    packet
+        .map(|packet| {
+            json!({"instanceId":packet.instance_id(),
+        "documentId":packet.document_id(),"cells":packet_cells_payload(packet)})
+        })
+        .unwrap_or(Value::Null)
 }
 
 #[cfg(test)]

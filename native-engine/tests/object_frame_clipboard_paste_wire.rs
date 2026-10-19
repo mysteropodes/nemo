@@ -253,3 +253,6 @@ fn ordered_packet_wire_keeps_exact_dtos_and_v1_omits_the_new_field() {
         );
     }
 }
+
+#[path = "object_frame_clipboard_cut_wire.rs"]
+mod cut;

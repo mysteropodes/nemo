@@ -16,7 +16,7 @@ font_asset_admission = ["project_media_codec", "dep:read-fonts"]
 font_asset_wire = ["font_asset_admission"]
 commands = ["codec"]
 history = ["commands"]
-evaluation = ["commands"]
+evaluation = ["commands", "dep:libm"]
 scheduler = ["evaluation"]
 compositor = ["scheduler", "dep:vello", "dep:wgpu", "dep:pollster"]
 viewport = ["compositor", "dep:raw-window-handle"]
@@ -38,6 +38,8 @@ test-object_expression_pin = ["object_expression_pin"]
 test-object_expression_runtime = ["object_expression_runtime"]
 
 [dependencies]
+# #2130: portable trig for Paper-compatible rotation; already pinned transitively.
+libm = { version = "=0.2.16", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 # Reproduction's object export must preserve adjacent f64 command values.
 serde_json = { version = "1", features = ["float_roundtrip", "raw_value"], optional = true }

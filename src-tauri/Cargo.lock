@@ -2671,6 +2671,7 @@ dependencies = [
  "base64 0.22.1",
  "flate2",
  "i_overlay",
+ "libm",
  "miniz_oxide 0.9.1",
  "png 0.18.1",
  "pollster",
