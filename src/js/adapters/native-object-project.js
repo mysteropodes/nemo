@@ -5,10 +5,10 @@
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
   var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
   var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding);
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,typeof module==='object'&&module.exports?require('./native-layer-playhead-cut-ui.js'):undefined);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,CutUI){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -464,7 +464,7 @@
       repaint:function(frameOnly){return paintUI(root,frameOnly);}
     };
     if(root.NemoNativeObjectUI&&typeof root.NemoNativeObjectUI.createPolicyPorts==='function')
-      Object.assign(ports,root.NemoNativeObjectUI.createPolicyPorts(root,ports));
+      Object.assign(ports,(root.NemoNativeLayerPlayheadCutUI||CutUI).compose(root,ports,root.NemoNativeObjectUI.createPolicyPorts(root,ports)));
     Object.freeze(ports);uiBindings.set(root,ports);return ports;
   }
   function uiFailure(root,error){

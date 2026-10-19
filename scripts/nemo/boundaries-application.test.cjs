@@ -239,10 +239,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 34, 125, 126, 127, 128, 129, 173, 225, 226, 249, 250, 251, 252, 255, 256, 257, 258]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 127, 128, 129, 130, 131, 175, 227, 228, 251, 252, 253, 254, 257, 258, 259, 260]);
   // One frame helper follows its SDK; all 42 pre-existing identities remain frozen above.
-  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 227);
-  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 227);
+  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 229);
+  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 229);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -250,10 +250,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 170);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 171);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 172);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 174);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 172);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 173);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 174);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 176);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
@@ -362,14 +362,14 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
   const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
   assert.equal(runtime.length, 1); assert.equal(data.length, 1);
-  assert.equal(runtime[0].ordinal, 114); assert.equal(data[0].ordinal, 115);
+  assert.equal(runtime[0].ordinal, 116); assert.equal(data[0].ordinal, 117);
   assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 114);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 116);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};
@@ -400,7 +400,7 @@ function assertF06Bootstrap(html) {
     assert.equal(selected[0].tag, '<script src="' + source + '"></script>', source + ' must be synchronous classic');
     return scripts.indexOf(selected[0]);
   });
-  assert.deepEqual(positions, [13, 15, 16, 17, 18, 19, 20, 21, 22],
+  assert.deepEqual(positions, [13, 15, 16, 17, 18, 19, 20, 22, 23],
     'underlay → parser → properties → desktop → Exposure → Project → ProjectFile → UI must remain in that order');
   const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
     const selected = scripts.filter((entry) => entry.src === source);

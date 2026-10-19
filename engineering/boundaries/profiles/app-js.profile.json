@@ -2532,12 +2532,14 @@
       "dir": "src/js/adapters",
       "files": [
         "native-object-ui.js",
-        "native-layer-range-desktop.js"
+        "native-layer-range-desktop.js",
+        "native-layer-playhead-cut-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-object-ui.js",
-        "native-layer-range-desktop.js"
+        "native-layer-range-desktop.js",
+        "native-layer-playhead-cut-ui.js"
       ]
     },
     {
@@ -3204,6 +3206,18 @@
       "sizeProfile": "Domain/application",
       "publicApi": [
         "native-audio-track-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.layer.splice.domain",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-layer-splice.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-layer-splice.js"
       ]
     }
   ],
