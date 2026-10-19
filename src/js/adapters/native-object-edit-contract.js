@@ -74,6 +74,10 @@
   const uid = (v, at) => text(v, MAX_ID, at), layerUid = opaque;
   const uids = (min) => (v, at) => list(v, at, min, MAX_ITEMS, (item, i) => text(item, MAX_ID, i));
   const FIELDS = {
+    point: (v,at)=>{if(!Array.isArray(v)||v.length!==2||v.some((n)=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>1e12))fail(at+' invalid fill point');},
+    color: (v,at)=>{if(typeof v!=='string'||!/^#[0-9a-fA-F]{8}$/.test(v))fail(at+' requires hex8');},
+    opacity: (v,at)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1)fail(at+' invalid opacity');},
+    flag: (v,at)=>{if(typeof v!=='boolean')fail(at+' requires boolean');},
     uid: uid, layerUid: layerUid, layerUids: (v, at) => { list(v, at, 1, MAX_ITEMS, opaque); if (new Set(v).size !== v.length) fail(`${at} repeats a layer`); },
     gap: (v, at) => { if (typeof v !== 'number' || !Number.isFinite(v)) fail(`${at} must be a finite number`); },
     selection: selection, name: (v, at) => { if (typeof v !== 'string') fail(`${at} must be a string`); },
@@ -101,6 +105,7 @@
     'boolean.apply': ['object.boolean.apply', 'command', [['mode', 'booleanMode'], ['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeIds', 'strokeIds2']]],
     'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']]],
     'boolean.flatten': ['object.boolean.flatten', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['groupId', 'groupId']]],
+    'fill.trace':['object.fill.trace','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['point','point'],['color','color'],['opacity','opacity'],['remove','flag']]],
   };
   const OPERATIONS = Object.freeze(Object.keys(SPEC).map((suffix) => PREFIX + suffix));
   const spec = (operation) => (typeof operation === 'string' && operation.startsWith(PREFIX) && has(SPEC, operation.slice(PREFIX.length)) ? SPEC[operation.slice(PREFIX.length)] : null);

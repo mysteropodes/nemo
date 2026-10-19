@@ -90,6 +90,7 @@ pub(crate) enum PlanError {
     HolderOrphan(String),
     Stack(StackError),
     IdUnavailable,
+    FillUnavailable,
     Internal(&'static str),
 }
 

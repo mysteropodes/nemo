@@ -144,7 +144,7 @@
     }
   }
   function ext(value, label, hasStroke) {
-    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient'], label);
+    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace'], label);
     if (!Object.keys(value).length) fail(`${label} must be omitted when empty`);
     if (has(value, 'pressure')) {
       pressure(value.pressure, `${label}.pressure`);
@@ -152,6 +152,15 @@
     }
     if (has(value, 'paramShape')) shapeBody(value.paramShape, `${label}.paramShape`, false);
     if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`);
+    if (has(value, 'fillTrace')) {
+      const t=value.fillTrace; exact(t, [], ['seed','seeds','walls','gapPx'], label+'.fillTrace');
+      if (!has(t,'seed')&&!has(t,'seeds')) fail(label+' fillTrace requires seed or seeds');
+      const seed=(p)=>{if(!Array.isArray(p)||p.length!==2)fail(label+' fill seed requires two coordinates');p.forEach((n)=>num(n,label));};
+      if(has(t,'seed'))seed(t.seed);
+      if(has(t,'seeds')){if(!Array.isArray(t.seeds))fail(label+' fill seeds requires an array');t.seeds.forEach(seed);}
+      if(has(t,'walls')&&(!Array.isArray(t.walls)||t.walls.some((id)=>typeof id!=='string'||!id.length)))fail(label+' invalid fill walls');
+      if(has(t,'gapPx')){num(t.gapPx,label);if(t.gapPx<0)fail(label+' negative fill gap');}
+    }
     if (has(value, 'fillGradient')) { gradient(value.fillGradient, label + '.fillGradient'); if (has(value, 'pressure')) fail(label + ' pressure-gradient consumer is unavailable'); }
   }
   // The complete `editable-vector-path` record (create and replace carry it; the read path returns it).

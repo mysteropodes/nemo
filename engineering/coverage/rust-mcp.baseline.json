@@ -565,6 +565,17 @@
       "regions": 99.74,
       "functions": 100,
       "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_fill_trace_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean e4641008889c016b1d3730d5afe1432cf5bbba36, MCP tree fd9d53246ddab873f79c526b5806c5747b7f14ea; standard cargo-llvm-cov 0.9.1 JSON 11f8c1c11e1748030bf0c347cb0c089812bb095e0628bfc6fc10d17908d15746, actual full unfiltered suites 387 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6278970723. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_fill_trace_wire.rs": {
+      "lines": 96.87,
+      "regions": 98.03,
+      "functions": 100,
+      "note": "Measured clean e4641008889c016b1d3730d5afe1432cf5bbba36, MCP tree fd9d53246ddab873f79c526b5806c5747b7f14ea; standard cargo-llvm-cov 0.9.1 JSON 11f8c1c11e1748030bf0c347cb0c089812bb095e0628bfc6fc10d17908d15746, actual full unfiltered suites 387 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6278970723. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
     }
   },
   "nativeObjectContractRegistration": {

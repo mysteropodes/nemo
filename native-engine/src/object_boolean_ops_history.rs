@@ -13,8 +13,18 @@ use crate::transaction::CompactResult;
 const OP_BOOLEAN_APPLY: &str = "command.document.object.boolean.apply";
 const OP_BOOLEAN_ERASE: &str = "command.document.object.boolean.erase";
 const OP_BOOLEAN_FLATTEN: &str = "command.document.object.boolean.flatten";
+const OP_FILL_TRACE: &str = "command.document.object.fill.trace";
+#[cfg(test)]
+#[path = "../tests/object_fill_trace_history.rs"]
+mod fill_trace_tests;
 
 impl NativeObjectHistory {
+    pub(crate) fn prepare_fill_trace_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedBooleanEdit, DispatchErrorCode> {
+        self.owner.prepare_fill_trace_json(bytes)
+    }
     pub(crate) fn prepare_boolean_op_json(
         &self,
         bytes: &[u8],
@@ -61,7 +71,7 @@ impl NativeObjectHistory {
     pub(crate) fn boolean_operation(operation: &str) -> bool {
         matches!(
             operation,
-            OP_BOOLEAN_APPLY | OP_BOOLEAN_ERASE | OP_BOOLEAN_FLATTEN
+            OP_BOOLEAN_APPLY | OP_BOOLEAN_ERASE | OP_BOOLEAN_FLATTEN | OP_FILL_TRACE
         )
     }
     /// Prepare and commit one boolean edit for the dispatcher, which has already
@@ -82,6 +92,7 @@ impl NativeObjectHistory {
             OP_BOOLEAN_APPLY => self.prepare_boolean_op_json(&bytes),
             OP_BOOLEAN_ERASE => self.prepare_boolean_erase_json(&bytes),
             OP_BOOLEAN_FLATTEN => self.prepare_boolean_flatten_json(&bytes),
+            OP_FILL_TRACE => self.prepare_fill_trace_json(&bytes),
             _ => Err(DispatchErrorCode::InvalidRequest),
         };
         let candidate =

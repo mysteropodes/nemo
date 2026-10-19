@@ -85,6 +85,11 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             "boolean.flatten",
             json!({"command":"object.boolean.flatten","layerUid":"layer-a","contextId":"scene-root","frame":0,"groupId":"group-1"}),
         ),
+        (
+            "fill.trace",
+            json!({"command":"object.fill.trace","layerUid":"layer-a","contextId":"scene-root","frame":0,
+            "point":[20,20],"color":"#336699ff","opacity":0.5,"remove":false}),
+        ),
     ]
 }
 
@@ -105,7 +110,7 @@ fn patched(suffix: &str, key: &str, value: Value) -> Value {
 }
 
 #[test]
-fn the_seventeen_declared_commands_are_exactly_the_admitted_operations() {
+fn the_eighteen_declared_commands_are_exactly_the_admitted_operations() {
     let expected = [
         "layer.delete",
         "layer.duplicate",
@@ -124,8 +129,9 @@ fn the_seventeen_declared_commands_are_exactly_the_admitted_operations() {
         "boolean.apply",
         "boolean.erase",
         "boolean.flatten",
+        "fill.trace",
     ];
-    assert_eq!(SPECS.len(), 17);
+    assert_eq!(SPECS.len(), 18);
     assert_eq!(
         valid().iter().map(|(s, _)| *s).collect::<Vec<_>>(),
         expected
@@ -138,7 +144,7 @@ fn the_seventeen_declared_commands_are_exactly_the_admitted_operations() {
         "command.document.object.layer.policy.edit",
         "command.document.object.clipboard.copy",
         "command.document.object.clipboard.cut",
-        "command.document.object.fill.trace",
+        "command.document.object.fill.trace.extra",
         "query.document.object",
         "command.document.object.group",
         "command.document.object.layer.delete.extra",
@@ -148,6 +154,35 @@ fn the_seventeen_declared_commands_are_exactly_the_admitted_operations() {
         assert!(!admitted(other), "{other}");
         assert!(!request(other, &json!({})), "{other}");
     }
+}
+
+#[test]
+fn fill_trace_wire_bounds_refuse_invalid_coordinates_paint_and_disposition() {
+    let operation = format!("{P}fill.trace");
+    let good = valid()
+        .into_iter()
+        .find(|(name, _)| *name == "fill.trace")
+        .unwrap()
+        .1;
+    for (key, bad) in [
+        ("point", json!([0])),
+        ("point", json!([1e13, 0])),
+        ("point", json!([false, 0])),
+        ("color", json!("#fff")),
+        ("color", json!("#ggffffff")),
+        ("opacity", json!(-0.1)),
+        ("opacity", json!(1.1)),
+        ("remove", json!("true")),
+    ] {
+        let mut payload = good.clone();
+        payload[key] = bad;
+        assert!(!request(&operation, &payload));
+    }
+    let mut edge = good;
+    edge["point"] = json!([-1e12, 1e12]);
+    edge["opacity"] = json!(0);
+    edge["remove"] = json!(true);
+    assert!(request(&operation, &edge));
 }
 
 #[test]

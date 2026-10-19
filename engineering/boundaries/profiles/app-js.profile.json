@@ -3219,6 +3219,18 @@
       "publicApi": [
         "native-object-layer-splice.js"
       ]
+    },
+    {
+      "id": "app.native.fill.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-fill-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-fill-desktop.js"
+      ]
     }
   ],
   "layerRules": {

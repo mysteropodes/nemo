@@ -41,8 +41,12 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
         && ext.param_shape.missing()
         && ext.box_angle.missing()
         && ext.fill_gradient.missing()
+        && ext.fill_trace.missing()
     {
         return Err(invalid("an empty vectorExt must be omitted"));
+    }
+    if ext.fill_trace.value().is_some_and(|trace| !trace.valid()) {
+        return Err(invalid("invalid fill trace provenance"));
     }
     if let Some(gradient) = ext.fill_gradient.value() {
         if !gradient.valid() {
