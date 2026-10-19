@@ -1250,6 +1250,7 @@
         "object_scene_producer_text_rows.rs",
         "object_scene_producer_text_controls.rs",
         "scene_effect_gpu_blend.rs",
+        "scene_effect_gpu_blend_atlas.rs",
         "scene_effect_gpu_blend_cases.rs",
         "scene_effect_gpu_blend_controls.rs",
         "scene_effect_gpu_blend_owner.rs",

@@ -298,3 +298,8 @@ fn gpu_repeated_swatches_keep_target_retirement_without_claiming_atlas_byte_reti
     // Texture count is not residency bytes: pressure growth/eviction still needs
     // separately booked resource evidence; no immediate cache eviction is asserted.
 }
+
+// These real-image pressure inputs consume the SAME Vello resolver as the
+// straight RGB swatches. No cache purge or immediate atlas release is assumed.
+#[path = "scene_effect_gpu_blend_atlas.rs"]
+mod atlas;

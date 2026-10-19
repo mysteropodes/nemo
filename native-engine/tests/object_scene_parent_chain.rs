@@ -94,6 +94,12 @@ fn direct_plan(s: &crate::revision::ObjectSnapshot) -> crate::object_render_scen
 fn real_v1_identity_keeps_native_scene_and_original_no_order_paint_refusal() {
     use vello::kurbo::Shape;
     let doc = v1_drawing();
+    // Stored x/y are the centre (baseline serR), not the display-rect origin.
+    let raw = &doc["items"]["raster"][0]["item"];
+    assert_eq!(raw["x"], 40);
+    assert_eq!(raw["y"], 40);
+    assert_eq!(raw["width"], 2);
+    assert_eq!(raw["height"], 2);
     let o = owner(&doc);
     let s = snapshot(&o);
     let before = crate::object_codec::encode_storage_project(s.document()).unwrap();
@@ -112,7 +118,7 @@ fn real_v1_identity_keeps_native_scene_and_original_no_order_paint_refusal() {
             raster.rect.width,
             raster.rect.height
         ),
-        (40.0, 40.0, 2.0, 2.0)
+        (39.0, 39.0, 2.0, 2.0) // top-left = centre40 - extent2 / 2
     );
     assert_eq!(raster.opacity, 1.0);
     let t = &scene.texts.entries[0];
