@@ -113,6 +113,9 @@ mod object_raster_asset_owner;
 #[allow(dead_code)]
 mod object_media_link_owner;
 pub(crate) use object_media_link_owner::PreparedPlacementEdit;
+#[path = "object_audio_track_edit_owner.rs"]
+mod audio_track_edit;
+pub(crate) use audio_track_edit::PreparedAudioTrackEdit;
 // L01-F (#2107): sealed vector create/replace/delete over the same revision owner.
 #[path = "object_vector_edit.rs"]
 mod vector_edit;

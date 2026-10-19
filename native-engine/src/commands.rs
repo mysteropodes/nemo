@@ -14,11 +14,11 @@ pub(crate) use object_fill_owner::{insert_order_element, remove_order_element, O
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::{
     ComponentTablesEdit, ImportBatchResult, ImportSkipReport, ItemEditResult, ObjectFillOwner,
-    PasteDestination, PreparedBooleanEdit, PreparedComponentTables, PreparedGroupEdit,
-    PreparedImageMeshEdit, PreparedImportBatch, PreparedItemEdit, PreparedLayerCreate,
-    PreparedLayerLifecycle, PreparedLayerPolicy, PreparedLayerVisibility, PreparedPlacementEdit,
-    PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit, PreparedSelectionEdit,
-    PreparedVectorEdit, PreparedWidgetEdit, ReferenceEdit, VectorEditResult,
+    PasteDestination, PreparedAudioTrackEdit, PreparedBooleanEdit, PreparedComponentTables,
+    PreparedGroupEdit, PreparedImageMeshEdit, PreparedImportBatch, PreparedItemEdit,
+    PreparedLayerCreate, PreparedLayerLifecycle, PreparedLayerPolicy, PreparedLayerVisibility,
+    PreparedPlacementEdit, PreparedProjectSettings, PreparedPropertyEdit, PreparedReferenceEdit,
+    PreparedSelectionEdit, PreparedVectorEdit, PreparedWidgetEdit, ReferenceEdit, VectorEditResult,
     MAX_VECTOR_REQUEST_BYTES,
 };
 

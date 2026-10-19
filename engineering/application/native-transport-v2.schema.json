@@ -6208,6 +6208,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.audio.track.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectAudioTrackPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -9359,6 +9376,121 @@
           "$ref": "#/$defs/ObjectFrame"
         }
       }
+    },
+    "ObjectAudioTrackPayload": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId",
+            "muted"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setMuted"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "muted": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rename"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setTrim"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "trimStart": {
+              "type": "number"
+            },
+            "trimEnd": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": [
+                "trimStart"
+              ]
+            },
+            {
+              "required": [
+                "trimEnd"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId",
+            "field"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unset"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "field": {
+              "enum": [
+                "name",
+                "muted",
+                "trimStart",
+                "trimEnd"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

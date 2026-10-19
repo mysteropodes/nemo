@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 const MAX_BYTES: usize = 4096;
 const MAX_REVISION: u64 = 9_007_199_254_740_991;
-const OPERATIONS: [&str; 10] = [
+const OPERATIONS: [&str; 11] = [
     "query.document.object",
     "command.document.object.fill.set",
     "command.document.object.undo",
@@ -18,6 +18,7 @@ const OPERATIONS: [&str; 10] = [
     "command.document.object.project.settings.edit",
     "command.document.object.layer.policy.edit",
     "command.document.object.project.placement.edit",
+    "command.document.object.audio.track.edit",
     "command.document.object.layer.cut",
 ];
 

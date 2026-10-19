@@ -3193,6 +3193,18 @@
       "publicApi": [
         "native-layer-playhead-cut-contract.js"
       ]
+    },
+    {
+      "id": "app.native.audio.track.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-audio-track-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-audio-track-contract.js"
+      ]
     }
   ],
   "layerRules": {

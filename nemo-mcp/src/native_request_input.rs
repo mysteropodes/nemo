@@ -95,6 +95,7 @@ impl NativeApplicationRequest {
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
                 | crate::native_contract::placement::OP
+                | crate::native_contract::audio_track::OP
                 | crate::native_contract::brush::PUBLISH
                 | crate::native_contract::font::IMPORT
                 | crate::native_contract::item::ITEM
@@ -120,6 +121,8 @@ impl NativeApplicationRequest {
                 "layer policy"
             } else if self.operation == crate::native_contract::brush::PUBLISH {
                 "brush publication"
+            } else if self.operation == crate::native_contract::audio_track::OP {
+                "AudioTrack metadata edit"
             } else if self.operation == crate::native_contract::placement::OP {
                 "project placement"
             } else if self.operation.ends_with(".settings.edit") {

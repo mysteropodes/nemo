@@ -23,6 +23,8 @@ mod object;
 #[path = "native_text_read_contract.rs"]
 pub(crate) mod text_read;
 
+#[path = "native_audio_track_contract.rs"]
+pub(crate) mod audio_track;
 #[path = "native_project_placement_contract.rs"]
 pub(crate) mod placement;
 #[path = "native_project_settings_contract.rs"]
@@ -129,6 +131,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
         placement::OP => placement::request(payload),
+        audio_track::OP => audio_track::request(payload),
         layer_policy::OP => layer_policy::request(payload),
         layer_cut::OP => layer_cut::request(payload),
         property_track::OP => property_track::request(payload),
@@ -336,6 +339,9 @@ pub(crate) fn validate_result(
     }
     if operation == placement::OP {
         return placement::result(result);
+    }
+    if operation == audio_track::OP {
+        return audio_track::result(result);
     }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);

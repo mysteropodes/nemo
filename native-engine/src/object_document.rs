@@ -28,6 +28,7 @@ mod audio_tracks;
 pub(crate) use assets::{
     AssetId, AssetInventory, AssetKind, AssetPlacement, AssetRecord, AssetSource, AssetTarget,
 };
+pub(crate) use audio_tracks::edit as audio_track_edit;
 pub(crate) use audio_tracks::{AudioTrackRecord, AudioTracks};
 
 #[path = "project_media_envelope.rs"]

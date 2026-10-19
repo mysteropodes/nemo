@@ -25,6 +25,9 @@ mod edits;
 #[path = "object_media_link_command.rs"]
 mod placement;
 use placement::OP_PLACEMENT_EDIT;
+#[path = "object_audio_track_edit_command.rs"]
+mod audio_track;
+use audio_track::OP_AUDIO_TRACK_EDIT;
 
 const OP_OBJECT_FILL: &str = "command.document.object.fill.set";
 const OP_OBJECT_UNDO: &str = "command.document.object.undo";
@@ -109,6 +112,7 @@ impl NativeObjectHistory {
                     | OP_PROPERTY_TRACK_EDIT
                     | OP_PROJECT_SETTINGS
                     | OP_PLACEMENT_EDIT
+                    | OP_AUDIO_TRACK_EDIT
                     | OP_OBJECT_VECTOR
                     | OP_IMAGE_MESH_EDIT
                     | OP_WIDGET_CREATE
@@ -154,6 +158,8 @@ impl NativeObjectHistory {
                 OP_WIDGET_CREATE | OP_WIDGET_WRITE | OP_WIDGET_SETTINGS
             ) {
                 "Widget request refused."
+            } else if request.operation == OP_AUDIO_TRACK_EDIT {
+                "AudioTrack edit request refused."
             } else if request.operation == OP_PLACEMENT_EDIT {
                 "Placement edit request refused."
             } else if request.operation == OP_PROJECT_SETTINGS {
@@ -358,6 +364,8 @@ impl NativeObjectHistory {
                 self.dispatch_widget_command(request.operation.as_str(), &payload)
             } else if is_frame_clipboard_operation(request.operation.as_str()) {
                 self.dispatch_frame_clipboard(request)
+            } else if request.operation == OP_AUDIO_TRACK_EDIT {
+                self.dispatch_audio_track_edit(&request.payload)
             } else if request.operation == OP_PLACEMENT_EDIT {
                 self.dispatch_placement_edit(&request.payload)
             } else if request.operation == OP_PROJECT_SETTINGS {

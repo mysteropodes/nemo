@@ -81,6 +81,8 @@ where
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(transparent)]
 pub(crate) struct AudioTracks(Vec<AudioTrackRecord>);
+#[path = "object_audio_track_edit.rs"]
+pub(crate) mod edit;
 impl<'de> Deserialize<'de> for AudioTracks {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let records = Vec::<AudioTrackRecord>::deserialize(deserializer)?;

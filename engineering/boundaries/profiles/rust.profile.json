@@ -113,7 +113,8 @@
         "object_frame_bulk_move_document.rs",
         "object_audio_track_record.rs",
         "object_media_placement_offset.rs",
-        "audio_wave_admission.rs"
+        "audio_wave_admission.rs",
+        "object_audio_track_edit.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -272,7 +273,8 @@
         "object_layer_shift_motion.rs",
         "object_layer_shift_range.rs",
         "object_layer_playhead_cut.rs",
-        "object_layer_playhead_cut_owner.rs"
+        "object_layer_playhead_cut_owner.rs",
+        "object_audio_track_edit_owner.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -340,7 +342,9 @@
         "object_frame_bulk_move_history.rs",
         "object_layer_shift_history.rs",
         "object_media_link_command.rs",
-        "object_layer_playhead_cut_history.rs"
+        "object_layer_playhead_cut_history.rs",
+        "object_audio_track_edit_history.rs",
+        "object_audio_track_edit_command.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -1543,7 +1547,10 @@
         "audio_wave_admission.rs",
         "project_audio_retention_fixture.rs",
         "object_layer_playhead_cut.rs",
-        "object_layer_playhead_cut_history.rs"
+        "object_layer_playhead_cut_history.rs",
+        "object_audio_track_edit.rs",
+        "object_audio_track_edit_history.rs",
+        "object_audio_track_edit_fixture.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1673,7 +1680,10 @@
         "src/native_project_placement_contract_tests.rs",
         "src/native_layer_playhead_cut_contract.rs",
         "src/native_layer_playhead_cut_contract_tests.rs",
-        "src/native_layer_playhead_cut_wire_tests.rs"
+        "src/native_layer_playhead_cut_wire_tests.rs",
+        "src/native_audio_track_contract.rs",
+        "src/native_audio_track_contract_tests.rs",
+        "src/native_audio_track_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1931,7 +1941,8 @@
         "native_frame_clipboard_transport_tests.rs",
         "native_project_placement_public_tests.rs",
         "native_project_placement_audio_fixture.rs",
-        "native_layer_playhead_cut_public_tests.rs"
+        "native_layer_playhead_cut_public_tests.rs",
+        "native_audio_track_public_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -77,6 +77,8 @@ mod object_frame_clipboard_repeat;
 #[path = "object_frame_clipboard_tracks_history.rs"]
 mod object_frame_clipboard_tracks;
 // L09-H (#2115): placement edits as one history transaction (G42, I16b).
+#[path = "object_audio_track_edit_history.rs"]
+mod audio_track_edit;
 #[path = "object_media_link_history.rs"]
 #[allow(dead_code)]
 mod object_media_link_history;

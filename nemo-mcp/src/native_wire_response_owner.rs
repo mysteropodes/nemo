@@ -13,6 +13,7 @@ pub(super) fn correlated(
     let correlated_operation = request.operation == crate::native_contract::text_read::OP
         || request.operation == crate::native_contract::metadata::OP
         || request.operation == crate::native_contract::placement::OP
+        || request.operation == crate::native_contract::audio_track::OP
         || request.operation == crate::native_contract::layer_cut::OP
         || policy_command
         || track_command
@@ -41,6 +42,15 @@ pub(super) fn correlated(
                 b.len() <= crate::wire::native_response_byte_limit(&request.operation)
             }));
     correlated_identity
+        && (request.operation != crate::native_contract::audio_track::OP
+            || !response.ok
+            || response.result.as_ref().is_some_and(|result| {
+                crate::native_contract::audio_track::revision_matches(
+                    request.expected_revision,
+                    response.content_revision,
+                    result,
+                )
+            }))
         && (request.operation != crate::native_contract::layer_cut::OP
             || !response.ok
             || response.result.as_ref().is_some_and(|result| {

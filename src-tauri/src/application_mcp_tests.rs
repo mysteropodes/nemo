@@ -314,6 +314,8 @@ fn ui_and_bundled_mcp_share_the_released_unavailable_state() {
     assert_eq!(ui.error.unwrap().code, "unavailable");
 }
 
+#[path = "native_audio_track_public_tests.rs"]
+mod audio_track_public_tests;
 #[path = "native_layer_playhead_cut_public_tests.rs"]
 mod layer_playhead_cut_public_tests;
 #[path = "native_project_placement_public_tests.rs"]
