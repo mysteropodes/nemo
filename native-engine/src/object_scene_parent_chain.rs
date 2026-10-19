@@ -6,12 +6,16 @@ use crate::evaluation::motion_parent_chain::{
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_vector_rest, is_vector_record, record_layer_has_active_path_fx,
 };
-use crate::object_document::{ObjectLayer, Presence, PropertyHolderTarget};
+use crate::object_frame_packet::text::{ObjectLayer, Presence, PropertyHolderTarget};
 use crate::object_frame_packet::{sample_property_raw, ObjectFramePacket};
 use crate::object_render_scene::object_scene_producer_text::TextSceneItem;
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::collections::{BTreeMap, BTreeSet};
-use vello::kurbo::{BezPath, Rect, Shape};
+use vello::kurbo::{Rect, Shape};
+
+#[path = "object_scene_parent_curve.rs"]
+mod curve;
+use curve::curve_path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ChainUnavailable {
@@ -279,7 +283,11 @@ impl SceneParentChains {
     pub(crate) fn needs_bounds(&self, layer: usize) -> bool {
         self.needed.contains(&layer)
     }
-    fn matches(&self, layer: usize, target: &crate::object_document::ObjectTarget) -> bool {
+    fn matches(
+        &self,
+        layer: usize,
+        target: &crate::object_frame_packet::text::ObjectTarget,
+    ) -> bool {
         target.context_id() == self.packet.context_id()
             && target.scope_kind() == self.packet.scope_kind()
             && self.packet.source_frame_for_layer(layer) == Some(target.frame())
@@ -338,7 +346,7 @@ impl SceneParentChains {
                     if record_layer_has_active_path_fx(&self.packet, &record) {
                         return Err(ChainUnavailable::VectorGeometry);
                     }
-                    let pair=|p:&crate::object_document::ObjectPoint| -> Result<[f64;2],ChainUnavailable> {
+                    let pair=|p:&crate::object_frame_packet::text::ObjectPoint| -> Result<[f64;2],ChainUnavailable> {
                     Ok([p.x.as_f64().filter(|v|v.is_finite()).ok_or(ChainUnavailable::VectorGeometry)?,
                         p.y.as_f64().filter(|v|v.is_finite()).ok_or(ChainUnavailable::VectorGeometry)?])
                 };
@@ -465,36 +473,4 @@ impl SceneParentChains {
         }
         Ok(self)
     }
-}
-/// Tight native Bezier bounds; never the control-point hull/envelope centre.
-fn curve_path(
-    segments: &[([f64; 2], [f64; 2], [f64; 2])],
-    closed: bool,
-) -> Result<BezPath, ChainUnavailable> {
-    if segments.is_empty() {
-        return Err(ChainUnavailable::VectorGeometry);
-    }
-    if !segments
-        .iter()
-        .flat_map(|s| s.0.iter().chain(s.1.iter()).chain(s.2.iter()))
-        .all(|v| v.is_finite())
-    {
-        return Err(ChainUnavailable::VectorGeometry);
-    }
-    let mut path = BezPath::new();
-    path.move_to((segments[0].0[0], segments[0].0[1]));
-    let ends = segments.len() + usize::from(closed);
-    for i in 1..ends {
-        let prev = segments[(i - 1) % segments.len()];
-        let next = segments[i % segments.len()];
-        path.curve_to(
-            (prev.0[0] + prev.2[0], prev.0[1] + prev.2[1]),
-            (next.0[0] + next.1[0], next.0[1] + next.1[1]),
-            (next.0[0], next.0[1]),
-        );
-    }
-    if closed {
-        path.close_path();
-    }
-    Ok(path)
 }

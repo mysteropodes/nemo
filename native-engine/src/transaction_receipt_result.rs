@@ -1,7 +1,7 @@
 //! Compact retained receipt serialization; extracted without changing other operation results.
 //! Repeat alone exposes its immutable prepared cycle/skip outcome after successful commit.
-use super::{CompactResult, RetainedDisposition};
 use crate::commands::{DispatchError, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION};
+use crate::transaction::{CompactResult, RetainedDisposition};
 use serde_json::json;
 
 impl RetainedDisposition {

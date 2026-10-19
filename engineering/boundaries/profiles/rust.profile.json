@@ -522,7 +522,8 @@
         "object_text_scene_join.rs",
         "object_text_scene_fonts.rs",
         "object_text_scene_bundled.rs",
-        "object_scene_parent_chain.rs"
+        "object_scene_parent_chain.rs",
+        "object_scene_parent_curve.rs"
       ],
       "publicApi": [
         "render_scene.rs",

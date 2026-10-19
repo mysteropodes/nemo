@@ -4,8 +4,8 @@
 //! This admits only root, ordinary vector-only layers. Other families, parents,
 //! expressions and controls stay unavailable until their own producer consumes
 //! them. Opacity remains the packet's existing paint-factor responsibility.
-use super::{EvalSegment, VectorEvalError};
 use crate::evaluation::motion_parent_chain::{motion_mat_from_values, transform_segments, Segment};
+use crate::evaluation::object_vector_kernels::render_vector_eval::{EvalSegment, VectorEvalError};
 use crate::object_document::{
     FrameScopeKind, ObjectDocument, ObjectRecord, Presence, PropertyHolder, PropertyHolderTarget,
     VECTOR_FAMILY,

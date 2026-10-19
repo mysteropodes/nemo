@@ -239,7 +239,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 34, 122, 123, 124, 125, 126, 169, 221, 222, 243, 244, 245, 246, 249, 250, 251, 252]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 34, 122, 123, 124, 125, 126, 169, 221, 222, 244, 245, 246, 247, 250, 251, 252, 253]);
+  // One frame helper follows its SDK; all 42 pre-existing identities remain frozen above.
+  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 223);
+  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 223);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';

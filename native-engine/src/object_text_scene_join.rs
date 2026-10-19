@@ -56,7 +56,7 @@ fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
 struct TextInput<'a> {
     source_index: usize,
     layer_index: usize,
-    entry: &'a crate::object_document::TextEntry,
+    entry: &'a crate::object_frame_packet::text::TextEntry,
     visible: bool,
 }
 fn text_inputs<'a>(
@@ -147,7 +147,7 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
                 font: &fonts::PreparedFont,
                 chain: &[crate::evaluation::motion_parent_chain::ChainEntry]| {
         let version = font.resource.version();
-        let holder = crate::object_document::text_holder_id(&input.entry.target);
+        let holder = crate::object_frame_packet::text::text_holder_id(&input.entry.target);
         prepare_block(
             Some(TextFontProvider {
                 catalog: &font.faces,

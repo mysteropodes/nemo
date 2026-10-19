@@ -10,7 +10,7 @@ use std::collections::HashMap;
 #[path = "object_order_evaluation.rs"]
 mod order;
 #[path = "object_text_frame.rs"]
-mod text;
+pub(crate) mod text;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
 #[path = "object_property_sampling.rs"]
 mod property_sampling;

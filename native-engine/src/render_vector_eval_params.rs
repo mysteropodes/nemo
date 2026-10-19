@@ -151,7 +151,7 @@ fn track_value(
 /// Text/raster layer poses and their actual ancestors use the scene parent consumer.
 /// Visible vector parents, unsupported properties and expressions remain unavailable.
 pub(crate) fn holders_fully_consumed(document: &ObjectDocument) -> bool {
-    if !super::motion::visible_vector_parents_supported(document) {
+    if !crate::evaluation::object_vector_kernels::render_vector_eval::motion::visible_vector_parents_supported(document) {
         return false;
     }
     document.property_holders().is_none_or(|holders| {
@@ -171,7 +171,7 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
         return false;
     }
     let Some(stroke_id) = target.stroke_id() else {
-        return super::motion::layer_holder_consumed(document, holder);
+        return crate::evaluation::object_vector_kernels::render_vector_eval::motion::layer_holder_consumed(document, holder);
     };
     let mut matched = false;
     for record in document.objects() {
