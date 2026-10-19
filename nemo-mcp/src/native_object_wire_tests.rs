@@ -129,8 +129,15 @@ async fn object_reader_preserves_complete_bytes_and_rejects_oversized_envelopes(
     let mut too_large = response.clone();
     let segments = &mut too_large.result.as_mut().unwrap()["object"]["geometry"]["segments"];
     *segments = Value::Array(vec![segments[0].clone(); 256]);
-    // Still a complete schema-valid record; encoded transport refuses it.
-    assert!(validate_native_response(&too_large, &request).is_ok());
+    // Inner record grammar is valid; typed envelope and raw reader BOTH enforce
+    // the unchanged ordinary object-response bound before returning bytes.
+    assert!(crate::native_contract::validate_result(
+        &request.operation,
+        &request.document_id,
+        &request.payload,
+        too_large.result.as_ref().unwrap()
+    ));
+    assert!(validate_native_response(&too_large, &request).is_err());
     let before = too_large.clone();
     let mut bytes = serde_json::to_vec(&too_large).unwrap();
     assert!(bytes.len() > NATIVE_MAX_MESSAGE_BYTES);
