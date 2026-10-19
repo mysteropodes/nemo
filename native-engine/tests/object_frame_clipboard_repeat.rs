@@ -273,12 +273,12 @@ fn the_new_frame_count_and_the_count_clamp_are_the_baseline_arithmetic() {
 fn with_component(mut drawing: ObjectDocument) -> ObjectDocument {
     drawing.layers[1].timing = Presence::Missing;
     let mut value = serde_json::to_value(drawing).unwrap();
+    // Component frameKeys require outer timing keys; this genuine no-timing instance has none.
     value["componentTables"] = json!({"components": {
         "format":"nemo.native-component-set", "formatVersion":1,
         "components":[{"symbolId":"symbol", "totalFrames":3,
             "layers":[{"layerUid":"inside"}], "objects":[]}],
-        "instances":[{"contextId":"scene-root", "layerUid":"L1", "symbolId":"symbol",
-            "frameKeys":[{"frame":0,"componentFrame":1}], "symSpeed":2}]
+        "instances":[{"contextId":"scene-root", "layerUid":"L1", "symbolId":"symbol", "symSpeed":2}]
     }});
     crate::object_codec::decode_storage_project(value.to_string().as_bytes()).unwrap()
 }
