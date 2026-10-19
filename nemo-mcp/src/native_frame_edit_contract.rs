@@ -1,5 +1,5 @@
 //! L05-K public contract of the native frame-edit operations (F09-F13): closed request shapes and the one compact
-//! result. Storage, history, locks and receipts stay in the native owner; every shape mirrors the strict payload
+//! result, with Repeat-only cycle/skip counts. Storage, history, locks and receipts stay in the native owner; every shape mirrors the strict payload
 //! parser of the owner of that operation (structure, key, retime, selection duplicate, repeat). Cut, copy and paste
 //! have no declaration here: a clipboard packet is produced by the typed native API only.
 use crate::native_contract::{exact, frame, object};
@@ -160,6 +160,48 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
 }
 pub(super) fn result(value: &Value) -> bool {
     object::visibility_result(value)
+}
+/// Repeat alone exposes native cycle/skip counts; no other operation accepts them.
+pub(crate) fn result_for_operation(operation: &str, value: &Value) -> bool {
+    if operation != REPEAT {
+        return declares(operation) && result(value);
+    }
+    exact(
+        value,
+        &[
+            "applied",
+            "historyEntriesAdded",
+            "cycledLayers",
+            "skippedComponentLayers",
+        ],
+        &[],
+    )
+    .is_some_and(|value| {
+        matches!(
+            (
+                value.get("applied").and_then(Value::as_bool),
+                value.get("historyEntriesAdded").and_then(Value::as_u64)
+            ),
+            (Some(true), Some(1)) | (Some(false), Some(0))
+        ) && ["cycledLayers", "skippedComponentLayers"]
+            .iter()
+            .all(|key| {
+                value
+                    .get(*key)
+                    .and_then(Value::as_u64)
+                    .is_some_and(|count| count <= u64::from(u32::MAX))
+            })
+    })
+}
+pub(crate) fn revision_matches_for_operation(
+    operation: &str,
+    expected: Option<u64>,
+    revision: u64,
+    value: &Value,
+) -> bool {
+    result_for_operation(operation, value)
+        && expected.and_then(|before| before.checked_add(u64::from(value["applied"] == true)))
+            == Some(revision)
 }
 pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Value) -> bool {
     result(value)

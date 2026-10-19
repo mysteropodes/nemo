@@ -230,3 +230,104 @@ fn results_correlate_applied_history_and_exact_revision() {
         assert!(!result(&bad));
     }
 }
+
+#[test]
+fn actual_catalog_repeat_result_and_other_receipts_remain_operation_closed() {
+    let catalog = crate::capabilities::native_catalog();
+    let descriptor = catalog.capability_for_operation(REPEAT).unwrap();
+    let examples = descriptor["examples"].as_array().unwrap();
+    assert_eq!(examples.len(), OPERATIONS.len());
+    for example in examples {
+        let request: NativeApplicationRequest =
+            serde_json::from_value(example["request"].clone()).unwrap();
+        assert!(request.validate_input().is_ok());
+        let receipt = &example["response"]["result"];
+        assert!(crate::native_contract::validate_result(
+            &request.operation,
+            &request.document_id,
+            &request.payload,
+            receipt,
+        ));
+        assert!(revision_matches_for_operation(
+            &request.operation,
+            request.expected_revision,
+            example["response"]["contentRevision"].as_u64().unwrap(),
+            receipt,
+        ));
+        let compact = json!({"applied":true,"historyEntriesAdded":1});
+        let repeat = json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":1,"skippedComponentLayers":0});
+        assert_eq!(
+            result_for_operation(&request.operation, &compact),
+            request.operation != REPEAT
+        );
+        assert_eq!(
+            result_for_operation(&request.operation, &repeat),
+            request.operation == REPEAT
+        );
+    }
+    assert!(!result_for_operation(
+        "command.document.object.frames.clipboard.cut",
+        &json!({"applied":false,"historyEntriesAdded":0})
+    ));
+}
+
+#[test]
+fn repeat_counts_are_required_closed_u32_without_inventing_cycle_to_applied_rules() {
+    let valid =
+        json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":0,"skippedComponentLayers":2});
+    assert!(
+        result_for_operation(REPEAT, &valid),
+        "global growth may cycle no drawing layer"
+    );
+    assert!(revision_matches_for_operation(REPEAT, Some(7), 8, &valid));
+    assert!(!revision_matches_for_operation(REPEAT, Some(7), 7, &valid));
+    assert!(!revision_matches_for_operation(REPEAT, None, 8, &valid));
+    assert!(!revision_matches_for_operation(
+        REPEAT,
+        Some(u64::MAX),
+        0,
+        &valid
+    ));
+    let noop = json!({"applied":false,"historyEntriesAdded":0,"cycledLayers":1,"skippedComponentLayers":0});
+    assert!(revision_matches_for_operation(REPEAT, Some(7), 7, &noop));
+    assert!(!revision_matches_for_operation(REPEAT, Some(7), 8, &noop));
+    for field in [
+        "applied",
+        "historyEntriesAdded",
+        "cycledLayers",
+        "skippedComponentLayers",
+    ] {
+        let mut missing = valid.clone();
+        missing.as_object_mut().unwrap().remove(field);
+        assert!(!result_for_operation(REPEAT, &missing), "missing {field}");
+    }
+    for field in ["cycledLayers", "skippedComponentLayers"] {
+        for bad in [
+            json!(-1),
+            json!(0.5),
+            json!(4294967296u64),
+            json!(null),
+            json!(true),
+            json!("1"),
+        ] {
+            let mut value = valid.clone();
+            value[field] = bad;
+            assert!(!result_for_operation(REPEAT, &value), "{field}: {value}");
+        }
+        let mut maximum = valid.clone();
+        maximum[field] = json!(u32::MAX);
+        assert!(result_for_operation(REPEAT, &maximum));
+    }
+    for (field, bad) in [
+        ("applied", json!(1)),
+        ("historyEntriesAdded", json!(0)),
+        ("historyEntriesAdded", json!(2)),
+    ] {
+        let mut value = valid.clone();
+        value[field] = bad;
+        assert!(!result_for_operation(REPEAT, &value));
+    }
+    let mut extra = valid;
+    extra["clipboard"] = json!(null);
+    assert!(!result_for_operation(REPEAT, &extra));
+}

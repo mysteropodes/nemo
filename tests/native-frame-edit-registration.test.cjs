@@ -84,7 +84,7 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.match(contract, /#\[path = "native_frame_edit_contract\.rs"\]\s*pub\(crate\) mod frame_edit;/);
   assert.ok(contract.indexOf('native_frame_edit_contract.rs') < contract.indexOf('native_layer_policy_contract.rs'), 'frame_edit precedes layer_policy (rustfmt order)');
   assert.match(contract, /op if frame_edit::declares\(op\) => frame_edit::request\(op, payload\),/);
-  assert.match(contract, /if frame_edit::declares\(operation\) \{\s*return frame_edit::result\(result\);/);
+  assert.match(contract, /if frame_edit::declares\(operation\) \{\s*return frame_edit::result_for_operation\(operation, result\);/);
   assert.match(text('nemo-mcp/src/native_request_input.rs'), /frame_edit::declares\(&self\.operation\)[\s\S]{0,200}requires expectedRevision/);
   const wire = text('nemo-mcp/src/wire.rs');
   assert.match(wire, /#\[path = "native_wire_response_owner\.rs"\]\s*mod response_owner;/);
@@ -98,7 +98,7 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.match(correlatedOperation[1], /(?:^|\|\|)\s*request\.operation == crate::native_contract::metadata::OP\s*(?:\|\||$)/);
   assert.match(correlatedOperation[1], /(?:^|\|\|)\s*policy_command\s*(?:\|\||$)/);
   assert.match(responseOwner, /let correlated_identity = !correlated_operation\s*\|\| \(response\.request_id == request\.request_id\s*&&/);
-  assert.match(wire, /frame_edit::revision_matches\(\s*request\.expected_revision,\s*response\.content_revision,/);
+  assert.match(wire, /frame_edit::revision_matches_for_operation\(\s*&request\.operation,\s*request\.expected_revision,\s*response\.content_revision,/);
   const rust = text('nemo-mcp/src/native_frame_edit_contract.rs');
   assert.doesNotMatch(rust.split('#[cfg(test)]')[0], /\bsuper::/, 'no relative import in production code');
   assert.match(rust, /#\[cfg\(test\)\]\s*#\[path = "native_frame_edit_contract_tests\.rs"\]\s*mod tests;/);

@@ -339,7 +339,8 @@ fn validate_native_response(
                         result,
                     ))
                 && (!frame_edit_command
-                    || crate::native_contract::frame_edit::revision_matches(
+                    || crate::native_contract::frame_edit::revision_matches_for_operation(
+                        &request.operation,
                         request.expected_revision,
                         response.content_revision,
                         result,
