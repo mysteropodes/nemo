@@ -85,7 +85,7 @@ fn real_context_metadata_and_typed_layer_values_reach_the_guest() {
         ("layer('Rig').position.at(0)[1]", 9.),
     ] {
         let result = run(code);
-        assert_eq!(result.value, vec![expected], "{code}");
+        assert_eq!(result.value, vec![expected], "{code}: {result:?}");
         assert_eq!(result.diagnostic, None, "{code}");
     }
 }
@@ -99,7 +99,7 @@ fn controls_read_actual_owner_layer_and_execute_their_stored_expression() {
         "control('Point')[0] + layerControl('Ctrl','Gain') + 5",
     ] {
         let result = run(code);
-        assert_eq!(result.value, vec![14.], "{code}");
+        assert_eq!(result.value, vec![14.], "{code}: {result:?}");
         assert_eq!(result.diagnostic, None);
     }
     let result = run("layerControl('Ctrl','deleted')");
@@ -112,7 +112,8 @@ fn controls_read_actual_owner_layer_and_execute_their_stored_expression() {
 
 #[test]
 fn raw_self_sampling_never_reenters_its_own_expression() {
-    assert_eq!(run("self.at(500) + self.at(-20)").value, vec![100.]);
+    let result = run("self.at(500) + self.at(-20)");
+    assert_eq!(result.value, vec![100.], "{result:?}");
     let result = run("layer('Rig').at('rotation',5)");
     assert!((result.value[0] - 50.).abs() < 1e-6);
     assert_eq!(result.diagnostic, None);
@@ -142,7 +143,7 @@ fn lookup_uses_the_real_authored_key_track_and_fps() {
     let result =
         evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
             .unwrap();
-    assert_eq!(result.value, vec![6.]);
+    assert_eq!(result.value, vec![6.], "{result:?}");
     assert_eq!(result.diagnostic, None);
 }
 
