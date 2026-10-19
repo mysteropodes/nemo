@@ -1,8 +1,8 @@
 //! Several simultaneous sessions: isolation and parallelism.
 
+use super::decode::decode_at;
 use super::tests::*;
 use super::*;
-use super::decode::decode_at;
 
 #[test]
 fn concurrent_sessions_decode_in_parallel_not_serialized() {
@@ -14,15 +14,30 @@ fn concurrent_sessions_decode_in_parallel_not_serialized() {
     let path_b = gen_video(
         "h264_320_concurrency_b.mp4",
         "testsrc2=size=320x240:rate=30:duration=3",
-        &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+        ],
     );
 
     let sessions = StdArc::new(VideoSessions::default());
     let (sa, _, _) = open_session_core_t(path_a.to_str().unwrap()).unwrap();
     let (sb, _, _) = open_session_core_t(path_b.to_str().unwrap()).unwrap();
     let (id_a, id_b) = (1u32, 2u32);
-    sessions.0.lock().unwrap().insert(id_a, StdArc::new(Mutex::new(sa)));
-    sessions.0.lock().unwrap().insert(id_b, StdArc::new(Mutex::new(sb)));
+    sessions
+        .0
+        .lock()
+        .unwrap()
+        .insert(id_a, StdArc::new(Mutex::new(sa)));
+    sessions
+        .0
+        .lock()
+        .unwrap()
+        .insert(id_b, StdArc::new(Mutex::new(sb)));
 
     fn work(sessions: StdArc<VideoSessions>, id: u32) -> u128 {
         let t0 = StdInstant::now();
@@ -42,7 +57,10 @@ fn concurrent_sessions_decode_in_parallel_not_serialized() {
     let db = hb.join().unwrap();
     let wall = t_wall.elapsed().as_millis();
 
-    eprintln!("[concurrency] A={da}ms B={db}ms wall={wall}ms sum={}ms", da + db);
+    eprintln!(
+        "[concurrency] A={da}ms B={db}ms wall={wall}ms sum={}ms",
+        da + db
+    );
     assert!(
         wall < (da + db) * 8 / 10,
         "wall={wall}ms not meaningfully less than sum={}ms — sessions may still be serializing",
@@ -61,8 +79,30 @@ fn concurrent_sessions_decode_in_parallel_not_serialized() {
 #[test]
 fn three_simultaneous_sessions_playback_mostly_avoids_respawns() {
     let pa = make_test_video(); // 320x240, 60 frames
-    let pb = gen_video("play3_b.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
-    let pc = gen_video("play3_c.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
+    let pb = gen_video(
+        "play3_b.mp4",
+        "testsrc2=size=320x240:rate=30:duration=3",
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+        ],
+    );
+    let pc = gen_video(
+        "play3_c.mp4",
+        "testsrc2=size=320x240:rate=30:duration=3",
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+        ],
+    );
     let (sa, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
     let (sb, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
     let (sc, _, _) = open_session_core_t(pc.to_str().unwrap()).unwrap();
@@ -99,7 +139,9 @@ fn three_simultaneous_sessions_playback_mostly_avoids_respawns() {
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    eprintln!("[diag] three-session playback: {respawn_count}/{total} requests needed a fresh spawn");
+    eprintln!(
+        "[diag] three-session playback: {respawn_count}/{total} requests needed a fresh spawn"
+    );
     assert!(
         respawn_count <= sessions.len() as u32 * 3,
         "{respawn_count}/{total} requests respawned — expected steady-state playback to avoid this almost entirely (only early warm-up spawns)"

@@ -239,7 +239,8 @@ pub fn optimized_media_target(path: String) -> Result<(String, bool), String> {
     let target = dir.join(format!("{:016x}.mjpeg", h.finish()));
     // "exists" must mean "usable": the stream without its sidecar index
     // (e.g. an interrupted transcode) is not.
-    let exists = target.exists() && std::path::Path::new(&format!("{}.idx", target.to_string_lossy())).exists();
+    let exists = target.exists()
+        && std::path::Path::new(&format!("{}.idx", target.to_string_lossy())).exists();
     Ok((target.to_string_lossy().to_string(), exists))
 }
 

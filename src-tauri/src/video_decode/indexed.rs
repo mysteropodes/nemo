@@ -69,7 +69,11 @@ pub(super) const SENTINEL_PADS_PER_REQUEST: usize = 3;
 /// q2 compression noise (±10ish) never gets near the ±80 tolerance.
 pub(super) fn paint_sentinel_signature(rgba: &mut [u8], width: usize) {
     for block in 0..4usize {
-        let (r, g, b) = if block % 2 == 0 { (255u8, 0u8, 255u8) } else { (0, 255, 0) };
+        let (r, g, b) = if block % 2 == 0 {
+            (255u8, 0u8, 255u8)
+        } else {
+            (0, 255, 0)
+        };
         for i in 0..8usize {
             let x = block * 8 + i;
             if x >= width {
@@ -93,10 +97,17 @@ pub(super) fn is_sentinel_frame(rgba: &[u8], width: usize) -> bool {
         return false;
     }
     for block in 0..4usize {
-        let (er, eg, eb) = if block % 2 == 0 { (255i32, 0i32, 255i32) } else { (0, 255, 0) };
+        let (er, eg, eb) = if block % 2 == 0 {
+            (255i32, 0i32, 255i32)
+        } else {
+            (0, 255, 0)
+        };
         for &x in &[block * 8 + 3, block * 8 + 4] {
             let p = &rgba[x * 4..x * 4 + 3];
-            if (p[0] as i32 - er).abs() > 80 || (p[1] as i32 - eg).abs() > 80 || (p[2] as i32 - eb).abs() > 80 {
+            if (p[0] as i32 - er).abs() > 80
+                || (p[1] as i32 - eg).abs() > 80
+                || (p[2] as i32 - eb).abs() > 80
+            {
                 return false;
             }
         }
@@ -118,9 +129,25 @@ pub(super) fn sentinel_pad(width: u32, height: u32) -> Result<Vec<u8>, String> {
     paint_sentinel_signature(&mut raw, w);
     let mut child = Command::new(ffmpeg_path())
         .args([
-            "-v", "error",
-            "-f", "rawvideo", "-pix_fmt", "rgba", "-s", &format!("{width}x{height}"), "-i", "-",
-            "-frames:v", "1", "-c:v", "mjpeg", "-q:v", "2", "-f", "mjpeg", "-",
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-s",
+            &format!("{width}x{height}"),
+            "-i",
+            "-",
+            "-frames:v",
+            "1",
+            "-c:v",
+            "mjpeg",
+            "-q:v",
+            "2",
+            "-f",
+            "mjpeg",
+            "-",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -132,7 +159,9 @@ pub(super) fn sentinel_pad(width: u32, height: u32) -> Result<Vec<u8>, String> {
         let _ = stdin.write_all(&raw);
         // dropping stdin closes the pipe — EOF terminates the encode
     });
-    let out = child.wait_with_output().map_err(|e| format!("sentinel encode: {e}"))?;
+    let out = child
+        .wait_with_output()
+        .map_err(|e| format!("sentinel encode: {e}"))?;
     let _ = writer.join();
     if !out.status.success() || out.stdout.is_empty() {
         return Err("sentinel encode produced no output".into());
@@ -151,7 +180,8 @@ pub(super) fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, 
     }
     Some((|| {
         let text = std::fs::read_to_string(&idx_path).map_err(|e| format!("read idx: {e}"))?;
-        let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("parse idx: {e}"))?;
+        let v: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| format!("parse idx: {e}"))?;
         let fps = v["fps"].as_f64().ok_or("idx: missing fps")?;
         let width = v["width"].as_u64().ok_or("idx: missing width")? as u32;
         let height = v["height"].as_u64().ok_or("idx: missing height")? as u32;
@@ -170,14 +200,19 @@ pub(super) fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, 
         // than misdetect pads; the JS caller falls back to the original
         // file on open failure.
         if width < 32 {
-            return Err(format!("indexed mode unsupported below 32px width (got {width})"));
+            return Err(format!(
+                "indexed mode unsupported below 32px width (got {width})"
+            ));
         }
         let count = (offsets.len() - 1) as u64;
         let file = std::fs::File::open(path).map_err(|e| format!("open {path}: {e}"))?;
         // Stale-index guard: the sentinel must equal the current file size.
         let len = file.metadata().map_err(|e| e.to_string())?.len();
         if *offsets.last().unwrap() != len {
-            return Err(format!("idx is stale for {path} (sentinel {} != file len {len})", offsets.last().unwrap()));
+            return Err(format!(
+                "idx is stale for {path} (sentinel {} != file len {len})",
+                offsets.last().unwrap()
+            ));
         }
         let duration = count as f64 / fps;
         // Sentinel pipeline padding — see IndexedSeq::pad. Generated once
@@ -196,7 +231,12 @@ pub(super) fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, 
                 readahead_active: false,
                 readahead_goal: 0,
                 last_foreground_request: -1,
-                indexed: Some(IndexedSeq { file, offsets, conv: None, pad }),
+                indexed: Some(IndexedSeq {
+                    file,
+                    offsets,
+                    conv: None,
+                    pad,
+                }),
                 codec: "mjpeg-indexed".into(),
             },
             count,
@@ -218,10 +258,24 @@ pub(super) fn try_open_indexed(path: &str) -> Option<Result<(VideoSession, u64, 
 pub(super) fn conv_spawn(frame_bytes: usize, width: usize) -> Result<ConvProc, String> {
     let mut child = Command::new(ffmpeg_path())
         .args([
-            "-v", "error",
-            "-probesize", "32", "-fpsprobesize", "0", "-analyzeduration", "1",
-            "-f", "mjpeg", "-i", "-",
-            "-f", "rawvideo", "-pix_fmt", "rgba", "-an", "-",
+            "-v",
+            "error",
+            "-probesize",
+            "32",
+            "-fpsprobesize",
+            "0",
+            "-analyzeduration",
+            "1",
+            "-f",
+            "mjpeg",
+            "-i",
+            "-",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "-an",
+            "-",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -265,7 +319,11 @@ pub(super) fn conv_spawn(frame_bytes: usize, width: usize) -> Result<ConvProc, S
             }
         }
     });
-    Ok(ConvProc { child, jpeg_tx: tx, frame_rx: frx })
+    Ok(ConvProc {
+        child,
+        jpeg_tx: tx,
+        frame_rx: frx,
+    })
 }
 
 /// Decode one frame of an indexed session: read its JPEG bytes at the
@@ -282,8 +340,12 @@ pub(super) fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<V
     }
     let (a, b) = (seq.offsets[i], seq.offsets[i + 1]);
     let mut jpeg = vec![0u8; (b - a) as usize];
-    seq.file.seek(SeekFrom::Start(a)).map_err(|e| e.to_string())?;
-    seq.file.read_exact(&mut jpeg).map_err(|e| format!("read frame {frame_index}: {e}"))?;
+    seq.file
+        .seek(SeekFrom::Start(a))
+        .map_err(|e| e.to_string())?;
+    seq.file
+        .read_exact(&mut jpeg)
+        .map_err(|e| format!("read frame {frame_index}: {e}"))?;
 
     for attempt in 0..2 {
         if seq.conv.is_none() {
@@ -296,7 +358,8 @@ pub(super) fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<V
         // channel only ever yields real frames. recv_timeout (never a
         // bare blocking read) is what guarantees this can't freeze the
         // session mutex (see ConvProc::frame_rx).
-        let mut payload = Vec::with_capacity(jpeg.len() + seq.pad.len() * SENTINEL_PADS_PER_REQUEST);
+        let mut payload =
+            Vec::with_capacity(jpeg.len() + seq.pad.len() * SENTINEL_PADS_PER_REQUEST);
         payload.extend_from_slice(&jpeg);
         for _ in 0..SENTINEL_PADS_PER_REQUEST {
             payload.extend_from_slice(&seq.pad);
@@ -307,7 +370,10 @@ pub(super) fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<V
         }
         let mut extra_volleys = 0u32;
         let failure = loop {
-            match conv.frame_rx.recv_timeout(std::time::Duration::from_millis(700)) {
+            match conv
+                .frame_rx
+                .recv_timeout(std::time::Duration::from_millis(700))
+            {
                 Ok(frame) => {
                     return Ok(frame);
                 }
@@ -336,7 +402,9 @@ pub(super) fn indexed_decode(s: &mut VideoSession, frame_index: i64) -> Result<V
         let _ = conv.child.wait();
         seq.conv = None;
         if attempt == 1 {
-            return Err(format!("indexed decode failed twice for frame {frame_index}: {failure}"));
+            return Err(format!(
+                "indexed decode failed twice for frame {frame_index}: {failure}"
+            ));
         }
     }
     unreachable!()

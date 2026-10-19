@@ -19,7 +19,11 @@ use super::session::{
 /// replacement for v1's numeric "frames walked" count — ffmpeg's own
 /// `-ss`/accurate_seek walk happens inside the child process now, where
 /// we can't observe or bound it directly (see the module doc comment).
-pub(super) fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) -> Result<(Vec<u8>, bool), String> {
+pub(super) fn decode_at(
+    s: &mut VideoSession,
+    frame_index: i64,
+    caller: &str,
+) -> Result<(Vec<u8>, bool), String> {
     // Tail robustness (ported from v1 — caught live 2026-07, "decode:
     // stream exhausted" aborting scrubs near the end): requesting a frame
     // at/near the tail can hit EOF because frame_count is DERIVED
@@ -66,7 +70,10 @@ pub(super) fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) ->
             origin = p.next_frame;
         }
     }
-    if origin == frame_index && (s.proc.is_none() || gap_for_diag.is_some_and(|g| !(0..=SMALL_FORWARD_REUSE_TOLERANCE).contains(&g))) {
+    if origin == frame_index
+        && (s.proc.is_none()
+            || gap_for_diag.is_some_and(|g| !(0..=SMALL_FORWARD_REUSE_TOLERANCE).contains(&g)))
+    {
         eprintln!("[video-decode] DIAG real-respawn: caller={caller} target={frame_index} gap={gap_for_diag:?}");
         // A real respawn is unavoidable. If this request is a small
         // BACKWARD STEP from the previous foreground request (frame-by-
@@ -173,7 +180,10 @@ pub(super) fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) ->
 // request was cold (fresh process spawn) or hit the running sequential
 // stream — see decode_at's doc comment for why this replaced v1's
 // numeric walked-frame count.
-pub(super) fn decode_frame_core(s: &mut VideoSession, frame_index: i64) -> Result<(Vec<u8>, bool), String> {
+pub(super) fn decode_frame_core(
+    s: &mut VideoSession,
+    frame_index: i64,
+) -> Result<(Vec<u8>, bool), String> {
     // Clamp to the stream's real range, AE-style: scrubbing to (or past)
     // the last frame HOLDS the last frame instead of erroring — unchanged
     // from v1.

@@ -70,10 +70,17 @@ pub(super) fn spawn_at(s: &mut VideoSession, frame_index: i64) -> Result<(), Str
         let seconds = frame_index as f64 / s.fps;
         cmd.args(["-ss", &format!("{seconds:.6}")]);
     }
-    cmd.args(["-i", &s.path, "-f", "rawvideo", "-pix_fmt", "rgba", "-vsync", "0", "-an", "-sn", "-"]);
-    cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args([
+        "-i", &s.path, "-f", "rawvideo", "-pix_fmt", "rgba", "-vsync", "0", "-an", "-sn", "-",
+    ]);
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| format!("spawn ffmpeg: {e}"))?;
-    let stdout = child.stdout.take().ok_or("ffmpeg spawned with no stdout pipe")?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or("ffmpeg spawned with no stdout pipe")?;
     // Buffer sized to one full frame (or 64KB, whichever is larger) so a
     // single read_exact() below is satisfied by one or two underlying
     // syscalls even at 4K, not dozens of small reads.

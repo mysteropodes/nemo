@@ -46,7 +46,9 @@ fn decode_past_end_clamps_to_last_frame() {
     let path = make_test_video();
     let (mut s, frame_count, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let expected_len = (s.width * s.height * 4) as usize;
-    let past = decode_frame_core(&mut s, frame_count as i64 + 100).unwrap().0;
+    let past = decode_frame_core(&mut s, frame_count as i64 + 100)
+        .unwrap()
+        .0;
     assert_eq!(past.len(), expected_len);
     let last_a = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap().0;
     let last_b = decode_frame_core(&mut s, frame_count as i64 - 1).unwrap().0;
@@ -64,20 +66,32 @@ fn webm_tail_seek_does_not_exhaust() {
     let (mut s, frame_count, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     assert!(frame_count > 0);
     let expected_len = (s.width * s.height * 4) as usize;
-    for probe in [frame_count as i64 - 1, frame_count as i64, frame_count as i64 + 10] {
+    for probe in [
+        frame_count as i64 - 1,
+        frame_count as i64,
+        frame_count as i64 + 10,
+    ] {
         let (f, _) = decode_frame_core(&mut s, probe)
             .unwrap_or_else(|e| panic!("tail probe {probe} failed: {e}"));
         assert_eq!(f.len(), expected_len, "tail probe {probe} wrong size");
     }
 }
 
-
 #[test]
 fn codec_hevc_mp4() {
     let p = gen_video(
         "hevc_320.mp4",
         "testsrc2=size=320x240:rate=30:duration=2",
-        &["-c:v", hevc_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15", "-tag:v", "hvc1"],
+        &[
+            "-c:v",
+            hevc_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+            "-tag:v",
+            "hvc1",
+        ],
     );
     assert_decodes_and_seeks(&p, 320, 240);
 }
@@ -97,7 +111,14 @@ fn codec_prores_mov() {
     let p = gen_video(
         "prores_320.mov",
         "testsrc2=size=320x240:rate=30:duration=2",
-        &["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le"],
+        &[
+            "-c:v",
+            "prores_ks",
+            "-profile:v",
+            "3",
+            "-pix_fmt",
+            "yuv422p10le",
+        ],
     );
     assert_decodes_and_seeks(&p, 320, 240);
 }
@@ -113,7 +134,14 @@ fn codec_prores4444_alpha_survives_the_pipe() {
     let p = gen_video(
         "prores4444_alpha_320.mov",
         "testsrc2=size=320x240:rate=30:duration=1,format=rgba,colorchannelmixer=aa=0.5",
-        &["-c:v", "prores_ks", "-profile:v", "4", "-pix_fmt", "yuva444p10le"],
+        &[
+            "-c:v",
+            "prores_ks",
+            "-profile:v",
+            "4",
+            "-pix_fmt",
+            "yuva444p10le",
+        ],
     );
     let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     let f0 = decode_frame_core(&mut s, 0).unwrap().0;
@@ -136,7 +164,14 @@ fn odd_width_stride_padding() {
     let p = gen_video(
         "odd_954x542.mp4",
         "testsrc2=size=954x542:rate=30:duration=1",
-        &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+        ],
     );
     assert_decodes_and_seeks(&p, 954, 542);
 }
@@ -146,7 +181,14 @@ fn seek_accuracy_at_25fps() {
     let p = gen_video(
         "fps25_320.mp4",
         "testsrc2=size=320x240:rate=25:duration=2",
-        &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "12"],
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "12",
+        ],
     );
     let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     assert!((s.fps - 25.0).abs() < 0.01, "fps was {}", s.fps);
@@ -164,7 +206,14 @@ fn interleaved_sessions_stay_isolated() {
     let pb = gen_video(
         "iso_b_160.mp4",
         "testsrc2=size=160x120:rate=30:duration=2",
-        &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+        ],
     );
     let (mut a, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
     let (mut b, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
@@ -175,11 +224,22 @@ fn interleaved_sessions_stay_isolated() {
     let a2 = decode_frame_core(&mut a, 2).unwrap().0;
 
     let (mut a_ref, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
-    assert_eq!(a0, decode_frame_core(&mut a_ref, 0).unwrap().0, "a0 diverged");
-    assert_eq!(a1, decode_frame_core(&mut a_ref, 1).unwrap().0, "a1 diverged");
-    assert_eq!(a2, decode_frame_core(&mut a_ref, 2).unwrap().0, "a2 diverged");
+    assert_eq!(
+        a0,
+        decode_frame_core(&mut a_ref, 0).unwrap().0,
+        "a0 diverged"
+    );
+    assert_eq!(
+        a1,
+        decode_frame_core(&mut a_ref, 1).unwrap().0,
+        "a1 diverged"
+    );
+    assert_eq!(
+        a2,
+        decode_frame_core(&mut a_ref, 2).unwrap().0,
+        "a2 diverged"
+    );
 }
-
 
 // Locks in the small-forward-reuse fix ("un peu de régression... chaque
 // seek respawn un process complet, même pour un pas d'une frame" —
@@ -205,12 +265,21 @@ fn small_forward_gap_reuses_running_process_no_respawn() {
     let (mut s2, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     decode_frame_core(&mut s2, 0).unwrap();
     let (jumped_12, seeked) = decode_frame_core(&mut s2, 12).unwrap();
-    assert!(!seeked, "a 12-frame forward gap should reuse the running process, not respawn");
-    assert_eq!(jumped_12, truth_12, "reused-process forward walk landed on the wrong frame");
+    assert!(
+        !seeked,
+        "a 12-frame forward gap should reuse the running process, not respawn"
+    );
+    assert_eq!(
+        jumped_12, truth_12,
+        "reused-process forward walk landed on the wrong frame"
+    );
 
     // A gap PAST the tolerance must still (correctly) respawn.
     let (mut s3, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     decode_frame_core(&mut s3, 0).unwrap();
     let (_far, seeked_far) = decode_frame_core(&mut s3, 40).unwrap();
-    assert!(seeked_far, "a gap far beyond the small-forward tolerance should still respawn");
+    assert!(
+        seeked_far,
+        "a gap far beyond the small-forward tolerance should still respawn"
+    );
 }

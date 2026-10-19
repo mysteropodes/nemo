@@ -138,9 +138,11 @@ pub(super) const MAX_TAIL_BACKOFF_ATTEMPTS: u32 = 8;
 /// Rust code right now.
 #[allow(dead_code)]
 pub(super) fn is_all_intra_codec(codec: &str) -> bool {
-    ["mjpeg", "prores", "dnxhd", "rawvideo", "qtrle", "huffyuv", "ffv1", "png", "v210"]
-        .iter()
-        .any(|k| codec.contains(k))
+    [
+        "mjpeg", "prores", "dnxhd", "rawvideo", "qtrle", "huffyuv", "ffv1", "png", "v210",
+    ]
+    .iter()
+    .any(|k| codec.contains(k))
 }
 
 // Core open logic, tauri-free so `cargo test` can exercise it directly
@@ -157,10 +159,13 @@ pub(super) fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), 
         .output()
         .map_err(|e| format!("probe spawn: {e}"))?;
     let stderr = String::from_utf8_lossy(&out.stderr);
-    let (width, height, fps, duration_seconds, codec) = parse_probe(&stderr)
-        .map_err(|e| format!("probe parse failed for {path}: {e}\n--- ffmpeg -i stderr ---\n{stderr}"))?;
+    let (width, height, fps, duration_seconds, codec) = parse_probe(&stderr).map_err(|e| {
+        format!("probe parse failed for {path}: {e}\n--- ffmpeg -i stderr ---\n{stderr}")
+    })?;
     if fps <= 0.0 || width == 0 || height == 0 {
-        return Err(format!("invalid stream parameters (w={width} h={height} fps={fps})"));
+        return Err(format!(
+            "invalid stream parameters (w={width} h={height} fps={fps})"
+        ));
     }
     // frame_count is ALWAYS derived (duration×fps) — v1 only did this as a
     // WebM-specific fallback because video-rs otherwise exposed a real

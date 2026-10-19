@@ -55,10 +55,16 @@ pub(super) fn index_mjpeg_stream(path: &str) -> Result<Vec<u64>, String> {
     'images: loop {
         let start = pos;
         // Expect SOI (or clean EOF between images).
-        let Some(b0) = next_byte(&mut r, &mut pos) else { break };
-        let Some(b1) = next_byte(&mut r, &mut pos) else { break };
+        let Some(b0) = next_byte(&mut r, &mut pos) else {
+            break;
+        };
+        let Some(b1) = next_byte(&mut r, &mut pos) else {
+            break;
+        };
         if b0 != 0xFF || b1 != 0xD8 {
-            return Err(format!("not an MJPEG stream: expected SOI at byte {start}, found {b0:02x}{b1:02x}"));
+            return Err(format!(
+                "not an MJPEG stream: expected SOI at byte {start}, found {b0:02x}{b1:02x}"
+            ));
         }
         offsets.push(start);
         // Walk marker segments.
@@ -66,10 +72,14 @@ pub(super) fn index_mjpeg_stream(path: &str) -> Result<Vec<u64>, String> {
             // Marker prefix: one or more 0xFF fill bytes then the marker id.
             let m;
             loop {
-                let Some(b) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF in marker)".into()) };
+                let Some(b) = next_byte(&mut r, &mut pos) else {
+                    return Err("truncated JPEG (EOF in marker)".into());
+                };
                 if b == 0xFF {
                     loop {
-                        let Some(b2) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF after 0xFF)".into()) };
+                        let Some(b2) = next_byte(&mut r, &mut pos) else {
+                            return Err("truncated JPEG (EOF after 0xFF)".into());
+                        };
                         if b2 != 0xFF {
                             m = b2;
                             break;
@@ -78,25 +88,36 @@ pub(super) fn index_mjpeg_stream(path: &str) -> Result<Vec<u64>, String> {
                     break;
                 }
                 // Non-FF between segments would be corruption; be strict.
-                return Err(format!("corrupt JPEG segment structure at byte {}", pos - 1));
+                return Err(format!(
+                    "corrupt JPEG segment structure at byte {}",
+                    pos - 1
+                ));
             }
             match m {
-                0xD9 => continue 'images,          // EOI with no scan (degenerate but legal)
-                0x01 | 0xD0..=0xD7 => continue,    // standalone markers, no payload
+                0xD9 => continue 'images,       // EOI with no scan (degenerate but legal)
+                0x01 | 0xD0..=0xD7 => continue, // standalone markers, no payload
                 0xDA => {
                     // SOS: skip its header, then scan entropy-coded data.
-                    let Some(l0) = next_byte(&mut r, &mut pos) else { return Err("truncated SOS".into()) };
-                    let Some(l1) = next_byte(&mut r, &mut pos) else { return Err("truncated SOS".into()) };
+                    let Some(l0) = next_byte(&mut r, &mut pos) else {
+                        return Err("truncated SOS".into());
+                    };
+                    let Some(l1) = next_byte(&mut r, &mut pos) else {
+                        return Err("truncated SOS".into());
+                    };
                     let seg_len = u16::from_be_bytes([l0, l1]) as u64;
                     if seg_len < 2 || !skip(&mut r, &mut pos, seg_len - 2) {
                         return Err("truncated SOS header".into());
                     }
                     loop {
-                        let Some(b) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF in scan)".into()) };
+                        let Some(b) = next_byte(&mut r, &mut pos) else {
+                            return Err("truncated JPEG (EOF in scan)".into());
+                        };
                         if b != 0xFF {
                             continue;
                         }
-                        let Some(b2) = next_byte(&mut r, &mut pos) else { return Err("truncated JPEG (EOF in scan marker)".into()) };
+                        let Some(b2) = next_byte(&mut r, &mut pos) else {
+                            return Err("truncated JPEG (EOF in scan marker)".into());
+                        };
                         match b2 {
                             0x00 | 0xD0..=0xD7 => continue, // stuffing / restart
                             0xD9 => continue 'images,       // EOI — frame complete
@@ -111,8 +132,12 @@ pub(super) fn index_mjpeg_stream(path: &str) -> Result<Vec<u64>, String> {
                                 if b2 == 0x01 || (0xD0..=0xD7).contains(&b2) {
                                     continue;
                                 }
-                                let Some(l0) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
-                                let Some(l1) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
+                                let Some(l0) = next_byte(&mut r, &mut pos) else {
+                                    return Err("truncated segment".into());
+                                };
+                                let Some(l1) = next_byte(&mut r, &mut pos) else {
+                                    return Err("truncated segment".into());
+                                };
                                 let seg_len = u16::from_be_bytes([l0, l1]) as u64;
                                 if seg_len < 2 || !skip(&mut r, &mut pos, seg_len - 2) {
                                     return Err("truncated segment payload".into());
@@ -123,8 +148,12 @@ pub(super) fn index_mjpeg_stream(path: &str) -> Result<Vec<u64>, String> {
                 }
                 _ => {
                     // Length-prefixed segment: APPn, DQT, DHT, SOF0, COM...
-                    let Some(l0) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
-                    let Some(l1) = next_byte(&mut r, &mut pos) else { return Err("truncated segment".into()) };
+                    let Some(l0) = next_byte(&mut r, &mut pos) else {
+                        return Err("truncated segment".into());
+                    };
+                    let Some(l1) = next_byte(&mut r, &mut pos) else {
+                        return Err("truncated segment".into());
+                    };
                     let seg_len = u16::from_be_bytes([l0, l1]) as u64;
                     if seg_len < 2 || !skip(&mut r, &mut pos, seg_len - 2) {
                         return Err("truncated segment payload".into());
@@ -155,10 +184,14 @@ pub(super) fn create_optimized_media_core(src: &str, target: &str) -> Result<(),
     // Width/height come from the source too: the transcode never rescales,
     // and the raw MJPEG result can't be re-probed anyway (no Duration line
     // without a container — the whole reason the sidecar exists).
-    let (width, height, fps, _, _) = parse_probe(&stderr).map_err(|e| format!("probe {src}: {e}"))?;
+    let (width, height, fps, _, _) =
+        parse_probe(&stderr).map_err(|e| format!("probe {src}: {e}"))?;
 
     let status = Command::new(ffmpeg_path())
-        .args(["-y", "-v", "error", "-nostdin", "-i", src, "-c:v", "mjpeg", "-q:v", "3", "-an", "-f", "mjpeg", target])
+        .args([
+            "-y", "-v", "error", "-nostdin", "-i", src, "-c:v", "mjpeg", "-q:v", "3", "-an", "-f",
+            "mjpeg", target,
+        ])
         .status()
         .map_err(|e| format!("transcode spawn: {e}"))?;
     if !status.success() {
@@ -178,7 +211,10 @@ pub(super) fn create_optimized_media_core(src: &str, target: &str) -> Result<(),
         "count": count,
         "offsets": offsets,
     });
-    std::fs::write(format!("{target}.idx"), serde_json::to_vec(&idx).map_err(|e| e.to_string())?)
-        .map_err(|e| format!("write idx: {e}"))?;
+    std::fs::write(
+        format!("{target}.idx"),
+        serde_json::to_vec(&idx).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| format!("write idx: {e}"))?;
     Ok(())
 }

@@ -1,15 +1,22 @@
 //! Frame cache reuse and the readahead thread in both directions.
 
+use super::session::is_all_intra_codec;
 use super::tests::*;
 use super::*;
-use super::session::is_all_intra_codec;
 
 #[test]
 fn revisited_frame_is_cache_accelerated_and_byte_identical() {
     let p = gen_video(
         "h264_320_biggop.mp4",
         "testsrc2=size=320x240:rate=30:duration=3",
-        &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "60"],
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "60",
+        ],
     );
     let (mut s, _frame_count, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
 
@@ -17,14 +24,20 @@ fn revisited_frame_is_cache_accelerated_and_byte_identical() {
     let t0 = std::time::Instant::now();
     let (first, seeked) = decode_frame_core(&mut s, target).unwrap();
     let cold_ms = t0.elapsed().as_secs_f64() * 1000.0;
-    assert!(seeked, "target should have required a real spawn+seek to set up this test");
+    assert!(
+        seeked,
+        "target should have required a real spawn+seek to set up this test"
+    );
 
     decode_frame_core(&mut s, 10).unwrap();
     let t1 = std::time::Instant::now();
     let (second, seeked2) = decode_frame_core(&mut s, target).unwrap();
     let warm_ms = t1.elapsed().as_secs_f64() * 1000.0;
 
-    assert_eq!(first, second, "cached frame bytes diverged from the original decode");
+    assert_eq!(
+        first, second,
+        "cached frame bytes diverged from the original decode"
+    );
     assert!(!seeked2, "cache hit should not report a fresh spawn");
     assert!(
         warm_ms < cold_ms / 2.0,
@@ -49,7 +62,11 @@ fn readahead_warms_the_cache_ahead_of_requests() {
             if warmed {
                 break;
             }
-            assert!(std::time::Instant::now() < deadline, "readahead never warmed frames 1-4 (cache: {:?})", s.cache.iter().map(|(i, _)| *i).collect::<Vec<_>>());
+            assert!(
+                std::time::Instant::now() < deadline,
+                "readahead never warmed frames 1-4 (cache: {:?})",
+                s.cache.iter().map(|(i, _)| *i).collect::<Vec<_>>()
+            );
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
@@ -65,7 +82,11 @@ fn readahead_warms_backward_on_all_intra() {
         &["-c:v", "mjpeg", "-q:v", "3", "-pix_fmt", "yuvj420p"],
     );
     let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
-    assert!(is_all_intra_codec(&s.codec), "test file should read as all-intra, got {}", s.codec);
+    assert!(
+        is_all_intra_codec(&s.codec),
+        "test file should read as all-intra, got {}",
+        s.codec
+    );
     let arc = std::sync::Arc::new(Mutex::new(s));
     decode_frame_core(&mut arc.lock().unwrap(), 20).unwrap();
     spawn_readahead(arc.clone(), 20);
@@ -74,8 +95,14 @@ fn readahead_warms_backward_on_all_intra() {
         {
             let s = arc.lock().unwrap();
             let warmed = (17..=19).all(|i| s.cache.iter().any(|(idx, _)| *idx == i));
-            if warmed { break; }
-            assert!(std::time::Instant::now() < deadline, "backward frames 17-19 never warmed (cache: {:?})", s.cache.iter().map(|(i, _)| *i).collect::<Vec<_>>());
+            if warmed {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "backward frames 17-19 never warmed (cache: {:?})",
+                s.cache.iter().map(|(i, _)| *i).collect::<Vec<_>>()
+            );
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
@@ -99,7 +126,18 @@ fn readahead_warms_backward_on_all_intra() {
 // spinning.
 #[test]
 fn readahead_backward_fill_does_not_fight_forward_playback() {
-    let p = gen_video("play_thrash.mp4", "testsrc2=size=320x240:rate=30:duration=4", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
+    let p = gen_video(
+        "play_thrash.mp4",
+        "testsrc2=size=320x240:rate=30:duration=4",
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+        ],
+    );
     let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -151,7 +189,18 @@ fn readahead_backward_fill_does_not_fight_forward_playback() {
 // idle instead of spinning.
 #[test]
 fn readahead_settles_even_when_cache_cannot_hold_the_full_window() {
-    let p = gen_video("thrash_1080p.mp4", "testsrc2=size=1920x1080:rate=30:duration=3", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
+    let p = gen_video(
+        "thrash_1080p.mp4",
+        "testsrc2=size=1920x1080:rate=30:duration=3",
+        &[
+            "-c:v",
+            h264_fixture_encoder(),
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "15",
+        ],
+    );
     let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -204,12 +253,17 @@ fn backward_scrub_steps_amortize_into_cache_hits() {
     // Following backward steps: all inside the prefetched window.
     for target in (34..=38).rev() {
         let (bytes, seeked) = decode_frame_core(&mut s, target).unwrap();
-        assert!(!seeked, "backward scrub to {target} respawned — prefetch window not cached");
+        assert!(
+            !seeked,
+            "backward scrub to {target} respawned — prefetch window not cached"
+        );
         let truth = decode_frame_core(&mut s_ref, target).unwrap().0;
-        assert_eq!(bytes, truth, "prefetched frame {target} is not byte-identical to a direct decode");
+        assert_eq!(
+            bytes, truth,
+            "prefetched frame {target} is not byte-identical to a direct decode"
+        );
     }
 }
-
 
 #[test]
 fn cache_hit_does_not_corrupt_decoder_position() {
@@ -223,5 +277,8 @@ fn cache_hit_does_not_corrupt_decoder_position() {
     let (_, seeked) = decode_frame_core(&mut s, 45).unwrap();
     assert!(!seeked, "expected a cache hit for the revisit");
     let f46 = decode_frame_core(&mut s, 46).unwrap().0;
-    assert_eq!(f46, truth_46, "frame 46 after a cache hit isn't the real frame 46 — decoder position corrupted");
+    assert_eq!(
+        f46, truth_46,
+        "frame 46 after a cache hit isn't the real frame 46 — decoder position corrupted"
+    );
 }
