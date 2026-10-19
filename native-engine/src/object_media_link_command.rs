@@ -1,6 +1,6 @@
 //! Staged placement commands through the existing history and request-receipt owner.
 //! The parent dispatcher performs envelope, owner, replay, cancel and revision checks.
-//! This is not public capability/host admission; AudioTrack owner refusal stays intact.
+//! Audio requires its actual persisted record and sealed source; absent owners still refuse.
 use crate::history::NativeObjectHistory;
 use crate::object_document::media_timing::object_media_link_edit::PlacementEdit;
 use crate::object_document::AssetTarget;
@@ -20,14 +20,14 @@ enum EditIn {
         #[serde(rename = "placementId")]
         placement_id: String,
         #[serde(rename = "offsetFrames")]
-        offset_frames: i64,
+        offset_frames: serde_json::Number,
     },
     #[serde(rename = "shiftOffset")]
     ShiftOffset {
         #[serde(rename = "placementId")]
         placement_id: String,
         #[serde(rename = "deltaFrames")]
-        delta_frames: i64,
+        delta_frames: serde_json::Number,
     },
     #[serde(rename = "remove")]
     Remove {
@@ -43,7 +43,7 @@ struct PlacementIn {
     id: String,
     asset_id: String,
     target: TargetIn,
-    offset_frames: i64,
+    offset_frames: serde_json::Number,
 }
 
 #[derive(Deserialize)]

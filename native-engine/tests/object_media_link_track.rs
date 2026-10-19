@@ -75,7 +75,13 @@ fn oracle_offset_tokens_are_accepted_exactly_when_the_baseline_reads_a_safe_inte
                 accepted += 1;
                 let value: i64 = canonical.parse().unwrap();
                 let inventory = project.asset_inventory().unwrap();
-                assert_eq!(inventory.placements()[0].offset_frames(), value);
+                assert_eq!(
+                    inventory.placements()[0]
+                        .offset_frames()
+                        .as_i64()
+                        .expect("original integer fixture"),
+                    value
+                );
                 assert!(encode(&project).contains(&format!(r#""offsetFrames":{canonical}}}"#)));
             }
             Err(error) => {
@@ -108,7 +114,10 @@ fn oracle_absent_and_null_offsets_are_refused_instead_of_defaulted_to_zero() {
             refused += 1;
         } else {
             let project = result.unwrap();
-            let offset = project.asset_inventory().unwrap().placements()[0].offset_frames();
+            let offset = project.asset_inventory().unwrap().placements()[0]
+                .offset_frames()
+                .as_i64()
+                .expect("original integer fixture");
             assert_eq!(offset.to_string(), saved);
         }
     }
@@ -123,7 +132,13 @@ fn video_placement_round_trips_with_every_authored_field() {
     let placement = &inventory.placements()[0];
     assert_eq!(placement.id(), "p1");
     assert_eq!(placement.asset_id().as_str(), "v1");
-    assert_eq!(placement.offset_frames(), -3);
+    assert_eq!(
+        placement
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        -3
+    );
     assert_eq!(placement.target(), &drawing("L"));
     let saved = encode(&project);
     assert!(saved.contains(&format!(r#""placements":[{VIDEO}]"#)));
@@ -137,7 +152,13 @@ fn explicit_zero_is_a_value_and_the_member_is_always_written() {
     let zero = VIDEO.replace(r#""offsetFrames":-3"#, r#""offsetFrames":0"#);
     let project = decode(&wire(&list(&[&zero]))).unwrap();
     let placement = &project.asset_inventory().unwrap().placements()[0];
-    assert_eq!(placement.offset_frames(), 0);
+    assert_eq!(
+        placement
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        0
+    );
     assert!(encode(&project).contains(&format!(r#""placements":[{zero}]"#)));
 }
 
@@ -175,7 +196,13 @@ fn audio_track_placement_round_trips_at_the_wire() {
             track_uid: "t1".into()
         }
     );
-    assert_eq!(placement.offset_frames(), 48);
+    assert_eq!(
+        placement
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        48
+    );
     assert!(encode(&project).contains(&format!(r#""placements":[{AUDIO}]"#)));
 }
 

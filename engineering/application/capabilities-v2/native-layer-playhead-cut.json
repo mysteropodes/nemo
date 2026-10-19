@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.layer-playhead-cut",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.layer.cut"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerPlayheadCutPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete retained correlated cut disposition or typed refusal; no document/resource payload."
+  },
+  "semantics": "Cut one scene-root vector layer at an explicit u32 frame using its same-snapshot actual native resolved range. The same native owner copies complete authored frames/timing/Motion/controls, preserves original raw in point and markers, drops live time links, ends original at cut-1 and creates an adjacent ordinary unlocked second half with literal name suffix (2). Changed cut adds one revision/history entry and returns its stable layerUid. Outside range is no-op with no publication or redo loss. Fractional resolved in is compared losslessly; unrepresentable materialized out and unconsumed item/component/duplicator/nonroot/project-placement sources remain typed unavailable. Payload context IDs are bounded authored IDs; non-root does not activate another context owner. No optimistic JS/Paper writer or separate authority. UI/installed/render/export acceptance remains open.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Actual cut owner: adjacent second layer, one revision and undo entry; installed acceptance pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "cut-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.cut",
+        "payload": {
+          "command": "object.layer.cut",
+          "contextId": "scene-root",
+          "layerUid": "authored layer alpha",
+          "frame": 10
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "cut-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    },
+    {
+      "label": "Outside actual resolved range: no publication, history or redo change",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "cut-noop",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.cut",
+        "payload": {
+          "command": "object.layer.cut",
+          "contextId": "scene-root",
+          "layerUid": "authored layer alpha",
+          "frame": 2
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "cut-noop",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "applied": false,
+          "historyEntriesAdded": 0
+        }
+      }
+    }
+  ]
+}

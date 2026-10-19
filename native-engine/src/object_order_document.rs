@@ -63,6 +63,8 @@ pub struct OrderedObjectDocument {
     pub(crate) component_tables: Presence<ComponentTables>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) audio_tracks: Presence<crate::object_document::AudioTracks>,
 }
 object_deserialize!(OrderedObjectDocument {
     format: String, format_version: u32, total_frames: u32,
@@ -72,7 +74,8 @@ object_deserialize!(OrderedObjectDocument {
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
     #[serde(default)] items: Presence<ItemRecords>,
     #[serde(default)] component_tables: Presence<ComponentTables>,
-    #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>
+    #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
 });
 impl OrderedObjectDocument {
     pub(crate) fn into_storage(self) -> ObjectDocument {
@@ -89,6 +92,7 @@ impl OrderedObjectDocument {
             items: self.items,
             component_tables: self.component_tables,
             motion_arcs: self.motion_arcs,
+            audio_tracks: self.audio_tracks,
         }
     }
     pub fn total_frames(&self) -> u32 {

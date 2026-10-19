@@ -12,6 +12,24 @@ use crate::object_document::{
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
 
+pub(super) fn validate_audio_tracks(
+    tracks: Option<&crate::object_document::AudioTracks>,
+) -> Result<(), ObjectCodecError> {
+    if let Some(tracks) = tracks {
+        tracks.validate(validate_effect_track).map_err(|message| {
+            ObjectCodecError::new(
+                if message == "unsupported audio Motion property" {
+                    ObjectCodecErrorKind::Unsupported
+                } else {
+                    ObjectCodecErrorKind::Invalid
+                },
+                message,
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn invalid(message: &str) -> ObjectCodecError {
     ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message)
 }
@@ -292,6 +310,7 @@ pub(crate) fn validate_storage_order(
     document: &ObjectDocument,
     plan: &OrderPlan,
 ) -> Result<(), ObjectCodecError> {
+    validate_audio_tracks(document.audio_tracks.value())?;
     if document.format != OBJECT_DOCUMENT_FORMAT || document.format_version != 2 {
         return Err(unsupported("unsupported ordered object format or version"));
     }
@@ -328,13 +347,15 @@ pub(crate) fn validate_storage_order(
 }
 
 pub fn decode_ordered_project(bytes: &[u8]) -> Result<OrderedObjectDocument, ObjectCodecError> {
-    let document = parse(bytes)?;
+    let document: OrderedObjectDocument = parse(bytes)?;
+    validate_audio_tracks(document.audio_tracks.value())?;
     ordered(&document)?;
     Ok(document)
 }
 pub fn encode_ordered_project(
     document: &OrderedObjectDocument,
 ) -> Result<Vec<u8>, ObjectCodecError> {
+    validate_audio_tracks(document.audio_tracks.value())?;
     ordered(document)?;
     serde_json::to_vec(document).map_err(|e| invalid(&e.to_string()))
 }
@@ -358,6 +379,7 @@ pub fn migrate_ordered_project(
         items: document.items.clone(),
         component_tables: document.component_tables.clone(),
         motion_arcs: document.motion_arcs.clone(),
+        audio_tracks: document.audio_tracks.clone(),
     };
     ordered(&migrated)?;
     Ok(migrated)

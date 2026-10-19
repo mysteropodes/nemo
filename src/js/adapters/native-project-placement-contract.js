@@ -12,7 +12,7 @@
     return v;
   }
   function sourceId(v){if(typeof v!=='string'||BLANK.test(v)||bytes(v)>255||v.includes('\0'))fail('invalid placement source id');}
-  function offset(v){if(!Number.isSafeInteger(v))fail('invalid placement offset');}
+  function offset(v,whole=false){if(typeof v!=='number'||!Number.isFinite(v)||Math.abs(v)>Number.MAX_SAFE_INTEGER||whole&&!Number.isSafeInteger(v))fail('invalid placement offset');}
   function target(v){
     if(v&&v.kind==='drawing'){
       exact(v,['kind','contextId','layerUid'],['strokeId']);sourceId(v.contextId);sourceId(v.layerUid);
@@ -24,7 +24,7 @@
     if(op!==OP)fail('placement operation is not declared');
     if(v&&v.kind==='place'){
       exact(v,['kind','placement']);const p=exact(v.placement,['id','assetId','target','offsetFrames']);
-      sourceId(p.id);sourceId(p.assetId);target(p.target);offset(p.offsetFrames);
+      sourceId(p.id);sourceId(p.assetId);target(p.target);offset(p.offsetFrames,p.target.kind!=='audioTrack');
     }else if(v&&['setOffset','shiftOffset'].includes(v.kind)){
       const field=v.kind==='setOffset'?'offsetFrames':'deltaFrames';exact(v,['kind','placementId',field]);sourceId(v.placementId);offset(v[field]);
     }else if(v&&v.kind==='remove'){exact(v,['kind','placementId']);sourceId(v.placementId);}

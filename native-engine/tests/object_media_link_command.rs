@@ -202,8 +202,20 @@ fn old_snapshot_keeps_real_encoded_bytes_and_inventory_across_edit_and_owner_dro
         encoded,
         new_image.source().encoded_allocation().unwrap()
     ));
-    assert_eq!(old_inventory.placements()[0].offset_frames(), 5);
-    assert_eq!(next_inventory.placements()[0].offset_frames(), 9);
+    assert_eq!(
+        old_inventory.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        5
+    );
+    assert_eq!(
+        next_inventory.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        9
+    );
     assert_eq!(
         o.serialize_project_file(0, pin.snapshot_id()).unwrap(),
         old_bytes
@@ -216,7 +228,9 @@ fn old_snapshot_keeps_real_encoded_bytes_and_inventory_across_edit_and_owner_dro
             .asset_inventory()
             .unwrap()
             .placements()[0]
-            .offset_frames(),
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
         5
     );
 }

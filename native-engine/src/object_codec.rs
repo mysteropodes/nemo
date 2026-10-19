@@ -177,6 +177,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         items: wire.items,
         component_tables: Presence::Missing,
         motion_arcs: wire.motion_arcs,
+        audio_tracks: wire.audio_tracks,
     };
     validate(&document)?;
     Ok(document)
@@ -194,6 +195,7 @@ struct LegacyDocument {
     image_meshes: Presence<ImageMeshStore>,
     items: Presence<crate::object_document::ItemRecords>,
     motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
+    audio_tracks: Presence<crate::object_document::AudioTracks>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
@@ -202,7 +204,8 @@ crate::object_document::object_deserialize!(LegacyDocument {
     #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
     #[serde(default)] items: Presence<crate::object_document::ItemRecords>,
-    #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>
+    #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
 });
 
 /// Route canonical v2 to its strict codec so its typed refusal is not masked by v1.
@@ -259,6 +262,7 @@ pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecE
 }
 
 pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    order::validate_audio_tracks(document.audio_tracks.value())?;
     use ObjectCodecErrorKind::Unsupported;
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
     if document.format != OBJECT_DOCUMENT_FORMAT

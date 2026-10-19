@@ -28,6 +28,7 @@ fn wire_limits() -> ProjectWireLimits {
             DIMENSION,
         )
         .unwrap();
+    let limits = limits.with_audio_limit(ENCODED_BYTES).unwrap();
     #[cfg(feature = "font_asset_wire")]
     let limits = limits
         .with_font_limits(crate::object_codec::FontAssetLimits::new(ENCODED_BYTES, 256).unwrap());

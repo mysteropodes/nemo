@@ -97,7 +97,10 @@
         "src/native_layer_shift_contract_tests.rs",
         "src/native_layer_shift_wire_tests.rs",
         "src/native_project_placement_contract.rs",
-        "src/native_project_placement_contract_tests.rs"
+        "src/native_project_placement_contract_tests.rs",
+        "src/native_layer_playhead_cut_contract.rs",
+        "src/native_layer_playhead_cut_contract_tests.rs",
+        "src/native_layer_playhead_cut_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

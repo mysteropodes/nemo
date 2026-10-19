@@ -110,7 +110,10 @@
         "object_frame_edit_ranges.rs",
         "object_motion_arcs.rs",
         "object_effect_key_tracks.rs",
-        "object_frame_bulk_move_document.rs"
+        "object_frame_bulk_move_document.rs",
+        "object_audio_track_record.rs",
+        "object_media_placement_offset.rs",
+        "audio_wave_admission.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -144,7 +147,10 @@
         "object_component_codec.rs",
         "object_frame_edit_range_codec.rs",
         "object_parent_links.rs",
-        "object_effect_stack_codec.rs"
+        "object_effect_stack_codec.rs",
+        "object_audio_track_baseline.rs",
+        "project_audio_asset_wire.rs",
+        "project_asset_source_wire.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -264,7 +270,9 @@
         "object_frame_bulk_move.rs",
         "object_layer_shift.rs",
         "object_layer_shift_motion.rs",
-        "object_layer_shift_range.rs"
+        "object_layer_shift_range.rs",
+        "object_layer_playhead_cut.rs",
+        "object_layer_playhead_cut_owner.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -331,7 +339,8 @@
         "object_raster_image_import_history.rs",
         "object_frame_bulk_move_history.rs",
         "object_layer_shift_history.rs",
-        "object_media_link_command.rs"
+        "object_media_link_command.rs",
+        "object_layer_playhead_cut_history.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -469,7 +478,8 @@
         "object_parametric_transform.rs",
         "object_text_frame.rs",
         "property_expression_lookup.rs",
-        "object_frame_context.rs"
+        "object_frame_context.rs",
+        "object_audio_track_sampling.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -1523,7 +1533,17 @@
         "object_frame_bulk_move_fixture.rs",
         "object_layer_shift_motion_fixture.rs",
         "object_context_frame_packet.rs",
-        "object_media_link_command.rs"
+        "object_media_link_command.rs",
+        "object_audio_track_record.rs",
+        "object_audio_track_sampling.rs",
+        "object_audio_track_baseline.rs",
+        "object_audio_track_owner.rs",
+        "object_media_placement_offset.rs",
+        "project_audio_retention.rs",
+        "audio_wave_admission.rs",
+        "project_audio_retention_fixture.rs",
+        "object_layer_playhead_cut.rs",
+        "object_layer_playhead_cut_history.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1650,7 +1670,10 @@
         "src/native_layer_shift_contract_tests.rs",
         "src/native_layer_shift_wire_tests.rs",
         "src/native_project_placement_contract.rs",
-        "src/native_project_placement_contract_tests.rs"
+        "src/native_project_placement_contract_tests.rs",
+        "src/native_layer_playhead_cut_contract.rs",
+        "src/native_layer_playhead_cut_contract_tests.rs",
+        "src/native_layer_playhead_cut_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1906,7 +1929,9 @@
         "native_raster_image_preview_tests.rs",
         "native_asset_remove_dispatch_tests.rs",
         "native_frame_clipboard_transport_tests.rs",
-        "native_project_placement_public_tests.rs"
+        "native_project_placement_public_tests.rs",
+        "native_project_placement_audio_fixture.rs",
+        "native_layer_playhead_cut_public_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -1147,62 +1147,100 @@
                   "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
                 },
                 "target": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "kind",
-                        "contextId",
-                        "layerUid"
-                      ],
-                      "properties": {
-                        "kind": {
-                          "const": "drawing"
-                        },
-                        "contextId": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255,
-                          "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
-                        },
-                        "layerUid": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255,
-                          "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
-                        },
-                        "strokeId": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255,
-                          "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
-                        }
-                      }
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "contextId",
+                    "layerUid"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "drawing"
                     },
-                    {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "kind",
-                        "trackUid"
-                      ],
-                      "properties": {
-                        "kind": {
-                          "const": "audioTrack"
-                        },
-                        "trackUid": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255,
-                          "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
-                        }
-                      }
+                    "contextId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                    },
+                    "layerUid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                    },
+                    "strokeId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
                     }
-                  ]
+                  }
                 },
                 "offsetFrames": {
                   "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "place"
+            },
+            "placement": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "assetId",
+                "target",
+                "offsetFrames"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                },
+                "assetId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                },
+                "target": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "trackUid"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "audioTrack"
+                    },
+                    "trackUid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                    }
+                  }
+                },
+                "offsetFrames": {
+                  "type": "number",
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 }
@@ -1229,7 +1267,7 @@
               "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
             },
             "offsetFrames": {
-              "type": "integer",
+              "type": "number",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
             }
@@ -1254,7 +1292,7 @@
               "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
             },
             "deltaFrames": {
-              "type": "integer",
+              "type": "number",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
             }
@@ -6153,6 +6191,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.cut"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerPlayheadCutPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -9274,6 +9329,36 @@
         }
       },
       "description": "Actual immutable identity and selected source; complete encoded result <=4096bytes or typed Unavailable. A core read is not live host/UI epoch admission or rendering/export acceptance."
+    },
+    "ObjectLayerPlayheadCutPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.cut"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authored context identity; Rust/JS enforce128 UTF8bytes. Only scene-root has an admitted positive copy owner; other contexts return typed unavailable."
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Original opaque authored layer identity; no identifier grammar invented. Native/JS enforce128 UTF8bytes."
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
     }
   }
 }

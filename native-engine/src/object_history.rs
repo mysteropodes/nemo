@@ -52,6 +52,9 @@ mod scene_effect_layer_history;
 // L02-I (#2108): boolean tool / eraser / Flatten as owner transactions.
 #[path = "object_boolean_ops_history.rs"]
 mod boolean_history;
+// F11 cut at playhead: one existing history transaction.
+#[path = "object_layer_playhead_cut_history.rs"]
+mod object_layer_playhead_cut;
 // L05-C (lane #2111): frame-structure transactions (insert / extend / duplicate / remove frames).
 #[path = "object_frame_edit_structure_history.rs"]
 mod object_frame_edit_structure;

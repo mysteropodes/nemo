@@ -41,7 +41,8 @@ struct PlacementIn<'a> {
     asset_id: &'a RawValue,
     #[serde(borrow)]
     target: &'a RawValue,
-    offset_frames: i64,
+    #[serde(borrow)]
+    offset_frames: &'a RawValue,
 }
 
 #[derive(Deserialize)]
@@ -112,8 +113,18 @@ pub(crate) fn read(items: Vec<&RawValue>) -> Result<Vec<AssetPlacement>, Project
         let asset_id =
             AssetId::new(text(wire.asset_id, 255)?).map_err(|_| ProjectWireError::Invalid)?;
         let target = target_of(wire.target)?;
+        let offset = match &target {
+            AssetTarget::AudioTrack { .. } => {
+                serde_json::from_str::<serde_json::Number>(wire.offset_frames.get())
+                    .map_err(|_| ProjectWireError::Invalid)?
+            }
+            _ => serde_json::Number::from(
+                serde_json::from_str::<i64>(wire.offset_frames.get())
+                    .map_err(|_| ProjectWireError::Invalid)?,
+            ),
+        };
         placements.push(
-            AssetPlacement::new(id, asset_id, target, wire.offset_frames)
+            AssetPlacement::new_number(id, asset_id, target, offset)
                 .map_err(|_| ProjectWireError::Invalid)?,
         );
     }
@@ -147,7 +158,7 @@ pub(crate) struct PlacementOutput<'a> {
     id: &'a str,
     asset_id: &'a str,
     target: TargetOutput<'a>,
-    offset_frames: i64,
+    offset_frames: &'a serde_json::Number,
 }
 
 #[derive(Serialize)]

@@ -34,7 +34,7 @@ fn place(placement_id: &str, target: AssetTarget, offset: i64) -> PlacementEdit 
         placement_id: placement_id.to_owned(),
         asset_id: "img".to_owned(),
         target,
-        offset_frames: offset,
+        offset_frames: (offset).into(),
     }
 }
 fn changed(outcome: Result<PlacementOutcome, PlacementEditError>) -> AssetInventory {
@@ -229,7 +229,13 @@ fn placing_an_image_follows_the_edit_kernel_and_refuses_what_does_not_exist() {
         place("p1", element_target("L", "r0"), 12),
     ));
     assert_eq!(first.placements().len(), 1);
-    assert_eq!(first.placements()[0].offset_frames(), 12);
+    assert_eq!(
+        first.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        12
+    );
     // The identical placement again is a no-op; another id on the same target, or another body, conflicts.
     assert_eq!(
         apply_edit(&first, &doc, place("p1", element_target("L", "r0"), 12)),
@@ -286,29 +292,47 @@ fn image_offsets_move_exactly_within_the_catalog_bound_and_removal_keeps_the_rec
         &doc,
         place("p1", layer_target("L"), max),
     ));
-    assert_eq!(at_max.placements()[0].offset_frames(), max);
+    assert_eq!(
+        at_max.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        max
+    );
     let shift = |delta: i64| {
         apply_edit(
             &at_max,
             &doc,
             PlacementEdit::ShiftOffset {
                 placement_id: "p1".to_owned(),
-                delta_frames: delta,
+                delta_frames: (delta).into(),
             },
         )
     };
     assert_eq!(shift(1), Err(PlacementEditError::Overflow));
     let down = changed(shift(-max));
-    assert_eq!(down.placements()[0].offset_frames(), 0);
+    assert_eq!(
+        down.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        0
+    );
     let negative = changed(apply_edit(
         &down,
         &doc,
         PlacementEdit::SetOffset {
             placement_id: "p1".to_owned(),
-            offset_frames: -max,
+            offset_frames: (-max).into(),
         },
     ));
-    assert_eq!(negative.placements()[0].offset_frames(), -max);
+    assert_eq!(
+        negative.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        -max
+    );
     let removed = changed(apply_edit(
         &negative,
         &doc,

@@ -60,19 +60,19 @@ pub(crate) fn place(id: &str, asset: &str, target: AssetTarget, offset: i64) -> 
         placement_id: id.to_owned(),
         asset_id: asset.to_owned(),
         target,
-        offset_frames: offset,
+        offset_frames: (offset).into(),
     }
 }
 pub(crate) fn set_offset(id: &str, offset: i64) -> PlacementEdit {
     PlacementEdit::SetOffset {
         placement_id: id.to_owned(),
-        offset_frames: offset,
+        offset_frames: (offset).into(),
     }
 }
 pub(crate) fn shift(id: &str, delta: i64) -> PlacementEdit {
     PlacementEdit::ShiftOffset {
         placement_id: id.to_owned(),
-        delta_frames: delta,
+        delta_frames: (delta).into(),
     }
 }
 pub(crate) fn remove(id: &str) -> PlacementEdit {

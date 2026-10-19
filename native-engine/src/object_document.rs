@@ -21,9 +21,14 @@ mod property_tests;
 
 #[path = "project_asset_inventory.rs"]
 mod assets;
+pub(crate) use assets::offset as placement_offset;
+pub(crate) use assets::wave as audio_wave;
+#[path = "object_audio_track_record.rs"]
+mod audio_tracks;
 pub(crate) use assets::{
     AssetId, AssetInventory, AssetKind, AssetPlacement, AssetRecord, AssetSource, AssetTarget,
 };
+pub(crate) use audio_tracks::{AudioTrackRecord, AudioTracks};
 
 #[path = "project_media_envelope.rs"]
 mod project;
@@ -195,6 +200,8 @@ pub struct ObjectDocument {
     pub(crate) component_tables: Presence<ComponentTables>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) audio_tracks: Presence<AudioTracks>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -290,7 +297,8 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
     #[serde(default)] items: Presence<ItemRecords>,
     #[serde(default)] component_tables: Presence<ComponentTables>,
-    #[serde(default)] motion_arcs: Presence<Option<MotionArcs>> });
+    #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(default)] audio_tracks: Presence<AudioTracks> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
     #[serde(default)] key_lock: Presence<Option<KeyLockMode>>,

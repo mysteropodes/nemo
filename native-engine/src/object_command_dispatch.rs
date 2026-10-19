@@ -31,6 +31,7 @@ const OP_OBJECT_UNDO: &str = "command.document.object.undo";
 const OP_OBJECT_REDO: &str = "command.document.object.redo";
 const OP_LAYER_VISIBILITY: &str = "command.document.object.layer.visibility.set";
 const OP_LAYER_CREATE: &str = "command.document.object.layer.create";
+const OP_LAYER_PLAYHEAD_CUT: &str = "command.document.object.layer.cut";
 const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
@@ -102,6 +103,7 @@ impl NativeObjectHistory {
                     | OP_OBJECT_REDO
                     | OP_LAYER_VISIBILITY
                     | OP_LAYER_CREATE
+                    | OP_LAYER_PLAYHEAD_CUT
                     | OP_LAYER_POLICY
                     | OP_PROPERTY_EDIT
                     | OP_PROPERTY_TRACK_EDIT
@@ -299,6 +301,8 @@ impl NativeObjectHistory {
                 self.dispatch_vector_edit_command(request, &payload)
             } else if Self::vector_param_operation(&request.operation) {
                 self.dispatch_vector_param(&request.operation, &request.payload)
+            } else if request.operation == OP_LAYER_PLAYHEAD_CUT {
+                self.dispatch_layer_playhead_cut(&request.operation, &request.payload)
             } else if Self::layer_lifecycle_operation(&request.operation) {
                 self.dispatch_layer_lifecycle(&request.operation, &request.payload)
             } else if Self::component_setup_operation(&request.operation) {

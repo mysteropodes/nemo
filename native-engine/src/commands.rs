@@ -7,6 +7,8 @@ pub use object_fill::{prepare_object_fill_json, PreparedObjectFill};
 #[cfg(feature = "history")]
 mod object_fill_owner;
 #[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedLayerPlayheadCut;
+#[cfg(feature = "history")]
 #[allow(unused_imports)]
 pub(crate) use object_fill_owner::{insert_order_element, remove_order_element, OrderEditError};
 #[cfg(feature = "history")]

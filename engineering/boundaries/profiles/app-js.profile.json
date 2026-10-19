@@ -3181,6 +3181,18 @@
       "publicApi": [
         "native-text-tool-desktop.js"
       ]
+    },
+    {
+      "id": "app.native.layer.playhead.cut.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-layer-playhead-cut-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-layer-playhead-cut-contract.js"
+      ]
     }
   ],
   "layerRules": {

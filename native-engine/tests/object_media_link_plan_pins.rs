@@ -431,7 +431,13 @@ fn the_plan_neither_changes_nor_retains_the_pinned_inventory() {
         held,
         "no encoded allocation is cloned into a plan"
     );
-    assert_eq!(inv.placements()[0].offset_frames(), 3);
+    assert_eq!(
+        inv.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        3
+    );
 }
 
 #[test]

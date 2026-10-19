@@ -288,3 +288,186 @@ async fn external_placement_wire_requires_subscriber_then_observes_and_acks_real
     assert!(events.is_empty());
     assert_eq!(saved(&state, &receipt), before);
 }
+
+// Audio source/record/placement joins below use the actual shared host. They do
+// not establish playback, ordinary editor integration or installed acceptance.
+#[path = "native_project_placement_audio_fixture.rs"]
+mod audio_fixture;
+use audio_fixture::{audio_offset, audio_wire, bootstrap_audio_wire, AUDIO_WAV};
+
+#[test]
+fn public_audio_bootstrap_persists_real_wave_and_authored_record_through_actual_reopen() {
+    use base64::Engine;
+    let state = ApplicationMcp::default();
+    let original = audio_wire(true);
+    let receipt = bootstrap_audio_wire(&state, &original, "audio-install");
+    assert_eq!(receipt["contentRevision"], 0);
+    let file = saved(&state, &receipt);
+    assert_eq!(file, original);
+    let source = &file["assets"][0]["source"];
+    assert_eq!(source["mediaType"], "audio/wav");
+    assert_eq!(
+        base64::engine::general_purpose::STANDARD
+            .decode(source["data"].as_str().unwrap())
+            .unwrap(),
+        AUDIO_WAV
+    );
+    let track = &file["drawing"]["audioTracks"][0];
+    assert_eq!(track["audioId"], "track-a");
+    assert_eq!(track["trimEnd"], Value::Null);
+    assert!(track.get("dataB64").is_none());
+    assert!(track.get("offsetFrames").is_none());
+    assert_eq!(audio_offset(&file), -1.25);
+    let reopened = ApplicationMcp::default();
+    let new_receipt = bootstrap_audio_wire(&reopened, &file, "audio-reopen");
+    assert_eq!(new_receipt["contentRevision"], 0);
+    assert_eq!(saved(&reopened, &new_receipt), file);
+}
+#[test]
+fn public_audio_place_fractional_shift_set_and_replay_use_the_actual_history_owner() {
+    let state = ApplicationMcp::default();
+    let receipt = bootstrap_audio_wire(&state, &audio_wire(false), "audio-unplaced");
+    let before = saved(&state, &receipt);
+    let place = request(
+        &receipt,
+        "audio-place",
+        0,
+        json!({"kind":"place","placement":{
+        "id":"audio-p","assetId":"wave-a","target":{"kind":"audioTrack","trackUid":"track-a"},"offsetFrames":-1.25}}),
+    );
+    let first = dispatch(&state, place.clone());
+    assert_eq!(first["ok"], true);
+    assert_eq!(
+        first["result"],
+        json!({"applied":true,"historyEntriesAdded":1})
+    );
+    assert_eq!(first["contentRevision"], 1);
+    assert_eq!(dispatch(&state, place), first);
+    let shift = request(
+        &receipt,
+        "audio-shift",
+        1,
+        json!({"kind":"shiftOffset","placementId":"audio-p","deltaFrames":0.625}),
+    );
+    let shifted = dispatch(&state, shift.clone());
+    assert_eq!(shifted["ok"], true);
+    assert_eq!(shifted["contentRevision"], 2);
+    let after_shift = saved(&state, &receipt);
+    assert_eq!(audio_offset(&after_shift), -0.625);
+    assert_eq!(dispatch(&state, shift.clone()), shifted);
+    undo(&state, &receipt, 2);
+    let undone = saved(&state, &receipt);
+    assert_eq!(audio_offset(&undone), -1.25);
+    assert_eq!(dispatch(&state, shift), shifted);
+    assert_eq!(saved(&state, &receipt), undone);
+    let noop = request(
+        &receipt,
+        "audio-zero",
+        3,
+        json!({"kind":"shiftOffset","placementId":"audio-p","deltaFrames":0.0}),
+    );
+    let no_change = dispatch(&state, noop.clone());
+    assert_eq!(no_change["ok"], true);
+    assert_eq!(
+        no_change["result"],
+        json!({"applied":false,"historyEntriesAdded":0})
+    );
+    assert_eq!(no_change["contentRevision"], 3);
+    assert_eq!(dispatch(&state, noop), no_change);
+    assert_eq!(saved(&state, &receipt), undone);
+    let info = state
+        .native_project_info(receipt["documentId"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(info["redoDepth"], 1);
+    let set = request(
+        &receipt,
+        "audio-set",
+        3,
+        json!({"kind":"setOffset","placementId":"audio-p","offsetFrames":-3.875}),
+    );
+    let response = dispatch(&state, set);
+    assert_eq!(response["ok"], true);
+    assert_eq!(response["contentRevision"], 4);
+    let changed = saved(&state, &receipt);
+    assert_eq!(audio_offset(&changed), -3.875);
+    for field in ["drawing", "assets", "project", "viewportReference"] {
+        assert_eq!(changed[field], before[field]);
+    }
+    let reopened = ApplicationMcp::default();
+    let reopened_receipt = bootstrap_audio_wire(&reopened, &changed, "audio-edited-reopen");
+    assert_eq!(saved(&reopened, &reopened_receipt), changed);
+}
+#[test]
+fn public_audio_bad_target_scalar_cancel_stale_and_foreign_identity_leave_saved_state_unchanged() {
+    let state = ApplicationMcp::default();
+    let receipt = bootstrap_audio_wire(&state, &audio_wire(true), "audio-refusal-install");
+    let before = saved(&state, &receipt);
+    for (index, payload, code) in [
+        (
+            0,
+            json!({"kind":"place","placement":{"id":"missing-track","assetId":"wave-a",
+            "target":{"kind":"audioTrack","trackUid":"absent"},"offsetFrames":0.5}}),
+            "not_found",
+        ),
+        (
+            1,
+            json!({"kind":"setOffset","placementId":"audio-p","offsetFrames":null}),
+            "invalid_request",
+        ),
+        (
+            2,
+            json!({"kind":"shiftOffset","placementId":"audio-p","deltaFrames":9007199254740992_u64}),
+            "invalid_request",
+        ),
+    ] {
+        let req = request(&receipt, &format!("audio-refused-{index}"), 0, payload);
+        let first = dispatch(&state, req.clone());
+        assert_eq!(first["error"]["code"], code);
+        assert_eq!(dispatch(&state, req), first);
+        assert_eq!(saved(&state, &receipt), before);
+    }
+    for (field, value, code) in [
+        (
+            "cancelledBeforeDispatch",
+            json!(true),
+            "cancelled_before_dispatch",
+        ),
+        ("expectedRevision", json!(1), "stale_revision"),
+        ("documentId", json!("foreign-audio"), "wrong_document"),
+    ] {
+        let mut req = request(
+            &receipt,
+            field,
+            0,
+            json!({"kind":"shiftOffset","placementId":"audio-p","deltaFrames":0.5}),
+        );
+        req[field] = value;
+        let response = dispatch(&state, req.clone());
+        assert_eq!(response["error"]["code"], code);
+        assert_eq!(dispatch(&state, req), response);
+        assert_eq!(saved(&state, &receipt), before);
+    }
+    let info = state
+        .native_project_info(receipt["documentId"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(info["contentRevision"], 0);
+    assert_eq!(info["undoDepth"], 0);
+}
+#[test]
+fn public_audio_bootstrap_refuses_mime_only_wave_before_install_and_allows_a_valid_successor() {
+    let state = ApplicationMcp::default();
+    let mut invalid = audio_wire(true);
+    // Valid base64 and advertised MIME, but bytes are not a RIFF/WAVE container.
+    invalid["assets"][0]["source"]["data"] = json!("AAAA");
+    assert!(bootstrap_raw(
+        &state,
+        &json!({"apiVersion":2,"requestId":"bad-wave",
+        "instanceId":state.instance_id(),"documentJson":invalid.to_string()})
+        .to_string()
+    )
+    .is_err());
+    let valid = audio_wire(true);
+    let receipt = bootstrap_audio_wire(&state, &valid, "valid-after-bad-wave");
+    assert_eq!(receipt["contentRevision"], 0);
+    assert_eq!(saved(&state, &receipt), valid);
+}

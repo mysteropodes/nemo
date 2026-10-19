@@ -42,6 +42,10 @@ pub(crate) use object_frame_clipboard_paste_wire::{cut_clipboard_payload, paste_
 mod component_tables;
 #[allow(unused_imports)]
 pub(crate) use component_tables::{ComponentTablesEdit, PreparedComponentTables};
+// F11 cut-at-playhead through the existing sealed revision owner.
+#[path = "object_layer_playhead_cut_owner.rs"]
+mod layer_playhead_cut;
+pub(crate) use layer_playhead_cut::PreparedLayerPlayheadCut;
 #[path = "object_layer_lifecycle_ops.rs"]
 mod layer_lifecycle;
 pub(crate) use layer_lifecycle::PreparedLayerLifecycle;

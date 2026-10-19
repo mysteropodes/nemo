@@ -11,8 +11,8 @@ fn source_id(value: Option<&Value>) -> bool {
 }
 fn offset(value: Option<&Value>) -> bool {
     value
-        .and_then(Value::as_i64)
-        .is_some_and(|v| v.unsigned_abs() <= MAX_OFFSET)
+        .and_then(Value::as_f64)
+        .is_some_and(|v| v.is_finite() && v.abs() <= MAX_OFFSET as f64)
 }
 fn target(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
@@ -42,6 +42,7 @@ pub(super) fn request(value: &Value) -> bool {
                     && source_id(p.get("assetId"))
                     && target(&p["target"])
                     && offset(p.get("offsetFrames"))
+                    && (p["target"]["kind"] == "audioTrack" || p["offsetFrames"].as_i64().is_some())
             })
         }),
         Some("setOffset") => exact(value, &["kind", "placementId", "offsetFrames"], &[])

@@ -89,6 +89,7 @@ impl NativeApplicationRequest {
             self.operation.as_str(),
             "command.document.object.layer.visibility.set"
                 | crate::native_contract::layer_policy::OP
+                | crate::native_contract::layer_cut::OP
                 | crate::native_contract::property_track::OP
                 | crate::native_contract::property_edit::OP
                 | "command.document.object.layer.create"
@@ -113,6 +114,8 @@ impl NativeApplicationRequest {
                 "item or asset"
             } else if crate::native_contract::vector::owns(&self.operation) {
                 "vector"
+            } else if self.operation == crate::native_contract::layer_cut::OP {
+                "layer cut"
             } else if self.operation == crate::native_contract::layer_policy::OP {
                 "layer policy"
             } else if self.operation == crate::native_contract::brush::PUBLISH {

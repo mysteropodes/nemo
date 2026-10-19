@@ -9,10 +9,12 @@ function place(target={kind:'drawing',contextId:'scene-root',layerUid:'L'}){retu
 test('original placement DTO accepts four edits and preserves opaque IDs without resource payload admission',()=>{
   for(const payload of [place(),place({kind:'drawing',contextId:'scene-root',layerUid:'L',strokeId:'item'}),place({kind:'audioTrack',trackUid:'track'}),
     {kind:'setOffset',placementId:'p1',offsetFrames:-Number.MAX_SAFE_INTEGER},{kind:'shiftOffset',placementId:'p1',deltaFrames:Number.MAX_SAFE_INTEGER},
+    {kind:'setOffset',placementId:'p1',offsetFrames:-0.5},{kind:'shiftOffset',placementId:'p1',deltaFrames:0.25},
+    {kind:'place',placement:{...place({kind:'audioTrack',trackUid:'track'}).placement,offsetFrames:-1.25}},
     {kind:'remove',placementId:'blob:opaque-source-id'},{kind:'remove',placementId:'\uFEFF'},
   ])assert.doesNotThrow(()=>validateRequest(request(payload)));
   for(const payload of [
-    {kind:'setOffset',placementId:'p1',offsetFrames:null},{kind:'setOffset',placementId:'p1',offsetFrames:0.5},
+    {kind:'setOffset',placementId:'p1',offsetFrames:null},{kind:'place',placement:{...place().placement,offsetFrames:0.5}},
     {kind:'shiftOffset',placementId:'p1',deltaFrames:Number.MAX_SAFE_INTEGER+1},
     {kind:'remove',placementId:'p1',extra:0},{kind:'remove',placementId:'\u0085'},
     {kind:'remove',placementId:'é'.repeat(128)},{kind:'remove',placementId:'p\0'},

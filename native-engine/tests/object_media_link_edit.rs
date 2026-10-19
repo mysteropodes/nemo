@@ -71,7 +71,7 @@ fn place(placement_id: &str, asset: &str, target: AssetTarget, off: i64) -> Plac
         placement_id: placement_id.to_owned(),
         asset_id: asset.to_owned(),
         target,
-        offset_frames: off,
+        offset_frames: (off).into(),
     }
 }
 fn changed(outcome: Result<PlacementOutcome, PlacementEditError>) -> AssetInventory {
@@ -84,7 +84,14 @@ fn offsets(inventory: &AssetInventory) -> Vec<(String, i64)> {
     inventory
         .placements()
         .iter()
-        .map(|p| (p.id().to_owned(), p.offset_frames()))
+        .map(|p| {
+            (
+                p.id().to_owned(),
+                p.offset_frames()
+                    .as_i64()
+                    .expect("original integer fixture"),
+            )
+        })
         .collect()
 }
 
@@ -109,7 +116,7 @@ fn shift_matches_the_baseline_drag_edit_on_every_oracle_row() {
         .unwrap();
         let edit = PlacementEdit::ShiftOffset {
             placement_id: "p1".to_owned(),
-            delta_frames: delta,
+            delta_frames: (delta).into(),
         };
         let outcome = apply_edit(&inventory, &document(), edit);
         if f[3] == "0" {
@@ -121,7 +128,11 @@ fn shift_matches_the_baseline_drag_edit_on_every_oracle_row() {
         } else {
             let next = changed(outcome);
             assert_eq!(
-                next.placements()[0].offset_frames().to_string(),
+                next.placements()[0]
+                    .offset_frames()
+                    .as_i64()
+                    .expect("original integer fixture")
+                    .to_string(),
                 f[4],
                 "{line}"
             );
@@ -236,7 +247,13 @@ fn place_refusals_are_typed_and_leave_the_inventory_as_it_was() {
         &doc,
         place("p2", "v2", layer("M"), max),
     ));
-    assert_eq!(edge.placements()[1].offset_frames(), max);
+    assert_eq!(
+        edge.placements()[1]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        max
+    );
 }
 
 #[test]
@@ -268,7 +285,7 @@ fn set_offset_is_exact_and_a_no_op_when_equal() {
     let doc = document();
     let set = |off: i64| PlacementEdit::SetOffset {
         placement_id: "p1".to_owned(),
-        offset_frames: off,
+        offset_frames: (off).into(),
     };
     assert_eq!(
         apply_edit(&inventory, &doc, set(5)),
@@ -288,7 +305,7 @@ fn set_offset_is_exact_and_a_no_op_when_equal() {
     );
     let unknown = PlacementEdit::SetOffset {
         placement_id: "nope".to_owned(),
-        offset_frames: 0,
+        offset_frames: (0).into(),
     };
     assert_eq!(
         apply_edit(&inventory, &doc, unknown),
@@ -304,7 +321,7 @@ fn shift_by_zero_is_a_no_op_and_the_bound_is_exact() {
         AssetInventory::new(records, vec![placement("p1", "v1", layer("L"), max)], 1, 1).unwrap();
     let shift = |d: i64| PlacementEdit::ShiftOffset {
         placement_id: "p1".to_owned(),
-        delta_frames: d,
+        delta_frames: (d).into(),
     };
     let doc = document();
     assert_eq!(
@@ -324,10 +341,16 @@ fn shift_by_zero_is_a_no_op_and_the_bound_is_exact() {
         Err(PlacementEditError::Overflow)
     );
     let down = changed(apply_edit(&at_max, &doc, shift(-max)));
-    assert_eq!(down.placements()[0].offset_frames(), 0);
+    assert_eq!(
+        down.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        0
+    );
     let unknown = PlacementEdit::ShiftOffset {
         placement_id: "nope".to_owned(),
-        delta_frames: 1,
+        delta_frames: (1).into(),
     };
     assert_eq!(
         apply_edit(&at_max, &doc, unknown),
@@ -409,11 +432,11 @@ fn every_edit_leaves_the_input_inventory_equal_to_its_clone() {
         place("p2", "v2", layer("M"), 3),
         PlacementEdit::SetOffset {
             placement_id: "p1".to_owned(),
-            offset_frames: 9,
+            offset_frames: (9).into(),
         },
         PlacementEdit::ShiftOffset {
             placement_id: "p1".to_owned(),
-            delta_frames: -2,
+            delta_frames: (-2).into(),
         },
         PlacementEdit::Remove {
             placement_id: "p1".to_owned(),

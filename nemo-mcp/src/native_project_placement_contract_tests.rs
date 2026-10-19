@@ -30,6 +30,8 @@ fn exact_four_edit_shapes_register_without_claiming_audio_owner_availability() {
         json!({"kind":"setOffset","placementId":"p1","offsetFrames":-9007199254740991_i64}),
         json!({"kind":"shiftOffset","placementId":"p1","deltaFrames":9007199254740991_i64}),
         json!({"kind":"remove","placementId":"p1"}),
+        json!({"kind":"setOffset","placementId":"p1","offsetFrames":-1.25}),
+        json!({"kind":"shiftOffset","placementId":"p1","deltaFrames":0.5}),
     ] {
         assert!(request(&payload));
         let r = envelope(payload);
@@ -50,7 +52,11 @@ fn malformed_null_unknown_and_overflow_values_refuse_the_public_dto() {
     for payload in [
         json!({"kind":"remove","placementId":"p1","extra":0}),
         json!({"kind":"setOffset","placementId":"p1","offsetFrames":null}),
-        json!({"kind":"setOffset","placementId":"p1","offsetFrames":1.5}),
+        {
+            let mut p = place(drawing.clone());
+            p["placement"]["offsetFrames"] = json!(1.5);
+            p
+        },
         json!({"kind":"shiftOffset","placementId":"p1","deltaFrames":9007199254740992_u64}),
         json!({"kind":"remove","placementId":"\u{85}"}),
         json!({"kind":"remove","placementId":"a\u{0}"}),

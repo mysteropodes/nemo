@@ -278,7 +278,10 @@ fn video_selection(
     };
     let layer = VideoLayerTiming {
         frame_count: facts.frame_count,
-        offset_frames: placement.offset_frames() as f64,
+        offset_frames: placement
+            .offset_frames()
+            .as_f64()
+            .ok_or_else(|| unavailable(placement, Unavailable::VideoFacts))?,
         native_video: true,
         time_remap: facts.time_remap,
         interp_mode: facts.interp_mode.as_deref(),
@@ -308,7 +311,10 @@ fn audio_start(
     let track = AudioTrackTiming {
         muted: facts.muted,
         buffer_duration: facts.buffer_duration,
-        offset_frames: placement.offset_frames() as f64,
+        offset_frames: placement
+            .offset_frames()
+            .as_f64()
+            .ok_or_else(|| unavailable(placement, Unavailable::AudioFacts))?,
         trim_start: facts.trim_start,
         trim_end: facts.trim_end,
         volume: facts.volume,

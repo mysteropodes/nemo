@@ -36,6 +36,8 @@ pub(crate) mod frame_edit;
 pub(crate) mod import;
 #[path = "native_item_contract.rs"]
 pub(crate) mod item;
+#[path = "native_layer_playhead_cut_contract.rs"]
+pub(crate) mod layer_cut;
 #[path = "native_layer_policy_contract.rs"]
 pub(crate) mod layer_policy;
 #[path = "native_object_component_contract.rs"]
@@ -128,6 +130,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "command.document.object.project.settings.edit" => settings::request(payload),
         placement::OP => placement::request(payload),
         layer_policy::OP => layer_policy::request(payload),
+        layer_cut::OP => layer_cut::request(payload),
         property_track::OP => property_track::request(payload),
         property_edit::OP => property_edit::request(payload),
         op if frame_edit::declares(op) => frame_edit::request(op, payload),
@@ -309,6 +312,9 @@ pub(crate) fn validate_result(
     }
     if operation == layer_policy::OP {
         return layer_policy::result(result);
+    }
+    if operation == layer_cut::OP {
+        return layer_cut::result(result);
     }
     if frame_edit::declares(operation) {
         return frame_edit::result_for_operation(operation, result);

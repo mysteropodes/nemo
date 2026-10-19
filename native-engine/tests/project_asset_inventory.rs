@@ -90,7 +90,13 @@ fn mixed_native_values_preserve_exact_identity_source_order_and_placement() {
     assert_eq!(inventory.placements()[0].id(), "place-video");
     assert_eq!(inventory.placements()[0].asset_id(), &id("video-B"));
     assert_eq!(inventory.placements()[0].target(), &drawing("video"));
-    assert_eq!(inventory.placements()[0].offset_frames(), -7);
+    assert_eq!(
+        inventory.placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
+        -7
+    );
     assert_eq!(inventory.encoded_allocations().count(), 2);
     for original in records {
         assert!(Arc::ptr_eq(

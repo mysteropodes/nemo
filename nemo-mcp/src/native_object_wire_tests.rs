@@ -1,3 +1,6 @@
+#[path = "native_layer_playhead_cut_wire_tests.rs"]
+mod layer_playhead_cut;
+
 use super::*;
 use serde_json::{json, Value};
 
