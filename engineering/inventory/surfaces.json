@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "463045390f2914a4de0c22a42ce9b26e36b45a4b",
-  "describe": "v0.7.0-alpha.4-2402-g46304539"
+  "head": "382976796d32e9c63a28e9a9c20d1c0bef43b31d",
+  "describe": "v0.7.0-alpha.4-2405-g38297679-dirty"
  },
- "inputsDigest": "fbd9970b7bd46aed7d5e04c2f331cca36178fbe7c3b9058dec0da19e66608edc",
+ "inputsDigest": "c525437503cbc0273b55c691e9953716c6bb3fc31b4b67425b923ee880863807",
  "states": [
   "inventoried",
   "characterized",
@@ -2495,7 +2495,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 134,
+    "functionsVisited": 131,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9085 action()"
@@ -4992,7 +4992,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 143,
+    "functionsVisited": 140,
     "via": "variable trigger",
     "references": []
    },
@@ -9210,7 +9210,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 80,
+    "functionsVisited": 77,
     "via": "chain",
     "references": []
    },
@@ -10221,7 +10221,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 70,
+    "functionsVisited": 67,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2900 updateCornersPanel()",
@@ -14690,7 +14690,7 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 217,
+    "functionsVisited": 214,
     "via": "chain",
     "references": [
      "src/js/project.js:644 renderTabBar()",
@@ -17428,7 +17428,7 @@
     "container": "web-changelog-row",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 81,
+    "functionsVisited": 78,
     "via": "variable toggle",
     "references": []
    },
@@ -27462,7 +27462,7 @@
    "source": "src/js/rig-widget.js:519",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
-    "functionsVisited": 201
+    "functionsVisited": 198
    },
    "fixtures": [
     "static-props",
@@ -27503,7 +27503,7 @@
    "source": "src/js/rig-widget.js:533",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
-    "functionsVisited": 201
+    "functionsVisited": 198
    },
    "fixtures": [
     "static-props",
