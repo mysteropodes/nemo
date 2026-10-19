@@ -13,10 +13,10 @@ class Element{
  addEventListener(k,fn,o){const capture=typeof o==='boolean'?o:!!o?.capture;const list=this.listeners.get(k)||[];list.push({fn,capture});this.listeners.set(k,list);}
  removeEventListener(k,fn,o){const capture=typeof o==='boolean'?o:!!o?.capture;this.listeners.set(k,(this.listeners.get(k)||[]).filter(x=>x.fn!==fn||x.capture!==capture));}
  focus(){this.ownerDocument.activeElement=this;}
- fire(kind,data={}){const e={target:this,type:kind,key:'',button:0,pointerId:1,isPrimary:true,buttons:kind==='pointerup'?0:1,clientX:100,clientY:100,...data,stopped:false,prevented:false,stopImmediatePropagation(){this.stopped=true;},preventDefault(){this.prevented=true;}};
+ fire(kind,data={}){const e={target:this,type:kind,bubbles:kind!=='blur'&&kind!=='focus',key:'',button:0,pointerId:1,isPrimary:true,buttons:kind==='pointerup'?0:1,clientX:100,clientY:100,...data,stopped:false,prevented:false,stopImmediatePropagation(){this.stopped=true;},preventDefault(){this.prevented=true;}};
   const ancestors=[];for(let p=this.parentNode;p;p=p.parentNode)ancestors.push(p);
   const run=(n,capture)=>{e.currentTarget=n;for(const r of n.listeners.get(kind)||[]){if(r.capture===capture)r.fn(e);if(e.stopped)return;}};
-  for(const n of ancestors.slice().reverse()){run(n,true);if(e.stopped)return e;}run(this,true);if(!e.stopped)run(this,false);if(!e.stopped)for(const n of ancestors){run(n,false);if(e.stopped)break;}return e;
+  for(const n of ancestors.slice().reverse()){run(n,true);if(e.stopped)return e;}run(this,true);if(!e.stopped)run(this,false);if(!e.stopped&&e.bubbles)for(const n of ancestors){run(n,false);if(e.stopped)break;}return e;
  }
 }
 async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
@@ -338,4 +338,13 @@ test('native hex layout preserves existing controls and restores prior inline wr
  assert.deepEqual(parent.children.filter(n=>n!==label),controls,'the original controls retain their nodes and order');
  await binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:null});assert.equal(f.get('native-text-color-hex').disabled,false);
  binding.retire();assert.equal(parent.style.flexWrap,'wrap-reverse','native mount restores pre-existing inline layout');assert.deepEqual(parent.children,controls);assert.equal(f.get('native-text-color-hex'),null);assert.equal(f.owner.log.executed.length,0);
+});
+
+
+test('element blur keeps an invalid area draft while real window blur cancels it without publication',async()=>{
+ const f=await fixture();let windowBlur=0,capturedBlur=0;f.root.addEventListener('blur',()=>windowBlur++);f.root.addEventListener('blur',()=>capturedBlur++,true);
+ f.canvas.fire('pointerdown',{clientX:100,clientY:110});f.canvas.fire('pointermove',{clientX:300,clientY:190});f.canvas.fire('pointerup',{clientX:300,clientY:190});await f.turn();
+ const area=f.get('native-text-area-draft');area.value='Pending color';area.fire('input');f.input('native-text-color-hex','#invalid');
+ const event=area.fire('blur');await f.turn();assert.equal(event.bubbles,false);assert.equal(capturedBlur,1);assert.equal(windowBlur,0);assert.ok(f.binding.core.snapshot().draft);assert.equal(f.owner.log.executed.length,0);
+ f.root.fire('blur');await f.turn();assert.equal(windowBlur,1);assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
 });
