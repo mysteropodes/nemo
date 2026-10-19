@@ -71,6 +71,57 @@ fn actual_context_view_is_closed_and_correlated_in_the_mcp_contract() {
     assert!(result(document, p, &unavailable));
     unavailable["compUnavailable"] = Value::Null;
     assert!(!result(document, p, &unavailable));
+
+    // Real views include unresolved element holders and resolved parent names.
+    let mut parent = v.clone();
+    parent["self"]["parent"] = json!({"name":"Parent","index":1});
+    parent["self"]["hasParent"] = json!(true);
+    assert!(result(document, p, &parent));
+    let mut unresolved = v.clone();
+    unresolved["self"] = Value::Null;
+    assert!(result(document, p, &unresolved));
+    let mut unnamed = v.clone();
+    unnamed["self"]["name"] = Value::Null;
+    assert!(result(document, p, &unnamed));
+    // Preserve the baseline alias's (totalFrames || 1) / fps behavior.
+    let mut empty = v.clone();
+    empty["comp"]["frames"] = json!(0);
+    empty["comp"]["duration"] = json!(1. / 25.);
+    assert!(result(document, p, &empty));
+    for pointer in ["/self", "/self/parent", "/comp"] {
+        let object = parent.pointer(pointer).unwrap().as_object().unwrap();
+        for field in object.keys() {
+            let mut bad = parent.clone();
+            bad.pointer_mut(pointer)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
+            assert!(!result(document, p, &bad), "missing {pointer}/{field}");
+        }
+    }
+    for (pointer, replacement) in [
+        ("/self/name", json!(false)),
+        ("/self/index", json!(u64::from(u32::MAX) + 1)),
+        ("/self/isShape", json!(0)),
+        ("/self/hasParent", json!("true")),
+        ("/self/parent/name", Value::Null),
+        ("/self/parent/index", json!(-1)),
+        ("/comp/width", json!(0)),
+        ("/comp/height", json!(0)),
+        ("/comp/frames", json!(-1)),
+        ("/comp/layers", json!(false)),
+        ("/comp/name", Value::Null),
+        ("/comp/fps", json!(0)),
+        ("/comp/fps", json!(-25)),
+        ("/comp/fps", json!("25")),
+        ("/keyCount", json!(-1)),
+        ("/keyCount", json!(true)),
+    ] {
+        let mut bad = parent.clone();
+        *bad.pointer_mut(pointer).unwrap() = replacement;
+        assert!(!result(document, p, &bad), "{pointer}");
+    }
 }
 #[test]
 fn property_read_shapes_and_presence_are_closed_without_inventing_track_defaults() {
