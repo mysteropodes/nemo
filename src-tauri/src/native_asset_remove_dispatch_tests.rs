@@ -8,26 +8,45 @@ fn with_host<T>(state: &ApplicationMcp, read: impl FnOnce(&mut NativeObjectHost)
     let native = state.native_state();
     let mut authority = native.lock().unwrap();
     let generation = authority.active_generation().unwrap();
-    read(authority.active_mut(generation).unwrap().as_any_mut()
-        .downcast_mut::<NativeObjectHost>().unwrap())
+    read(
+        authority
+            .active_mut(generation)
+            .unwrap()
+            .as_any_mut()
+            .downcast_mut::<NativeObjectHost>()
+            .unwrap(),
+    )
 }
 fn snapshot(state: &ApplicationMcp) -> ObjectSnapshot {
-    with_host(state, |host| host.history.acquire_snapshot(host.history.content_revision()).unwrap())
+    with_host(state, |host| {
+        host.history
+            .acquire_snapshot(host.history.content_revision())
+            .unwrap()
+    })
 }
 fn pin(state: &ApplicationMcp) -> Value {
-    state.native_project_info(snapshot(state).document_id()).unwrap()
+    state
+        .native_project_info(snapshot(state).document_id())
+        .unwrap()
 }
 fn saved(state: &ApplicationMcp) -> Vec<u8> {
     let p = pin(state);
-    state.native_project_file_snapshot(p["documentId"].as_str().unwrap(),
-        p["contentRevision"].as_u64().unwrap(), p["documentSnapshotId"].as_str().unwrap())
-        .unwrap().unwrap()
+    state
+        .native_project_file_snapshot(
+            p["documentId"].as_str().unwrap(),
+            p["contentRevision"].as_u64().unwrap(),
+            p["documentSnapshotId"].as_str().unwrap(),
+        )
+        .unwrap()
+        .unwrap()
 }
 fn oracle(name: &str) -> Value {
     include_str!("../../native-engine/tests/fixtures/object-raster-asset-attach/oracle.txt")
-        .lines().filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .lines()
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
-        .find(|row| row["name"] == name).unwrap()
+        .find(|row| row["name"] == name)
+        .unwrap()
 }
 fn seed() -> ApplicationMcp {
     let state = ApplicationMcp::default();
@@ -37,15 +56,24 @@ fn seed() -> ApplicationMcp {
     for (id, name) in [("blue", "blue-2x1"), ("red", "red-2x1")] {
         let row = oracle(name);
         let hex = row["hex"].as_str().unwrap();
-        let bytes: Vec<u8> = (0..hex.len()).step_by(2)
-            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()).collect();
+        let bytes: Vec<u8> = (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect();
         with_host(&state, |host| {
-            let current = host.history.acquire_snapshot(host.history.content_revision()).unwrap();
+            let current = host
+                .history
+                .acquire_snapshot(host.history.content_revision())
+                .unwrap();
             let request: OpacityRequest = serde_json::from_value(json!({"apiVersion":2,
                 "requestId":id,"instanceId":state.instance_id(),"documentId":current.document_id(),
                 "expectedRevision":current.content_revision(),"operation":"command.document.object.asset.attach",
                 "payload":{"documentSnapshotId":current.snapshot_id(),"name":name,"mediaType":"image/png"}})).unwrap();
-            assert!(host.history.dispatch_asset_command(&request, Some(&bytes)).unwrap().is_ok());
+            assert!(host
+                .history
+                .dispatch_asset_command(&request, Some(&bytes))
+                .unwrap()
+                .is_ok());
         });
     }
     state
@@ -57,7 +85,12 @@ fn request(state: &ApplicationMcp, id: &str, asset: &str) -> Value {
         "payload":{"documentSnapshotId":p["documentSnapshotId"],"assetId":asset}})
 }
 fn invoke(state: &ApplicationMcp, request: Value) -> Value {
-    serde_json::to_value(state.dispatch_native(serde_json::from_value(request).unwrap()).unwrap()).unwrap()
+    serde_json::to_value(
+        state
+            .dispatch_native(serde_json::from_value(request).unwrap())
+            .unwrap(),
+    )
+    .unwrap()
 }
 fn history(state: &ApplicationMcp, id: &str, action: &str) -> Value {
     let mut r = request(state, id, "unused");
@@ -65,7 +98,8 @@ fn history(state: &ApplicationMcp, id: &str, action: &str) -> Value {
     r["payload"] = json!({"command":format!("object.{action}")});
     serde_json::to_value(
         crate::application_mcp::object_client::dispatch_raw(state, &r.to_string()).unwrap(),
-    ).unwrap()
+    )
+    .unwrap()
 }
 fn depths(state: &ApplicationMcp) -> (usize, usize) {
     with_host(state, |host| host.history.history_depths())
@@ -80,12 +114,18 @@ fn public_remove_saves_real_remaining_bytes_and_undo_redo_restore_original_recor
     let removed = invoke(&state, request(&state, "remove-blue", "asset-blue"));
     assert_eq!(removed["ok"], true);
     assert_eq!(removed["contentRevision"], 3);
-    assert_eq!(removed["result"], json!({"applied":true,"historyEntriesAdded":1}));
+    assert_eq!(
+        removed["result"],
+        json!({"applied":true,"historyEntriesAdded":1})
+    );
     let after = saved(&state);
     let file: Value = serde_json::from_slice(&after).unwrap();
     assert_eq!(file["assetInventory"]["assetIds"], json!(["asset-red"]));
     assert_eq!(file["assets"].as_array().unwrap().len(), 1);
-    assert_eq!(file["assets"][0]["source"]["data"], oracle("red-2x1")["b64"]);
+    assert_eq!(
+        file["assets"][0]["source"]["data"],
+        oracle("red-2x1")["b64"]
+    );
     assert_eq!(file["assets"][0], original["assets"][1]);
     let reopened = ApplicationMcp::default();
     reopened.install_native_project_file(&after).unwrap();
@@ -117,7 +157,10 @@ fn public_exact_replay_after_undo_and_absent_noop_preserve_redo_and_changed_body
     assert_eq!(invoke(&state, r.clone()), first);
     assert_eq!(pin(&state)["contentRevision"], revision);
     let noop = invoke(&state, request(&state, "absent-noop", "absent"));
-    assert_eq!(noop["result"], json!({"applied":false,"historyEntriesAdded":0}));
+    assert_eq!(
+        noop["result"],
+        json!({"applied":false,"historyEntriesAdded":0})
+    );
     assert_eq!(noop["contentRevision"], revision);
     assert_eq!(depths(&state), (2, 1));
     let mut changed = r;
@@ -131,8 +174,13 @@ fn public_exact_replay_after_undo_and_absent_noop_preserve_redo_and_changed_body
 
 #[test]
 fn public_owner_stale_snapshot_and_cancel_refusals_publish_nothing() {
-    for (mode, code) in [("instance", "wrong_instance"), ("document", "wrong_document"),
-        ("revision", "stale_revision"), ("snapshot", "stale_revision"), ("cancel", "cancelled_before_dispatch")] {
+    for (mode, code) in [
+        ("instance", "wrong_instance"),
+        ("document", "wrong_document"),
+        ("revision", "stale_revision"),
+        ("snapshot", "stale_revision"),
+        ("cancel", "cancelled_before_dispatch"),
+    ] {
         let state = seed();
         let before = saved(&state);
         let revision = pin(&state)["contentRevision"].clone();
@@ -176,18 +224,26 @@ fn public_remove_refuses_real_viewport_reference_and_placement_without_partial_p
             file = serde_json::from_slice(&saved(&original)).unwrap();
         }
         let state = ApplicationMcp::default();
-        state.install_native_project_file(&serde_json::to_vec(&file).unwrap()).unwrap();
+        state
+            .install_native_project_file(&serde_json::to_vec(&file).unwrap())
+            .unwrap();
         let before = saved(&state);
         let reopened: Value = serde_json::from_slice(&before).unwrap();
         if reference {
             assert_eq!(reopened["viewportReference"]["assetId"], "asset-blue");
         } else {
-            assert_eq!(reopened["drawing"]["items"]["raster"][0]["item"]["assetId"], "asset-blue");
+            assert_eq!(
+                reopened["drawing"]["items"]["raster"][0]["item"]["assetId"],
+                "asset-blue"
+            );
         }
         let r = request(&state, "in-use", "asset-blue");
         let first = invoke(&state, r.clone());
         assert_eq!(first["ok"], false, "reference={reference}: {first}");
-        assert_eq!(first["error"]["code"], "busy_conflict", "reference={reference}");
+        assert_eq!(
+            first["error"]["code"], "busy_conflict",
+            "reference={reference}"
+        );
         assert_eq!(first["error"]["details"]["reason"], "asset_in_use");
         assert_eq!(invoke(&state, r), first);
         assert_eq!(saved(&state), before);
@@ -198,48 +254,82 @@ fn public_remove_refuses_real_viewport_reference_and_placement_without_partial_p
 
 #[tokio::test]
 async fn public_remove_external_wire_requires_subscriber_and_waits_for_exact_ack() {
-    use nemo_mcp::{registry::Endpoint, wire::{self, AuthenticatedWireRequest}};
+    use nemo_mcp::{
+        registry::Endpoint,
+        wire::{self, AuthenticatedWireRequest},
+    };
     use tokio::{net::TcpListener, sync::oneshot};
     for subscribed in [false, true] {
         let state = seed();
         let before = saved(&state);
-        let binding = state.control_revision_for_test(json!({"action":"binding"})).unwrap();
+        let binding = state
+            .control_revision_for_test(json!({"action":"binding"}))
+            .unwrap();
         if subscribed {
-            state.control_revision_for_test(json!({"action":"subscribe","binding":binding})).unwrap();
+            state
+                .control_revision_for_test(json!({"action":"subscribe","binding":binding}))
+                .unwrap();
         }
         let command = request(&state, "wire-remove", "asset-blue");
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let endpoint = Endpoint { instance_id:state.instance_id().into(), port:listener.local_addr().unwrap().port(),
-            secret:"isolated-remove".into(), build_id:"isolated-remove".into() };
+        let endpoint = Endpoint {
+            instance_id: state.instance_id().into(),
+            port: listener.local_addr().unwrap().port(),
+            secret: "isolated-remove".into(),
+            build_id: "isolated-remove".into(),
+        };
         let (sent, received) = oneshot::channel();
         let client_endpoint = endpoint.clone();
         let mut client = tokio::spawn(async move {
-            wire::call_native(&client_endpoint, serde_json::from_value(command).unwrap(), wire::CancellationToken::new()).await.unwrap()
+            wire::call_native(
+                &client_endpoint,
+                serde_json::from_value(command).unwrap(),
+                wire::CancellationToken::new(),
+            )
+            .await
+            .unwrap()
         });
         let server = async {
             let (mut stream, _) = listener.accept().await.unwrap();
             let message: AuthenticatedWireRequest = wire::read_json(&mut stream).await.unwrap();
             let native = match message {
-                AuthenticatedWireRequest::Native(message) => { assert_eq!(message.secret, endpoint.secret); message.native_request },
+                AuthenticatedWireRequest::Native(message) => {
+                    assert_eq!(message.secret, endpoint.secret);
+                    message.native_request
+                }
                 _ => panic!("remove did not use native wire"),
             };
-            state.serve_external_for_test(&mut stream, native, |event| {
-                assert!(subscribed, "absent subscriber must refuse before publication");
-                sent.send(event).map_err(|_| "subscriber closed".into())
-            }).await.unwrap();
+            state
+                .serve_external_for_test(&mut stream, native, |event| {
+                    assert!(
+                        subscribed,
+                        "absent subscriber must refuse before publication"
+                    );
+                    sent.send(event).map_err(|_| "subscriber closed".into())
+                })
+                .await
+                .unwrap();
         };
         let observe = async {
             if subscribed {
                 let event = received.await.unwrap();
-                assert!(tokio::time::timeout(std::time::Duration::from_millis(20), &mut client).await.is_err());
-                state.control_revision_for_test(json!({"action":"acknowledge",
-                    "subscriptionId":binding["subscriptionId"],"event":event})).unwrap();
+                assert!(
+                    tokio::time::timeout(std::time::Duration::from_millis(20), &mut client)
+                        .await
+                        .is_err()
+                );
+                state
+                    .control_revision_for_test(json!({"action":"acknowledge",
+                    "subscriptionId":binding["subscriptionId"],"event":event}))
+                    .unwrap();
             }
             client.await.unwrap()
         };
         let (_, response) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
             tokio::join!(server, observe)
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
         assert_eq!(response.ok, subscribed);
         if subscribed {
             assert_eq!(response.content_revision, 3);
