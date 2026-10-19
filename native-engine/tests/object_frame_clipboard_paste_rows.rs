@@ -166,6 +166,7 @@ impl Row {
         self.clip
             .iter()
             .map(|entry| PasteCell {
+                order_elements: crate::object_document::Presence::Missing,
                 rel_layer: entry.rl,
                 rel_frame: entry.rf,
                 keyframe: entry.cell.flag != '.',
@@ -235,4 +236,50 @@ pub(crate) fn packet_matches(row: &Row, packet: &FrameClipboardPacket) -> Result
         }
     }
     Ok(())
+}
+
+/// Hand-authored order deliberately disagrees with record insertion order a,b.
+pub(crate) fn ordered_elements(layer: &str) -> serde_json::Value {
+    serde_json::json!([
+        {"layerUid":layer,"strokeId":"b","naturalPosition":0,"order":{"static":[-4],
+            "track":{"keys":[{"frame":0,"v":[-3]}]},"expression":{"enabled":false,"code":"1"}}},
+        {"layerUid":layer,"strokeId":"a","naturalPosition":1,"order":{"static":[7]}}
+    ])
+}
+pub(crate) fn ordered_document(form: Build) -> ObjectDocument {
+    let mut value =
+        super::build::document_json(&parse_layers("K=a.1.10,b.2.20;.;.;.|K=c.3.30;.;.;."), form);
+    let scopes = value["compositionOrder"]["contexts"][0]["scopes"]
+        .as_array_mut()
+        .unwrap();
+    let elements = scopes[0]["elements"].as_array_mut().unwrap();
+    let other = elements
+        .iter()
+        .find(|element| element["layerUid"] == "L1")
+        .unwrap()
+        .clone();
+    *elements = ordered_elements("L0").as_array().unwrap().clone();
+    elements.push(other);
+    crate::object_codec::decode_storage_project(value.to_string().as_bytes()).unwrap()
+}
+pub(crate) fn scoped_elements(
+    document: &ObjectDocument,
+    layer: &str,
+    frame: u32,
+) -> serde_json::Value {
+    serde_json::to_value(
+        document
+            .composition_order
+            .value()
+            .unwrap()
+            .contexts
+            .iter()
+            .filter(|context| context.context_id == "scene-root")
+            .flat_map(|context| &context.scopes)
+            .filter(|scope| scope.frame_scope.frame == frame)
+            .flat_map(|scope| &scope.elements)
+            .filter(|element| element.layer_uid == layer)
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
 }

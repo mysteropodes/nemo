@@ -1,7 +1,7 @@
 //! Frame-clipboard transactions through the real history owner: every oracle row (oracle.txt; the verbatim baseline
 //! editor at fbe4b8a3) is rebuilt in two native document forms, applied as the operation the baseline function stands
 //! for (typed paste, typed cut, dispatched duplicate selection), compared back to the baseline, undone to the original
-//! bytes, redone and reopened from storage. Ordered documents refuse typed. Hand-computed cases, replay, no-op/redo,
+//! bytes, redone and reopened from storage. Ordered V2/V2Extras retain explicit authored elements. Hand-computed cases, replay, no-op/redo,
 //! preflight, sealing and a chain of edits are in object_frame_clipboard_paste_edges.rs; negative controls in
 //! object_frame_clipboard_paste_controls.rs.
 use super::*;
@@ -194,26 +194,90 @@ fn oracle_reaches_every_branch() {
 }
 
 #[test]
-fn ordered_documents_refuse_typed_and_publish_nothing() {
-    let all = rows();
-    for op in ["paste", "cut", "dupsel"] {
-        for row in all
-            .iter()
-            .filter(|row| row.op == op && !row.any_locked())
-            .take(3)
-        {
-            for form in [Build::V2, Build::V2Extras] {
-                let mut o = owner(document(&row.input, form));
-                let before = state(&o);
-                let refusal =
-                    apply(row, &mut o, Mistake::None).expect_err("ordered documents refuse");
-                assert!(
-                    refusal.to_lowercase().contains("unavailable"),
-                    "{} {form:?}: {refusal}",
-                    row.label()
-                );
-                assert_eq!(state(&o), before, "{} {form:?}", row.label());
-            }
-        }
+fn ordered_documents_copy_duplicate_cut_and_paste_preserve_authored_dtos_atomically() {
+    use crate::commands::{packet_paste_cells, CellRef, FrameClipboardOperation, PasteRequest};
+    for form in [Build::V2, Build::V2Extras] {
+        let input = rows::ordered_document(form);
+        let mut o = owner(input.clone());
+        let before = bytes(&o);
+        let selected = vec![CellRef {
+            layer_uid: "L0".into(),
+            frame: 0,
+        }];
+        let packet = o.copy_frame_clipboard(&selected).unwrap();
+        assert_eq!(
+            serde_json::to_value(packet.cells()[0].order_elements().value().unwrap()).unwrap(),
+            rows::ordered_elements("L0")
+        );
+        let submitted = request(
+            &o,
+            "ordered-dup",
+            rows::OP_DUPLICATE,
+            json!({"command":"object.frames.clipboard.duplicate","layerUid":"L1",
+                "selection":[{"layerUid":"L0","frame":0}]}),
+        );
+        let reply = dispatch(&mut o, &submitted);
+        assert_eq!(reply["ok"], true, "{reply}");
+        assert_eq!(
+            rows::scoped_elements(head(&o).document(), "L1", 1),
+            rows::ordered_elements("L1")
+        );
+        assert_eq!(o.history_depths(), (1, 0));
+        let after = state(&o);
+        assert_eq!(dispatch(&mut o, &submitted), reply);
+        assert_eq!(state(&o), after);
+        assert_eq!(
+            build::untouched(&input),
+            build::untouched(head(&o).document())
+        );
+        let saved = bytes(&o);
+        assert_eq!(
+            encode_storage_project(&decode_storage_project(&saved).unwrap()).unwrap(),
+            saved
+        );
+        o.undo(1).unwrap();
+        assert_eq!(bytes(&o), before);
+        o.redo(o.content_revision()).unwrap();
+        assert_eq!(bytes(&o), saved);
+        let cut = o.cut_frame_cells(&selected).unwrap().unwrap();
+        assert_eq!(cut.cells(), packet.cells());
+        assert_eq!(
+            rows::scoped_elements(head(&o).document(), "L0", 0),
+            json!([])
+        );
+        let operation = FrameClipboardOperation::Paste(PasteRequest {
+            instance_id: o.instance_id().into(),
+            document_id: o.document_id().into(),
+            anchor_layer: "L0".into(),
+            anchor_frame: 0,
+            cells: packet_paste_cells(&cut),
+        });
+        let candidate = o.prepare_frame_clipboard(&operation).unwrap();
+        o.commit_frame_clipboard(candidate).unwrap();
+        let restored = head(&o).document().clone();
+        assert_eq!(
+            rows::scoped_elements(&restored, "L0", 0),
+            rows::ordered_elements("L0")
+        );
+        assert_eq!(
+            rows::scoped_elements(&restored, "L1", 1),
+            rows::ordered_elements("L1")
+        );
+        assert_eq!(build::render_layer(&restored, 0), "K=a.1.10,b.2.20;.;.;.");
+        assert_eq!(
+            build::render_layer(&restored, 1),
+            "K=c.3.30;K=a.1.10,b.2.20;.;."
+        );
+        assert_eq!(build::untouched(&restored), build::untouched(&input));
+        let restored_bytes = bytes(&o);
+        assert_eq!(
+            encode_storage_project(&decode_storage_project(&restored_bytes).unwrap()).unwrap(),
+            restored_bytes
+        );
+        assert_eq!(o.history_depths(), (3, 0));
+        let candidate = o.prepare_frame_clipboard(&operation).unwrap();
+        let stable = state(&o);
+        o.commit_frame_clipboard(candidate).unwrap();
+        assert_eq!(state(&o), stable, "ordered exact paste is a semantic no-op");
     }
 }

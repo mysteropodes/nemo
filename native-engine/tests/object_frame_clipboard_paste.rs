@@ -21,6 +21,7 @@ fn doc(text: &str) -> ObjectDocument {
 }
 fn cell(rel_layer: u32, rel_frame: u32, keyframe: bool, strokes: &[(&str, i64, i64)]) -> PasteCell {
     PasteCell {
+        order_elements: crate::object_document::Presence::Missing,
         rel_layer,
         rel_frame,
         keyframe,
@@ -183,12 +184,12 @@ fn malformed_cell_sets_refuse_before_any_write() {
 }
 
 #[test]
-fn ordered_documents_and_a_layer_without_timing_are_typed_unavailable() {
+fn ordered_cells_require_explicit_order_and_a_layer_without_timing_refuses() {
     let ordered = document(&parse_layers(SMALL), Build::V2);
     let one = [cell(0, 0, true, &[("n", 1, 1)])];
     assert_eq!(
         paste(&ordered, 0, 1, &one),
-        Err(DispatchErrorCode::Unavailable)
+        Err(DispatchErrorCode::InvalidRequest)
     );
     let mut untimed = doc(SMALL);
     untimed.layers[1].timing = Presence::Missing;
@@ -218,4 +219,169 @@ fn reference_records_and_every_other_cell_survive_a_paste() {
         out.total_frames, input.total_frames,
         "a paste never grows the timeline"
     );
+}
+
+#[test]
+fn ordered_metadata_is_required_exact_and_can_change_without_record_changes() {
+    let input = rows::ordered_document(Build::V2Extras);
+    let o = crate::commands::ObjectFillOwner::new("ordered", input.clone()).unwrap();
+    let packet = o
+        .copy_frame_clipboard(&[crate::commands::CellRef {
+            layer_uid: "L0".into(),
+            frame: 0,
+        }])
+        .unwrap();
+    let cells = crate::commands::packet_paste_cells(&packet);
+    assert_eq!(paste(&input, 0, 0, &cells), Ok(None));
+    let mut wrong = cells.clone();
+    wrong[0].order_elements = Presence::Missing;
+    assert_eq!(
+        paste(&input, 0, 1, &wrong),
+        Err(DispatchErrorCode::InvalidRequest)
+    );
+    for mutate in [0, 1, 2, 3] {
+        let mut wrong = cells.clone();
+        let Presence::Present(elements) = &mut wrong[0].order_elements else {
+            panic!()
+        };
+        match mutate {
+            0 => {
+                elements.pop();
+            }
+            1 => elements[0].natural_position = 2,
+            2 => elements[0].stroke_id = "not-a-record".into(),
+            _ => elements[0].natural_position = elements[1].natural_position,
+        }
+        assert_eq!(
+            paste(&input, 0, 1, &wrong),
+            Err(DispatchErrorCode::InvalidRequest)
+        );
+    }
+    let mut changed_order = cells.clone();
+    let Presence::Present(elements) = &mut changed_order[0].order_elements else {
+        panic!()
+    };
+    elements[0].order.static_value = Presence::Present(vec![serde_json::Number::from(99)]);
+    let out = paste(&input, 0, 0, &changed_order).unwrap().unwrap();
+    assert_eq!(
+        render_layer(&out, 0),
+        render_layer(&input, 0),
+        "record content is identical while authored order changes"
+    );
+    let mut expected = rows::ordered_elements("L0");
+    expected[0]["order"]["static"] = serde_json::json!([99]);
+    assert_eq!(rows::scoped_elements(&out, "L0", 0), expected);
+    assert_eq!(untouched(&out), untouched(&input));
+    assert_eq!(paste(&input, 9, 0, &cells), Ok(None));
+    assert_eq!(paste(&input, 0, input.total_frames, &cells), Ok(None));
+    let legacy = doc(SMALL);
+    assert_eq!(
+        paste(&legacy, 0, 1, &cells),
+        Err(DispatchErrorCode::InvalidRequest)
+    );
+}
+
+#[test]
+fn ordered_key_manual_sample_held_and_blank_normalize_through_real_copy_and_paste() {
+    use crate::commands::{packet_paste_cells, CellRef, ObjectFillOwner};
+    use serde_json::json;
+    for form in [Build::V2, Build::V2Extras] {
+        let mut value =
+            build::document_json(&parse_layers("K=a.1.10;M=b.2.20;.;K|K=z.3.30;.;.;."), form);
+        let a = json!({"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{"static":[7]}});
+        let b = json!({"layerUid":"L0","strokeId":"b","naturalPosition":0,"order":{"static":[-4]}});
+        for scope in value["compositionOrder"]["contexts"][0]["scopes"]
+            .as_array_mut()
+            .unwrap()
+        {
+            for element in scope["elements"].as_array_mut().unwrap() {
+                if element["layerUid"] == "L0" {
+                    *element = if element["strokeId"] == "a" {
+                        a.clone()
+                    } else {
+                        b.clone()
+                    };
+                }
+            }
+        }
+        let input =
+            crate::object_codec::decode_storage_project(value.to_string().as_bytes()).unwrap();
+        let frozen = serde_json::to_vec(&input).unwrap();
+        let owner = ObjectFillOwner::new("ordered-normalize", input.clone()).unwrap();
+        let selected: Vec<CellRef> = (0..4)
+            .map(|frame| CellRef {
+                layer_uid: "L0".into(),
+                frame,
+            })
+            .collect();
+        let packet = owner.copy_frame_clipboard(&selected).unwrap();
+        let source = packet.cells();
+        assert!(source[1].manual_edit());
+        assert_eq!(
+            source
+                .iter()
+                .map(|cell| cell.source_frame())
+                .collect::<Vec<_>>(),
+            [Some(0), Some(1), Some(0), Some(3)]
+        );
+        assert_eq!(
+            source[2].records().len(),
+            1,
+            "held source facts retain the shown key"
+        );
+        assert_eq!(
+            serde_json::to_value(source[2].order_elements().value().unwrap()).unwrap(),
+            json!([a])
+        );
+        let cells = packet_paste_cells(&packet);
+        assert_eq!(
+            cells
+                .iter()
+                .map(|cell| (cell.keyframe, cell.records.len()))
+                .collect::<Vec<_>>(),
+            [(true, 1), (true, 1), (false, 0), (true, 0)]
+        );
+        assert_eq!(
+            serde_json::to_value(cells[1].order_elements.value().unwrap()).unwrap(),
+            json!([b])
+        );
+        for index in [2, 3] {
+            assert_eq!(cells[index].order_elements.value().unwrap().len(), 0);
+        }
+        let out = paste(&input, 1, 0, &cells).unwrap().unwrap();
+        assert_eq!(render_layer(&out, 1), "K=a.1.10;K=b.2.20;.;K");
+        assert_eq!(exposure_string(&out, 1), "**1*");
+        let records: Vec<serde_json::Value> = out
+            .objects
+            .iter()
+            .filter(|record| scene_authored(record) && record.target.layer_uid == "L1")
+            .map(|record| serde_json::to_value(record).unwrap())
+            .collect();
+        assert_eq!(
+            records,
+            vec![
+                record_json("scene-root", "authored", "L1", "a", 0, 1, 10),
+                record_json("scene-root", "authored", "L1", "b", 1, 2, 20)
+            ]
+        );
+        assert_eq!(
+            out.layers[1].timing.value().unwrap().exposure(1),
+            ("key", Some(1), false)
+        );
+        assert_eq!(
+            rows::scoped_elements(&out, "L1", 0),
+            json!([
+            {"layerUid":"L1","strokeId":"a","naturalPosition":0,"order":{"static":[7]}}])
+        );
+        assert_eq!(
+            rows::scoped_elements(&out, "L1", 1),
+            json!([
+            {"layerUid":"L1","strokeId":"b","naturalPosition":0,"order":{"static":[-4]}}])
+        );
+        assert_eq!(rows::scoped_elements(&out, "L1", 2), json!([]));
+        assert_eq!(rows::scoped_elements(&out, "L1", 3), json!([]));
+        assert_eq!(render_layer(&out, 0), "K=a.1.10;M=b.2.20;.;K");
+        assert_eq!(untouched(&out), untouched(&input));
+        assert_eq!(serde_json::to_vec(&input).unwrap(), frozen);
+    }
 }

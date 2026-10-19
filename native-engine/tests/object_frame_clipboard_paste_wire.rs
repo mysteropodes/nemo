@@ -50,12 +50,14 @@ fn each_command_admits_exactly_its_own_fields_and_builds_its_operation() {
         anchor_frame: 2,
         cells: vec![
             PasteCell {
+                order_elements: crate::object_document::Presence::Missing,
                 rel_layer: 0,
                 rel_frame: 1,
                 keyframe: true,
                 records: vec![stroke_record("a", 1, 10)],
             },
             PasteCell {
+                order_elements: crate::object_document::Presence::Missing,
                 rel_layer: 1,
                 rel_frame: 0,
                 keyframe: false,
@@ -202,4 +204,52 @@ fn the_existing_message_bound_refuses_a_packet_that_does_not_fit() {
         parse(&payload).unwrap_err(),
         DispatchErrorCode::InvalidRequest
     );
+}
+
+#[test]
+fn ordered_packet_wire_keeps_exact_dtos_and_v1_omits_the_new_field() {
+    let legacy = ObjectFillOwner::new("wire", doc("K=a.1.10;.;.;.")).unwrap();
+    let selection = [CellRef {
+        layer_uid: "L0".into(),
+        frame: 0,
+    }];
+    let old = paste_payload(&legacy.copy_frame_clipboard(&selection).unwrap(), "L0", 1);
+    assert!(old["cells"][0].get("orderElements").is_none());
+    for form in [Build::V2, Build::V2Extras] {
+        let o = ObjectFillOwner::new("wire", rows::ordered_document(form)).unwrap();
+        let packet = o.copy_frame_clipboard(&selection).unwrap();
+        let payload = paste_payload(&packet, "L1", 1);
+        assert_eq!(
+            payload["cells"][0]["orderElements"],
+            rows::ordered_elements("L0")
+        );
+        assert_eq!(
+            parse(&payload).unwrap(),
+            FrameClipboardOperation::Paste(PasteRequest {
+                instance_id: o.instance_id().into(),
+                document_id: o.document_id().into(),
+                anchor_layer: "L1".into(),
+                anchor_frame: 1,
+                cells: packet_paste_cells(&packet)
+            })
+        );
+        let mut null = payload.clone();
+        null["cells"][0]["orderElements"] = Value::Null;
+        assert_eq!(parse(&null).unwrap_err(), DispatchErrorCode::InvalidRequest);
+        let mut unknown = payload.clone();
+        unknown["cells"][0]["orderElements"][0]["extra"] = json!(1);
+        assert_eq!(
+            parse(&unknown).unwrap_err(),
+            DispatchErrorCode::InvalidRequest
+        );
+        let raw = payload.to_string().replace(
+            "\"naturalPosition\":0",
+            "\"naturalPosition\":0,\"naturalPosition\":1",
+        );
+        assert_ne!(raw, payload.to_string());
+        assert_eq!(
+            parse_clipboard_payload(raw.as_bytes()).unwrap_err(),
+            DispatchErrorCode::InvalidRequest
+        );
+    }
 }
