@@ -32,11 +32,15 @@ enum K {
     Labels,
     Clip,
     Footprint,
+    Point,
+    Color,
+    Opacity,
+    Flag,
 }
 
 /// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
 /// duplicate reports the identity it minted, every other receipt is the compact command result.
-static SPECS: [(&str, &str, &str); 17] = [
+static SPECS: [(&str, &str, &str); 18] = [
     ("layer.delete", "object.layer.delete", "selection:selection"),
     (
         "layer.duplicate",
@@ -118,6 +122,7 @@ static SPECS: [(&str, &str, &str); 17] = [
         "object.boolean.flatten",
         "layerUid:uid contextId:uid frame:frame groupId:uid",
     ),
+    ("fill.trace","object.fill.trace","layerUid:uid contextId:uid frame:frame point:point color:color opacity:opacity remove:flag"),
 ];
 const PREFIX: &str = "command.document.object.";
 
@@ -266,6 +271,10 @@ fn kind(token: &str) -> Option<K> {
         "labels" => K::Labels,
         "clip" => K::Clip,
         "footprint" => K::Footprint,
+        "point" => K::Point,
+        "color" => K::Color,
+        "opacity" => K::Opacity,
+        "flag" => K::Flag,
         _ => return None,
     })
 }
@@ -300,6 +309,22 @@ fn check(kind: K, value: &Value) -> bool {
         K::Labels => labels(value),
         K::Clip => clip(value),
         K::Footprint => footprint(value),
+        K::Point => value.as_array().is_some_and(|p| {
+            p.len() == 2
+                && p.iter().all(|n| {
+                    n.as_f64()
+                        .is_some_and(|n| n.is_finite() && n.abs() <= 1.0e12)
+                })
+        }),
+        K::Color => value.as_str().is_some_and(|s| {
+            s.len() == 9
+                && s.starts_with('#')
+                && s.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+        }),
+        K::Opacity => value
+            .as_f64()
+            .is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n)),
+        K::Flag => value.is_boolean(),
     }
 }
 

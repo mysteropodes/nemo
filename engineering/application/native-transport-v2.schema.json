@@ -712,6 +712,9 @@
         },
         "fillGradient": {
           "$ref": "#/$defs/ObjectVectorFillGradient"
+        },
+        "fillTrace": {
+          "$ref": "#/$defs/ObjectFillTrace"
         }
       },
       "minProperties": 1,
@@ -6225,6 +6228,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.fill.trace"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFillTracePayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -9491,6 +9511,105 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ObjectFillTracePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "contextId",
+        "frame",
+        "point",
+        "color",
+        "opacity",
+        "remove"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.fill.trace"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "point": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -1000000000000.0,
+            "maximum": 1000000000000.0
+          }
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{8}$"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "remove": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectFillTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "seeds": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "walls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "gapPx": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "seed"
+          ]
+        },
+        {
+          "required": [
+            "seeds"
+          ]
+        }
+      ],
+      "description": "Authored fillSeed/fillSeeds/fillWalls/fillGapPx provenance in the existing native vector record. Empty arrays and an explicit zero remain distinct from absence."
     }
   }
 }

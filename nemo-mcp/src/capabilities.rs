@@ -45,6 +45,7 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-object-group.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-selection-edit.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-boolean.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-fill.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-item.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-asset.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object-asset-remove.json"),

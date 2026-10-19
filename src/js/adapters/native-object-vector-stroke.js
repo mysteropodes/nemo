@@ -15,7 +15,7 @@
   // Members the record owns; everything else a dictionary carries is reported (UNMAPPED) or refuses the mapping (REFUSED).
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
-    'strokeId', 'boxAngle', 'paramShape', 'fillGradient'];
+    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx'];
   // Look-changing members with no record slot: mapping them as a plain path would lose the look without a word.
   const REFUSED = ['strokeGradientAlongPath', 'bitmapBrushSpec', 'brushTexturePreset', 'isBrushTextureCopy', 'isText', 'isTextRoot',
     'isVectorText', 'isMask', 'effects'];
@@ -114,6 +114,15 @@
     if (dict.strokeId) out.strokeId = dict.strokeId;
     if (dict.boxAngle) out.boxAngle = dict.boxAngle;
     if (dict.paramShape) out.paramShape = dict.paramShape;
+    const seed=(p)=>Array.isArray(p)&&p.length===2&&p.every((n)=>typeof n==='number'&&Number.isFinite(n));
+    ['fillSeed','fillSeeds','fillWalls','fillGapPx'].forEach((key)=>{
+      if(!has(dict,key)||dict[key]===undefined)return;
+      const v=dict[key],ok=key==='fillSeed'?seed(v):key==='fillSeeds'?Array.isArray(v)&&v.every(seed):
+        key==='fillWalls'?Array.isArray(v)&&v.every((id)=>typeof id==='string'&&id.length>0):
+        typeof v==='number'&&Number.isFinite(v)&&v>=0;
+      if(!ok)refuse('invalid_dict','invalid '+key);
+      out[key]=JSON.parse(JSON.stringify(v));
+    });
     return out;
   }
 
@@ -167,6 +176,14 @@
       }
       if (n.paramShape !== undefined) ext.paramShape = shape(n.paramShape);
       if (n.boxAngle !== undefined) ext.boxAngle = n.boxAngle;
+      const trace={};
+      [['fillSeed','seed'],['fillSeeds','seeds'],['fillWalls','walls'],['fillGapPx','gapPx']].forEach(([key,stored])=>{
+        if(has(n,key))trace[stored]=JSON.parse(JSON.stringify(n[key]));
+      });
+      if(Object.keys(trace).length){
+        if(!has(trace,'seed')&&!has(trace,'seeds'))refuse('unavailable','fill provenance requires its authored seed');
+        ext.fillTrace=trace;
+      }
       const strokeId = where.strokeId !== undefined ? where.strokeId : (n.strokeId || '');
       const record = {
         schemaVersion: 1, family: FAMILY,
@@ -216,6 +233,9 @@
     if (x.boxAngle) out.boxAngle = x.boxAngle;
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
     if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
+    if(x.fillTrace)[['seed','fillSeed'],['seeds','fillSeeds'],['walls','fillWalls'],['gapPx','fillGapPx']].forEach(([stored,key])=>{
+      if(has(x.fillTrace,stored))out[key]=JSON.parse(JSON.stringify(x.fillTrace[stored]));
+    });
     return out;
   }
 

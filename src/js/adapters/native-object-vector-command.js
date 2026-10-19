@@ -13,8 +13,9 @@
   function fault(code, message, extra) { const error = new Error(message); error.code = code; return Object.assign(error, extra || {}); }
   function ownerKey(pin) { return JSON.stringify([pin.instanceId, pin.documentId, pin.lifecycleGeneration]); }
 
-  function create(session, label) {
-    if (!contract) throw new Error('Native vector contract is unavailable');
+  function create(session, label, operationContract) {
+    const activeContract = operationContract || contract;
+    if (!activeContract) throw new Error('Native vector contract is unavailable');
     function owner() {
       const pin = session.info();
       if (!session.isActive() || !pin) throw fault('unavailable', 'Native project is unavailable', { reason: 'no_native_project' });
@@ -58,7 +59,7 @@
         throw fault('uncorrelated', `Native ${label} response is uncorrelated`, { requestId: request.requestId });
       }
       if (!response.ok) { await reconcile(ctx, request, response.contentRevision, stored); throw refusal(response, request); }
-      try { contract.result(request.operation, response.result); contract.correlate(request, response); } catch (bad) {
+      try { activeContract.result(request.operation, response.result); activeContract.correlate(request, response); } catch (bad) {
         try { await ctx.reconcile(); } catch (_) { /* the uncorrelated receipt is the reported fault */ }
         throw fault('uncorrelated', `Native ${label} receipt is uncorrelated: ${bad.message}`, { requestId: request.requestId });
       }
@@ -93,8 +94,8 @@
           apiVersion: 2, requestId: session.requestId(label), instanceId: pin.instanceId, documentId: pin.documentId,
           expectedRevision: pin.contentRevision, operation, payload: build(pin),
         };
-        try { contract.payload(operation, request.payload); } catch (bad) { throw fault('invalid_request', bad.message, { reason: 'local_validation' }); }
-        const size = contract.bytes(JSON.stringify(request)), limit = contract.requestByteLimit(operation);
+        try { activeContract.payload(operation, request.payload); } catch (bad) { throw fault('invalid_request', bad.message, { reason: 'local_validation' }); }
+        const size = activeContract.bytes(JSON.stringify(request)), limit = (typeof activeContract.requestByteLimit === 'function' ? activeContract.requestByteLimit(operation) : 4096);
         if (size > limit) {
           throw fault('request_too_large', `Native ${label} request is ${size} encoded bytes; the public transport bound is ${limit}`,
             { reason: 'request_size', bytes: size, limit });
