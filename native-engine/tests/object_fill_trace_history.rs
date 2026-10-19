@@ -237,3 +237,72 @@ fn removing_a_fill_keeps_its_identity_and_restores_it_with_one_undo() {
     owner.undo(2).unwrap();
     assert_eq!(f::bytes(&owner), before);
 }
+
+fn held_document() -> Value {
+    let mut d = document();
+    d["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,
+        "family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
+    d
+}
+
+#[test]
+fn an_ordinary_held_cell_fill_promotes_and_paints_as_one_sealed_history_entry() {
+    let d = held_document();
+    let mut owner = f::owner_of(&d);
+    let before = f::bytes(&owner);
+    let mut p = payload();
+    p["frame"] = json!(2);
+    let candidate = owner
+        .prepare_fill_trace_json(p.to_string().as_bytes())
+        .unwrap();
+    assert_eq!(
+        f::bytes(&owner),
+        before,
+        "preparation must not publish promotion"
+    );
+    owner.commit_boolean_edit(candidate).unwrap();
+    let after = f::state(&owner);
+    assert_eq!(owner.content_revision(), 1);
+    assert_eq!(owner.history_depths(), (1, 0));
+    assert_eq!(
+        after["layers"][0]["timing"]["keys"],
+        json!([{"frame":0},{"frame":2}])
+    );
+    assert_eq!(
+        f::frame_records(&after, "L0", 0),
+        f::frame_records(&d, "L0", 0)
+    );
+    let records = f::frame_records(&after, "L0", 2);
+    assert_eq!(records.len(), 2);
+    assert!(records.iter().any(|r| r["target"]["strokeId"] == "wall"));
+    let painted = records
+        .iter()
+        .find(|r| r["vectorExt"]["fillTrace"].is_object())
+        .unwrap();
+    assert_eq!(painted["vectorExt"]["fillTrace"]["walls"], json!(["wall"]));
+    let saved = f::bytes(&owner);
+    assert_eq!(f::bytes(&f::owner_of(&after)), saved);
+    owner.undo(1).unwrap();
+    assert_eq!(f::bytes(&owner), before);
+    owner.redo(2).unwrap();
+    assert_eq!(f::bytes(&owner), saved);
+}
+
+#[test]
+fn a_held_no_region_keeps_its_original_undoable_key_promotion() {
+    let mut owner = f::owner_of(&held_document());
+    let before = f::bytes(&owner);
+    let mut p = payload();
+    p["frame"] = json!(2);
+    p["point"] = json!([1000, 1000]);
+    paint(&mut owner, &p);
+    let after = f::state(&owner);
+    assert_eq!(owner.history_depths(), (1, 0));
+    assert_eq!(
+        after["layers"][0]["timing"]["keys"],
+        json!([{"frame":0},{"frame":2}])
+    );
+    assert_eq!(f::frame_records(&after, "L0", 2).len(), 1);
+    owner.undo(1).unwrap();
+    assert_eq!(f::bytes(&owner), before);
+}

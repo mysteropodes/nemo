@@ -1,7 +1,12 @@
 //! Bounded public paint-bucket payload -> the existing sealed boolean/history candidate.
 use super::{BooleanEditKind, PreparedBooleanEdit};
+use crate::commands::object_fill_owner::object_frame_edit_document::{
+    promote_cells, DocumentEdit, FrameEditError,
+};
 use crate::commands::ObjectFillOwner;
-use crate::object_document::object_group_kernels::object_boolean_ops::plan::PlanError;
+use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
+    check_scope, PlanError,
+};
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_fill_trace_ops::document::plan_trace;
 use crate::object_document::SolidFill;
@@ -60,8 +65,35 @@ impl ObjectFillOwner {
             layer_uid: p.layer_uid,
             frame: p.frame,
         };
-        let plan = plan_trace(
-            origin.document(),
+        check_scope(origin.document(), &scope).map_err(|error| Self::fill_plan_error(&error))?;
+        let held = scope.context_id == "scene-root"
+            && origin
+                .document()
+                .layers
+                .iter()
+                .find(|layer| layer.layer_uid == scope.layer_uid)
+                .and_then(|layer| layer.timing.value())
+                .is_some_and(|timing| {
+                    matches!(timing.exposure(scope.frame).0, "held" | "unexposed")
+                });
+        // Ordinary Fill's ensureKeyframe is part of the same undo operation.
+        // Reuse the real detached frame kernel before tracing the visible copy;
+        // a later geometry/provider refusal still publishes neither change.
+        let promoted = if held {
+            match promote_cells(origin.document(), &scope.layer_uid, &[scope.frame]) {
+                Ok(DocumentEdit::Changed(document)) => Some(document),
+                Ok(DocumentEdit::NoChange) => None,
+                Err(FrameEditError::Unsupported | FrameEditError::MissingTiming) => {
+                    return Err(DispatchErrorCode::Unavailable)
+                }
+                Err(FrameEditError::UnknownLayer) => return Err(DispatchErrorCode::NotFound),
+                Err(_) => return Err(DispatchErrorCode::InvalidRequest),
+            }
+        } else {
+            None
+        };
+        let mut plan = plan_trace(
+            promoted.as_ref().unwrap_or_else(|| origin.document()),
             &scope,
             p.point,
             &paint,
@@ -70,6 +102,7 @@ impl ObjectFillOwner {
             origin.content_revision(),
         )
         .map_err(|error| Self::fill_plan_error(&error))?;
+        plan.changed |= promoted.is_some();
         ObjectSnapshot::validate_drawing(&plan.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedBooleanEdit {
