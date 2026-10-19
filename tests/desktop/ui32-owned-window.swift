@@ -4,6 +4,32 @@ import ApplicationServices
 import CoreGraphics
 import Darwin
 
+// Finite fixture admission belongs to this runner's entry policy. Every
+// caller selects one fixed source artifact; picker/file ownership stays separate.
+let ui32FixtureHash="642bc4c681373c9a4e7ab3c1795f024ee1c7f277ac255298c5fdf8e1f57c8831"
+let ui32F03FixtureHash="7fba834f64254aa27b828e0fc0fb7e2715977aea282a2b188c09782cb258bed2"
+let ui32F03InitialFixtureHash="f3d471501a1e0fcfdd8add247b1e63f363541b025e72db3fa5ef5efb308fcddd"
+func ui32FixedFixture(_ raw:String?) throws -> (name:String,size:Int,hash:String,f03:Bool) {
+  if raw == nil || raw == "initial-text" { return ("Initial-text.json",7791,ui32FixtureHash,false) }
+  if raw == "f03-original" { return ("candidate.project.json",7744,ui32F03FixtureHash,true) }
+  if raw == "f03-initial" { return ("initial.project.json",5721,ui32F03InitialFixtureHash,true) }
+  throw Refusal(code:"adapter-refused")
+}
+func ui32UsesF03Fixture(_ raw:String?) throws -> Bool {try ui32FixedFixture(raw).f03}
+func ui32FixedFixtureSelfTest() throws {
+  try check(try ui32UsesF03Fixture(nil) == false)
+  try check(try ui32UsesF03Fixture("initial-text") == false)
+  try check(try ui32UsesF03Fixture("f03-original") == true)
+  try check(try ui32UsesF03Fixture("f03-initial") == true)
+  let initial=try ui32FixedFixture("f03-initial"),terminal=try ui32FixedFixture("f03-original"),text=try ui32FixedFixture(nil)
+  try check(initial.name == "initial.project.json" && initial.size == 5721 && initial.hash == ui32F03InitialFixtureHash)
+  try check(terminal.name == "candidate.project.json" && terminal.size == 7744 && terminal.hash == ui32F03FixtureHash)
+  try check(text.name == "Initial-text.json" && text.size == 7791 && text.hash == ui32FixtureHash)
+  for unknown in ["","Initial-text","f03","F03-initial","f03-initial ","/private/tmp/candidate.project.json","other"] {
+    var refused=false;do { _ = try ui32UsesF03Fixture(unknown) } catch { refused=true };try check(refused)
+  }
+}
+
 func runUI32(_ args:[String], _ environment:[String:String]) throws {
   let pinned:OwnedInitialWindow
   do { pinned=try discoverOwnedInitialWindow(args,environment,scopeCheck:ui32Scope) }

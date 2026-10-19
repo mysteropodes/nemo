@@ -15,6 +15,9 @@ use vello::{
     Scene,
 };
 
+#[path = "object_scene_parent_chain.rs"]
+pub(crate) mod parent_chain;
+
 #[cfg(feature = "font_asset_admission")]
 #[path = "object_text_scene_fonts.rs"]
 mod fonts;
@@ -42,6 +45,7 @@ impl TextSource {
 pub(crate) struct TextSources {
     pub(crate) entries: Vec<TextSource>,
     pub(crate) resources: Arc<ObjectSceneResourceSet>,
+    pub(crate) parent_chains: Arc<parent_chain::SceneParentChains>,
 }
 fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
     ObjectSceneError::UnsupportedGeometry {
@@ -49,17 +53,66 @@ fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
         reason,
     }
 }
+struct TextInput<'a> {
+    source_index: usize,
+    layer_index: usize,
+    entry: &'a crate::object_document::TextEntry,
+    visible: bool,
+}
+fn text_inputs<'a>(
+    packet: &'a ObjectFramePacket,
+    chains: &parent_chain::SceneParentChains,
+) -> Result<Vec<TextInput<'a>>, ObjectSceneError> {
+    let visible: std::collections::BTreeSet<_> =
+        packet.text_records().map(|r| r.source_index()).collect();
+    let Some(items) = packet.snapshot().document().item_records() else {
+        return Ok(Vec::new());
+    };
+    let offset = packet.snapshot().document().objects().len() + items.raster_entries().len();
+    let mut selected = Vec::new();
+    for (index, entry) in items.text_entries().iter().enumerate() {
+        if entry.target.context_id() != packet.context_id()
+            || entry.target.scope_kind() != packet.scope_kind()
+        {
+            continue;
+        }
+        let layer = packet
+            .source_layers()
+            .iter()
+            .position(|l| l.layer_uid() == entry.target.layer_uid())
+            .ok_or_else(|| unavailable(offset + index, "Text layer unavailable"))?;
+        if packet.source_frame_for_layer(layer) != Some(entry.target.frame()) {
+            continue;
+        }
+        if visible.contains(&(offset + index)) || chains.needs_bounds(layer) {
+            selected.push(TextInput {
+                source_index: offset + index,
+                layer_index: layer,
+                entry,
+                visible: visible.contains(&(offset + index)),
+            });
+        }
+    }
+    Ok(selected)
+}
 #[cfg(not(feature = "font_asset_admission"))]
 pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectSceneError> {
-    if let Some(record) = packet.text_records().next() {
+    let chains = parent_chain::SceneParentChains::new(packet)
+        .map_err(|e| unavailable(e.source_index, e.reason()))?;
+    if let Some(input) = text_inputs(packet, &chains)?.first() {
         return Err(unavailable(
-            record.source_index(),
+            input.source_index,
             "native font parser is unavailable",
         ));
     }
     Ok(TextSources {
         entries: Vec::new(),
         resources: Arc::new(ObjectSceneResourceSet::empty()),
+        parent_chains: Arc::new(
+            chains
+                .finish()
+                .map_err(|e| unavailable(e.source_index, e.reason()))?,
+        ),
     })
 }
 #[cfg(feature = "font_asset_admission")]
@@ -70,64 +123,54 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
     use crate::object_render_scene::scene_effect_kernels::object_scene_resource_set::SceneResourceKind;
     use crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::GeometryAdmission;
     use std::collections::BTreeMap;
+    let mut chains = parent_chain::SceneParentChains::new(packet)
+        .map_err(|e| unavailable(e.source_index, e.reason()))?;
+    let inputs = text_inputs(packet, &chains)?;
     let mut bundled = fonts::BundledInputs::default();
-    for record in packet.text_records() {
-        let layer = &packet.source_layers()[record.layer_index()];
-        // Existing Motion holder/range guard remains mandatory in frame preparation.
-        // Parent/effect/special contexts must not paint unmodified text while their
-        // actual consumers are absent. No above-raw motion or expression fallback.
-        if layer.parent_layer_uid.value().is_some_and(|v| v.is_some())
-            || layer.path_fx().is_some_and(|v| !v.is_empty())
-            || layer.widget.value().is_some()
-            || layer.groups.value().is_some()
-            || layer.rig.value().is_some()
-            || layer.folder_id.value().is_some_and(|v| v.is_some())
-            || layer.blend_mode.value().is_some_and(|v| v != "normal")
-            || layer.matte_mode.value().is_some_and(|v| v != "none")
-            || layer.matte_source_layer_uid.value().is_some()
-            || layer.mattes_more.value().is_some_and(|v| !v.is_empty())
-            || layer.is_effect_layer.value() == Some(&true)
-            || layer.effects.value().is_some_and(|v| !v.is_empty())
-            || layer.effects_from.value().is_some()
+    for input in &inputs {
+        // Parent admission now comes from the actual immutable chain producer.
+        // No unrelated Text path-effect, group, rig or special-context waiver.
+        if packet.source_layers()[input.layer_index]
+            .path_fx()
+            .is_some_and(|v| !v.is_empty())
         {
             return Err(unavailable(
-                record.source_index(),
-                "Text parent, group or layer effects are unavailable",
+                input.source_index,
+                "Text path effects are unavailable",
             ));
         }
-        bundled.include(&record.entry().block, record.source_index())?;
+        bundled.include(&input.entry.block, input.source_index)?;
     }
     let mut resources: BTreeMap<String, Arc<fonts::FontResource>> = BTreeMap::new();
-    let mut entries = Vec::new();
-    for record in packet.text_records() {
-        let source_index = record.source_index();
-        let entry = record.entry();
-        let font = fonts::prepare(packet.snapshot(), &entry.block, &bundled, source_index)?;
+    let mut pending = Vec::new();
+    let make = |input: &TextInput<'_>,
+                font: &fonts::PreparedFont,
+                chain: &[crate::evaluation::motion_parent_chain::ChainEntry]| {
         let version = font.resource.version();
-        let holder = record.holder_id();
-        let item = prepare_block(
+        let holder = crate::object_document::text_holder_id(&input.entry.target);
+        prepare_block(
             Some(TextFontProvider {
                 catalog: &font.faces,
                 outlines: &fonts::Outlines(&font.faces),
                 resource_version: &version,
             }),
             &TextBlockTarget {
-                source_object_index: source_index,
+                source_object_index: input.source_index,
                 holder_id: &holder,
-                record: &entry.block,
+                record: &input.entry.block,
                 glyph_stages: &[],
-                chain: &[],
-                item_opacity: packet
-                    .layer_opacity(record.layer_index())
-                    .map_err(|_| unavailable(source_index, "Text layer opacity is unavailable"))?,
+                chain,
+                item_opacity: packet.layer_opacity(input.layer_index).map_err(|_| {
+                    unavailable(input.source_index, "Text layer opacity is unavailable")
+                })?,
                 admission: GeometryAdmission::DropCoincidentCurves,
             },
         )
         .map_err(|error| {
             unavailable(
-                source_index,
+                input.source_index,
                 match error {
-                    TextProducerError::Scene(ref error) => error.reason(),
+                    TextProducerError::Scene(ref e) => e.reason(),
                     TextProducerError::Layout(_) => "native Text layout unavailable",
                     TextProducerError::FontProviderUnavailable => {
                         "native retained font unavailable"
@@ -135,27 +178,61 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
                     TextProducerError::Color => "native Text paint unavailable",
                 },
             )
-        })?;
+        })
+    };
+    for input in inputs {
+        let font = fonts::prepare(
+            packet.snapshot(),
+            &input.entry.block,
+            &bundled,
+            input.source_index,
+        )?;
+        let raw = make(&input, &font, &[])?;
+        // This includes hidden ancestor Text from its actual exposure, never an
+        // advance estimate/anchor box. Its retained font remains in the witness.
+        chains
+            .include_text(input.layer_index, &raw)
+            .map_err(|e| unavailable(input.source_index, e.reason()))?;
         let id = format!("font:{}", font.key);
-        if item.font_resource() != id {
+        if raw.font_resource() != id {
             return Err(unavailable(
-                source_index,
+                input.source_index,
                 "Text resolved font identity mismatch",
             ));
         }
         if let Some(previous) = resources.get(&id) {
             if !previous.same_allocation_as(&font.resource) {
                 return Err(unavailable(
-                    source_index,
+                    input.source_index,
                     "Text font allocation identity mismatch",
                 ));
             }
         } else {
-            resources.insert(id, font.resource);
+            resources.insert(id, Arc::clone(&font.resource));
         }
+        pending.push((input, font, raw));
+    }
+    let chains = Arc::new(
+        chains
+            .finish()
+            .map_err(|e| unavailable(e.source_index, e.reason()))?,
+    );
+    let mut entries = Vec::new();
+    for (input, font, raw) in pending {
+        if !input.visible {
+            continue;
+        }
+        let chain = chains
+            .chain(input.layer_index)
+            .map_err(|e| unavailable(input.source_index, e.reason()))?;
+        let item = if chain.is_empty() {
+            raw
+        } else {
+            make(&input, &font, &chain)?
+        };
         entries.push(TextSource {
-            source_index,
-            layer_index: record.layer_index(),
+            source_index: input.source_index,
+            layer_index: input.layer_index,
             item,
         });
     }
@@ -173,6 +250,7 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
         .collect();
     Ok(TextSources {
         entries,
+        parent_chains: chains,
         resources: Arc::new(
             ObjectSceneResourceSet::new(resources)
                 .map_err(|_| unavailable(0, "native Text resource declarations invalid"))?,
@@ -231,3 +309,13 @@ pub(super) fn verify(
 ))]
 #[path = "../tests/object_text_scene_join.rs"]
 mod tests;
+
+#[cfg(all(
+    test,
+    feature = "font_asset_admission",
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_scene_parent_chain.rs"]
+mod parent_chain_tests;

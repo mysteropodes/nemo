@@ -28,7 +28,11 @@ func ui32ContentCertificate<Node>(_ main:Node, pid:Int, retained:Node?, deadline
     nodes.append(node);roles.append(role);modals.append(modal);declared.append(ancestor);reportedRefs.append(nil)
     if ancestor != nil {
       let (query,observed)=parent(node)
-      try ui32ScopeCheck(query == 0 && observed != nil,"parent-query")
+      guard query == 0 && observed != nil else {
+        throw ActionRefusal(diagnostics:["stage":"content-scope","reason":"parent-query",
+          "queryError":query,"parentPresent":observed != nil,"nodeIndex":index,"depth":depth,
+          "role":role,"declaredParentIndex":ancestor!,"queriedNodeOwnerVerified":true])
+      }
       try owned(observed!);reportedRefs[index]=observed!
     }
     let (query,rows)=children(node)

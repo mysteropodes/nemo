@@ -33,8 +33,8 @@ function rig(o) {
   s.presented = s.frame;
   const info = () => ({ instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 1, contentRevision: s.rev,
     documentSnapshotId: 'native-object:document-A:' + s.rev, totalFrames: s.total, layers: s.uids.map((layerUid) => ({ layerUid })) });
-  const receipt = (applied) => ({ apiVersion: 2, requestId: 'frame-edit-1', ok: true, instanceId: 'instance-A', documentId: 'document-A',
-    contentRevision: s.rev, result: { applied, historyEntriesAdded: applied ? 1 : 0 } });
+  const receipt = (applied, op) => ({ apiVersion: 2, requestId: 'frame-edit-1', ok: true, instanceId: 'instance-A', documentId: 'document-A',
+    contentRevision: s.rev, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, op === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : {}) });
   const session = {
     info,
     readPresentedObjectSession() {
@@ -48,7 +48,7 @@ function rig(o) {
         if (o.write) return o.write(s, op, payload, receipt);
         s.total = lengthAfter(s, op, payload); s.rev += 1;
         s.frame = Math.min(s.frame, s.total - 1); s.presented = s.frame;
-        return receipt(true);
+        return receipt(true, op);
       };
     }
   };
@@ -359,4 +359,21 @@ test('no legacy or Paper writer is reachable from the adapter, statically or at 
     for (const kind of Intent.KINDS) await rig({ active: 1, cells: [{ layer: 1, frame: 3 }], layerSel: [1] }).intent.run(act(kind));
   } finally { names.forEach((name) => { delete globalThis[name]; }); delete globalThis.window; }
   assert.deepEqual(calls, []);
+});
+
+test('repeat intent exposes only native confirmed cycle/skip counts and does not equate growth with cycled layers', async()=>{
+  const selected=[{layer:0,frame:2}];
+  for(const applied of [true,false]) {
+    const r=rig({cells:selected,write:(s,op,p,receipt)=>{
+      if(applied){s.rev++;s.total+=2;}
+      const value=receipt(applied,op);value.result.cycledLayers=0;value.result.skippedComponentLayers=1;return value;
+    }});
+    const out=await r.intent.run({kind:'repeatSelection',times:2});
+    assert.equal(out.status,applied?'applied-presented':'unchanged');
+    assert.equal(out.applied,applied);assert.equal(out.cycledLayers,0);assert.equal(out.skippedComponentLayers,1);
+  }
+  for(const mutate of [r=>{delete r.result.cycledLayers;},r=>{r.result.skippedComponentLayers=-1;},r=>{r.result.extra=1;}]) {
+    const r=rig({cells:selected,write:(s,op,p,receipt)=>{s.rev++;const value=receipt(true,op);mutate(value);return value;}});
+    assert.deepEqual(await r.intent.run({kind:'repeatSelection',times:2}),{status:'unconfirmed'});
+  }
 });

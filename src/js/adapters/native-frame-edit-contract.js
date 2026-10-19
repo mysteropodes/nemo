@@ -150,7 +150,9 @@
   }
   function result(operation, value) {
     if (!admitted(operation)) fail('frame edit operation is not declared');
-    exact(value, ['applied', 'historyEntriesAdded'], [], 'frame edit result');
+    var repeat = operation === PREFIX + 'frames.repeat';
+    exact(value, ['applied', 'historyEntriesAdded'].concat(repeat ? ['cycledLayers', 'skippedComponentLayers'] : []), [], 'frame edit result');
+    if (repeat) { u32(value.cycledLayers, 'cycledLayers'); u32(value.skippedComponentLayers, 'skippedComponentLayers'); }
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) {
       fail('invalid frame edit disposition');
     }

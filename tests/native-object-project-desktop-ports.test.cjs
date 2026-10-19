@@ -8,16 +8,17 @@ const Files=require('../src/js/adapters/native-object-project-file.js');
 const Application=require('../src/js/adapters/native-application.js');
 const turn=()=>new Promise(setImmediate);
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
-function fixture(){
+function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
   const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[];
+  let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
   const document={documentElement:{clientWidth:1200,clientHeight:900,
     classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
     style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}},
     getElementById:id=>{assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId,contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,lifecycleGeneration:generation,
-    documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:[{layerUid:'drawing',visible:true}],reference:null});
+    documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:layerRows.map(row=>({...row})),reference:null});
   const root={document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
     NemoNativeObjectProjectFile:{...Files,refreshLayerTable:(r,i)=>{log.push('project');return !projectionRefused&&Files.refreshLayerTable(r,i);}},
     NemoNativeApplicationAdapter:Application,NemoNativeObjectUI:{refreshTiming:r=>{assert.equal(r,root);log.push('timing');},refreshPolicy:r=>{assert.equal(r,root);log.push('policy');}},
@@ -64,6 +65,7 @@ function fixture(){
   const session=Project.desktop(root);
   const open=()=>session.openPath('/fake.json',{reveal:async i=>{Files.projectView(root,i);root.updateUI();}});
   return {root,session,open,log,calls,classes,styles,transports,info,
+    layers:value=>{layerRows=value.map(row=>({...row}));},
     hold:v=>held=v,foreign:v=>foreign=v,rect:v=>rect=v,refuseProjection:v=>projectionRefused=v,ackGate:v=>rawAck=v,previewGate:v=>previewHold=v,mutateReply:v=>replyMutation=v,
     async emit(){const t=transports.at(-1),from=revision;revision++;const event={...info(),requestId:'event-'+revision,fromRevision:from,toRevision:revision};return t.synchronize(event,t.binding);}};
 }
@@ -208,4 +210,37 @@ test('factory retains policy-specific SDK dispatch and policy notifications afte
 test('SDK-valid advancing partial-page cursor is preserved without a local completeness guess',async()=>{
   const f=fixture();await f.open();f.mutateReply(r=>r.result.nextOffset=1);
   const result=await f.session.readPropertyMetadata(selector(f));assert.equal(result.nextOffset,1);assert.equal(result.items.length,1);
+});
+
+
+test('real desktop ports project frozen opaque parent metadata through revision refresh without document writers',async()=>{
+  const parent='親:雪/opaque',base=[{layerUid:parent,visible:true},{layerUid:'drawing',visible:true,parentLayerUid:parent}];
+  const f=fixture(base);await f.open();const ports=Ports.createPorts(f.root),table=f.root.state.layers,child=table[1];
+  const initial=f.session.info();assert.equal(initial.layers[1].parentLayerUid,parent);
+  assert.equal(Object.isFrozen(initial.layers[1]),true);assert.equal(child.parentLayerUid,parent);
+  assert.equal(ports.projectionReady(initial),true);
+  for(const nextRows of [[base[0],{...base[1],parentLayerUid:null}],base,[base[0],{layerUid:'drawing',visible:true}]]){
+    f.layers(nextRows);await f.emit();
+    const current=f.session.info();assert.strictEqual(f.root.state.layers,table);assert.strictEqual(table[1],child);
+    assert.equal(child.parentLayerUid,Object.hasOwn(nextRows[1],'parentLayerUid')?nextRows[1].parentLayerUid:null);
+    assert.equal(ports.projectionReady(current),true);assert.equal(Object.isFrozen(current.layers[1]),true);
+  }
+  assert.equal(f.calls.some(c=>c.r&&c.r.operation&&c.r.operation.startsWith('command.')),false);
+});
+test('actual desktop projection readiness rejects same-revision parent drift with complete UI state intact',async()=>{
+  const parent='親:雪',f=fixture([{layerUid:parent},{layerUid:'drawing',parentLayerUid:parent}]);await f.open();
+  const ports=Ports.createPorts(f.root),current=f.session.info(),before=JSON.stringify(f.root.state);
+  const changed={...current,layers:current.layers.map((row,i)=>i===1?{...row,parentLayerUid:null}:{...row})};
+  assert.equal(ports.projectionReady(changed),false);
+  assert.equal(Files.refreshLayerTable(f.root,changed),false);assert.equal(JSON.stringify(f.root.state),before);
+  assert.equal(ports.projectionReady(current),true);assert.strictEqual(f.session.info(),current);
+});
+test('real desktop metadata rejects a late malformed parent before any partial projection publication',async()=>{
+  const parent='親:雪',base=[{layerUid:parent,visible:true},{layerUid:'drawing',visible:true,parentLayerUid:parent}];
+  const f=fixture(base);await f.open();const before=JSON.stringify(f.root.state),table=f.root.state.layers;
+  f.layers([{...base[0],visible:false},{...base[1],parentLayerUid:''}]);
+  await assert.rejects(f.emit(),/metadata.*uncorrelated/i);
+  assert.equal(JSON.stringify(f.root.state),before);assert.strictEqual(f.root.state.layers,table);
+  assert.equal(f.session.isIndeterminate(),true);
+  assert.equal(f.calls.some(c=>c.r&&c.r.operation&&c.r.operation.startsWith('command.')),false);
 });

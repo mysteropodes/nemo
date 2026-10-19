@@ -408,8 +408,8 @@ where
     // The typed holder table is admitted for persistence and native reads.
     // Until its sampled values reach this producer, never paint unmodified
     // geometry while silently ignoring authored Motion properties. L01-H consumes exactly
-    // parametric-shape tracks, raw layer opacity and root vector-layer Position (holders_fully_consumed); every
-    // other holder still keeps the packet unavailable.
+    // parametric-shape, root-vector Position and the actual Text/raster parent consumer.
+    // Other holders and visible vector parenting remain unavailable (holders_fully_consumed).
     if !holders_fully_consumed(document) {
         return Err(ObjectFrameError::Unavailable.into());
     }

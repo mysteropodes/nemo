@@ -33,7 +33,7 @@ function scenario(o) {
     if (failure === 'stale') return Object.assign(base, { contentRevision: revision, ok: false, error: { code: 'stale_revision', message: 'Stale frame edit' } });
     const applied = failure !== 'noop';
     if (applied) { total = lengthAfter(r.operation, r.payload); revision += 1; }
-    return Object.assign(base, { contentRevision: revision, ok: true, result: { applied, historyEntriesAdded: applied ? 1 : 0 } });
+    return Object.assign(base, { contentRevision: revision, ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, r.operation === P + 'frames.repeat' ? { cycledLayers: 3, skippedComponentLayers: 0 } : {}) });
   }
   const ports = {
     invoke, frame: () => ui.frame, projectionReady: () => true, publishRevision: () => true,

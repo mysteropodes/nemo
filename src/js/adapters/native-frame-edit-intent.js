@@ -196,8 +196,9 @@
       var applied = null, frame = state.frame, layers = before.layers.map(function (row) { return row.layerUid; });
       try {
         var receipt = await write.call(session, step.op, step.payload, before), result = receipt && receipt.result;
+        try { Contract.result(step.op, result); } catch (_) { return Object.freeze({ status: 'unconfirmed' }); }
         if (!receipt || receipt.apiVersion !== 2 || receipt.ok !== true || receipt.instanceId !== before.instanceId || receipt.documentId !== before.documentId ||
-            !result || Object.keys(result).length !== 2 || typeof result.applied !== 'boolean' || result.historyEntriesAdded !== (result.applied ? 1 : 0) ||
+            !result || typeof result.applied !== 'boolean' || result.historyEntriesAdded !== (result.applied ? 1 : 0) ||
             receipt.contentRevision !== before.contentRevision + (result.applied ? 1 : 0)) return Object.freeze({ status: 'unconfirmed' });
         applied = result.applied;
         if (retired || ports.currentSession() !== session) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
@@ -210,6 +211,9 @@
             (length === null ? !(after.totalFrames >= before.totalFrames) : after.totalFrames !== length) || ports.available(session, after) !== true ||
             !whole(playhead, 0, after.totalFrames - 1) || !presented(session, after, playhead)) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
         var out = { status: applied ? 'applied-presented' : 'unchanged', applied: applied }, hint = applied ? playheadHint(step.op, frame, after.totalFrames) : null;
+        if (step.op === P + 'frames.repeat') {
+          out.cycledLayers = result.cycledLayers; out.skippedComponentLayers = result.skippedComponentLayers;
+        }
         if (hint !== null) out.playhead = hint;
         return Object.freeze(out);
       } catch (error) {

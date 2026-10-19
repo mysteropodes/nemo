@@ -200,18 +200,22 @@ fn parented_text_refuses_atomically_and_keeps_old_witness_usable() {
         .unwrap()
         .push(json!({"layerUid":"parent","naturalPosition":1,"order":{}}));
     doc["layers"][0]["parentLayerUid"] = json!("parent");
-    // Parenting is refused by native admission before a scene can be prepared.
-    // The storage wrapper preserves its first (v1) error, so check the explicit
-    // ordered codec too rather than inventing an inadmissible native owner.
-    use crate::object_codec::{
-        decode_ordered_project, decode_storage_project, ObjectCodecErrorKind,
-    };
+    // Top-level ordered-v2 storage preserves static parents. This mixed layer
+    // still has visible vector content without a parent-transform consumer.
+    use crate::object_codec::{decode_ordered_project, decode_storage_project};
     let encoded = serde_json::to_vec(&doc).unwrap();
-    let ordered_error = decode_ordered_project(&encoded).unwrap_err();
-    assert_eq!(ordered_error.kind(), ObjectCodecErrorKind::Unsupported);
-    assert_eq!(ordered_error.message(), "layer parenting is unavailable");
-    let storage_error = decode_storage_project(&encoded).unwrap_err();
-    assert_eq!(storage_error.kind(), ObjectCodecErrorKind::Unsupported);
+    decode_ordered_project(&encoded).unwrap();
+    let admitted = decode_storage_project(&encoded).unwrap();
+    let parented = owner(&doc);
+    let parented_before = support::state(&parented);
+    let parented_snapshot = support::head(&parented);
+    assert_eq!(*parented_snapshot.document(), admitted);
+    assert_eq!(
+        prepare_object_exposure_frame(&parented_snapshot, &selector(&parented_snapshot, 0))
+            .unwrap_err(),
+        crate::object_frame_packet::ObjectFrameError::Unavailable
+    );
+    assert_eq!(support::state(&parented), parented_before);
     assert_eq!(serde_json::to_vec(&doc).unwrap(), encoded);
     assert_eq!(support::state(&o), bytes);
     retained

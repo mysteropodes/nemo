@@ -37,6 +37,14 @@ impl ObjectPaintPlan {
         Ok(declared)
     }
 
+    /// Same immutable chain provider retained by Text/raster paints, not caller data.
+    pub(crate) fn native_parent_chains(
+        &self,
+    ) -> &std::sync::Arc<crate::object_render_scene::text_scene::parent_chain::SceneParentChains>
+    {
+        &self.scene.texts.parent_chains
+    }
+
     pub(crate) fn raster_sources(&self) -> &[RasterSource] {
         &self.scene.rasters
     }

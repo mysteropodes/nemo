@@ -205,8 +205,12 @@ mod retained {
                         },
                     );
                 }
+                let chain = plan
+                    .native_parent_chains()
+                    .chain(source.layer_index)
+                    .map_err(|error| unavailable(source.source_index, error.reason()))?;
                 draws.push(
-                    prepare_raster_scene_image(&source.source, &[], &Pixels(&assets)).map_err(
+                    prepare_raster_scene_image(&source.source, &chain, &Pixels(&assets)).map_err(
                         |_| {
                             unavailable(
                                 source.source_index,

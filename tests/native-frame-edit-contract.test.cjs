@@ -15,7 +15,7 @@ const schema = read('engineering/application/native-transport-v2.schema.json');
 const P = 'command.document.object.';
 const OPS = Contract.OPERATIONS;
 const request = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'frame-edit-7', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
-const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: { applied, historyEntriesAdded: applied ? 1 : 0 } });
+const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : {}) });
 const OPTIONAL = { 'object.frames.insert': ['layerUids'], 'object.layer.key.promote': ['layerUids'] };
 
 test('the descriptor, the schema and the contract declare the same eleven operations', () => {
@@ -193,4 +193,23 @@ test('valid() is the non-throwing verdict of payload() for every operation', () 
   }
   assert.equal(Contract.valid('command.document.object.frames.clipboard.paste', { command: 'object.frames.clipboard.paste' }), false);
   assert.equal(Contract.valid(undefined, {}), false);
+});
+
+// Native owner counts are exercised by Rust; these are actual SDK contract refusal controls.
+test('repeat counts are required, closed, bounded and exclusive to repeat, including applied growth with zero cycles', async () => {
+  const op=P+'frames.repeat', q=request(op,Contract.example(op));
+  for(const applied of [true,false]) {
+    const r=reply(q,applied);r.result.cycledLayers=0;r.result.skippedComponentLayers=2;
+    const client=SDK.createNativeApplicationAdapter('frame-edit-test',{dispatch(){return structuredClone(r);}});
+    assert.deepEqual(await client.dispatch(q),r);
+  }
+  for(const key of ['cycledLayers','skippedComponentLayers']) {
+    for(const value of [undefined,-1,1.5,4294967296,NaN,Infinity,'1',null]) {
+      const r=reply(q,true);if(value===undefined)delete r.result[key];else r.result[key]=value;
+      assert.throws(()=>Contract.result(op,r.result),TypeError);
+    }
+  }
+  for(const other of OPS.filter(x=>x!==op))assert.throws(()=>Contract.result(other,reply(q,true).result),TypeError);
+  assert.deepEqual(schema.$defs.ObjectFrameRepeatResult.required,['applied','historyEntriesAdded','cycledLayers','skippedComponentLayers']);
+  assert.equal(schema.$defs.ObjectFrameRepeatResult.additionalProperties,false);
 });

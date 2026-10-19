@@ -52,7 +52,7 @@ fn vector_only_layer(document: &ObjectDocument, target: &PropertyHolderTarget) -
         })
 }
 
-pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     let target = holder.target();
     ordinary_root_layer(document, target)
         && !holder.properties().is_empty()
@@ -64,6 +64,93 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
                     _ => false,
                 }
         })
+}
+
+/// True only for a real Text/raster consumer or one of its actual same-context
+/// ancestors. This admits sampled inputs; the scene provider still proves the
+/// complete chain, real bounds, cycle/depth/expressions and exact frame.
+fn scene_consumer_uses_layer(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    if document.format_version() != 2
+        || target.context_id() != "scene-root"
+        || target.stroke_id().is_some()
+    {
+        return false;
+    }
+    let Some(context) = document.composition_order.value().and_then(|plan| {
+        plan.contexts
+            .iter()
+            .find(|c| c.context_id == target.context_id())
+    }) else {
+        return false;
+    };
+    let Some(items) = document.item_records() else {
+        return false;
+    };
+    items
+        .targets()
+        .filter(|item| item.context_id() == target.context_id())
+        .any(|item| {
+            let mut next = Some(item.layer_uid());
+            let mut seen = std::collections::BTreeSet::new();
+            let mut used = false;
+            while let Some(uid) = next {
+                if seen.len() > crate::evaluation::motion_parent_chain::CHAIN_NODE_LIMIT
+                    || !seen.insert(uid)
+                {
+                    return false;
+                }
+                let Some(layer) = document.layers().iter().find(|l| l.layer_uid() == uid) else {
+                    return false;
+                };
+                if !context.layers.iter().any(|l| l.layer_uid == uid) {
+                    return false;
+                }
+                used |= uid == target.layer_uid();
+                next = layer.parent_layer_uid.value().and_then(Option::as_deref);
+            }
+            used
+        })
+}
+
+pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+    if vector_layer_holder_consumed(document, holder) {
+        return true;
+    }
+    let target = holder.target();
+    if !scene_consumer_uses_layer(document, target) || holder.properties().is_empty() {
+        return false;
+    }
+    // The new provider transforms only Text/raster paints. A visible vector on
+    // the same layer must never silently ignore rotation/scale/anchor/Position.
+    let visible_vector = document.layers().iter().any(|layer| {
+        layer.layer_uid() == target.layer_uid()
+            && layer.visible()
+            && document.objects().iter().any(|record| {
+                record.target.context_id == target.context_id()
+                    && record.target.layer_uid == target.layer_uid()
+            })
+    });
+    holder.properties().iter().all(|property| {
+        !property.expression.value().is_some_and(|code| code.enabled)
+            && match property.property() {
+                "opacity" => true,
+                "position" | "anchor" | "rotation" | "scale" => !visible_vector,
+                _ => false,
+            }
+    })
+}
+
+/// Static parenting on visible contour/vector content has no consumer in this
+/// slice. Refuse the whole frame even with no Motion holder to trigger a guard.
+pub(super) fn visible_vector_parents_supported(document: &ObjectDocument) -> bool {
+    !document.layers().iter().any(|layer| {
+        layer.visible()
+            && layer.parent_layer_uid.value().is_some_and(Option::is_some)
+            && document
+                .objects()
+                .iter()
+                .any(|record| record.target.layer_uid == layer.layer_uid())
+    })
 }
 
 /// No holder/Position means no transform, preserving every old float bit.
@@ -96,7 +183,7 @@ pub(super) fn apply_layer_position(
         .controls
         .value()
         .is_some_and(|controls| !controls.is_empty())
-        || !layer_holder_consumed(snapshot.document(), holder)
+        || !vector_layer_holder_consumed(snapshot.document(), holder)
     {
         return Err(VectorEvalError::LayerMotionUnavailable);
     }

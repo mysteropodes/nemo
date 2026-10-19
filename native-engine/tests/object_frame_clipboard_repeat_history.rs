@@ -77,8 +77,9 @@ fn run_row(row: &Row, form: Build) {
     let reply = run_request(&mut o, &row.request(), "row");
     assert_eq!(reply["ok"], true, "{who}: {reply}");
     assert_eq!(
-        json!({"applied":reply["result"]["applied"],"historyEntriesAdded":reply["result"]["historyEntriesAdded"]}),
-        json!({"applied":row.chg,"historyEntriesAdded":u8::from(row.chg)}),
+        reply["result"],
+        json!({"applied":row.chg,"historyEntriesAdded":u8::from(row.chg),
+            "cycledLayers":row.bounds().1 - row.bounds().0 + 1,"skippedComponentLayers":0}),
         "{who}"
     );
     let out = head(&o).document().clone();
@@ -232,4 +233,168 @@ fn a_layer_in_the_bounds_without_timing_refuses_typed_and_publishes_nothing() {
         assert_eq!(reply["error"]["code"], "unavailable", "{form:?}: {reply}");
         assert_eq!(state(&o), before, "{form:?}");
     }
+}
+
+/// Genuine admitted component table, matching Lead's retained Repeat kernel controls.
+/// L1 has no drawing timing; it is a native scene-root component instance, not a flag pretending to be one.
+fn component_outcome_document() -> ObjectDocument {
+    let mut value = build::document_json(&rows::parse_layers("K=a.1.10;.;.|.;.;."), Build::V2);
+    value["layers"][1].as_object_mut().unwrap().remove("timing");
+    // Component frameKeys require outer timing keys; this genuine no-timing instance has none.
+    value["componentTables"] = json!({"components": {
+        "format":"nemo.native-component-set", "formatVersion":1,
+        "components":[{"symbolId":"symbol", "totalFrames":3,
+            "layers":[{"layerUid":"inside"}], "objects":[]}],
+        "instances":[{"contextId":"scene-root", "layerUid":"L1", "symbolId":"symbol",
+            "symSpeed":2}]
+    }});
+    decode_storage_project(value.to_string().as_bytes()).unwrap()
+}
+
+fn outcome_cycle(from: usize, to: usize, first: u32, last: u32, times: i64) -> RepeatRequest {
+    RepeatRequest {
+        from_layer: build::uid(from),
+        to_layer: build::uid(to),
+        from_frame: first,
+        to_frame: last,
+        times,
+    }
+}
+
+#[test]
+fn real_repeat_dispatch_retains_mixed_and_component_only_counts_through_replay_undo_and_redo() {
+    for (from, to, times, changed, cycled, skipped) in [
+        (0, 1, 3, true, 1, 1),
+        (1, 1, 3, true, 0, 1),
+        (1, 1, 1, false, 0, 1),
+    ] {
+        let input = component_outcome_document();
+        let mut o = owner(input.clone());
+        let before = state(&o);
+        let cycle = outcome_cycle(from, to, 0, 0, times);
+        let submitted = request(&o, "component-counts", OP_REPEAT, repeat_payload(&cycle));
+        let reply = dispatch(&mut o, &submitted);
+        assert_eq!(reply["ok"], true, "{reply}");
+        assert_eq!(
+            reply["result"],
+            json!({"applied":changed,"historyEntriesAdded":u8::from(changed),
+            "cycledLayers":cycled,"skippedComponentLayers":skipped})
+        );
+        assert_eq!(o.history_depths(), (usize::from(changed), 0));
+        let output = head(&o).document().clone();
+        assert_eq!(output.layers[1], input.layers[1]);
+        assert_eq!(output.component_tables, input.component_tables);
+        if cycled == 0 {
+            assert_eq!(
+                output.objects, input.objects,
+                "global growth does not cycle any component drawing"
+            );
+            assert_eq!(output.total_frames, if changed { 4 } else { 3 });
+        }
+        let after = state(&o);
+        assert_eq!(dispatch(&mut o, &submitted), reply);
+        assert_eq!(
+            state(&o),
+            after,
+            "retained count reply cannot execute twice"
+        );
+        if changed {
+            let undo = request(
+                &o,
+                "undo",
+                "command.document.object.undo",
+                json!({"command":"object.undo"}),
+            );
+            let undone = dispatch(&mut o, &undo);
+            assert_eq!(
+                undone["result"],
+                json!({"applied":true,"historyEntriesAdded":0}),
+                "other command results keep exactly two fields"
+            );
+            assert_eq!(bytes(&o), before.3);
+            assert_eq!(o.history_depths(), (0, 1));
+            let after_undo = state(&o);
+            assert_eq!(
+                dispatch(&mut o, &submitted),
+                reply,
+                "replay retains the original four fields after Undo"
+            );
+            assert_eq!(state(&o), after_undo);
+            let redo = request(
+                &o,
+                "redo",
+                "command.document.object.redo",
+                json!({"command":"object.redo"}),
+            );
+            let redone = dispatch(&mut o, &redo);
+            assert_eq!(
+                redone["result"],
+                json!({"applied":true,"historyEntriesAdded":0})
+            );
+            assert_eq!(*head(&o).document(), output);
+        } else {
+            assert_eq!(
+                state(&o),
+                before,
+                "all-component no-op retains its skip count without publication"
+            );
+        }
+    }
+}
+
+#[test]
+fn real_identical_layer_noop_reports_visited_cycle_and_preserves_redo_and_exact_replay() {
+    let mut o = owner(build::document(
+        &rows::parse_layers("K=a.1.10;.;K=b.2.20;.|K;.;.;K"),
+        Build::V1,
+    ));
+    let changed = run_request(&mut o, &outcome_cycle(0, 0, 0, 1, 1), "seed-redo");
+    assert_eq!(
+        changed["result"],
+        json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":1,"skippedComponentLayers":0})
+    );
+    o.undo(1).unwrap();
+    let before = state(&o);
+    let submitted = request(
+        &o,
+        "noop-counts",
+        OP_REPEAT,
+        repeat_payload(&outcome_cycle(1, 1, 1, 1, 1)),
+    );
+    let reply = dispatch(&mut o, &submitted);
+    assert_eq!(
+        reply["result"],
+        json!({"applied":false,"historyEntriesAdded":0,"cycledLayers":1,"skippedComponentLayers":0})
+    );
+    assert_eq!(state(&o), before);
+    assert_eq!(o.history_depths(), (0, 1));
+    assert_eq!(dispatch(&mut o, &submitted), reply);
+    assert_eq!(state(&o), before);
+    let mut altered = submitted.clone();
+    altered["payload"]["times"] = json!(2);
+    let refused = dispatch(&mut o, &altered);
+    assert_eq!(refused["ok"], false);
+    assert_eq!(refused["error"]["code"], "invalid_request");
+    assert_eq!(refused["result"], Value::Null);
+    assert_eq!(state(&o), before);
+    o.redo(o.content_revision()).unwrap();
+    assert_eq!(o.history_depths(), (1, 0));
+}
+
+#[test]
+fn refused_repeat_never_publishes_prepared_counts_or_changes_history() {
+    let mut o = owner(component_outcome_document());
+    let before = state(&o);
+    let invalid = outcome_cycle(0, 1, 0, 3, 1);
+    let submitted = request(&o, "invalid-counts", OP_REPEAT, repeat_payload(&invalid));
+    let reply = dispatch(&mut o, &submitted);
+    assert_eq!(reply["ok"], false);
+    assert_eq!(reply["result"], Value::Null);
+    assert_eq!(state(&o), before);
+    assert_eq!(dispatch(&mut o, &submitted), reply);
+    assert_eq!(
+        state(&o),
+        before,
+        "a retained failure cannot publish a partial outcome"
+    );
 }

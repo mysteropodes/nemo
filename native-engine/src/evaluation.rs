@@ -10,6 +10,10 @@ use crate::revision::DocumentSnapshot;
 use serde_json::Number;
 use std::fmt::{Display, Formatter};
 
+// D16-K1: supplied immutable lookup records; no guest or owner binding yet.
+#[path = "property_expression_lookup.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_expression_lookup;
 // N22C: private expression noise kernel; its consumers arrive in later leaves.
 #[path = "expression_noise.rs"]
 #[allow(dead_code)]
@@ -40,15 +44,15 @@ pub(crate) mod property_expression_runtime;
 #[allow(dead_code)]
 pub(crate) mod property_expression_views;
 // D28-K1: private contribution kernel over explicit resolved selector inputs.
-#[path = "property_text_animator.rs"]
-#[allow(dead_code)]
-pub(crate) mod property_text_animator;
 #[path = "property_follow_path_sample.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_follow_path_sample;
 #[path = "property_projection_3d.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_projection_3d;
+#[path = "property_text_animator.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_text_animator;
 #[path = "property_transform_eval.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_transform_eval;

@@ -264,6 +264,7 @@
       "files": [
         "history.rs",
         "transaction.rs",
+        "transaction_receipt_result.rs",
         "object_history.rs",
         "object_project_history.rs",
         "object_reference_dispatch.rs",
@@ -448,7 +449,8 @@
         "object_scene_producer_brush_slot.rs",
         "object_scene_producer_brush.rs",
         "object_parametric_transform.rs",
-        "object_text_frame.rs"
+        "object_text_frame.rs",
+        "property_expression_lookup.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -517,7 +519,8 @@
         "object_raster_scene_join.rs",
         "object_text_scene_join.rs",
         "object_text_scene_fonts.rs",
-        "object_text_scene_bundled.rs"
+        "object_text_scene_bundled.rs",
+        "object_scene_parent_chain.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -1457,7 +1460,10 @@
         "object_text_scene_join.rs",
         "object_text_scene_gpu.rs",
         "object_text_scene_history.rs",
-        "object_text_scene_svg.rs"
+        "object_text_scene_svg.rs",
+        "object_scene_parent_chain.rs",
+        "object_scene_parent_chain_pixels.rs",
+        "property_expression_lookup.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

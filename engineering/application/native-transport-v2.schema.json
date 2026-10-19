@@ -6745,6 +6745,9 @@
             },
             {
               "$ref": "native-object-item-v1.schema.json#/$defs/ImageImportResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectFrameRepeatResult"
             }
           ]
         },
@@ -8111,6 +8114,62 @@
         }
       ],
       "description": "At most 3072 UTF-8 encoded JSON result bytes; complete envelope at most4096. Chunk offsets count original UTF-8 text bytes, never UTF-16 code units. Pagination never splits a native identity or Unicode scalar."
+    },
+    "ObjectFrameRepeatResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "cycledLayers",
+        "skippedComponentLayers"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cycledLayers": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "skippedComponentLayers": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applied": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ],
+      "description": "Repeat-only immutable native preparation counts, retained after successful commit and on exact replay. Counts describe visited/skipped layers, not whether the document changed; all-component timeline growth can apply with zero cycled layers."
     }
   }
 }
