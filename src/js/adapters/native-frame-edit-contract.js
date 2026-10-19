@@ -9,6 +9,11 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var MAX_U32 = 4294967295, MAX_LIST = 4096, MAX_EXTEND = 999;
+  var DATA_BYTES = 4 * 1024 * 1024, MAX_DATA_ITEMS = DATA_BYTES / 32, MESSAGE_BYTES = DATA_BYTES + MAX_LIST * 256 + 4096;
+  function bytes(value) { return new TextEncoder().encode(JSON.stringify(value)).length; }
+  function clipboardOperation(op) { return [PREFIX + 'frames.clipboard.copy', PREFIX + 'frames.clipboard.cut', PREFIX + 'frames.clipboard.paste'].indexOf(op) >= 0; }
+  function requestByteLimit(op) { return clipboardOperation(op) ? MESSAGE_BYTES : 4096; }
+  function responseByteLimit(op) { return packetResult(op) ? MESSAGE_BYTES : 4096; }
   var PREFIX = 'command.document.object.';
   // Operation -> native payload command. Clipboard records remain detached data; Rust alone validates/publishes them.
   var COMMANDS = Object.freeze({
@@ -78,13 +83,17 @@
   }
   function packetCells(value) {
     if (!Array.isArray(value) || value.length > MAX_LIST) fail('clipboard cells must be bounded');
+    var dataBytes = 0;
     value.forEach(function (v) {
       exact(v, ['relLayer', 'relFrame', 'keyframe', 'records'], ['orderElements'], 'clipboard cell');
       u32(v.relLayer, 'relLayer'); u32(v.relFrame, 'relFrame');
-      if (typeof v.keyframe !== 'boolean' || !Array.isArray(v.records) || v.records.length > MAX_LIST ||
+      if (typeof v.keyframe !== 'boolean' || !Array.isArray(v.records) || v.records.length > MAX_DATA_ITEMS ||
           !v.records.every(plain)) fail('invalid clipboard records');
-      if (has(v, 'orderElements') && (!Array.isArray(v.orderElements) || v.orderElements.length > MAX_LIST ||
+      if (has(v, 'orderElements') && (!Array.isArray(v.orderElements) || v.orderElements.length > MAX_DATA_ITEMS ||
           !v.orderElements.every(plain))) fail('invalid clipboard order');
+      v.records.forEach(function (record) { dataBytes += bytes(record); });
+      if (has(v, 'orderElements')) dataBytes += bytes(v.orderElements);
+      if (dataBytes > DATA_BYTES) fail('clipboard data exceeds native 4MiB bound');
     });
   }
   function clipboard(value) {
@@ -227,6 +236,7 @@
       return base;
     }
     return Object.freeze({
+      requestByteLimit: requestByteLimit, responseByteLimit: responseByteLimit,
       admitted: function (operation) { return admitted(operation) || !!base && base.admitted(operation); },
       requiresRevision: function (operation) { return admitted(operation) ? true : !!base && base.requiresRevision(operation); },
       payload: function (operation, value, envelope) { return pick(operation).payload(operation, value, envelope); },
@@ -236,6 +246,7 @@
     });
   }
   var api = Object.freeze({
+    DATA_BYTES: DATA_BYTES, MAX_DATA_ITEMS: MAX_DATA_ITEMS, MESSAGE_BYTES: MESSAGE_BYTES, requestByteLimit: requestByteLimit, responseByteLimit: responseByteLimit,
     PREFIX: PREFIX, OPERATIONS: OPERATIONS, admitted: admitted, requiresRevision: requiresRevision, commandOf: commandOf,
     payload: payload, valid: valid, result: result, correlate: correlate, paths: paths, example: example, join: join
   });

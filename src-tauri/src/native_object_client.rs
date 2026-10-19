@@ -172,7 +172,18 @@ pub async fn nemo_native_dispatch(
             .try_fs_scope()
             .is_some_and(|scope| scope.is_allowed(path))
     });
-    state.dispatch_native_scoped(request, permission).await
+    let response = state
+        .dispatch_native_scoped(request.clone(), permission)
+        .await?;
+    if matches!(
+        request.operation.as_str(),
+        "command.document.object.frames.clipboard.copy"
+            | "command.document.object.frames.clipboard.cut"
+            | "command.document.object.frames.clipboard.paste"
+    ) {
+        wire::validate_native_response(&response, &request).map_err(|error| error.to_string())?;
+    }
+    Ok(response)
 }
 
 #[tauri::command]

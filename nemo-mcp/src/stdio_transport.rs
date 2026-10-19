@@ -200,3 +200,7 @@ where
         pending.and(closed)
     }
 }
+
+#[cfg(test)]
+#[path = "native_clipboard_stdio_output_tests.rs"]
+mod clipboard_output_tests;

@@ -38,6 +38,7 @@ const OPERATIONS: [&str; 15] = [
     REPEAT,
 ];
 const MAX_LIST: usize = 4096;
+const MAX_DATA_ITEMS: usize = crate::wire::native_clipboard_transport::DATA_BYTES / 32;
 const MAX_EXTEND: u64 = 999;
 const MAX_SAFE: i64 = 9_007_199_254_740_991;
 
@@ -95,28 +96,29 @@ fn unique_cells(value: Option<&Value>) -> bool {
 fn object_list(value: Option<&Value>) -> bool {
     value
         .and_then(Value::as_array)
-        .is_some_and(|items| items.len() <= MAX_LIST && items.iter().all(Value::is_object))
+        .is_some_and(|items| items.len() <= MAX_DATA_ITEMS && items.iter().all(Value::is_object))
 }
 fn clipboard_cells(value: Option<&Value>) -> bool {
-    value.and_then(Value::as_array).is_some_and(|cells| {
-        cells.len() <= MAX_LIST
-            && cells.iter().all(|cell| {
-                exact(
-                    cell,
-                    &["relLayer", "relFrame", "keyframe", "records"],
-                    &["orderElements"],
-                )
-                .is_some_and(|cell| {
-                    frame(cell.get("relLayer")).is_some()
-                        && frame(cell.get("relFrame")).is_some()
-                        && cell.get("keyframe").is_some_and(Value::is_boolean)
-                        && object_list(cell.get("records"))
-                        && cell
-                            .get("orderElements")
-                            .is_none_or(|v| object_list(Some(v)))
+    value.is_some_and(crate::wire::native_clipboard_transport::data_admitted)
+        && value.and_then(Value::as_array).is_some_and(|cells| {
+            cells.len() <= MAX_LIST
+                && cells.iter().all(|cell| {
+                    exact(
+                        cell,
+                        &["relLayer", "relFrame", "keyframe", "records"],
+                        &["orderElements"],
+                    )
+                    .is_some_and(|cell| {
+                        frame(cell.get("relLayer")).is_some()
+                            && frame(cell.get("relFrame")).is_some()
+                            && cell.get("keyframe").is_some_and(Value::is_boolean)
+                            && object_list(cell.get("records"))
+                            && cell
+                                .get("orderElements")
+                                .is_none_or(|v| object_list(Some(v)))
+                    })
                 })
-            })
-    })
+        })
 }
 fn clipboard_selection(value: Option<&Value>) -> bool {
     value.and_then(Value::as_array).is_some_and(Vec::is_empty) || unique_cells(value)

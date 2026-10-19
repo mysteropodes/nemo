@@ -249,7 +249,8 @@
     validatePayload(value.operation, value.payload, value);
     const encoded = JSON.stringify(value);
     const encodedBytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
-    const limit = vectorContract ? vectorContract.requestByteLimit(value.operation) : 4096;
+    const limit = Math.max(vectorContract ? vectorContract.requestByteLimit(value.operation) : 4096,
+      fontContract && fontContract.requestByteLimit ? fontContract.requestByteLimit(value.operation) : 4096);
     if (typeof encoded !== 'string' || encodedBytes > limit) throw new TypeError(`request exceeds ${limit} encoded bytes`);
     return value;
   }
@@ -413,7 +414,8 @@
     'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation, readOperation, 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
-      if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
+      const limit = fontContract && fontContract.responseByteLimit ? fontContract.responseByteLimit(operation) : 4096;
+      if (bytes > limit) throw new TypeError(`response exceeds ${limit} encoded bytes`);
     }
     exact(value, ['apiVersion', 'requestId', 'instanceId', 'documentId', 'contentRevision', 'ok'], value.ok ? ['result'] : ['error'], 'response');
     if (value.apiVersion !== 2 || value.requestId !== requestId || typeof value.ok !== 'boolean') throw new TypeError('response identity is invalid');

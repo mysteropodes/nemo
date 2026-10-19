@@ -265,7 +265,10 @@ fn copy_raw_wire_refuses_duplicate_unknown_null_malformed_and_oversized_fields()
         good.replace("\"frame\":0", "\"frame\":\"0\""),
         good.replace("\"command\":", "\"unknown\":true,\"command\":"),
     ];
-    raw.push(format!("{good}{}", " ".repeat(4097)));
+    raw.push(format!(
+        "{good}{}",
+        " ".repeat(crate::request_receipts::frame_clipboard_transport::MESSAGE_BYTES + 1)
+    ));
     for text in raw {
         assert_eq!(
             o.copy_frame_clipboard_json(text.as_bytes()).unwrap_err(),
@@ -276,7 +279,7 @@ fn copy_raw_wire_refuses_duplicate_unknown_null_malformed_and_oversized_fields()
 }
 
 #[test]
-fn oversized_copy_reply_is_refused_and_retained_without_effect() {
+fn formerly_4096_limited_copy_reply_is_retained_without_effect() {
     let d = build::document(
         &rows::parse_layers("K=a.1.1,b.1.2,c.1.3,d.1.4,e.1.5,f.1.6,g.1.7,h.1.8;.;.;."),
         build::Build::V1,
@@ -285,7 +288,8 @@ fn oversized_copy_reply_is_refused_and_retained_without_effect() {
     let before = state(&o);
     let q = request(&o, "too-large", COPY, one(0));
     let reply = dispatch(&mut o, &q);
-    assert_eq!(reply["error"]["code"], "invalid_request", "{reply}");
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert!(serde_json::to_vec(&reply).unwrap().len() > 4096);
     assert_eq!(dispatch(&mut o, &q), reply);
     assert_eq!(state(&o), before);
 }
@@ -327,7 +331,8 @@ fn copy_preflights_full_correlated_envelope_even_when_packet_alone_fits() {
             {
                 let before = state(&o);
                 let reply = dispatch(&mut o, &q);
-                assert_eq!(reply["error"]["code"], "invalid_request", "{reply}");
+                assert_eq!(reply["ok"], true, "{reply}");
+                assert_eq!(reply["result"]["clipboard"], clipboard);
                 assert_eq!(dispatch(&mut o, &q), reply);
                 assert_eq!(state(&o), before);
                 return;

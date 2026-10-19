@@ -1,18 +1,17 @@
 //! Strict frame-clipboard payloads (F12): copy, paste, cut and duplicate, plus the detached packet wire form.
 //! One field set per command; duplicate, unknown,
-//! missing, null, wrongly typed, negative, fractional, > u32 and over-4096-byte inputs are `InvalidRequest`. Cut admits
+//! missing, null, wrongly typed, negative, fractional, > u32 and over-budget inputs are `InvalidRequest`. Cut admits
 //! selection only; its detached result uses the same normalized cells as paste. The dispatcher must check the complete
-//! correlated response against4096 bytes BEFORE committing the prepared edit.
-//!
-//! The existing 4096-byte object message bound applies unchanged, so a pasted packet that does not fit refuses; the
-//! ingress bound for large packets is an open Architect decision and nothing here changes it.
+//! correlated response against the operation-specific full-message budget BEFORE commit.
+//! Copy/Cut/Paste alone use the F12 transport budget; Duplicate retains4096.
+//! Records plus complete order arrays retain the existing4MiB copied-data bound.
 use crate::commands::object_fill_owner::object_frame_clipboard_packet::FrameClipboardPacket;
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     CellRef, FrameClipboardOperation, PasteCell, PasteRequest,
 };
 use crate::commands::object_fill_owner::object_frame_clipboard_paste_plan::packet_paste_cells;
 use crate::object_document::{object_deserialize, ObjectRecord, OrderElement, Presence};
-use crate::request_receipts::DispatchErrorCode;
+use crate::request_receipts::{frame_clipboard_transport as budget, DispatchErrorCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -87,7 +86,7 @@ impl crate::commands::ObjectFillOwner {
         &self,
         bytes: &[u8],
     ) -> Result<Option<FrameClipboardPacket>, DispatchErrorCode> {
-        if bytes.len() > MAX_PAYLOAD_BYTES {
+        if bytes.len() > budget::MESSAGE_BYTES {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let payload: ClipboardPayload =
@@ -121,11 +120,18 @@ impl crate::commands::ObjectFillOwner {
 pub(crate) fn parse_clipboard_payload(
     bytes: &[u8],
 ) -> Result<FrameClipboardOperation, DispatchErrorCode> {
-    if bytes.len() > MAX_PAYLOAD_BYTES {
+    if bytes.len() > budget::MESSAGE_BYTES {
         return Err(DispatchErrorCode::InvalidRequest);
     }
     let payload: ClipboardPayload =
         serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+    if !matches!(
+        payload.command.as_str(),
+        "object.frames.clipboard.cut" | "object.frames.clipboard.paste"
+    ) && bytes.len() > MAX_PAYLOAD_BYTES
+    {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
     match payload.command.as_str() {
         "object.frames.clipboard.cut" => {
             forbid(&payload.instance_id)?;
@@ -146,7 +152,21 @@ pub(crate) fn parse_clipboard_payload(
         }
         "object.frames.clipboard.paste" => {
             forbid(&payload.selection)?;
-            let cells = require(payload.cells)?
+            let wire_cells = require(payload.cells)?;
+            let mut data_bytes = 0;
+            for cell in &wire_cells {
+                for record in &cell.records {
+                    if !budget::charge(&mut data_bytes, record) {
+                        return Err(DispatchErrorCode::InvalidRequest);
+                    }
+                }
+                if let Presence::Present(order) = &cell.order_elements {
+                    if !budget::charge(&mut data_bytes, order) {
+                        return Err(DispatchErrorCode::InvalidRequest);
+                    }
+                }
+            }
+            let cells = wire_cells
                 .into_iter()
                 .map(|cell| PasteCell {
                     rel_layer: cell.rel_layer,

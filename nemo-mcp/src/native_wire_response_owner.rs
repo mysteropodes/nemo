@@ -1,7 +1,5 @@
 //! Closed owner correlation of the existing native wire; endpoint admission remains in call_native.
-use crate::contract::{
-    NativeApplicationRequest, NativeApplicationResponse, NATIVE_MAX_MESSAGE_BYTES,
-};
+use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 pub(super) fn correlated(
     request: &NativeApplicationRequest,
     response: &NativeApplicationResponse,
@@ -37,7 +35,9 @@ pub(super) fn correlated(
                                     .as_ref()
                                     .is_some_and(|e| e.code == "wrong_document"))),
                 )
-            && serde_json::to_vec(response).is_ok_and(|b| b.len() <= NATIVE_MAX_MESSAGE_BYTES));
+            && serde_json::to_vec(response).is_ok_and(|b| {
+                b.len() <= crate::wire::native_response_byte_limit(&request.operation)
+            }));
     correlated_identity
 }
 pub(super) fn reports_document(

@@ -155,7 +155,8 @@
       "layer": "native-request-receipts",
       "dir": "native-engine/src",
       "files": [
-        "request_receipts.rs"
+        "request_receipts.rs",
+        "object_frame_clipboard_transport.rs"
       ],
       "publicApi": [
         "request_receipts.rs"
@@ -1487,7 +1488,8 @@
         "object_layer_range_evaluate.rs",
         "object_layer_range_frames.rs",
         "object_motion_arcs.rs",
-        "object_exposure_edit_retime_arcs.rs"
+        "object_exposure_edit_retime_arcs.rs",
+        "object_frame_clipboard_transport.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1601,7 +1603,10 @@
         "src/native_frame_edit_blank_wire_tests.rs",
         "src/native_frame_clipboard_contract_tests.rs",
         "src/native_frame_clipboard_wire_tests.rs",
-        "src/native_frame_clipboard_response_schema_tests.rs"
+        "src/native_frame_clipboard_response_schema_tests.rs",
+        "src/native_clipboard_transport.rs",
+        "src/native_clipboard_transport_tests.rs",
+        "src/native_clipboard_stdio_output_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1855,7 +1860,8 @@
         "native_property_edit_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
-        "native_asset_remove_dispatch_tests.rs"
+        "native_asset_remove_dispatch_tests.rs",
+        "native_frame_clipboard_transport_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

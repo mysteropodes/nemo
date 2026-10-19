@@ -25,7 +25,7 @@ test('the descriptor, the schema and the contract declare the same fifteen opera
   assert.equal(descriptor.availability.state, 'available');
   assert.equal(descriptor.authority.adapterOwnsWritableMirror, false);
   assert.equal(descriptor.authority.fallback, 'none');
-  assert.equal(descriptor.resourceBoundary.maxRequestBytes, 4096);
+  assert.equal(descriptor.resourceBoundary.maxRequestBytes, 5246976);
   assert.equal(descriptor.input.oneOf.length, 15);
   assert.deepEqual(descriptor.examples.map((e) => e.request.operation), OPS);
   for (const op of OPS) {

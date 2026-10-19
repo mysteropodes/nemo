@@ -8,6 +8,7 @@ use crate::history::object_history::object_frame_edit_structure::is_frame_struct
 use crate::history::object_history::object_rig_edit_history::is_rig_edit_operation;
 use crate::history::object_history::object_rig_pose_history::is_rig_pose_operation;
 use crate::history::NativeObjectHistory;
+use crate::request_receipts::frame_clipboard_transport;
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,
     APPLICATION_API_VERSION,
@@ -38,7 +39,9 @@ const MAX_MESSAGE_BYTES: usize = 4096;
 /// Request-envelope bound per operation: only the vector and image-mesh edits may carry a bounded body
 /// (a hand-drawn mask outline is hundreds of points).
 fn request_limit(operation: &str) -> usize {
-    if operation == OP_OBJECT_VECTOR || operation == OP_IMAGE_MESH_EDIT {
+    if frame_clipboard_transport::owns(operation) {
+        frame_clipboard_transport::request_limit(operation)
+    } else if operation == OP_OBJECT_VECTOR || operation == OP_IMAGE_MESH_EDIT {
         MAX_VECTOR_REQUEST_BYTES
     } else {
         MAX_MESSAGE_BYTES
@@ -437,10 +440,9 @@ impl NativeObjectHistory {
         let response = disposition
             .response(request, self.instance_id(), self.document_id())
             .ok_or(DispatchErrorCode::Internal)?;
-        if !matches!(
-            serde_json::to_vec(&response).map(|bytes| bytes.len()),
-            Ok(0..=MAX_MESSAGE_BYTES)
-        ) {
+        if !serde_json::to_vec(&response).is_ok_and(|bytes| {
+            bytes.len() <= frame_clipboard_transport::response_limit(&request.operation)
+        }) {
             return Err(DispatchErrorCode::Internal);
         }
         Ok(response)

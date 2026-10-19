@@ -8296,20 +8296,20 @@
         },
         "records": {
           "type": "array",
-          "maxItems": 4096,
+          "maxItems": 131072,
           "items": {
             "type": "object"
           }
         },
         "orderElements": {
           "type": "array",
-          "maxItems": 4096,
+          "maxItems": 131072,
           "items": {
             "type": "object"
           }
         }
       },
-      "description": "Bounded structural DTO shell only. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped."
+      "description": "Bounded structural DTO shell only. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped. Records/order arrays use nativeDataBytes/32=131072 entries to avoid rejecting native-valid packets above4096 objects; cell/selection counts stay4096 and aggregate native data bytes remain4MiB."
     },
     "ObjectFrameClipboardPacket": {
       "type": "object",
@@ -8333,7 +8333,8 @@
             "$ref": "#/$defs/ObjectFrameClipboardCell"
           }
         }
-      }
+      },
+      "description": "Native detached packet; aggregate serialized records plus complete orderElements arrays <=4194304 UTF8 bytes, independently of full correlated envelope. Runtime validators enforce byte accounting."
     },
     "ObjectFramesClipboardCopyPayload": {
       "type": "object",
@@ -8354,7 +8355,9 @@
             "$ref": "#/$defs/ObjectFrameEditCell"
           }
         }
-      }
+      },
+      "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedRequestBytes": 5246976
     },
     "ObjectFramesClipboardCutPayload": {
       "type": "object",
@@ -8375,7 +8378,9 @@
             "$ref": "#/$defs/ObjectFrameEditCell"
           }
         }
-      }
+      },
+      "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedRequestBytes": 5246976
     },
     "ObjectFramesClipboardPastePayload": {
       "type": "object",
@@ -8411,7 +8416,9 @@
             "$ref": "#/$defs/ObjectFrameClipboardCell"
           }
         }
-      }
+      },
+      "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedRequestBytes": 5246976
     },
     "ObjectFrameClipboardCopyResult": {
       "type": "object",
@@ -8439,7 +8446,8 @@
           ]
         }
       },
-      "description": "Native retained clipboard result; null means no new packet and preserves the existing UI clipboard. Inner packet instance/document must match the actual invoking owner; complete correlated reply remains bounded to4096 encoded bytes."
+      "description": "Native retained clipboard result; inner instance/document must match invoking owner; null means no new packet. Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedResponseBytes": 5246976
     },
     "ObjectFrameClipboardCutResult": {
       "type": "object",
@@ -8513,7 +8521,8 @@
           }
         }
       ],
-      "description": "Native retained clipboard result; null means no new packet and preserves the existing UI clipboard. Inner packet instance/document must match the actual invoking owner; complete correlated reply remains bounded to4096 encoded bytes."
+      "description": "Native retained clipboard result; inner instance/document must match invoking owner; null means no new packet. Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedResponseBytes": 5246976
     },
     "ObjectVectorGradientStop": {
       "type": "object",

@@ -107,7 +107,7 @@ fn empty_cut_is_null_clipboard_and_never_publishes() {
     assert_eq!(state(&o), before);
 }
 #[test]
-fn oversized_actual_cut_is_refused_and_retained_before_any_mutation() {
+fn formerly_4096_limited_cut_is_retained_and_commits_exactly_once() {
     let d = build::document(
         &rows::parse_layers("K=a.1.1,b.1.2,c.1.3,d.1.4,e.1.5,f.1.6,g.1.7,h.1.8;.;.;."),
         build::Build::V1,
@@ -116,11 +116,12 @@ fn oversized_actual_cut_is_refused_and_retained_before_any_mutation() {
     let before = state(&o);
     let q = request(&o, "too-large", OP, payload(0));
     let reply = dispatch(&mut o, &q);
-    assert_eq!(reply["ok"], false, "{reply}");
-    assert_eq!(reply["error"]["code"], "invalid_request");
-    assert_eq!(state(&o), before);
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert!(serde_json::to_vec(&reply).unwrap().len() > 4096);
+    assert_ne!(state(&o), before);
+    let committed = state(&o);
     assert_eq!(dispatch(&mut o, &q), reply);
-    assert_eq!(state(&o), before);
+    assert_eq!(state(&o), committed);
 }
 #[test]
 fn complete_header_is_preflighted_even_when_the_clipboard_alone_fits() {
@@ -161,9 +162,12 @@ fn complete_header_is_preflighted_even_when_the_clipboard_alone_fits() {
             {
                 let before = state(&o);
                 let reply = dispatch(&mut o, &q);
-                assert_eq!(reply["error"]["code"], "invalid_request", "{reply}");
-                assert_eq!(state(&o), before);
+                assert_eq!(reply["ok"], true, "{reply}");
+                assert_eq!(reply["result"]["clipboard"], clipboard);
+                assert_ne!(state(&o), before);
+                let committed = state(&o);
                 assert_eq!(dispatch(&mut o, &q), reply);
+                assert_eq!(state(&o), committed);
                 return;
             }
         }
