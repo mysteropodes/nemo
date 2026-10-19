@@ -44,6 +44,10 @@ fn expected_revision<'de, D: serde::Deserializer<'de>>(
 }
 
 impl OpacityRequest {
+    pub fn operation(&self) -> &str {
+        &self.operation
+    }
+
     pub fn query(
         request_id: impl Into<String>,
         instance_id: impl Into<String>,

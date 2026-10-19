@@ -281,7 +281,7 @@ impl NativeDispatch for NativeObjectHost {
         if self.released.is_some() {
             return Err("native object host was released".into());
         }
-        if request.operation == "command.document.object.asset.remove" {
+        if request.operation() == "command.document.object.asset.remove" {
             return self
                 .remove_asset(&request)
                 .map_err(|_| "native asset removal correlation is invalid".into());
