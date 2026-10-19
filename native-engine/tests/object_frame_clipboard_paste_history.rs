@@ -15,6 +15,8 @@ use serde_json::{json, Value};
 pub(crate) mod build;
 #[path = "object_frame_clipboard_paste_controls.rs"]
 mod controls;
+#[path = "object_frame_clipboard_copy_dispatch.rs"]
+mod copy_dispatch;
 #[path = "object_frame_clipboard_cut_dispatch.rs"]
 mod cut_dispatch;
 #[path = "object_frame_clipboard_paste_edges.rs"]

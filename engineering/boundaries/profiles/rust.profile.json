@@ -138,7 +138,8 @@
         "object_group_codec.rs",
         "object_raster_asset_codec.rs",
         "object_component_codec.rs",
-        "object_frame_edit_range_codec.rs"
+        "object_frame_edit_range_codec.rs",
+        "object_parent_links.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -1471,7 +1472,9 @@
         "object_blank_key_edit.rs",
         "object_blank_key_edit_build.rs",
         "object_blank_key_history.rs",
-        "object_blank_key_history_controls.rs"
+        "object_blank_key_history_controls.rs",
+        "object_parent_links.rs",
+        "object_frame_clipboard_copy_dispatch.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

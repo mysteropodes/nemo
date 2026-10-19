@@ -1,4 +1,4 @@
-//! Strict frame-clipboard payloads (F12): paste, cut and duplicate, plus the detached packet wire form.
+//! Strict frame-clipboard payloads (F12): copy, paste, cut and duplicate, plus the detached packet wire form.
 //! One field set per command; duplicate, unknown,
 //! missing, null, wrongly typed, negative, fractional, > u32 and over-4096-byte inputs are `InvalidRequest`. Cut admits
 //! selection only; its detached result uses the same normalized cells as paste. The dispatcher must check the complete
@@ -80,6 +80,43 @@ fn nonempty(value: String) -> Result<String, DispatchErrorCode> {
     }
 }
 
+impl crate::commands::ObjectFillOwner {
+    /// Strict read-only Copy ingress. The existing snapshot-pinned producer owns packet semantics.
+    /// Empty selection returns no new packet; it does not clear a client's prior clipboard.
+    pub(crate) fn copy_frame_clipboard_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<Option<FrameClipboardPacket>, DispatchErrorCode> {
+        if bytes.len() > MAX_PAYLOAD_BYTES {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let payload: ClipboardPayload =
+            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        if payload.command != "object.frames.clipboard.copy" {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        forbid(&payload.instance_id)?;
+        forbid(&payload.document_id)?;
+        forbid(&payload.layer_uid)?;
+        forbid(&payload.frame)?;
+        forbid(&payload.cells)?;
+        let selection = require(payload.selection)?
+            .into_iter()
+            .map(|cell| {
+                nonempty(cell.layer_uid).map(|layer_uid| CellRef {
+                    layer_uid,
+                    frame: cell.frame,
+                })
+            })
+            .collect::<Result<Vec<CellRef>, DispatchErrorCode>>()?;
+        if selection.is_empty() {
+            Ok(None)
+        } else {
+            self.copy_frame_clipboard(&selection).map(Some)
+        }
+    }
+}
+
 /// Parse one clipboard command payload into its typed operation.
 pub(crate) fn parse_clipboard_payload(
     bytes: &[u8],
@@ -150,7 +187,7 @@ pub(crate) fn parse_clipboard_payload(
     }
 }
 
-/// One definition of the normalized detached cells used by both public Cut and existing paste.
+/// One definition of normalized detached cells shared by public Copy/Cut and existing paste.
 fn packet_cells_payload(packet: &FrameClipboardPacket) -> Vec<Value> {
     packet_paste_cells(packet)
         .iter()

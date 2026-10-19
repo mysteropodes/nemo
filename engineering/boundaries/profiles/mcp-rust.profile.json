@@ -80,7 +80,8 @@
         "src/native_text_read_wire_tests.rs",
         "src/native_image_import_contract_tests.rs",
         "src/native_wire_response_owner.rs",
-        "src/native_image_import_owner_wire_tests.rs"
+        "src/native_image_import_owner_wire_tests.rs",
+        "src/native_frame_edit_blank_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

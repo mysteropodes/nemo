@@ -346,21 +346,9 @@ pub(crate) fn validate_content(
     )
 }
 
-/// Only explicit ordered top-level v2 storage opts into static parent links.
-pub(crate) fn validate_scene_content(
-    total_frames: u32,
-    declared_layers: &[ObjectLayer],
-    objects: &[ObjectRecord],
-    complete_contexts: bool,
-) -> Result<(), ObjectCodecError> {
-    validate_content_inner(
-        total_frames,
-        declared_layers,
-        objects,
-        complete_contexts,
-        true,
-    )
-}
+#[path = "object_parent_links.rs"]
+mod parent_links;
+pub(crate) use parent_links::validate_scene_content;
 
 fn validate_content_inner(
     total_frames: u32,

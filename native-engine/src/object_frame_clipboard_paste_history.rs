@@ -8,6 +8,7 @@ use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest};
 use crate::transaction::{CompactResult, RetainedDisposition};
 
+const OP_CLIPBOARD_COPY: &str = "command.document.object.frames.clipboard.copy";
 const OP_CLIPBOARD_CUT: &str = "command.document.object.frames.clipboard.cut";
 const OP_CLIPBOARD_PASTE: &str = "command.document.object.frames.clipboard.paste";
 const OP_CLIPBOARD_DUPLICATE: &str = "command.document.object.frames.clipboard.duplicate";
@@ -16,12 +17,13 @@ const OP_CLIPBOARD_DUPLICATE: &str = "command.document.object.frames.clipboard.d
 pub(crate) fn is_frame_clipboard_operation(operation: &str) -> bool {
     matches!(
         operation,
-        OP_CLIPBOARD_PASTE | OP_CLIPBOARD_DUPLICATE | OP_CLIPBOARD_CUT
+        OP_CLIPBOARD_COPY | OP_CLIPBOARD_PASTE | OP_CLIPBOARD_DUPLICATE | OP_CLIPBOARD_CUT
     )
 }
 
 fn command_of(operation: &str) -> Option<&'static str> {
     match operation {
+        OP_CLIPBOARD_COPY => Some("object.frames.clipboard.copy"),
         OP_CLIPBOARD_CUT => Some("object.frames.clipboard.cut"),
         OP_CLIPBOARD_PASTE => Some("object.frames.clipboard.paste"),
         OP_CLIPBOARD_DUPLICATE => Some("object.frames.clipboard.duplicate"),
@@ -94,6 +96,31 @@ impl NativeObjectHistory {
             .ok_or_else(|| invalid("Frame clipboard operation is unknown."))?;
         let bytes = serde_json::to_vec(&request.payload)
             .map_err(|_| invalid("Frame clipboard payload is invalid."))?;
+        if request.operation == OP_CLIPBOARD_COPY {
+            // Reuse the existing detached three-field result, never prepare or commit Cut.
+            let packet = self
+                .owner
+                .copy_frame_clipboard_json(&bytes)
+                .map_err(|code| {
+                    (
+                        code,
+                        "Frame clipboard copy payload or selection is invalid or unavailable.",
+                    )
+                })?;
+            let result = CompactResult::FrameClipboardCut {
+                applied: false,
+                history_entries_added: 0,
+                clipboard: cut_clipboard_payload(packet.as_ref()),
+            };
+            let prospective = RetainedDisposition::Exact {
+                content_revision: self.content_revision(),
+                outcome: Ok(result.clone()),
+            };
+            // Admit the complete correlated response before the caller retains any result.
+            self.object_reply(request, &prospective)
+                .map_err(|_| invalid("Frame clipboard result exceeds the bounded response."))?;
+            return Ok(result);
+        }
         let candidate = self.prepare_frame_clipboard_json(&bytes).map_err(|code| {
             (
                 code,

@@ -85,11 +85,21 @@ fn public_blank_key_in_four_forms_has_one_checkpoint_undo_redo_and_storage_reope
         let after_state = state(&o);
         assert_eq!(dispatch(&mut o, &q), reply);
         assert_eq!(state(&o), after_state);
-        let undo = request(&o, "undo", "command.document.object.undo", json!({}));
+        let undo = request(
+            &o,
+            "undo",
+            "command.document.object.undo",
+            json!({"command":"object.undo"}),
+        );
         assert_eq!(dispatch(&mut o, &undo)["ok"], true);
         assert_eq!(bytes(&o), before);
         assert_eq!(o.history_depths(), (0, 1));
-        let redo = request(&o, "redo", "command.document.object.redo", json!({}));
+        let redo = request(
+            &o,
+            "redo",
+            "command.document.object.redo",
+            json!({"command":"object.redo"}),
+        );
         assert_eq!(dispatch(&mut o, &redo)["ok"], true);
         assert_eq!(bytes(&o), after);
         assert_eq!(o.history_depths(), (1, 0));
@@ -118,7 +128,12 @@ fn already_blank_f7_success_always_checkpoints_and_exact_replay_does_not_checkpo
     let before = state(&o);
     assert_eq!(dispatch(&mut o, &q1), r1);
     assert_eq!(state(&o), before);
-    let undo = request(&o, "undo-empty", "command.document.object.undo", json!({}));
+    let undo = request(
+        &o,
+        "undo-empty",
+        "command.document.object.undo",
+        json!({"command":"object.undo"}),
+    );
     assert_eq!(dispatch(&mut o, &undo)["ok"], true);
     assert_eq!(o.history_depths(), (1, 1));
     let next = blank(&o, "blank-after-undo", "L0", 0);
@@ -175,7 +190,7 @@ fn component_without_timing_public_f7_undo_restores_exact_absence_and_replay_is_
             &o,
             "component-undo",
             "command.document.object.undo",
-            json!({}),
+            json!({"command":"object.undo"}),
         );
         assert_eq!(dispatch(&mut o, &undo)["ok"], true);
         assert_eq!(bytes(&o), before);
@@ -193,14 +208,53 @@ fn mixed_raster_text_blank_history_restores_real_item_and_order_bytes_on_undo() 
     let after = bytes(&o);
     assert_ne!(after, before);
     assert_eq!(o.history_depths(), (1, 0));
-    let undo = request(&o, "mixed-undo", "command.document.object.undo", json!({}));
+    let undo = request(
+        &o,
+        "mixed-undo",
+        "command.document.object.undo",
+        json!({"command":"object.undo"}),
+    );
     assert_eq!(dispatch(&mut o, &undo)["ok"], true);
     assert_eq!(bytes(&o), before);
-    let redo = request(&o, "mixed-redo", "command.document.object.redo", json!({}));
+    let redo = request(
+        &o,
+        "mixed-redo",
+        "command.document.object.redo",
+        json!({"command":"object.redo"}),
+    );
     assert_eq!(dispatch(&mut o, &redo)["ok"], true);
     assert_eq!(bytes(&o), after);
     assert_eq!(
         bytes(&owner(decode_storage_project(&after).unwrap())),
         after
     );
+}
+
+#[test]
+fn empty_history_payload_refuses_without_moving_f7_history_or_retained_state() {
+    let mut o = owner(fixture::document("K=a.1.10;K=b.2.20;.;.", build::Build::V2));
+    let q = blank(&o, "negative-fixture-blank", "L0", 1);
+    success(&dispatch(&mut o, &q));
+    for (operation, command) in [
+        ("command.document.object.undo", "object.undo"),
+        ("command.document.object.redo", "object.redo"),
+    ] {
+        let before = state(&o);
+        let bad = request(&o, command, operation, json!({}));
+        let refused = dispatch(&mut o, &bad);
+        assert_eq!(refused["ok"], false, "{refused}");
+        assert_eq!(refused["error"]["code"], "invalid_request");
+        assert_eq!(state(&o), before);
+        assert_eq!(dispatch(&mut o, &bad), refused);
+        assert_eq!(state(&o), before);
+        let good = request(
+            &o,
+            &format!("valid-{command}"),
+            operation,
+            json!({"command":command}),
+        );
+        let reply = dispatch(&mut o, &good);
+        assert_eq!(reply["ok"], true, "{reply}");
+    }
+    assert_eq!(o.history_depths(), (1, 0));
 }

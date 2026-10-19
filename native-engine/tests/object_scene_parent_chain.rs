@@ -325,8 +325,20 @@ fn missing_parent_cycle_and_enabled_expression_never_publish_a_scene() {
                     json!({"contextId":"scene-root","entries":[],"members":[]})
             }
         }
-        // Storage-valid graph/pose faults must reach the actual frame/scene
-        // refusal, rather than passing because an unrelated fixture is invalid.
+        // Malformed graphs now refuse atomically at storage, before any owner or scene.
+        if fault == "missing" || fault == "cycle" {
+            let bytes = serde_json::to_vec(&doc).unwrap();
+            let error = crate::object_codec::decode_ordered_project(&bytes).unwrap_err();
+            assert_eq!(
+                error.kind(),
+                crate::object_codec::ObjectCodecErrorKind::Invalid,
+                "{fault}"
+            );
+            assert!(crate::object_codec::decode_storage_project(&bytes).is_err());
+            assert_eq!(serde_json::to_vec(&doc).unwrap(), bytes);
+            continue;
+        }
+        // Storage-valid pose/context faults must still reach the actual frame/scene refusal.
         crate::object_codec::decode_ordered_project(&serde_json::to_vec(&doc).unwrap())
             .unwrap_or_else(|error| panic!("{fault} fixture admission: {error:?}"));
         let o = owner(&doc);
