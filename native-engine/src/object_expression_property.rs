@@ -65,8 +65,8 @@ fn compile_property<'js>(
 ) -> Result<Function<'js>, (ExpressionRefusal, String)> {
     let time = if has_time { ",time" } else { "" };
     let prefix = format!(
-        "function(value,frame,__read{time}){{'use strict';{}",
-        bridge::PRELUDE
+        "function(value,frame{time},{}){{'use strict';",
+        bridge::READ_NAMES.join(",")
     );
     let expression = format!("{prefix}\nreturn ({code}\n);}}");
     match eval_single_function(ctx, &expression) {
@@ -166,11 +166,7 @@ fn evaluate_property_in_context(
             Dim::Undefined => -1,
         };
         let read = read_runtime::bind(ctx, request, limits, state.clone())?;
-        let called: rquickjs::Result<Value> = if raw.len() == 1 {
-            function.call((raw[0], request.frame(), read, time))
-        } else {
-            function.call((raw.to_vec(), request.frame(), read, time))
-        };
+        let called = read_runtime::call_property(ctx, &function, request, read, time);
         let read = called.and_then(|value| {
             let reader: Function = ctx.eval(READ_TYPED)?;
             reader.call::<_, Vec<Value>>((value, dim))

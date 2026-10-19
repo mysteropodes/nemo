@@ -263,3 +263,28 @@ fn dependency_depth_warning_is_attributed_only_to_its_actual_property() {
     assert_eq!(result.diagnostic, Some(Diagnostic::TooDeep));
     assert_eq!(owner.history_depths(), (0, 0));
 }
+
+#[test]
+fn public_read_bindings_preserve_user_local_shadowing_without_exposing_host_reads() {
+    for (code, expected) in [
+        ("var self = 3; return self + value;", 53.),
+        (
+            "self = {at:function(){return 4}}; return self.at()+value;",
+            54.,
+        ),
+        ("function control(){return 9} return control()+value;", 59.),
+        (
+            "var layer=function(){return 12}; return layer()+value;",
+            62.,
+        ),
+        (
+            "function _get(){throw new Error('local')} return control('Point')[0];",
+            -5.,
+        ),
+        ("typeof __read === 'undefined' ? value : 0", 50.),
+    ] {
+        let result = run(code);
+        assert_eq!(result.value, vec![expected], "{code}: {result:?}");
+        assert_eq!(result.diagnostic, None, "{code}");
+    }
+}

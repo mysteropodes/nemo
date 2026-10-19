@@ -7,7 +7,7 @@ use crate::object_expression_pin::{
     PropertyExpressionRequest,
 };
 use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
-use rquickjs::{Ctx, Exception, Function};
+use rquickjs::{function::Args, Ctx, Exception, Function, Object, Value};
 use serde_json::{json, Value};
 use std::{
     cell::RefCell,
@@ -130,4 +130,37 @@ pub(super) fn bind<'js>(
         },
     )
     .map_err(|_| ExpressionRefusal::Bootstrap)
+}
+
+/// Bind the public vocabulary as actual function parameters, as Motion does.
+/// User local vars/function declarations may shadow those parameters without
+/// colliding with the fixed provider implementation or exposing its callback.
+pub(super) fn call_property<'js>(
+    ctx: &Ctx<'js>,
+    function: &Function<'js>,
+    request: &PropertyExpressionRequest,
+    read: Function<'js>,
+    time: Option<f64>,
+) -> rquickjs::Result<Value<'js>> {
+    let source = format!(
+        "function(__read,frame){{{}\nreturn{{{}}};}}",
+        super::bridge::PRELUDE,
+        super::bridge::READ_NAMES.join(",")
+    );
+    let factory = crate::object_expression_runtime::eval_single_function(ctx, &source)?;
+    let scope: Object = factory.call((read, request.frame()))?;
+    let mut args = Args::new(ctx.clone(), super::bridge::READ_NAMES.len() + 3);
+    if request.raw().len() == 1 {
+        args.push_arg(request.raw()[0])?;
+    } else {
+        args.push_arg(request.raw().to_vec())?;
+    }
+    args.push_arg(request.frame())?;
+    if let Some(time) = time {
+        args.push_arg(time)?;
+    }
+    for name in super::bridge::READ_NAMES {
+        args.push_arg(scope.get::<_, Value>(*name)?)?;
+    }
+    function.call_arg(args)
 }

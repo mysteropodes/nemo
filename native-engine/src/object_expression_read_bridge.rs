@@ -1,5 +1,24 @@
 //! Fixed guest vocabulary. All record values come from SnapshotReads; this
 //! prelude carries no document state or writable application capability.
+pub(super) const READ_NAMES: &[&str] = &[
+    "control",
+    "layerControl",
+    "layer",
+    "self",
+    "comp",
+    "thisComp",
+    "key",
+    "numKeys",
+    "nearestKey",
+    "valueAtFrame",
+    "valueAtTime",
+    "velocityAtTime",
+    "speedAtTime",
+    "timeToFrames",
+    "framesToTime",
+    "toFrames",
+    "toSeconds",
+];
 pub(super) const PRELUDE: &str = r#"
 const _get = function(op, ref, prop, at) {
  return JSON.parse(__read(op, ref || '', prop || '', at === undefined ? frame : at));
