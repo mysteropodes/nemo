@@ -172,11 +172,37 @@ fn gradient(value: &Value) -> bool {
                 })
         })
 }
+fn fill_trace(value: &Value) -> bool {
+    let pair = |v: &Value| {
+        v.as_array()
+            .is_some_and(|p| p.len() == 2 && p.iter().all(finite))
+    };
+    exact(value, &[], &["seed", "seeds", "walls", "gapPx"]).is_some_and(|o| {
+        (o.contains_key("seed") || o.contains_key("seeds"))
+            && o.get("seed").is_none_or(pair)
+            && o.get("seeds")
+                .is_none_or(|v| v.as_array().is_some_and(|s| s.iter().all(pair)))
+            && o.get("walls").is_none_or(|v| {
+                v.as_array().is_some_and(|ids| {
+                    ids.iter()
+                        .all(|id| id.as_str().is_some_and(|s| !s.is_empty()))
+                })
+            })
+            && o.get("gapPx").is_none_or(non_negative)
+    })
+}
+
 fn extension(value: &Value, has_stroke: bool) -> bool {
     exact(
         value,
         &[],
-        &["pressure", "paramShape", "boxAngle", "fillGradient"],
+        &[
+            "pressure",
+            "paramShape",
+            "boxAngle",
+            "fillGradient",
+            "fillTrace",
+        ],
     )
     .is_some_and(|object| {
         !object.is_empty()
@@ -185,6 +211,7 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
                 .is_none_or(|v| pressure(v) && !has_stroke)
             && object.get("paramShape").is_none_or(|v| shape(v, false))
             && object.get("boxAngle").is_none_or(finite)
+            && object.get("fillTrace").is_none_or(fill_trace)
             && object
                 .get("fillGradient")
                 .is_none_or(|v| gradient(v) && !object.contains_key("pressure"))

@@ -8,6 +8,10 @@ use crate::object_document::{object_deserialize, ParamShape, Presence, PressureF
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 
+#[path = "object_fill_trace_record.rs"]
+mod fill_trace;
+pub(crate) use fill_trace::FillTrace;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct VectorExt {
@@ -22,12 +26,15 @@ pub struct VectorExt {
     /// Baseline serP fillGradient, kept in document-world coordinates and original stop order.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) fill_gradient: Presence<StoredGradient>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) fill_trace: Presence<FillTrace>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
     #[serde(default)] param_shape: Presence<ParamShape>,
     #[serde(default)] box_angle: Presence<Number>,
-    #[serde(default)] fill_gradient: Presence<StoredGradient>
+    #[serde(default)] fill_gradient: Presence<StoredGradient>,
+    #[serde(default)] fill_trace: Presence<FillTrace>
 });
 
 /// Named L07-I positive subset: exactly two stops, linear or radial. No coercion or defaults.

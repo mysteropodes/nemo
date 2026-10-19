@@ -5,6 +5,8 @@ use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use crate::native_contract::{exact, object};
 use serde_json::Value;
 use std::collections::HashSet;
+#[path = "native_fill_trace_wire.rs"]
+mod fill;
 
 const MAX_ID: usize = 128;
 const MAX_NAME: usize = 256;
@@ -32,11 +34,12 @@ enum K {
     Labels,
     Clip,
     Footprint,
+    Fill(fill::Field),
 }
 
 /// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
 /// duplicate reports the identity it minted, every other receipt is the compact command result.
-static SPECS: [(&str, &str, &str); 17] = [
+static SPECS: [(&str, &str, &str); 18] = [
     ("layer.delete", "object.layer.delete", "selection:selection"),
     (
         "layer.duplicate",
@@ -118,6 +121,7 @@ static SPECS: [(&str, &str, &str); 17] = [
         "object.boolean.flatten",
         "layerUid:uid contextId:uid frame:frame groupId:uid",
     ),
+    ("fill.trace","object.fill.trace","layerUid:uid contextId:uid frame:frame point:point color:color opacity:opacity remove:flag"),
 ];
 const PREFIX: &str = "command.document.object.";
 
@@ -266,7 +270,7 @@ fn kind(token: &str) -> Option<K> {
         "labels" => K::Labels,
         "clip" => K::Clip,
         "footprint" => K::Footprint,
-        _ => return None,
+        _ => K::Fill(fill::kind(token)?),
     })
 }
 
@@ -300,6 +304,7 @@ fn check(kind: K, value: &Value) -> bool {
         K::Labels => labels(value),
         K::Clip => clip(value),
         K::Footprint => footprint(value),
+        K::Fill(field) => fill::check(field, value),
     }
 }
 

@@ -21,6 +21,7 @@ use std::collections::HashSet;
 
 #[path = "object_vector_edit_order.rs"]
 pub(crate) mod order;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use order::OrderEditError;
 
 /// Operation-specific bound on the FULL serialized request envelope of the vector edit operation only
@@ -336,7 +337,12 @@ impl ObjectFillOwner {
         let payload: VectorPayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
         let origin = self.current_snapshot();
-        let edit = match (
+        let target = payload
+            .record
+            .value()
+            .map(|r| r.target.clone())
+            .or_else(|| payload.stable_target.value().cloned());
+        let mut edit = match (
             payload.command.as_str(),
             payload.record,
             payload.stable_target,
@@ -352,6 +358,22 @@ impl ObjectFillOwner {
             }
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
+        if edit.changed {
+            let target = target.ok_or(DispatchErrorCode::InvalidRequest)?;
+            let scope =
+                crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope {
+                    context_id: target.context_id,
+                    layer_uid: target.layer_uid,
+                    frame: target.frame_scope.frame,
+                };
+            edit.document = regenerate(
+                edit.document,
+                &scope,
+                &edit.stroke_id,
+                origin.content_revision(),
+            )
+            .map_err(|error| Self::fill_plan_error(&error))?;
+        }
         ObjectSnapshot::validate_drawing(&edit.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedVectorEdit {

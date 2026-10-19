@@ -158,7 +158,7 @@ fn responses_must_name_the_same_owner_and_document_and_advance_exactly() {
 }
 
 #[test]
-fn the_catalog_declares_each_operation_once_under_four_owner_descriptors() {
+fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
     let family = |suffix: &str| match suffix {
         "layer.delete" | "layer.duplicate" | "layer.rename" | "layer.reorder" => {
             "native.object.layer-lifecycle"
@@ -167,6 +167,7 @@ fn the_catalog_declares_each_operation_once_under_four_owner_descriptors() {
         "selection.delete" | "selection.duplicate" | "layer.split" | "clipboard.paste" => {
             "native.object.selection-edit"
         }
+        "fill.trace" => "native.object.fill",
         _ => "native.object.boolean",
     };
     let mut declared = 0;
@@ -182,7 +183,7 @@ fn the_catalog_declares_each_operation_once_under_four_owner_descriptors() {
         assert_eq!(descriptor["resourceBoundary"]["maxRequestBytes"], 4096);
         declared += 1;
     }
-    assert_eq!(declared, 17);
+    assert_eq!(declared, 18);
 }
 
 #[test]
@@ -191,9 +192,15 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
     for descriptor in crate::capabilities::native_catalog().descriptors() {
         let id = descriptor["id"].as_str().unwrap();
         if !id.starts_with("native.object.")
-            || !["layer-lifecycle", "group", "selection-edit", "boolean"]
-                .iter()
-                .any(|f| id.ends_with(f))
+            || ![
+                "layer-lifecycle",
+                "group",
+                "selection-edit",
+                "boolean",
+                "fill",
+            ]
+            .iter()
+            .any(|f| id.ends_with(f))
         {
             continue;
         }
@@ -217,5 +224,5 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 17, "one copyable example per declared operation");
+    assert_eq!(seen, 18, "one copyable example per declared operation");
 }

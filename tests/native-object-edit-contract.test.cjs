@@ -1,5 +1,5 @@
 'use strict';
-// L02-J public declaration of the 17 native object edit operations: contract, common SDK, capability files and schema agree.
+// L02-J public declaration of the 18 native object edit operations: contract, common SDK, capability files and schema agree.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const contract = require('../src/js/adapters/native-object-edit-contract.js');
 const seam = require('../src/js/adapters/native-object-edit-seam.js');
@@ -29,17 +29,18 @@ const VALID = [
   ['boolean.apply', { command: 'object.boolean.apply', mode: 'intersect', ...at, frame: 0, strokeIds: ['stroke-1', 'stroke-2'] }],
   ['boolean.erase', { command: 'object.boolean.erase', ...at, frame: 0, strokeId: 'stroke-1', footprint: [[0, 0], [4, 0], [4, 4]] }],
   ['boolean.flatten', { command: 'object.boolean.flatten', ...at, frame: 0, groupId: 'group-1' }],
+  ['fill.trace', {command:'object.fill.trace',...cell,point:[20,20],color:'#336699ff',opacity:0.5,remove:false}],
 ];
 const envelope = (suffix, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A',
   operation: P + suffix, expectedRevision: 7, payload }, extra);
 
-test('the contract admits exactly the 17 declared operations, all revisioned commands', () => {
+test('the contract admits exactly the 18 declared operations, all revisioned commands', () => {
   const edit = contract;
   assert.deepEqual(edit.OPERATIONS, VALID.map(([s]) => P + s));
-  assert.equal(edit.OPERATIONS.length, 17);
+  assert.equal(edit.OPERATIONS.length, 18);
   for (const op of edit.OPERATIONS) { assert.equal(edit.admitted(op), true); assert.equal(edit.requiresRevision(op), true); assert.equal(seam.admitted(op), true); }
   for (const op of ['command.document.object.layer.create', 'command.document.object.layer.policy.edit', 'command.document.object.clipboard.copy',
-    'command.document.object.clipboard.cut', 'command.document.object.fill.trace', 'query.document.object', P + 'group', P + 'toString', '', null, undefined]) {
+    'command.document.object.clipboard.cut', 'command.document.object.fill.unknown', 'query.document.object', P + 'group', P + 'toString', '', null, undefined]) {
     assert.equal(edit.admitted(op), false, String(op));
   }
 });
@@ -157,7 +158,7 @@ test('the injected seam is the font contract composed with the edit contract and
 
 test('capability descriptors and the closed transport schema declare exactly the contract operations', () => {
   const dir = path.join(ROOT, 'engineering/application/capabilities-v2');
-  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
+  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
   const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/native-transport-v2.schema.json'), 'utf8'));
   const declared = [];
   const ids = new Set();
@@ -177,8 +178,8 @@ test('capability descriptors and the closed transport schema declare exactly the
     declared.push(...d.operations);
   }
   assert.deepEqual(declared.slice().sort(), contract.OPERATIONS.slice().sort());
-  assert.equal(new Set(declared).size, 17);
-  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit']);
+  assert.equal(new Set(declared).size, 18);
+  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit']);
   for (const [suffix, payload] of VALID) {
     const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === P + suffix);
     assert.equal(branches.length, 1, suffix);

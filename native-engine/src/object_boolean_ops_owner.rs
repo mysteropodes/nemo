@@ -19,6 +19,7 @@ use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_boolean_ops::{BoolOp, OpsError};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate_many;
 use crate::object_document::object_group_kernels::object_group_combine_plan::{
     CombineError, FlattenError,
 };
@@ -27,6 +28,8 @@ use crate::object_document::ObjectDocument;
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 
+#[path = "object_fill_trace_owner.rs"]
+mod fill_trace;
 #[path = "object_boolean_ops_payload.rs"]
 mod wire;
 use wire::{
@@ -48,6 +51,7 @@ pub(crate) fn refusal_code(error: &PlanError) -> DispatchErrorCode {
         | PlanError::MotionUnavailable(_)
         | PlanError::HolderOrphan(_)
         | PlanError::IdUnavailable => DispatchErrorCode::Unavailable,
+        PlanError::FillUnavailable => DispatchErrorCode::Unavailable,
         PlanError::InvalidScope
         | PlanError::FewerThanTwo(_)
         | PlanError::DuplicateOperand(_)
@@ -99,6 +103,7 @@ pub(crate) enum BooleanEditKind {
     Op,
     Erase,
     Flatten,
+    FillTrace,
 }
 
 /// A detached candidate sealed to the snapshot it was planned from. Only this
@@ -142,7 +147,7 @@ impl PreparedBooleanEdit {
         request: &BooleanRequest,
         motion: &dyn ElementMotionSource,
     ) -> Result<Self, DispatchErrorCode> {
-        let plan = plan_boolean(
+        let mut plan = plan_boolean(
             origin.document(),
             scope,
             request,
@@ -151,6 +156,16 @@ impl PreparedBooleanEdit {
         )
         .map_err(|error| refusal_code(&error))?;
         if plan.changed {
+            let touched = match request {
+                BooleanRequest::Op { strokes, .. } => strokes.clone(),
+                BooleanRequest::Erase { stroke, .. } => vec![stroke.clone()],
+                BooleanRequest::Flatten { .. } => {
+                    plan.removed.iter().chain(&plan.created).cloned().collect()
+                }
+            };
+            plan.document =
+                regenerate_many(plan.document, scope, &touched, origin.content_revision())
+                    .map_err(|error| refusal_code(&error))?;
             // The edited document must pass the admission a reopened file would. The plan already
             // refused every caller-caused overflow (`TooManySegments`), so a failure here is an
             // engine invariant breach, as in the group owner.
