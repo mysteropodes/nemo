@@ -172,3 +172,79 @@ test('replacement or disposal while settled refresh is awaiting cannot receive t
 test('settled ordinary native no-op restores its inspector and reports no key changes',async()=>{
  const o=await repaintingOwner();await o.select();await o.button('Linear').fire('click');await Promise.all(o.updates);assert.equal(o.f.session.info().contentRevision,0);assert.equal(o.f.requests.filter(q=>q.operation==='command.document.object.property.track.edit').length,1);assert.equal(o.busyCleared,true);assert.equal(o.queries,4);assert.equal(o.mainStatus(),'No key changes.');await o.select();assert.equal(o.button('Hold').disabled,false);o.binding.dispose();
 });
+
+test('selected-key projection exports actual qualified fractional identities and independent local queued currency',async()=>{
+ const h=fixture({keys:[{frame:-2.5,v:[1],lockTo:'in'},{frame:4.25,v:[2],lockTo:null}]});assert.equal(await h.open(),true);
+ const cleared=h.editor.captureSelectedKeys();assert.deepEqual(cleared.keys,[]);assert.equal(cleared.isCurrent(),true);
+ await h.select(1);assert.equal(cleared.isCurrent(),false);const captured=h.editor.captureSelectedKeys();
+ assert.deepEqual(captured.keys,[{target:{kind:'property',target,property:'opacity'},frame:4.25}]);assert.equal(Object.isFrozen(captured.keys[0].target),true);assert.equal(Object.keys(captured).includes('isCurrent'),false);
+ h.ready(false);assert.equal(h.editor.captureSelectedKeys(),null);assert.equal(captured.isCurrent(),true,'local selection proof remains readable while the queue hides presentation');
+ h.editor.clear();assert.equal(captured.isCurrent(),false);h.ready(true);assert.deepEqual(h.editor.captureSelectedKeys().keys,[]);h.editor.dispose();assert.equal(h.editor.captureSelectedKeys(),null);
+ for(const lockTo of [false,0,{},'other']){const bad=fixture({keys:[{frame:0,v:[1],lockTo}]});assert.equal(await bad.open(),false);}
+});
+
+test('key timeline is a frozen single-property native read projection with nonserialized pure UI selectors',async()=>{
+ const h=fixture();assert.equal(h.editor.readKeyTimeline(),null);await h.open();
+ const projection=h.editor.readKeyTimeline(),literal=copy(projection);
+ assert.deepEqual(Object.keys(literal).sort(),['frame','items','pin','property','target','viewGeneration']);
+ assert.deepEqual(literal,{pin:h.context().pin,frame:10,viewGeneration:2,target,property:'opacity',items:[{frame:-0.5,selected:false},{frame:4.25,selected:false},{frame:10,selected:false}]});
+ assert.equal(Object.isFrozen(projection),true);assert.equal(Object.isFrozen(projection.items),true);assert.equal(Object.isFrozen(projection.items[0]),true);
+ assert.equal(projection.isCurrent(),true);assert.equal(Object.getOwnPropertyDescriptor(projection,'selectFrames').enumerable,false);
+ const reads=h.reads.length;assert.equal(projection.selectFrames([4.25,-0.5]),true);assert.equal(projection.isCurrent(),false);
+ assert.deepEqual(h.checks().map(n=>n.checked),[true,true,false]);assert.match(h.status(),/^2 native key/);
+ assert.deepEqual(copy(h.editor.captureSelectedKeys()).keys.map(k=>k.frame),[-0.5,4.25]);
+ const next=h.editor.readKeyTimeline();assert.equal(next.isCurrent(),true);assert.deepEqual(copy(next.items),[{frame:-0.5,selected:true},{frame:4.25,selected:true},{frame:10,selected:false}]);
+ assert.equal(next.selectFrames([4.25,-0.5]),true);assert.equal(next.isCurrent(),true,'same selected set does not invalidate an unchanged projection');
+ assert.equal(h.reads.length,reads);assert.equal(h.writes.length,0);
+});
+
+test('timeline selection validates all existing finite unique frames and the32 bound before changing the inspector Set',async()=>{
+ const h=fixture({keys:Array.from({length:35},(_,i)=>({frame:i-4.5,v:[i]}))});await h.open();
+ let view=h.editor.readKeyTimeline();assert.equal(view.selectFrames([-4.5]),true);view=h.editor.readKeyTimeline();
+ const before=h.checks().map(n=>n.checked),message=h.status();
+ for(const frames of [null,{},[-4.5,-4.5],[1000],[NaN],[Infinity],['-4.5'],new Array(1),Array.from({length:33},(_,i)=>i-4.5)]){
+  assert.equal(view.selectFrames(frames),false);assert.equal(view.isCurrent(),true);assert.deepEqual(h.checks().map(n=>n.checked),before);assert.equal(h.status(),message);
+ }
+ assert.equal(view.selectFrames(Array.from({length:32},(_,i)=>i-4.5)),true);assert.equal(h.checks().filter(n=>n.checked).length,32);
+ assert.equal(h.writes.length,0);assert.equal(h.editor.readKeyTimeline().selectFrames([]),true);assert.equal(h.checks().filter(n=>n.checked).length,0);
+});
+
+test('stale or pending timeline callbacks refuse without clearing accepted selected checkboxes',async()=>{
+ for(const change of [h=>h.frame(11),h=>h.generation(),h=>h.replace(),h=>h.foreign(),h=>h.revision(),h=>h.ready(false)]){
+  const h=fixture();await h.open();await h.select(1);const view=h.editor.readKeyTimeline(),before=h.checks().map(n=>n.checked);
+  change(h);assert.equal(view.isCurrent(),false);assert.equal(h.editor.readKeyTimeline(),null);assert.equal(view.selectFrames([]),false);
+  assert.deepEqual(h.checks().map(n=>n.checked),before);assert.equal(h.writes.length,0);
+ }
+ const h=fixture();await h.open();const view=h.editor.readKeyTimeline();h.editor.dispose();assert.equal(view.isCurrent(),false);assert.equal(view.selectFrames([]),false);assert.equal(h.editor.readKeyTimeline(),null);
+});
+
+test('read reset checkbox timeline selection busy and dispose publish safe synchronous key timeline notifications',async()=>{
+ const wait=deferred(),h=fixture({writer:()=>wait.promise}),events=[];
+ h.ports.keyTimelineChanged=reason=>{events.push({reason,available:h.editor.readKeyTimeline()!==null});if(reason==='selection')throw Error('observer must not own control flow');};
+ await h.open();assert.ok(events.some(e=>e.reason==='read'&&e.available));await h.select(1);
+ assert.equal(h.editor.readKeyTimeline().selectFrames([-0.5]),true);
+ const pending=h.button('Hold').fire('click');assert.ok(events.some(e=>e.reason==='busy'&&!e.available));assert.equal(h.editor.readKeyTimeline(),null);
+ wait.resolve({applied:true,historyEntriesAdded:1});await pending;assert.ok(events.some(e=>e.reason==='reset'&&!e.available));
+ h.editor.dispose();assert.equal(events.at(-1).reason,'dispose');assert.equal(events.at(-1).available,false);
+});
+
+test('read-only native keys may project but timeline selection retains existing disabled-writer semantics',async()=>{
+ const h=fixture({readonly:true});await h.open();const view=h.editor.readKeyTimeline(),before=h.status();
+ assert.ok(view);assert.equal(view.isCurrent(),true);assert.equal(view.selectFrames([-0.5]),false);assert.equal(h.status(),before);
+ assert.deepEqual(h.checks().map(n=>n.checked),[false,false,false]);assert.equal(h.writes.length,0);
+});
+
+test('selection preflight and checkboxes honor the aggregate budget without mutating on refusal',async()=>{
+ const h=fixture();let elsewhere=31,preflights=0;h.ports.acceptKeySelection=frames=>{preflights++;return frames.length+elsewhere<=32;};await h.open();
+ let view=h.editor.readKeyTimeline();assert.equal(view.canSelectFrames([4.25]),true);assert.equal(h.checks().filter(n=>n.checked).length,0);
+ assert.equal(view.selectFrames([4.25]),true);await h.select(0);assert.deepEqual(h.checks().map(n=>n.checked),[false,true,false]);
+ view=h.editor.readKeyTimeline();assert.equal(view.canSelectFrames([-0.5,4.25]),false);assert.equal(view.selectFrames([-0.5,4.25]),false);assert.equal(view.isCurrent(),true);
+ elsewhere=30;assert.equal(view.selectFrames([-0.5,4.25]),true);assert.equal(h.checks().filter(n=>n.checked).length,2);assert.ok(preflights>=5);assert.equal(h.writes.length,0);
+});
+
+test('throwing or revoked aggregate selection admission never changes inspector selection',async()=>{
+ const h=fixture();await h.open();assert.equal(h.editor.readKeyTimeline().selectFrames([4.25]),true);
+ h.ports.acceptKeySelection=()=>{throw Error('Aggregate selection unavailable');};const view=h.editor.readKeyTimeline();
+ assert.equal(view.canSelectFrames([]),false);assert.equal(view.selectFrames([]),false);await h.select(0);
+ assert.deepEqual(h.checks().map(n=>n.checked),[false,true,false]);assert.equal(view.isCurrent(),true);assert.equal(h.writes.length,0);
+});

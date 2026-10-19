@@ -265,7 +265,10 @@ fn copy_raw_wire_refuses_duplicate_unknown_null_malformed_and_oversized_fields()
         good.replace("\"frame\":0", "\"frame\":\"0\""),
         good.replace("\"command\":", "\"unknown\":true,\"command\":"),
     ];
-    raw.push(format!("{good}{}", " ".repeat(4097)));
+    raw.push(format!(
+        "{good}{}",
+        " ".repeat(crate::request_receipts::frame_clipboard_transport::MESSAGE_BYTES + 1)
+    ));
     for text in raw {
         assert_eq!(
             o.copy_frame_clipboard_json(text.as_bytes()).unwrap_err(),
@@ -276,7 +279,7 @@ fn copy_raw_wire_refuses_duplicate_unknown_null_malformed_and_oversized_fields()
 }
 
 #[test]
-fn oversized_copy_reply_is_refused_and_retained_without_effect() {
+fn formerly_4096_limited_copy_reply_is_retained_without_effect() {
     let d = build::document(
         &rows::parse_layers("K=a.1.1,b.1.2,c.1.3,d.1.4,e.1.5,f.1.6,g.1.7,h.1.8;.;.;."),
         build::Build::V1,
@@ -285,7 +288,8 @@ fn oversized_copy_reply_is_refused_and_retained_without_effect() {
     let before = state(&o);
     let q = request(&o, "too-large", COPY, one(0));
     let reply = dispatch(&mut o, &q);
-    assert_eq!(reply["error"]["code"], "invalid_request", "{reply}");
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert!(serde_json::to_vec(&reply).unwrap().len() > 4096);
     assert_eq!(dispatch(&mut o, &q), reply);
     assert_eq!(state(&o), before);
 }
@@ -327,7 +331,8 @@ fn copy_preflights_full_correlated_envelope_even_when_packet_alone_fits() {
             {
                 let before = state(&o);
                 let reply = dispatch(&mut o, &q);
-                assert_eq!(reply["error"]["code"], "invalid_request", "{reply}");
+                assert_eq!(reply["ok"], true, "{reply}");
+                assert_eq!(reply["result"]["clipboard"], clipboard);
                 assert_eq!(dispatch(&mut o, &q), reply);
                 assert_eq!(state(&o), before);
                 return;
@@ -378,25 +383,31 @@ fn original_dense_cut_copy_packets_match_public_copy_without_editing_their_sourc
             .unwrap();
             let before = state(&o);
             let reply = dispatch(&mut o, &q);
-            if serde_json::to_vec(&q).unwrap().len() <= 4096
-                && serde_json::to_vec(&prospective).unwrap().len() <= 4096
-            {
-                assert_eq!(reply["ok"], true, "{} {form:?}: {reply}", row.label());
-                assert_eq!(
-                    reply["result"],
-                    result(clipboard),
-                    "{} {form:?}",
-                    row.label()
-                );
-                admitted += 1;
-            } else {
-                assert_eq!(
-                    reply["error"]["code"],
-                    "invalid_request",
-                    "{} {form:?}: {reply}",
-                    row.label()
-                );
+            let limit = crate::request_receipts::frame_clipboard_transport::MESSAGE_BYTES;
+            assert_eq!(limit, 5_246_976);
+            assert!(serde_json::to_vec(&q).unwrap().len() <= limit);
+            assert!(serde_json::to_vec(&prospective).unwrap().len() <= limit);
+            let mut data_bytes = 0;
+            for cell in clipboard["cells"].as_array().unwrap() {
+                for record in cell["records"].as_array().unwrap() {
+                    data_bytes += serde_json::to_vec(record).unwrap().len();
+                }
+                if let Some(order) = cell.get("orderElements") {
+                    data_bytes += serde_json::to_vec(order).unwrap().len();
+                }
             }
+            assert!(
+                data_bytes <= 4_194_304,
+                "original record/order data stays within4MiB"
+            );
+            assert_eq!(reply["ok"], true, "{} {form:?}: {reply}", row.label());
+            assert_eq!(
+                reply["result"],
+                result(clipboard),
+                "{} {form:?}",
+                row.label()
+            );
+            admitted += 1;
             assert_eq!(state(&o), before, "{} {form:?}", row.label());
             visited += 1;
         }
@@ -405,5 +416,8 @@ fn original_dense_cut_copy_packets_match_public_copy_without_editing_their_sourc
         visited, 260,
         "all130 original cut-copy packets in both admitted legacy forms"
     );
-    assert!(admitted > 0);
+    assert_eq!(
+        admitted, 260,
+        "every original packet fits the paired transport"
+    );
 }

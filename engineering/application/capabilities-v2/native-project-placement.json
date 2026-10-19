@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-placement",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.project.placement.edit"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectPlacementPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained placement receipt or typed refusal; no raw document, resource or path payload."
+  },
+  "semantics": "Placement edits use the existing native project asset catalog/history/request receipts. Changed place/setOffset/shiftOffset/remove publishes one revision and undo entry; semantic no-op preserves stored number spelling, bytes and redo. Exact retry returns its retained receipt before stale checking, including after undo. Drawing/Video offsets keep original integer admission; AudioTrack offsets preserve finite fractional values within the same safe bound. Audio targets require the stored AudioID record and its exact validated embedded WAV source; no missing-owner, linked-source or MIME-only fallback. Supported WAV admission is PCM8/16/24/32 or IEEEfloat32 mono/stereo with strict RIFF structure; other original codecs and actual native playback/export remain unavailable. Audio metadata, authored Motion/static volume and source bytes persist in the same native document authority. Ordinary UI and installed full AudioTrack acceptance remain pending.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Video offset edit through shared owner; AudioTrack and installed acceptance remain pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "placement-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.placement.edit",
+        "payload": {
+          "kind": "shiftOffset",
+          "placementId": "placement-1",
+          "deltaFrames": -3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "placement-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

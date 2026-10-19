@@ -93,8 +93,48 @@ test('ordinary UI paint and public reveal use actual sole Project cached port an
  const {createRequire}=require('node:module'),ownerPath=path.join(__dirname,'native-object-project-desktop-ports.test.cjs'),ownerSource=fs.readFileSync(ownerPath,'utf8');
  const makeOwner=new Function('require',ownerSource.slice(0,ownerSource.indexOf('\ntest('))+';return fixture;')(createRequire(ownerPath));
  const f=makeOwner();await f.open();const h=host({root:f.root}),Project=require('../src/js/adapters/native-object-project.js'),before=f.session.info();
+ f.root.NemoNativeObjectProject=Project;require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(f.root);
  f.mutateReply(reply=>{const request=f.calls.at(-1).r;if(request.operation!=='query.document.object.property.metadata')return;const v=request.payload.view,list=v.kind==='targets'?[{kind:'context',contextId:'scene-root'},{kind:'layer',target:{contextId:'scene-root',layerUid:'drawing'}}]:fixture.propertyPageOracle.slice(0,5);reply.result={instanceId:request.instanceId,documentId:request.documentId,atRevision:request.payload.atRevision,documentSnapshotId:request.payload.documentSnapshotId,kind:v.kind,target:v.kind==='targets'?null:v.target,items:clone(list.slice(v.offset,v.offset+v.limit)),nextOffset:null,unavailableCategories:clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories)};});
  assert.equal(Project.paintUI(f.root,false),true);await h.settle();assert.equal(h.rows().length,5);assert.equal(h.status(),'Select Keys to inspect native animation.');assert.ok(h.button('Keys'));
  await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');assert.equal(Project.desktop(f.root),f.session);assert.strictEqual(f.session.info(),before);assert.equal(f.transports.length,1);
  const queries=f.calls.filter(c=>c.r?.operation==='query.document.object.property.metadata');assert.ok(queries.length>=3);assert.ok(queries.every(c=>/^project-metadata-/.test(c.r.requestId)&&!('expectedRevision'in c.r)));assert.ok(f.calls.every(c=>!c.r?.operation?.startsWith('command.')));h.retire();
+});
+
+test('ordinary Motion hooks expose known cleared selection only after native editor retirement',async()=>{
+ const h=host();assert.equal(typeof UI.readSelectedMotionKeys,'function');
+ const ordinary=Binding.createOrdinary(h.root,{});const info=h.ports.currentSession().info();assert.equal(ordinary.captureSelectedKeys(info),null,'Motion with no qualified editor is unknown');
+ h.root.state.appMode='animation';const cleared=ordinary.captureSelectedKeys(info);assert.deepEqual(cleared.keys,[]);assert.equal(cleared.isCurrent(),true);
+ ordinary.dispose();assert.equal(cleared.isCurrent(),false);assert.equal(ordinary.captureSelectedKeys(info),null);h.retire();
+});
+
+
+test('actual ordinary Drawing paint retires native keys and exposes only a current known-cleared selection',async()=>{
+ const h=host();h.paint();await h.settle();h.root.state.appMode='drawing';h.paint();
+ const snapshot=UI.readSelectedMotionKeys(h.root,h.ports.currentSession().info());
+ assert.ok(snapshot);assert.deepEqual(snapshot.keys,[]);assert.equal(snapshot.isCurrent(),true);
+ h.root.state.appMode='motion';assert.equal(snapshot.isCurrent(),false);h.retire();
+});
+
+test('ordinary key timeline observer is dynamic safe and detachable without manufacturing an unopened property projection',()=>{
+ const h=host(),events=[],ordinary=Binding.createOrdinary(h.root,{keyTimelineChanged:reason=>events.push(reason)});
+ assert.equal(ordinary.readKeyTimeline(),null);let notified=0;
+ assert.equal(ordinary.setKeyTimelineListener(()=>{notified++;throw Error('observer');}),true);
+ assert.equal(notified,1);assert.ok(events.includes('listener'));assert.equal(ordinary.readKeyTimeline(),null);
+ assert.equal(ordinary.setKeyTimelineListener(3),false);assert.equal(ordinary.setKeyTimelineListener(null),true);
+ const n=notified;ordinary.dispose();assert.equal(notified,n);assert.equal(ordinary.readKeyTimeline(),null);assert.equal(ordinary.setKeyTimelineListener(()=>{}),false);h.retire();
+});
+
+test('actual Panel reuses first inspector and reopens identities without duplicate track instances',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'native-motion-key-timeline.test.cjs'),'utf8');
+ const begin=source.indexOf('// BEGIN REUSABLE REAL PROPERTY PANEL FIXTURE'),end=source.indexOf('// END REUSABLE REAL PROPERTY PANEL FIXTURE');assert.ok(begin>0&&end>begin);
+ const createPropertyPanel=new Function('require',source.slice(begin,end)+'\nreturn createPropertyPanel;')(require);
+ const doc=document(),container=doc.createElement('div');doc.body.appendChild(container);
+ const pin={instanceId:'panel-instance',documentId:'panel-document',lifecycleGeneration:1,contentRevision:4,documentSnapshotId:'panel-snapshot'},target={contextId:'scene-root',layerUid:'panel-layer'};
+ const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
+ const h=createPropertyPanel({document:doc,container,readContext:context,tracks:[{target,property:'opacity',dimension:1,items:[{frame:1,v:[50]}]},{target,property:'position',dimension:2,items:[{frame:2,v:[5,7]}]}]});
+ assert.equal(await h.ready,true);const initial=tree(container).find(node=>node.className==='native-motion-property-keys');
+ await h.openProperty(target,'opacity');assert.strictEqual(tree(container).find(node=>node.className==='native-motion-property-keys'),initial);
+ await h.openProperty(target,'position');assert.equal(h.readKeyTimelines().tracks.length,2);assert.equal(h.readKeyTimeline().property,'position');
+ await h.openProperty(target,'opacity');assert.equal(h.readKeyTimeline().property,'opacity');assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,2);
+ const view=h.readKeyTimelines();h.dispose();assert.equal(view.isCurrent(),false);assert.equal(h.readKeyTimelines(),null);assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,0);
 });

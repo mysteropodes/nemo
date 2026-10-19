@@ -69,7 +69,7 @@ fn place(placement_id: &str, asset: &str, target: AssetTarget, offset: i64) -> P
         placement_id: placement_id.to_owned(),
         asset_id: asset.to_owned(),
         target,
-        offset_frames: offset,
+        offset_frames: (offset).into(),
     }
 }
 fn remove(placement_id: &str) -> PlacementEdit {

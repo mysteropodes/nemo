@@ -3,7 +3,7 @@
  * over the shipped Paper.js by tools/gen-oracle.cjs); `toRecord` maps that to the native record; `toDict` is the inverse.
  * The importer rules live HERE, not in storage: `strokeWidth || 3`, the white `#fff` fallback, Paper's miterLimit 10 and
  * dashOffset 0, 3-decimal outline rounding (_r3) and hex8 <-> {r,g,b,a}. A stroke the record cannot carry without changing
- * its look (gradients, texture/bitmap brushes, text, masks, per-element effects) is a typed refusal, never a silent drop. */
+ * its look (unsupported gradients, texture/bitmap brushes, text, masks, per-element effects) is a typed refusal, never a silent drop. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -15,9 +15,9 @@
   // Members the record owns; everything else a dictionary carries is reported (UNMAPPED) or refuses the mapping (REFUSED).
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
-    'strokeId', 'boxAngle', 'paramShape'];
+    'strokeId', 'boxAngle', 'paramShape', 'fillGradient'];
   // Look-changing members with no record slot: mapping them as a plain path would lose the look without a word.
-  const REFUSED = ['fillGradient', 'strokeGradientAlongPath', 'bitmapBrushSpec', 'brushTexturePreset', 'isBrushTextureCopy', 'isText', 'isTextRoot',
+  const REFUSED = ['strokeGradientAlongPath', 'bitmapBrushSpec', 'brushTexturePreset', 'isBrushTextureCopy', 'isText', 'isTextRoot',
     'isVectorText', 'isMask', 'effects'];
   const SHAPE_MEMBERS = { rect: ['tl', 'tr', 'br', 'bl'], ellipse: ['startAngle', 'sweep', 'innerRadius'], star: ['pointCount', 'innerRatio', 'cornerRadius'] };
   const FX_TYPES = [
@@ -56,6 +56,23 @@
     if (!Array.isArray(value) || value.length < 2) refuse('invalid_dict', `${label} must be an [x, y] pair`);
     return [value[0], value[1]];
   }
+  function gradient(value) {
+    if (!plain(value) || Object.keys(value).sort().join(',') !== 'from,kind,stops,to' ||
+        !['linear','radial'].includes(value.kind) || !Array.isArray(value.stops) || value.stops.length !== 2) refuse('unavailable', 'only two-stop linear/radial fillGradient is admitted');
+    const coordinate = (p) => {
+      if (!Array.isArray(p) || p.length !== 2 || ![p[0],p[1]].every((n) => Number.isFinite(n) && Math.abs(n) <= 3.4028234663852886e38)) refuse('invalid_gradient', 'gradient points must be finite pairs');
+      return p.slice();
+    };
+    const stops = [0,1].map((i) => {
+      const s = value.stops[i];
+      if (!plain(s) || Object.keys(s).sort().join(',') !== 'color,offset' || !Number.isFinite(s.offset) || Math.abs(s.offset) > 3.4028234663852886e38 ||
+          typeof s.color !== 'string' || !/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s.color)) refuse('invalid_gradient', 'invalid gradient stop');
+      return {offset:s.offset,color:s.color};
+    });
+    const from=coordinate(value.from), to=coordinate(value.to);
+    if (!Number.isFinite(Math.fround(Math.hypot(to[0]-from[0],to[1]-from[1])))) refuse('invalid_gradient', 'gradient extent is not representable');
+    return {kind:value.kind,from,to,stops};
+  }
   function normalize(dict, op) {
     if (!plain(dict) || !Array.isArray(dict.segments)) refuse('invalid_dict', 'a stroke dictionary needs a segments array');
     const vb = !!dict.isVectorBrush;
@@ -86,6 +103,7 @@
     if (dict.dashArray && dict.dashArray.length) out.dashArray = dict.dashArray.slice();
     out.dashOffset = dict.dashOffset !== undefined ? dict.dashOffset : 0;
     if (dict.paintOrder) out.paintOrder = dict.paintOrder;
+    if (dict.fillGradient) out.fillGradient = gradient(dict.fillGradient);
     if (vb) {
       out.isVectorBrush = true;
       if (dict.centerSegments) out.centerSegments = dict.centerSegments;
@@ -143,6 +161,10 @@
         if (n.profileBase !== undefined) pressure.profileBase = n.profileBase;
         ext.pressure = pressure;
       }
+      if (n.fillGradient !== undefined) {
+        if (n.isVectorBrush) refuse('unavailable', 'pressure-gradient consumer is unavailable');
+        ext.fillGradient = gradient(n.fillGradient);
+      }
       if (n.paramShape !== undefined) ext.paramShape = shape(n.paramShape);
       if (n.boxAngle !== undefined) ext.boxAngle = n.boxAngle;
       const strokeId = where.strokeId !== undefined ? where.strokeId : (n.strokeId || '');
@@ -193,6 +215,7 @@
     if (record.target.strokeId) out.strokeId = record.target.strokeId;
     if (x.boxAngle) out.boxAngle = x.boxAngle;
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
+    if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
     return out;
   }
 

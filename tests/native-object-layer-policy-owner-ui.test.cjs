@@ -239,6 +239,8 @@ function scenarioDesktop(openFault){
   const session=Project.desktop(root);
   root.state.appMode='drawing';root.SM={toggleLayerLock(){throw Error('Existing native guard: no legacy lock write');},toggleLayerShy(){throw Error('Existing native guard: no legacy shy write');},toggleShyMode(){throw Error('Existing native guard: no legacy global write');}};
   root.NemoNativeObjectUI={...UI,render(...args){uiPorts=args[3];return UI.render(...args);}};
+  root.NemoNativeObjectProject=Project;
+  require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(root);
   async function open(){return session.openPath('/native.json',{
     ...(openFault?{reveal:()=>{if(openFault.stage==='reveal')throw openError;}}:{}),
     commit:meta=>{if(openFault?.stage==='ui-commit')throw openError;Files.projectView(root,meta);}});}

@@ -60,6 +60,14 @@ fn examples() -> Vec<(&'static str, Value)> {
             "layerUid":"layer-a","frame":3,"cells":[{"relLayer":0,"relFrame":0,"keyframe":true,"records":[],"orderElements":[]}]}),
         ),
         (
+            RANGE_DRAG,
+            json!({"command":"object.layer.range.drag","contextId":"scene-root","layerUid":"layer-a","activeLayerUid":"layer-b","part":"both","barSelection":[],"samples":[0,2],"plainClick":false,"alt":false,"frame":1,"selectedKeys":[]}),
+        ),
+        (
+            MOVE,
+            json!({"command":"object.frames.move","selection":[{"layerUid":"layer-a","frame":3}],"layerUid":"layer-b","frame":4}),
+        ),
+        (
             REPEAT,
             json!({"command":"object.frames.repeat","fromLayerUid":"layer-a","toLayerUid":"layer-b",
                 "fromFrame":2,"toFrame":3,"times":2}),
@@ -216,7 +224,7 @@ fn a_data_prefixed_layer_uid_is_an_opaque_name() {
 
 #[test]
 fn clipboard_copy_cut_and_paste_are_declared_without_legacy_aliases() {
-    assert_eq!(OPERATIONS.len(), 15);
+    assert_eq!(OPERATIONS.len(), 17);
     for (operation, payload) in examples().into_iter().filter(|(operation, _)| {
         [CLIPBOARD_COPY, CLIPBOARD_CUT, CLIPBOARD_PASTE].contains(operation)
     }) {
@@ -280,7 +288,7 @@ fn actual_catalog_repeat_result_and_other_receipts_remain_operation_closed() {
         let repeat = json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":1,"skippedComponentLayers":0});
         assert_eq!(
             result_for_operation(&request.operation, &compact),
-            ![REPEAT, CLIPBOARD_COPY, CLIPBOARD_CUT].contains(&request.operation.as_str())
+            ![REPEAT, CLIPBOARD_COPY, CLIPBOARD_CUT, MOVE].contains(&request.operation.as_str())
         );
         assert_eq!(
             result_for_operation(&request.operation, &repeat),
@@ -450,3 +458,36 @@ fn blank_key_success_requires_one_checkpoint_and_revision_even_if_already_blank(
 #[cfg(test)]
 #[path = "native_frame_clipboard_contract_tests.rs"]
 mod clipboard;
+
+#[cfg(test)]
+#[path = "native_frame_bulk_move_contract_tests.rs"]
+mod bulk_move;
+
+#[test]
+fn key_move_optional_active_layer_is_typed_and_operation_specific() {
+    let base = json!({"command":"object.layer.key.move","layerUid":"target","from":0,"to":2});
+    assert!(request(KEY_MOVE, &base));
+    let mut with_active = base.clone();
+    with_active["activeLayerUid"] = json!("different-active");
+    assert!(request(KEY_MOVE, &with_active));
+    assert!(envelope(KEY_MOVE, with_active.clone()).validate().is_ok());
+    for invalid in [
+        Value::Null,
+        json!(""),
+        json!(1),
+        json!(false),
+        json!([]),
+        json!({}),
+    ] {
+        with_active["activeLayerUid"] = invalid;
+        assert!(!request(KEY_MOVE, &with_active));
+        assert!(envelope(KEY_MOVE, with_active.clone()).validate().is_err());
+    }
+    with_active["activeLayerUid"] = json!("x".repeat(257));
+    assert!(request(KEY_MOVE, &with_active));
+    assert!(envelope(KEY_MOVE, with_active).validate().is_ok());
+    let mut other =
+        json!({"command":"object.layer.tween.remove","layerUid":"target","from":0,"to":2});
+    other["activeLayerUid"] = json!("different-active");
+    assert!(!request(TWEEN_REMOVE, &other));
+}

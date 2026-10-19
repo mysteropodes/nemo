@@ -24,19 +24,20 @@
 //! Named dependencies, not provided here: sampled parent/self fields
 //! (position, keys, controls; D11/D15), markers (D16/D26), in/out points,
 //! mesh vertex identity, contentBox geometry, text views and component
-//! (non-root) contexts and names. A bare drawing carries no canvas or fps,
+//! playback/override/camera/marker evaluation beyond these identity views.
+//! A bare drawing carries no canvas or fps,
 //! so its comp view is unavailable rather than defaulted.
 
-use crate::evaluation::SUPPORTED_CONTEXT_ID;
-use crate::object_document::{ObjectDocument, ProjectMetadata, PropertyHolderTarget};
+use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
+use crate::object_document::{ObjectDocument, ObjectLayer, ProjectMetadata, PropertyHolderTarget};
 use crate::revision::ObjectSnapshot;
 
 /// Why a view cannot be bound or answered. Each names a missing provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ViewUnavailable {
-    /// The target's context is not the supported scene root.
+    /// The target's context is not declared by the retained document.
     ComponentContext,
-    /// The document declares component contexts besides the scene root.
+    /// An order-plan context has no corresponding declared document context.
     ComponentLayers,
     /// No project metadata (canvas, fps) in this revision.
     ProjectMetadata,
@@ -62,7 +63,7 @@ impl SnapshotIdentity {
     }
 }
 
-/// `comp` and its `thisComp` alias, over the scene root.
+/// `comp` and its `thisComp` alias, over one declared document context.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CompView {
     width: u32,
@@ -70,6 +71,7 @@ pub(crate) struct CompView {
     fps: f64,
     frames: u32,
     layers: usize,
+    name: String,
 }
 
 impl CompView {
@@ -88,9 +90,9 @@ impl CompView {
     pub(crate) fn layers(&self) -> usize {
         self.layers
     }
-    /// Root context name. Component names wait for the component provider.
-    pub(crate) fn name(&self) -> &'static str {
-        "Scene"
+    /// Component name follows the baseline `name || "Component"` rule.
+    pub(crate) fn name(&self) -> &str {
+        &self.name
     }
     /// Alias `thisComp.frameDuration`.
     pub(crate) fn frame_duration(&self) -> f64 {
@@ -211,30 +213,43 @@ fn bind_parts(
     target: &PropertyHolderTarget,
     property: &str,
 ) -> Result<ExpressionContextView, ViewUnavailable> {
-    if target.context_id() != SUPPORTED_CONTEXT_ID {
-        return Err(ViewUnavailable::ComponentContext);
-    }
-    // Temporary: until the component-layer provider says which layers a
-    // component context owns, any declared component context makes the scene
-    // root's layer list unknowable, so nothing is answered.
-    if let Some(plan) = document.composition_order.value() {
-        if plan
-            .contexts
+    let source = ContextSource::of_document(document);
+    let context = source
+        .context(target.context_id())
+        .map_err(|_| ViewUnavailable::ComponentContext)?;
+    // Keep malformed/unresolved order declarations unavailable. A real declared
+    // component does not obscure the root or another component's layer list.
+    if document.composition_order.value().is_some_and(|plan| {
+        plan.contexts
             .iter()
-            .any(|c| c.context_id != SUPPORTED_CONTEXT_ID)
-        {
-            return Err(ViewUnavailable::ComponentLayers);
-        }
+            .any(|entry| source.context(&entry.context_id).is_err())
+    }) {
+        return Err(ViewUnavailable::ComponentLayers);
     }
+    let component = context.component();
     let comp = metadata
         .map(|m| {
             let (width, height) = m.canvas_dimensions();
             CompView {
                 width,
                 height,
-                fps: m.fps(),
-                frames: document.total_frames(),
-                layers: document.layers().len(),
+                // enterSymbol inherits project dimensions and uses sym.fps || state.fps.
+                fps: component
+                    .and_then(|c| c.fps.value())
+                    .and_then(|fps| fps.as_f64())
+                    .unwrap_or(m.fps()),
+                frames: context.total_frames(),
+                layers: context.layers().len(),
+                name: component
+                    .map(|c| {
+                        c.name
+                            .value()
+                            .filter(|name| !name.is_empty())
+                            .map(String::as_str)
+                            .unwrap_or("Component")
+                    })
+                    .unwrap_or("Scene")
+                    .to_owned(),
             }
         })
         .ok_or(ViewUnavailable::ProjectMetadata);
@@ -243,12 +258,15 @@ fn bind_parts(
         target: target.clone(),
         property: property.to_owned(),
         comp,
-        self_view: resolve_self(document, target),
+        self_view: resolve_self(document, context.layers(), target),
     })
 }
 
-fn resolve_self(document: &ObjectDocument, target: &PropertyHolderTarget) -> Option<SelfView> {
-    let layers = document.layers();
+fn resolve_self(
+    document: &ObjectDocument,
+    layers: &[ObjectLayer],
+    target: &PropertyHolderTarget,
+) -> Option<SelfView> {
     let index = layers
         .iter()
         .position(|l| l.layer_uid() == target.layer_uid())?;

@@ -333,7 +333,7 @@ fn raw_payload_maps_refuse_atomically_with_their_typed_codes() {
         ("effects", json!({"effects":[{"type":"blur"}]})),
         (
             "effects",
-            json!({"effects":[{"type":"blur","enabled":true,"keys":{}}]}),
+            json!({"effects":[{"type":"blur","enabled":true,"keys":{"p1":{"keys":[{"frame":1,"v":[1,2]}]}}}]}),
         ),
         ("effects", json!({"effects":[],"mode":"alpha"})),
         ("effectsFromSet", json!({})),
@@ -449,4 +449,38 @@ fn a_real_edit_discards_redo_once_through_the_owner_and_through_dispatch() {
     assert_eq!(o.history_depths(), (undo_before + 1, 0), "dispatch path");
     assert_eq!(layer_json(&o, "d")["blendMode"], "overlay");
     assert_eq!(layer_json(&o, "b").get("matteSourceLayerUid"), None);
+}
+
+#[test]
+fn empty_and_scalar_effect_key_maps_publish_reopen_and_undo_without_losing_metadata() {
+    for version in [1, 2] {
+        for keys in [
+            json!({}),
+            json!({"p1":{"keys":[{"frame":1,"v":[3],"hold":true,"hIn":[0,0],
+                "hOut":[0,0],"curvePoints":[],"lockTo":"layer"}]}}),
+        ] {
+            let mut o = owner("effect-key-edit", &fixture(version));
+            let retained = head(&o);
+            let before = state(&o);
+            let effects = json!([{"type":"blur","enabled":true,"p1":12,"keys":keys}]);
+            let candidate = prepare(&o, "b", "effects", json!({"effects":effects}));
+            assert_eq!(state(&o), before, "preparation is read-only");
+            o.commit_layer_compositing(candidate).unwrap();
+            assert_eq!(o.history_depths(), (1, 0));
+            assert_eq!(layer_json(&o, "b")["effects"], effects);
+            let after = bytes(&o);
+            assert_eq!(
+                encode_storage_project(&decode_storage_project(&after).unwrap()).unwrap(),
+                after
+            );
+            assert_eq!(
+                encode_storage_project(retained.document()).unwrap(),
+                before.3
+            );
+            o.undo(o.content_revision()).unwrap();
+            assert_eq!(bytes(&o), before.3);
+            o.redo(o.content_revision()).unwrap();
+            assert_eq!(bytes(&o), after);
+        }
+    }
 }

@@ -59,7 +59,7 @@ fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHold
         && holder.properties().iter().all(|property| {
             !property.expression.value().is_some_and(|code| code.enabled)
                 && match property.property() {
-                    "opacity" => true,
+                    "opacity" | "timeLinkInOffset" | "timeLinkOutOffset" => true,
                     "position" => vector_only_layer(document, target),
                     _ => false,
                 }
@@ -113,6 +113,26 @@ fn scene_consumer_uses_layer(document: &ObjectDocument, target: &PropertyHolderT
 }
 
 pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+    // The immutable packet range reader consumes these nonanimatable inputs on
+    // every root layer, including structural folders, before selecting content.
+    let target = holder.target();
+    if target.context_id() == "scene-root"
+        && target.stroke_id().is_none()
+        && document
+            .layers()
+            .iter()
+            .any(|layer| layer.layer_uid() == target.layer_uid())
+        && !holder.properties().is_empty()
+        && holder.properties().iter().all(|property| {
+            matches!(
+                property.property(),
+                "timeLinkInOffset" | "timeLinkOutOffset"
+            ) && property.track.value().is_none()
+                && !property.expression.value().is_some_and(|code| code.enabled)
+        })
+    {
+        return true;
+    }
     if vector_layer_holder_consumed(document, holder) {
         return true;
     }
@@ -133,7 +153,7 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
     holder.properties().iter().all(|property| {
         !property.expression.value().is_some_and(|code| code.enabled)
             && match property.property() {
-                "opacity" => true,
+                "opacity" | "timeLinkInOffset" | "timeLinkOutOffset" => true,
                 "position" | "anchor" | "rotation" | "scale" => !visible_vector,
                 _ => false,
             }

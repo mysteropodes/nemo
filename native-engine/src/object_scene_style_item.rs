@@ -22,11 +22,10 @@
 //! Absent, `null` and explicit values stay distinct: an absent fill or stroke slot is refused, an explicit
 //! `null` is "no paint", an explicit zero miter limit is a limit of zero. Nothing is defaulted or clamped
 //! here; a record that cannot be drawn is a typed `StyleUnavailable`, never a flat or missing shape.
-//! The document model has no gradient field, so this module never produces a gradient fill; the emit module
-//! draws one when a future producer supplies it through `FillResolution::Gradient`.
+//! Stored vectorExt.fillGradient feeds the existing typed gradient kernel; missing extensions keep old style bytes.
 
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::{
-    FillResolution, PaintOrder, PaintRules, ScenePaintError, SceneSolid,
+    FillResolution, GradientInput, PaintOrder, PaintRules, ScenePaintError, SceneSolid, StopInput,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_stroke::{
     EngineStrokeItem, SceneStroke, StrokeError, BASELINE as STROKE_RULES,
@@ -73,6 +72,8 @@ pub(crate) enum StyleUnavailable {
     NonSolidPaint,
     InconsistentStroke,
     InvalidOpacity,
+    TransformUnavailable,
+    GradientUnavailable,
     Paint(ScenePaintError),
     Stroke(StrokeError),
 }
@@ -86,6 +87,8 @@ impl StyleUnavailable {
             Self::MissingStroke => "vector body carries no stroke slot",
             Self::NonSolidPaint => "only solid paint has a scene representation",
             Self::InconsistentStroke => "hasRealStroke disagrees with the stroke slot",
+            Self::GradientUnavailable => "stored gradient is unavailable",
+            Self::TransformUnavailable => "gradient transform is unavailable",
             Self::InvalidOpacity => "item opacity must be finite and within 0..1",
             Self::Paint(error) => error.message(),
             Self::Stroke(error) => error.message(),
@@ -112,7 +115,7 @@ pub(crate) fn style_of_record_with_opacity(
             let fill = record.solid_fill().ok_or(StyleUnavailable::MissingFill)?;
             Ok(SceneItemStyle::solid_fill(solid_of(fill, layer_opacity)?))
         }
-        VECTOR_FAMILY => vector_style(record, layer_opacity),
+        VECTOR_FAMILY => vector_style(record, layer_opacity, [0.0, 0.0]),
         _ => Err(StyleUnavailable::UnknownFamily),
     }
 }
@@ -120,6 +123,7 @@ pub(crate) fn style_of_record_with_opacity(
 fn vector_style(
     record: &ObjectRecord,
     layer_opacity: f64,
+    offset: [f64; 2],
 ) -> Result<SceneItemStyle, StyleUnavailable> {
     let body = record.vector().ok_or(StyleUnavailable::MissingVectorBody)?;
     let opacity = body
@@ -148,14 +152,118 @@ fn vector_style(
         }),
     };
     let order = PaintRules::BASELINE.paint_order(body.paint_order.value().map(String::as_str));
-    let fill = PaintRules::BASELINE
-        .resolve_fill(None, flat, None)
-        .map_err(StyleUnavailable::Paint)?;
+    let fill = if let Some(stored) = record.fill_gradient() {
+        if !stored.valid() {
+            return Err(StyleUnavailable::GradientUnavailable);
+        }
+        let from = translate_gradient_point(&stored.from, offset)?;
+        let to = translate_gradient_point(&stored.to, offset)?;
+        let stops: Vec<_> = stored
+            .stops
+            .iter()
+            .map(|stop| StopInput {
+                offset: stop.offset.as_f64().unwrap(),
+                color: Some(stop.color.as_str()),
+            })
+            .collect();
+        PaintRules::BASELINE
+            .resolve_fill(
+                Some(&GradientInput {
+                    kind: &stored.kind,
+                    from: Some(&from),
+                    to: Some(&to),
+                    stops: Some(&stops),
+                }),
+                flat,
+                Some(opacity),
+            )
+            .map_err(StyleUnavailable::Paint)?
+    } else {
+        PaintRules::BASELINE
+            .resolve_fill(None, flat, None)
+            .map_err(StyleUnavailable::Paint)?
+    };
     Ok(SceneItemStyle {
         fill,
         stroke,
         order,
     })
+}
+
+/// Only the existing admitted root-vector Position port is applied here; the packet already fences holders.
+pub(crate) fn style_of_record_at_frame(
+    record: &ObjectRecord,
+    factor: f64,
+    packet: &crate::object_frame_packet::ObjectFramePacket,
+) -> Result<SceneItemStyle, StyleUnavailable> {
+    if !factor.is_finite() || factor < 0.0 {
+        return Err(StyleUnavailable::InvalidOpacity);
+    }
+    if record.fill_gradient().is_none() {
+        return style_of_record_with_opacity(record, factor);
+    }
+    let target = crate::object_document::PropertyHolderTarget {
+        context_id: record.target.context_id.clone(),
+        layer_uid: record.target.layer_uid.clone(),
+        stroke_id: crate::object_document::Presence::Missing,
+    };
+    let mut offset = [0.0, 0.0];
+    if packet
+        .snapshot()
+        .document()
+        .property_holders()
+        .is_some_and(|holders| {
+            holders.iter().any(|holder| {
+                holder.target() == &target
+                    && holder
+                        .properties()
+                        .iter()
+                        .any(|p| p.property() == "position")
+            })
+        })
+    {
+        let values = crate::object_frame_packet::sample_property_raw(
+            packet.snapshot(),
+            &target,
+            "position",
+            f64::from(packet.frame()),
+        )
+        .map_err(|_| StyleUnavailable::TransformUnavailable)?;
+        let [x, y] = values.as_slice() else {
+            return Err(StyleUnavailable::TransformUnavailable);
+        };
+        offset = [*x, *y];
+    }
+    vector_style(record, factor, offset)
+}
+fn translate_gradient_point(
+    point: &[Number; 2],
+    offset: [f64; 2],
+) -> Result<[f64; 2], StyleUnavailable> {
+    use crate::evaluation::motion_parent_chain::{
+        motion_mat_from_values, transform_segments, Segment,
+    };
+    let source = [point[0].as_f64().unwrap(), point[1].as_f64().unwrap()];
+    let Some(mat) = motion_mat_from_values(offset, [0., 0.], 0., [100., 100.], 100.) else {
+        return Ok(source);
+    };
+    let segment = Segment {
+        point: source,
+        handle_in: None,
+        handle_out: None,
+    };
+    let moved = transform_segments(&[segment], [0., 0.], &mat);
+    let result = moved
+        .first()
+        .ok_or(StyleUnavailable::TransformUnavailable)?
+        .point;
+    if !result
+        .iter()
+        .all(|v| v.is_finite() && (*v as f32).is_finite())
+    {
+        return Err(StyleUnavailable::TransformUnavailable);
+    }
+    Ok(result)
 }
 
 /// Fold item/layer opacity into the alpha. One keeps the original numbers untouched.

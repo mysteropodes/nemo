@@ -354,3 +354,138 @@ fn numeric_key_and_curve_spelling_noop_preserves_redo_but_real_change_commits() 
     assert_eq!(o.history_depths(), (2, 0));
     assert_eq!(record(&o)["track"]["keys"][0]["v"], json!([25.5]));
 }
+
+#[cfg(feature = "evaluation")]
+#[test]
+fn component_property_edits_tracks_reads_and_history_share_the_same_persistent_identity() {
+    let row = include_str!("fixtures/object-component-document/oracle.txt")
+        .lines()
+        .find(|line| line.starts_with("G\t"))
+        .unwrap();
+    let mut o = NativeObjectHistory::new(
+        "component-properties",
+        decode_storage_project(row.split('\t').nth(1).unwrap().as_bytes()).unwrap(),
+    )
+    .unwrap();
+    let old = o.acquire_snapshot(0).unwrap();
+    let original = encode_storage_project(old.document()).unwrap();
+    let target = |context: &str| json!({"contextId":context,"layerUid":"ly_comp_ia","strokeId":"s_comp_a_0"});
+    let change = |context: &str, action: Value| {
+        json!({"command":"object.property.edit",
+        "target":target(context),"property":"opacity","action":action})
+    };
+    assert_eq!(
+        apply(&mut o, change("sym_comp", set_key(0., 10.))).unwrap(),
+        1
+    );
+    assert_eq!(
+        apply(&mut o, change("sym_comp", set_key(4., 90.))).unwrap(),
+        2
+    );
+    assert_eq!(
+        apply(&mut o, change("sym_comp_b", set_value(0., 70.))).unwrap(),
+        3
+    );
+    let a = serde_json::from_value(target("sym_comp")).unwrap();
+    let b = serde_json::from_value(target("sym_comp_b")).unwrap();
+    let three = o.acquire_snapshot(3).unwrap();
+    assert_eq!(three.sample_property_raw(&a, "opacity", 2.).unwrap(), [50.]);
+    assert_eq!(three.sample_property_raw(&b, "opacity", 2.).unwrap(), [70.]);
+    let query = |view: Value| {
+        json!({"instanceId":three.instance_id(),"documentId":three.document_id(),
+        "atRevision":3,"documentSnapshotId":three.snapshot_id(),"view":view})
+    };
+    let metadata = three
+        .query_property_metadata_json(
+            query(json!({"kind":"storedProperty",
+        "target":target("sym_comp_b"),"property":"opacity"}))
+            .to_string()
+            .as_bytes(),
+        )
+        .unwrap();
+    assert_eq!(metadata["target"], target("sym_comp_b"));
+    assert_eq!(metadata["items"][0]["authored"]["hasStaticOverride"], true);
+    assert_eq!(metadata["items"][0]["authored"]["keyCount"], 0);
+    let mut offset = 0u64;
+    let mut seen = std::collections::HashSet::new();
+    let mut complete = false;
+    for _ in 0..128 {
+        let page = three
+            .query_property_metadata_json(
+                query(json!({"kind":"targets",
+            "offset":offset,"limit":8}))
+                .to_string()
+                .as_bytes(),
+            )
+            .unwrap();
+        for item in page["items"].as_array().unwrap() {
+            assert!(seen.insert(item.to_string()));
+        }
+        match page["nextOffset"].as_u64() {
+            Some(next) => {
+                assert!(next > offset);
+                offset = next;
+            }
+            None => {
+                complete = true;
+                break;
+            }
+        }
+    }
+    assert!(complete);
+    for context in ["sym_comp", "sym_comp_b"] {
+        assert!(seen.contains(&json!({"kind":"element","target":target(context)}).to_string()));
+    }
+    let track = json!({"command":"object.property.track.edit","selections":[{
+        "target":target("sym_comp"),"property":"opacity","frame":0}],
+        "action":{"kind":"preset","preset":"hold"}});
+    let prepared = o
+        .prepare_property_track_edit_json(track.to_string().as_bytes())
+        .unwrap();
+    assert_eq!(o.commit_property_edit(prepared).unwrap(), 4);
+    assert_eq!(
+        o.acquire_snapshot(4)
+            .unwrap()
+            .sample_property_raw(&a, "opacity", 2.)
+            .unwrap(),
+        [10.]
+    );
+    assert_eq!(
+        apply(&mut o, change("sym_comp", set_value(0., 10.))).unwrap(),
+        4
+    );
+    assert_eq!(o.undo(4).unwrap(), 5);
+    assert_eq!(
+        o.acquire_snapshot(5)
+            .unwrap()
+            .sample_property_raw(&a, "opacity", 2.)
+            .unwrap(),
+        [50.]
+    );
+    assert_eq!(o.redo(5).unwrap(), 6);
+    let saved = encode_storage_project(o.acquire_snapshot(6).unwrap().document()).unwrap();
+    let reopened = NativeObjectHistory::new(
+        "component-reopened",
+        decode_storage_project(&saved).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        encode_storage_project(reopened.acquire_snapshot(0).unwrap().document()).unwrap(),
+        saved
+    );
+    assert_eq!(
+        reopened
+            .acquire_snapshot(0)
+            .unwrap()
+            .sample_property_raw(&b, "opacity", 2.)
+            .unwrap(),
+        [70.]
+    );
+    assert_eq!(encode_storage_project(old.document()).unwrap(), original);
+    assert_eq!(three.sample_property_raw(&a, "opacity", 2.).unwrap(), [50.]);
+    let before = (o.content_revision(), o.history_depths(), wire(&o));
+    let bad = json!({"command":"object.property.edit","target":{"contextId":"sym_comp","layerUid":"ly_toggle"},
+        "property":"opacity","action":{"kind":"setValue","frame":0,"values":[50]}});
+    assert_eq!(apply(&mut o, bad), Err(DispatchErrorCode::NotFound));
+    assert_eq!((o.content_revision(), o.history_depths(), wire(&o)), before);
+}

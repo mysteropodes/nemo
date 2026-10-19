@@ -245,3 +245,18 @@ test('authored identities may start with data: or blob:, nothing else may', () =
   assert.equal(C.bytes('é'), 2);
   assert.equal(C.bytes(JSON.stringify(envelope(C.VECTOR, COMMANDS[0][1]))) < C.MAX_REQUEST_BYTES, true, 'a two-anchor create fits the public bound');
 });
+
+
+test('gradient record admission is closed at the same public vector and read DTO boundary', () => {
+  const Stroke=require('../src/js/adapters/native-object-vector-stroke.js');
+  const dict={segments:[{point:[0,0],handleIn:[0,0],handleOut:[0,0]},{point:[8,0],handleIn:[0,0],handleOut:[0,0]}],
+    closed:false,hasRealStroke:false,fillColor:'#ff0000',fillGradient:{kind:'linear',from:[0,0],to:[8,0],stops:[{offset:0,color:'#ff0000'},{offset:1,color:'#0000ff'}]}};
+  const mapped=Stroke.toRecord(dict,{layerUid:'L1',frame:0,strokeId:''});assert.equal(mapped.ok,true);
+  const record=mapped.record;assert.doesNotThrow(()=>C.record(record,true));
+  for (const change of [g=>{g.stops=[];},g=>{delete g.to;},g=>{g.stops[0].offset=null;},g=>{g.stops[0].extra=1;},
+    g=>{g.from=[0,0,0];},g=>{g.stops[1].color='data:paint';}]) {
+    const bad=JSON.parse(JSON.stringify(record));change(bad.vectorExt.fillGradient);assert.throws(()=>C.record(bad,true),TypeError);
+  }
+  const missing=JSON.parse(JSON.stringify(record));delete missing.vectorExt;assert.doesNotThrow(()=>C.record(missing,true));
+  const nullGradient=JSON.parse(JSON.stringify(record));nullGradient.vectorExt.fillGradient=null;assert.throws(()=>C.record(nullGradient,true),TypeError);
+});

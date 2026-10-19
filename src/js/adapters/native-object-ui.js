@@ -24,7 +24,11 @@
   function bindMotion(root,hooks){
     if(!root||!hooks||typeof hooks.paint!=='function'||typeof hooks.retire!=='function')throw new TypeError('Native Motion UI hooks unavailable');
     if(motionBindings.has(root))throw new Error('Native Motion UI already bound');motionBindings.set(root,hooks);
-    return Object.freeze({dispose:function(){if(motionBindings.get(root)!==hooks)return;retireMotion(root);motionBindings.delete(root);}});
+    if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(function(){
+      var range=root.NemoNativeLayerRangeDesktop;if(range&&typeof range.refreshKeys==='function')range.refreshKeys(root);
+    });
+    return Object.freeze({dispose:function(){if(motionBindings.get(root)!==hooks)return;retireMotion(root);
+      if(typeof hooks.setKeyTimelineListener==='function')hooks.setKeyTimelineListener(null);motionBindings.delete(root);}});
   }
   function paintMotion(root,ports,prior){
     if(!root.state||root.state.appMode!=='motion'){retireMotion(root);prior.notice.textContent='Native drawing property inspectors are unavailable.';return;}
@@ -41,12 +45,56 @@
     var hooks=motionBindings.get(root);if(!hooks||typeof hooks.shortcut!=='function'||!paintMotionInspector(root))return false;
     Promise.resolve(hooks.shortcut(key,shift)).catch(function(){});return true;
   }
+  function readSelectedMotionKeys(root,info){
+    try{
+      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
+      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
+         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.captureSelectedKeys!=='function')return null;
+      return hooks.captureSelectedKeys(info);
+    }catch(_){return null;}
+  }
+  function readMotionKeyTimeline(root,info){
+    try{
+      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
+      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
+         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.readKeyTimeline!=='function')return null;
+      return hooks.readKeyTimeline();
+    }catch(_){return null;}
+  }
+  function readMotionKeyTimelines(root,info){
+    try{
+      var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),hooks=motionBindings.get(root);
+      if(!info||!session||!session.isActive()||!sameTimingPin(session.info(),info)||ports.projectionReady(info)!==true||
+         !confirmed(root,info,session.readPresentedObjectSession())||!hooks||typeof hooks.readKeyTimelines!=='function')return null;
+      return hooks.readKeyTimelines();
+    }catch(_){return null;}
+  }
+  function setKeyTimelineRows(root,layout,info){
+    var view=views.get(root);
+    if(!view||!sameTimingPin(view.pin,info)||!Array.isArray(layout)||!view.rows.every(function(row,i){return row.parentNode===view.list&&row.children.length===4&&view.controls[i].every(function(n,k){return row.children[k]===n;});}))return false;
+    var labels=new Map();
+    for(var entry of layout){
+      if(!entry||typeof entry.layerUid!=='string'||labels.has(entry.layerUid)||!Array.isArray(entry.labels)||!entry.labels.every(function(v){return typeof v==='string';})||!info.layers.some(function(l){return l.layerUid===entry.layerUid;}))return false;
+      labels.set(entry.layerUid,entry.labels);
+    }
+    view.rows.forEach(function(row,i){
+      var lines=labels.get(info.layers[i].layerUid)||[],pick=row.children[0],name=info.layers[i].name===undefined?info.layers[i].layerUid:info.layers[i].name;
+      row.style.height=((1+lines.length)*22)+'px';row.style.alignItems=lines.length?'flex-start':'';
+      pick.style.height=lines.length?'100%':'';pick.style.alignSelf=lines.length?'stretch':'';
+      pick.style.paddingTop=lines.length?'0':'';pick.style.paddingBottom=lines.length?'0':'';
+      if(!lines.length){pick.textContent=name;return;}
+      var spans=[name].concat(lines).map(function(text){var span=createNativeObjectUiText(root,'span',text);Object.assign(span.style,{display:'block',height:'22px',lineHeight:'22px',textAlign:'left'});return span;});
+      pick.replaceChildren.apply(pick,spans);
+    });
+    return true;
+  }
   function paintMotionInspector(root){
     var view=views.get(root),prior=inspectors.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),info=session&&session.info();
     if(!prior||!info||!session.isActive()||!sameTimingPin(view.pin,info)||ports.projectionReady(info)!==true||!confirmed(root,info,session.readPresentedObjectSession()))return false;
     unavailableInspector(root,ports,info);return true;
   }
   function restoreInspector(root){
+    if(root.NemoNativeLayerRangeDesktop)root.NemoNativeLayerRangeDesktop.retire(root);
     retireMotion(root);
     retirePolicy(root);
     views.delete(root);
@@ -197,7 +245,7 @@
       info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible&&old[3]===layer.locked&&old[4]===layer.shy;})&&
       list.children.length===previous.rows.length&&previous.rows.every(function(row,i){return list.children[i]===row&&
         row.children.length===4&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
-      header.children.length===1&&header.children[0]===previous.caption&&grid.children.length===1&&grid.children[0]===previous.unavailable;
+      header.children.length===1&&header.children[0]===previous.caption&&((root.NemoNativeLayerRangeDesktop&&root.NemoNativeLayerRangeDesktop.owns(root,grid,previous.unavailable))||(grid.children.length===1&&grid.children[0]===previous.unavailable));
     var rows,caption,unavailable;
     if(reuse){rows=previous.rows;caption=previous.caption;unavailable=previous.unavailable;}
     else{
@@ -234,6 +282,8 @@
       // Build all nodes before replacing any visible legacy rows/cells.
       list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
     }
+    if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
+      root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
@@ -403,5 +453,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
 }));

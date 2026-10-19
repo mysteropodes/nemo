@@ -99,6 +99,7 @@ fn real_import_joins_vector_and_raster_in_one_pinned_order_and_keeps_contour_api
                 }
                 PaintEntry::Raster(index) => format!("raster:{index}"),
                 PaintEntry::Text(_) => panic!("PNG-only fixture gained unexpected Text"),
+                PaintEntry::Component(_) => panic!("PNG-only fixture gained unexpected Component"),
             })
             .collect();
         assert_eq!(sequence, ["vector:red-square", "raster:0"]);
@@ -264,7 +265,7 @@ fn unsupported_raster_brush_range_and_context_are_refused_by_the_actual_producti
         if kind == "brush" {
             stored["drawing"]["items"]["raster"][0]["item"]["isBitmapBrush"] = json!(true);
         } else {
-            stored["drawing"]["layers"][1]["range"] = json!({"inPoint":0});
+            stored["drawing"]["layers"][1]["range"] = json!({"inPoint":3,"outPoint":7});
         }
         let reopened = NativeObjectHistory::from_project_file(
             "unsupported",
@@ -280,10 +281,39 @@ fn unsupported_raster_brush_range_and_context_are_refused_by_the_actual_producti
                 Err(crate::object_render_scene::ObjectSceneError::UnsupportedGeometry { .. })
             ));
         } else {
-            assert!(matches!(
-                packet,
-                Err(crate::object_frame_packet::ObjectFrameError::Unavailable)
-            ));
+            // D27 admits range selection for rasters through the same packet as vectors.
+            assert_eq!(packet.unwrap().source_frame_for_layer(1), None);
+            let before = saved_bytes(&reopened);
+            let history = reopened.history_depths();
+            for (frame, visible) in [(2, false), (3, true), (7, true), (8, false), (20, false)] {
+                let pins = selector(&snapshot, frame);
+                let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
+                assert_eq!(packet.frame(), frame);
+                assert_eq!(packet.source_frame_for_layer(0), Some(0));
+                assert_eq!(packet.source_frame_for_layer(1), visible.then_some(0));
+                assert_eq!(packet.layer_opacity(1), Ok(1.0));
+                assert_eq!(packet.raster_records().len(), usize::from(visible));
+                let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+                let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
+                let entries: Vec<_> = ordered_entries(&plan)
+                    .map(|entry| match entry {
+                        PaintEntry::Contour(_) => "vector",
+                        PaintEntry::Raster(_) => "raster",
+                        PaintEntry::Text(_) => panic!("PNG-only fixture gained unexpected Text"),
+                        PaintEntry::Component(_) => {
+                            panic!("PNG-only fixture gained unexpected Component")
+                        }
+                    })
+                    .collect();
+                let expected = if visible {
+                    vec!["vector", "raster"]
+                } else {
+                    vec!["vector"]
+                };
+                assert_eq!(entries, expected);
+                assert_eq!(saved_bytes(&reopened), before);
+                assert_eq!(reopened.history_depths(), history);
+            }
         }
     }
     let snapshot = scene_snapshot(&owner);

@@ -240,6 +240,7 @@ pub(crate) fn path_record(
         }),
         // An SVG path carries no pressure profile, paramShape or boxAngle (L01-E): absent on the wire.
         vector_ext: Presence::Missing,
+        effects: Presence::Missing,
     })
 }
 

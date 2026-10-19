@@ -46,6 +46,13 @@ impl RetainedDisposition {
                         "historyEntriesAdded": history_entries_added,
                         "clipboard": clipboard
                     }),
+                    CompactResult::FrameBulkMove {
+                        applied,
+                        history_entries_added,
+                        selection,
+                    } => json!({
+                        "applied": applied, "historyEntriesAdded": history_entries_added, "selection": selection
+                    }),
                     CompactResult::FrameRepeat {
                         applied,
                         history_entries_added,

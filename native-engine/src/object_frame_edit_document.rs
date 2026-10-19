@@ -446,7 +446,9 @@ pub(crate) fn demote_span(
 // L05-E (lane #2111): the document half of the key retime (moveKeyframe, F10); a child so the scope helpers stay private.
 #[path = "object_exposure_edit_retime_document.rs"]
 mod object_exposure_edit_retime_document;
-pub(crate) use object_exposure_edit_retime_document::{retime_key, RetimeOutcome};
+pub(crate) use object_exposure_edit_retime_document::{
+    retime_key, retime_key_with_active, RetimeOutcome,
+};
 #[cfg(test)]
 #[path = "../tests/object_frame_edit_document_build.rs"]
 mod build;

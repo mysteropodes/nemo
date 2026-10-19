@@ -13,13 +13,18 @@ pub(crate) enum PaintIndex {
     Contour(usize),
     Raster(usize),
     Text(usize),
+    Component(usize),
 }
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
     Raster(usize),
     Text(&'a crate::object_render_scene::text_scene::TextSource),
+    Component(&'a crate::object_render_scene::component_scene::ComponentPaint),
 }
 impl ObjectPaintPlan {
+    pub(crate) fn has_components(&self) -> bool {
+        !self.scene.components.paints.is_empty()
+    }
     pub(crate) fn has_text(&self) -> bool {
         !self.scene.texts.entries.is_empty()
     }
@@ -53,9 +58,13 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
     plan.mixed.iter().map(|index| match index {
         PaintIndex::Contour(index) => PaintEntry::Contour(ObjectPaintCommand {
             entry: plan.scene.entry(*index).expect("pinned contour index"),
+            packet: plan.packet(),
         }),
         PaintIndex::Raster(index) => PaintEntry::Raster(*index),
         PaintIndex::Text(index) => PaintEntry::Text(&plan.scene.texts.entries[*index]),
+        PaintIndex::Component(index) => {
+            PaintEntry::Component(&plan.scene.components.paints[*index])
+        }
     })
 }
 pub(super) fn prepare(
@@ -106,16 +115,50 @@ pub(super) fn prepare(
     }
     let mut indices = Vec::new();
     let mut mixed = Vec::new();
-    for entry in joined.entries() {
-        match entry.outcome() {
-            SceneOutcome::Item { payload, .. } => {
-                mixed.push(*payload);
-                if let PaintIndex::Contour(index) = payload {
-                    indices.push(*index);
+    if let Some(components) = &scene.components.scene {
+        use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_scene::SceneSlot;
+        // Preserve the SAME plan's layer-slot ordering; an instance has no
+        // root object record and must never borrow a contour source index.
+        let slots = components
+            .merge(scene.packet(), &joined)
+            .map_err(|_| ObjectPaintPlanError::InvalidOrder)?;
+        for slot in slots {
+            match slot {
+                SceneSlot::Object(entry) => {
+                    append_object_entry(entry, &mut indices, &mut mixed)?;
+                }
+                SceneSlot::Component(slot) => {
+                    for (index, paint) in scene.components.paints.iter().enumerate() {
+                        if paint.host_layer_index == slot.entry().source_layer_index {
+                            mixed.push(PaintIndex::Component(index));
+                        }
+                    }
                 }
             }
-            SceneOutcome::Unavailable(_) => return Err(ObjectPaintPlanError::Unavailable),
+        }
+    } else {
+        for entry in joined.entries() {
+            append_object_entry(entry, &mut indices, &mut mixed)?;
         }
     }
     Ok((indices, mixed))
+}
+
+fn append_object_entry(
+    entry: &crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::SceneEntry<
+        PaintIndex,
+    >,
+    indices: &mut Vec<usize>,
+    mixed: &mut Vec<PaintIndex>,
+) -> Result<(), ObjectPaintPlanError> {
+    match entry.outcome() {
+        SceneOutcome::Item { payload, .. } => {
+            mixed.push(*payload);
+            if let PaintIndex::Contour(index) = payload {
+                indices.push(*index);
+            }
+            Ok(())
+        }
+        SceneOutcome::Unavailable(_) => Err(ObjectPaintPlanError::Unavailable),
+    }
 }

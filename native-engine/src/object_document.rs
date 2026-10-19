@@ -21,9 +21,15 @@ mod property_tests;
 
 #[path = "project_asset_inventory.rs"]
 mod assets;
+pub(crate) use assets::offset as placement_offset;
+pub(crate) use assets::wave as audio_wave;
+#[path = "object_audio_track_record.rs"]
+mod audio_tracks;
 pub(crate) use assets::{
     AssetId, AssetInventory, AssetKind, AssetPlacement, AssetRecord, AssetSource, AssetTarget,
 };
+pub(crate) use audio_tracks::edit as audio_track_edit;
+pub(crate) use audio_tracks::{AudioTrackRecord, AudioTracks};
 
 #[path = "project_media_envelope.rs"]
 mod project;
@@ -33,6 +39,7 @@ pub(crate) use project::{
 
 #[path = "object_layer_timing.rs"]
 mod timing;
+pub(crate) use timing::range::{RangeError, RangeEvaluator, ResolvedRange};
 #[allow(unused_imports)]
 pub(crate) use timing::TimingEdit;
 pub(crate) use timing::{LayerTiming, LayerTimingError};
@@ -127,7 +134,7 @@ pub(crate) use path_effects_record::{PathFxRecord, PATH_FX_TYPE_IDS};
 #[path = "object_vector_ext.rs"]
 #[allow(dead_code)]
 mod vector_ext;
-pub(crate) use vector_ext::VectorExt;
+pub(crate) use vector_ext::{StoredGradient, StoredGradientStop, VectorExt};
 
 // L08-J (#2114): layer compositing fields; transactions are scene_effect_layer_edit.rs / _history.rs.
 #[path = "scene_effect_layer_record.rs"]
@@ -166,6 +173,11 @@ pub use object_record::{
     ObjectTarget, SolidFill,
 };
 
+#[path = "object_motion_arcs.rs"]
+mod object_motion_arcs;
+#[allow(unused_imports)]
+pub(crate) use object_motion_arcs::{KeyLockMode, MotionArcError, MotionArcHandles, MotionArcs};
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectDocument {
@@ -187,6 +199,10 @@ pub struct ObjectDocument {
     pub(crate) items: Presence<ItemRecords>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) component_tables: Presence<ComponentTables>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) audio_tracks: Presence<AudioTracks>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -199,6 +215,8 @@ pub struct ObjectLayer {
     pub(crate) visible: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) locked: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) key_lock: Presence<Option<KeyLockMode>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) color: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
@@ -279,9 +297,12 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     #[serde(default)] composition_order: Presence<OrderPlan>,
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
     #[serde(default)] items: Presence<ItemRecords>,
-    #[serde(default)] component_tables: Presence<ComponentTables> });
+    #[serde(default)] component_tables: Presence<ComponentTables>,
+    #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(default)] audio_tracks: Presence<AudioTracks> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
+    #[serde(default)] key_lock: Presence<Option<KeyLockMode>>,
     #[serde(default)] color: Presence<String>,
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
     #[serde(default)] folder_id: Presence<Option<String>>,
@@ -376,6 +397,7 @@ impl ObjectLayer {
             name: Presence::Missing,
             visible: Presence::Missing,
             locked: Presence::Missing,
+            key_lock: Presence::Missing,
             color: Presence::Missing,
             parent_layer_uid: Presence::Missing,
             folder_id: Presence::Missing,
@@ -412,3 +434,7 @@ impl ObjectLayer {
         self.path_fx.value().map(Vec::as_slice)
     }
 }
+
+pub(crate) use timing::{
+    plan_move_frames, plan_shift_frames, BulkCell, BulkMoveLayer, BulkMovePlan, BulkRetimePair,
+};

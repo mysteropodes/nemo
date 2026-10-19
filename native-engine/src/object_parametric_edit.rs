@@ -307,6 +307,30 @@ impl ObjectFillOwner {
         next.geometry.closed = outcome.closed;
         if let Presence::Present(next_ext) = &mut next.vector_ext {
             next_ext.param_shape = Presence::Present(outcome.shape);
+            // Baseline transformFillGradient applies the same gesture to its document-world endpoints.
+            if let Some(gradient) = next_ext.fill_gradient.value().cloned() {
+                let mut moved = gradient;
+                for point in [&mut moved.from, &mut moved.to] {
+                    let [x, y] = [finite(&point[0])?, finite(&point[1])?];
+                    let values = match payload.command.as_str() {
+                        "object.parametric.translate" => {
+                            let delta = pair(&payload.delta)?;
+                            [x + delta[0], y + delta[1]]
+                        }
+                        "object.parametric.scale" => {
+                            let scale = pair(&payload.scale)?;
+                            let anchor = pair(&payload.anchor)?;
+                            [
+                                anchor[0] + (x - anchor[0]) * scale[0],
+                                anchor[1] + (y - anchor[1]) * scale[1],
+                            ]
+                        }
+                        _ => [x, y],
+                    };
+                    *point = [number(values[0])?, number(values[1])?];
+                }
+                next_ext.fill_gradient = Presence::Present(moved);
+            }
         }
         let changed = !same_record(record, &next);
         let mut document = current.clone();

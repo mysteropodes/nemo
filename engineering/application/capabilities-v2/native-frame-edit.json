@@ -24,6 +24,8 @@
     "command.document.object.frames.clipboard.copy",
     "command.document.object.frames.clipboard.cut",
     "command.document.object.frames.clipboard.paste",
+    "command.document.object.frames.move",
+    "command.document.object.layer.range.drag",
     "command.document.object.frames.repeat"
   ],
   "input": {
@@ -71,6 +73,12 @@
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesClipboardPastePayload"
       },
       {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesMovePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerRangeDragPayload"
+      },
+      {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesRepeatPayload"
       }
     ]
@@ -81,11 +89,73 @@
     "fallback": "none"
   },
   "resourceBoundary": {
-    "maxRequestBytes": 4096,
-    "maxReadResponseBytes": 4096,
-    "policy": "Complete request and correlated retained reply remain bounded to4096 encoded UTF-8 bytes. Copy/Cut may return the existing detached native clipboard DTO inline; an oversized complete reply refuses before mutation. No truncation, chunking, cap increase or alternative clipboard owner."
+    "maxRequestBytes": 5246976,
+    "maxReadResponseBytes": 5246976,
+    "policy": "Complete original encoded UTF8 native request: Copy/Cut/Paste alone allow5246976 bytes (4MiB records+complete order arrays, 4096*256 bounded cell/container reserve,4096 full header reserve); Copy/Cut complete correlated replies use the same limit; Paste compact replies and every other frame operation remain4096. Authenticated TCP and actual MCP nemo_command frames above the unchanged1048574-byte legacy outer limit add at most4096 wrapper bytes; ordinary legacy frames keep their original bound. Native data accounting remains4194304 bytes; no truncation, chunking, fallback or new clipboard owner. Full reply preflight precedes Cut commit. Per-message bounds do not solve pre-existing unbounded lifetime receipt retention. MCP ingress/TCP frame limit is not a stdout limit. Actual SDK structured stdout duplicates native JSON as text plus structuredContent; separately derived conservative resource ceiling16789636 bytes includes escaping, existing admitted outer ID and finalLF, without a new postcommit output gate.",
+    "nativeClipboardDataBytes": 4194304,
+    "cellAndContainerReserveBytes": 1048576,
+    "correlationHeaderReserveBytes": 4096,
+    "authenticatedWrapperReserveBytes": 4096,
+    "requestBytesByOperation": {
+      "command.document.object.frames.insert": 4096,
+      "command.document.object.frames.extend": 4096,
+      "command.document.object.frames.duplicate": 4096,
+      "command.document.object.frames.remove": 4096,
+      "command.document.object.layer.key.promote": 4096,
+      "command.document.object.layer.key.blank": 4096,
+      "command.document.object.layer.key.clear": 4096,
+      "command.document.object.layer.key.clear_cells": 4096,
+      "command.document.object.layer.tween.remove": 4096,
+      "command.document.object.layer.key.move": 4096,
+      "command.document.object.frames.clipboard.duplicate": 4096,
+      "command.document.object.frames.clipboard.copy": 5246976,
+      "command.document.object.frames.clipboard.cut": 5246976,
+      "command.document.object.frames.clipboard.paste": 5246976,
+      "command.document.object.frames.move": 4096,
+      "command.document.object.layer.range.drag": 4096,
+      "command.document.object.frames.repeat": 4096
+    },
+    "responseBytesByOperation": {
+      "command.document.object.frames.insert": 4096,
+      "command.document.object.frames.extend": 4096,
+      "command.document.object.frames.duplicate": 4096,
+      "command.document.object.frames.remove": 4096,
+      "command.document.object.layer.key.promote": 4096,
+      "command.document.object.layer.key.blank": 4096,
+      "command.document.object.layer.key.clear": 4096,
+      "command.document.object.layer.key.clear_cells": 4096,
+      "command.document.object.layer.tween.remove": 4096,
+      "command.document.object.layer.key.move": 4096,
+      "command.document.object.frames.clipboard.duplicate": 4096,
+      "command.document.object.frames.clipboard.copy": 5246976,
+      "command.document.object.frames.clipboard.cut": 5246976,
+      "command.document.object.frames.clipboard.paste": 4096,
+      "command.document.object.frames.move": 4096,
+      "command.document.object.layer.range.drag": 4096,
+      "command.document.object.frames.repeat": 4096
+    },
+    "maxClipboardCells": 4096,
+    "maxClipboardDataItemsPerArray": 131072,
+    "mcpStructuredStdout": {
+      "kind": "derived maximum resource use; not a new output admission/rejection cap",
+      "scope": "Actual nemo_command CallToolResult structured/structured_error -> locked rmcp JSON-RPC encoder -> existing stdio output owner",
+      "nativeMessageBytes": 5246976,
+      "nativeDataBytes": 4194304,
+      "nativeCells": 4096,
+      "textJsonBytesBound": "2*nativeCanonicalBytes+2",
+      "fixedStructuredJsonlBytes": 132,
+      "fixedStructuredErrorJsonlBytes": 131,
+      "encodedOuterIdBytesBound": 1048574,
+      "encodedOuterIdProof": "Unchanged legacy entire JSONL content <=1048574. Larger clipboard ingress requires non-native wrapper <=4096, including ID. Canonical i64/string ID encoding cannot exceed its original valid JSON span. No new ID restriction introduced.",
+      "maxStructuredStdoutJsonlBytes": 16789636,
+      "derivation": "native<=5246976 plus escaped text<=2*native+2 plus outerID<=1048574 plus fixed fields and LF132. 3*5246976+2+1048574+132=16789636. Negotiated removal of resultType can only reduce this. No task/meta fields are supplied by this native call constructor.",
+      "nativeTcpAndMcpIngressBytesExcludingLF": 5251072,
+      "distinction": "5251072 only describes actual clipboard ingress/TCP framing, never SDK structured stdout. Existing stdio encoder has no added late cap. No field is removed, retried, truncated or chunked.",
+      "retentionOpen": "Per-reply output can hold duplicated structured Value plus native text plus encoded JSONL and transient serialization copies; exact peak is unmeasured. Existing StageReceipts and RequestReceipts remain unbounded in count/aggregate bytes; increasing native Copy/Cut entries from4KiB toward5MiB amplifies lifetime retention. No aggregate bounded-memory acceptance claimed.",
+      "controls": "Two new authored tests use actual SDK structured constructors and existing production send/encoder/output, including native-shaped Copy/Cut complete fields and escape-heavy native full-limit error replies with actually admitted legacy-limit outer IDs. All execution UNRUN."
+    }
   },
-  "semantics": "Fifteen frame, key, exposure and clipboard operations of the dense editor (F5/F6/F7, extend, duplicate key, remove frame(s), clear key, delete frames, remove tween, move key, duplicate selection, repeat selection). Each is prepared against the retained snapshot and published through the shared revision, history and request-receipt owner: one changed operation adds one revision and one undo entry; a semantic no-op adds neither and keeps redo, except F7 deliberately adds one revision and undo checkpoint for every successful blank key including already blank; a locked layer is skipped or refused exactly as the baseline does. Frame numbers are zero-based u32 cells; layers are named by their opaque stable layerUid. Copy and Cut return exactly applied/historyEntriesAdded/clipboard; clipboard is null (no new packet, preserve the existing UI clipboard) or the detached native source instanceId/documentId/cells packet. Copy is read-only and always applied=false/historyEntriesAdded=0 with the same revision. Cut reports its actual change with zero or one history entry and matching revision, including an unchanged locked source that still returns a packet. Paste returns the compact two-field receipt and consumes the exact existing packet cells, including optional orderElements. Empty selection and empty paste cells are admitted by the native API; ordinary UI selection refusal stays in its caller. The bounded public DTO shell checks containers; full record/order grammar and semantic relationships are validated atomically by the native owner. Complete correlated replies are size-admitted before any commit. F7 targets only the active layer; locked ordinary layers refuse, component outer keys may be blanked even when locked. Preserved-holder and nested-context cases may remain unavailable and are not full desktop acceptance. No JS/Paper writer, optimistic mutation or fallback. Repeat alone returns native cycledLayers and skippedComponentLayers, including unchanged cycles; an applied global timeline growth may have zero cycled layers. The UI consumes confirmed counts rather than inferring them from selection or applied.",
+  "semantics": "Seventeen frame, key, exposure and clipboard operations of the dense editor (F5/F6/F7, extend, duplicate key, remove frame(s), clear key, delete frames, remove tween, move key, duplicate selection, repeat selection). Each is prepared against the retained snapshot and published through the shared revision, history and request-receipt owner: one changed operation adds one revision and one undo entry; a semantic no-op adds neither and keeps redo, except F7 deliberately adds one revision and undo checkpoint for every successful blank key including already blank; a locked layer is skipped or refused exactly as the baseline does. Frame numbers are zero-based u32 cells; layers are named by their opaque stable layerUid. Copy and Cut return exactly applied/historyEntriesAdded/clipboard; clipboard is null (no new packet, preserve the existing UI clipboard) or the detached native source instanceId/documentId/cells packet. Copy is read-only and always applied=false/historyEntriesAdded=0 with the same revision. Cut reports its actual change with zero or one history entry and matching revision, including an unchanged locked source that still returns a packet. Paste returns the compact two-field receipt and consumes the exact existing packet cells, including optional orderElements. Empty selection and empty paste cells are admitted by the native API; ordinary UI selection refusal stays in its caller. The bounded public DTO shell checks containers; full record/order grammar and semantic relationships are validated atomically by the native owner. Complete correlated replies are size-admitted before any commit. F7 targets only the active layer; locked ordinary layers refuse, component outer keys may be blanked even when locked. Preserved-holder and nested-context cases may remain unavailable and are not full desktop acceptance. No JS/Paper writer, optimistic mutation or fallback. Repeat alone returns native cycledLayers and skippedComponentLayers, including unchanged cycles; an applied global timeline growth may have zero cycled layers. The UI consumes confirmed counts rather than inferring them from selection or applied. Key move accepts optional activeLayerUid captured from the original caller; its motionArc rekeys follow that active layer even for a different dragged layer. A changed request with nonempty stored Arc entries and no captured active layer reports unavailable before any content/history publication; missing/null/empty Arc stores retain old four-field request compatibility. No additional writer or history checkpoint. Ordinary whole-cell Move uses an absolute selection bounding-box anchor and returns exactly applied/historyEntriesAdded/selection; eligible Move true/1/actual destination array (possibly empty), original early no-op false/0/null. Atomic layer.range.drag is the original nonmodifier layer-bar gesture: captured stable root context/layer/active Arc identity, bar parts, ordered actual quantized movement samples and native selected-key addresses. Native snapshot ranges, Motion locks/selection, drawn content and Arc update in one sealed replacement and one history checkpoint/revision even unchanged clicks. Result exactly applied=true/historyEntriesAdded=1. Complete original4096 envelope/reply limits remain; no sample coalescing or truncation. Only same-pinned root ordinary native caller is admitted; unsupported contexts/providers, orphan/fractional ranges and over-capacity gestures refuse without mutation and remain original OPEN obligations. Source capability availability is not installed/client acceptance. No JavaScript persistent writer or alternate queue.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -545,6 +615,85 @@
       "response": {
         "apiVersion": 2,
         "requestId": "frames-clipboard-paste-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Ordinary whole-cell Move: absolute bounding-box anchor; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-move-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.move",
+        "payload": {
+          "command": "object.frames.move",
+          "selection": [
+            {
+              "layerUid": "layer-a",
+              "frame": 3
+            }
+          ],
+          "layerUid": "layer-b",
+          "frame": 4
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-move-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "selection": [
+            {
+              "layerUid": "layer-b",
+              "frame": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Atomic layer-bar gesture: same-owner range, Motion, content and Arc; installed acceptance pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-range-drag-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.range.drag",
+        "payload": {
+          "command": "object.layer.range.drag",
+          "contextId": "scene-root",
+          "layerUid": "layer-a",
+          "activeLayerUid": "layer-b",
+          "part": "both",
+          "barSelection": [],
+          "samples": [
+            0,
+            2
+          ],
+          "plainClick": false,
+          "alt": false,
+          "frame": 1,
+          "selectedKeys": []
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-range-drag-7",
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,

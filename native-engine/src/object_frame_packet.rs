@@ -1,11 +1,18 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
-use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, Presence, PropertyHolderTarget,
+pub(crate) use crate::object_document::{
+    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget, Presence,
+    PropertyHolderTarget, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
 use std::collections::HashMap;
+
+#[path = "object_frame_context.rs"]
+mod context;
+#[path = "object_frame_sources.rs"]
+mod sources;
+use context::FrameContext;
 
 #[path = "object_order_evaluation.rs"]
 mod order;
@@ -181,6 +188,7 @@ impl<'a> ObjectFrameRasterRecord<'a> {
 pub struct ObjectFramePacket {
     snapshot: ObjectSnapshot,
     context_id: String,
+    context: FrameContext,
     scope_kind: FrameScopeKind,
     frame: u32,
     records: Vec<ObjectFrameIndices>,
@@ -200,7 +208,7 @@ impl ObjectFramePacket {
             .item_records()
             .map(|items| items.raster_entries())
             .unwrap_or(&[]);
-        let offset = self.snapshot.document().objects().len();
+        let offset = self.source_objects().len();
         self.raster_records
             .iter()
             .map(move |index| ObjectFrameRasterRecord {
@@ -284,7 +292,10 @@ impl ObjectFramePacket {
     }
     /// Original layer table, including layers with no matching records.
     pub fn source_layers(&self) -> &[ObjectLayer] {
-        self.snapshot.document().layers()
+        self.context.layers(self.snapshot.document())
+    }
+    fn source_objects(&self) -> &[ObjectRecord] {
+        self.context.objects(self.snapshot.document())
     }
     /// Borrow one selected provenance position in constant time, not paint rank.
     pub(crate) fn record_at(&self, index: usize) -> Option<ObjectFrameRecord<'_>> {
@@ -292,11 +303,7 @@ impl ObjectFramePacket {
         Some(ObjectFrameRecord {
             source_layer_index: indices.source_layer_index,
             source_object_index: indices.source_object_index,
-            record: self
-                .snapshot
-                .document()
-                .objects()
-                .get(indices.source_object_index)?,
+            record: self.source_objects().get(indices.source_object_index)?,
         })
     }
     /// Source encounter order conveys provenance, never a paint-order promise.
@@ -305,9 +312,20 @@ impl ObjectFramePacket {
             source_layer_index: indices.source_layer_index,
             source_object_index: indices.source_object_index,
             // Private indices were selected from this same immutable document.
-            record: &self.snapshot.document().objects()[indices.source_object_index],
+            record: &self.source_objects()[indices.source_object_index],
         })
     }
+}
+
+/// Reuse the scoped order producer with a caller-validated source selection.
+/// Placed symbols intentionally select timing without entered-layer range gates.
+pub(crate) fn prepare_scoped_order_from_sources(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    frame: u32,
+    sources: &[Option<u32>],
+) -> Result<NumericOrderPlan, ObjectFrameError> {
+    order::prepare_context(snapshot, context_id, frame, sources, true)
 }
 
 /// Explicit exact-scoped native query, not a temporal desktop fallback.
@@ -316,7 +334,7 @@ pub fn prepare_object_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    prepare_frame_with_order(snapshot, selector, false, order::prepare)
+    prepare_frame_with_order(snapshot, selector, false, order::prepare_context)
 }
 
 /// Desktop drawing exposure requires explicit timing for every admitted layer.
@@ -325,7 +343,7 @@ pub fn prepare_object_exposure_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    prepare_frame_with_order(snapshot, selector, true, order::prepare)
+    prepare_frame_with_order(snapshot, selector, true, order::prepare_context)
 }
 
 /// Explicit exact-scoped resolver; its authored source equals the selector frame.
@@ -342,10 +360,15 @@ where
         snapshot,
         selector,
         false,
-        |snapshot, frame, sources, exposure| {
-            order::prepare_with_resolver(snapshot, frame, sources, exposure, |_, layer, stroke| {
-                resolver(layer, stroke)
-            })
+        |snapshot, context_id, frame, sources, exposure| {
+            order::prepare_context_with_resolver(
+                snapshot,
+                context_id,
+                frame,
+                sources,
+                exposure,
+                |_, layer, stroke| resolver(layer, stroke),
+            )
         },
     )
 }
@@ -364,8 +387,10 @@ where
         snapshot,
         selector,
         true,
-        |snapshot, frame, sources, exposure| {
-            order::prepare_with_resolver(snapshot, frame, sources, exposure, resolver)
+        |snapshot, context_id, frame, sources, exposure| {
+            order::prepare_context_with_resolver(
+                snapshot, context_id, frame, sources, exposure, resolver,
+            )
         },
     )
 }
@@ -378,33 +403,14 @@ fn prepare_frame_with_order<E, F>(
 ) -> Result<ObjectFramePacket, E>
 where
     E: From<ObjectFrameError>,
-    F: FnOnce(&ObjectSnapshot, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
+    F: FnOnce(&ObjectSnapshot, &str, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
 {
-    if selector.instance_id != snapshot.instance_id() {
-        return Err(ObjectFrameError::WrongInstance.into());
-    }
-    if selector.document_id != snapshot.document_id() {
-        return Err(ObjectFrameError::WrongDocument.into());
-    }
-    if selector.content_revision != snapshot.content_revision() {
-        return Err(ObjectFrameError::WrongRevision.into());
-    }
-    if selector.document_snapshot_id != snapshot.snapshot_id() {
-        return Err(ObjectFrameError::WrongSnapshot.into());
-    }
-    let v2 = snapshot.document().format_version() == 2;
-    if (exposure || v2)
-        && (selector.context_id != "scene-root" || selector.scope_kind != FrameScopeKind::Authored)
-    {
-        return Err(ObjectFrameError::Unavailable.into());
-    }
-    if selector.context_id != "scene-root" {
-        return Err(ObjectFrameError::InvalidContext.into());
-    }
+    let context = FrameContext::admit(snapshot, selector, exposure)?;
     let document = snapshot.document();
-    if selector.frame >= document.total_frames() {
-        return Err(ObjectFrameError::FrameOutOfRange.into());
-    }
+    let context_layers = context.layers(document);
+    let exposure = exposure || context.is_component();
+    let context_objects = context.objects(document);
+    let v2 = document.format_version() == 2;
     // The typed holder table is admitted for persistence and native reads.
     // Until its sampled values reach this producer, never paint unmodified
     // geometry while silently ignoring authored Motion properties. L01-H consumes exactly
@@ -413,33 +419,17 @@ where
     if !holders_fully_consumed(document) {
         return Err(ObjectFrameError::Unavailable.into());
     }
-    // F11 (L05-G): a stored in/out point or live time link decides which frames a layer shows; until the D27
-    // evaluator consumes them, never paint every frame of such a layer.
-    if document
-        .layers()
-        .iter()
-        .any(ObjectLayer::range_gates_frames)
-    {
-        return Err(ObjectFrameError::Unavailable.into());
-    }
-    let source_frames: Vec<_> = document
-        .layers()
-        .iter()
-        .map(|layer| {
-            if exposure {
-                layer
-                    .timing
-                    .value()
-                    .map(|timing| timing.exposure(selector.frame).1)
-                    .ok_or(ObjectFrameError::Unavailable)
-            } else {
-                Ok(Some(selector.frame))
-            }
-        })
-        .collect::<Result<_, _>>()?;
+    let source_frames = sources::select(
+        snapshot,
+        selector,
+        context_layers,
+        exposure,
+        context.is_component(),
+    )?;
     let numeric_order = if v2 {
         Some(prepare_order(
             snapshot,
+            selector.context_id,
             selector.frame,
             &source_frames,
             exposure,
@@ -447,14 +437,13 @@ where
     } else {
         None
     };
-    let layers: HashMap<_, _> = document
-        .layers()
+    let layers: HashMap<_, _> = context_layers
         .iter()
         .enumerate()
         .map(|(index, layer)| (layer.layer_uid(), index))
         .collect();
     let mut records = Vec::new();
-    for (source_object_index, record) in document.objects().iter().enumerate() {
+    for (source_object_index, record) in context_objects.iter().enumerate() {
         let target = record.target();
         if target.context_id() == selector.context_id && target.scope_kind() == &selector.scope_kind
         {
@@ -462,7 +451,7 @@ where
                 .get(target.layer_uid())
                 .ok_or(ObjectFrameError::InvalidSource)?;
             if source_frames[source_layer_index] != Some(target.frame())
-                || !document.layers()[source_layer_index].visible()
+                || !context_layers[source_layer_index].visible()
             {
                 continue;
             }
@@ -482,20 +471,19 @@ where
                 let layer = *layers
                     .get(target.layer_uid())
                     .ok_or(ObjectFrameError::InvalidSource)?;
-                if source_frames[layer] == Some(target.frame())
-                    && document.layers()[layer].visible()
-                {
+                if source_frames[layer] == Some(target.frame()) && context_layers[layer].visible() {
                     raster_records.push(ObjectFrameRasterIndex { layer, entry });
                 }
             }
         }
     }
-    let text_records = text::select(snapshot, selector, &source_frames)?;
+    let text_records = text::select(snapshot, selector, context_layers, &source_frames)?;
     Ok(ObjectFramePacket {
         text_records,
         raster_records,
         snapshot: snapshot.clone(),
         context_id: selector.context_id.to_owned(),
+        context,
         scope_kind: selector.scope_kind.clone(),
         frame: selector.frame,
         records,
@@ -518,3 +506,7 @@ mod layer_opacity_tests;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_layer_opacity_raster.rs"]
 mod layer_opacity_raster_tests;
+
+#[cfg(all(test, feature = "codec"))]
+#[path = "../tests/object_context_frame_packet.rs"]
+mod context_frame_tests;

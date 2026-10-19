@@ -1,7 +1,7 @@
 //! Typed, frame-independent Motion holders in the existing object document.
 use crate::object_document::{
-    object_deserialize, FrameScopeKind, ObjectLayer, ObjectRecord, OrderExpression, OrderPlan,
-    OrderTrack, Presence,
+    object_deserialize, ComponentTables, FrameScopeKind, ObjectLayer, ObjectRecord,
+    OrderExpression, OrderPlan, OrderTrack, Presence,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
@@ -236,6 +236,7 @@ pub(crate) fn validate_property_holders(
     layers: &[ObjectLayer],
     records: &[ObjectRecord],
     plan: Option<&OrderPlan>,
+    tables: Option<&ComponentTables>,
 ) -> Result<(), PropertyAdmissionError> {
     let layer_ids: HashSet<_> = layers.iter().map(ObjectLayer::layer_uid).collect();
     let contexts: HashSet<_> = plan.map_or_else(
@@ -255,22 +256,49 @@ pub(crate) fn validate_property_holders(
             )
         })
         .collect();
+    let components = tables.and_then(|tables| tables.components.value());
     let mut identities = HashSet::new();
     for holder in holders.value().into_iter().flatten() {
         let target = &holder.target;
-        if !contexts.contains(target.context_id.as_str())
-            || !layer_ids.contains(target.layer_uid.as_str())
-        {
+        // A declared component owns its inner identities; never search root
+        // tables or another component when a local layer/element is absent.
+        // Legacy order-only contexts retain their previous storage admission.
+        let component = components.and_then(|set| set.component(&target.context_id));
+        let layer_exists = component.map_or_else(
+            || {
+                contexts.contains(target.context_id.as_str())
+                    && layer_ids.contains(target.layer_uid.as_str())
+            },
+            |component| {
+                component
+                    .layers()
+                    .iter()
+                    .any(|layer| layer.layer_uid() == target.layer_uid)
+            },
+        );
+        if !layer_exists {
             return Err(invalid("unresolved property holder context or layer"));
         }
         if let Some(stroke_id) = target.stroke_id.value() {
-            if stroke_id.is_empty()
-                || !elements.contains(&(
-                    target.context_id.as_str(),
-                    target.layer_uid.as_str(),
-                    stroke_id.as_str(),
-                ))
-            {
+            let element_exists = component.map_or_else(
+                || {
+                    elements.contains(&(
+                        target.context_id.as_str(),
+                        target.layer_uid.as_str(),
+                        stroke_id.as_str(),
+                    ))
+                },
+                |component| {
+                    component.objects().iter().any(|record| {
+                        let item = &record.target;
+                        item.context_id == target.context_id
+                            && item.layer_uid == target.layer_uid
+                            && item.stroke_id == *stroke_id
+                            && item.frame_scope.kind == FrameScopeKind::Authored
+                    })
+                },
+            );
+            if stroke_id.is_empty() || !element_exists {
                 return Err(invalid("unresolved property holder element"));
             }
         }

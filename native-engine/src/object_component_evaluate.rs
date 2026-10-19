@@ -19,11 +19,9 @@
 //!   selection the placed instance uses), detached copies with their stable `(context, layer, frame,
 //!   stroke)` targets. No instance placement, playback or override applies inside: the baseline shows
 //!   the symbol's own layers as ordinary layers, and ordinary layers obey their own time range
-//!   (`getEffectiveStrokes` -> `layerHasTimeRange`). The entered view does not evaluate in points, out
-//!   points or time links yet (D27), so a VISIBLE inner layer whose stored range gates frames
-//!   (`ObjectLayer::range_gates_frames`) makes the whole query a typed `Inside(InnerFeature)`
-//!   refusal, never every frame of that layer painted. The placed instance is unaffected: the
-//!   baseline's symbol branch never reads an inner layer's range.
+//!   (`getEffectiveStrokes` -> `layerHasTimeRange`). The entered view applies the shared
+//!   immutable range reader. Missing providers remain typed refusals. The placed instance
+//!   is unaffected: the baseline's symbol branch never reads an inner layer's range.
 //!
 //! `evaluate_packet` is the scene-root half for a caller that already holds a packet: the viewport
 //! (`prepare_object_frame`) and the export (`prepare_object_exposure_frame`) both end here, so there is
@@ -43,11 +41,11 @@ use crate::evaluation::object_scene_style_kernels::object_scene_producer_compone
     ComponentJoinError, ComponentScene,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::{
-    select_records, ComponentUnavailable,
+    select_records_with_ranges, ComponentUnavailable,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::ScenePin;
 use crate::evaluation::property_camera_eval::CameraKey;
-use crate::object_document::ObjectRecord;
+use crate::object_document::{ObjectRecord, RangeEvaluator};
 use crate::object_frame_packet::{
     prepare_object_frame, ObjectFrameError, ObjectFramePacket, ObjectFrameSelector,
 };
@@ -180,20 +178,15 @@ pub(crate) fn evaluate_component_frame(
             let Some(component) = admitted.context.component() else {
                 return Err(ComponentFrameError::Frame(ObjectFrameError::InvalidContext));
             };
-            if let Some(layer) = component
-                .layers()
-                .iter()
-                .find(|layer| layer.visible() && layer.range_gates_frames())
-            {
-                return Err(ComponentFrameError::Inside(
-                    ComponentUnavailable::InnerFeature {
-                        layer_uid: layer.layer_uid().to_owned(),
-                        feature: "layer range",
-                    },
-                ));
-            }
-            let records =
-                select_records(component, admitted.frame).map_err(ComponentFrameError::Inside)?;
+            let ranges = RangeEvaluator::new(snapshot, selector.context_id, admitted.frame)
+                .map_err(|_| {
+                    ComponentFrameError::Inside(ComponentUnavailable::InnerFeature {
+                        layer_uid: String::new(),
+                        feature: "layer range context",
+                    })
+                })?;
+            let records = select_records_with_ranges(component, admitted.frame, Some(&ranges))
+                .map_err(ComponentFrameError::Inside)?;
             Ok(ComponentFrame::Inside(InsideFrame {
                 pin: expected,
                 symbol_id: component.symbol_id().to_owned(),

@@ -1,7 +1,5 @@
 //! Closed owner correlation of the existing native wire; endpoint admission remains in call_native.
-use crate::contract::{
-    NativeApplicationRequest, NativeApplicationResponse, NATIVE_MAX_MESSAGE_BYTES,
-};
+use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 pub(super) fn correlated(
     request: &NativeApplicationRequest,
     response: &NativeApplicationResponse,
@@ -14,6 +12,9 @@ pub(super) fn correlated(
     let image_owner = crate::native_contract::item::placed_png_owner_matches(request, response);
     let correlated_operation = request.operation == crate::native_contract::text_read::OP
         || request.operation == crate::native_contract::metadata::OP
+        || request.operation == crate::native_contract::placement::OP
+        || request.operation == crate::native_contract::audio_track::OP
+        || request.operation == crate::native_contract::layer_cut::OP
         || policy_command
         || track_command
         || property_edit
@@ -37,8 +38,37 @@ pub(super) fn correlated(
                                     .as_ref()
                                     .is_some_and(|e| e.code == "wrong_document"))),
                 )
-            && serde_json::to_vec(response).is_ok_and(|b| b.len() <= NATIVE_MAX_MESSAGE_BYTES));
+            && serde_json::to_vec(response).is_ok_and(|b| {
+                b.len() <= crate::wire::native_response_byte_limit(&request.operation)
+            }));
     correlated_identity
+        && (request.operation != crate::native_contract::audio_track::OP
+            || !response.ok
+            || response.result.as_ref().is_some_and(|result| {
+                crate::native_contract::audio_track::revision_matches(
+                    request.expected_revision,
+                    response.content_revision,
+                    result,
+                )
+            }))
+        && (request.operation != crate::native_contract::layer_cut::OP
+            || !response.ok
+            || response.result.as_ref().is_some_and(|result| {
+                crate::native_contract::layer_cut::revision_matches(
+                    request.expected_revision,
+                    response.content_revision,
+                    result,
+                )
+            }))
+        && (request.operation != crate::native_contract::placement::OP
+            || !response.ok
+            || response.result.as_ref().is_some_and(|result| {
+                crate::native_contract::placement::revision_matches(
+                    request.expected_revision,
+                    response.content_revision,
+                    result,
+                )
+            }))
 }
 pub(super) fn reports_document(
     request: &NativeApplicationRequest,

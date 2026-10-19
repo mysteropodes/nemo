@@ -194,3 +194,24 @@ fn property_read_admitted_short_curves_and_explicit_tangents_are_preserved() {
     q["view"]["frame"] = json!("2");
     assert!(!request(&q));
 }
+
+#[test]
+fn exact_authored_key_lock_metadata_is_nullable_and_kept_separate_from_original_curve_oracles() {
+    let q = payload(true);
+    for lock in [Value::Null, json!("in"), json!("out"), json!("layer")] {
+        let mut value = output(true);
+        value["items"][0]["lockTo"] = lock;
+        assert!(result("document", &q, &value));
+    }
+    for lock in [
+        json!("unknown"),
+        json!(true),
+        json!(1),
+        json!({}),
+        json!([]),
+    ] {
+        let mut value = output(true);
+        value["items"][0]["lockTo"] = lock;
+        assert!(!result("document", &q, &value));
+    }
+}

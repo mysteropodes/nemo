@@ -34,6 +34,25 @@ fn handle(value: &Presence<Vec<Number>>) -> [f64; 2] {
         .unwrap_or([0., 0.])
 }
 fn target_exists(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    if let Some(component) = document.component_set().and_then(|set| {
+        set.components
+            .iter()
+            .find(|component| component.symbol_id() == target.context_id())
+    }) {
+        return component
+            .layers()
+            .iter()
+            .any(|layer| layer.layer_uid() == target.layer_uid())
+            && target.stroke_id().is_none_or(|stroke| {
+                component.objects().iter().any(|record| {
+                    let item = record.target();
+                    item.context_id() == target.context_id()
+                        && item.layer_uid() == target.layer_uid()
+                        && item.stroke_id() == stroke
+                        && item.scope_kind() == &crate::object_document::FrameScopeKind::Authored
+                })
+            });
+    }
     let context_exists =
         document
             .composition_order

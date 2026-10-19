@@ -12,6 +12,8 @@
 //! 2^53 - 1 are not exactly representable there.
 use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::{LayerRange, ObjectLayer};
+// Immutable range read types stay available with codec/commands-only features.
+pub(crate) use crate::object_document::{RangeError, RangeEvaluator};
 
 /// Largest frame number a baseline number holds exactly (2^53 - 1).
 const MAX_RANGE_FRAME: i64 = 9_007_199_254_740_991;

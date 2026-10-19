@@ -157,6 +157,7 @@ fn set_key(
             frame,
             v: values,
             hold: Presence::Missing,
+            lock_to: Presence::Missing,
             curve_points: Presence::Present(Some(curve.unwrap_or_else(default_curve))),
             h_in: Presence::Present(vec![0.into(), 0.into()]),
             h_out: Presence::Present(vec![0.into(), 0.into()]),
@@ -215,6 +216,7 @@ impl ObjectFillOwner {
             &document.layers,
             &document.objects,
             document.composition_order.value(),
+            document.component_tables(),
         )
         .map_err(|_| DispatchErrorCode::NotFound)?;
         let metadata = holder

@@ -307,3 +307,15 @@ test('actual Tauri transport invalidates a successful wrong-owner timing respons
   await transport.connect(); await assert.rejects(createNativeApplicationAdapter('wrong-owner', transport).dispatch(timingRead()));
   assert.equal(transport.status(), null);
 });
+
+test('range-only timing view is closed correlated and distinct from original cell exposure',async()=>{
+ const q=timingRead();q.payload.view='range';const range={rawInPoint:-2.5,rawOutPoint:30,inPoint:0,outPoint:20,hasCustomRange:true,hasTimeLink:false};
+ function response(request){const {view,...selector}=request.payload;return {apiVersion:2,requestId:request.requestId,instanceId:request.instanceId,documentId:request.documentId,contentRevision:selector.atRevision,ok:true,result:{kind:'layerRange',instanceId:request.instanceId,documentId:request.documentId,...selector,range:{...range}}};}
+ const h=adapter(response);assert.deepEqual((await h.api.dispatch(q)).result.range,range);assert.equal(h.calls.length,1);
+ for(const mutate of [r=>r.result.range.rawInPoint=Infinity,r=>r.result.range.hasTimeLink=null,r=>delete r.result.range.rawOutPoint,r=>r.result.range.extra=0,r=>r.result.layerUid='foreign',r=>r.result.frame++]){
+   const bad=adapter(request=>{const r=response(request);mutate(r);return r;});await assert.rejects(bad.api.dispatch(q),TypeError);
+ }
+ const original=timingRead();await assert.rejects(adapter(response).api.dispatch(original),TypeError);
+ await assert.rejects(adapter(timingResponse).api.dispatch(q),TypeError);
+ for(const view of [null,'timing',{},false])assert.throws(()=>validateRequest({...q,payload:{...q.payload,view}}),TypeError);
+});

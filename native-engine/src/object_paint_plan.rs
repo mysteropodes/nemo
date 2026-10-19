@@ -1,6 +1,6 @@
 //! Pinned CPU commands join existing numeric order to retained real contours.
 use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
-    style_of_record_with_opacity, SceneItemStyle, StyleUnavailable,
+    style_of_record_at_frame, SceneItemStyle, StyleUnavailable,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
@@ -25,6 +25,7 @@ pub enum ObjectPaintPlanError {
 #[derive(Debug, Clone, Copy)]
 pub struct ObjectPaintCommand<'a> {
     entry: ObjectRenderEntry<'a>,
+    packet: &'a ObjectFramePacket,
 }
 impl<'a> ObjectPaintCommand<'a> {
     pub fn source(&self) -> ObjectFrameRecord<'a> {
@@ -63,7 +64,7 @@ impl<'a> ObjectPaintCommand<'a> {
         if record.vector().is_none() {
             return Ok(SceneItemStyle::solid_fill(self.solid().clone()));
         }
-        style_of_record_with_opacity(record, self.entry.layer_opacity())
+        style_of_record_at_frame(record, self.entry.layer_opacity(), self.packet)
     }
 }
 
@@ -85,6 +86,7 @@ impl ObjectPaintPlan {
     pub fn commands(&self) -> impl ExactSizeIterator<Item = ObjectPaintCommand<'_>> + '_ {
         // Allocation-free indexed borrows; no record/paint copies or second sort.
         self.indices.iter().map(|&index| ObjectPaintCommand {
+            packet: self.packet(),
             entry: self
                 .scene
                 .entry(index)
@@ -108,7 +110,10 @@ pub fn prepare_object_paint_plan(
     // Authored v2. v1/no-plan and all Reference/nonroot inputs are unavailable.
     // L07-F: the retained scene is reported as the contour producer output and joined
     // through the pinned registry (pin check once, NumericOrderPlan order).
-    let (indices, mixed) = if scene.rasters.is_empty() && scene.texts.entries.is_empty() {
+    let (indices, mixed) = if scene.rasters.is_empty()
+        && scene.texts.entries.is_empty()
+        && scene.components.scene.is_none()
+    {
         let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
         let indices = join(scene, &sequence)?;
         let mixed = indices.iter().copied().map(PaintIndex::Contour).collect();

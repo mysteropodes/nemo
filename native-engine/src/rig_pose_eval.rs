@@ -39,6 +39,7 @@ use crate::evaluation::object_image_mesh_kernels::rig_pose_deform::{
 };
 use crate::evaluation::object_image_mesh_kernels::rig_pose_deform_anchor::DeformError;
 use crate::evaluation::object_image_mesh_kernels::rig_pose_weights::Point2;
+use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::object_rig_record::{
     bind_link, BindLink, BindTarget, MeshVertexLookup,
 };
@@ -227,7 +228,8 @@ fn stroke_record<'a>(
 ) -> Option<&'a ObjectRecord> {
     objects.iter().find(|record| {
         let target = record.target();
-        target.layer_uid() == layer_uid
+        target.context_id() == SCENE_CONTEXT
+            && target.layer_uid() == layer_uid
             && target.stroke_id() == stroke_id
             && target.frame() == frame
             && *target.scope_kind() == FrameScopeKind::Authored
@@ -301,7 +303,9 @@ fn overlay_mesh(
     }
 }
 
-/// Evaluate the rig of `layer_uid` at `frame` against one pinned snapshot.
+/// Evaluate a ROOT-layer rig at `frame` against one pinned snapshot.
+/// The provider is document.layers()/objects(), never a component's inner tables;
+/// stored target resolution is constrained to SCENE_CONTEXT and Authored scope.
 ///
 /// `meshes` is the image-mesh provider; `None` means none is wired and every mesh bind reports
 /// [`PoseUnavailable::MeshStore`]. Path binds never need it.

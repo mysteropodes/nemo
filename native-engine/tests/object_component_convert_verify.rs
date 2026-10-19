@@ -289,3 +289,98 @@ pub(crate) fn verify_window(
     }
     window(host, &format!("{p}.inst"))
 }
+
+#[cfg(feature = "evaluation")]
+#[test]
+fn the_lifted_window_gates_the_root_frame_packet_so_a_merged_block_is_never_painted_unwindowed() {
+    use super::fixture::{decode, uids, windowed_document, wire};
+    use super::plan_convert;
+    use crate::object_document::FrameScopeKind;
+    use crate::object_frame_packet::{
+        prepare_object_exposure_frame, ObjectFrameError, ObjectFrameSelector,
+    };
+    use crate::object_snapshot::ObjectSnapshot;
+    // A and B merge; only A's lifted range gates the placing layer.
+    // The fixture authors only frame 0; desktop exposure holds that source while
+    // the lifted range and packet frame still use the requested scene time.
+    let packet = |a: Value, b: Value, frame: u32| -> Result<(Option<u32>, f64), ObjectFrameError> {
+        let doc = windowed_document(&[
+            ("ly_x", "X", "xa", Value::Null),
+            ("ly_a", "A", "aa", a),
+            ("ly_b", "B", "ba", b),
+        ]);
+        let plan = plan_convert(&decode(&doc), 5, &uids(&["ly_a", "ly_b"])).unwrap();
+        let uid = plan.layer_uid.clone().unwrap();
+        let snapshot = ObjectSnapshot::new("convert-packet", plan.document).unwrap();
+        let before = wire(snapshot.document());
+        let selector = ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "scene-root",
+            scope_kind: FrameScopeKind::Authored,
+            frame,
+        };
+        let selected = prepare_object_exposure_frame(&snapshot, &selector)?;
+        let index = selected
+            .source_layers()
+            .iter()
+            .position(|layer| layer.layer_uid() == uid)
+            .unwrap();
+        let result = (
+            selected.source_frame_for_layer(index),
+            selected.layer_opacity(index)?,
+        );
+        assert_eq!(selected.frame(), frame);
+        assert_eq!(selected.document_snapshot_id(), snapshot.snapshot_id());
+        assert_eq!(
+            wire(snapshot.document()),
+            before,
+            "range selection is immutable"
+        );
+        Ok(result)
+    };
+    for frame in [0, 4, 23] {
+        assert_eq!(packet(Value::Null, Value::Null, frame), Ok((Some(0), 1.0)));
+    }
+    // Inclusive boundaries suppress the merged block outside the lifted window.
+    for (range, frames) in [
+        (
+            json!({"inPoint":4}),
+            vec![(3, false), (4, true), (23, true)],
+        ),
+        (json!({"outPoint":0}), vec![(0, true), (1, false)]),
+        (
+            json!({"inPoint":4,"outPoint":6}),
+            vec![(3, false), (4, true), (6, true), (7, false)],
+        ),
+    ] {
+        for (frame, visible) in frames {
+            assert_eq!(
+                packet(range.clone(), Value::Null, frame),
+                Ok((visible.then_some(0), 1.0))
+            );
+        }
+    }
+    // A valid native link is consumed; X has the full 0..23 authored range.
+    for frame in [0, 4, 23] {
+        assert_eq!(
+            packet(json!({"timeLink":{"uid":"ly_x"}}), Value::Null, frame),
+            Ok((Some(0), 1.0))
+        );
+    }
+    // Markers never gate. B's window stays inside and cannot gate the placing layer.
+    assert_eq!(
+        packet(json!({"markers":[{"frame":2}]}), Value::Null, 23),
+        Ok((Some(0), 1.0))
+    );
+    assert_eq!(
+        packet(Value::Null, json!({"inPoint":4}), 0),
+        Ok((Some(0), 1.0))
+    );
+    assert_eq!(
+        packet(Value::Null, Value::Null, 24),
+        Err(ObjectFrameError::FrameOutOfRange)
+    );
+}

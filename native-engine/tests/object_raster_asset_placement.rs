@@ -212,7 +212,14 @@ fn the_layer_query_returns_whole_layer_and_element_placements_in_table_order() {
 fn the_target_query_finds_exactly_the_placement_of_that_target() {
     let inventory = catalog();
     let at = |target: AssetTarget| {
-        placement_for_target(&inventory, &target).map(|p| (p.id().to_owned(), p.offset_frames()))
+        placement_for_target(&inventory, &target).map(|p| {
+            (
+                p.id().to_owned(),
+                p.offset_frames()
+                    .as_i64()
+                    .expect("original integer fixture"),
+            )
+        })
     };
     assert_eq!(at(layer_target("L")), Some(("p1".to_owned(), 5)));
     assert_eq!(

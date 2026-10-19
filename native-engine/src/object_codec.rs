@@ -1,4 +1,6 @@
 //! Atomic admission and semantic JSON round-trip for staged native objects.
+#[path = "object_effect_stack_codec.rs"]
+mod effect_stack_codec;
 #[cfg(feature = "commands")]
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
@@ -21,9 +23,9 @@ pub(crate) use crate::object_document::AssetRecord;
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};
 use crate::object_document::{
-    ImageMeshStore, ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+    ImageMeshStore, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
 };
-pub(crate) use crate::object_document::{Presence, PropertyHolder};
+pub(crate) use crate::object_document::{ObjectLayer, Presence, PropertyHolder};
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -110,11 +112,11 @@ mod object_group_codec;
 // L01-E (#2107): admission of the vector extension slot and of the per-layer pathFx stack.
 #[path = "object_vector_ext_codec.rs"]
 #[allow(dead_code)]
-mod object_vector_ext_codec;
+pub(crate) mod object_vector_ext_codec;
 // L05-G (#2111): admission of the per-layer range record (inPoint, outPoint, timeLink, markers).
 #[path = "object_frame_edit_range_codec.rs"]
 #[allow(dead_code)]
-mod object_frame_edit_range_codec;
+pub(crate) mod object_frame_edit_range_codec;
 // L06-L (#2112): admission of the lane-6 `items` document member (raster items and text blocks).
 #[path = "object_raster_asset_codec.rs"]
 #[allow(dead_code)]
@@ -174,6 +176,8 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         image_meshes: wire.image_meshes,
         items: wire.items,
         component_tables: Presence::Missing,
+        motion_arcs: wire.motion_arcs,
+        audio_tracks: wire.audio_tracks,
     };
     validate(&document)?;
     Ok(document)
@@ -190,6 +194,8 @@ struct LegacyDocument {
     layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
     image_meshes: Presence<ImageMeshStore>,
     items: Presence<crate::object_document::ItemRecords>,
+    motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
+    audio_tracks: Presence<crate::object_document::AudioTracks>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
@@ -197,18 +203,23 @@ crate::object_document::object_deserialize!(LegacyDocument {
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
     #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
     #[serde(default)] image_meshes: Presence<ImageMeshStore>,
-    #[serde(default)] items: Presence<crate::object_document::ItemRecords>
+    #[serde(default)] items: Presence<crate::object_document::ItemRecords>,
+    #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
 });
 
-/// Explicit core storage admission; both attempts read the original raw bytes.
+/// Route canonical v2 to its strict codec so its typed refusal is not masked by v1.
+/// The header chooses a codec only; admission always reads the ORIGINAL raw bytes.
 pub fn decode_storage_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> {
-    match decode_project(bytes) {
-        Ok(document) => Ok(document),
-        Err(legacy_error) => match decode_ordered_project(bytes) {
-            Ok(document) => Ok(document.into_storage()),
-            Err(_) => Err(legacy_error),
-        },
+    #[derive(Deserialize)]
+    struct StorageVersion {
+        #[serde(rename = "formatVersion")]
+        version: u32,
     }
+    if serde_json::from_slice::<StorageVersion>(bytes).is_ok_and(|wire| wire.version == 2) {
+        return decode_ordered_project(bytes).map(|document| document.into_storage());
+    }
+    decode_project(bytes)
 }
 
 pub fn encode_storage_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecError> {
@@ -251,6 +262,7 @@ pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecE
 }
 
 pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    order::validate_audio_tracks(document.audio_tracks.value())?;
     use ObjectCodecErrorKind::Unsupported;
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
     if document.format != OBJECT_DOCUMENT_FORMAT
@@ -274,6 +286,7 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.property_holders,
         &document.layers,
         &document.objects,
+        None,
         None,
     )?;
     validate_image_meshes(&document.image_meshes)?;
@@ -310,10 +323,11 @@ pub(crate) fn validate_property_holders(
     layers: &[ObjectLayer],
     records: &[ObjectRecord],
     plan: Option<&crate::object_document::OrderPlan>,
+    tables: Option<&crate::object_document::ComponentTables>,
 ) -> Result<(), ObjectCodecError> {
     use crate::object_document::PropertyAdmissionError;
-    crate::object_document::validate_property_holders(holders, layers, records, plan).map_err(
-        |error| {
+    crate::object_document::validate_property_holders(holders, layers, records, plan, tables)
+        .map_err(|error| {
             let (kind, message) = match error {
                 PropertyAdmissionError::Invalid(message) => {
                     (ObjectCodecErrorKind::Invalid, message)
@@ -326,8 +340,7 @@ pub(crate) fn validate_property_holders(
                 }
             };
             ObjectCodecError::new(kind, message)
-        },
-    )
+        })
 }
 
 /// Legacy and component-symbol content retain their original parent refusal.
@@ -365,6 +378,7 @@ fn validate_content_inner(
             "positive totalFrames and identified layers are required",
         ));
     }
+    effect_stack_codec::validate_fields(declared_layers, objects)?;
     let mut layers = HashSet::new();
     for layer in declared_layers {
         // Drawing Fill enforces its own lock guard. Generic Motion actions

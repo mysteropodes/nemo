@@ -336,15 +336,28 @@ test('timing declaration and closed transport definitions retain the accepted se
   assert.equal(timing.id, 'native.object.layer-timing'); assert.deepEqual(timing.operations, ['query.document.object.layer.timing']);
   assert.equal(timing.availability.state, 'available'); assert.ok(timing.ports.every(port => port.state === 'pending'));
   assert.equal(branch.allOf[0].$ref, '#/$defs/ForbiddenRevisionRequest'); assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectLayerTimingPayload');
-  const normalize = value => JSON.parse(JSON.stringify(value).replaceAll('#/$defs/ObjectLayerTimingFrame', '#/$defs/Frame'));
+  const timingReferences = Object.fromEntries([
+    ['ObjectLayerTimingFrame','Frame'], ['ObjectLayerTimingCellPayload','CellSelector'],
+    ['ObjectLayerRangePayload','RangeSelector'], ['ObjectLayerTimingCellResult','CellReadResult'],
+    ['ObjectLayerRangeResult','RangeReadResult']
+  ].map(([from,to])=>['#/$defs/'+from,'#/$defs/'+to]));
+  const normalize = value => JSON.parse(JSON.stringify(value),(key,entry)=>key==='$ref'&&Object.hasOwn(timingReferences,entry)?timingReferences[entry]:entry);
+  // Preserve both original cell and admitted range contracts down to their closed leaf definitions.
+  for(const [from,to] of [['ObjectLayerTimingCellPayload','CellSelector'],['ObjectLayerRangePayload','RangeSelector'],
+    ['ObjectLayerTimingCellResult','CellReadResult'],['ObjectLayerRangeResult','RangeReadResult']])assert.deepEqual(normalize(transport.$defs[from]),accepted[to]);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingPayload), accepted.Selector);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingResult), accepted.ReadResult);
   assert.deepEqual(transport.$defs.ObjectLayerTimingFrame, accepted.Frame);
   assert.ok(transport.$defs.ResponseBase.properties.result.oneOf.some(value => value.$ref === '#/$defs/ObjectLayerTimingResult'));
+  // This subset validator has no oneOf: check the same declared exclusive branches.
+  const validateSelector=value=>{const branches=transport.$defs.ObjectLayerTimingPayload.oneOf.map(branch=>validate(branch,value,transport.$defs));return branches.filter(errors=>errors.length===0).length===1?[]:['selector must match exactly one declared branch'];};
   const request = timing.examples[0].request; assert.equal(validateRequest(request), request);
-  assert.deepEqual(validate(transport.$defs.ObjectLayerTimingPayload, request.payload, transport.$defs), []);
-  for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }]) {
-    assert.ok(validate(transport.$defs.ObjectLayerTimingPayload, bad, transport.$defs).length);
+  assert.deepEqual(validateSelector(request.payload), []);
+  const rangeRequest={...request,payload:{...request.payload,view:'range'}};
+  assert.equal(validateRequest(rangeRequest),rangeRequest);
+  assert.deepEqual(validateSelector(rangeRequest.payload),[]);
+  for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }, {...rangeRequest.payload,view:'other'}]) {
+    assert.ok(validateSelector(bad).length);
   }
   assert.equal(load('engineering/application/capabilities-v2/native-object-layer-create.json').availability.state, 'available');
 });
