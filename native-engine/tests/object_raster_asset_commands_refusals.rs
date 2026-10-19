@@ -277,6 +277,7 @@ fn a_prepared_candidate_pins_its_origin_and_a_stale_or_foreign_commit_publishes_
     assert_eq!(state(&o), before);
 }
 
+#[cfg(feature = "project_media_codec")]
 fn remove_asset_request(
     o: &NativeObjectHistory,
     id: &str,
@@ -290,6 +291,7 @@ fn remove_asset_request(
 }
 
 #[test]
+#[cfg(feature = "project_media_codec")]
 fn stored_raster_references_refuse_asset_removal_without_publication_or_history_change() {
     for (layer, frame, hidden, locked) in [
         ("L0", 0, false, false),
@@ -340,6 +342,7 @@ fn stored_raster_references_refuse_asset_removal_without_publication_or_history_
 }
 
 #[test]
+#[cfg(feature = "project_media_codec")]
 fn deleting_the_last_raster_allows_removal_and_undo_redo_restore_both_owners() {
     let mut o = owner(&drawing(json!({"items":{"raster":[
         {"target":target("L0","r0"),"item":raster_item("img-1",1,2,3,4)}]}})));
