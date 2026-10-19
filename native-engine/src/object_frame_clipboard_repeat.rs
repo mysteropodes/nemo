@@ -19,8 +19,8 @@
 //!
 //! Atomic: the candidate is detached, non-Clone and sealed to the retained snapshot; it holds the complete after-document
 //! (`None` for a semantic no-op, which publishes nothing and keeps redo) validated by the shared strict drawing admission.
-//! A layer in the bounds without a timing record is typed `Unavailable` (nothing is invented). Component layers are not
-//! representable in a native document yet, so the baseline's "component layers are skipped" branch has no native analogue.
+//! A layer in the bounds without a timing record is typed `Unavailable` (nothing is invented). Native component-instance layers are skipped using the admitted component table,
+//! including their drawing cells and Motion tracks; global timeline growth still applies.
 use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     finish, layer_position, scene_authored, timing_refusal,
 };
@@ -143,6 +143,13 @@ fn cell_is_written(document: &ObjectDocument, layer: &str, source: Option<u32>, 
         && elements_at(document, layer, dst) == want_elements
 }
 
+/// Baseline `symbolId` layers are the real scene-root native component instances.
+fn is_component_layer(document: &ObjectDocument, uid: &str) -> bool {
+    document
+        .component_set()
+        .is_some_and(|set| set.instance(CONTEXT, uid).is_some())
+}
+
 /// repeatSelection over an admitted document. A cycle that changes nothing (every copy equals its destination and the
 /// timeline does not grow) is `NoChange`.
 pub(crate) fn repeat_cells(
@@ -167,6 +174,9 @@ pub(crate) fn repeat_cells(
     // Every layer's timing plan is computed before anything is written, so one refusal leaves nothing behind.
     let mut plans = Vec::new();
     for index in first_layer..=last_layer {
+        if is_component_layer(document, &document.layers[index].layer_uid) {
+            continue;
+        }
         let timing = document.layers[index]
             .timing
             .value()
@@ -212,6 +222,7 @@ pub(crate) fn repeat_cells(
     // that cannot be admitted (a clone on an existing key) refuses the whole cycle, cells included.
     let cycled: Vec<String> = document.layers[first_layer..=last_layer]
         .iter()
+        .filter(|layer| !is_component_layer(document, &layer.layer_uid))
         .map(|layer| layer.layer_uid.clone())
         .collect();
     repeat_motion_tracks(&mut next, &cycled, first, last, times)?;
@@ -227,6 +238,21 @@ pub(crate) fn repeat_cells(
 pub(crate) struct PreparedFrameRepeat {
     origin: ObjectSnapshot,
     document: Option<ObjectDocument>,
+    cycled_layers: usize,
+    skipped_component_layers: usize,
+}
+
+// Typed preparation outcome for the native caller port. The compact/UI result
+// still needs its separately owned composition; applied alone means a document
+// changed, including global growth when every selected layer is a component.
+#[allow(dead_code)]
+impl PreparedFrameRepeat {
+    pub(crate) fn cycled_layers(&self) -> usize {
+        self.cycled_layers
+    }
+    pub(crate) fn skipped_component_layers(&self) -> usize {
+        self.skipped_component_layers
+    }
 }
 
 impl ObjectFillOwner {
@@ -239,7 +265,22 @@ impl ObjectFillOwner {
             DocumentEdit::Changed(next) => Some(next),
             DocumentEdit::NoChange => None,
         };
-        Ok(PreparedFrameRepeat { origin, document })
+        // repeat_cells validated these bounds before preparing the detached result.
+        let source = origin.document();
+        let first =
+            layer_position(source, &request.from_layer).ok_or(DispatchErrorCode::NotFound)?;
+        let last = layer_position(source, &request.to_layer).ok_or(DispatchErrorCode::NotFound)?;
+        let skipped_component_layers = source.layers[first..=last]
+            .iter()
+            .filter(|layer| is_component_layer(source, &layer.layer_uid))
+            .count();
+        let cycled_layers = last - first + 1 - skipped_component_layers;
+        Ok(PreparedFrameRepeat {
+            origin,
+            document,
+            cycled_layers,
+            skipped_component_layers,
+        })
     }
 
     pub(crate) fn prepare_frame_repeat_json(

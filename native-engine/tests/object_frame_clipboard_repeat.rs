@@ -268,3 +268,163 @@ fn the_new_frame_count_and_the_count_clamp_are_the_baseline_arithmetic() {
         assert_eq!(clamp_times(raw), expected, "times {raw}");
     }
 }
+
+/// A genuine native instance on L1; its own drawing timing is absent, as for a component layer.
+fn with_component(mut drawing: ObjectDocument) -> ObjectDocument {
+    drawing.layers[1].timing = Presence::Missing;
+    let mut value = serde_json::to_value(drawing).unwrap();
+    // Component frameKeys require outer timing keys; this genuine no-timing instance has none.
+    value["componentTables"] = json!({"components": {
+        "format":"nemo.native-component-set", "formatVersion":1,
+        "components":[{"symbolId":"symbol", "totalFrames":3,
+            "layers":[{"layerUid":"inside"}], "objects":[]}],
+        "instances":[{"contextId":"scene-root", "layerUid":"L1", "symbolId":"symbol", "symSpeed":2}]
+    }});
+    crate::object_codec::decode_storage_project(value.to_string().as_bytes()).unwrap()
+}
+
+#[test]
+fn real_components_without_drawing_timing_are_skipped_while_drawings_repeat() {
+    let input = with_component(doc("K=a.1.10;.;.|.;.;.", Build::V2));
+    let frozen = crate::object_codec::encode_storage_project(&input).unwrap();
+    let out = changed(&input, &request(0, 1, 0, 0, 3));
+    assert_eq!(out.total_frames, 4);
+    assert_eq!(render_layer(&out, 0), "K=a.1.10;K=a.1.10;K=a.1.10;K=a.1.10");
+    assert_eq!(out.layers[1], input.layers[1]);
+    assert_eq!(out.component_tables, input.component_tables);
+    assert_eq!(
+        crate::object_codec::encode_storage_project(&input).unwrap(),
+        frozen
+    );
+    assert_eq!(out.objects.len(), 4);
+}
+
+#[test]
+fn an_all_component_selection_does_not_require_drawing_timing_or_cycle_content() {
+    let input = with_component(doc("K=a.1.10;.;.|.;.;.", Build::V2));
+    assert!(cycle(&input, &request(1, 1, 0, 0, 1)).unwrap().is_none());
+    let out = changed(&input, &request(1, 1, 0, 0, 3));
+    assert_eq!(
+        out.total_frames, 4,
+        "baseline grows before deciding no layer can cycle"
+    );
+    let mut expected = input.clone();
+    expected.total_frames = 4;
+    assert_eq!(
+        out, expected,
+        "growth is the only change, not successful component cycling"
+    );
+}
+
+#[test]
+fn skipped_component_and_unselected_motion_and_order_tracks_remain_exact() {
+    let mut value = serde_json::to_value(with_component(doc(
+        "K=a.1.10;.;.|.;.;.|K=z.1.5;.;.",
+        Build::V2,
+    )))
+    .unwrap();
+    // Component and unselected tracks have a key at destination 1. Repeating either
+    // would collide, so the ordinary layer's successful repeat proves both exclusions.
+    value["propertyHolders"] = json!([
+        {"target":{"contextId":"scene-root","layerUid":"L0"},
+            "properties":[{"property":"rotation","track":{"keys":[{"frame":0,"v":[11]}]}}]},
+        {"target":{"contextId":"scene-root","layerUid":"L1"},
+            "properties":[{"property":"rotation","track":{"keys":[{"frame":0,"v":[20]},{"frame":1,"v":[21]}]}}]},
+        {"target":{"contextId":"scene-root","layerUid":"L2"},
+            "properties":[{"property":"rotation","track":{"keys":[{"frame":0,"v":[30]},{"frame":1,"v":[31]}]}}]}
+    ]);
+    for (index, keys) in [
+        json!([{"frame":0,"v":[0]}]),
+        json!([{"frame":0,"v":[1]},{"frame":1,"v":[2]}]),
+        json!([{"frame":0,"v":[2]},{"frame":1,"v":[3]}]),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        value["compositionOrder"]["contexts"][0]["layers"][index]["order"]["track"] =
+            json!({"keys":keys});
+    }
+    let input = crate::object_codec::decode_storage_project(value.to_string().as_bytes()).unwrap();
+    let out = changed(&input, &request(0, 1, 0, 0, 1));
+    let after = serde_json::to_value(&out).unwrap();
+    assert_eq!(
+        after["propertyHolders"][0]["properties"][0]["track"]["keys"],
+        json!([{"frame":0,"v":[11]},{"frame":1,"v":[11]}])
+    );
+    assert_eq!(
+        after["compositionOrder"]["contexts"][0]["layers"][0]["order"]["track"]["keys"],
+        json!([{"frame":0,"v":[0]},{"frame":1,"v":[0]}])
+    );
+    for index in [1, 2] {
+        assert_eq!(
+            after["propertyHolders"][index],
+            value["propertyHolders"][index]
+        );
+        assert_eq!(
+            after["compositionOrder"]["contexts"][0]["layers"][index],
+            value["compositionOrder"]["contexts"][0]["layers"][index]
+        );
+    }
+    assert_eq!(out.component_tables, input.component_tables);
+    assert!(cycle(&input, &request(1, 1, 0, 0, 1)).unwrap().is_none());
+    let mut expected = input.clone();
+    expected.total_frames = 4;
+    assert_eq!(
+        changed(&input, &request(1, 1, 0, 0, 3)),
+        expected,
+        "all-component growth never cycles collision-bearing Motion/order tracks"
+    );
+}
+
+#[test]
+fn typed_repeat_outcome_distinguishes_real_cycles_from_component_only_growth() {
+    use crate::history::NativeObjectHistory;
+    use crate::object_codec::encode_storage_project;
+    for (from, to, cycled, skipped) in [(0, 1, 1, 1), (1, 1, 0, 1)] {
+        let input = with_component(doc("K=a.1.10;.;.|.;.;.", Build::V2));
+        let before = encode_storage_project(&input).unwrap();
+        let mut owner = NativeObjectHistory::new("repeat-outcome", input).unwrap();
+        let candidate = owner
+            .prepare_frame_repeat(&request(from, to, 0, 0, 3))
+            .unwrap();
+        assert_eq!(
+            (
+                candidate.cycled_layers(),
+                candidate.skipped_component_layers()
+            ),
+            (cycled, skipped)
+        );
+        assert_eq!(
+            (owner.content_revision(), owner.history_depths()),
+            (0, (0, 0))
+        );
+        owner.commit_frame_repeat(candidate).unwrap();
+        assert_eq!(
+            (owner.content_revision(), owner.history_depths()),
+            (1, (1, 0))
+        );
+        let after = encode_storage_project(owner.acquire_snapshot(1).unwrap().document()).unwrap();
+        owner.undo(1).unwrap();
+        assert_eq!(
+            encode_storage_project(owner.acquire_snapshot(2).unwrap().document()).unwrap(),
+            before
+        );
+        owner.redo(2).unwrap();
+        assert_eq!(
+            encode_storage_project(owner.acquire_snapshot(3).unwrap().document()).unwrap(),
+            after
+        );
+    }
+    let input = with_component(doc("K=a.1.10;.;.|.;.;.", Build::V2));
+    let mut owner = NativeObjectHistory::new("repeat-no-cycle", input).unwrap();
+    let candidate = owner.prepare_frame_repeat(&request(1, 1, 0, 0, 1)).unwrap();
+    assert_eq!(
+        (
+            candidate.cycled_layers(),
+            candidate.skipped_component_layers()
+        ),
+        (0, 1)
+    );
+    assert_eq!(owner.commit_frame_repeat(candidate).unwrap(), 0);
+    assert_eq!(owner.history_depths(), (0, 0));
+}
