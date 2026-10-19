@@ -5,7 +5,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
 const original=require('./p38-owned-window-build.cjs');
-const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift','ui32-owned-picker.swift','ui32-owned-readiness.swift','ui32-owned-profile.swift','ui32-owned-phase2.swift','ui32-owned-content.swift','f03-owned-opacity.swift','f03-owned-opacity-controls.swift','f03-owned-save.swift','f03-owned-save-controls.swift','ui32-owned-fixture-controls.swift']);
+const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift','ui32-owned-picker.swift','ui32-owned-readiness.swift','ui32-owned-profile.swift','ui32-owned-phase2.swift','ui32-owned-content.swift','f03-owned-opacity.swift','f03-owned-opacity-controls.swift','f03-owned-save.swift','f03-owned-save-controls.swift','ui32-owned-fixture-controls.swift','ui32-owned-native-busy.swift']);
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function requireValid(ok){if(!ok)throw Error('ui32-helper-build-refused');}
 function fresh(file){
@@ -53,7 +53,7 @@ function buildUI32Helper(output,proofFile){
     const after=identity.sourceIdentity();requireValid(!after.dirty&&after.head===source.head&&manifest().sourceSha256===frozen.sourceSha256);
     fresh(output);fresh(proofFile);fs.copyFileSync(executable,output,fs.constants.COPYFILE_EXCL);published=true;fs.chmodSync(output,0o700);
     const proof={schema:'nemo.ui32-window-helper/1',purpose:'UI32',sourceHead:source.head,sourceSha256:frozen.sourceSha256,
-      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (seventeen frozen inputs)',
+      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (eighteen frozen inputs)',
       runtimeAX:false,foreignReads:0,controls};
     fs.writeFileSync(proofFile,JSON.stringify(proof,null,2)+'\n',{flag:'wx',mode:0o600});return proof;
   }catch(e){if(published)fs.rmSync(output,{force:true});throw e;}
