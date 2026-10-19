@@ -7,8 +7,7 @@
 //! and silently drops every cell outside the layers or frames; a locked target layer is skipped; each written cell
 //! REPLACES what the target held (records, timing entry); a copied in-between lands as a full key, a copied plain
 //! cell lands plain; stroke ids are the originals (a target is keyed by context, scope, layer and stroke id, so a copy
-//! on another layer or frame stays unique). Ordered (v2) documents are refused typed: the packet carries no
-//! composition-order elements to write.
+//! on another layer or frame stays unique). Ordered (v2) cells require exact detached composition-order elements; missing metadata refuses typed.
 use crate::commands::object_fill_owner::object_frame_clipboard_packet::{
     ClipboardPacketError, MAX_PACKET_CELLS,
 };
@@ -16,8 +15,8 @@ use crate::commands::object_fill_owner::object_frame_edit_document::{
     drop_cells, DocumentEdit, FrameEditError,
 };
 use crate::object_document::{
-    FrameScope, FrameScopeKind, LayerTimingError, ObjectDocument, ObjectRecord, Presence,
-    TimingEdit,
+    FrameScope, FrameScopeKind, LayerTimingError, ObjectDocument, ObjectRecord, OrderElement,
+    OrderScope, Presence, TimingEdit,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -41,6 +40,8 @@ pub(crate) struct PasteCell {
     pub(crate) rel_frame: u32,
     pub(crate) keyframe: bool,
     pub(crate) records: Vec<ObjectRecord>,
+    /// Missing for v1; v2 requires explicit exact authored order, including empty cells.
+    pub(crate) order_elements: Presence<Vec<OrderElement>>,
 }
 
 /// A paste: the identity of the document the clipboard was copied from, the target anchor (baseline
@@ -153,7 +154,33 @@ fn cell_matches(
                 && record.target.frame_scope.frame == frame
         })
         .collect();
-    current.len() == cell.records.len()
+    let order_same = match (&document.composition_order, &cell.order_elements) {
+        (Presence::Missing, Presence::Missing) => true,
+        (Presence::Present(plan), Presence::Present(want)) => {
+            let current: Vec<OrderElement> = plan
+                .contexts
+                .iter()
+                .filter(|context| context.context_id == CONTEXT)
+                .flat_map(|context| &context.scopes)
+                .filter(|scope| scope.frame_scope.frame == frame)
+                .flat_map(|scope| &scope.elements)
+                .filter(|element| element.layer_uid == layer.layer_uid)
+                .cloned()
+                .collect();
+            let moved: Vec<OrderElement> = want
+                .iter()
+                .cloned()
+                .map(|mut element| {
+                    element.layer_uid = layer.layer_uid.clone();
+                    element
+                })
+                .collect();
+            current == moved
+        }
+        _ => false,
+    };
+    order_same
+        && current.len() == cell.records.len()
         && current.iter().zip(&cell.records).all(|(have, want)| {
             let mut moved = want.clone();
             retarget(&mut moved, &layer.layer_uid, frame);
@@ -192,6 +219,46 @@ fn write_cell(
         retarget(&mut copy, &layer_uid, frame);
         next.objects.push(copy);
     }
+    if let (Presence::Present(plan), Presence::Present(elements)) =
+        (&mut next.composition_order, &cell.order_elements)
+    {
+        let context = plan
+            .contexts
+            .iter_mut()
+            .find(|context| context.context_id == CONTEXT)
+            .ok_or(DispatchErrorCode::Unavailable)?;
+        let index = match context
+            .scopes
+            .iter()
+            .position(|scope| scope.frame_scope.frame == frame)
+        {
+            Some(index) => index,
+            None => {
+                let index = context
+                    .scopes
+                    .iter()
+                    .position(|scope| scope.frame_scope.frame > frame)
+                    .unwrap_or(context.scopes.len());
+                context.scopes.insert(
+                    index,
+                    OrderScope {
+                        frame_scope: FrameScope {
+                            kind: FrameScopeKind::Authored,
+                            frame,
+                        },
+                        elements: Vec::new(),
+                    },
+                );
+                index
+            }
+        };
+        context.scopes[index]
+            .elements
+            .extend(elements.iter().cloned().map(|mut element| {
+                element.layer_uid = layer_uid.clone();
+                element
+            }));
+    }
     Ok(())
 }
 
@@ -203,7 +270,7 @@ pub(crate) fn paste_cells(
     anchor_frame: u32,
     cells: &[PasteCell],
 ) -> Result<DocumentEdit, DispatchErrorCode> {
-    if document.format_version != 1 {
+    if !matches!(document.format_version, 1 | 2) {
         return Err(DispatchErrorCode::Unavailable);
     }
     if cells.len() > MAX_PACKET_CELLS {
@@ -211,7 +278,26 @@ pub(crate) fn paste_cells(
     }
     let mut seen = HashSet::new();
     for cell in cells {
-        let well_formed = seen.insert((cell.rel_layer, cell.rel_frame))
+        let ordered = match (document.format_version, &cell.order_elements) {
+            (1, Presence::Missing) => true,
+            (2, Presence::Present(elements)) => {
+                let mut ids = HashSet::new();
+                let mut positions = HashSet::new();
+                elements.len() == cell.records.len()
+                    && elements.iter().all(|element| {
+                        ids.insert(element.stroke_id.as_str())
+                            && positions.insert(element.natural_position)
+                            && (element.natural_position as usize) < elements.len()
+                            && cell.records.iter().any(|record| {
+                                record.target.layer_uid == element.layer_uid
+                                    && record.target.stroke_id == element.stroke_id
+                            })
+                    })
+            }
+            _ => false,
+        };
+        let well_formed = ordered
+            && seen.insert((cell.rel_layer, cell.rel_frame))
             && cell.records.iter().all(scene_authored)
             && (cell.keyframe || cell.records.is_empty());
         if !well_formed {

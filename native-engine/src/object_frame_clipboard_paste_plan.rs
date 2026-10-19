@@ -16,7 +16,7 @@ use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
 use crate::commands::object_fill_owner::object_frame_clipboard_paste_wire::parse_clipboard_payload;
 use crate::commands::object_fill_owner::object_frame_edit_document::{clear_cells, DocumentEdit};
 use crate::commands::ObjectFillOwner;
-use crate::object_document::ObjectDocument;
+use crate::object_document::{ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 
@@ -31,6 +31,14 @@ pub(crate) fn packet_paste_cells(packet: &FrameClipboardPacket) -> Vec<PasteCell
             rel_frame: cell.rel_frame(),
             keyframe: cell.paste_is_keyframe(),
             records: cell.paste_records().to_vec(),
+            order_elements: match cell.order_elements() {
+                Presence::Present(elements) => Presence::Present(if cell.paste_is_keyframe() {
+                    elements.clone()
+                } else {
+                    Vec::new()
+                }),
+                Presence::Missing => Presence::Missing,
+            },
         })
         .collect()
 }
