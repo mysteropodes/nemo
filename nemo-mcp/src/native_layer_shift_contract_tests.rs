@@ -123,8 +123,9 @@ fn transport_validator() -> jsonschema::Validator {
             .add(id, jsonschema::Resource::from_contents(value))
             .unwrap();
     }
+    let registry = resources.prepare().unwrap();
     jsonschema::draft202012::options()
-        .with_registry(resources.prepare().unwrap())
+        .with_registry(&registry)
         .build(&transport)
         .unwrap()
 }
