@@ -48,11 +48,50 @@
         return !!(session&&(session.isActive()||typeof session.blocksLegacy==='function'&&session.blocksLegacy()));
       }catch(_){return true;}
     }
+    function sameCurrent(info){
+      var session=current();return !!session&&available(session,info)&&same(session.info(),info);
+    }
+    function captureClipboard(){
+      return {selection:root._sel,holder:root._sel&&root._sel.clipboard,op:root._sel&&root._sel.clipOp,
+        kind:root._lastClipKind,canvas:root._canvasClip,canvasSnaps:root._canvasClip&&root._canvasClip.snaps};
+    }
+    function clipboardUnchanged(token){
+      return !!token&&root._sel===token.selection&&root._sel.clipboard===token.holder&&root._sel.clipOp===token.op&&
+        root._lastClipKind===token.kind&&root._canvasClip===token.canvas&&(!root._canvasClip||root._canvasClip.snaps===token.canvasSnaps);
+    }
+    function readClipboard(){
+      var value=root._sel&&root._sel.clipboard;
+      return value&&!Array.isArray(value)&&Array.isArray(value.cells)?
+        {instanceId:value.instanceId,documentId:value.documentId,cells:JSON.parse(JSON.stringify(value.cells))}:null;
+    }
+    function selectCells(cells){
+      if(typeof root.selClear==='function')root.selClear();else root._sel.frames=[];
+      cells.forEach(function(cell){if(typeof root.selAdd==='function')root.selAdd(cell.layer,cell.frame);else root._sel.frames.push(cell);});
+      if(typeof root.selApplyCSS==='function')root.selApplyCSS();
+    }
+    function acceptClipboard(packet,kind,info){
+      if(!sameCurrent(info)||!root._sel||packet.instanceId!==info.instanceId||packet.documentId!==info.documentId)return false;
+      var value=JSON.parse(JSON.stringify(packet));
+      Object.defineProperty(value,'length',{value:value.cells.length,enumerable:false});
+      root._sel.clipboard=value;root._sel.clipOp=kind==='copyFrames'?'copy':'cut';root._lastClipKind='frames';
+      if(kind==='cutFrames')selectCells([]);
+      return true;
+    }
+    function acceptPaste(payload,info){
+      if(!sameCurrent(info)||!root._sel)return false;
+      var anchor=info.layers.findIndex(function(layer){return layer.layerUid===payload.layerUid;});
+      if(anchor<0)return false;
+      selectCells(payload.cells.map(function(cell){return {layer:anchor+cell.relLayer,frame:payload.frame+cell.relFrame};})
+        .filter(function(cell){return cell.layer<info.layers.length&&cell.frame<info.totalFrames;}));
+      return true;
+    }
     var intent=root.NemoNativeFrameEditIntent.create({currentSession:current,application:root.NemoNativeApplicationAdapter,
       frame:function(){return root.state&&root.state.currentFrame;},
       activeLayer:function(){return root.state&&root.state.activeLayerIdx;},
       layerSelection:function(){return root._layerSel;},
-      cellSelection:function(){return root._sel&&root._sel.frames;},available:available});
+      cellSelection:function(){return root._sel&&root._sel.frames;},available:available,
+      readClipboard:readClipboard,acceptClipboard:acceptClipboard,acceptPaste:acceptPaste,
+      captureClipboard:captureClipboard,clipboardUnchanged:clipboardUnchanged});
     function capture(){
       try{
         var session=current(),info=session&&session.info(),state=root.state;

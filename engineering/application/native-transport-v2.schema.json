@@ -4722,6 +4722,57 @@
             {
               "properties": {
                 "operation": {
+                  "const": "command.document.object.frames.clipboard.copy"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesClipboardCopyPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.clipboard.cut"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesClipboardCutPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.clipboard.paste"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesClipboardPastePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
                   "const": "command.document.object.frames.repeat"
                 },
                 "payload": {
@@ -6785,6 +6836,9 @@
             },
             {
               "$ref": "#/$defs/ObjectFrameRepeatResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectFrameClipboardCutResult"
             }
           ]
         },
@@ -8207,6 +8261,246 @@
         }
       ],
       "description": "Repeat-only immutable native preparation counts, retained after successful commit and on exact replay. Counts describe visited/skipped layers, not whether the document changed; all-component timeline growth can apply with zero cycled layers."
+    },
+    "ObjectFrameClipboardCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relLayer",
+        "relFrame",
+        "keyframe",
+        "records"
+      ],
+      "properties": {
+        "relLayer": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "relFrame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "keyframe": {
+          "type": "boolean"
+        },
+        "records": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "object"
+          }
+        },
+        "orderElements": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "description": "Bounded structural DTO shell only. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped."
+    },
+    "ObjectFrameClipboardPacket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "cells"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "documentId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "cells": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameClipboardCell"
+          }
+        }
+      }
+    },
+    "ObjectFramesClipboardCopyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "selection"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.clipboard.copy"
+        },
+        "selection": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameEditCell"
+          }
+        }
+      }
+    },
+    "ObjectFramesClipboardCutPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "selection"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.clipboard.cut"
+        },
+        "selection": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameEditCell"
+          }
+        }
+      }
+    },
+    "ObjectFramesClipboardPastePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "instanceId",
+        "documentId",
+        "layerUid",
+        "frame",
+        "cells"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.clipboard.paste"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "documentId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "cells": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameClipboardCell"
+          }
+        }
+      }
+    },
+    "ObjectFrameClipboardCopyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "clipboard"
+      ],
+      "properties": {
+        "applied": {
+          "const": false
+        },
+        "historyEntriesAdded": {
+          "const": 0
+        },
+        "clipboard": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectFrameClipboardPacket"
+            }
+          ]
+        }
+      },
+      "description": "Native retained clipboard result; null means no new packet and preserves the existing UI clipboard. Inner packet instance/document must match the actual invoking owner; complete correlated reply remains bounded to4096 encoded bytes."
+    },
+    "ObjectFrameClipboardCutResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "clipboard"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "clipboard": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectFrameClipboardPacket"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applied": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "clipboard": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "applied": {
+                "const": false
+              },
+              "historyEntriesAdded": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ],
+      "description": "Native retained clipboard result; null means no new packet and preserves the existing UI clipboard. Inner packet instance/document must match the actual invoking owner; complete correlated reply remains bounded to4096 encoded bytes."
     }
   }
 }

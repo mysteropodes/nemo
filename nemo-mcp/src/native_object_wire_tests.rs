@@ -483,3 +483,7 @@ fn repeat_wire_accepts_actual_catalog_counts_and_rejects_shape_revision_or_ident
 #[cfg(test)]
 #[path = "native_frame_edit_blank_wire_tests.rs"]
 mod blank_key;
+
+#[cfg(test)]
+#[path = "native_frame_clipboard_wire_tests.rs"]
+mod clipboard;

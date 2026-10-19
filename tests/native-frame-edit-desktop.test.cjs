@@ -35,7 +35,7 @@ function harness(options={}){
     if(options.beforeAck)options.beforeAck(root);
     if(options.refusal)return {apiVersion:2,requestId:q.requestId,instanceId:'instance',documentId:'document',
       contentRevision:revision,ok:false,error:{code:'stale_revision',message:'Stale frame edit'}};
-    const applied=options.noop!==true;
+    const applied=options.noop!==true&&q.operation!==P+'frames.clipboard.copy';
     if(applied){
       if(q.operation===P+'frames.insert'||q.operation===P+'frames.duplicate')total++;
       if(q.operation===P+'frames.extend')total+=q.payload.count;
@@ -45,6 +45,8 @@ function harness(options={}){
     const reply={apiVersion:2,requestId:q.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,
       ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
     if(q.operation===P+'frames.repeat')Object.assign(reply.result,{cycledLayers:2,skippedComponentLayers:0});
+    if(/frames\.clipboard\.(copy|cut)$/.test(q.operation))reply.result.clipboard=options.packet===null?null:
+      options.packet?structuredClone(options.packet):{instanceId:'instance',documentId:'document',cells:[{relLayer:0,relFrame:0,keyframe:true,records:[],orderElements:[]}]};
     if(options.badAck)reply.requestId='foreign-receipt';
     return reply;
   }
@@ -123,14 +125,14 @@ test('every mapped writer uses the actual signature and reaches exactly its expe
   }
 });
 
-test('clipboard packets and unsupported multi-cell moves consume without any legacy or native write',async()=>{
+test('unsupported multi-cell moves consume without any legacy or native write',async()=>{
   const h=harness();await h.open();
-  for(const name of ['copyFrames','cutFrames','pasteFrames','moveFrames','shiftLayerFrames']){
+  for(const name of ['moveFrames','shiftLayerFrames']){
     const route=h.controller.routeWriter('timeline',name,[[],1,1]);
     assert.equal(route.handled,true);assert.equal((await route.result).status,'unavailable');
   }
   assert.equal(h.commands().length,0);
-  assert.equal(h.notices.length,5);assert.ok(h.notices.every(message=>/unavailable/i.test(message)));
+  assert.equal(h.notices.length,2);assert.ok(h.notices.every(message=>/unavailable/i.test(message)));
   assert.equal(h.controller.routeWriter('timeline','notAWriter',[]),null);
   assert.equal(h.controller.routeWriter('global','moveKeyframe',[0,1,2]),null);
   assert.ok(Object.isFrozen(Desktop.writerNames('timeline')));
@@ -224,7 +226,7 @@ test('actual legacy desktop surface wraps the full writer list and routes before
   assert.deepEqual(h.commands().map(c=>c.q.payload),[
     {command:'object.layer.key.promote',layerUids:['alpha'],cells:[4]},
     {command:'object.frames.extend',cell:2,count:3}]);
-  for(const name of ['copyFrames','cutFrames','pasteFrames','moveFrames','shiftLayerFrames']){
+  for(const name of ['moveFrames','shiftLayerFrames']){
     assert.equal((await h.root.SM[name]([],1,1)).status,'unavailable',name);
   }
   assert.deepEqual([legacy,guards,admissions],[0,0,0]);
@@ -329,4 +331,72 @@ test('F7 pending, native refusal and malformed ACK consume without fallback or p
   assert.equal(h.commands().length,1);assert.equal(h.root.state.currentFrame,2);
   gate.resolve();assert.equal((await first.result).status,'applied-presented');
   assert.equal(h.session.info().contentRevision,1);assert.deepEqual(h.navigation,[]);
+});
+
+
+test('real Desktop/Intent/SDK/Project chain copies detached native data, cuts once, pastes at the active anchor and paints selection',async()=>{
+  const h=harness();await h.open();let paints=0;h.root.selApplyCSS=()=>paints++;
+  const original=[{legacy:true}];h.root._sel.clipboard=original;
+  const copy=await h.controller.routeWriter('timeline','copyFrames',[]).result;
+  assert.deepEqual({...copy},{status:'unchanged',applied:false});assert.equal(h.info().contentRevision,0);
+  assert.equal(h.commands()[0].q.operation,P+'frames.clipboard.copy');
+  assert.deepEqual(h.commands()[0].q.payload.selection,[{layerUid:'alpha',frame:1},{layerUid:'beta',frame:2}]);
+  const packet=h.root._sel.clipboard;assert.notEqual(packet,original);assert.equal(packet.length,1);
+  assert.deepEqual(Object.keys(packet),['instanceId','documentId','cells']);assert.equal(h.root._lastClipKind,'frames');
+  h.root.state.activeLayerIdx=0;
+  const pasted=await h.controller.routeWriter('timeline','pasteFrames',[]).result;
+  assert.equal(pasted.status,'applied-presented');assert.equal(h.info().contentRevision,1);
+  const paste=h.commands()[1].q.payload;assert.equal(paste.layerUid,'alpha');assert.equal(paste.frame,2);
+  assert.deepEqual(paste.cells,packet.cells);assert.deepEqual(h.root._sel.frames,[{layer:0,frame:2}]);assert.equal(paints,1);
+  const cut=await h.controller.routeWriter('timeline','cutFrames',[]).result;
+  assert.equal(cut.status,'applied-presented');assert.equal(h.info().contentRevision,2);
+  assert.deepEqual(h.root._sel.frames,[]);assert.equal(paints,2);assert.equal(h.root._sel.clipOp,'cut');assert.equal(h.commands().length,3);
+});
+test('null or refused clipboard ACK never replaces a prior clipboard, and missing selection never sends',async()=>{
+  for(const options of [{packet:null,noop:true},{refusal:true}]){
+    const h=harness(options);await h.open();const prior=[{old:true}];h.root._sel.clipboard=prior;
+    await h.controller.run({kind:'copyFrames'});assert.equal(h.root._sel.clipboard,prior);assert.equal(h.info().contentRevision,0);
+    h.root._sel.frames=[];const before=h.commands().length;
+    assert.equal((await h.controller.run({kind:'cutFrames'})).code,'frame_edit_selection_required');assert.equal(h.commands().length,before);
+  }
+});
+test('newer clipboard choice, changed selection or document replacement while ACK is pending prevents stale UI publication',async()=>{
+  for(const fault of ['frame-clipboard','canvas-clipboard','kind','selection','replacement']){
+    const h=harness();await h.open();const prior=[{old:true}];h.root._sel.clipboard=prior;h.root._canvasClip={snaps:[]};
+    const gate=h.hold(),pending=h.controller.run({kind:'copyFrames'});await turn();
+    let chosen=prior;
+    if(fault==='frame-clipboard'){chosen=[{new:true}];h.root._sel.clipboard=chosen;}
+    if(fault==='canvas-clipboard')h.root._canvasClip={snaps:[{new:true}]};
+    if(fault==='kind')h.root._lastClipKind='canvas';
+    if(fault==='selection')h.root._sel.frames=[{layer:1,frame:4}];
+    if(fault==='replacement')h.replace({});
+    gate.resolve();const result=await pending;assert.notEqual(result.status,'unchanged',fault);
+    assert.equal(h.root._sel.clipboard,chosen,fault);assert.equal(h.commands().length,1);assert.equal(h.info().contentRevision,0);
+  }
+});
+test('opaque data/blob record/order UIDs survive the actual SDK in both directions while raw payloads still refuse',async()=>{
+  const record=JSON.parse(fs.readFileSync('engineering/application/examples/native-object-v1/cases.json','utf8')).records[0];
+  record.target.layerUid='data:layer';record.target.strokeId='blob:stroke';
+  const packet={instanceId:'instance',documentId:'document',cells:[{relLayer:0,relFrame:0,keyframe:true,records:[record],
+    orderElements:[{layerUid:'data:layer',strokeId:'blob:stroke',naturalPosition:0,order:{}}]}]};
+  const h=harness({packet});await h.open();assert.equal((await h.controller.run({kind:'copyFrames'})).status,'unchanged');
+  assert.equal((await h.controller.run({kind:'pasteFrames'})).status,'applied-presented');
+  assert.equal(h.commands()[1].q.payload.cells[0].records[0].target.strokeId,'blob:stroke');
+  const SDK=require('../src/js/adapters/native-application.js');
+  const q=h.commands()[1].q;q.payload.cells[0].records[0].geometry.raw='data:image/png;base64,AA';
+  assert.throws(()=>SDK.validateRequest(q),TypeError);
+});
+test('forged clipboard source identity cannot publish or be pasted across a document replacement',async()=>{
+  const packet={instanceId:'foreign',documentId:'document',cells:[]};const h=harness({packet});await h.open();
+  const prior=[{old:true}];h.root._sel.clipboard=prior;
+  assert.notEqual((await h.controller.run({kind:'copyFrames'})).status,'unchanged');assert.equal(h.root._sel.clipboard,prior);
+  h.root._sel.clipboard=packet;const sent=h.commands().length;
+  assert.equal((await h.controller.run({kind:'pasteFrames'})).code,'frame_edit_stale_intent');assert.equal(h.commands().length,sent);
+});
+
+test('changed Cut with a null packet is unconfirmed and cannot replace the clipboard or clear selection',async()=>{
+  const h=harness({packet:null});await h.open();const prior=[{old:true}],selected=structuredClone(h.root._sel.frames);
+  h.root._sel.clipboard=prior;const result=await h.controller.run({kind:'cutFrames'});
+  assert.notEqual(result.status,'applied-presented');assert.equal(h.root._sel.clipboard,prior);
+  assert.deepEqual(h.root._sel.frames,selected);assert.equal(h.commands().length,1);
 });

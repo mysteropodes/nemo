@@ -47,6 +47,19 @@ fn examples() -> Vec<(&'static str, Value)> {
                 "selection":[{"layerUid":"layer-a","frame":2}]}),
         ),
         (
+            CLIPBOARD_COPY,
+            json!({"command":"object.frames.clipboard.copy","selection":[]}),
+        ),
+        (
+            CLIPBOARD_CUT,
+            json!({"command":"object.frames.clipboard.cut","selection":[{"layerUid":"layer-a","frame":2}]}),
+        ),
+        (
+            CLIPBOARD_PASTE,
+            json!({"command":"object.frames.clipboard.paste","instanceId":"instance","documentId":"document",
+            "layerUid":"layer-a","frame":3,"cells":[{"relLayer":0,"relFrame":0,"keyframe":true,"records":[],"orderElements":[]}]}),
+        ),
+        (
             REPEAT,
             json!({"command":"object.frames.repeat","fromLayerUid":"layer-a","toLayerUid":"layer-b",
                 "fromFrame":2,"toFrame":3,"times":2}),
@@ -202,16 +215,21 @@ fn a_data_prefixed_layer_uid_is_an_opaque_name() {
 }
 
 #[test]
-fn clipboard_cut_copy_and_paste_are_not_declared() {
+fn clipboard_copy_cut_and_paste_are_declared_without_legacy_aliases() {
+    assert_eq!(OPERATIONS.len(), 15);
+    for (operation, payload) in examples().into_iter().filter(|(operation, _)| {
+        [CLIPBOARD_COPY, CLIPBOARD_CUT, CLIPBOARD_PASTE].contains(operation)
+    }) {
+        assert!(declares(operation));
+        assert!(envelope(operation, payload).validate_input().is_ok());
+    }
     for operation in [
-        "command.document.object.frames.clipboard.paste",
-        "command.document.object.frames.clipboard.cut",
-        "command.document.object.frames.clipboard.copy",
+        "command.document.object.frames.copy",
+        "command.document.object.frames.cut",
+        "command.document.object.frames.paste",
     ] {
         assert!(!declares(operation));
-        let payload =
-            json!({"command":"object.frames.clipboard.paste","layerUid":"a","frame":0,"cells":[]});
-        assert!(envelope(operation, payload).validate_input().is_err());
+        assert!(envelope(operation, json!({})).validate_input().is_err());
     }
 }
 
@@ -262,7 +280,7 @@ fn actual_catalog_repeat_result_and_other_receipts_remain_operation_closed() {
         let repeat = json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":1,"skippedComponentLayers":0});
         assert_eq!(
             result_for_operation(&request.operation, &compact),
-            request.operation != REPEAT
+            ![REPEAT, CLIPBOARD_COPY, CLIPBOARD_CUT].contains(&request.operation.as_str())
         );
         assert_eq!(
             result_for_operation(&request.operation, &repeat),
@@ -428,3 +446,7 @@ fn blank_key_success_requires_one_checkpoint_and_revision_even_if_already_blank(
         &json!({"applied":false,"historyEntriesAdded":0})
     ));
 }
+
+#[cfg(test)]
+#[path = "native_frame_clipboard_contract_tests.rs"]
+mod clipboard;

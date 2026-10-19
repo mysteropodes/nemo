@@ -15,18 +15,18 @@ const schema = read('engineering/application/native-transport-v2.schema.json');
 const P = 'command.document.object.';
 const OPS = Contract.OPERATIONS;
 const request = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'frame-edit-7', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
-const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : {}) });
+const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(q.operation) ? { clipboard: {instanceId:q.instanceId,documentId:q.documentId,cells:[]} } : {}) });
 const OPTIONAL = { 'object.frames.insert': ['layerUids'], 'object.layer.key.promote': ['layerUids'] };
 
-test('the descriptor, the schema and the contract declare the same twelve operations', () => {
-  assert.equal(OPS.length, 12);
+test('the descriptor, the schema and the contract declare the same fifteen operations', () => {
+  assert.equal(OPS.length, 15);
   assert.deepEqual(descriptor.operations, OPS);
   assert.equal(descriptor.id, 'native.frame-edit');
   assert.equal(descriptor.availability.state, 'available');
   assert.equal(descriptor.authority.adapterOwnsWritableMirror, false);
   assert.equal(descriptor.authority.fallback, 'none');
   assert.equal(descriptor.resourceBoundary.maxRequestBytes, 4096);
-  assert.equal(descriptor.input.oneOf.length, 12);
+  assert.equal(descriptor.input.oneOf.length, 15);
   assert.deepEqual(descriptor.examples.map((e) => e.request.operation), OPS);
   for (const op of OPS) {
     const sample = Contract.example(op), command = Contract.commandOf(op);
@@ -42,7 +42,7 @@ test('the descriptor, the schema and the contract declare the same twelve operat
     assert.deepEqual(Object.keys(def.properties).sort(), Object.keys(sample).concat(optional.filter((k) => !(k in sample))).sort(), op);
   }
   assert.equal(schema.$defs.ObjectFramesExtendPayload.properties.count.maximum, 999);
-  for (const op of ['command.document.object.frames.clipboard.paste', 'command.document.object.frames.clipboard.cut']) {
+  for (const op of ['command.document.object.frames.clipboard.unknown', 'command.document.object.frames.clipboard.move']) {
     assert.equal(descriptor.operations.includes(op), false);
     assert.equal(schema.$defs.Request.oneOf.some((b) => b.allOf[1].properties.operation.const === op), false);
   }
@@ -126,8 +126,8 @@ test('a request over the 4096-byte message bound is refused before transport', (
   assert.doesNotThrow(() => SDK.validateRequest(request(P + 'layer.key.clear_cells', { command: 'object.layer.key.clear_cells', targets: targets.slice(0, 20) })));
 });
 
-test('clipboard packets and unsupported blank-key aliases are not admitted', () => {
-  for (const op of [P + 'frames.clipboard.paste', P + 'frames.clipboard.cut', P + 'frames.clipboard.copy', P + 'layer.key.insert_blank', P + 'frames.insert_blank']) {
+test('unsupported clipboard and blank-key aliases are not admitted', () => {
+  for (const op of [P + 'frames.clipboard.unknown', P + 'layer.key.insert_blank', P + 'frames.insert_blank']) {
     assert.equal(Contract.admitted(op), false);
     assert.throws(() => SDK.validateRequest(request(op, { command: 'object.frames.clipboard.paste' })), /not admitted/);
   }
@@ -136,16 +136,16 @@ test('clipboard packets and unsupported blank-key aliases are not admitted', () 
 test('receipts must carry exactly one revision per applied change and the same owner', async () => {
   for (const op of OPS) {
     const q = request(op, Contract.example(op));
-    for (const applied of op === P + 'layer.key.blank' ? [true] : [true, false]) {
+    for (const applied of op === P + 'layer.key.blank' ? [true] : op === P + 'frames.clipboard.copy' ? [false] : [true, false]) {
       const adapter = SDK.createNativeApplicationAdapter('frame-edit-test', { dispatch() { return reply(q, applied); } });
       assert.deepEqual(await adapter.dispatch(q), reply(q, applied));
     }
     const wrong = [
-      (r) => { r.contentRevision = 7; }, (r) => { r.contentRevision = 9; }, (r) => { r.result.applied = false; }, (r) => { r.result.historyEntriesAdded = 0; },
+      (r) => { r.contentRevision -= 1; }, (r) => { r.contentRevision += 1; }, (r) => { r.result.applied = !r.result.applied; }, (r) => { r.result.historyEntriesAdded = 1-r.result.historyEntriesAdded; },
       (r) => { r.result.extra = 1; }, (r) => { r.instanceId = 'foreign'; }, (r) => { r.documentId = 'foreign'; }, (r) => { r.requestId = 'foreign'; }, (r) => { delete r.result; }
     ];
     for (const mutate of wrong) {
-      const adapter = SDK.createNativeApplicationAdapter('frame-edit-test', { dispatch() { const r = reply(q, true); mutate(r); return r; } });
+      const adapter = SDK.createNativeApplicationAdapter('frame-edit-test', { dispatch() { const r = reply(q, op !== P + 'frames.clipboard.copy'); mutate(r); return r; } });
       await assert.rejects(adapter.dispatch(q), op);
     }
     const stale = { apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: 8, ok: false, error: { code: 'stale_revision', message: 'Stale frame edit' } };
@@ -163,7 +163,7 @@ test('join keeps the font declarations and refuses everything it was not given',
   assert.equal(joined.admitted(fontOp), true); assert.equal(joined.requiresRevision(fontOp), Font.requiresRevision(fontOp));
   assert.deepEqual(joined.paths(fontOp), Font.paths(fontOp));
   for (const op of OPS) { assert.equal(joined.admitted(op), true); assert.equal(joined.requiresRevision(op), true); assert.equal(joined.paths(op).has('payload.layerUid'), true); }
-  for (const op of ['query.document.object', P + 'layer.policy.edit', P + 'frames.clipboard.paste']) {
+  for (const op of ['query.document.object', P + 'layer.policy.edit', P + 'frames.clipboard.unknown']) {
     assert.equal(joined.admitted(op), false); assert.equal(joined.requiresRevision(op), false);
   }
   const alone = Contract.join(null);
@@ -228,4 +228,33 @@ test('F7 success always checkpoints once, including an already blank key; no-op 
   await assert.rejects(adapter(extra).dispatch(q));
   assert.throws(() => SDK.validateRequest(request(op, { command: 'object.layer.key.blank', layerUid: 'active', cell: 2, layerUids: ['other'] })), TypeError);
   assert.throws(() => SDK.validateRequest(request(op, { command: 'object.layer.key.blank', layerUid: 'x'.repeat(4096), cell: 2 })), /4096/);
+});
+
+
+test('clipboard shells preserve native ownership, records/order presence and every fixed message bound', async () => {
+  for(const kind of ['copy','cut']){
+    const op=P+'frames.clipboard.'+kind,q=request(op,Contract.example(op));
+    assert.doesNotThrow(()=>SDK.validateRequest(request(op,{command:'object.frames.clipboard.'+kind,selection:[]})));
+    for(const selection of [null,[{layerUid:'a',frame:0},{layerUid:'a',frame:0}],[{layerUid:'a',frame:0,extra:1}]])
+      assert.throws(()=>SDK.validateRequest(request(op,{command:'object.frames.clipboard.'+kind,selection})),TypeError);
+    for(const fault of ['inner-instance','inner-document','extra-packet','missing-packet','bad-offset','bad-records','bad-order','overflow']){
+      const value=reply(q,kind==='cut');value.result.clipboard.cells=[{relLayer:0,relFrame:0,keyframe:true,records:[],orderElements:[]}];
+      if(fault==='inner-instance')value.result.clipboard.instanceId='foreign';
+      if(fault==='inner-document')value.result.clipboard.documentId='foreign';
+      if(fault==='extra-packet')value.result.clipboard.extra=1;
+      if(fault==='missing-packet')delete value.result.clipboard;
+      if(fault==='bad-offset')value.result.clipboard.cells[0].relLayer=-1;
+      if(fault==='bad-records')value.result.clipboard.cells[0].records=null;
+      if(fault==='bad-order')value.result.clipboard.cells[0].orderElements=null;
+      if(fault==='overflow')value.result.clipboard.cells[0].records=[{large:'x'.repeat(5000)}];
+      const adapter=SDK.createNativeApplicationAdapter('clipboard',{dispatch:()=>value});
+      await assert.rejects(adapter.dispatch(q),fault);
+    }
+    const empty=reply(q,false);empty.result.clipboard=null;
+    assert.deepEqual(await SDK.createNativeApplicationAdapter('clipboard',{dispatch:()=>empty}).dispatch(q),empty);
+  }
+  const op=P+'frames.clipboard.paste';
+  assert.doesNotThrow(()=>SDK.validateRequest(request(op,Contract.example(op))));
+  const invalid=Contract.example(op);invalid.cells[0].extra=1;
+  assert.throws(()=>SDK.validateRequest(request(op,invalid)),TypeError);
 });

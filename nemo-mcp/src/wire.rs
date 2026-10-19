@@ -345,6 +345,13 @@ fn validate_native_response(
                         response.content_revision,
                         result,
                     ))
+                && (!frame_edit_command
+                    || crate::native_contract::frame_edit::clipboard_identity_matches(
+                        &request.operation,
+                        &request.instance_id,
+                        &request.document_id,
+                        result,
+                    ))
                 && crate::native_contract::font::response_matches(request, response)
                 && crate::native_contract::object_edit::response_matches(request, response)
                 && crate::native_contract::object_rig::response_matches(request, response)

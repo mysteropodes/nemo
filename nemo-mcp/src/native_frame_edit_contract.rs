@@ -1,7 +1,6 @@
-//! L05-K public contract of the native frame-edit operations (F09-F13): closed request shapes and the one compact
-//! result, with Repeat-only cycle/skip counts. Storage, history, locks and receipts stay in the native owner; every shape mirrors the strict payload
-//! parser of the owner of that operation (structure, key, retime, selection duplicate, repeat). F7 always publishes one checkpoint. Cut, copy and paste
-//! have no declaration here: a clipboard packet is produced by the typed native API only.
+//! Public native frame-edit contract: closed input and operation-aware result DTOs.
+//! The native owner retains documents, history, locks and receipts. Clipboard checks here validate
+//! bounded DTO containers; native strict decoding validates the full record/order grammar atomically.
 use crate::native_contract::{exact, frame, object};
 use serde_json::{Map, Value};
 use std::collections::HashSet;
@@ -18,7 +17,10 @@ pub(crate) const TWEEN_REMOVE: &str = "command.document.object.layer.tween.remov
 pub(crate) const KEY_MOVE: &str = "command.document.object.layer.key.move";
 pub(crate) const SELECTION_DUPLICATE: &str = "command.document.object.frames.clipboard.duplicate";
 pub(crate) const REPEAT: &str = "command.document.object.frames.repeat";
-const OPERATIONS: [&str; 12] = [
+pub(crate) const CLIPBOARD_COPY: &str = "command.document.object.frames.clipboard.copy";
+pub(crate) const CLIPBOARD_CUT: &str = "command.document.object.frames.clipboard.cut";
+pub(crate) const CLIPBOARD_PASTE: &str = "command.document.object.frames.clipboard.paste";
+const OPERATIONS: [&str; 15] = [
     INSERT,
     EXTEND,
     DUPLICATE,
@@ -30,6 +32,9 @@ const OPERATIONS: [&str; 12] = [
     TWEEN_REMOVE,
     KEY_MOVE,
     SELECTION_DUPLICATE,
+    CLIPBOARD_COPY,
+    CLIPBOARD_CUT,
+    CLIPBOARD_PASTE,
     REPEAT,
 ];
 const MAX_LIST: usize = 4096;
@@ -86,6 +91,77 @@ fn unique_cells(value: Option<&Value>) -> bool {
             })
     })
 }
+// This is the bounded DTO shell. Native decoding validates full records/order and their relationships.
+fn object_list(value: Option<&Value>) -> bool {
+    value
+        .and_then(Value::as_array)
+        .is_some_and(|items| items.len() <= MAX_LIST && items.iter().all(Value::is_object))
+}
+fn clipboard_cells(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_array).is_some_and(|cells| {
+        cells.len() <= MAX_LIST
+            && cells.iter().all(|cell| {
+                exact(
+                    cell,
+                    &["relLayer", "relFrame", "keyframe", "records"],
+                    &["orderElements"],
+                )
+                .is_some_and(|cell| {
+                    frame(cell.get("relLayer")).is_some()
+                        && frame(cell.get("relFrame")).is_some()
+                        && cell.get("keyframe").is_some_and(Value::is_boolean)
+                        && object_list(cell.get("records"))
+                        && cell
+                            .get("orderElements")
+                            .is_none_or(|v| object_list(Some(v)))
+                })
+            })
+    })
+}
+fn clipboard_selection(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_array).is_some_and(Vec::is_empty) || unique_cells(value)
+}
+fn clipboard_packet(value: &Value) -> bool {
+    exact(value, &["instanceId", "documentId", "cells"], &[]).is_some_and(|packet| {
+        name(packet.get("instanceId"))
+            && name(packet.get("documentId"))
+            && clipboard_cells(packet.get("cells"))
+    })
+}
+fn clipboard_result(operation: &str, value: &Value) -> bool {
+    exact(value, &["applied", "historyEntriesAdded", "clipboard"], &[]).is_some_and(|value| {
+        let publication = (
+            value.get("applied").and_then(Value::as_bool),
+            value.get("historyEntriesAdded").and_then(Value::as_u64),
+        );
+        (matches!(publication, (Some(false), Some(0)))
+            || (operation == CLIPBOARD_CUT && matches!(publication, (Some(true), Some(1)))))
+            && value.get("clipboard").is_some_and(|packet| {
+                if packet.is_null() {
+                    publication == (Some(false), Some(0))
+                } else {
+                    clipboard_packet(packet)
+                }
+            })
+    })
+}
+/// The response header and detached packet both belong to the actual invoking owner.
+pub(crate) fn clipboard_identity_matches(
+    operation: &str,
+    instance_id: &str,
+    document_id: &str,
+    value: &Value,
+) -> bool {
+    if !matches!(operation, CLIPBOARD_COPY | CLIPBOARD_CUT) {
+        return true;
+    }
+    clipboard_result(operation, value)
+        && value.get("clipboard").is_some_and(|packet| {
+            packet.is_null()
+                || (packet.get("instanceId").and_then(Value::as_str) == Some(instance_id)
+                    && packet.get("documentId").and_then(Value::as_str) == Some(document_id))
+        })
+}
 fn span(map: &Map<String, Value>) -> bool {
     name(map.get("layerUid")) && frame(map.get("from")).is_some() && frame(map.get("to")).is_some()
 }
@@ -140,6 +216,36 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                     && name(p.get("layerUid"))
                     && unique_cells(p.get("selection"))
             }),
+        CLIPBOARD_COPY | CLIPBOARD_CUT => {
+            exact(value, &["command", "selection"], &[]).is_some_and(|p| {
+                let command = if operation == CLIPBOARD_COPY {
+                    "object.frames.clipboard.copy"
+                } else {
+                    "object.frames.clipboard.cut"
+                };
+                command_is(p, command) && clipboard_selection(p.get("selection"))
+            })
+        }
+        CLIPBOARD_PASTE => exact(
+            value,
+            &[
+                "command",
+                "instanceId",
+                "documentId",
+                "layerUid",
+                "frame",
+                "cells",
+            ],
+            &[],
+        )
+        .is_some_and(|p| {
+            command_is(p, "object.frames.clipboard.paste")
+                && name(p.get("instanceId"))
+                && name(p.get("documentId"))
+                && name(p.get("layerUid"))
+                && frame(p.get("frame")).is_some()
+                && clipboard_cells(p.get("cells"))
+        }),
         REPEAT => exact(
             value,
             &[
@@ -170,6 +276,9 @@ pub(super) fn result(value: &Value) -> bool {
 }
 /// Repeat alone exposes native cycle/skip counts; no other operation accepts them.
 pub(crate) fn result_for_operation(operation: &str, value: &Value) -> bool {
+    if matches!(operation, CLIPBOARD_COPY | CLIPBOARD_CUT) {
+        return clipboard_result(operation, value);
+    }
     if operation == KEY_BLANK {
         return result(value) && value["applied"] == true;
     }

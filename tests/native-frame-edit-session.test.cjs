@@ -31,9 +31,9 @@ function scenario(o) {
     assert.equal(r.instanceId, 'frame-instance'); assert.equal(r.documentId, 'frame-document'); assert.equal(r.expectedRevision, revision);
     const base = { apiVersion: 2, requestId: r.requestId, instanceId: r.instanceId, documentId: r.documentId };
     if (failure === 'stale') return Object.assign(base, { contentRevision: revision, ok: false, error: { code: 'stale_revision', message: 'Stale frame edit' } });
-    const applied = failure !== 'noop';
+    const applied = failure !== 'noop' && r.operation !== P + 'frames.clipboard.copy';
     if (applied) { total = lengthAfter(r.operation, r.payload); revision += 1; }
-    return Object.assign(base, { contentRevision: revision, ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, r.operation === P + 'frames.repeat' ? { cycledLayers: 3, skippedComponentLayers: 0 } : {}) });
+    return Object.assign(base, { contentRevision: revision, ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, r.operation === P + 'frames.repeat' ? { cycledLayers: 3, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(r.operation) ? {clipboard:{instanceId:r.instanceId,documentId:r.documentId,cells:[]}} : {}) });
   }
   const ports = {
     invoke, frame: () => ui.frame, projectionReady: () => true, publishRevision: () => true,
@@ -79,7 +79,8 @@ test('every declared operation reaches the host with exactly the contract payloa
     assert.equal(out.ok, true, op);
     const { r } = h.commands().at(-1);
     assert.equal(r.operation, op); assert.deepEqual(r.payload, Contract.example(op)); assert.equal(r.expectedRevision, before.contentRevision);
-    assert.equal(h.session.info().contentRevision, before.contentRevision + 1, op);
+    assert.equal(h.session.info().contentRevision, before.contentRevision + (out.result.applied ? 1 : 0), op);
+    if(op===P+'frames.clipboard.copy')assert.deepEqual(out.result,{applied:false,historyEntriesAdded:0,clipboard:{instanceId:before.instanceId,documentId:before.documentId,cells:[]}});
   }
   assert.equal(h.commands().length, OPS.length);
 });
