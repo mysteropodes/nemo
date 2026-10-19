@@ -147,5 +147,5 @@ fn trim_number_equivalence_preserves_spelling_without_collapsing_large_exact_int
     let equal =
         AudioTrackEdit::parse(br#"{"kind":"setTrim","audioId":"track-a","trimStart":0}"#).unwrap();
     assert!(apply(&authored, equal).unwrap().is_none());
-    assert_eq!(serde_json::to_vec(authored).unwrap(), raw);
+    assert_eq!(serde_json::to_vec(&authored).unwrap(), raw);
 }
