@@ -378,7 +378,7 @@ fn skipped_component_and_unselected_motion_and_order_tracks_remain_exact() {
 
 #[test]
 fn typed_repeat_outcome_distinguishes_real_cycles_from_component_only_growth() {
-    use crate::history::object_history::NativeObjectHistory;
+    use crate::history::NativeObjectHistory;
     use crate::object_codec::encode_storage_project;
     for (from, to, cycled, skipped) in [(0, 1, 1, 1), (1, 1, 0, 1)] {
         let input = with_component(doc("K=a.1.10;.;.|.;.;.", Build::V2));
