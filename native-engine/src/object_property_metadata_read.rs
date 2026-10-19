@@ -354,12 +354,16 @@ impl ObjectSnapshot {
                 // cursor. Vertex discovery is an explicit compatible opt-in.
                 let vertices = if include_vertices {
                     PropertyHolder::vertex_count(self.document(), &target).unwrap_or(0)
-                } else { 0 };
+                } else {
+                    0
+                };
                 let extra: Vec<_> = holder
                     .properties()
                     .iter()
                     .filter_map(|p| {
-                        if !include_vertices { return None; }
+                        if !include_vertices {
+                            return None;
+                        }
                         let i = PropertyHolder::vertex_index(p.property())?;
                         (i >= vertices || p.property() != format!("vtx{i}")).then_some(p.property())
                     })
