@@ -36,7 +36,9 @@ const _layer = function(ref) {
  for (const p of ['name','index','hasParent']) out[p] = info[p];
  for (const p of ['position','anchor','rotation','scale','opacity']) {
   const v = _sample(uid,p,frame);
-  if (Array.isArray(v)) v.at = function(f) { return _sample(uid,p,_num(f)); };
+  if (Array.isArray(v)) Object.defineProperty(v,'at',{
+   value:function(f) { return _sample(uid,p,_num(f)); },writable:true,configurable:true
+  });
   out[p] = v;
  }
  out.at = function(p,f) { return _sample(uid,String(p),_num(f)); };
