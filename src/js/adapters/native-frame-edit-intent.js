@@ -26,8 +26,8 @@
   var FIELDS = {
     insertFrame: [], insertKey: [], insertKeyAt: ['layer', 'frame'], convertToKeyframes: [], insertBlankKey: [],
     duplicateKey: [], extendExposure: ['count'], clearKey: [], deleteFrames: [], removeTween: ['layer', 'from', 'to'],
-    removeFrame: [], removeFrameSpan: [], moveKey: ['layer', 'from', 'to'], duplicateSelection: [], repeatSelection: ['times'],
-    copyFrames: [], cutFrames: [], pasteFrames: []
+    removeFrame: [], removeFrameSpan: [], moveFrames: ['selection', 'layer', 'frame'], moveKey: ['layer', 'from', 'to'], duplicateSelection: [], repeatSelection: ['times'],
+    copyFrames: [], cutFrames: [], pasteFrames: [], rangeDrag: ['gesture','capture']
   };
   var OPTIONAL = { extendExposure: ['count'] };
 
@@ -46,7 +46,16 @@
     var keys = Object.keys(value).filter(function (key) { return key !== 'kind'; });
     if (keys.some(function (key) { return fields.indexOf(key) < 0; }) ||
         fields.some(function (key) { return optional.indexOf(key) < 0 && !Object.prototype.hasOwnProperty.call(value, key); })) return null;
-    return Object.freeze(Object.assign({}, value));
+    var out = Object.assign({}, value);
+    if (value.kind === 'moveFrames') {
+      if (!Array.isArray(value.selection) || value.selection.length > 4096 || !value.selection.every(function (cell) {
+        return cell && typeof cell === 'object' && !Array.isArray(cell) && Object.keys(cell).length === 2 &&
+          Object.prototype.hasOwnProperty.call(cell, 'layer') && Object.prototype.hasOwnProperty.call(cell, 'frame');
+      })) return null;
+      out.selection = Object.freeze(value.selection.map(function (cell) { return Object.freeze({ layer: cell.layer, frame: cell.frame }); }));
+    }
+    if(value.kind==='rangeDrag')out.gesture=JSON.parse(JSON.stringify(value.gesture));
+    return Object.freeze(out);
   }
 
   // The editor state read once per run, validated against the pinned info: indices into info.layers, frames inside the timeline.
@@ -96,6 +105,10 @@
         instanceId: clipboard.instanceId, documentId: clipboard.documentId, layerUid: uid(state.active), frame: state.frame, cells: clipboard.cells } };
     }
     switch (intent.kind) {
+      case 'rangeDrag':
+        if(!intent.gesture||intent.gesture.frame!==state.frame||intent.gesture.activeLayerUid!==uid(state.active)||intent.gesture.contextId!=='scene-root'||
+           info.layers.every(function(l){return l.layerUid!==intent.gesture.layerUid;}))return {code:CODES.stale};
+        return {op:P+'layer.range.drag',payload:intent.gesture};
       case 'insertBlankKey': return { op: P + 'layer.key.blank', payload: { command: 'object.layer.key.blank', layerUid: uid(state.active), cell: state.frame } };
       case 'insertFrame': return { op: P + 'frames.insert', payload: selected('object.frames.insert', { cell: state.frame }) };
       case 'insertKey': return { op: P + 'layer.key.promote', payload: selected('object.layer.key.promote', { cells: [state.frame] }) };
@@ -124,6 +137,10 @@
         // No selection falls back to the single current frame, as the baseline does.
         var span = state.cells.length ? bounds(state.cells) : { minF: state.frame, maxF: state.frame };
         return { op: P + 'frames.remove', payload: { command: 'object.frames.remove', from: span.minF, to: span.maxF } };
+      case 'moveFrames':
+        if (!whole(intent.layer, 0, info.layers.length - 1) || !whole(intent.frame, 0, 4294967295)) return { code: CODES.invalid };
+        if (JSON.stringify(intent.selection) !== JSON.stringify(state.cells)) return { code: CODES.stale };
+        return { op: P + 'frames.move', payload: { command: 'object.frames.move', selection: cellRefs(), layerUid: uid(intent.layer), frame: intent.frame } };
       case 'moveKey':
         if (!whole(intent.layer, 0, info.layers.length - 1) || !whole(intent.from, 0, info.totalFrames - 1) || !whole(intent.to, 0, info.totalFrames - 1)) return { code: CODES.invalid };
         return { op: P + 'layer.key.move', payload: { command: 'object.layer.key.move', layerUid: uid(intent.layer), activeLayerUid: uid(state.active), from: intent.from, to: intent.to } };
@@ -188,11 +205,13 @@
         if (PACKET[intent.kind] && (typeof ports.captureClipboard !== 'function' || typeof ports.clipboardUnchanged !== 'function')) return unavailable(CODES.packet);
         if (PACKET[intent.kind] && (intent.kind === 'pasteFrames' ? typeof ports.readClipboard !== 'function' || typeof ports.acceptPaste !== 'function' :
             typeof ports.acceptClipboard !== 'function')) return unavailable(CODES.packet);
+        if (intent.kind === 'moveFrames' && typeof ports.acceptMove !== 'function') return unavailable(CODES.session);
         session = ports.currentSession(); before = session && session.info();
         if (!session || !before || !Array.isArray(before.layers) || !whole(before.totalFrames, 1, 4294967295) ||
             ports.available(session, before) !== true || typeof session.readPresentedObjectSession !== 'function') return unavailable(CODES.session);
         state = readState(ports, before);
         if (!state) return unavailable(CODES.invalid);
+        if(intent.kind==='rangeDrag'&&(typeof ports.rangeCurrent!=='function'||ports.rangeCurrent(intent.capture,before,false)!==true))return unavailable(CODES.stale);
         clipboardToken = PACKET[intent.kind] ? ports.captureClipboard() : null;
         step = plan(intent, state, before, intent.kind === 'pasteFrames' ? ports.readClipboard() : null);
         if (step.code) return unavailable(step.code);
@@ -207,11 +226,11 @@
       pending = true;
       var applied = null, frame = state.frame, layers = before.layers.map(function (row) { return row.layerUid; });
       try {
-        var receipt = await write.call(session, step.op, step.payload, before), result = receipt && receipt.result;
+        var receipt = await write.call(session, step.op, step.payload, before, intent.kind==='rangeDrag'?function(){return ports.rangeCurrent(intent.capture,before,false,true)===true;}:undefined), result = receipt && receipt.result;
         try { Contract.result(step.op, result); } catch (_) { return Object.freeze({ status: 'unconfirmed' }); }
         if (!receipt || receipt.apiVersion !== 2 || receipt.ok !== true || receipt.instanceId !== before.instanceId || receipt.documentId !== before.documentId ||
             !result || typeof result.applied !== 'boolean' || result.historyEntriesAdded !== (result.applied ? 1 : 0) ||
-            (step.op === P + 'layer.key.blank' && result.applied !== true) ||
+            ([P+'layer.key.blank',P+'layer.range.drag'].includes(step.op) && result.applied !== true) ||
             receipt.contentRevision !== before.contentRevision + (result.applied ? 1 : 0)) return Object.freeze({ status: 'unconfirmed' });
         applied = result.applied;
         if (retired || ports.currentSession() !== session) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
@@ -224,6 +243,11 @@
             (length === null ? !(after.totalFrames >= before.totalFrames) : after.totalFrames !== length) || ports.available(session, after) !== true ||
             !whole(playhead, 0, after.totalFrames - 1) || !presented(session, after, playhead)) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
         var out = { status: applied ? 'applied-presented' : 'unchanged', applied: applied }, hint = applied ? playheadHint(step.op, frame, after.totalFrames) : null;
+        if(intent.kind==='rangeDrag'){
+          var shiftedState=readState(ports,after);
+          if(!shiftedState||shiftedState.frame!==state.frame||shiftedState.active!==state.active||!sameList(shiftedState.layers,state.layers)||
+             JSON.stringify(shiftedState.cells)!==JSON.stringify(state.cells)||ports.rangeCurrent(intent.capture,after,true)!==true)return Object.freeze({status:'applied-unconfirmed',applied:applied});
+        }
         if (PACKET[intent.kind]) {
           var current = readState(ports, after);
           if (ports.clipboardUnchanged(clipboardToken) !== true || !current || current.frame !== state.frame || current.active !== state.active || !sameList(current.layers, state.layers) ||
@@ -234,6 +258,13 @@
             if (result.clipboard.instanceId !== before.instanceId || result.clipboard.documentId !== before.documentId ||
                 ports.acceptClipboard(result.clipboard, intent.kind, after) !== true) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
           }
+        }
+        if (step.op === P + 'frames.move' && result.selection !== null) {
+          var movedState = readState(ports, after);
+          if (!movedState || movedState.frame !== state.frame || movedState.active !== state.active || !sameList(movedState.layers, state.layers) ||
+              JSON.stringify(movedState.cells) !== JSON.stringify(state.cells) || result.selection.some(function (cell) {
+                return layers.indexOf(cell.layerUid) < 0 || cell.frame >= after.totalFrames;
+              }) || ports.acceptMove(result.selection, after) !== true) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
         }
         if (step.op === P + 'frames.repeat') {
           out.cycledLayers = result.cycledLayers; out.skippedComponentLayers = result.skippedComponentLayers;

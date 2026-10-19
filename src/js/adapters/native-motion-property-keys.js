@@ -12,7 +12,8 @@
   function freeze(v){if(object(v)||Array.isArray(v)){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
   function targetKey(t){return JSON.stringify([t.contextId,t.layerUid,Object.prototype.hasOwnProperty.call(t,'strokeId'),t.strokeId]);}
   function authoredKey(v,dimension){
-    if(!exact(v,['frame','v'],['hold','curvePoints','hIn','hOut'])||!Number.isFinite(v.frame)||!vector(v.v,dimension))return false;
+    if(!exact(v,['frame','v'],['hold','curvePoints','hIn','hOut','lockTo'])||!Number.isFinite(v.frame)||!vector(v.v,dimension))return false;
+    if('lockTo'in v&&v.lockTo!==null&&!['in','out','layer'].includes(v.lockTo))return false;
     if('hold'in v&&typeof v.hold!=='boolean')return false;
     if(['hIn','hOut'].some(function(k){return k in v&&!vector(v[k],2);}))return false;
     if('curvePoints'in v&&v.curvePoints!==null){
@@ -120,9 +121,23 @@
         accepted=value;render(value,ticket);return true;
       }catch(error){if(ticket!==serial||retired)return false;return refuse('Native key read refused: '+String(error&&error.message||error));}
     }
+    function captureSelectedKeys(){
+      try{
+        if(retired||busy||!mounted())return null;
+        var context=ports.readContext(),token=View.captureContext(context);
+        if(!token)return null;
+        if(selected.size&&(!accepted||!current(accepted,serial)))return null;
+        var keys=selected.size?accepted.items.filter(function(k){return selected.has(k.frame);}).map(function(k){
+          return {target:{kind:'property',target:accepted.target,property:accepted.property},frame:k.frame};}):[];
+        if(keys.length!==selected.size)return null;
+        var capturedSerial=serial,capturedFrames=JSON.stringify(Array.from(selected)),value={pin:Object.assign({},token.pin),frame:context.frame,viewGeneration:context.viewGeneration,keys:keys};
+        Object.defineProperty(value,'isCurrent',{value:function(){return mounted()&&!retired&&!busy&&serial===capturedSerial&&JSON.stringify(Array.from(selected))===capturedFrames;}});
+        return freeze(value);
+      }catch(_){return null;}
+    }
     function cancel(){reset('Native key read cancelled.',false);return true;}
     controls();
-    return Object.freeze({element:element,open:open,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);}});
+    return Object.freeze({element:element,open:open,captureSelectedKeys:captureSelectedKeys,clear:function(){reset('',true);},cancel:cancel,dispose:function(){if(retired)return;reset('',true);retired=true;unbind(bindings);if(element.parentNode===container)container.removeChild(element);}});
   }
   return Object.freeze({create:create});
 }));

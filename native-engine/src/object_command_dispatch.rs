@@ -2,9 +2,11 @@
 use crate::commands::MAX_VECTOR_REQUEST_BYTES;
 use crate::history::object_history::object_exposure_edit_key::is_exposure_key_operation;
 use crate::history::object_history::object_exposure_edit_retime::is_exposure_retime_operation;
+use crate::history::object_history::object_frame_bulk_move::is_frame_bulk_move_operation;
 use crate::history::object_history::object_frame_clipboard_paste::is_frame_clipboard_operation;
 use crate::history::object_history::object_frame_clipboard_repeat::is_frame_repeat_operation;
 use crate::history::object_history::object_frame_edit_structure::is_frame_structure_operation;
+use crate::history::object_history::object_layer_shift::is_layer_shift_operation;
 use crate::history::object_history::object_rig_edit_history::is_rig_edit_operation;
 use crate::history::object_history::object_rig_pose_history::is_rig_pose_operation;
 use crate::history::NativeObjectHistory;
@@ -113,6 +115,8 @@ impl NativeObjectHistory {
             && !is_rig_edit_operation(request.operation.as_str())
             && !is_rig_pose_operation(request.operation.as_str())
             && !is_frame_repeat_operation(request.operation.as_str())
+            && !is_frame_bulk_move_operation(request.operation.as_str())
+            && !is_layer_shift_operation(request.operation.as_str())
         {
             return Ok(None);
         }
@@ -169,6 +173,10 @@ impl NativeObjectHistory {
                 "Exposure key request refused."
             } else if is_exposure_retime_operation(request.operation.as_str()) {
                 "Key retime request refused."
+            } else if is_layer_shift_operation(request.operation.as_str()) {
+                "Layer range drag request refused."
+            } else if is_frame_bulk_move_operation(request.operation.as_str()) {
+                "Frame move request refused."
             } else if is_frame_repeat_operation(request.operation.as_str()) {
                 "Frame repeat request refused."
             } else if Self::import_batch_operation(&request.operation) {
@@ -317,6 +325,10 @@ impl NativeObjectHistory {
                 self.dispatch_rig_pose(&request.payload)
             } else if is_rig_edit_operation(request.operation.as_str()) {
                 self.dispatch_rig_edit(&request.payload)
+            } else if is_layer_shift_operation(request.operation.as_str()) {
+                self.dispatch_layer_shift(request)
+            } else if is_frame_bulk_move_operation(request.operation.as_str()) {
+                self.dispatch_frame_bulk_move(request)
             } else if is_frame_repeat_operation(request.operation.as_str()) {
                 self.dispatch_frame_repeat(request.operation.as_str(), &request.payload)
             } else if request.operation == OP_LAYER_VISIBILITY {

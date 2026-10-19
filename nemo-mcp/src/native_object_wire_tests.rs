@@ -487,3 +487,11 @@ mod blank_key;
 #[cfg(test)]
 #[path = "native_frame_clipboard_wire_tests.rs"]
 mod clipboard;
+
+#[cfg(test)]
+#[path = "native_frame_bulk_move_wire_tests.rs"]
+mod bulk_move;
+
+#[cfg(test)]
+#[path = "native_layer_shift_wire_tests.rs"]
+mod layer_shift;

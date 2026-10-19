@@ -87,7 +87,14 @@
         "src/native_frame_clipboard_response_schema_tests.rs",
         "src/native_clipboard_transport.rs",
         "src/native_clipboard_transport_tests.rs",
-        "src/native_clipboard_stdio_output_tests.rs"
+        "src/native_clipboard_stdio_output_tests.rs",
+        "src/native_frame_bulk_move_contract_tests.rs",
+        "src/native_frame_bulk_move_wire_tests.rs",
+        "src/native_layer_range_contract.rs",
+        "src/native_layer_range_contract_tests.rs",
+        "src/native_layer_shift_contract.rs",
+        "src/native_layer_shift_contract_tests.rs",
+        "src/native_layer_shift_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

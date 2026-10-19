@@ -52,10 +52,13 @@ function harness(){
       return null;
     }
     assert.equal(command,'nemo_native_dispatch');assert.equal(r.operation,'query.document.object.layer.timing');
-    assert.deepEqual(Object.keys(r.payload).sort(),['atRevision','contextId','documentSnapshotId','frame','layerUid']);
+    assert.deepEqual(Object.keys(r.payload).sort(),['atRevision','contextId','documentSnapshotId','frame','layerUid'].concat(r.payload.view==='range'?['view']:[]));
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:r.payload.atRevision,ok:true,
       result:{instanceId:r.instanceId,documentId:r.documentId,...r.payload,...rows.get(r.payload.frame)}};
-    if(r.payload.layerUid==='missing'){
+    if(r.payload.view==='range'){
+      const {view,...selector}=r.payload;response.result={kind:'layerRange',instanceId:r.instanceId,documentId:r.documentId,...selector,range:{rawInPoint:-2.5,rawOutPoint:24,inPoint:0,outPoint:20,hasCustomRange:true,hasTimeLink:false}};
+    }
+    if(r.payload.layerUid==='missing'&&r.payload.view!=='range'){
       response.ok=false;delete response.result;response.error={code:'unavailable',message:'No authored timing'};
     }
     const broken=fault;fault=null;if(broken)broken(response);
@@ -145,4 +148,12 @@ test('stale owner/revision/snapshot selectors refuse before dispatching a native
     {...h.session.info(),contentRevision:1},{...h.session.info(),documentSnapshotId:'old'}])
     assert.equal(await h.session.readLayerTiming('drawing:雪',0,pin),null);
   assert.equal(h.queries().length,count);assert.equal(h.meta().contentRevision,0);
+});
+
+test('Project range-only read works for untimed layer without inventing cell exposure and rejects stale shape',async()=>{
+ const h=harness();await h.open();const pin=h.session.info(),frame=h.root.state.currentFrame;
+ const range=await h.session.readLayerRange('missing',frame,pin);assert.equal(range.kind,'layerRange');assert.equal(range.range.rawInPoint,-2.5);assert.equal('cellKind'in range,false);assert.equal(Object.isFrozen(range.range),true);
+ assert.equal(h.queries().at(-1).r.payload.view,'range');const revision=h.meta().contentRevision;
+ h.fault(r=>r.result.range.extra=1);assert.equal(await h.session.readLayerRange('missing',frame,pin),null);assert.equal(h.meta().contentRevision,revision);
+ const old=h.queries().length;assert.equal(await h.session.readLayerRange('missing',frame,{...pin,documentSnapshotId:'foreign'}),null);assert.equal(h.queries().length,old);
 });

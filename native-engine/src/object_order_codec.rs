@@ -6,7 +6,7 @@ use crate::object_codec::{
 };
 use crate::object_document::{
     AuthoredOrder, FrameScopeKind, ItemRecords, ObjectLayer, ObjectRecord, OrderContext,
-    OrderCurvePoint, OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
+    OrderCurvePoint, OrderPlan, OrderTrack, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
 };
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
@@ -59,26 +59,53 @@ fn curve(points: &[OrderCurvePoint]) -> Result<(), ObjectCodecError> {
     }
     Ok(())
 }
+pub(super) fn validate_scalar_track(track: &OrderTrack) -> Result<(), ObjectCodecError> {
+    scalar_track(track, curve)
+}
+/// Effects use Motion's shared curve admission, including the original zero/one-point passthrough.
+/// The Order-specific predicate above stays unchanged for every existing order caller.
+pub(super) fn validate_effect_track(track: &OrderTrack) -> Result<(), ObjectCodecError> {
+    scalar_track(track, |points| {
+        let points: Vec<_> = points
+            .iter()
+            .map(|p| crate::document::CurvePoint {
+                x: p.x.clone(),
+                y: p.y.clone(),
+                tx: p.tx.value().cloned(),
+                ty: p.ty.value().cloned(),
+            })
+            .collect();
+        crate::document::validate_curve_points(&points).map_err(invalid)
+    })
+}
+fn scalar_track(
+    track: &OrderTrack,
+    check_curve: impl Fn(&[OrderCurvePoint]) -> Result<(), ObjectCodecError>,
+) -> Result<(), ObjectCodecError> {
+    let mut previous = None;
+    for key in &track.keys {
+        let frame = finite(&key.frame)?;
+        if previous.is_some_and(|v| frame <= v) {
+            return Err(invalid("order keys must strictly increase"));
+        }
+        previous = Some(frame);
+        numbers(&key.v, 1)?;
+        if let Some(Some(points)) = key.curve_points.value() {
+            check_curve(points)?;
+        }
+        for value in [key.h_in.value(), key.h_out.value()].into_iter().flatten() {
+            numbers(value, 2)?;
+        }
+    }
+    Ok(())
+}
+
 fn authored(order: &AuthoredOrder) -> Result<(), ObjectCodecError> {
     if let Some(value) = order.static_value.value() {
         numbers(value, 1)?;
     }
     if let Some(track) = order.track.value() {
-        let mut previous = None;
-        for key in &track.keys {
-            let frame = finite(&key.frame)?;
-            if previous.is_some_and(|v| frame <= v) {
-                return Err(invalid("order keys must strictly increase"));
-            }
-            previous = Some(frame);
-            numbers(&key.v, 1)?;
-            if let Some(Some(points)) = key.curve_points.value() {
-                curve(points)?;
-            }
-            for value in [key.h_in.value(), key.h_out.value()].into_iter().flatten() {
-                numbers(value, 2)?;
-            }
-        }
+        validate_scalar_track(track)?;
     }
     if let Some(expression) = order.expression.value() {
         if expression.code.len() > 4096 {

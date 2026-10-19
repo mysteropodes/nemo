@@ -190,6 +190,7 @@ pub(crate) fn island_record(
             fill: Presence::Present(Some(style.fill.clone())),
             vector: Presence::Missing,
             vector_ext: Presence::Missing,
+            effects: style.source.effects.clone(),
         });
     }
     let carried = if style.keep_source_stroke_style && build == IslandBuild::Single {
@@ -243,6 +244,7 @@ pub(crate) fn island_record(
         fill: Presence::Present(Some(style.fill.clone())),
         vector: Presence::Present(body),
         vector_ext: ext,
+        effects: style.source.effects.clone(),
     })
 }
 

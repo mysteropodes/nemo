@@ -154,7 +154,7 @@
     var actionScopes=new WeakMap();
     function captureShortcutScope(){var value=baseScope();if(!value)return null;var token=Object.freeze({});actionScopes.set(token,{session:value.session,signature:value.uiSignature,identity:value.identity,frame:value.context.frame});return token;}
     function isShortcutScopeCurrent(token){var before=token&&actionScopes.get(token),after=baseScope();return !!before&&!!after&&before.session===after.session&&before.signature===after.uiSignature&&same(before.identity,after.identity)&&before.frame===after.context.frame;}
-    return Object.freeze({update:update,shortcut:shortcut,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
+    return Object.freeze({captureSelectedKeys:function(){return scope()?caller.captureSelectedKeys():null;},update:update,shortcut:shortcut,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
   }
   var owners=new WeakMap();
   var revealKeys=['p','a','r','s','t','u','e','m'];
@@ -204,7 +204,13 @@
       }
       Promise.resolve(active.binding.update(false)).catch(unavailable);return true;
     }
-    return Object.freeze({paint:paint,retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},dispose:function(){if(retired)return;retire();retired=true;}});
+    return Object.freeze({captureSelectedKeys:function(info){
+      if(retired)return null;
+      if(active)return active.binding.captureSelectedKeys();
+      if(!info||!root.state||root.state.appMode==='motion')return null;
+      var value={pin:clonePin(info),frame:root.state.currentFrame,viewGeneration:0,keys:Object.freeze([])};
+      Object.defineProperty(value,'isCurrent',{value:function(){return !retired&&!active&&root.state.appMode!=='motion';}});return Object.freeze(value);
+    },paint:paint,retire:retire,shortcut:function(key,shift){return active?active.binding.shortcut(key,shift):Promise.resolve(false);},dispose:function(){if(retired)return;retire();retired=true;}});
   }
   return Object.freeze({create:create,createOrdinary:createOrdinary});
 }));

@@ -514,3 +514,7 @@ impl NativeOpacityApplication {
 
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use object_fill_owner::image_import::{wire::ImageImport, ImageImportResult};
+
+// Same sealed candidates; no extra document or history owner.
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::{PreparedBulkFrameEdit, PreparedLayerShift};

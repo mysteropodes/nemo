@@ -108,7 +108,9 @@
         "object_rig_record_links.rs",
         "object_frame_edit_range_records.rs",
         "object_frame_edit_ranges.rs",
-        "object_motion_arcs.rs"
+        "object_motion_arcs.rs",
+        "object_effect_key_tracks.rs",
+        "object_frame_bulk_move_document.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -141,7 +143,8 @@
         "object_raster_asset_codec.rs",
         "object_component_codec.rs",
         "object_frame_edit_range_codec.rs",
-        "object_parent_links.rs"
+        "object_parent_links.rs",
+        "object_effect_stack_codec.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -255,7 +258,12 @@
         "object_path_effects_edit.rs",
         "object_raster_image_import_owner.rs",
         "object_raster_image_import_wire.rs",
-        "object_blank_key_edit.rs"
+        "object_blank_key_edit.rs",
+        "object_effect_key_shift.rs",
+        "object_frame_bulk_move.rs",
+        "object_layer_shift.rs",
+        "object_layer_shift_motion.rs",
+        "object_layer_shift_range.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -319,7 +327,9 @@
         "object_component_convert_history.rs",
         "object_frame_clipboard_tracks_history.rs",
         "object_parametric_edit_history.rs",
-        "object_raster_image_import_history.rs"
+        "object_raster_image_import_history.rs",
+        "object_frame_bulk_move_history.rs",
+        "object_layer_shift_history.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -672,7 +682,8 @@
         "object_rig_pose_read.rs",
         "object_parametric_edit_read.rs",
         "object_text_read.rs",
-        "object_text_font_resources.rs"
+        "object_text_font_resources.rs",
+        "object_layer_range_snapshot.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1489,7 +1500,21 @@
         "object_layer_range_frames.rs",
         "object_motion_arcs.rs",
         "object_exposure_edit_retime_arcs.rs",
-        "object_frame_clipboard_transport.rs"
+        "object_frame_clipboard_transport.rs",
+        "object_effect_key_provider.rs",
+        "object_effect_key_tracks.rs",
+        "object_frame_bulk_move.rs",
+        "object_frame_bulk_move_build.rs",
+        "object_frame_bulk_move_history.rs",
+        "object_frame_bulk_move_history_controls.rs",
+        "object_layer_range_snapshot.rs",
+        "object_layer_shift.rs",
+        "object_layer_shift_build.rs",
+        "object_layer_shift_history.rs",
+        "object_layer_shift_history_controls.rs",
+        "object_layer_shift_motion.rs",
+        "object_frame_bulk_move_fixture.rs",
+        "object_layer_shift_motion_fixture.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1606,7 +1631,14 @@
         "src/native_frame_clipboard_response_schema_tests.rs",
         "src/native_clipboard_transport.rs",
         "src/native_clipboard_transport_tests.rs",
-        "src/native_clipboard_stdio_output_tests.rs"
+        "src/native_clipboard_stdio_output_tests.rs",
+        "src/native_frame_bulk_move_contract_tests.rs",
+        "src/native_frame_bulk_move_wire_tests.rs",
+        "src/native_layer_range_contract.rs",
+        "src/native_layer_range_contract_tests.rs",
+        "src/native_layer_shift_contract.rs",
+        "src/native_layer_shift_contract_tests.rs",
+        "src/native_layer_shift_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

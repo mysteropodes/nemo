@@ -29,12 +29,12 @@ function rig(o) {
   o = o || {};
   const n = o.layers || 3;
   const s = { rev: 7, total: o.total || 10, frame: o.frame === undefined ? 2 : o.frame, active: o.active || 0, layerSel: o.layerSel || [], cells: o.cells || [],
-    uids: Array.from({ length: n }, (_, i) => uid(i)), writes: [], presented: null };
+    uids: Array.from({ length: n }, (_, i) => uid(i)), writes: [], acceptedMoves: [], presented: null };
   s.presented = s.frame;
   const info = () => ({ instanceId: 'instance-A', documentId: 'document-A', lifecycleGeneration: 1, contentRevision: s.rev,
     documentSnapshotId: 'native-object:document-A:' + s.rev, totalFrames: s.total, layers: s.uids.map((layerUid) => ({ layerUid })) });
   const receipt = (applied, op) => ({ apiVersion: 2, requestId: 'frame-edit-1', ok: true, instanceId: 'instance-A', documentId: 'document-A',
-    contentRevision: s.rev, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, op === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : {}) });
+    contentRevision: s.rev, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, op === P + 'frames.move' ? { selection: applied ? structuredClone(o.moveSelection || []) : null } : op === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : {}) });
   const session = {
     info,
     readPresentedObjectSession() {
@@ -53,7 +53,8 @@ function rig(o) {
     }
   };
   const ports = { currentSession: () => (o.noSession ? null : (s.replacement || session)), application: o.application || SDK, frame: () => s.frame,
-    activeLayer: () => s.active, layerSelection: () => s.layerSel, cellSelection: () => s.cells, available: () => o.unavailable !== true };
+    activeLayer: () => s.active, layerSelection: () => s.layerSel, cellSelection: () => s.cells, available: () => o.unavailable !== true,
+    rangeCurrent:()=>true,acceptMove: (cells, info) => { s.acceptedMoves.push({ cells: structuredClone(cells), info }); s.cells = cells.map(cell => ({ layer: s.uids.indexOf(cell.layerUid), frame: cell.frame })); return true; } };
   return { s, session, ports, intent: Intent.create(ports) };
 }
 async function runKind(r, action) {
@@ -107,7 +108,7 @@ const KIND = { insertFrame: 'insertFrame', insertKey: 'insertKey', insertKeyAt: 
   duplicateKey: 'duplicateKey', extendExposure: 'extendExposure', removeFrame: 'removeFrame', removeFrameSpan: 'removeFrameSpan', deleteFrames: 'deleteFrames' };
 const ACTIONS = { insertFrame: {}, insertKey: {}, insertKeyAt: { layer: 1, frame: 3 }, convertToKeyframes: {}, insertBlankKey: {}, duplicateKey: {}, extendExposure: { count: 2 },
   clearKey: {}, deleteFrames: {}, removeTween: { layer: 1, from: 2, to: 4 }, removeFrame: {}, removeFrameSpan: {}, moveKey: { layer: 1, from: 2, to: 4 },
-  duplicateSelection: {}, repeatSelection: { times: 2 }, copyFrames: {}, cutFrames: {}, pasteFrames: {} };
+  duplicateSelection: {}, moveFrames: { selection: [{ layer: 1, frame: 3 }], layer: 1, frame: 4 }, repeatSelection: { times: 2 }, copyFrames: {}, cutFrames: {}, pasteFrames: {}, rangeDrag:{gesture:{command:'object.layer.range.drag',contextId:'scene-root',layerUid:uid(1),activeLayerUid:uid(1),part:'both',barSelection:[],samples:[0,1],plainClick:false,alt:false,frame:2,selectedKeys:[]},capture:{}} };
 const act = (kind) => Object.assign({ kind }, ACTIONS[kind]);
 function rigFor(row) {
   return rig({ layers: row.grid.length, total: row.total, frame: row.cf, active: row.active, layerSel: row.layerSel, cells: row.cells });
@@ -236,7 +237,7 @@ test('every request the adapter emits is accepted by the shared application clie
       emitted++;
     } else assert.equal(out.status, 'unavailable', kind);
   }
-  assert.equal(emitted, 15, 'fifteen actions reach a write; only copy, cut and paste do not');
+  assert.equal(emitted, 17, 'seventeen actions reach a write; clipboard actions without their own holder ports do not');
 });
 
 test('statuses: applied, unchanged, unconfirmed and applied-unconfirmed are decided from the receipt and the published state', async () => {
@@ -423,4 +424,44 @@ test('F7 preserves missing declaration/session, stale, refusal, busy and unconfi
   assert.deepEqual({ ...await held.intent.run({ kind: 'insertBlankKey' }) }, { status: 'busy' });
   assert.equal(held.s.writes.length, 1); release();
   assert.equal((await first).status, 'applied-presented'); assert.equal(held.s.rev, 8);
+});
+
+
+test('bulk Move uses exact captured selection and absolute bbox target; native selection wins',async()=>{
+  const cells=[{layer:2,frame:4},{layer:0,frame:3}], actual=[{layerUid:uid(2),frame:7}];
+  const r=rig({cells:structuredClone(cells),moveSelection:actual});
+  const action={kind:'moveFrames',selection:structuredClone(cells),layer:1,frame:6};
+  assert.deepEqual({...await r.intent.run(action)},{status:'applied-presented',applied:true});
+  assert.deepEqual(r.s.writes[0].payload,{command:'object.frames.move',selection:[{layerUid:uid(2),frame:4},{layerUid:uid(0),frame:3}],layerUid:uid(1),frame:6});
+  assert.deepEqual(r.s.acceptedMoves[0].cells,actual);assert.deepEqual(r.s.cells,[{layer:2,frame:7}]);
+  const mismatch=rig({cells});
+  assert.equal((await mismatch.intent.run({...action,selection:cells.slice().reverse()})).code,'frame_edit_stale_intent');
+  assert.equal(mismatch.s.writes.length,0);
+});
+
+test('bulk Move rejects malformed or stale receipts and never overwrites newer selection',async()=>{
+  const cells=[{layer:0,frame:1}], action={kind:'moveFrames',selection:cells,layer:0,frame:2};
+  const noop=rig({cells,write:(s,op,p,receipt)=>receipt(false,op)});
+  assert.deepEqual({...await noop.intent.run(action)},{status:'unchanged',applied:false});assert.equal(noop.s.acceptedMoves.length,0);
+  for(const selection of [null,[{layerUid:'foreign',frame:2}],[{layerUid:uid(0),frame:10}],[{layerUid:uid(0),frame:2,extra:1}]]){
+    const r=rig({cells,write:(s,op,p,receipt)=>{s.rev++;const r=receipt(true,op);r.result.selection=selection;return r;}});
+    assert.notEqual((await r.intent.run(action)).status,'applied-presented');assert.equal(r.s.acceptedMoves.length,0);
+  }
+  let finish;const r=rig({cells:structuredClone(cells),write:(s,op,p,receipt)=>new Promise(resolve=>{
+    finish=()=>{s.rev++;resolve(receipt(true,op));};})});
+  const pending=r.intent.run(action);action.selection[0].frame=9;
+  assert.equal(r.s.writes[0].payload.selection[0].frame,1,'the command copied the explicit selection before awaiting');
+  r.s.cells=[{layer:1,frame:5}];finish();
+  assert.equal((await pending).status,'applied-unconfirmed');assert.deepEqual(r.s.cells,[{layer:1,frame:5}]);assert.equal(r.s.acceptedMoves.length,0);
+});
+
+test('range Intent admits one strict native gesture with action-local predispatch currency and mandatory checkpoint',async()=>{
+ const r=rig(),capture={},gesture={...require('../src/js/adapters/native-frame-edit-contract.js').example(P+'layer.range.drag'),layerUid:uid(0),activeLayerUid:uid(0),frame:2,samples:[0,3,1]};
+ let current=true;r.ports.rangeCurrent=(value,info,after)=>value===capture&&current;
+ const out=await r.intent.run({kind:'rangeDrag',gesture,capture});assert.equal(out.status,'applied-presented');assert.deepEqual(r.s.writes[0].payload.samples,[0,3,1]);assert.equal(r.s.rev,8);
+ const no=rig({write(s,op,p,receipt){return receipt(false,op);}});no.ports.rangeCurrent=()=>true;
+ assert.equal((await no.intent.run({kind:'rangeDrag',gesture,capture})).status,'unconfirmed');assert.equal(no.s.rev,7);
+ const stale=rig();stale.ports.rangeCurrent=()=>false;assert.equal((await stale.intent.run({kind:'rangeDrag',gesture,capture})).code,Intent.CODES.stale);assert.equal(stale.s.writes.length,0);
+ const held=rig({write(s,op,p,receipt){s.layerSel=[2];s.rev++;return receipt(true,op);}});held.ports.rangeCurrent=()=>true;
+ assert.equal((await held.intent.run({kind:'rangeDrag',gesture,capture})).status,'applied-unconfirmed');assert.deepEqual(held.s.layerSel,[2]);
 });

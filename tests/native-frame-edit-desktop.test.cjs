@@ -21,7 +21,7 @@ function harness(options={}){
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
     documentSnapshotId:'snapshot-'+revision,contentRevision:revision,documentDigest:String(revision%10).repeat(64),
     byteCount:1000,canvasW:320,canvasH:180,fps:24,totalFrames:total,
-    layers:[{layerUid:'alpha'},{layerUid:'beta'}],reference:null,undoDepth:revision,redoDepth:0});
+    layers:[Object.assign({layerUid:'alpha'},options.lockedAlpha?{locked:true}:{}),{layerUid:'beta'}],reference:null,undoDepth:revision,redoDepth:0});
   const publish=i=>{state.totalFrames=i.totalFrames;state.layers=i.layers.map(row=>({...row}));return true;};
   async function invoke(command,args){
     const q=args&&(args.request||JSON.parse(args.requestJson));calls.push({command,q});
@@ -47,6 +47,7 @@ function harness(options={}){
     if(q.operation===P+'frames.repeat')Object.assign(reply.result,{cycledLayers:2,skippedComponentLayers:0});
     if(/frames\.clipboard\.(copy|cut)$/.test(q.operation))reply.result.clipboard=options.packet===null?null:
       options.packet?structuredClone(options.packet):{instanceId:'instance',documentId:'document',cells:[{relLayer:0,relFrame:0,keyframe:true,records:[],orderElements:[]}]};
+    if(q.operation===P+'frames.move')reply.result.selection=applied?structuredClone(options.moveSelection===undefined?[{layerUid:'alpha',frame:3},{layerUid:'beta',frame:4}]:options.moveSelection):null;
     if(options.badAck)reply.requestId='foreign-receipt';
     return reply;
   }
@@ -109,7 +110,7 @@ test('every mapped writer uses the actual signature and reaches exactly its expe
     ['global','removeFrame',[],P+'frames.remove',{from:2,to:2}],
     ['timeline','removeFrameSpan',[],P+'frames.remove',{from:1,to:2}],
     ['global','removeTweenSpan',[0,1,5],P+'layer.tween.remove',{layerUid:'alpha',from:1,to:5}],
-    ['timeline','moveKeyframe',[1,1,4],P+'layer.key.move',{layerUid:'beta',from:1,to:4}],
+    ['timeline','moveKeyframe',[1,1,4],P+'layer.key.move',{layerUid:'beta',activeLayerUid:'beta',from:1,to:4}],
     ['timeline','deleteSelectedFrames',[],P+'layer.key.clear_cells',{targets:[{layerUid:'alpha',frame:1},{layerUid:'beta',frame:2}]}],
     ['timeline','duplicateKeyframe',[],P+'frames.duplicate',{layerUid:'beta',cell:2}],
     ['timeline','extendExposure',[3],P+'frames.extend',{cell:2,count:3}],
@@ -125,14 +126,14 @@ test('every mapped writer uses the actual signature and reaches exactly its expe
   }
 });
 
-test('unsupported multi-cell moves consume without any legacy or native write',async()=>{
+test('public Shift stays unavailable without any legacy or native write',async()=>{
   const h=harness();await h.open();
-  for(const name of ['moveFrames','shiftLayerFrames']){
+  for(const name of ['shiftLayerFrames']){
     const route=h.controller.routeWriter('timeline',name,[[],1,1]);
     assert.equal(route.handled,true);assert.equal((await route.result).status,'unavailable');
   }
   assert.equal(h.commands().length,0);
-  assert.equal(h.notices.length,2);assert.ok(h.notices.every(message=>/unavailable/i.test(message)));
+  assert.equal(h.notices.length,1);assert.ok(h.notices.every(message=>/unavailable/i.test(message)));
   assert.equal(h.controller.routeWriter('timeline','notAWriter',[]),null);
   assert.equal(h.controller.routeWriter('global','moveKeyframe',[0,1,2]),null);
   assert.ok(Object.isFrozen(Desktop.writerNames('timeline')));
@@ -226,7 +227,7 @@ test('actual legacy desktop surface wraps the full writer list and routes before
   assert.deepEqual(h.commands().map(c=>c.q.payload),[
     {command:'object.layer.key.promote',layerUids:['alpha'],cells:[4]},
     {command:'object.frames.extend',cell:2,count:3}]);
-  for(const name of ['moveFrames','shiftLayerFrames']){
+  for(const name of ['shiftLayerFrames']){
     assert.equal((await h.root.SM[name]([],1,1)).status,'unavailable',name);
   }
   assert.deepEqual([legacy,guards,admissions],[0,0,0]);
@@ -399,4 +400,62 @@ test('changed Cut with a null packet is unconfirmed and cannot replace the clipb
   h.root._sel.clipboard=prior;const result=await h.controller.run({kind:'cutFrames'});
   assert.notEqual(result.status,'applied-presented');assert.equal(h.root._sel.clipboard,prior);
   assert.deepEqual(h.root._sel.frames,selected);assert.equal(h.commands().length,1);
+});
+
+
+test('actual grid Move call and SM wrapper apply only native destinations after ACK/inspect/present',async()=>{
+  const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  for(const [frame,actual,lockedAlpha]of [[3,[{layerUid:'beta',frame:4}],true],[11,[{layerUid:'alpha',frame:11}],false],[12,[],false]]){
+    const h=harness({moveSelection:actual,lockedAlpha});await h.open();let legacy=0,css=0;
+    h.root.__TAURI__={core:{invoke(){throw Error('no private writer transport');}}};
+    h.root.NemoNativeFrameEditDesktop=Desktop;h.root.SM={importJSON(){},moveFrames(){legacy++;}};
+    h.root.selApplyCSS=()=>{css++;assert.equal(h.session.readPresentedObjectSession().contentRevision,1);};
+    const stop=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>{legacy++;return true;});
+    const main=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8');
+    const line=main.split('\n').find(line=>line.includes('window.SM.moveFrames(_sel.frames.slice(),b.minL+offL,b.minF+offF)'));
+    assert.ok(line,'ordinary frame-grid calls the wrapped exact SM signature');
+    try{
+      const returned=vm.runInNewContext(line.trim(),{window:h.root,_sel:h.root._sel,b:{minL:0,minF:1},offL:0,offF:frame-1});
+      assert.equal((await returned).status,'applied-presented');
+    }finally{stop();}
+    assert.equal(legacy,0);assert.equal(h.commands().length,1);assert.equal(css,1);
+    assert.deepEqual(h.commands()[0].q.payload,{command:'object.frames.move',selection:[{layerUid:'alpha',frame:1},{layerUid:'beta',frame:2}],layerUid:'alpha',frame});
+    assert.deepEqual(h.root._sel.frames,actual.map(c=>({layer:c.layerUid==='alpha'?0:1,frame:c.frame})));
+    assert.equal(h.root.state.currentFrame,2);assert.equal(h.root.state.totalFrames,12);assert.deepEqual(h.navigation,[]);
+  }
+});
+
+test('Move null no-op preserves selection; delayed ACK cannot replace newer UI or owner',async()=>{
+  const h=harness({noop:true});await h.open();const selected=h.root._sel.frames;
+  assert.equal((await h.controller.routeWriter('timeline','moveFrames',[selected,0,1]).result).status,'unchanged');
+  assert.equal(h.root._sel.frames,selected);assert.equal(h.session.info().contentRevision,0);
+  for(const change of [r=>{r._sel.frames=[{layer:1,frame:8}];},r=>{r._layerSel=[0];},r=>{r.state.activeLayerIdx=0;},r=>{r.state.currentFrame=4;}]){
+    const h=harness();await h.open();const explicit=structuredClone(h.root._sel.frames),gate=h.hold();
+    const first=h.controller.routeWriter('timeline','moveFrames',[explicit,0,3]);await turn();change(h.root);
+    const newer=structuredClone(h.root._sel.frames);assert.equal((await h.controller.run({kind:'insertKey'})).status,'busy');
+    gate.resolve();assert.equal((await first.result).status,'applied-unconfirmed');assert.deepEqual(h.root._sel.frames,newer);
+    assert.equal(h.commands().length,1);assert.deepEqual(h.navigation,[]);
+  }
+  const r=harness();await r.open();const gate=r.hold();const pending=r.controller.routeWriter('timeline','moveFrames',[structuredClone(r.root._sel.frames),0,3]);
+  await turn();r.replace({isActive:()=>true,info:r.info});gate.resolve();
+  assert.equal((await pending.result).status,'applied-unconfirmed');assert.deepEqual(r.root._sel.frames,[{layer:0,frame:1},{layer:1,frame:2}]);
+});
+
+test('Move malformed receipt or foreign destination never mutates selection and mismatched input never dispatches',async()=>{
+  for(const moveSelection of [null,[{layerUid:'foreign',frame:3}],[{layerUid:'alpha',frame:12}],[{layerUid:'alpha',frame:3,extra:1}]]){
+    const h=harness({moveSelection});await h.open();const selected=structuredClone(h.root._sel.frames);
+    assert.notEqual((await h.controller.routeWriter('timeline','moveFrames',[selected,0,3]).result).status,'applied-presented');
+    assert.deepEqual(h.root._sel.frames,selected);assert.equal(h.commands().length,1);
+  }
+  const h=harness();await h.open();
+  assert.equal((await h.controller.routeWriter('timeline','moveFrames',[[{layer:1,frame:2}],0,3]).result).code,'frame_edit_stale_intent');
+  assert.equal(h.commands().length,0);
+});
+
+test('Desktop range action preserves its own selected-key token through real Intent and Project queue',async()=>{
+ const h=harness();await h.open();const token={};let current=true;
+ Object.defineProperty(token,'isCurrent',{value:function(info,after,queued){if(queued)assert.equal(h.session.readPresentedObjectSession(),null);return current;}});
+ const gesture={command:'object.layer.range.drag',contextId:'scene-root',layerUid:'alpha',activeLayerUid:'beta',part:'in',barSelection:[],samples:[0,2,1],plainClick:false,alt:false,frame:2,selectedKeys:[]};
+ const out=await h.controller.run({kind:'rangeDrag',gesture,capture:token});assert.equal(out.status,'applied-presented');assert.equal(h.commands().length,1);assert.deepEqual(h.commands()[0].q.payload,gesture);assert.deepEqual(h.navigation,[]);
+ current=false;assert.equal((await h.controller.run({kind:'rangeDrag',gesture,capture:token})).status,'unavailable');assert.equal(h.commands().length,1);
 });

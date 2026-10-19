@@ -1,4 +1,6 @@
 //! Atomic admission and semantic JSON round-trip for staged native objects.
+#[path = "object_effect_stack_codec.rs"]
+mod effect_stack_codec;
 #[cfg(feature = "commands")]
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
@@ -368,6 +370,7 @@ fn validate_content_inner(
             "positive totalFrames and identified layers are required",
         ));
     }
+    effect_stack_codec::validate_fields(declared_layers, objects)?;
     let mut layers = HashSet::new();
     for layer in declared_layers {
         // Drawing Fill enforces its own lock guard. Generic Motion actions

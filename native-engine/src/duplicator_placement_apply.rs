@@ -123,6 +123,7 @@ pub(crate) fn apply_placement(
             // stroke-paint hue and opacity factor to them is still reported in `unavailable`.
             vector: source.vector.clone(),
             vector_ext: source.vector_ext.clone(),
+            effects: source.effects.clone(),
         },
         dup_3d: place.dup_3d,
         unavailable,

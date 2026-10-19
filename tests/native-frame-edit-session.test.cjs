@@ -31,9 +31,10 @@ function scenario(o) {
     assert.equal(r.instanceId, 'frame-instance'); assert.equal(r.documentId, 'frame-document'); assert.equal(r.expectedRevision, revision);
     const base = { apiVersion: 2, requestId: r.requestId, instanceId: r.instanceId, documentId: r.documentId };
     if (failure === 'stale') return Object.assign(base, { contentRevision: revision, ok: false, error: { code: 'stale_revision', message: 'Stale frame edit' } });
+    if (o.beforeAck) o.beforeAck(ui);
     const applied = failure !== 'noop' && r.operation !== P + 'frames.clipboard.copy';
     if (applied) { total = lengthAfter(r.operation, r.payload); revision += 1; }
-    return Object.assign(base, { contentRevision: revision, ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, r.operation === P + 'frames.repeat' ? { cycledLayers: 3, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(r.operation) ? {clipboard:{instanceId:r.instanceId,documentId:r.documentId,cells:[]}} : {}) });
+    return Object.assign(base, { contentRevision: revision, ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, r.operation === P + 'frames.move' ? {selection:applied ? structuredClone(o.moveSelection || []) : null} : r.operation === P + 'frames.repeat' ? { cycledLayers: 3, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(r.operation) ? {clipboard:{instanceId:r.instanceId,documentId:r.documentId,cells:[]}} : {}) });
   }
   const ports = {
     invoke, frame: () => ui.frame, projectionReady: () => true, publishRevision: () => true,
@@ -44,7 +45,8 @@ function scenario(o) {
   if (!o.noClient) ports.dispatchApplication = (request) => SDK.createNativeApplicationAdapter('ui', { dispatch: (value) => invoke('nemo_native_dispatch', { request: value }) }).dispatch(request);
   const session = Project.create(ports);
   const intent = Intent.create({ currentSession: () => session, application: SDK, frame: () => ui.frame, activeLayer: () => ui.active,
-    layerSelection: () => ui.layerSel, cellSelection: () => ui.cells, available: () => true });
+    layerSelection: () => ui.layerSel, cellSelection: () => ui.cells, available: () => true,
+    rangeCurrent:()=>true,acceptMove: (cells) => { ui.cells = cells.map(cell => ({layer:uids.indexOf(cell.layerUid),frame:cell.frame})); return true; } });
   return { session, intent, ui, calls, commands: () => calls.filter((c) => c.command === 'nemo_native_dispatch'), open: async () => { await session.openPath('/frames.json'); await session.presentPreview(ui.frame); } };
 }
 
@@ -164,4 +166,27 @@ test('F7 real Project/SDK chain uses active UID, one ACK/inspect/presentation pe
   const noop = scenario({ failure: 'noop' }); await noop.open();
   assert.equal((await noop.intent.run({ kind: 'insertBlankKey' })).status, 'unconfirmed');
   assert.equal(noop.session.info().contentRevision, 0);
+});
+
+
+test('bulk Move real session reconciles ACK and presentation before publishing native destinations',async()=>{
+  const actual=[{layerUid:'layer-beta',frame:7}],h=scenario({moveSelection:actual});await h.open();
+  h.ui.cells=[{layer:0,frame:2},{layer:2,frame:4}];
+  assert.deepEqual({...await h.intent.run({kind:'moveFrames',selection:structuredClone(h.ui.cells),layer:1,frame:6})},{status:'applied-presented',applied:true});
+  assert.deepEqual(h.commands()[0].r.payload,{command:'object.frames.move',selection:[{layerUid:'layer-alpha',frame:2},{layerUid:'layer-gamma',frame:4}],layerUid:'layer-beta',frame:6});
+  assert.deepEqual(h.ui.cells,[{layer:1,frame:7}]);assert.equal(h.ui.frame,5);assert.equal(h.session.info().totalFrames,21);
+  assert.equal(h.session.readPresentedObjectSession().contentRevision,1);assert.equal(h.calls.at(-1).command,'nemo_native_object_preview');
+  for(const failure of ['noop','stale']){
+    const h=scenario({failure});await h.open();const selected=[{layer:0,frame:2}];h.ui.cells=selected;
+    const result=await h.intent.run({kind:'moveFrames',selection:selected,layer:0,frame:3});
+    assert.equal(result.status,failure==='noop'?'unchanged':'refused');assert.equal(h.ui.cells,selected);assert.equal(h.session.info().contentRevision,0);
+  }
+});
+
+test('range native session checks queued local currency while public presented getter remains suppressed',async()=>{
+ const h=scenario();await h.open();const pin=h.session.info(),op=P+'layer.range.drag';let calls=0;
+ const gesture={...Contract.example(op),layerUid:'layer-alpha',activeLayerUid:'layer-beta',frame:5,samples:[0,3,1]};
+ const receipt=await h.session.editFrames(op,gesture,pin,()=>{calls++;assert.equal(h.session.readPresentedObjectSession(),null);return true;});
+ assert.equal(calls,1);assert.deepEqual(receipt.result,{applied:true,historyEntriesAdded:1});assert.deepEqual(h.commands().at(-1).r.payload.samples,[0,3,1]);assert.equal(h.session.readPresentedObjectSession().contentRevision,1);
+ const count=h.commands().length;await assert.rejects(h.session.editFrames(op,gesture,h.session.info(),()=>false),/intent is stale/);assert.equal(h.commands().length,count);
 });

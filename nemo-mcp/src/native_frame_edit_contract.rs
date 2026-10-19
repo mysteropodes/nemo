@@ -16,11 +16,13 @@ pub(crate) const KEY_CLEAR_CELLS: &str = "command.document.object.layer.key.clea
 pub(crate) const TWEEN_REMOVE: &str = "command.document.object.layer.tween.remove";
 pub(crate) const KEY_MOVE: &str = "command.document.object.layer.key.move";
 pub(crate) const SELECTION_DUPLICATE: &str = "command.document.object.frames.clipboard.duplicate";
+pub(crate) const RANGE_DRAG: &str = "command.document.object.layer.range.drag";
+pub(crate) const MOVE: &str = "command.document.object.frames.move";
 pub(crate) const REPEAT: &str = "command.document.object.frames.repeat";
 pub(crate) const CLIPBOARD_COPY: &str = "command.document.object.frames.clipboard.copy";
 pub(crate) const CLIPBOARD_CUT: &str = "command.document.object.frames.clipboard.cut";
 pub(crate) const CLIPBOARD_PASTE: &str = "command.document.object.frames.clipboard.paste";
-const OPERATIONS: [&str; 15] = [
+const OPERATIONS: [&str; 17] = [
     INSERT,
     EXTEND,
     DUPLICATE,
@@ -35,6 +37,8 @@ const OPERATIONS: [&str; 15] = [
     CLIPBOARD_COPY,
     CLIPBOARD_CUT,
     CLIPBOARD_PASTE,
+    MOVE,
+    RANGE_DRAG,
     REPEAT,
 ];
 const MAX_LIST: usize = 4096;
@@ -257,6 +261,15 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                 && frame(p.get("frame")).is_some()
                 && clipboard_cells(p.get("cells"))
         }),
+        RANGE_DRAG => layer_shift::request(value),
+        MOVE => {
+            exact(value, &["command", "selection", "layerUid", "frame"], &[]).is_some_and(|p| {
+                command_is(p, "object.frames.move")
+                    && clipboard_selection(p.get("selection"))
+                    && name(p.get("layerUid"))
+                    && frame(p.get("frame")).is_some()
+            })
+        }
         REPEAT => exact(
             value,
             &[
@@ -290,7 +303,19 @@ pub(crate) fn result_for_operation(operation: &str, value: &Value) -> bool {
     if matches!(operation, CLIPBOARD_COPY | CLIPBOARD_CUT) {
         return clipboard_result(operation, value);
     }
-    if operation == KEY_BLANK {
+    if operation == MOVE {
+        return exact(value, &["applied", "historyEntriesAdded", "selection"], &[]).is_some_and(
+            |p| match (
+                p.get("applied").and_then(Value::as_bool),
+                p.get("historyEntriesAdded").and_then(Value::as_u64),
+            ) {
+                (Some(true), Some(1)) => clipboard_selection(p.get("selection")),
+                (Some(false), Some(0)) => p.get("selection").is_some_and(Value::is_null),
+                _ => false,
+            },
+        );
+    }
+    if matches!(operation, KEY_BLANK | RANGE_DRAG) {
         return result(value) && value["applied"] == true;
     }
     if operation != REPEAT {
@@ -342,3 +367,6 @@ pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Val
 #[cfg(test)]
 #[path = "native_frame_edit_contract_tests.rs"]
 mod tests;
+
+#[path = "native_layer_shift_contract.rs"]
+mod layer_shift;

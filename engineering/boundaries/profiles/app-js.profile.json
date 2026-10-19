@@ -1265,11 +1265,13 @@
       "layer": "app-legacy",
       "dir": "src/js",
       "files": [
-        "layer-inout.js"
+        "layer-inout.js",
+        "layer-inout-selection.js"
       ],
       "sizeProfile": "App JS unclassified (pre-R01)",
       "publicApi": [
-        "layer-inout.js"
+        "layer-inout.js",
+        "layer-inout-selection.js"
       ]
     },
     {
@@ -2517,11 +2519,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-ui.js"
+        "native-object-ui.js",
+        "native-layer-range-desktop.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-ui.js"
+        "native-object-ui.js",
+        "native-layer-range-desktop.js"
       ]
     },
     {

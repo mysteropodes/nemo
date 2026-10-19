@@ -98,3 +98,18 @@ test('ordinary UI paint and public reveal use actual sole Project cached port an
  await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');assert.equal(Project.desktop(f.root),f.session);assert.strictEqual(f.session.info(),before);assert.equal(f.transports.length,1);
  const queries=f.calls.filter(c=>c.r?.operation==='query.document.object.property.metadata');assert.ok(queries.length>=3);assert.ok(queries.every(c=>/^project-metadata-/.test(c.r.requestId)&&!('expectedRevision'in c.r)));assert.ok(f.calls.every(c=>!c.r?.operation?.startsWith('command.')));h.retire();
 });
+
+test('ordinary Motion hooks expose known cleared selection only after native editor retirement',async()=>{
+ const h=host();assert.equal(typeof UI.readSelectedMotionKeys,'function');
+ const ordinary=Binding.createOrdinary(h.root,{});const info=h.ports.currentSession().info();assert.equal(ordinary.captureSelectedKeys(info),null,'Motion with no qualified editor is unknown');
+ h.root.state.appMode='animation';const cleared=ordinary.captureSelectedKeys(info);assert.deepEqual(cleared.keys,[]);assert.equal(cleared.isCurrent(),true);
+ ordinary.dispose();assert.equal(cleared.isCurrent(),false);assert.equal(ordinary.captureSelectedKeys(info),null);h.retire();
+});
+
+
+test('actual ordinary Drawing paint retires native keys and exposes only a current known-cleared selection',async()=>{
+ const h=host();h.paint();await h.settle();h.root.state.appMode='drawing';h.paint();
+ const snapshot=UI.readSelectedMotionKeys(h.root,h.ports.currentSession().info());
+ assert.ok(snapshot);assert.deepEqual(snapshot.keys,[]);assert.equal(snapshot.isCurrent(),true);
+ h.root.state.appMode='motion';assert.equal(snapshot.isCurrent(),false);h.retire();
+});

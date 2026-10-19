@@ -31,10 +31,12 @@
     'command.document.object.frames.clipboard.copy': 'object.frames.clipboard.copy',
     'command.document.object.frames.clipboard.cut': 'object.frames.clipboard.cut',
     'command.document.object.frames.clipboard.paste': 'object.frames.clipboard.paste',
+    'command.document.object.frames.move': 'object.frames.move',
+    'command.document.object.layer.range.drag': 'object.layer.range.drag',
     'command.document.object.frames.repeat': 'object.frames.repeat'
   });
   var OPERATIONS = Object.freeze(Object.keys(COMMANDS));
-  var OPAQUE_PATH = /^payload\.(?:layerUid|fromLayerUid|toLayerUid)$|^payload\.layerUids\.\d+$|^payload\.(?:targets|selection)\.\d+\.layerUid$/;
+  var OPAQUE_PATH = /^payload\.(?:layerUid|activeLayerUid|fromLayerUid|toLayerUid)$|^payload\.layerUids\.\d+$|^payload\.(?:targets|selection)\.\d+\.layerUid$/;
 
   function has(value, key) { return Object.prototype.hasOwnProperty.call(value, key); }
   function fail(message) { throw new TypeError(message); }
@@ -101,7 +103,43 @@
     uid(value.instanceId, 'clipboard instanceId'); uid(value.documentId, 'clipboard documentId'); packetCells(value.cells);
   }
   function packetResult(operation) { return operation === PREFIX + 'frames.clipboard.copy' || operation === PREFIX + 'frames.clipboard.cut'; }
+  function motionKey(value) {
+    exact(value, ['target', 'frame'], [], 'selected Motion key');
+    if (!Number.isFinite(value.frame)) fail('invalid selected Motion frame');
+    var t=value.target;
+    if (!plain(t)) fail('invalid selected Motion target');
+    if (t.kind === 'property') {
+      exact(t, ['kind', 'target', 'property'], [], 'Motion property target');
+      exact(t.target, ['contextId', 'layerUid'], ['strokeId'], 'Motion holder');
+      ['contextId','layerUid'].forEach(function(k){uid(t.target[k],k);});
+      if(has(t.target,'strokeId'))uid(t.target.strokeId,'strokeId');
+      uid(t.property,'property');
+    } else {
+      exact(t, ['kind','contextId','layerUid'].concat(t.kind==='elementOrder'?['frameScope','strokeId']:[]), [], 'Motion track target');
+      if(!['layerOrder','elementOrder','timeRemap'].includes(t.kind))fail('invalid Motion track kind');
+      uid(t.contextId,'contextId');uid(t.layerUid,'layerUid');
+      if(t.kind==='elementOrder'){
+        exact(t.frameScope,['kind','frame'],[],'Motion frame scope');
+        if(!['authored','reference'].includes(t.frameScope.kind))fail('invalid Motion scope');
+        u32(t.frameScope.frame,'Motion frame');uid(t.strokeId,'strokeId');
+      }
+    }
+  }
+  function rangeDrag(p) {
+    exact(p,['command','contextId','layerUid','activeLayerUid','part','barSelection','samples','plainClick','alt','frame','selectedKeys'],[],'layer range gesture');
+    ['contextId','layerUid','activeLayerUid'].forEach(function(k){uid(p[k],k);});
+    if(!['in','out','both'].includes(p.part)||typeof p.plainClick!=='boolean'||typeof p.alt!=='boolean')fail('invalid bar gesture');
+    u32(p.frame,'frame');
+    if(!Array.isArray(p.barSelection)||p.barSelection.length>MAX_LIST||!Array.isArray(p.samples)||p.samples.length>MAX_LIST||
+       !Array.isArray(p.selectedKeys)||p.selectedKeys.length>MAX_LIST)fail('unbounded bar gesture');
+    var seen=new Set();p.barSelection.forEach(function(v){exact(v,['layerUid','part'],[],'bar selection');uid(v.layerUid,'bar UID');
+      if(!['in','out','both'].includes(v.part)||seen.has(v.layerUid))fail('invalid duplicate bar selection');seen.add(v.layerUid);});
+    p.samples.forEach(function(v){if(!Number.isSafeInteger(v))fail('invalid ordered bar sample');});
+    seen=new Set();p.selectedKeys.forEach(function(v){motionKey(v);var t=v.target,a=t.target||t,key=JSON.stringify([t.kind,a.contextId,a.layerUid,Object.prototype.hasOwnProperty.call(a,'strokeId'),a.strokeId,t.property,t.frameScope&&t.frameScope.kind,t.frameScope&&t.frameScope.frame,v.frame]);
+      if(seen.has(key))fail('duplicate selected key');seen.add(key);});
+  }
   var SHAPES = {
+    'object.layer.range.drag': rangeDrag,
     'object.frames.clipboard.copy': function (p) { exact(p, ['command', 'selection'], [], 'clipboard copy'); selectedCells(p.selection); },
     'object.frames.clipboard.cut': function (p) { exact(p, ['command', 'selection'], [], 'clipboard cut'); selectedCells(p.selection); },
     'object.frames.clipboard.paste': function (p) {
@@ -150,6 +188,10 @@
       exact(p, ['command', 'layerUid', 'selection'], [], 'selection duplicate');
       uid(p.layerUid, 'layerUid'); list(p.selection, 'selection', cell, cellKey);
     },
+    'object.frames.move': function (p) {
+      exact(p, ['command', 'selection', 'layerUid', 'frame'], [], 'frames move');
+      selectedCells(p.selection); uid(p.layerUid, 'layerUid'); u32(p.frame, 'frame');
+    },
     'object.frames.repeat': function (p) {
       exact(p, ['command', 'fromLayerUid', 'toLayerUid', 'fromFrame', 'toFrame', 'times'], [], 'frames repeat');
       uid(p.fromLayerUid, 'fromLayerUid'); uid(p.toLayerUid, 'toLayerUid'); u32(p.fromFrame, 'fromFrame'); u32(p.toFrame, 'toFrame');
@@ -157,6 +199,7 @@
     }
   };
   var EXAMPLES = {
+    'object.layer.range.drag': function () { return {command:'object.layer.range.drag',contextId:'scene-root',layerUid:'layer-a',activeLayerUid:'layer-b',part:'both',barSelection:[],samples:[0,2],plainClick:false,alt:false,frame:1,selectedKeys:[]}; },
     'object.frames.clipboard.copy': function () { return {"command":"object.frames.clipboard.copy","selection":[{"layerUid":"layer-a","frame":2}]}; },
     'object.frames.clipboard.cut': function () { return {"command":"object.frames.clipboard.cut","selection":[{"layerUid":"layer-a","frame":2}]}; },
     'object.frames.clipboard.paste': function () { return {"command":"object.frames.clipboard.paste","instanceId":"instance-A","documentId":"document-A","cells":[{"relLayer":0,"relFrame":0,"keyframe":true,"records":[],"orderElements":[]}],"layerUid":"layer-a","frame":4}; },
@@ -174,6 +217,9 @@
     'object.layer.key.move': function () { return { command: 'object.layer.key.move', layerUid: 'layer-a', from: 2, to: 4 }; },
     'object.frames.clipboard.duplicate': function () {
       return { command: 'object.frames.clipboard.duplicate', layerUid: 'layer-a', selection: [{ layerUid: 'layer-a', frame: 2 }] };
+    },
+    'object.frames.move': function () {
+      return { command: 'object.frames.move', selection: [{ layerUid: 'layer-a', frame: 3 }], layerUid: 'layer-b', frame: 4 };
     },
     'object.frames.repeat': function () {
       return { command: 'object.frames.repeat', fromLayerUid: 'layer-a', toLayerUid: 'layer-a', fromFrame: 2, toFrame: 3, times: 2 };
@@ -199,14 +245,18 @@
   }
   function result(operation, value) {
     if (!admitted(operation)) fail('frame edit operation is not declared');
-    var repeat = operation === PREFIX + 'frames.repeat';
-    exact(value, ['applied', 'historyEntriesAdded'].concat(repeat ? ['cycledLayers', 'skippedComponentLayers'] : packetResult(operation) ? ['clipboard'] : []), [], 'frame edit result');
+    var repeat = operation === PREFIX + 'frames.repeat', move = operation === PREFIX + 'frames.move';
+    exact(value, ['applied', 'historyEntriesAdded'].concat(repeat ? ['cycledLayers', 'skippedComponentLayers'] : move ? ['selection'] : packetResult(operation) ? ['clipboard'] : []), [], 'frame edit result');
     if (packetResult(operation) && value.clipboard !== null) clipboard(value.clipboard);
     if (operation === PREFIX + 'frames.clipboard.cut' && value.applied === true && value.clipboard === null) fail('applied cut must carry its packet');
     if (operation === PREFIX + 'frames.clipboard.copy' && (value.applied !== false || value.historyEntriesAdded !== 0)) fail('copy cannot mutate history');
+    if (move) {
+      if (value.applied === true) selectedCells(value.selection);
+      else if (value.selection !== null) fail('unchanged move must retain selection');
+    }
     if (repeat) { u32(value.cycledLayers, 'cycledLayers'); u32(value.skippedComponentLayers, 'skippedComponentLayers'); }
     // F7 preserves the unconditional baseline checkpoint, including an already blank key.
-    if (operation === PREFIX + 'layer.key.blank' && value.applied !== true) fail('blank key must add one history entry');
+    if (['layer.key.blank','layer.range.drag'].some(function(k){return operation===PREFIX+k;}) && value.applied !== true) fail('blank key must add one history entry');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) {
       fail('invalid frame edit disposition');
     }
@@ -224,7 +274,7 @@
   // Layer UIDs are opaque authored bytes: a `data:`-prefixed UID is a name, not a resource payload.
   function paths(operation) {
     return admitted(operation) ? { has: function (path) {
-      return OPAQUE_PATH.test(path) || /^payload\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path) ||
+      return OPAQUE_PATH.test(path) || (operation === PREFIX + 'layer.range.drag' && (/^payload\.(?:contextId|activeLayerUid)$/.test(path) || /^payload\.barSelection\.\d+\.layerUid$/.test(path) || /^payload\.selectedKeys\.\d+\.target\.(?:target\.)?(?:contextId|layerUid|strokeId)$/.test(path))) || (operation === PREFIX + 'frames.move' && /^result\.selection\.\d+\.layerUid$/.test(path)) || /^payload\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path) ||
         /^result\.clipboard\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path);
     } } : null;
   }

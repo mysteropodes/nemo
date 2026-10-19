@@ -72,7 +72,7 @@ pub(crate) enum ComponentUnavailable {
     Camera(&'static str),
     /// An inner layer has no authored timing: its exposure is unknown.
     InnerTimingMissing { layer_uid: String },
-    /// An inner layer carries a feature this producer does not evaluate.
+    /// An inner layer or selected record carries a feature this producer does not evaluate.
     InnerFeature {
         layer_uid: String,
         feature: &'static str,
@@ -328,6 +328,12 @@ pub(crate) fn evaluate_records(
     records: &[ObjectRecord],
     placement: &ResolvedComponentPlacement,
 ) -> Result<Vec<ComponentShape>, ComponentUnavailable> {
+    if let Some(record) = records.iter().find(|record| record.has_enabled_effects()) {
+        return Err(ComponentUnavailable::InnerFeature {
+            layer_uid: record.target().layer_uid().to_owned(),
+            feature: "per-element effects",
+        });
+    }
     let sources = records
         .iter()
         .map(shape_data)

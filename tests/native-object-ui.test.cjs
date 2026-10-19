@@ -571,3 +571,10 @@ test('Drawing session publishes frozen admitted parent metadata only through the
   assert.ok(h.log.indexOf('preview')<h.log.indexOf('ACK'));
   assert.equal(h.calls.some(call=>call.request&&call.request.operation&&call.request.operation.startsWith('command.')),false);
 });
+
+test('metadata presenter invokes native bar mount without adding persistent range fields to projected layers',()=>{
+ const root=view(),info=metadata();let mounted=0,retired=0;const before=JSON.stringify(root.state.layers);
+ root.NemoNativeLayerRangeDesktop={mount(r,grid,value,ports){assert.strictEqual(r,root);assert.strictEqual(grid,root.document.nodes.get('frame-grid'));assert.strictEqual(value,info);assert.ok(ports);mounted++;},retire(r){assert.strictEqual(r,root);retired++;},owns:()=>false};
+ assert.equal(UI.render(root,info,false,fixturePorts(root)),true);assert.equal(mounted,1);assert.equal(JSON.stringify(root.state.layers),before);
+ UI.restoreInspector(root);assert.equal(retired,1);
+});

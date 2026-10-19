@@ -425,3 +425,7 @@ impl ObjectLayer {
         self.path_fx.value().map(Vec::as_slice)
     }
 }
+
+pub(crate) use timing::{
+    plan_move_frames, plan_shift_frames, BulkCell, BulkMoveLayer, BulkMovePlan, BulkRetimePair,
+};

@@ -1,6 +1,6 @@
 //! Object record DTOs of the staged native object document (target, frame scope, geometry, solid fill and the
 //! record itself), moved verbatim out of object_document.rs (#2106); the parent re-exports every public name.
-use crate::object_document::{object_deserialize, Presence, VectorBody, VectorExt};
+use crate::object_document::{object_deserialize, LayerEffect, Presence, VectorBody, VectorExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 
@@ -58,6 +58,9 @@ pub struct ObjectRecord {
     /// Pressure fields, paramShape and boxAngle of the `editable-vector-path` family (L01-E).
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) vector_ext: Presence<VectorExt>,
+    /// Original stroke data.effects, shared by storage/copy/retime; never a rendering cache.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) effects: Presence<Option<Vec<LayerEffect>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -112,7 +115,8 @@ object_deserialize!(ObjectRecord {
     geometry: ObjectGeometry,
     #[serde(default)] fill: Presence<Option<SolidFill>>,
     #[serde(default)] vector: Presence<VectorBody>,
-    #[serde(default)] vector_ext: Presence<VectorExt>
+    #[serde(default)] vector_ext: Presence<VectorExt>,
+    #[serde(default)] effects: Presence<Option<Vec<LayerEffect>>>
 });
 object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
     handle_space: String, segments: Vec<ObjectSegment> });
@@ -134,6 +138,14 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectRecord {
+    pub(crate) fn effects(&self) -> Option<&[LayerEffect]> {
+        self.effects.value().and_then(Option::as_deref)
+    }
+    pub(crate) fn has_enabled_effects(&self) -> bool {
+        self.effects()
+            .is_some_and(|stack| stack.iter().any(|effect| effect.enabled))
+    }
+
     pub fn target(&self) -> &ObjectTarget {
         &self.target
     }

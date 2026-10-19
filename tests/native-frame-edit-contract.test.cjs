@@ -15,18 +15,18 @@ const schema = read('engineering/application/native-transport-v2.schema.json');
 const P = 'command.document.object.';
 const OPS = Contract.OPERATIONS;
 const request = (operation, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'frame-edit-7', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 7, operation, payload }, extra);
-const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(q.operation) ? { clipboard: {instanceId:q.instanceId,documentId:q.documentId,cells:[]} } : {}) });
+const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.move' ? { selection: applied ? [] : null } : q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : /frames\.clipboard\.(copy|cut)$/.test(q.operation) ? { clipboard: {instanceId:q.instanceId,documentId:q.documentId,cells:[]} } : {}) });
 const OPTIONAL = { 'object.frames.insert': ['layerUids'], 'object.layer.key.promote': ['layerUids'], 'object.layer.key.move': ['activeLayerUid'] };
 
-test('the descriptor, the schema and the contract declare the same fifteen operations', () => {
-  assert.equal(OPS.length, 15);
+test('the descriptor, the schema and the contract declare the same seventeen operations', () => {
+  assert.equal(OPS.length, 17);
   assert.deepEqual(descriptor.operations, OPS);
   assert.equal(descriptor.id, 'native.frame-edit');
   assert.equal(descriptor.availability.state, 'available');
   assert.equal(descriptor.authority.adapterOwnsWritableMirror, false);
   assert.equal(descriptor.authority.fallback, 'none');
   assert.equal(descriptor.resourceBoundary.maxRequestBytes, 5246976);
-  assert.equal(descriptor.input.oneOf.length, 15);
+  assert.equal(descriptor.input.oneOf.length, 17);
   assert.deepEqual(descriptor.examples.map((e) => e.request.operation), OPS);
   for (const op of OPS) {
     const sample = Contract.example(op), command = Contract.commandOf(op);
@@ -136,7 +136,7 @@ test('unsupported clipboard and blank-key aliases are not admitted', () => {
 test('receipts must carry exactly one revision per applied change and the same owner', async () => {
   for (const op of OPS) {
     const q = request(op, Contract.example(op));
-    for (const applied of op === P + 'layer.key.blank' ? [true] : op === P + 'frames.clipboard.copy' ? [false] : [true, false]) {
+    for (const applied of [P+'layer.key.blank',P+'layer.range.drag'].includes(op) ? [true] : op === P + 'frames.clipboard.copy' ? [false] : [true, false]) {
       const adapter = SDK.createNativeApplicationAdapter('frame-edit-test', { dispatch() { return reply(q, applied); } });
       assert.deepEqual(await adapter.dispatch(q), reply(q, applied));
     }
@@ -260,6 +260,37 @@ test('clipboard shells preserve native ownership, records/order presence and eve
 });
 
 
+test('bulk Move has a closed stable-UID request and exact applied selection receipt', async () => {
+  const op=P+'frames.move', q=request(op,Contract.example(op));
+  assert.equal(OPS.indexOf(op),OPS.indexOf(P+'layer.range.drag')-1);
+  assert.equal(OPS.indexOf(op),OPS.indexOf(P+'frames.repeat')-2);
+  assert.deepEqual(q.payload,{command:'object.frames.move',selection:[{layerUid:'layer-a',frame:3}],layerUid:'layer-b',frame:4});
+  for(const selection of [[],[{layerUid:'data:source',frame:0}]]){
+    assert.doesNotThrow(()=>SDK.validateRequest({...q,payload:{...q.payload,selection}}));
+  }
+  for(const selection of [null,[{layerUid:'a',frame:0,extra:1}],[{layerUid:'a',frame:0},{layerUid:'a',frame:0}],
+    [{layerUid:'',frame:0}],[{layerUid:'a',frame:-1}],Array(4097).fill({layerUid:'a',frame:0})]){
+    assert.throws(()=>SDK.validateRequest({...q,payload:{...q.payload,selection}}),TypeError);
+  }
+  const client=result=>SDK.createNativeApplicationAdapter('move',{dispatch:()=>({...reply(q,result.applied),result})});
+  for(const selection of [[],[{layerUid:'data:destination',frame:4}]]){
+    const result={applied:true,historyEntriesAdded:1,selection};
+    assert.deepEqual((await client(result).dispatch(q)).result,result);
+  }
+  assert.deepEqual((await client({applied:false,historyEntriesAdded:0,selection:null}).dispatch(q)).result,
+    {applied:false,historyEntriesAdded:0,selection:null});
+  for(const result of [{applied:true,historyEntriesAdded:1},{applied:true,historyEntriesAdded:1,selection:null},
+    {applied:false,historyEntriesAdded:0,selection:[]},{applied:true,historyEntriesAdded:0,selection:[]},
+    {applied:true,historyEntriesAdded:1,selection:[{layerUid:'a',frame:1,extra:0}]},
+    {applied:true,historyEntriesAdded:1,selection:[{layerUid:'a',frame:1},{layerUid:'a',frame:1}]},
+    {applied:true,historyEntriesAdded:1,selection:[],clipboard:null}])await assert.rejects(client(result).dispatch(q));
+  assert.equal(Contract.paths(op).has('result.selection.0.layerUid'),true);
+  assert.equal(Contract.paths(P+'frames.insert').has('result.selection.0.layerUid'),false);
+  const oversized={applied:true,historyEntriesAdded:1,selection:[{layerUid:'x'.repeat(4096),frame:0}]};
+  await assert.rejects(client(oversized).dispatch(q),/4096/);
+});
+
+
 test('key move admits only an optional opaque active layer across the closed shared request', () => {
   const op = P + 'layer.key.move', base = Contract.example(op);
   assert.doesNotThrow(() => SDK.validateRequest(request(op, base)));
@@ -270,4 +301,24 @@ test('key move admits only an optional opaque active layer across the closed sha
   assert.doesNotThrow(() => SDK.validateRequest(request(op, {...base, activeLayerUid: 'x'.repeat(257)})));
   const other = Contract.example(P + 'layer.tween.remove');
   assert.throws(() => SDK.validateRequest(request(P + 'layer.tween.remove', {...other, activeLayerUid: 'active'})), TypeError);
+});
+
+test('range gesture contract preserves ordered samples and exact true1 receipt without accepting target aliases',async()=>{
+ const op=P+'layer.range.drag',p=Contract.example(op);assert.equal(OPS.indexOf(op),OPS.indexOf(P+'frames.repeat')-1);
+ const q=request(op,{...p,samples:[0,3,1,1,0],selectedKeys:[{target:{kind:'property',target:{contextId:'scene-root',layerUid:'data:layer',strokeId:'data:stroke'},property:'opacity'},frame:-2.5}]});
+ assert.doesNotThrow(()=>SDK.validateRequest(q));assert.equal(Contract.paths(op).has('payload.selectedKeys.0.target.target.strokeId'),true);
+ const sent=[];const api=SDK.createNativeApplicationAdapter('ui',{dispatch:async v=>{sent.push(v);return reply(v,true);}});await api.dispatch(q);assert.deepEqual(sent[0].payload.samples,[0,3,1,1,0]);
+ for(const patch of [{samples:null},{samples:[0.5]},{samples:[Number.MAX_SAFE_INTEGER+1]},{plainClick:0},{alt:null},{part:'body'},{frame:-1},{barSelection:[{layerUid:'x',part:'in'},{layerUid:'x',part:'out'}]},{selectedKeys:[{target:{kind:'unknown'},frame:0}]},{selectedKeys:[q.payload.selectedKeys[0],q.payload.selectedKeys[0]]}])assert.throws(()=>SDK.validateRequest(request(op,{...p,...patch})),TypeError);
+ assert.throws(()=>Contract.result(op,{applied:false,historyEntriesAdded:0}),TypeError);
+ assert.throws(()=>Contract.result(op,{applied:true,historyEntriesAdded:1,range:{}}),TypeError);
+ assert.doesNotThrow(()=>Contract.result(op,{applied:true,historyEntriesAdded:1}));
+ assert.throws(()=>SDK.validateRequest(request(op,{...p,samples:Array(4096).fill(0)})),/bound|4096|large|bytes/i,'complete wire cap is not an excuse to coalesce samples');
+});
+
+
+test('range selected key duplicate identity ignores JSON member insertion order',()=>{
+ const op='command.document.object.layer.range.drag',value=Contract.example(op);
+ value.selectedKeys=[{target:{kind:'property',target:{contextId:'scene-root',layerUid:'layer-a'},property:'opacity'},frame:0},
+  {target:{property:'opacity',target:{layerUid:'layer-a',contextId:'scene-root'},kind:'property'},frame:0}];
+ assert.throws(()=>Contract.payload(op,value),/duplicate selected key/);
 });

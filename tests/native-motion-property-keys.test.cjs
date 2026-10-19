@@ -172,3 +172,13 @@ test('replacement or disposal while settled refresh is awaiting cannot receive t
 test('settled ordinary native no-op restores its inspector and reports no key changes',async()=>{
  const o=await repaintingOwner();await o.select();await o.button('Linear').fire('click');await Promise.all(o.updates);assert.equal(o.f.session.info().contentRevision,0);assert.equal(o.f.requests.filter(q=>q.operation==='command.document.object.property.track.edit').length,1);assert.equal(o.busyCleared,true);assert.equal(o.queries,4);assert.equal(o.mainStatus(),'No key changes.');await o.select();assert.equal(o.button('Hold').disabled,false);o.binding.dispose();
 });
+
+test('selected-key projection exports actual qualified fractional identities and independent local queued currency',async()=>{
+ const h=fixture({keys:[{frame:-2.5,v:[1],lockTo:'in'},{frame:4.25,v:[2],lockTo:null}]});assert.equal(await h.open(),true);
+ const cleared=h.editor.captureSelectedKeys();assert.deepEqual(cleared.keys,[]);assert.equal(cleared.isCurrent(),true);
+ await h.select(1);assert.equal(cleared.isCurrent(),false);const captured=h.editor.captureSelectedKeys();
+ assert.deepEqual(captured.keys,[{target:{kind:'property',target,property:'opacity'},frame:4.25}]);assert.equal(Object.isFrozen(captured.keys[0].target),true);assert.equal(Object.keys(captured).includes('isCurrent'),false);
+ h.ready(false);assert.equal(h.editor.captureSelectedKeys(),null);assert.equal(captured.isCurrent(),true,'local selection proof remains readable while the queue hides presentation');
+ h.editor.clear();assert.equal(captured.isCurrent(),false);h.ready(true);assert.deepEqual(h.editor.captureSelectedKeys().keys,[]);h.editor.dispose();assert.equal(h.editor.captureSelectedKeys(),null);
+ for(const lockTo of [false,0,{},'other']){const bad=fixture({keys:[{frame:0,v:[1],lockTo}]});assert.equal(await bad.open(),false);}
+});

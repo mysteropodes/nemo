@@ -233,6 +233,12 @@ fn emit_command(
     command: ObjectPaintCommand<'_>,
 ) -> Result<(), SvgExportError> {
     let record = command.source().record();
+    if record.has_enabled_effects() {
+        return Err(SvgExportError::Unsupported {
+            source_object_index,
+            reason: "per-element effects have no admitted SVG representation",
+        });
+    }
     admit_record(
         source_object_index,
         &RecordFacts {

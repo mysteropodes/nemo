@@ -1076,109 +1076,24 @@
       "maximum": 4294967295
     },
     "ObjectLayerTimingPayload": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "atRevision",
-        "documentSnapshotId",
-        "contextId",
-        "layerUid",
-        "frame"
-      ],
-      "properties": {
-        "atRevision": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectLayerTimingCellPayload"
         },
-        "documentSnapshotId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "contextId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "layerUid": {
-          "type": "string",
-          "minLength": 1
-        },
-        "frame": {
-          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        {
+          "$ref": "#/$defs/ObjectLayerRangePayload"
         }
-      },
-      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+      ]
     },
     "ObjectLayerTimingResult": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "instanceId",
-        "documentId",
-        "atRevision",
-        "documentSnapshotId",
-        "contextId",
-        "layerUid",
-        "frame",
-        "cellKind",
-        "sourceFrame",
-        "hasContent",
-        "manualEdit"
-      ],
-      "properties": {
-        "instanceId": {
-          "type": "string",
-          "minLength": 1
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectLayerTimingCellResult"
         },
-        "documentId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "atRevision": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "documentSnapshotId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "contextId": {
-          "const": "scene-root"
-        },
-        "layerUid": {
-          "type": "string",
-          "minLength": 1
-        },
-        "frame": {
-          "$ref": "#/$defs/ObjectLayerTimingFrame"
-        },
-        "cellKind": {
-          "enum": [
-            "key",
-            "interpolated",
-            "held",
-            "unexposed"
-          ]
-        },
-        "sourceFrame": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/ObjectLayerTimingFrame"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "hasContent": {
-          "type": "boolean"
-        },
-        "manualEdit": {
-          "type": "boolean"
+        {
+          "$ref": "#/$defs/ObjectLayerRangeResult"
         }
-      },
-      "description": "Actual immutable identity and selected source; complete encoded result <=4096bytes or typed Unavailable. A core read is not live host/UI epoch admission or rendering/export acceptance."
+      ]
     },
     "ObjectQueryPayload": {
       "type": "object",
@@ -6017,6 +5932,40 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.move"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesMovePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.range.drag"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerRangeDragPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -6852,6 +6801,9 @@
             },
             {
               "$ref": "#/$defs/ObjectFrameClipboardCutResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectFrameBulkMoveResult"
             }
           ]
         },
@@ -7271,6 +7223,14 @@
             "minimum": -1.7976931348623157e+308,
             "maximum": 1.7976931348623157e+308
           }
+        },
+        "lockTo": {
+          "enum": [
+            null,
+            "in",
+            "out",
+            "layer"
+          ]
         }
       }
     },
@@ -8589,6 +8549,544 @@
         }
       },
       "description": "Bounded stored baseline fillGradient. Document-world coordinates and stop/color order retained; item/layer opacity folds once in native style production. Other stop counts remain unavailable."
+    },
+    "ObjectFramesMovePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "selection",
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.move"
+        },
+        "selection": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameEditCell"
+          }
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectFrameBulkMoveResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "selection"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "selection": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "maxItems": 4096,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/ObjectFrameEditCell"
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applied": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 1
+              },
+              "selection": {
+                "type": "array",
+                "maxItems": 4096,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/$defs/ObjectFrameEditCell"
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 0
+              },
+              "selection": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "description": "Ordinary Move actual native destination cells after locks/crop/ripple. Eligible checkpoint publishes true/1 even if bytes unchanged; early no-op false/0/null preserves UI selection. Complete correlated reply is admitted before commit."
+    },
+    "ObjectLayerShiftTrackTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "property"
+          ],
+          "properties": {
+            "kind": {
+              "const": "property"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid"
+          ],
+          "properties": {
+            "kind": {
+              "const": "layerOrder"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid"
+          ],
+          "properties": {
+            "kind": {
+              "const": "timeRemap"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid",
+            "frameScope",
+            "strokeId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "elementOrder"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frameScope": {
+              "$ref": "#/$defs/ObjectFrameScope"
+            },
+            "strokeId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "ObjectLayerRangeDragPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "activeLayerUid",
+        "part",
+        "barSelection",
+        "samples",
+        "plainClick",
+        "alt",
+        "frame",
+        "selectedKeys"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.range.drag"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "activeLayerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "part": {
+          "enum": [
+            "in",
+            "out",
+            "both"
+          ]
+        },
+        "barSelection": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "layerUid",
+              "part"
+            ],
+            "properties": {
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              },
+              "part": {
+                "enum": [
+                  "in",
+                  "out",
+                  "both"
+                ]
+              }
+            }
+          }
+        },
+        "samples": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "plainClick": {
+          "type": "boolean"
+        },
+        "alt": {
+          "type": "boolean"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "selectedKeys": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "frame"
+            ],
+            "properties": {
+              "target": {
+                "$ref": "#/$defs/ObjectLayerShiftTrackTarget"
+              },
+              "frame": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerRangePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "view": {
+          "const": "range"
+        }
+      },
+      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+    },
+    "ObjectLayerTimingCellPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        }
+      },
+      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+    },
+    "ObjectLayerRangeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "range"
+      ],
+      "properties": {
+        "kind": {
+          "const": "layerRange"
+        },
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rawInPoint",
+            "rawOutPoint",
+            "inPoint",
+            "outPoint",
+            "hasCustomRange",
+            "hasTimeLink"
+          ],
+          "properties": {
+            "rawInPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "rawOutPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "inPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "outPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "hasCustomRange": {
+              "type": "boolean"
+            },
+            "hasTimeLink": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerTimingCellResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "cellKind",
+        "sourceFrame",
+        "hasContent",
+        "manualEdit"
+      ],
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "cellKind": {
+          "enum": [
+            "key",
+            "interpolated",
+            "held",
+            "unexposed"
+          ]
+        },
+        "sourceFrame": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectLayerTimingFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasContent": {
+          "type": "boolean"
+        },
+        "manualEdit": {
+          "type": "boolean"
+        }
+      },
+      "description": "Actual immutable identity and selected source; complete encoded result <=4096bytes or typed Unavailable. A core read is not live host/UI epoch admission or rendering/export acceptance."
     }
   }
 }

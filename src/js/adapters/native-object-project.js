@@ -328,7 +328,7 @@
         operation:'command.document.object.layer.policy.edit',expectedRevision:pin.contentRevision,
         payload:{command:'object.layer.policy.edit',layerUid:payload.layerUid,flag:payload.flag,value:payload.value}};
     },'nemo_native_dispatch');}
-    function editFrames(operation,payload,expected){return mutation(function(pin){if(!same(pin,expected)||!FrameEdit||!FrameEdit.valid(operation,payload))throw new Error('Native frame edit intent is '+(same(pin,expected)?'invalid':'stale'));return {apiVersion:2,requestId:requestId('frame-edit'),instanceId:pin.instanceId,documentId:pin.documentId,operation:operation,expectedRevision:pin.contentRevision,payload:JSON.parse(JSON.stringify(payload))};},'nemo_native_dispatch');}
+    function editFrames(operation,payload,expected,current){return mutation(function(pin){if(typeof current==='function'&&current()!==true)throw new Error('Native frame edit intent is stale');if(!same(pin,expected)||!FrameEdit||!FrameEdit.valid(operation,payload))throw new Error('Native frame edit intent is '+(same(pin,expected)?'invalid':'stale'));return {apiVersion:2,requestId:requestId('frame-edit'),instanceId:pin.instanceId,documentId:pin.documentId,operation:operation,expectedRevision:pin.contentRevision,payload:JSON.parse(JSON.stringify(payload))};},'nemo_native_dispatch');}
     function editProjectSettings(action,expected){return mutation(function(pin){
       if(!same(pin,expected))throw new Error('Native project settings intent is stale');
       return {apiVersion:2,requestId:requestId('project-settings'),instanceId:pin.instanceId,documentId:pin.documentId,
@@ -355,27 +355,33 @@
     }
     function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
-    async function readLayerTiming(layerUid,frame,pin){
-      // Observe existing work without entering, advancing or settling its queue.
+    async function readLayerView(layerUid,frame,pin,rangeView){
       async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
-      function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&
-        value.presentation.frame===frame&&integer(frame,0)&&frame<pin.totalFrames&&
-        pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length===1;}
+      function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&value.presentation.frame===frame&&
+        integer(frame,0)&&frame<pin.totalFrames&&pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length===1;}
       try{
         await settled();if(!ready())return null;
-        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId('timing'),instanceId:pin.instanceId,documentId:pin.documentId,
+        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId(rangeView?'range':'timing'),instanceId:pin.instanceId,documentId:pin.documentId,
           operation:'query.document.object.layer.timing',payload:{atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,
             contextId:'scene-root',layerUid:layerUid,frame:frame}};
-        var response=await raw('nemo_native_dispatch',request);
-        await settled();
+        if(rangeView)request.payload.view='range';
+        var response=await raw('nemo_native_dispatch',request);await settled();
         if(ticket!==subscriptionTicket||!ready()||!response||response.ok!==true||response.instanceId!==pin.instanceId||
           response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)return null;
         var result=response.result;
-        if(!result||Object.keys(result).length!==11||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
+        if(!result||Object.keys(result).length!==(rangeView?9:11)||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
           ['atRevision','documentSnapshotId','contextId','layerUid','frame'].some(function(k){return result[k]!==request.payload[k];}))return null;
+        if(rangeView){
+          var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
+          if(result.kind!=='layerRange'||!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
+            !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return null;
+          return freeze(JSON.parse(JSON.stringify(result)));
+        }
         return freeze(Object.assign({},result));
       }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
     }
+    function readLayerTiming(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,false);}
+    function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,true);}
     if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
       dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
@@ -411,7 +417,7 @@
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
-      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,readLayerRange:readLayerRange,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
       get editFrames(){return FrameEdit&&typeof ports.dispatchApplication==='function'&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&

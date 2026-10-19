@@ -179,6 +179,9 @@ fn compile(
     source: ObjectFrameRecord<'_>,
     pose: Option<&PosedStroke>,
 ) -> Result<CompiledContour, &'static str> {
+    if source.record().has_enabled_effects() {
+        return Err("per-element effect evaluation awaits its native scene consumer");
+    }
     if is_vector_record(source.record()) {
         return compile_vector(packet, source, pose);
     }

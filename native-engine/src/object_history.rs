@@ -458,3 +458,8 @@ impl NativeObjectHistory {
         Ok(restored)
     }
 }
+
+#[path = "object_frame_bulk_move_history.rs"]
+mod object_frame_bulk_move;
+#[path = "object_layer_shift_history.rs"]
+mod object_layer_shift;

@@ -10,6 +10,13 @@
 // collapsed layer row (motion.js) — a layer's visible range is a layer-
 // level concept, not specific to either timeline view.
 (function () {
+  function nativeRangeMode() {
+    try { var s=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window),c=window.NemoNativeOpacityCutover;
+      return !!(s&&(s.isActive()||s.blocksLegacy&&s.blocksLegacy())||c&&c.blocksLegacy&&c.blocksLegacy());
+    } catch (_) { return true; }
+  }
+  function nativeRangeUnavailable() { if(window.showToast)window.showToast('Native layer range action is unavailable.'); }
+
   // Delegates to the shared globals in app.js — the RAW (unclamped)
   // layerInPointRaw/layerOutPointRaw, not layerInPoint/layerOutPoint
   // (2026-08, "les layer dans motion doivent pouvoir aller au delà de la
@@ -152,6 +159,7 @@
     return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
   }
   function updateBar(row, li) {
+    if(nativeRangeMode()){if(window.NemoNativeLayerRangeDesktop)window.NemoNativeLayerRangeDesktop.paint(window,row,li);return;}
     // row peut être null pour un membre de group-drag dont la ligne n'est
     // pas rendue (enfant d'un dossier REPLIÉ — computeLayerRenderOrder le
     // marque hidden et renderTimelineMotion ne construit alors aucune
@@ -345,6 +353,7 @@
     _keyDrag = { li: li, row: row, bar: bar, tickEl: tickEl, origFrame: frame, startX: e.clientX, previewFrame: frame };
   }
   document.addEventListener('mousemove', function (e) {
+    if(nativeRangeMode())return;
     if (!_keyDrag) return;
     var ld = state.layers[_keyDrag.li]; if (!ld) { _keyDrag = null; return; }
     var dx = Math.round((e.clientX - _keyDrag.startX) / FC);
@@ -357,6 +366,7 @@
     _keyDrag.tickEl.style.left = ((nf - inF) * FC) + 'px';
   });
   document.addEventListener('mouseup', function () {
+    if(nativeRangeMode()){_keyDrag=null;return;}
     if (!_keyDrag) return;
     var kd = _keyDrag; _keyDrag = null;
     if (kd.previewFrame !== kd.origFrame && window.SM && window.SM.moveKeyframe) {
@@ -400,6 +410,7 @@
   }
   var _marquee = null; // {startX, startY, rectEl, moved}
   function startMarquee(e) {
+    if(nativeRangeMode()){e.preventDefault();e.stopPropagation();if(window.NemoNativeLayerRangeDesktop)window.NemoNativeLayerRangeDesktop.startMarquee(window,e);else nativeRangeUnavailable();return;}
     var rect = document.createElement('div'); rect.className = 'layer-inout-marquee-rect';
     document.body.appendChild(rect);
     _marquee = { startX: e.clientX, startY: e.clientY, rectEl: rect, moved: false };
@@ -431,34 +442,8 @@
   // Un rectangle qui couvre la barre sans toucher aucune poignée sélectionne
   // la barre ENTIÈRE : il la désigne bien, il ne désigne simplement aucun bord
   // en particulier.
-  var HANDLE_TOLERANCE_PX = 6;
-  function partForBoxHit(bar, barRect, x0, x1) {
-    var hl = bar.querySelector('.layer-inout-handle.left');
-    var hr = bar.querySelector('.layer-inout-handle.right');
-    if (!hl || !hr) return partForOverlap(barRect, Math.max(x0, barRect.left), Math.min(x1, barRect.right));
-    var rl = hl.getBoundingClientRect(), rr = hr.getBoundingClientRect();
-    var touches = function (r) { return (r.left - HANDLE_TOLERANCE_PX) <= x1 && (r.right + HANDLE_TOLERANCE_PX) >= x0; };
-    var inHit = touches(rl), outHit = touches(rr);
-    if (inHit && outHit) return 'both';
-    if (inHit) return 'in';
-    if (outHit) return 'out';
-    // Aucune poignée dans le rectangle : on ne sélectionne AUCUN point.
-    // Cyril : « ce qu'il faudrait c'est que les in/out point qui sont
-    // SEULEMENT dans le rec de sélection soient sélectionnés ». Un premier
-    // jet renvoyait 'both' ici — donc un rectangle tracé au milieu d'une
-    // barre sélectionnait ses DEUX bords, exactement ce qu'il ne veut pas.
-    // La barre n'est pas perdue pour autant : le lasso de la grille verse
-    // alors ce calque dans la sélection de CALQUES (motion.js, endMarquee),
-    // ce qui est la lecture honnête du geste — « j'ai encadré ces lignes,
-    // sans viser de bord ».
-    return null;
-  }
-  function partForOverlap(barRect, ox0, ox1) {
-    var mid = (barRect.left + barRect.right) / 2;
-    var touchesLeft = ox0 <= mid, touchesRight = ox1 >= mid;
-    if (touchesLeft && !touchesRight) return 'in';
-    if (touchesRight && !touchesLeft) return 'out';
-    return 'both';
+  function partForBoxHit(bar,barRect,x0,x1) {
+    return window.NemoLayerInOutSelection.partForBoxHit(bar,barRect,x0,x1);
   }
   function applyMarqueeSelection(x0, y0, x1, y1) {
     var sel = [];
@@ -581,6 +566,7 @@
   // a handle to begin with, so its own hand-off branch is a permanent
   // no-op there rather than genuinely dead code).
   function onDown(li, row, type, e, forceHandleEl) {
+    if(nativeRangeMode()){e.preventDefault();e.stopPropagation();if(window.NemoNativeLayerRangeDesktop)window.NemoNativeLayerRangeDesktop.down(window,li,row,type,e);else nativeRangeUnavailable();return;}
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
     if (e.metaKey || e.ctrlKey) { // toggle one, no drag
@@ -798,6 +784,7 @@
     });
   }
   document.addEventListener('mousemove', function (e) {
+    if(nativeRangeMode())return;
     updateMarquee(e);
     if (!_drag) return;
     var total = state.totalFrames;
@@ -972,6 +959,7 @@
     }
   });
   document.addEventListener('mouseup', function (upEv) {
+    if(nativeRangeMode()){_drag=null;if(_marquee){_marquee.rectEl.remove();_marquee=null;}return;}
     endMarquee();
     if (!_drag) return;
     var d = _drag; _drag = null;
@@ -1310,6 +1298,7 @@
     return _barSel.map(function (s) { return { li: s.li, ld: state.layers[s.li] }; }).filter(function (x) { return x.ld; });
   }
   function applyBatch(fn) {
+    if (nativeRangeMode()) { nativeRangeUnavailable(); return; }
     var items = selectedLayers();
     if (items.length < 2) { if (window.showToast) showToast(SM.t('toastSelectAtLeast2Layers')); return; }
     if (window.pushUndo) pushUndo();
@@ -1401,6 +1390,7 @@
     });
   }
   function selectEveryNth(n) {
+    if (nativeRangeMode()) { nativeRangeUnavailable(); return; }
     n = Math.max(2, parseInt(n, 10) || 2);
     var sorted = _barSel.slice().sort(function (a, b) { return inPointOf(state.layers[a.li]) - inPointOf(state.layers[b.li]); });
     _barSel = sorted.filter(function (_s, i) { return i % n === 0; });
@@ -1457,6 +1447,7 @@
     });
   }
   function buildBar(row, li) {
+    if(nativeRangeMode()){_rowLayerIdx.set(row,li);_liToRow[li]=row;if(window.NemoNativeLayerRangeDesktop)window.NemoNativeLayerRangeDesktop.buildBar(window,row,li);return;}
     row.style.position = 'relative';
     var bar = document.createElement('div'); bar.className = 'layer-inout-bar' + (selPartOf(li) === 'both' ? ' sel' : '');
     var hleft = document.createElement('div'); hleft.className = 'layer-inout-handle left';
@@ -1645,6 +1636,7 @@
     // reimplementing (and drifting from) that pair. Callers own the in/out
     // values themselves; this moves what LIVES at those frames.
     retimeLayers: function (plan) {
+      if (nativeRangeMode()) { nativeRangeUnavailable(); return; }
       (plan || []).forEach(function (p) {
         if (!p || !p.dx) return;
         if (window.SM && window.SM.shiftLayerFrames) window.SM.shiftLayerFrames(p.li, p.dx);

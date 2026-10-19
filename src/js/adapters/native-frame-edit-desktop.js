@@ -30,7 +30,8 @@
     if(name==='moveKeyframe')return {kind:'moveKey',layer:args[0],from:args[1],to:args[2]};
     if(name==='extendExposure')return {kind:'extendExposure',count:args[0]};
     if(name==='repeatSelection')return {kind:'repeatSelection',times:args[0]};
-    if(name==='moveFrames'||name==='shiftLayerFrames')return {unsupported:true};
+    if(name==='moveFrames')return {kind:'moveFrames',selection:args[0],layer:args[1],frame:args[2]};
+    if(name==='shiftLayerFrames')return {unsupported:true};
     return {kind:shared[name]||({deleteSelectedFrames:'deleteFrames',duplicateKeyframe:'duplicateKey'})[name]||name};
   }
   function install(root){
@@ -85,13 +86,20 @@
         .filter(function(cell){return cell.layer<info.layers.length&&cell.frame<info.totalFrames;}));
       return true;
     }
+    function acceptMove(selection,info){
+      if(!sameCurrent(info)||!root._sel)return false;
+      var cells=selection.map(function(cell){return {layer:info.layers.findIndex(function(row){return row.layerUid===cell.layerUid;}),frame:cell.frame};});
+      if(cells.some(function(cell){return cell.layer<0||cell.frame>=info.totalFrames;}))return false;
+      selectCells(cells);return true;
+    }
     var intent=root.NemoNativeFrameEditIntent.create({currentSession:current,application:root.NemoNativeApplicationAdapter,
       frame:function(){return root.state&&root.state.currentFrame;},
       activeLayer:function(){return root.state&&root.state.activeLayerIdx;},
       layerSelection:function(){return root._layerSel;},
       cellSelection:function(){return root._sel&&root._sel.frames;},available:available,
-      readClipboard:readClipboard,acceptClipboard:acceptClipboard,acceptPaste:acceptPaste,
-      captureClipboard:captureClipboard,clipboardUnchanged:clipboardUnchanged});
+      readClipboard:readClipboard,acceptClipboard:acceptClipboard,acceptPaste:acceptPaste,acceptMove:acceptMove,
+      captureClipboard:captureClipboard,clipboardUnchanged:clipboardUnchanged,
+      rangeCurrent:function(capture,info,after,queued){return !!capture&&typeof capture.isCurrent==='function'&&capture.isCurrent(info,after,queued)===true;}});
     function capture(){
       try{
         var session=current(),info=session&&session.info(),state=root.state;

@@ -7,6 +7,16 @@
   'use strict';
   function create(ports) {
     const { exact, revision, objectUid, frame, id, plain, has } = ports;
+    function rangeResult(value) {
+      exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','range'],[],'range result');
+      id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
+      objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
+      if(value.contextId!=='scene-root')throw new TypeError('invalid range context');
+      exact(value.range,['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'],[],'resolved range');
+      if(!['rawInPoint','rawOutPoint','inPoint','outPoint'].every(k=>Number.isFinite(value.range[k]))||
+         typeof value.range.hasCustomRange!=='boolean'||typeof value.range.hasTimeLink!=='boolean')throw new TypeError('invalid resolved range');
+      return;
+    }
     function metadataPayload(p) {
       exact(p, ['atRevision', 'documentSnapshotId', 'view'], [], 'metadata selector'); revision(p.atRevision, 'atRevision'); objectUid(p.documentSnapshotId);
       const v=p.view, keys=v && v.kind==='targets' ? ['kind','offset','limit'] : v && v.kind==='properties' ? ['kind','target','offset','limit'] : ['kind','target','property'];
@@ -134,9 +144,10 @@
       }
     }
     function readKey(value, dimension) {
-      exact(value, ['frame', 'v'], ['hold', 'curvePoints', 'hIn', 'hOut'], 'authored property key');
+      exact(value, ['frame', 'v'], ['hold', 'curvePoints', 'hIn', 'hOut','lockTo'], 'authored property key');
       if (!Number.isFinite(value.frame)) throw new TypeError('invalid authored key frame');
       readVector(value.v, dimension);
+      if(has(value,'lockTo')&&value.lockTo!==null&&!['in','out','layer'].includes(value.lockTo))throw new TypeError('invalid authored lock');
       if (has(value, 'hold') && typeof value.hold !== 'boolean') throw new TypeError('invalid authored hold');
       for (const name of ['hIn', 'hOut']) if (has(value, name)) readVector(value[name], 2);
       if (has(value, 'curvePoints') && value.curvePoints !== null) {
@@ -201,7 +212,7 @@
       }
     }
     const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
-    return Object.freeze({ metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
+    return Object.freeze({ rangeResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }
   return Object.freeze({ create });
