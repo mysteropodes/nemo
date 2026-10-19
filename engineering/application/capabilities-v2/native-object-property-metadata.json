@@ -23,7 +23,7 @@
     "adapterOwnsWritableMirror": false,
     "fallback": "none"
   },
-  "readPolicy": "Existing RevisionSync and native owner locks select the current immutable history snapshot; four provider pins bind content. UI consumers separately compare captured local lifecycle and selection generation after await. No lifecycle echo, property writes, publication or acknowledgement.",
+  "readPolicy": "Existing RevisionSync and native owner locks select the current immutable history snapshot; four provider pins bind content. UI consumers separately compare captured local lifecycle and selection generation after await. No lifecycle echo, property writes, publication or acknowledgement. Property pages retain their original Transform/paint set and terminal cursor by default. Explicit boolean view.includeVertices adds actual path/mesh vertex descriptors, still under the original eight-item/3072-byte limits; it grants no property-write or render consumer.",
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,

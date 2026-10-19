@@ -45,6 +45,8 @@ enum ViewFields {
         target: PropertyHolderTarget,
         offset: u32,
         limit: u8,
+        #[serde(default, rename = "includeVertices")]
+        include_vertices: bool,
     },
     StoredProperty {
         target: PropertyHolderTarget,
@@ -305,6 +307,7 @@ impl ObjectSnapshot {
                 target,
                 offset,
                 limit,
+                include_vertices,
             } => {
                 if limit == 0 || limit > MAX_PAGE {
                     return Err(invalid());
@@ -347,11 +350,16 @@ impl ObjectSnapshot {
                 if let Some(paint) = paint {
                     keys.push(paint);
                 }
-                let vertices = PropertyHolder::vertex_count(self.document(), &target).unwrap_or(0);
+                // Preserve the standing Transform/paint page and its terminal
+                // cursor. Vertex discovery is an explicit compatible opt-in.
+                let vertices = if include_vertices {
+                    PropertyHolder::vertex_count(self.document(), &target).unwrap_or(0)
+                } else { 0 };
                 let extra: Vec<_> = holder
                     .properties()
                     .iter()
                     .filter_map(|p| {
+                        if !include_vertices { return None; }
                         let i = PropertyHolder::vertex_index(p.property())?;
                         (i >= vertices || p.property() != format!("vtx{i}")).then_some(p.property())
                     })

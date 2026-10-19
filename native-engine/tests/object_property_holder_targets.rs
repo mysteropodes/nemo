@@ -70,7 +70,7 @@ fn actual_item_and_mesh_holders_roundtrip_and_keep_vertex_units_separate() {
     for (id, unit) in [("s0", "px"), ("im_1", "%")] {
         let r = metadata(
             &pin,
-            json!({"kind":"properties","target":target("L0",Some(id)),"offset":6,"limit":8}),
+            json!({"kind":"properties","target":target("L0",Some(id)),"offset":6,"limit":8,"includeVertices":true}),
         );
         assert!(r["items"]
             .as_array()
@@ -138,6 +138,30 @@ fn animated_vertex_tracks_read_through_the_same_pinned_query_without_render_fall
 }
 
 #[test]
+fn vertex_discovery_keeps_original_paint_page_and_strictly_opts_in() {
+    let owner=owner(&fixture());let pin=owner.acquire_snapshot(0).unwrap();
+    let t=target("L0",Some("s0"));
+    let view=json!({"kind":"properties","target":t,"offset":6,"limit":1});
+    let legacy=metadata(&pin,view.clone());
+    assert_eq!(legacy["items"][0]["property"],"fillColor");
+    assert!(legacy["nextOffset"].is_null());
+    let mut explicit=view.clone();explicit["includeVertices"]=json!(false);
+    assert_eq!(metadata(&pin,explicit.clone()),legacy);
+    explicit["includeVertices"]=json!(true);
+    assert_eq!(metadata(&pin,explicit.clone())["nextOffset"],7);
+    explicit["offset"]=json!(7);explicit["limit"]=json!(2);
+    let vertices=metadata(&pin,explicit);
+    assert_eq!(vertices["items"].as_array().unwrap().iter().map(|v|v["property"].as_str().unwrap()).collect::<Vec<_>>(),vec!["vtx0","vtx1"]);
+    assert!(vertices["nextOffset"].is_null());
+    for invalid in [Value::Null,json!(1),json!("true")] {
+        let mut view=view.clone();view["includeVertices"]=invalid;
+        let q=json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":0,
+            "documentSnapshotId":pin.snapshot_id(),"view":view});
+        assert_eq!(pin.query_property_metadata_json(q.to_string().as_bytes()),Err(DispatchErrorCode::InvalidRequest));
+    }
+}
+
+#[test]
 fn target_pages_discover_only_real_frame_independent_item_and_mesh_keys() {
     let owner = owner(&fixture());
     let pin = owner.acquire_snapshot(0).unwrap();
@@ -166,7 +190,7 @@ fn target_pages_discover_only_real_frame_independent_item_and_mesh_keys() {
     loop {
         let page = metadata(
             &pin,
-            json!({"kind":"properties","target":mesh,"offset":offset,"limit":8}),
+            json!({"kind":"properties","target":mesh,"offset":offset,"limit":8,"includeVertices":true}),
         );
         names.extend(
             page["items"]

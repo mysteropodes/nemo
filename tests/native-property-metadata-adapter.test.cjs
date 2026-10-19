@@ -8,6 +8,22 @@ const categories=['conditionalMotionRows','pathVerticesTrimStrokeBrushMesh','ref
 function request(){return {apiVersion:2,requestId:'metadata-1',instanceId:'instance',documentId:'doc',operation:op,payload:{atRevision:0,documentSnapshotId:'native-object:doc:0',view:{kind:'properties',target:{contextId:'scene-root',layerUid:'data:opaque 雪'},offset:0,limit:2}}};}
 function response(q){return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:0,ok:true,result:{instanceId:q.instanceId,documentId:q.documentId,atRevision:0,documentSnapshotId:q.payload.documentSnapshotId,kind:'properties',target:{layerUid:q.payload.view.target.layerUid,contextId:'scene-root'},items:[{property:'opacity',dimension:1,unit:'',defaultValue:[100],animatable:true,controlType:null,controlName:'  data:雪  ',authored:{availability:'available',keyCount:0,hasStaticOverride:false,expressionEnabled:false},availability:{metadata:'available',applicability:'available',propertyWrite:'unavailable',reason:'read-only-description-not-command-availability'}}],nextOffset:1,unavailableCategories:categories.map(category=>({category,state:'unavailable',reason:'not-admitted'}))}};}
 const adapter=send=>createNativeApplicationAdapter('metadata-proposal',{dispatch:async q=>send(q)});
+test('vertex discovery is an explicit boolean opt-in on properties only', async()=>{
+  for(const flag of [true,false]){
+    const q=request();q.payload.view.includeVertices=flag;
+    assert.doesNotThrow(()=>validateRequest(q));
+    assert.deepEqual(await adapter(response).dispatch(q),response(q));
+  }
+  for(const flag of [null,1,'true',[],{}]){
+    const q=request();q.payload.view.includeVertices=flag;
+    assert.throws(()=>validateRequest(q));
+  }
+  for(const view of [{kind:'targets',offset:0,limit:1},
+    {kind:'storedProperty',target:request().payload.view.target,property:'opacity'}]){
+    const q=request();q.payload.view={...view,includeVertices:true};
+    assert.throws(()=>validateRequest(q));
+  }
+});
 test('opaque identities, reordered target keys and exact UTF8 control names round-trip without mutation',async()=>{const q=request(),before=structuredClone(q);const r=await adapter(response).dispatch(q);assert.deepEqual(q,before);assert.equal(r.result.controlName,undefined);assert.equal(r.result.items[0].controlName,'  data:雪  ');});
 test('strict selector rejects extra lifecycle, positional view, unsupported view and expected revision before send',()=>{for(const mutate of [q=>q.payload.lifecycleGeneration=1,q=>q.payload.view=[],q=>q.payload.view.kind='writes',q=>q.expectedRevision=0,q=>q.payload.view.limit=9,q=>q.payload.view.target.extra=true]){const q=request();mutate(q);let calls=0;assert.throws(()=>adapter(()=>{calls++;}).dispatch(q));assert.equal(calls,0);}});
 test('all four inner pins, original request ID, outer identities and content revision correlate',async()=>{for(const mutate of [r=>r.requestId='other',r=>r.instanceId='other',r=>r.documentId='other',r=>r.result.instanceId='other',r=>r.result.documentId='other',r=>r.result.atRevision=1,r=>r.result.documentSnapshotId='other',r=>r.contentRevision=1]){await assert.rejects(adapter(q=>{const r=response(q);mutate(r);return r;}).dispatch(request()));}});

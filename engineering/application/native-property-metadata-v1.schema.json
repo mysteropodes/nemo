@@ -69,6 +69,10 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 8
+            },
+            "includeVertices": {
+              "type": "boolean",
+              "description": "Explicitly include real path/mesh vertex descriptors; missing or false preserves the original Transform/paint pagination."
             }
           },
           "required": [

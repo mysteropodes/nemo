@@ -35,7 +35,9 @@ pub(super) fn request(v: &Value) -> bool {
                 } else {
                     return false;
                 };
-                exact(view, &required, &[]).is_some_and(|x| {
+                exact(view, &required, if kind=="properties" { &["includeVertices"] } else { &[] }).is_some_and(|x| {
+                    x.get("includeVertices").is_none_or(Value::is_boolean)
+                        &&
                     uint(x.get("offset")).is_some()
                         && x.get("limit")
                             .and_then(Value::as_u64)
@@ -268,6 +270,17 @@ mod tests {
             {"category":"expressionDiagnostics","state":"unavailable","reason":"not-admitted"},
             {"category":"layerEffectMatteReveal","state":"unavailable","reason":"not-admitted"},
             {"category":"propertyWrites","state":"unavailable","reason":"read-only"}]})
+    }
+    #[test]
+    fn vertex_discovery_is_optional_strict_boolean_and_properties_only() {
+        let mut p=payload();p["view"]=json!({"kind":"properties","target":{"contextId":"scene-root","layerUid":"L"},"offset":0,"limit":1});
+        assert!(request(&p));
+        for flag in [json!(true),json!(false)] { p["view"]["includeVertices"]=flag;assert!(request(&p)); }
+        for flag in [Value::Null,json!(1),json!("true"),json!([]),json!({})] {
+            p["view"]["includeVertices"]=flag;assert!(!request(&p));
+        }
+        p=payload();p["view"]["includeVertices"]=json!(true);assert!(!request(&p));
+        p["view"]=json!({"kind":"storedProperty","target":{"contextId":"scene-root","layerUid":"L"},"property":"opacity","includeVertices":true});assert!(!request(&p));
     }
     #[test]
     fn pages_refuse_unknown_views_members_positional_input_and_nonadvancing_cursors() {
