@@ -302,15 +302,21 @@ test('one action at a time, and a retired adapter refuses everything', async () 
   assert.deepEqual({ ...await pending }, { status: 'applied-unconfirmed', applied: true });
 });
 
-test('actions native has no operation for report typed unavailability before any session or selection is read', async () => {
+test('missing clipboard consumer ports refuse before session reads; declared native clipboard still validates payloads', async () => {
   const hostile = { currentSession() { throw new Error('must not consult'); }, application: SDK, frame() { throw new Error('no'); }, activeLayer() { throw new Error('no'); },
     layerSelection() { throw new Error('no'); }, cellSelection() { throw new Error('no'); }, available() { throw new Error('no'); } };
   const intent = Intent.create(hostile);
   for (const kind of ['copyFrames', 'cutFrames', 'pasteFrames']) assert.deepEqual({ ...await intent.run({ kind }) }, { status: 'unavailable', code: 'frame_edit_packet_unavailable' });
   assert.deepEqual({ ...await intent.run({ kind: 'insertBlankKey' }) }, { status: 'unavailable', code: 'frame_edit_session_unavailable' }, 'F7 now requires a real presented session');
-  // The shared client really declares none of them, so no later wiring can reach a write by accident.
+  // Declaration does not bypass the missing-consumer-port gate above, and malformed commands still refuse.
+  const Contract = require('../src/js/adapters/native-frame-edit-contract.js');
   for (const operation of [P + 'frames.clipboard.paste', P + 'frames.clipboard.cut', P + 'frames.clipboard.copy', P + 'layer.key.insert_blank']) {
-    assert.throws(() => SDK.validateRequest({ apiVersion: 2, requestId: 'req-1', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 1, operation, payload: { command: 'x' } }), /not admitted/);
+    const q = { apiVersion: 2, requestId: 'req-1', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 1, operation, payload: { command: 'x' } };
+    if (operation === P + 'layer.key.insert_blank') assert.throws(() => SDK.validateRequest(q), /not admitted/);
+    else {
+      assert.throws(() => SDK.validateRequest(q), /command does not match/);
+      assert.doesNotThrow(() => SDK.validateRequest({ ...q, payload: Contract.example(operation) }));
+    }
   }
 });
 

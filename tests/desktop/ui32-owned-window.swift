@@ -42,11 +42,12 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   var currentCommand:String?
   let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0,sourceCaptureStage = -1,newSettingsOpen=false
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
+  let f03=try f03Operator(pinned,environment)
   var retainedWebArea:AXUIElement?, latest:UI32ContentCertificate<AXUIElement>?
   func nativeIdentity() throws { try verifyOwnedWindow(pinned) }
   func identity() throws {
     try nativeIdentity()
-    let phase=try ui32IdentityPhase(currentCommand,
+    let phase=try f03IdentityPhase(f03,currentCommand,
       fixtureActive:fixture?.attempted == true && fixture?.completed != true,
       syncActive:syncPanel?.attempted == true && syncPanel?.completed != true)
     // Native picker commands prove their existing attached owner/context before
@@ -203,6 +204,9 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     let rectangle=CGRect(origin:p,size:size), window=CGRect(origin:origin,size:extent)
     try check(size.width > 0 && size.height > 0 && window.contains(rectangle))
   }
+  func f03Member(_ node:AXUIElement) throws {
+    let current=try tree();try check(owns(node,pid) && current.contains {CFEqual($0,node)})
+  }
   try identity()
   try emit(["status":"pinned","purpose":"UI32","pid":pid,"windowId":pinned.number,
     "processStartSeconds":pinned.start.seconds,"processStartMicroseconds":pinned.start.microseconds,"matchedAX":true])
@@ -285,6 +289,14 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       result["capture"]=name; try emit(result); continue
     }
     try ui32RequireObserved(observed)
+    if command.hasPrefix("f03.") {
+      try check(request["option"] == nil && request["value"] == nil)
+      guard let f03 else {throw Refusal(code:"adapter-refused")}
+      result=f03Result(result,try f03.perform(command,fixture:{fixture},setFixture:{fixture=$0},
+        syncActive:syncPanel?.attempted == true && syncPanel?.completed != true,
+        resolve:resolve,visible:enabledVisible,member:f03Member,afterDismissal:{_ = try tree()}))
+      try emit(result);continue
+    }
     if command == "selection.toggle.B" {
       try check(request["option"] == nil && request["value"] == nil && fixture?.completed == true && fixture?.confirmed == true)
       _ = try tree()

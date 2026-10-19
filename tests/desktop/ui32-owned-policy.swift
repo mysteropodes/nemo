@@ -109,6 +109,7 @@ func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, 
 }
 func ui32SelfTest() throws {
   let profileFocusCases=try ui32ProfileFocusSelfTest()
+  let f03Cases=try f03SelfTests()
   try ui32IdentityPhaseSelfTest();try ui32Phase2ReadSelfTest()
   try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()
@@ -152,7 +153,7 @@ func ui32SelfTest() throws {
     try check(refused == (fault != 0))
     try check(events == ((fault == 0 || fault == 3 || fault == 5) ? ["ax","posted"] : []))
   }
-  try emit(["status":"ui32-static-model-pass","runtimeAX":false,"foreignReads":0,"purpose":"UI32","profileFocusCases":profileFocusCases])
+  try emit(["status":"ui32-static-model-pass","runtimeAX":false,"foreignReads":0,"purpose":"UI32","profileFocusCases":profileFocusCases,"f03":f03Cases])
 }
 
 // Keep the existing child-array/count witness contract exactly; no nil-as-empty.
