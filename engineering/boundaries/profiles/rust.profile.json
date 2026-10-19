@@ -2005,7 +2005,19 @@
       "files": [
         "media_probe.rs",
         "vectorize.rs",
-        "video_decode.rs"
+        "video_decode.rs",
+        "video_decode/decode.rs",
+        "video_decode/indexed.rs",
+        "video_decode/optimized.rs",
+        "video_decode/process.rs",
+        "video_decode/readahead.rs",
+        "video_decode/session.rs",
+        "video_decode/tests.rs",
+        "video_decode/tests_cache.rs",
+        "video_decode/tests_decode.rs",
+        "video_decode/tests_indexed.rs",
+        "video_decode/tests_perf.rs",
+        "video_decode/tests_sessions.rs"
       ],
       "publicApi": [
         "media_probe.rs",
@@ -2249,15 +2261,6 @@
       "owner": "mysteropodes",
       "issue": "1013",
       "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content.",
-      "expires": "2026-12-05"
-    },
-    {
-      "path": "src-tauri/src/video_decode.rs",
-      "rule": "size",
-      "ceiling": 2266,
-      "owner": "mysteropodes",
-      "issue": "1013",
-      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content. P28/#1030 began that extraction and the file now measures 2160; the allowance is deliberately left at its adoption value so an extraction packet changes code, not size policy. See nonblankLinesNow in rust.coverage.json.",
       "expires": "2026-12-05"
     }
   ]
