@@ -162,10 +162,11 @@ pub(crate) fn record_layer_has_active_path_fx(
     packet: &ObjectFramePacket,
     record: &ObjectRecord,
 ) -> bool {
+    if record.target().context_id() != packet.context_id() {
+        return false;
+    }
     packet
-        .snapshot()
-        .document()
-        .layers()
+        .source_layers()
         .iter()
         .find(|layer| layer.layer_uid() == record.target.layer_uid)
         .and_then(stack_of)
@@ -182,14 +183,24 @@ pub(crate) fn load_stored(
         .objects()
         .get(object_index)
         .ok_or(VectorEvalError::MissingRecord)?;
+    stored_from_record(
+        record,
+        document
+            .layers()
+            .iter()
+            .find(|layer| layer.layer_uid() == record.target.layer_uid),
+    )
+}
+
+/// Build from an immutable record/layer pair; no object index is readdressed here.
+fn stored_from_record<'a>(
+    record: &'a ObjectRecord,
+    layer: Option<&ObjectLayer>,
+) -> Result<StoredVector<'a>, VectorEvalError> {
     if record.family != VECTOR_FAMILY {
         return Err(VectorEvalError::NotVectorFamily);
     }
-    let layer = document
-        .layers()
-        .iter()
-        .find(|layer| layer.layer_uid() == record.target.layer_uid)
-        .ok_or(VectorEvalError::MissingRecord)?;
+    let layer = layer.ok_or(VectorEvalError::MissingRecord)?;
     let segments = record
         .geometry
         .segments
@@ -207,6 +218,30 @@ pub(crate) fn load_stored(
         },
         stack,
     })
+}
+
+/// Packet records already borrow their selected retained context. Validate the
+/// matching selected layer/frame before consuming that pair; never index root objects.
+fn load_packet_stored<'a>(
+    packet: &ObjectFramePacket,
+    source: ObjectFrameRecord<'a>,
+) -> Result<StoredVector<'a>, VectorEvalError> {
+    if !packet.owns_record(source) {
+        return Err(VectorEvalError::MissingRecord);
+    }
+    let record = source.record();
+    let target = record.target();
+    let layer = packet
+        .source_layers()
+        .get(source.source_layer_index())
+        .filter(|layer| {
+            layer.layer_uid() == target.layer_uid()
+                && target.context_id() == packet.context_id()
+                && target.scope_kind() == packet.scope_kind()
+                && packet.source_frame_for_layer(source.source_layer_index())
+                    == Some(target.frame())
+        });
+    stored_from_record(record, layer)
 }
 
 /// Stage 1, `SMPathFx.apply(strokes, ld, frameIdx)` for one stroke: the active stack in storage order, each effect
@@ -282,6 +317,16 @@ pub(crate) fn evaluate_vector_rest(
     frame: u32,
 ) -> Result<EvaluatedVector, VectorEvalError> {
     let stored = load_stored(snapshot, object_index)?;
+    evaluate_stored_rest(snapshot, object_index, frame, stored)
+}
+
+/// The original pathFX -> parametric rebuild stages, shared without changing math.
+fn evaluate_stored_rest(
+    snapshot: &ObjectSnapshot,
+    object_index: usize,
+    frame: u32,
+    stored: StoredVector<'_>,
+) -> Result<EvaluatedVector, VectorEvalError> {
     let after_effects = run_path_fx(stored.stack.as_deref(), &stored.stroke, frame)?;
     let anchors = after_effects.segments.as_deref().unwrap_or(&[]);
     let segments = match run_param_shape(snapshot, stored.record, anchors, frame)? {
@@ -317,11 +362,20 @@ pub(crate) fn evaluate_record(
     packet: &ObjectFramePacket,
     record: ObjectFrameRecord<'_>,
 ) -> Result<EvaluatedVector, VectorEvalError> {
-    evaluate_vector(
+    let stored = load_packet_stored(packet, record)?;
+    let mut evaluated = evaluate_stored_rest(
         packet.snapshot(),
         record.source_object_index(),
         packet.frame(),
-    )
+        stored,
+    )?;
+    evaluated.segments = motion::apply_layer_position(
+        packet.snapshot(),
+        record.record(),
+        packet.frame(),
+        evaluated.segments,
+    )?;
+    Ok(evaluated)
 }
 
 /// Real scene producer entry for detached stored rig output. Other records use
@@ -336,7 +390,7 @@ pub(crate) fn evaluate_record_with_pose(
         return evaluate_record(packet, source);
     };
     let snapshot = packet.snapshot();
-    let stored = load_stored(snapshot, source.source_object_index())?;
+    let stored = load_packet_stored(packet, source)?;
     let anchors = stored.stroke.segments.as_deref().unwrap_or(&[]);
     if pose.stroke_id != stored.record.target.stroke_id
         || pose.closed != stored.stroke.closed

@@ -60,58 +60,94 @@
     value.items.forEach(function(k){if(!k||!Number.isFinite(k.frame)||k.frame<=previous||typeof k.selected!=='boolean')throw Error('Invalid native key projection');previous=k.frame;});
     return value;
   }
+  function keyViews(root,w){
+    var plural=w&&w.ports&&w.ports.readMotionKeyTimelines;
+    if(typeof plural!=='function'){
+      var one=keyView(root,w);if(!one)return null;
+      return {pin:one.pin,frame:one.frame,viewGeneration:one.viewGeneration,tracks:[{target:one.target,property:one.property,items:one.items}],
+        isCurrent:one.isCurrent,selectKeys:function(keys){return one.selectFrames(keys.map(function(k){return k.frame;}));}};
+    }
+    if(root.state.appMode!=='motion')return null;
+    var value=plural(w.info);if(value===null)return null;
+    if(!value||!same(value.pin,w.info)||value.frame!==root.state.currentFrame||!Array.isArray(value.tracks)||
+       typeof value.isCurrent!=='function'||typeof value.selectKeys!=='function'||value.isCurrent()!==true)throw Error('Native key tracks unavailable');
+    var seen=new Set();
+    value.tracks.forEach(function(track){
+      if(!track||!track.target||track.target.contextId!=='scene-root'||typeof track.target.layerUid!=='string'||typeof track.property!=='string'||!track.property||!Array.isArray(track.items))throw Error('Invalid native key track');
+      var id=trackIdentity(track),previous=-Infinity;if(seen.has(id))throw Error('Duplicate native key track');seen.add(id);
+      track.items.forEach(function(k){if(!k||!Number.isFinite(k.frame)||k.frame<=previous||typeof k.selected!=='boolean')throw Error('Invalid native key frames');previous=k.frame;});
+    });
+    return value;
+  }
+  function trackIdentity(track){return JSON.stringify([track.target.contextId,track.target.layerUid,Object.prototype.hasOwnProperty.call(track.target,'strokeId'),track.target.strokeId,track.property]);}
   function keyIdentity(value){return value&&JSON.stringify([pins.map(function(k){return value.pin[k];}),value.frame,value.viewGeneration,
-    value.target.contextId,value.target.layerUid,value.target.strokeId,value.property,value.items.map(function(k){return k.frame;})]);}
+    value.tracks.map(function(track){return [trackIdentity(track),track.items.map(function(k){return k.frame;})];})]);}
+  function keyAddress(track,frame){return {target:{kind:'property',target:track.target,property:track.property},frame:frame};}
+  function selectedAddresses(value){var keys=[];value.tracks.forEach(function(track){track.items.forEach(function(key){if(key.selected)keys.push(keyAddress(track,key.frame));});});return keys;}
   function clearKeys(w){(w.keyNodes||[]).forEach(function(n){if(n.parentNode)n.parentNode.removeChild(n);});w.keyNodes=[];}
+  function keyRows(root,w,layout){
+    if(layout.length&&(!w.ports||typeof w.ports.setKeyTimelineRows!=='function'||w.ports.setKeyTimelineRows(layout,w.info)!==true))throw Error('Native property label rows unavailable');
+    if(!layout.length&&w.ports&&typeof w.ports.setKeyTimelineRows==='function')w.ports.setKeyTimelineRows([],w.info);
+    w.rows.forEach(function(row,i){var entry=layout.find(function(v){return v.layerUid===w.info.layers[i].layerUid;}),extra=entry?entry.labels.length:0;
+      row.style.height=((1+extra)*22)+'px';var bar=row.querySelector('.layer-inout-bar');if(bar){bar.style.bottom=extra?'auto':'2px';bar.style.height=extra?'18px':'';}
+    });
+  }
   function refreshKeys(root){
     var w=works.get(root);if(!w)return;clearKeys(w);
     try{
+      keyRows(root,w,[]);
       if(!w.node||root.state.appMode!=='motion'||!ready(root,session(root),w.info))return;
-      var value=keyView(root,w),fc=root.FC;if(!value||!Number.isFinite(fc)||fc<=0)return;
-      var index=w.info.layers.findIndex(function(l){return l.layerUid===value.target.layerUid;}),row=w.rows[index];
-      if(!row||row.hidden)return;
-      // Preflight the complete projection before publishing even its first node.
-      var offsets=value.items.map(function(key){
-        var left=(key.frame+0.5)*fc-4.5;
-        if(!Number.isFinite(left))throw Error('Native key coordinate overflow');
-        return left;
+      var value=keyViews(root,w),fc=root.FC;if(!value||!Number.isFinite(fc)||fc<=0)return;
+      var groups=new Map(),layout=[],positions=[];
+      value.tracks.forEach(function(track){
+        var index=w.info.layers.findIndex(function(l){return l.layerUid===track.target.layerUid;});if(index<0)throw Error('Foreign native key layer');
+        var group=groups.get(index)||[];group.push(track);groups.set(index,group);
       });
-      value.items.forEach(function(key,keyIndex){
+      groups.forEach(function(tracks,index){
+        if(tracks.length>1)layout.push({layerUid:w.info.layers[index].layerUid,labels:tracks.map(function(t){return (t.target.strokeId===undefined?'':t.target.strokeId+' · ')+t.property;})});
+        tracks.forEach(function(track,lane){track.items.forEach(function(key){
+          // Preflight ALL coordinates in ALL tracks before publishing labels or nodes.
+          var left=(key.frame+0.5)*fc-4.5,top=(tracks.length>1?(lane+1)*22:0)+6;
+          if(!Number.isFinite(left)||!Number.isFinite(top))throw Error('Native key coordinate overflow');
+          positions.push({track:track,key:key,index:index,left:left,top:top});
+        });});
+      });
+      keyRows(root,w,layout);
+      positions.forEach(function(position){
+        var track=position.track,key=position.key,row=w.rows[position.index];if(row.hidden)return;
         var node=root.document.createElement('button');node.type='button';node.className='motion-key layer-inout-key native-motion-property-key';
-        Object.assign(node.style,{position:'absolute',left:offsets[keyIndex]+'px',top:'6px',padding:'0',cursor:'pointer',zIndex:'7'});
-        node.dataset.frame=String(key.frame);node.classList.toggle('sel',key.selected);
-        node.setAttribute('aria-label',value.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
+        Object.assign(node.style,{position:'absolute',left:position.left+'px',top:position.top+'px',padding:'0',cursor:'pointer',zIndex:'7'});
+        node.dataset.frame=String(key.frame);node.dataset.keyTrack=trackIdentity(track);node.classList.toggle('sel',key.selected);
+        node.setAttribute('aria-label',track.property+' key at frame '+String(key.frame));node.setAttribute('aria-pressed',String(key.selected));
         function choose(event){
-          event.preventDefault();event.stopPropagation();
-          if(event.button!==undefined&&event.button!==0)return;
+          event.preventDefault();event.stopPropagation();if(event.button!==undefined&&event.button!==0)return;
           try{
-            if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!value.isCurrent())throw Error('Stale native key selection');
-            var frames=event.ctrlKey||event.metaKey||event.shiftKey?value.items.filter(function(k){return k.selected;}).map(function(k){return k.frame;}):[];
-            var at=frames.indexOf(key.frame);if(at>=0&&(event.ctrlKey||event.metaKey))frames.splice(at,1);else if(at<0)frames.push(key.frame);
-            if(value.selectFrames(frames)!==true)throw Error('Native key selection refused');refreshKeys(root);
+            if(root.state.appMode!=='motion'||node.parentNode!==row||w.rows[position.index]!==row||root.FC!==fc||w.down||w.marquee||!ready(root,session(root),w.info)||!value.isCurrent())throw Error('Stale native key selection');
+            var keys=event.ctrlKey||event.metaKey||event.shiftKey?selectedAddresses(value):[],address=keyAddress(track,key.frame),id=JSON.stringify(address);
+            var at=keys.findIndex(function(k){return JSON.stringify(k)===id;});if(at>=0&&(event.ctrlKey||event.metaKey))keys.splice(at,1);else if(at<0)keys.push(address);
+            if(value.selectKeys(keys)!==true)throw Error('Native key selection refused');refreshKeys(root);
           }catch(_){notice(root,'Native key selection is unavailable or stale.');}
         }
-        node.addEventListener('mousedown',choose);
-        node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
+        node.addEventListener('mousedown',choose);node.addEventListener('click',function(event){if(event.detail===0)choose(event);});
         row.appendChild(node);w.keyNodes.push(node);
       });
-    }catch(_){clearKeys(w);notice(root,'Native key timeline coordinates are unavailable.');}
+    }catch(_){clearKeys(w);try{keyRows(root,w,[]);}catch(_){}notice(root,'Native key timeline coordinates are unavailable.');}
   }
   function marqueeKeys(root,w,m,x0,y0,x1,y1){
-    var value=keyView(root,w);
+    var value=keyViews(root,w);
     if(keyIdentity(value)!==m.keyIdentity||m.keyView&&m.keyView.isCurrent()!==true)throw Error('Native key view changed');
     if(!value)return;
-    var frames=[];
+    var keys=[];
     (w.keyNodes||[]).forEach(function(node){
       if(!node.parentNode||node.parentNode.hidden)return;
       var b=node.getBoundingClientRect(),cx=b.left+b.width/2,cy=b.top+b.height/2;
-      if(cx>=x0&&cx<=x1&&cy>=y0&&cy<=y1)frames.push(Number(node.dataset.frame));
+      if(cx>=x0&&cx<=x1&&cy>=y0&&cy<=y1){var track=value.tracks.find(function(t){return trackIdentity(t)===node.dataset.keyTrack;});if(!track)throw Error('Foreign key node');keys.push(keyAddress(track,Number(node.dataset.frame)));}
     });
-    if(value.selectFrames(frames)!==true)throw Error('Native key marquee refused');
-    m.keyView=keyView(root,w);if(keyIdentity(m.keyView)!==m.keyIdentity)throw Error('Native key marquee changed view');refreshKeys(root);
+    if(value.selectKeys(keys)!==true)throw Error('Native key marquee refused');
+    m.keyView=keyViews(root,w);if(keyIdentity(m.keyView)!==m.keyIdentity)throw Error('Native key marquee changed view');refreshKeys(root);
   }
   function cancel(root){var w=works.get(root);if(w&&w.marquee){var m=w.marquee;w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);}if(w&&w.capture){w.capture.valid=false;w.capture=null;}if(w)w.down=false;}
-  function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
+  function retire(root){var w=works.get(root);if(!w)return;cancel(root);clearKeys(w);try{keyRows(root,w,[]);}catch(_){}w.serial++;w.rows=[];if(w.node&&w.node.parentNode)w.node.parentNode.removeChild(w.node);w.node=null;w.grid=null;}
   function selection(root,w,li,part,event){
     var info=w.info,uid=info.layers[li].layerUid,values=bars(root,info)||[];
     if(event.metaKey||event.ctrlKey){var i=values.findIndex(function(v){return v.layerUid===uid;});if(i>=0)values.splice(i,1);else values.push({layerUid:uid,part:'both'});w.anchor=uid;}
@@ -147,7 +183,7 @@
     var w=works.get(root),s=session(root),info=s&&s.info();
     if(!w||!w.barUiReady||w.capture||w.marquee||root.state.activeSymbolId!=null||root.state.activeCompositionId!=null||!Number.isFinite(root.FC)||root.FC<=0||!ready(root,s,info)||!same(w.info,info)||!signature(root,info)||
       !Number.isFinite(event.clientX)||!Number.isFinite(event.clientY)||root.NemoNativeFrameEditDesktop.install(root).isPending()){notice(root);return true;}
-    var keys;try{keys=keyView(root,w);}catch(_){notice(root);return true;}
+    var keys;try{keys=keyViews(root,w);}catch(_){notice(root);return true;}
     var rect=root.document.createElement('div');rect.className='layer-inout-marquee-rect';root.document.body.appendChild(rect);
     w.marquee={rect:rect,x:event.clientX,y:event.clientY,info:info,ui:signature(root,info),fc:root.FC,moved:false,keyView:keys,keyIdentity:keyIdentity(keys)};return true;
   }
@@ -161,9 +197,9 @@
       if(m.moved){try{marqueeKeys(root,w,m,x0,y0,x1,y1);}catch(_){cancel(root);notice(root,'Native key marquee is unavailable or stale.');return true;}w.ports.barUi.marqueeSelect(x0,y0,x1,y1);}
     }else{
       try{
-        var keys=keyView(root,w);
+        var keys=keyViews(root,w);
         if(keyIdentity(keys)!==m.keyIdentity||m.keyView&&m.keyView.isCurrent()!==true)throw Error('Stale native key view');
-        if(!m.moved){if(keys&&keys.selectFrames([])!==true)throw Error('Native key selection refused');w.ports.barUi.setBarSelection([]);}
+        if(!m.moved){if(keys&&keys.selectKeys([])!==true)throw Error('Native key selection refused');w.ports.barUi.setBarSelection([]);}
       }catch(_){cancel(root);notice(root);return true;}
       w.marquee=null;if(m.rect.parentNode)m.rect.parentNode.removeChild(m.rect);
     }

@@ -205,15 +205,18 @@ crate::object_document::object_deserialize!(LegacyDocument {
     #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>
 });
 
-/// Explicit core storage admission; both attempts read the original raw bytes.
+/// Route canonical v2 to its strict codec so its typed refusal is not masked by v1.
+/// The header chooses a codec only; admission always reads the ORIGINAL raw bytes.
 pub fn decode_storage_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> {
-    match decode_project(bytes) {
-        Ok(document) => Ok(document),
-        Err(legacy_error) => match decode_ordered_project(bytes) {
-            Ok(document) => Ok(document.into_storage()),
-            Err(_) => Err(legacy_error),
-        },
+    #[derive(Deserialize)]
+    struct StorageVersion {
+        #[serde(rename = "formatVersion")]
+        version: u32,
     }
+    if serde_json::from_slice::<StorageVersion>(bytes).is_ok_and(|wire| wire.version == 2) {
+        return decode_ordered_project(bytes).map(|document| document.into_storage());
+    }
+    decode_project(bytes)
 }
 
 pub fn encode_storage_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecError> {

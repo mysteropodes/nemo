@@ -90,7 +90,9 @@
         check.type='checkbox';check.setAttribute('aria-label','Select key at frame '+String(k.frame));
         listen(check,'change',function(){
           if(accepted!==value||!current(value,ticket)||busy||typeof ports.editPropertyTrack!=='function'){check.checked=false;return refuse('Native key selection is unavailable or stale.');}
-          if(check.checked){if(selected.size>=32){check.checked=false;status.textContent='Select at most 32 native keys.';return;}selected.add(k.frame);}else selected.delete(k.frame);
+          var proposed=Array.from(selected);if(check.checked&&!selected.has(k.frame))proposed.push(k.frame);else proposed=proposed.filter(function(frame){return frame!==k.frame;});
+          if(proposed.length>32||!acceptSelection(proposed)){check.checked=selected.has(k.frame);status.textContent='Select at most 32 current native keys across open tracks.';return;}
+          if(check.checked)selected.add(k.frame);else selected.delete(k.frame);
           selectionEpoch++;status.textContent=selected.size+' native key(s) selected.';controls();timelineChanged('selection');
         },rowBindings);
         checks.push({frame:k.frame,node:check});label.appendChild(check);label.appendChild(text);rows.appendChild(label);
@@ -125,17 +127,23 @@
         accepted=value;render(value,ticket);timelineChanged('read');return true;
       }catch(error){if(ticket!==serial||retired)return false;return refuse('Native key read refused: '+String(error&&error.message||error));}
     }
+    function acceptSelection(frames){try{return typeof ports.acceptKeySelection!=='function'||ports.acceptKeySelection(frames)===true;}catch(_){return false;}}
     function readKeyTimeline(){
       try{
         var value=accepted,ticket=serial,epoch=selectionEpoch;
         if(retired||busy||!value||!current(value,ticket))return null;
         function isCurrent(){return accepted===value&&selectionEpoch===epoch&&!busy&&current(value,ticket);}
+        function proposedFrames(frames){
+          if(!isCurrent()||typeof ports.editPropertyTrack!=='function'||!Array.isArray(frames)||frames.length>32)return null;
+          var values=Array.from(frames),seen=new Set(),available=new Set(value.items.map(function(k){return k.frame;}));
+          if(!values.every(function(frame){if(!Number.isFinite(frame)||!available.has(frame)||seen.has(frame))return false;seen.add(frame);return true;}))return null;
+          return acceptSelection(values)&&isCurrent()?values:null;
+        }
+        function canSelectFrames(frames){try{return proposedFrames(frames)!==null;}catch(_){return false;}}
         function selectFrames(frames){
           try{
-            if(!isCurrent()||typeof ports.editPropertyTrack!=='function'||!Array.isArray(frames)||frames.length>32)return false;
-            var values=Array.from(frames),seen=new Set(),available=new Set(value.items.map(function(k){return k.frame;}));
-            if(!values.every(function(frame){if(!Number.isFinite(frame)||!available.has(frame)||seen.has(frame))return false;seen.add(frame);return true;}))return false;
-            if(!isCurrent())return false;
+            var values=proposedFrames(frames);if(values===null)return false;
+            var seen=new Set(values);
             if(selected.size===seen.size&&Array.from(selected).every(function(frame){return seen.has(frame);}))return true;
             selected.clear();values.forEach(function(frame){selected.add(frame);});selectionEpoch++;
             checks.forEach(function(check){check.node.checked=selected.has(check.frame);});
@@ -144,7 +152,7 @@
         }
         var projection={pin:Object.assign({},value.token.pin),frame:value.frame,viewGeneration:value.token.viewGeneration,
           target:Object.assign({},value.target),property:value.property,items:value.items.map(function(k){return {frame:k.frame,selected:selected.has(k.frame)};})};
-        Object.defineProperties(projection,{isCurrent:{value:isCurrent},selectFrames:{value:selectFrames}});
+        Object.defineProperties(projection,{isCurrent:{value:isCurrent},selectFrames:{value:selectFrames},canSelectFrames:{value:canSelectFrames}});
         return freeze(projection);
       }catch(_){return null;}
     }

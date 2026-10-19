@@ -15,7 +15,7 @@ class Node {
  get parentElement(){return this.parentNode;}
  querySelectorAll(selector){return this.children.flatMap(n=>(selector[0]==='.'&&selector.slice(1).split('.').every(k=>n.className.split(' ').includes(k))?[n]:[]).concat(n.querySelectorAll(selector)));}
  querySelector(selector){for(const n of this.children){if(selector[0]==='.'&&selector.slice(1).split('.').every(k=>n.className.split(' ').includes(k)))return n;const found=n.querySelector(selector);if(found)return found;}return null;}
- fire(type,extra={}){const event={type,target:this,clientX:100,preventDefault(){},stopPropagation(){},...extra};for(const f of this.events.get(type)||[])f(event);}
+ fire(type,extra={}){const event={type,target:this,clientX:100,preventDefault(){},stopPropagation(){},...extra};return Promise.all((this.events.get(type)||[]).map(f=>f(event)));}
 }
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 const source=fs.readFileSync(path.join(__dirname,'../src/js/layer-inout.js'),'utf8');
@@ -29,7 +29,7 @@ function actualHandlers(root,legacy){
  return {onDown:context.onDown,buildBar:context.buildBar,marqueeSelect:context.applyMarqueeSelection,readBars:()=>context._barSel,writeBars:v=>{context._barSel=v;}};
 }
 async function harness(options={}){
- let active=false,revision=0,gate=null,legacyKeys=[],localKeys=[],keyEpoch=0,barSel=[],legacy=0,keyEditor=null;
+ let active=false,revision=0,gate=null,legacyKeys=[],localKeys=[],keyEpoch=0,barSel=[],legacy=0,keyEditor=null,propertyPanel=null,leftRows=null;
  const doc=new Node('document');doc.createElement=tag=>new Node(tag);doc.body=doc.createElement('body');doc.appendChild(doc.body);const grid=doc.createElement('div');doc.body.appendChild(grid);grid.appendChild(doc.createElement('div'));
  const root={document:doc,NemoLayerInOutSelection:Selection,FC:10,state:{currentFrame:2,activeLayerIdx:0,totalFrames:12,appMode:'motion',activeSymbolId:null,activeCompositionId:null,layers:[{layerUid:'alpha'},{layerUid:'beta'}]},_layerSel:[],_sel:{frames:[]},events:new Map(),notices:[]};
  root.addEventListener=(k,f)=>root.events.set(k,f);root.showToast=m=>root.notices.push(m);
@@ -56,7 +56,7 @@ async function harness(options={}){
   subscribeRevisions:async()=>({instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,subscriptionId:'ranges'}),
   dispatchApplication:q=>SDK.createNativeApplicationAdapter('range-test',{dispatch:value=>invoke('nemo_native_dispatch',{request:value})}).dispatch(q)});
  Object.assign(root,{NemoNativeObjectProject:{desktop:()=>s},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>true},NemoNativeLayerRangeDesktop:Range,NemoNativeFrameEditDesktop:Desktop,NemoNativeFrameEditIntent:Intent,NemoNativeApplicationAdapter:SDK,
-  NemoNativeObjectUI:{readSelectedMotionKeys(r,pin){if(keyEditor)return keyEditor.captureSelectedKeys();if(options.staleKeys)return null;const epoch=keyEpoch,v={pin,frame:root.state.currentFrame,viewGeneration:epoch,keys:structuredClone(localKeys)};Object.defineProperty(v,'isCurrent',{value:()=>epoch===keyEpoch});return Object.freeze(v);}},
+  NemoNativeObjectUI:{readSelectedMotionKeys(r,pin){if(propertyPanel)return propertyPanel.captureSelectedKeys();if(keyEditor)return keyEditor.captureSelectedKeys();if(options.staleKeys)return null;const epoch=keyEpoch,v={pin,frame:root.state.currentFrame,viewGeneration:epoch,keys:structuredClone(localKeys)};Object.defineProperty(v,'isCurrent',{value:()=>epoch===keyEpoch});return Object.freeze(v);}},
   SMMotion:{getKeySelection:()=>legacyKeys}});
  const legacyFn=()=>{legacy++;throw Error('LEGACY WRITER');},actual=actualHandlers(root,legacyFn);
  root.SMLayerInOut={...actual,getBarSelection:()=>Array.from(actual.readBars(),v=>({...v})),setBarSelection(v){barSel=v.slice();actual.writeBars(v.slice());}};
@@ -71,7 +71,27 @@ async function harness(options={}){
   await keyEditor.open({contextId:'scene-root',layerUid:options.propertyLayer||'alpha'},'opacity');Range.refreshKeys(root);
  }
 
- return {root,doc,grid,s,controller,calls,info,ports,keyEditor,keyNodes:()=>grid.querySelectorAll('.native-motion-property-key'),commands:()=>calls.filter(c=>c.q?.operation===OP),legacy:()=>legacy,
+ if(options.propertyTracks){
+  const file=path.join(__dirname,'native-motion-key-timeline.test.cjs'),fixture=fs.readFileSync(file,'utf8');
+  const a=fixture.indexOf('// BEGIN REUSABLE REAL PROPERTY PANEL FIXTURE'),b=fixture.indexOf('// END REUSABLE REAL PROPERTY PANEL FIXTURE',a);
+  assert.ok(a>=0&&b>a);const makePanel=vm.compileFunction(fixture.slice(a,b)+'\nreturn createPropertyPanel;',['require'])(require);
+  const uiSource=fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-object-ui.js'),'utf8');
+  const start=uiSource.indexOf('  function setKeyTimelineRows('),end=uiSource.indexOf('  function paintMotionInspector(',start);assert.ok(start>0&&end>start);
+  const views=new WeakMap(),list=doc.createElement('div');doc.body.appendChild(list);
+  leftRows=info().layers.map(layer=>{const row=doc.createElement('div');for(let i=0;i<4;i++)row.appendChild(doc.createElement('button'));list.appendChild(row);return row;});
+  views.set(root,{pin:info(),list,rows:leftRows,controls:leftRows.map(row=>row.children.slice())});
+  const helpers=uiSource.split('\n').filter(line=>['createNativeObjectUiText','sameTimingPin'].some(name=>line.startsWith('  function '+name+'('))).join('\n');
+  const applyRows=vm.compileFunction(helpers+'\n'+uiSource.slice(start,end)+'\nreturn setKeyTimelineRows;',['views'])(views);
+  ports.setKeyTimelineRows=(layout,expected)=>applyRows(root,layout,expected);
+  ports.readMotionKeyTimelines=()=>propertyPanel?propertyPanel.readKeyTimelines():null;
+  const container=doc.createElement('div');doc.body.appendChild(container);
+  propertyPanel=makePanel({document:doc,container,readContext:()=>({pin:info(),frame:root.state.currentFrame,viewGeneration:1,presented:s.readPresentedObjectSession()}),tracks:options.propertyTracks,keyTimelineChanged:()=>Range.refreshKeys(root)});
+  await propertyPanel.ready;
+  for(const track of options.propertyTracks)await propertyPanel.openProperty(track.target,track.property);
+  Range.refreshKeys(root);
+ }
+
+ return {root,doc,grid,s,controller,calls,info,ports,keyEditor,propertyPanel,leftRows,keyNodes:()=>grid.querySelectorAll('.native-motion-property-key'),commands:()=>calls.filter(c=>c.q?.operation===OP),legacy:()=>legacy,
   rows:()=>grid.children[1].children,bar:i=>grid.children[1].children[i].querySelector('.layer-inout-bar'),
   down(i=0,part='both',event={}){actual.onDown(i,this.rows()[i],part,{clientX:100,preventDefault(){},stopPropagation(){},...event});},
   move:x=>doc.fire('mousemove',{clientX:x}),up:x=>doc.fire('mouseup',{clientX:x}),
@@ -208,4 +228,42 @@ test('native key click provenance uses the layer row independently from key ordi
   h.keyNodes()[first].fire('mousedown',{button:0,ctrlKey:true});assert.deepEqual(h.keyEditor.captureSelectedKeys().keys.map(k=>k.frame),[[2.25,7][1-first]]);
   assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
  }
+});
+
+
+test('real multi-property inspectors render paired native label/grid lanes and shared rectangle selection reaches one Shift request',async()=>{
+ const target={contextId:'scene-root',layerUid:'alpha'},h=await harness({propertyTracks:[
+  {target,property:'opacity',dimension:1,items:[{frame:2.25,v:[50]},{frame:7,v:[75]}]},
+  {target,property:'position',dimension:2,items:[{frame:4.5,v:[3,7]}]}]});
+ assert.equal(h.keyNodes().length,3);assert.equal(h.rows()[0].style.height,'66px');assert.equal(h.leftRows[0].style.height,'66px');
+ assert.equal(h.rows()[1].style.height,'22px');assert.equal(h.leftRows[1].style.height,'22px');
+ assert.deepEqual(h.leftRows[0].children[0].children.map(n=>n.textContent),['alpha','opacity','position']);assert.equal(h.leftRows[0].children.length,4,'original four controls retain identity');
+ assert.equal(h.bar(0).style.height,'18px');assert.deepEqual(h.keyNodes().map(n=>n.style.top),['28px','28px','50px']);
+ function geometry(){h.keyNodes().forEach(n=>{const x=(Number(n.dataset.frame)+0.5)*h.root.FC,y=Number.parseFloat(n.style.top);n.getBoundingClientRect=()=>({left:x-4.5,top:y,width:9,height:9});});}
+ geometry();h.bar(0).getBoundingClientRect=()=>({left:20,right:150,top:0,bottom:20});
+ h.bar(0).querySelector('.layer-inout-handle.left').getBoundingClientRect=()=>({left:20,right:24});h.bar(0).querySelector('.layer-inout-handle.right').getBoundingClientRect=()=>({left:146,right:150});
+ h.bar(1).getBoundingClientRect=()=>({left:200,right:300,top:66,bottom:86});
+ Range.startMarquee(h.root,{clientX:20,clientY:0});h.doc.fire('mousemove',{clientX:60,clientY:64});h.doc.fire('mouseup',{clientX:60,clientY:64});
+ assert.deepEqual(h.propertyPanel.captureSelectedKeys().keys.map(k=>[k.target.property,k.frame]),[['opacity',2.25],['position',4.5]]);
+ assert.deepEqual(h.root.SMLayerInOut.getBarSelection(),[{li:0,part:'in'}]);assert.equal(h.commands().length,0);
+ h.down(0,'both');h.move(120);h.up(120);await h.settle();
+ assert.equal(h.commands().length,1);assert.deepEqual(h.commands()[0].q.payload.selectedKeys.map(k=>[k.target.property,k.frame]),[['opacity',2.25],['position',4.5]]);assert.equal(h.legacy(),0);
+});
+
+test('multi-property clicks preserve typed targets and Ctrl selections across native layer rows',async()=>{
+ const a={contextId:'scene-root',layerUid:'alpha'},b={contextId:'scene-root',layerUid:'beta'},h=await harness({propertyTracks:[
+  {target:a,property:'opacity',dimension:1,items:[{frame:2.25,v:[50]}]},
+  {target:b,property:'position',dimension:2,items:[{frame:2.25,v:[3,7]}]}]});
+ assert.equal(h.keyNodes()[0].parentNode,h.rows()[0]);assert.equal(h.keyNodes()[1].parentNode,h.rows()[1]);
+ h.keyNodes()[0].fire('mousedown',{button:0});h.keyNodes()[1].fire('mousedown',{button:0,ctrlKey:true});
+ assert.deepEqual(h.propertyPanel.captureSelectedKeys().keys.map(k=>[k.target.target.layerUid,k.target.property,k.frame]),[['alpha','opacity',2.25],['beta','position',2.25]]);
+ assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+});
+
+test('multi-property whole-projection coordinate overflow refuses all lanes without key-frame rewrite',async()=>{
+ const target={contextId:'scene-root',layerUid:'alpha'},h=await harness({propertyTracks:[
+  {target,property:'opacity',dimension:1,items:[{frame:2.25,v:[50]}]},
+  {target,property:'position',dimension:2,items:[{frame:1e308,v:[3,7]}]}]});
+ assert.equal(h.keyNodes().length,0);assert.equal(h.rows()[0].style.height,'22px');assert.equal(h.leftRows[0].style.height,'22px');
+ assert.equal(h.propertyPanel.readKeyTimelines().tracks[1].items[0].frame,1e308);assert.ok(h.root.notices.some(v=>/coordinates/.test(v)));assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
 });

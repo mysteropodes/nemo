@@ -466,7 +466,8 @@
         "object_scene_producer_brush.rs",
         "object_parametric_transform.rs",
         "object_text_frame.rs",
-        "property_expression_lookup.rs"
+        "property_expression_lookup.rs",
+        "object_frame_context.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -1514,7 +1515,8 @@
         "object_layer_shift_history_controls.rs",
         "object_layer_shift_motion.rs",
         "object_frame_bulk_move_fixture.rs",
-        "object_layer_shift_motion_fixture.rs"
+        "object_layer_shift_motion_fixture.rs",
+        "object_context_frame_packet.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

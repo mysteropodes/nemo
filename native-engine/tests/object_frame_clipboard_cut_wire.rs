@@ -124,14 +124,29 @@ fn cut_raw_duplicate_fields_and_original_utf8_byte_boundary_are_strict() {
     value["selection"][0]["layerUid"] = json!("雪".repeat(1000));
     let mut bytes = value.to_string().into_bytes();
     assert!(bytes.len() < 4096);
-    bytes.resize(4096, b' ');
-    assert!(
-        parse_clipboard_payload(&bytes).is_ok(),
-        "exact original UTF8 byte ceiling"
-    );
+    let limit = crate::request_receipts::frame_clipboard_transport::MESSAGE_BYTES;
+    assert_eq!(limit, 5_246_976);
+    for size in [4096, 4097, limit - 1, limit] {
+        bytes.resize(size, b' ');
+        assert!(
+            parse_clipboard_payload(&bytes).is_ok(),
+            "original UTF8 bytes {size}"
+        );
+    }
     bytes.push(b' ');
     assert_eq!(
         parse_clipboard_payload(&bytes).unwrap_err(),
+        DispatchErrorCode::InvalidRequest
+    );
+    // Duplicate is not one of the three clipboard pairing operations.
+    value["command"] = json!("object.frames.clipboard.duplicate");
+    value["layerUid"] = json!("L0");
+    let mut duplicate = value.to_string().into_bytes();
+    duplicate.resize(4096, b' ');
+    assert!(parse_clipboard_payload(&duplicate).is_ok());
+    duplicate.push(b' ');
+    assert_eq!(
+        parse_clipboard_payload(&duplicate).unwrap_err(),
         DispatchErrorCode::InvalidRequest
     );
 }

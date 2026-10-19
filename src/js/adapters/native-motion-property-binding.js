@@ -154,7 +154,7 @@
     var actionScopes=new WeakMap();
     function captureShortcutScope(){var value=baseScope();if(!value)return null;var token=Object.freeze({});actionScopes.set(token,{session:value.session,signature:value.uiSignature,identity:value.identity,frame:value.context.frame});return token;}
     function isShortcutScopeCurrent(token){var before=token&&actionScopes.get(token),after=baseScope();return !!before&&!!after&&before.session===after.session&&before.signature===after.uiSignature&&same(before.identity,after.identity)&&before.frame===after.context.frame;}
-    return Object.freeze({readKeyTimeline:function(){return scope()?caller.readKeyTimeline():null;},captureSelectedKeys:function(){return scope()?caller.captureSelectedKeys():null;},update:update,shortcut:shortcut,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
+    return Object.freeze({readKeyTimelines:function(){return scope()?caller.readKeyTimelines():null;},readKeyTimeline:function(){return scope()?caller.readKeyTimeline():null;},captureSelectedKeys:function(){return scope()?caller.captureSelectedKeys():null;},update:update,shortcut:shortcut,captureShortcutScope:captureShortcutScope,isShortcutScopeCurrent:isShortcutScopeCurrent,isMounted:caller.isMounted,setFilter:function(mode){return caller.setFilter(mode);},cancel:cancel,dispose:dispose,readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,query:query,selectTarget:selectTarget});
   }
   var owners=new WeakMap();
   var revealKeys=['p','a','r','s','t','u','e','m'];
@@ -210,7 +210,7 @@
     }
     return Object.freeze({setKeyTimelineListener:function(fn){
       if(retired||fn!==null&&typeof fn!=='function')return false;keyTimelineListener=fn;keyTimelineChanged('listener');return true;
-    },readKeyTimeline:function(){return !retired&&active?active.binding.readKeyTimeline():null;},captureSelectedKeys:function(info){
+    },readKeyTimelines:function(){return !retired&&active?active.binding.readKeyTimelines():null;},readKeyTimeline:function(){return !retired&&active?active.binding.readKeyTimeline():null;},captureSelectedKeys:function(info){
       if(retired)return null;
       if(active)return active.binding.captureSelectedKeys();
       if(!info||!root.state||root.state.appMode==='motion')return null;

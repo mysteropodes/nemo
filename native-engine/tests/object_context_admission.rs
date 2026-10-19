@@ -269,15 +269,12 @@ fn frame_query_admission_checks_the_pins_first() {
     );
 }
 
-/// Ordering tripwire. The frame packet is NOT routed through the resolver in this leaf: it keeps
-/// answering `Unavailable` for every non-root context of a v2 document (pinned today by
-/// `object_exposure.rs`, `object_order_evaluation.rs`), including a context the resolver now
-/// declares. When the evaluation join (L04-K) routes component contexts, flip this assertion in
-/// the same change; that is the recorded order.
+/// Untimed component records remain unavailable; declaring a context is not a
+/// timing provider. The joined packet tests separately cover timed components.
 #[test]
-fn the_frame_packet_still_answers_unavailable_for_a_declared_component_context() {
+fn the_frame_packet_requires_component_timing_and_refuses_undeclared_contexts() {
     let snap = snapshot("D");
-    for context in ["sym_comp", "sym_comp_b", "symbol-A"] {
+    for context in ["sym_comp", "sym_comp_b"] {
         assert_eq!(
             prepare_object_frame(
                 &snap,
@@ -288,6 +285,14 @@ fn the_frame_packet_still_answers_unavailable_for_a_declared_component_context()
             "{context}"
         );
     }
+    assert_eq!(
+        prepare_object_frame(
+            &snap,
+            &selector(&snap, "symbol-A", FrameScopeKind::Authored, 0)
+        )
+        .err(),
+        Some(ObjectFrameError::InvalidContext)
+    );
     // The resolver admits the declared one and refuses the undeclared one.
     assert!(admit_frame_context(
         &snap,

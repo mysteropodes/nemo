@@ -122,3 +122,18 @@ test('ordinary key timeline observer is dynamic safe and detachable without manu
  assert.equal(ordinary.setKeyTimelineListener(3),false);assert.equal(ordinary.setKeyTimelineListener(null),true);
  const n=notified;ordinary.dispose();assert.equal(notified,n);assert.equal(ordinary.readKeyTimeline(),null);assert.equal(ordinary.setKeyTimelineListener(()=>{}),false);h.retire();
 });
+
+test('actual Panel reuses first inspector and reopens identities without duplicate track instances',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'native-motion-key-timeline.test.cjs'),'utf8');
+ const begin=source.indexOf('// BEGIN REUSABLE REAL PROPERTY PANEL FIXTURE'),end=source.indexOf('// END REUSABLE REAL PROPERTY PANEL FIXTURE');assert.ok(begin>0&&end>begin);
+ const createPropertyPanel=new Function('require',source.slice(begin,end)+'\nreturn createPropertyPanel;')(require);
+ const doc=document(),container=doc.createElement('div');doc.body.appendChild(container);
+ const pin={instanceId:'panel-instance',documentId:'panel-document',lifecycleGeneration:1,contentRevision:4,documentSnapshotId:'panel-snapshot'},target={contextId:'scene-root',layerUid:'panel-layer'};
+ const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
+ const h=createPropertyPanel({document:doc,container,readContext:context,tracks:[{target,property:'opacity',dimension:1,items:[{frame:1,v:[50]}]},{target,property:'position',dimension:2,items:[{frame:2,v:[5,7]}]}]});
+ assert.equal(await h.ready,true);const initial=tree(container).find(node=>node.className==='native-motion-property-keys');
+ await h.openProperty(target,'opacity');assert.strictEqual(tree(container).find(node=>node.className==='native-motion-property-keys'),initial);
+ await h.openProperty(target,'position');assert.equal(h.readKeyTimelines().tracks.length,2);assert.equal(h.readKeyTimeline().property,'position');
+ await h.openProperty(target,'opacity');assert.equal(h.readKeyTimeline().property,'opacity');assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,2);
+ const view=h.readKeyTimelines();h.dispose();assert.equal(view.isCurrent(),false);assert.equal(h.readKeyTimelines(),null);assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,0);
+});

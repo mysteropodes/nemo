@@ -1,6 +1,6 @@
 //! Immutable source-frame selection for the scene packet. The existing sparse exposure
 //! rules and shared D27 range reader run before any content/order is published.
-use crate::object_document::{FrameScopeKind, RangeError, RangeEvaluator};
+use crate::object_document::{FrameScopeKind, ObjectLayer, RangeError, RangeEvaluator};
 use crate::object_frame_packet::{ObjectFrameError, ObjectFrameSelector};
 use crate::revision::ObjectSnapshot;
 
@@ -19,15 +19,27 @@ impl<'a> RangeEvaluator<'a> {
 pub(super) fn select(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
+    layers: &[ObjectLayer],
     exposure: bool,
+    component: bool,
 ) -> Result<Vec<Option<u32>>, ObjectFrameError> {
     let ranges = RangeEvaluator::new(snapshot, selector.context_id, selector.frame)
         .map_err(|_| ObjectFrameError::Unavailable)?;
-    snapshot
-        .document()
-        .layers()
+    layers
         .iter()
         .map(|layer| {
+            if component && !layer.visible() {
+                return Ok(None);
+            }
+            if component
+                && layer.path_fx().is_some_and(|stack| {
+                    stack
+                        .iter()
+                        .any(|effect| effect.enabled_flag() != Some(false))
+                })
+            {
+                return Err(ObjectFrameError::Unavailable);
+            }
             // Keep the timing provider requirement even outside the visible window.
             let source = if exposure {
                 layer

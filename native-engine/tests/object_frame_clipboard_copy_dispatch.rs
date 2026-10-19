@@ -383,25 +383,31 @@ fn original_dense_cut_copy_packets_match_public_copy_without_editing_their_sourc
             .unwrap();
             let before = state(&o);
             let reply = dispatch(&mut o, &q);
-            if serde_json::to_vec(&q).unwrap().len() <= 4096
-                && serde_json::to_vec(&prospective).unwrap().len() <= 4096
-            {
-                assert_eq!(reply["ok"], true, "{} {form:?}: {reply}", row.label());
-                assert_eq!(
-                    reply["result"],
-                    result(clipboard),
-                    "{} {form:?}",
-                    row.label()
-                );
-                admitted += 1;
-            } else {
-                assert_eq!(
-                    reply["error"]["code"],
-                    "invalid_request",
-                    "{} {form:?}: {reply}",
-                    row.label()
-                );
+            let limit = crate::request_receipts::frame_clipboard_transport::MESSAGE_BYTES;
+            assert_eq!(limit, 5_246_976);
+            assert!(serde_json::to_vec(&q).unwrap().len() <= limit);
+            assert!(serde_json::to_vec(&prospective).unwrap().len() <= limit);
+            let mut data_bytes = 0;
+            for cell in clipboard["cells"].as_array().unwrap() {
+                for record in cell["records"].as_array().unwrap() {
+                    data_bytes += serde_json::to_vec(record).unwrap().len();
+                }
+                if let Some(order) = cell.get("orderElements") {
+                    data_bytes += serde_json::to_vec(order).unwrap().len();
+                }
             }
+            assert!(
+                data_bytes <= 4_194_304,
+                "original record/order data stays within4MiB"
+            );
+            assert_eq!(reply["ok"], true, "{} {form:?}: {reply}", row.label());
+            assert_eq!(
+                reply["result"],
+                result(clipboard),
+                "{} {form:?}",
+                row.label()
+            );
+            admitted += 1;
             assert_eq!(state(&o), before, "{} {form:?}", row.label());
             visited += 1;
         }
@@ -410,5 +416,8 @@ fn original_dense_cut_copy_packets_match_public_copy_without_editing_their_sourc
         visited, 260,
         "all130 original cut-copy packets in both admitted legacy forms"
     );
-    assert!(admitted > 0);
+    assert_eq!(
+        admitted, 260,
+        "every original packet fits the paired transport"
+    );
 }

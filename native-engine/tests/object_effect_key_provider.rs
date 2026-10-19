@@ -389,3 +389,45 @@ fn placed_component_disabled_or_unselected_effects_keep_original_shapes_and_empt
     };
     assert!(placed.shapes.is_empty());
 }
+
+#[test]
+fn storage_routes_v2_refusals_to_the_strict_ordered_codec_without_losing_raw_admission() {
+    let mut invalid = fixture();
+    invalid["layers"][0]["effects"][0]["keys"]["p1"]["keys"] = json!([{"frame":1,"v":[3,4]}]);
+    let raw = invalid.to_string();
+    let explicit = crate::object_codec::decode_ordered_project(raw.as_bytes()).unwrap_err();
+    assert_eq!(explicit.kind(), ObjectCodecErrorKind::Invalid);
+    assert_eq!(
+        decode_storage_project(raw.as_bytes()).unwrap_err(),
+        explicit
+    );
+    let mut unknown = fixture();
+    unknown["unknownRootMember"] = json!(true);
+    let raw = unknown.to_string();
+    assert_eq!(
+        decode_storage_project(raw.as_bytes()).unwrap_err(),
+        crate::object_codec::decode_ordered_project(raw.as_bytes()).unwrap_err()
+    );
+    let raw = fixture().to_string();
+    let duplicate = raw.replacen(
+        "\"formatVersion\":2",
+        "\"formatVersion\":2,\"formatVersion\":2",
+        1,
+    );
+    assert_ne!(duplicate, raw);
+    assert!(decode_storage_project(duplicate.as_bytes()).is_err());
+    assert!(decode_storage_project(b"[2]").is_err());
+    let legacy = build::document_json(&rows::parse_layers("K=a.1.10;.;."), build::Build::V1);
+    let raw = legacy.to_string();
+    assert_eq!(
+        value(&decode_storage_project(raw.as_bytes()).unwrap()),
+        value(&crate::object_codec::decode_project(raw.as_bytes()).unwrap())
+    );
+    let mut legacy_extra = legacy;
+    legacy_extra["compositionOrder"] = Value::Null;
+    let raw = legacy_extra.to_string();
+    assert_eq!(
+        decode_storage_project(raw.as_bytes()).unwrap_err(),
+        crate::object_codec::decode_project(raw.as_bytes()).unwrap_err()
+    );
+}

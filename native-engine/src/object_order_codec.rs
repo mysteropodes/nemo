@@ -5,8 +5,9 @@ use crate::object_codec::{
     ObjectDocument,
 };
 use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ItemRecords, ObjectLayer, ObjectRecord, OrderContext,
-    OrderCurvePoint, OrderPlan, OrderTrack, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
+    AuthoredOrder, ComponentTables, FrameScopeKind, ItemRecords, ObjectLayer, ObjectRecord,
+    OrderContext, OrderCurvePoint, OrderPlan, OrderTrack, OrderedObjectDocument, Presence,
+    OBJECT_DOCUMENT_FORMAT,
 };
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
@@ -142,6 +143,7 @@ fn validate_order(
     layers: &[ObjectLayer],
     objects: &[ObjectRecord],
     items: Option<&ItemRecords>,
+    component_tables: &Presence<ComponentTables>,
 ) -> Result<(), ObjectCodecError> {
     if plan.format != "nemo.native-object-order-plan"
         || plan.format_version != 1
@@ -151,9 +153,23 @@ fn validate_order(
     {
         return Err(unsupported("unsupported order plan version or policy"));
     }
-    let declared: HashSet<_> = layers.iter().map(|l| l.layer_uid.as_str()).collect();
+    let components = component_tables
+        .value()
+        .and_then(|tables| tables.components.value());
+    // Optional explicit inner plans do not create a migration requirement for
+    // native component records whose owner already defines natural order.
+    let inner_records = components
+        .into_iter()
+        .flat_map(|set| set.components.iter())
+        .filter(|component| {
+            plan.contexts
+                .iter()
+                .any(|context| context.context_id == component.symbol_id())
+        })
+        .flat_map(|component| component.objects());
     let expected: HashSet<_> = objects
         .iter()
+        .chain(inner_records)
         .map(|r| &r.target)
         .chain(items.into_iter().flat_map(|items| items.targets()))
         .filter(|target| target.frame_scope.kind == FrameScopeKind::Authored)
@@ -175,13 +191,26 @@ fn validate_order(
         if !contexts.insert(context.context_id.as_str()) {
             return Err(duplicate("duplicate order context"));
         }
+        let component = components.and_then(|set| {
+            set.components
+                .iter()
+                .find(|component| component.symbol_id() == context.context_id)
+        });
+        // Storage historically preserves other opaque contexts. They remain
+        // non-executable: ContextSource admits only root or declared components.
+        let local_layers = component.map_or(layers, |component| component.layers());
+        let local_frames = component.map_or(total_frames, |component| component.total_frames());
+        let declared: HashSet<_> = local_layers
+            .iter()
+            .map(|layer| layer.layer_uid.as_str())
+            .collect();
         layer_stack(context, &declared)?;
         let mut scopes = HashSet::new();
         for scope in &context.scopes {
             if scope.frame_scope.kind != FrameScopeKind::Authored {
                 return Err(unsupported("Reference order is unavailable"));
             }
-            if scope.frame_scope.frame >= total_frames {
+            if scope.frame_scope.frame >= local_frames {
                 return Err(invalid("invalid authored order source frame"));
             }
             if !scopes.insert(scope.frame_scope.frame) {
@@ -245,6 +274,7 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.layers,
         &document.objects,
         document.items.value(),
+        &document.component_tables,
     )?;
     crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
@@ -283,6 +313,7 @@ pub(crate) fn validate_storage_order(
         &document.layers,
         &document.objects,
         document.items.value(),
+        &document.component_tables,
     )?;
     crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(

@@ -317,7 +317,7 @@ fn validate_pins(
     if expected.document_snapshot_id != packet.document_snapshot_id() {
         return Err(ObjectSceneError::WrongSnapshot);
     }
-    if expected.context_id != "scene-root" || expected.context_id != packet.context_id() {
+    if expected.context_id != packet.context_id() {
         return Err(ObjectSceneError::InvalidContext);
     }
     if &expected.scope_kind != packet.scope_kind() {

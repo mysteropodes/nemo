@@ -233,3 +233,18 @@ test('read-only native keys may project but timeline selection retains existing 
  assert.ok(view);assert.equal(view.isCurrent(),true);assert.equal(view.selectFrames([-0.5]),false);assert.equal(h.status(),before);
  assert.deepEqual(h.checks().map(n=>n.checked),[false,false,false]);assert.equal(h.writes.length,0);
 });
+
+test('selection preflight and checkboxes honor the aggregate budget without mutating on refusal',async()=>{
+ const h=fixture();let elsewhere=31,preflights=0;h.ports.acceptKeySelection=frames=>{preflights++;return frames.length+elsewhere<=32;};await h.open();
+ let view=h.editor.readKeyTimeline();assert.equal(view.canSelectFrames([4.25]),true);assert.equal(h.checks().filter(n=>n.checked).length,0);
+ assert.equal(view.selectFrames([4.25]),true);await h.select(0);assert.deepEqual(h.checks().map(n=>n.checked),[false,true,false]);
+ view=h.editor.readKeyTimeline();assert.equal(view.canSelectFrames([-0.5,4.25]),false);assert.equal(view.selectFrames([-0.5,4.25]),false);assert.equal(view.isCurrent(),true);
+ elsewhere=30;assert.equal(view.selectFrames([-0.5,4.25]),true);assert.equal(h.checks().filter(n=>n.checked).length,2);assert.ok(preflights>=5);assert.equal(h.writes.length,0);
+});
+
+test('throwing or revoked aggregate selection admission never changes inspector selection',async()=>{
+ const h=fixture();await h.open();assert.equal(h.editor.readKeyTimeline().selectFrames([4.25]),true);
+ h.ports.acceptKeySelection=()=>{throw Error('Aggregate selection unavailable');};const view=h.editor.readKeyTimeline();
+ assert.equal(view.canSelectFrames([]),false);assert.equal(view.selectFrames([]),false);await h.select(0);
+ assert.deepEqual(h.checks().map(n=>n.checked),[false,true,false]);assert.equal(view.isCurrent(),true);assert.equal(h.writes.length,0);
+});

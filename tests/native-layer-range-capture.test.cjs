@@ -34,7 +34,7 @@ async function captured(options={}){
   if(!stopped){for(let n=target;n;n=n.parentNode){for(const callback of n.events.get('mousedown')||[])callback(event);if(stopped)break;}}
   return event;
  }
- function geometry(i,left,right){const bar=h.bar(i),top=i*22;bar.getBoundingClientRect=()=>({left,right,top,bottom:top+20});
+ function geometry(i,left,right){const bar=h.bar(i),top=Array.from(h.rows()).slice(0,i).reduce((sum,row)=>sum+(Number.parseFloat(row.style.height)||22),0);bar.getBoundingClientRect=()=>({left,right,top,bottom:top+20});
   bar.querySelector('.layer-inout-handle.left').getBoundingClientRect=()=>({left,right:left+4,top,bottom:top+20});
   bar.querySelector('.layer-inout-handle.right').getBoundingClientRect=()=>({left:right-4,right,top,bottom:top+20});}
  geometry(0,100,300);geometry(1,-100,110);
@@ -107,4 +107,18 @@ test('actual Motion capture uses the same rectangle for real inspector property 
  assert.equal(c.legacyStarts(),0);assert.equal(h.legacy(),0);assert.equal(h.commands().length,0);
  c.down(h.bar(0).querySelector('.layer-inout-handle.left'),{clientX:100});h.move(120);h.up(120);await h.settle();
  assert.deepEqual(h.commands()[0].q.payload.selectedKeys.map(k=>k.frame),[9,10,11]);
+});
+
+
+test('actual Motion ancestor shares one rectangle across multiple real property lanes and bar parts',async()=>{
+ const target={contextId:'scene-root',layerUid:'alpha'},c=await captured({propertyTracks:[
+  {target,property:'opacity',dimension:1,items:[{frame:9,v:[50]}]},
+  {target,property:'position',dimension:2,items:[{frame:10,v:[3,7]}]}]}),h=c.h;
+ h.keyNodes().forEach(n=>{const x=(Number(n.dataset.frame)+0.5)*h.root.FC,y=Number.parseFloat(n.style.top);n.getBoundingClientRect=()=>({left:x-4.5,top:y,width:9,height:9});});
+ assert.equal(h.leftRows[0].style.height,h.rows()[0].style.height);c.down(c.wrap,{clientX:95,clientY:0});
+ h.doc.fire('mousemove',{clientX:115,clientY:100});h.doc.fire('mouseup',{clientX:115,clientY:100});
+ assert.deepEqual(h.propertyPanel.captureSelectedKeys().keys.map(k=>[k.target.property,k.frame]),[['opacity',9],['position',10]]);
+ assert.deepEqual(h.root.SMLayerInOut.getBarSelection(),[{li:0,part:'in'},{li:1,part:'out'}]);assert.equal(c.legacyStarts(),0);assert.equal(h.commands().length,0);
+ c.down(h.bar(0).querySelector('.layer-inout-handle.left'),{clientX:100});h.move(120);h.up(120);await h.settle();
+ assert.deepEqual(h.commands()[0].q.payload.selectedKeys.map(k=>[k.target.property,k.frame]),[['opacity',9],['position',10]]);assert.equal(h.legacy(),0);
 });
