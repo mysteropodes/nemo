@@ -44,7 +44,7 @@ fn target_exists(document: &ObjectDocument, target: &PropertyHolderTarget) -> bo
             .iter()
             .any(|layer| layer.layer_uid() == target.layer_uid())
             && target.stroke_id().is_none_or(|stroke| {
-                component.objects().iter().any(|record| {
+                PropertyHolder::item_target_exists(document, target) || component.objects().iter().any(|record| {
                     let item = record.target();
                     item.context_id() == target.context_id()
                         && item.layer_uid() == target.layer_uid()
@@ -68,7 +68,7 @@ fn target_exists(document: &ObjectDocument, target: &PropertyHolderTarget) -> bo
             .iter()
             .any(|layer| layer.layer_uid() == target.layer_uid())
         && target.stroke_id().is_none_or(|stroke| {
-            document.objects.iter().any(|object| {
+            PropertyHolder::item_target_exists(document, target) || document.objects.iter().any(|object| {
                 object.target.context_id == target.context_id()
                     && object.target.layer_uid == target.layer_uid()
                     && object.target.stroke_id == stroke
@@ -133,7 +133,7 @@ pub fn sample_property_raw(
         .find(|holder| holder.target() == target)
         .unwrap_or(&empty);
     let metadata = holder
-        .metadata(property)
+        .metadata_in_document(document, property)
         .ok_or(PropertySampleError::UnsupportedProperty)?;
     let record = holder
         .properties()

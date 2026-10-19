@@ -21,9 +21,10 @@
 //! - `frames` is the stored total, but the alias `duration` divides
 //!   `totalFrames || 1`.
 //!
-//! Named dependencies, not provided here: sampled parent/self fields
+//! SnapshotReads supplies the real sampled comp/self/mesh providers.
+//! Named dependencies beyond these identity views: sampled parent/self fields
 //! (position, keys, controls; D11/D15), markers (D16/D26), in/out points,
-//! mesh vertex identity, contentBox geometry, text views and component
+//! contentBox geometry, text views and component
 //! playback/override/camera/marker evaluation beyond these identity views.
 //! A bare drawing carries no canvas or fps,
 //! so its comp view is unavailable rather than defaulted.
@@ -133,6 +134,7 @@ pub(crate) struct SelfView {
     index: usize,
     has_parent: bool,
     parent: Option<ParentRef>,
+    is_mesh: bool,
 }
 
 impl SelfView {
@@ -149,9 +151,12 @@ impl SelfView {
     pub(crate) fn index(&self) -> usize {
         self.index
     }
-    /// Element holder. Mesh holders are not representable in D10 targets yet.
+    /// A bound mesh uses an elementMotion key but is not a path shape.
     pub(crate) fn is_shape(&self) -> bool {
-        self.stroke_id.is_some()
+        self.stroke_id.is_some() && !self.is_mesh
+    }
+    pub(crate) fn is_mesh(&self) -> bool {
+        self.is_mesh
     }
     pub(crate) fn has_parent(&self) -> bool {
         self.has_parent
@@ -296,6 +301,7 @@ fn resolve_self(
         index,
         has_parent,
         parent,
+        is_mesh: crate::object_document::PropertyHolder::bound_mesh(document,target).is_some(),
     })
 }
 

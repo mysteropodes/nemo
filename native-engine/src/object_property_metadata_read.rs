@@ -8,7 +8,8 @@ use crate::revision::ObjectSnapshot;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::borrow::Cow;
-use std::collections::HashSet;
+#[path = "object_property_target_pages.rs"]
+mod target_pages;
 
 // The eventual common-envelope wrapper MUST still check its complete 4096 bytes.
 const MAX_REQUEST_BYTES: usize = 4096;
@@ -86,11 +87,12 @@ fn categories() -> Value {
     ])
 }
 fn descriptor(
+    document: &ObjectDocument,
     holder: &PropertyHolder,
     property: &str,
     applicable: bool,
 ) -> Result<Value, DispatchErrorCode> {
-    let metadata = holder.metadata(property).ok_or_else(unavailable)?;
+    let metadata = holder.metadata_in_document(document,property).ok_or_else(unavailable)?;
     let mut value = serde_json::to_value(metadata).map_err(|_| unavailable())?;
     let fields = value.as_object_mut().ok_or_else(unavailable)?;
     fields.insert("property".into(), json!(property));
@@ -209,86 +211,6 @@ impl ObjectSnapshot {
     // Enumeration uses the admitted order of contexts/layers; it is not a frame's
     // animated render order. Every element identity is deduplicated over authored
     // drawings. A reference-only record never creates an element property target.
-    fn metadata_target_page(
-        &self,
-        offset: usize,
-        limit: usize,
-    ) -> Result<(Vec<Value>, bool), DispatchErrorCode> {
-        let document = self.document();
-        let mut contexts: Vec<&str> = document.composition_order.value().map_or_else(
-            || vec!["scene-root"],
-            |plan| {
-                plan.contexts
-                    .iter()
-                    .map(|c| c.context_id.as_str())
-                    .collect()
-            },
-        );
-        if let Some(set) = document.component_set() {
-            for component in &set.components {
-                if !contexts.contains(&component.symbol_id()) {
-                    contexts.push(component.symbol_id());
-                }
-            }
-        }
-        let mut index = 0;
-        let mut items = Vec::new();
-        let mut emit = |item: Value| {
-            if index >= offset {
-                items.push(item);
-            }
-            index += 1;
-            items.len() > limit
-        };
-        'contexts: for context in contexts {
-            if emit(json!({"kind":"context","contextId":context})) {
-                break;
-            }
-            let (source_layers, source_records) = metadata_context_parts(document, context);
-            let mut layers: Vec<_> = source_layers.iter().collect();
-            if let Some(c) = document
-                .composition_order
-                .value()
-                .and_then(|plan| plan.contexts.iter().find(|c| c.context_id == context))
-            {
-                layers.sort_by_key(|l| {
-                    c.layers
-                        .iter()
-                        .find(|x| x.layer_uid == l.layer_uid)
-                        .map(|x| x.natural_position)
-                        .unwrap_or(u32::MAX)
-                });
-            }
-            for layer in layers {
-                if emit(
-                    json!({"kind":"layer","target":{"contextId":context,"layerUid":layer.layer_uid}}),
-                ) {
-                    break 'contexts;
-                }
-                let mut seen = HashSet::new();
-                for record in source_records {
-                    let t = &record.target;
-                    if t.context_id == context
-                        && t.layer_uid == layer.layer_uid
-                        && t.frame_scope.kind == FrameScopeKind::Authored
-                        && seen.insert(t.stroke_id.as_str())
-                        && emit(json!({"kind":"element","target":{"contextId":context,
-                            "layerUid":layer.layer_uid,"strokeId":t.stroke_id}}))
-                    {
-                        break 'contexts;
-                    }
-                }
-            }
-        }
-        if offset > index {
-            return Err(invalid());
-        }
-        let more = items.len() > limit;
-        if more {
-            items.pop();
-        }
-        Ok((items, more))
-    }
     pub(super) fn metadata_holder<'a>(
         &'a self,
         target: &PropertyHolderTarget,
@@ -313,7 +235,7 @@ impl ObjectSnapshot {
             return Err(DispatchErrorCode::NotFound);
         }
         if let Some(stroke) = target.stroke_id() {
-            if !records.iter().any(|r| {
+            if !PropertyHolder::item_target_exists(document,target) && !records.iter().any(|r| {
                 r.target.context_id == target.context_id()
                     && r.target.layer_uid == target.layer_uid()
                     && r.target.stroke_id == stroke
@@ -418,16 +340,22 @@ impl ObjectSnapshot {
                 if let Some(paint) = paint {
                     keys.push(paint);
                 }
-                if offset as usize > keys.len() {
-                    return Err(invalid());
-                }
-                let items = keys
-                    .iter()
-                    .skip(offset as usize)
-                    .take(limit as usize)
-                    .map(|p| descriptor(&holder, p, true))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let more = offset as usize + items.len() < keys.len();
+                let vertices=PropertyHolder::vertex_count(self.document(),&target).unwrap_or(0);
+                let extra: Vec<_>=holder.properties().iter().filter_map(|p| {
+                    let i=PropertyHolder::vertex_index(p.property())?;
+                    (i>=vertices || p.property()!=format!("vtx{i}")).then_some(p.property())
+                }).collect();
+                let total=keys.len().checked_add(vertices).and_then(|n|n.checked_add(extra.len())).ok_or_else(unavailable)?;
+                let start=offset as usize;
+                if start>total { return Err(invalid()); }
+                // Allocate only this bounded page, not one string per mesh vertex.
+                let names: Vec<String>=(start..total.min(start+limit as usize)).map(|i| {
+                    if i<keys.len() { keys[i].to_owned() }
+                    else if i<keys.len()+vertices { format!("vtx{}",i-keys.len()) }
+                    else { extra[i-keys.len()-vertices].to_owned() }
+                }).collect();
+                let items=names.iter().map(|p|descriptor(self.document(),&holder,p,true)).collect::<Result<Vec<_>,_>>()?;
+                let more=start+items.len()<total;
                 ("properties", Some(target), offset, items, more)
             }
             ViewFields::StoredProperty { target, property } => {
@@ -435,7 +363,7 @@ impl ObjectSnapshot {
                 if !holder.properties.iter().any(|p| p.property == property) {
                     return Err(DispatchErrorCode::NotFound);
                 }
-                let item = descriptor(&holder, &property, false)?;
+                let item = descriptor(self.document(), &holder, &property, false)?;
                 ("storedProperty", Some(target), 0, vec![item], false)
             }
         };

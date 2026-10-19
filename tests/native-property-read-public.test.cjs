@@ -74,6 +74,34 @@ test('native context view crosses the actual SDK validator with closed fields an
   }
 });
 
+test('actual mesh context is closed, correlated and separates missing vertices from rest UV', async () => {
+  const d = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-property-read.json')));
+  const e = d.examples.find(e => e.response.result.mesh);
+  assert.deepEqual(await read(e.request,e.response),e.response);
+  for (const mutate of [
+    m=>m.meshId='foreign', m=>m.vertexIndex=-2, m=>m.vertexIndex=2**32,
+    m=>m.vertexCount=-1, m=>m.outlineVertexCount=4, m=>m.vertexUV=[1],
+    m=>m.vertexUV=[0,NaN], m=>m.isOutlineVertex=false, m=>m.extra=true,
+    m=>{m.vertexIndex=99;m.isOutlineVertex=false;},
+  ]) {
+    const r=structuredClone(e.response);mutate(r.result.mesh);
+    await assert.rejects(read(e.request,r),TypeError);
+  }
+  for (const index of [-1,99]) {
+    const q=structuredClone(e.request),r=structuredClone(e.response);
+    const p=index===-1 ? 'position' : 'vtx99';q.payload.view.property=p;r.result.property=p;r.result.self.property=p;
+    Object.assign(r.result.mesh,
+      {vertexIndex:index,vertexUV:[0,0],isOutlineVertex:false});
+    assert.deepEqual(await read(q,r),r);
+  }
+  for (const key of Object.keys(e.response.result.mesh)) {
+    const r=structuredClone(e.response);delete r.result.mesh[key];
+    await assert.rejects(read(e.request,r),TypeError);
+  }
+  const q=request(),r=response(q);r.result.mesh=e.response.result.mesh;
+  await assert.rejects(read(q,r),TypeError);
+});
+
 test('raw reads preserve finite signed fractional frames and all dimensions without evaluating in JS', async () => {
   for (const frame of [-100, -1.5, 0, 0.25, 12]) for (const dimension of [1, 2, 3, 4]) {
     const q = request(); q.payload.view.frame = frame;

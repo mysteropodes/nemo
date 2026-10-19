@@ -138,7 +138,7 @@ impl ObjectSnapshot {
             return Err(Unavailable);
         }
         let holder = self.metadata_holder(target)?;
-        let dimension = holder.metadata(property).ok_or(Unavailable)?.dimension();
+        let dimension = holder.metadata_in_document(self.document(), property).ok_or(Unavailable)?.dimension();
         let mut result = json!({"instanceId":self.instance_id(),"documentId":self.document_id(),
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "kind":kind,"target":target,"property":property,"dimension":dimension});
@@ -155,8 +155,11 @@ impl ObjectSnapshot {
                         );
                     result["frame"] = json!(frame);
                     result["self"] = reads.info("").map_err(|_| Unavailable)?;
+                    if let Some(mesh)=reads.mesh().map_err(|_|Unavailable)? {
+                        result["mesh"]=mesh;
+                    }
                     result["keyCount"] = json!(reads.key_count().map_err(|_| Unavailable)?);
-                    match reads.comp() {
+                    match reads.public_comp() {
                         Ok(comp) => {
                             result["comp"] = comp;
                             result["compUnavailable"] = Value::Null;

@@ -116,6 +116,8 @@ pub(super) fn bind<'js>(
                 "control" => reads.control(&reference, property).map(|v| json!(v)),
                 "owner" => Ok(json!(reads.owner_uid())),
                 "info" => reads.info(&reference),
+                "mesh" => reads.mesh().map(|m|m.unwrap_or(Value::Null)),
+                "vertex-index" => reads.vertex_index().map(|i|json!(i)),
                 "comp" => reads.comp(),
                 "key" | "nearest-key" => reads.key(at, op == "nearest-key"),
                 "key-count" => reads.key_count().map(|n| json!(n)),

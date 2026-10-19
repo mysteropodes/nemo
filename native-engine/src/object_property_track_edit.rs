@@ -2,7 +2,7 @@
 use crate::commands::object_fill_owner::property_edit::curves::{self, CurvePreset, InfluenceSide};
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
-    object_deserialize, OrderKey, OrderTrack, Presence, PropertyHolderTarget,
+    object_deserialize, OrderKey, OrderTrack, Presence, PropertyHolder, PropertyHolderTarget,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -115,16 +115,18 @@ impl ObjectFillOwner {
                 .position(|h| h.target() == &selection.target)
                 .ok_or(DispatchErrorCode::NotFound)?;
             let holder = &holders[hi];
-            crate::object_document::validate_property_holders(
+            PropertyHolder::validate_with_items(
                 &Presence::Present(vec![holder.clone()]),
                 &source.layers,
                 &source.objects,
                 source.composition_order.value(),
                 source.component_tables(),
+                source.items.value(),
+                source.image_meshes.value(),
             )
             .map_err(|_| DispatchErrorCode::NotFound)?;
             let metadata = holder
-                .metadata(&selection.property)
+                .metadata_in_document(source, &selection.property)
                 .ok_or(DispatchErrorCode::Unavailable)?;
             if !metadata.animatable() {
                 return Err(DispatchErrorCode::Unavailable);

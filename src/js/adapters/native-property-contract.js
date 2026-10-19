@@ -187,8 +187,23 @@
         exact(c, ['width','height','fps','frames','layers','name','frameDuration','duration','numLayers'], [], 'expression comp');
         for (const k of ['width','height','frames','layers','numLayers']) frame(c[k]);
         if (c.width === 0 || c.height === 0 || typeof c.name !== 'string' || !Number.isFinite(c.fps) || c.fps <= 0 ||
+            !Number.isFinite(c.frameDuration) || !Number.isFinite(c.duration) ||
             c.frameDuration !== 1/c.fps || c.duration !== Math.max(c.frames,1)/c.fps ||
             c.numLayers !== c.layers || value.compUnavailable !== null) throw new TypeError('invalid comp metadata');
+      }
+      if (has(value,'mesh')) {
+        const m=value.mesh;
+        exact(m,['meshId','vertexIndex','vertexCount','outlineVertexCount','vertexUV','isOutlineVertex'],[],'expression mesh');
+        objectUid(m.meshId);frame(m.vertexCount);frame(m.outlineVertexCount);
+        const match=/^vtx(\d+)$/.exec(value.property), index=match ? Number(match[1]) : -1;
+        if (m.vertexIndex !== index || m.meshId !== value.target.strokeId || !Number.isInteger(m.vertexIndex) || m.vertexIndex < -1 ||
+            m.vertexIndex > 0xffffffff || m.outlineVertexCount > m.vertexCount ||
+            typeof m.isOutlineVertex !== 'boolean' ||
+            m.isOutlineVertex !== (m.vertexIndex >= 0 && m.vertexIndex < m.outlineVertexCount)) throw new TypeError('invalid mesh identity');
+        readVector(m.vertexUV,2);
+        if ((m.vertexIndex < 0 || m.vertexIndex >= m.vertexCount) && m.vertexUV.some(v=>v!==0)) {
+          throw new TypeError('missing vertex has no authored UV');
+        }
       }
     }
     function readResult(value) {
@@ -196,7 +211,7 @@
       const context = value && value.kind === 'expressionContext';
       const fields = raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : ['trackPresent', 'items', 'nextOffset'];
       exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId',
-        'kind', 'target', 'property', 'dimension', ...fields], [], 'property read result');
+        'kind', 'target', 'property', 'dimension', ...fields], context ? ['mesh'] : [], 'property read result');
       id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
       readTarget(value.target); objectUid(value.property);
@@ -240,7 +255,7 @@
         throw new TypeError('authored page cursor mismatch');
       }
     }
-    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.self\.property|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
+    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
     return Object.freeze({ rangeResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }

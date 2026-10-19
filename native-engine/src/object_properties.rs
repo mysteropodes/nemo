@@ -9,6 +9,10 @@ use std::collections::HashSet;
 
 #[path = "object_property_catalog.rs"]
 mod catalog;
+#[path = "object_property_names.rs"]
+mod names;
+#[path = "object_property_targets.rs"]
+mod targets;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -155,20 +159,16 @@ fn vector(values: &[Number], dimension: usize) -> Result<(), PropertyAdmissionEr
     }
     Ok(())
 }
-// Match the baseline JavaScript String.trim whitespace, including BOM.
-fn control_name(name: &str) -> String {
-    name.trim_matches(|c| {
-        matches!(c, '\u{0009}'..='\u{000D}' | ' ' | '\u{00A0}'
-        | '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{2028}' | '\u{2029}'
-        | '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}')
-    })
-    .to_lowercase()
+impl PropertyHolder {
+    pub(crate) fn normalized_control_name(name: &str) -> String {
+        names::normalize(name)
+    }
 }
 fn controls(holder: &PropertyHolder) -> Result<(), PropertyAdmissionError> {
     let mut keys = HashSet::new();
     let mut names = HashSet::new();
     for control in holder.controls.value().into_iter().flatten() {
-        let name = control_name(&control.name);
+        let name = PropertyHolder::normalized_control_name(&control.name);
         if control.key.is_empty() || name.is_empty() {
             return Err(invalid("empty control identity"));
         }
@@ -238,6 +238,15 @@ pub(crate) fn validate_property_holders(
     plan: Option<&OrderPlan>,
     tables: Option<&ComponentTables>,
 ) -> Result<(), PropertyAdmissionError> {
+    PropertyHolder::validate_with_items(holders,layers,records,plan,tables,None,None)
+}
+
+impl PropertyHolder {
+pub(crate) fn validate_with_items(
+    holders: &Presence<Vec<PropertyHolder>>, layers: &[ObjectLayer], records: &[ObjectRecord],
+    plan: Option<&OrderPlan>, tables: Option<&ComponentTables>,
+    items: Option<&crate::object_document::ItemRecords>, meshes: Option<&crate::object_document::ImageMeshStore>,
+) -> Result<(), PropertyAdmissionError> {
     let layer_ids: HashSet<_> = layers.iter().map(ObjectLayer::layer_uid).collect();
     let contexts: HashSet<_> = plan.map_or_else(
         || HashSet::from(["scene-root"]),
@@ -298,7 +307,7 @@ pub(crate) fn validate_property_holders(
                     })
                 },
             );
-            if stroke_id.is_empty() || !element_exists {
+            if stroke_id.is_empty() || !(element_exists || targets::item_target(items,target) || targets::mesh(items,meshes,target).is_some()) {
                 return Err(invalid("unresolved property holder element"));
             }
         }
@@ -320,6 +329,12 @@ pub(crate) fn validate_property_holders(
                     "property belongs to its existing order or remap owner",
                 ));
             }
+            if catalog::vertex_index(&record.property).is_some() {
+                let source_records=component.map_or(records,|c|c.objects());
+                if !targets::has_vertex_source(items,meshes,source_records,target) {
+                    return Err(unsupported("vertex property requires its actual path or mesh source"));
+                }
+            }
             let meta = holder
                 .metadata(&record.property)
                 .ok_or_else(|| unsupported("unknown property"))?;
@@ -327,4 +342,5 @@ pub(crate) fn validate_property_holders(
         }
     }
     Ok(())
+}
 }

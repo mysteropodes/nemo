@@ -114,7 +114,9 @@
         "object_audio_track_record.rs",
         "object_media_placement_offset.rs",
         "audio_wave_admission.rs",
-        "object_audio_track_edit.rs"
+        "object_audio_track_edit.rs",
+        "object_property_targets.rs",
+        "object_property_names.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -151,7 +153,8 @@
         "object_effect_stack_codec.rs",
         "object_audio_track_baseline.rs",
         "project_audio_asset_wire.rs",
-        "project_asset_source_wire.rs"
+        "project_asset_source_wire.rs",
+        "object_property_codec.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -483,7 +486,8 @@
         "object_text_frame.rs",
         "property_expression_lookup.rs",
         "object_frame_context.rs",
-        "object_audio_track_sampling.rs"
+        "object_audio_track_sampling.rs",
+        "object_expression_reads.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -671,7 +675,10 @@
         "reproduction_catalog.rs",
         "object_expression_pin.rs",
         "object_expression_runtime.rs",
-        "object_expression_property.rs"
+        "object_expression_property.rs",
+        "object_expression_read_bridge.rs",
+        "object_expression_read_runtime.rs",
+        "object_expression_harden.rs"
       ],
       "publicApi": [
         "application.rs"
@@ -701,7 +708,8 @@
         "object_parametric_edit_read.rs",
         "object_text_read.rs",
         "object_text_font_resources.rs",
-        "object_layer_range_snapshot.rs"
+        "object_layer_range_snapshot.rs",
+        "object_property_target_pages.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1550,7 +1558,9 @@
         "object_layer_playhead_cut_history.rs",
         "object_audio_track_edit.rs",
         "object_audio_track_edit_history.rs",
-        "object_audio_track_edit_fixture.rs"
+        "object_audio_track_edit_fixture.rs",
+        "object_expression_reads.rs",
+        "object_property_holder_targets.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -8056,6 +8056,52 @@
                 null,
                 "projectMetadata"
               ]
+            },
+            "mesh": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "meshId",
+                "vertexIndex",
+                "vertexCount",
+                "outlineVertexCount",
+                "vertexUV",
+                "isOutlineVertex"
+              ],
+              "properties": {
+                "meshId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "vertexIndex": {
+                  "type": "integer",
+                  "minimum": -1,
+                  "maximum": 4294967295
+                },
+                "vertexCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "outlineVertexCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "vertexUV": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  }
+                },
+                "isOutlineVertex": {
+                  "type": "boolean"
+                }
+              }
             }
           },
           "allOf": [

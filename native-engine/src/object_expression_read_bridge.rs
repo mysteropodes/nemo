@@ -75,6 +75,12 @@ const _keys = {
 };
 Object.defineProperty(_keys,'count',{get:function() { return _get('key-count'); }});
 const self = { at:_at, velocity:_velocity, speed:_speed, keys:_keys, control:control };
+const _mesh = function() { return _get('mesh'); };
+Object.defineProperty(self,'isMesh',{get:function() { return _mesh() !== null; }});
+Object.defineProperty(self,'vertexIndex',{get:function() { return _get('vertex-index'); }});
+Object.defineProperty(self,'vertexCount',{get:function() { const m=_mesh(); return m ? m.vertexCount : 0; }});
+Object.defineProperty(self,'vertexUV',{get:function() { const m=_mesh(); return m ? m.vertexUV : [0,0]; }});
+Object.defineProperty(self,'isOutlineVertex',{get:function() { const m=_mesh(); return !!(m && m.isOutlineVertex); }});
 for (const p of ['property','name','index','isShape','hasParent'])
  Object.defineProperty(self,p,{get:function() { const i=_get('info'); return i === null ? null : i[p]; }});
 Object.defineProperty(self,'parent',{get:function() { const i=_get('info'); return i && i.parent ? _layer(i.parent.name) : null; }});
@@ -82,8 +88,10 @@ const comp = {};
 for (const p of ['width','height','fps','frames','layers','name'])
  Object.defineProperty(comp,p,{get:function() { return _comp()[p]; }});
 const thisComp = {};
-for (const p of ['width','height','frameDuration','duration','numLayers','name'])
+for (const p of ['width','height','numLayers','name'])
  Object.defineProperty(thisComp,p,{get:function() { return _comp()[p]; }});
+Object.defineProperty(thisComp,'frameDuration',{get:function() { return 1/_fps(); }});
+Object.defineProperty(thisComp,'duration',{get:function() { const c=_comp();return Math.max(c.frames,1)/c.fps; }});
 thisComp.layer = layer;
 const key = _keys.at;
 const numKeys = _keys.count;

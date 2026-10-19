@@ -124,6 +124,30 @@ fn actual_context_view_is_closed_and_correlated_in_the_mcp_contract() {
     }
 }
 #[test]
+fn actual_mesh_context_is_closed_correlated_and_has_no_rest_pose_fallback() {
+    let d:Value=serde_json::from_str(include_str!("../../engineering/application/capabilities-v2/native-property-read.json")).unwrap();
+    let e=d["examples"].as_array().unwrap().iter().find(|e|e["response"]["result"].get("mesh").is_some()).unwrap();
+    let p=&e["request"]["payload"];let v=&e["response"]["result"];
+    let doc=v["documentId"].as_str().unwrap();assert!(result(doc,p,v));
+    for (key,replacement) in [
+        ("meshId",json!("foreign")),("vertexIndex",json!(-2)),("vertexIndex",json!(u64::from(u32::MAX)+1)),
+        ("vertexCount",json!(-1)),("outlineVertexCount",json!(4)),("vertexUV",json!([1])),
+        ("vertexUV",json!([0,"1"])),("isOutlineVertex",json!(false)),("extra",json!(true)),
+    ] {
+        let mut bad=v.clone();bad["mesh"][key]=replacement;assert!(!result(doc,p,&bad),"{key}");
+    }
+    for key in v["mesh"].as_object().unwrap().keys() {
+        let mut bad=v.clone();bad["mesh"].as_object_mut().unwrap().remove(key);assert!(!result(doc,p,&bad),"missing {key}");
+    }
+    for index in [-1,99] {
+        let mut q=p.clone();let mut orphan=v.clone();let name=if index==-1 {"position"}else{"vtx99"};
+        q["view"]["property"]=json!(name);orphan["property"]=json!(name);orphan["self"]["property"]=json!(name);
+        orphan["mesh"]["vertexIndex"]=json!(index);orphan["mesh"]["isOutlineVertex"]=json!(false);
+        assert!(!result(doc,&q,&orphan));orphan["mesh"]["vertexUV"]=json!([0,0]);assert!(result(doc,&q,&orphan));
+    }
+    let p=payload(false);let mut raw=output(false);raw["mesh"]=v["mesh"].clone();assert!(!result("document",&p,&raw));
+}
+#[test]
 fn property_read_shapes_and_presence_are_closed_without_inventing_track_defaults() {
     for keys in [false, true] {
         let p = payload(keys);

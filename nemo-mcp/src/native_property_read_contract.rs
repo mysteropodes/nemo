@@ -108,7 +108,7 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
     } else {
         vec!["trackPresent", "items", "nextOffset"]
     });
-    if exact(value, &required, &[]).is_none()
+    if exact(value, &required, if context { &["mesh"] } else { &[] }).is_none()
         || !value["instanceId"].as_str().is_some_and(bounded_identifier)
         || value["documentId"].as_str() != Some(document)
         || ["atRevision", "documentSnapshotId"]
@@ -207,6 +207,7 @@ fn expression_context(value: &Value) -> bool {
                 && uint(&c["width"]).is_some_and(|n| n > 0)
                 && uint(&c["height"]).is_some_and(|n| n > 0)
                 && c["name"].is_string()
+                && finite(&c["frameDuration"]) && finite(&c["duration"])
                 && fps.is_some_and(|fps| {
                     c["frameDuration"].as_f64() == Some(1. / fps)
                         && c["duration"].as_f64()
@@ -217,6 +218,24 @@ fn expression_context(value: &Value) -> bool {
         })
     };
     self_valid && comp_valid && uint(&value["keyCount"]).is_some_and(|n| n <= 65_536)
+        && value.get("mesh").is_none_or(|mesh|mesh_context(mesh,&value["target"],&value["property"]))
+}
+
+fn mesh_context(value:&Value,target:&Value,property:&Value) -> bool {
+    exact(value,&["meshId","vertexIndex","vertexCount","outlineVertexCount","vertexUV","isOutlineVertex"],&[])
+        .is_some_and(|m| {
+            let index=m["vertexIndex"].as_i64().filter(|i|(-1..=i64::from(u32::MAX)).contains(i));
+            let expected=property.as_str().and_then(|p|p.strip_prefix("vtx"))
+                .filter(|p|!p.is_empty() && p.bytes().all(|b|b.is_ascii_digit()))
+                .map_or(Some(-1),|p|p.parse::<i64>().ok());
+            let count=uint(&m["vertexCount"]);let outline=uint(&m["outlineVertexCount"]);
+            text(m.get("meshId")) && m.get("meshId")==target.get("strokeId")
+                && index.is_some() && index==expected && count.is_some() && outline.is_some()
+                && outline.unwrap()<=count.unwrap() && vector(&m["vertexUV"],2)
+                && m["isOutlineVertex"].as_bool()==Some(index.unwrap()>=0 && (index.unwrap() as u64)<outline.unwrap())
+                && ((index.unwrap()>=0 && (index.unwrap() as u64)<count.unwrap())
+                    || m["vertexUV"].as_array().unwrap().iter().all(|v|v.as_f64()==Some(0.)))
+        })
 }
 #[cfg(test)]
 #[path = "native_property_read_contract_tests.rs"]
