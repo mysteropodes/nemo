@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "382976796d32e9c63a28e9a9c20d1c0bef43b31d",
-  "describe": "v0.7.0-alpha.4-2405-g38297679-dirty"
+  "head": "d57b4500dc673fcb09cf167a61b698ae86f3f73e",
+  "describe": "v0.7.0-alpha.4-2421-gd57b4500"
  },
- "inputsDigest": "c525437503cbc0273b55c691e9953716c6bb3fc31b4b67425b923ee880863807",
+ "inputsDigest": "7922de1c7f8a90adce4e3bc1fcd7920fddf846261f48577541f03ee10ae698e9",
  "states": [
   "inventoried",
   "characterized",
@@ -1876,7 +1876,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 189,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -2205,7 +2205,7 @@
    "capability": "Propagate to all frames",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:232 init()"
+    "src/js/fill-bridge.js:233 init()"
    ],
    "events": [
     "click"
@@ -3900,7 +3900,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 98,
     "via": "chain",
     "references": []
    },
@@ -3945,7 +3945,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 98,
     "via": "chain",
     "references": []
    },
@@ -3990,7 +3990,7 @@
     "container": "sp-pointtype-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 98,
     "via": "chain",
     "references": []
    },
@@ -10683,7 +10683,7 @@
    "capability": "fillgapclose",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:253 init()"
+    "src/js/fill-bridge.js:254 init()"
    ],
    "events": [
     "change"
@@ -10731,7 +10731,7 @@
    "capability": "fillgapsize",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:259 init()"
+    "src/js/fill-bridge.js:260 init()"
    ],
    "events": [
     "change"
@@ -11424,7 +11424,7 @@
    "capability": "nib angle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:234 init()"
+    "src/js/fill-bridge.js:235 init()"
    ],
    "events": [
     "change"
@@ -11472,7 +11472,7 @@
    "capability": "nib factor",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:240 init()"
+    "src/js/fill-bridge.js:241 init()"
    ],
    "events": [
     "change"
@@ -13336,7 +13336,7 @@
    "capability": "trimends",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:246 init()"
+    "src/js/fill-bridge.js:247 init()"
    ],
    "events": [
     "change"
@@ -13377,7 +13377,7 @@
    "capability": "trimends max",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:248 init()"
+    "src/js/fill-bridge.js:249 init()"
    ],
    "events": [
     "change"
