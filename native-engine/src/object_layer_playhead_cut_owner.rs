@@ -4,6 +4,7 @@ use crate::object_document::object_group_kernels::object_layer_lifecycle_plan::S
 use crate::object_document::{object_deserialize, AssetTarget, ObjectDocument};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
+use serde::Deserialize;
 
 #[path = "object_layer_playhead_cut.rs"]
 mod plan;
