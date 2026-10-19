@@ -2,6 +2,7 @@
 use super::*;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_document::ObjectDocument;
+use crate::request_receipts::OpacityRequest;
 #[path = "object_frame_edit_document_build.rs"]
 #[allow(dead_code)]
 mod build;
