@@ -219,6 +219,7 @@ fn with_context_budget<T>(
 ) -> Result<T, ExpressionRefusal> {
     let context = Context::custom::<(
         intrinsic::Eval,
+        intrinsic::Json,
         intrinsic::RegExpCompiler,
         intrinsic::RegExp,
         intrinsic::Promise,
