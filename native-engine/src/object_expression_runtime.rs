@@ -106,40 +106,9 @@ impl DetachedCandidate {
     }
 }
 
-// Promise is installed for internal async classes and job detection, then
-// hidden from guest globals along with constructors and host-like capabilities.
-const HARDEN: &str = r#"(() => {
-'use strict';
-const internalPromise = Promise;
-const fnProtos = [Function.prototype,
- Object.getPrototypeOf(function*(){}), Object.getPrototypeOf(async function(){}),
- Object.getPrototypeOf(async function*(){})];
-for (const p of [...fnProtos, internalPromise.prototype])
- Object.defineProperty(p, 'constructor', {value:undefined,writable:false,configurable:false});
-Object.defineProperty(Math, 'random', {value:undefined,writable:false,configurable:false});
-if (typeof Array.fromAsync !== 'undefined')
- Object.defineProperty(Array, 'fromAsync', {value:undefined,writable:false,configurable:false});
-for (const n of ['eval','Function','Date','performance','Promise','SharedArrayBuffer','Atomics',
- 'WebAssembly','WeakRef','FinalizationRegistry','Proxy','window','document','process','require',
- 'fetch','XMLHttpRequest','WebSocket','console','setTimeout','queueMicrotask','Deno','Bun'])
- Object.defineProperty(globalThis,n,{value:undefined,writable:false,configurable:false});
-const seen=[];
-function freeze(o) {
- if(o===null || (typeof o!=='object' && typeof o!=='function') || seen.indexOf(o)>=0) return;
- seen.push(o);
- for(const k of Object.getOwnPropertyNames(o)) {
-  const d=Object.getOwnPropertyDescriptor(o,k);
-  if(d && 'value' in d) freeze(d.value);
-  if(d && d.get) freeze(d.get); if(d && d.set) freeze(d.set);
- }
- const p=Object.getPrototypeOf(o); if(p) freeze(p);
- Object.freeze(o);
-}
-for(const p of fnProtos) freeze(p);
-freeze(internalPromise);
-freeze(globalThis);
-return 1;
-})()"#;
+#[path = "object_expression_harden.rs"]
+mod harden;
+use harden::HARDEN;
 
 fn guest_error(
     ctx: &Ctx<'_>,
@@ -237,6 +206,17 @@ fn with_context<T>(
     limits: ExpressionLimits,
     body: impl for<'js> FnOnce(&Ctx<'js>, &Fail) -> Result<T, ExpressionRefusal>,
 ) -> Result<T, ExpressionRefusal> {
+    with_context_budget(rt, limits, Arc::new(AtomicUsize::new(0)), body)
+}
+
+/// Dependency expressions share the outer interrupt counter. A nested
+/// property read must not buy a fresh execution budget.
+fn with_context_budget<T>(
+    rt: &Runtime,
+    limits: ExpressionLimits,
+    polls: Arc<AtomicUsize>,
+    body: impl for<'js> FnOnce(&Ctx<'js>, &Fail) -> Result<T, ExpressionRefusal>,
+) -> Result<T, ExpressionRefusal> {
     let context = Context::custom::<(
         intrinsic::Eval,
         intrinsic::RegExpCompiler,
@@ -255,7 +235,7 @@ fn with_context<T>(
         return Err(ExpressionRefusal::Bootstrap);
     }
     let fail = Fail {
-        polls: Arc::new(AtomicUsize::new(0)),
+        polls,
         budget: limits.interrupt_polls,
     };
     let seen = Arc::clone(&fail.polls);

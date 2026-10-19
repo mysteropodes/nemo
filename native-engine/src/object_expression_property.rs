@@ -22,19 +22,61 @@ use crate::object_expression_pin::{
     prepare_property_expression_request, PropertyEvaluation, PropertyExpressionRequest,
 };
 use crate::object_expression_runtime::{
-    compile, in_runtime, with_context, ExpressionLimits, ExpressionRefusal,
+    eval_single_function, in_runtime, with_context_budget, ExpressionLimits, ExpressionRefusal,
+    Fail,
 };
 use crate::revision::ObjectSnapshot;
 use rquickjs::{Function, Runtime, Value};
+use std::sync::{atomic::AtomicUsize, Arc};
+
+#[path = "object_expression_read_bridge.rs"]
+mod bridge;
+#[path = "object_expression_read_runtime.rs"]
+mod read_runtime;
+#[path = "object_expression_reads.rs"]
+mod reads;
+use read_runtime::ReadState;
+
+#[cfg(all(test, feature = "test-object_expression_runtime"))]
+#[path = "../tests/object_expression_reads.rs"]
+mod read_tests;
 
 /// The typed twin: an E1 outcome made only of Rust data.
 pub(crate) struct PropertyCandidate {
     outcome: Result<Outcome, ExpressionRefusal>,
+    dependencies: Vec<crate::object_expression_pin::PropertyDependencyEffect>,
 }
 
 impl PropertyCandidate {
-    pub(crate) fn into_outcome(self) -> Result<Outcome, ExpressionRefusal> {
-        self.outcome
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        Result<Outcome, ExpressionRefusal>,
+        Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+    ) {
+        (self.outcome, self.dependencies)
+    }
+}
+
+fn compile_property<'js>(
+    ctx: &rquickjs::Ctx<'js>,
+    code: &str,
+    fail: &Fail,
+) -> Result<Function<'js>, (ExpressionRefusal, String)> {
+    let prefix = format!(
+        "function(value,frame,__read,time){{'use strict';{}",
+        bridge::PRELUDE
+    );
+    let expression = format!("{prefix}\nreturn ({code}\n);}}");
+    match eval_single_function(ctx, &expression) {
+        Ok(f) => Ok(f),
+        Err(error) => match fail.of(ctx, error) {
+            (ExpressionRefusal::Syntax, _) => {
+                eval_single_function(ctx, &format!("{prefix}\n{code}\n}}"))
+                    .map_err(|e| fail.of(ctx, e))
+            }
+            other => Err(other),
+        },
     }
 }
 
@@ -90,9 +132,10 @@ fn evaluate_property_in_context(
     rt: &Runtime,
     request: &PropertyExpressionRequest,
     limits: ExpressionLimits,
+    state: ReadState,
 ) -> Result<Outcome, ExpressionRefusal> {
-    with_context(rt, limits, |ctx, fail| {
-        let function = match compile(ctx, request.code(), fail) {
+    with_context_budget(rt, limits, Arc::clone(&state.polls), |ctx, fail| {
+        let function = match compile_property(ctx, request.code(), fail) {
             Ok(function) => function,
             Err((ExpressionRefusal::Interrupted, _)) => return Ok(Outcome::Timeout),
             Err((_, message)) => {
@@ -111,10 +154,16 @@ fn evaluate_property_in_context(
             Dim::Vertex => 2,
             Dim::Undefined => -1,
         };
+        let read = read_runtime::bind(ctx, request, limits, state.clone())?;
+        let time = reads::SnapshotReads::new(request)
+            .comp()
+            .ok()
+            .and_then(|c| c["fps"].as_f64())
+            .map(|fps| request.frame() / fps);
         let called: rquickjs::Result<Value> = if raw.len() == 1 {
-            function.call((raw[0], request.frame()))
+            function.call((raw[0], request.frame(), read, time))
         } else {
-            function.call((raw.to_vec(), request.frame()))
+            function.call((raw.to_vec(), request.frame(), read, time))
         };
         let read = called.and_then(|value| {
             let reader: Function = ctx.eval(READ_TYPED)?;
@@ -132,10 +181,26 @@ pub(crate) fn evaluate_property_detached(
     request: &PropertyExpressionRequest,
     limits: ExpressionLimits,
 ) -> Result<PropertyCandidate, ExpressionRefusal> {
+    let state = ReadState::new(Arc::new(AtomicUsize::new(0)));
+    let outcome = evaluate_shared(request, limits, state.clone())?;
+    Ok(PropertyCandidate {
+        outcome,
+        dependencies: state.effects(),
+    })
+}
+
+fn evaluate_shared(
+    request: &PropertyExpressionRequest,
+    limits: ExpressionLimits,
+    state: ReadState,
+) -> Result<Result<Outcome, ExpressionRefusal>, ExpressionRefusal> {
     let outcome = in_runtime(request.code(), limits, |rt| {
-        evaluate_property_in_context(rt, request, limits)
+        evaluate_property_in_context(rt, request, limits, state.clone())
     })?;
-    Ok(PropertyCandidate { outcome })
+    Ok(match state.refusal() {
+        Some(e) => Err(e),
+        None => outcome,
+    })
 }
 
 /// The typed property entry point: finalization rechecks the real owner.

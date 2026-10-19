@@ -212,6 +212,15 @@ pub(crate) struct PropertyExpressionRequest {
 }
 
 impl PropertyExpressionRequest {
+    pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
+        &self.snapshot
+    }
+    pub(crate) fn target(&self) -> &PropertyHolderTarget {
+        &self.target
+    }
+    pub(crate) fn property(&self) -> &str {
+        &self.property
+    }
     pub(crate) fn frame(&self) -> f64 {
         self.frame
     }
@@ -247,11 +256,19 @@ impl PropertyExpressionRequest {
             .ok_or(ObjectFrameError::Unavailable)?;
         verify_owner_snapshot(owner, &current, &self.snapshot)?;
         let revision = self.snapshot.content_revision();
-        let outcome = match publish_if_current(revision, current.content_revision(), candidate) {
-            Publish::Publish(candidate) => candidate.into_outcome()?,
-            Publish::Stale => return Err(ObjectFrameError::WrongRevision.into()),
-        };
-        let fallback = evaluate_with_fallback(self.dim, &self.raw, outcome);
+        let (outcome, dependencies) =
+            match publish_if_current(revision, current.content_revision(), candidate) {
+                Publish::Publish(candidate) => candidate.into_parts(),
+                Publish::Stale => return Err(ObjectFrameError::WrongRevision.into()),
+            };
+        let mut fallback = evaluate_with_fallback(self.dim, &self.raw, outcome?);
+        if fallback.diagnostic.is_none()
+            && dependencies
+                .iter()
+                .any(|d| d.diagnostic == Some(Diagnostic::TooDeep))
+        {
+            fallback.diagnostic = Some(Diagnostic::TooDeep);
+        }
         Ok(PropertyEvaluation {
             value: fallback.value,
             diagnostic: fallback.diagnostic,
@@ -260,6 +277,7 @@ impl PropertyExpressionRequest {
                 target: self.target,
                 property: self.property,
             }),
+            dependencies,
         })
     }
 }
@@ -271,6 +289,19 @@ pub(crate) struct PropertyEvaluation {
     pub(crate) value: Vec<f64>,
     pub(crate) diagnostic: Option<Diagnostic>,
     pub(crate) disable: Option<PropertyDisableRequest>,
+    pub(crate) dependencies: Vec<PropertyDependencyEffect>,
+}
+
+/// Inner diagnostics and timeout-disable requests retain their real target.
+/// Reading never commits them; the existing owner publishes them with the
+/// same final revision check as the outer result.
+#[cfg(feature = "object_expression_runtime")]
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PropertyDependencyEffect {
+    pub(crate) target: PropertyHolderTarget,
+    pub(crate) property: String,
+    pub(crate) diagnostic: Option<Diagnostic>,
+    pub(crate) disable: bool,
 }
 
 /// Motion's `ex.enabled = false` after a timeout, as data for the owner.
@@ -294,6 +325,18 @@ pub(crate) fn prepare_property_expression_request(
         .acquire_snapshot(owner.content_revision())
         .ok_or(ObjectFrameError::Unavailable)?;
     verify_owner_snapshot(owner, &current, snapshot)?;
+    prepare_retained_property_expression_request(snapshot, target, property, frame, depth)
+}
+
+/// A dependency read stays on the outer request's immutable snapshot. Only
+/// the outer request's owner finalizer can publish any of its results.
+pub(crate) fn prepare_retained_property_expression_request(
+    snapshot: &ObjectSnapshot,
+    target: &PropertyHolderTarget,
+    property: &str,
+    frame: f64,
+    depth: u32,
+) -> Result<PropertyExpressionRequest, ObjectFrameError> {
     let raw = sample_property_raw(snapshot, target, property, frame).map_err(|e| match e {
         PropertySampleError::InvalidFrame => ObjectFrameError::FrameOutOfRange,
         PropertySampleError::MissingTarget => ObjectFrameError::InvalidSource,
