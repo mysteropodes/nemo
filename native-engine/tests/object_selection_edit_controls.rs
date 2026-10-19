@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 fn operations() -> Vec<(&'static str, Value)> {
     let clip = copy(&owner_of(&base(2)), "L0", 0, &["b"]).unwrap().unwrap();
-    vec![
+    let mut operations = vec![
         ("delete", delete("L0", 0, "motion", &["b"])),
         ("duplicate", duplicate("L0", 0, "motion", &["b"])),
         ("split", split("L0", 0)),
@@ -21,7 +21,67 @@ fn operations() -> Vec<(&'static str, Value)> {
             json!({"command":"object.clipboard.paste","contextId":"scene-root","layerUid":"L1",
                 "frame":0,"mode":"motion","clip":serde_json::to_value(&clip).unwrap()}),
         ),
+    ];
+    operations.extend(held_operations());
+    operations
+}
+
+fn held_operations() -> Vec<(&'static str, Value)> {
+    let clip = copy(&owner_of(&base(2)), "L0", 0, &["b"]).unwrap().unwrap();
+    vec![
+        ("delete", delete("L0", 5, "animation2d", &["d"])),
+        ("duplicate", duplicate("L0", 5, "animation2d", &["d"])),
+        (
+            "paste",
+            json!({"command":"object.clipboard.paste","contextId":"scene-root","layerUid":"L0",
+                "frame":5,"mode":"animation2d","clip":serde_json::to_value(&clip).unwrap()}),
+        ),
     ]
+}
+
+#[test]
+fn the_real_owner_promotes_the_held_cell_with_the_edit_and_preserves_its_source() {
+    for version in [1, 2] {
+        for (op, payload) in held_operations() {
+            let mut owner = owner_of(&base(version));
+            let before = frozen(&owner);
+            let candidate = prepare(&owner, op, &payload).unwrap();
+            assert!(
+                candidate.promoted() && candidate.changed(),
+                "{op} v{version}"
+            );
+            assert_eq!(candidate.content_frame(), 5);
+            assert_eq!(frozen(&owner), before, "preparation publishes nothing");
+            owner.commit_selection_edit(candidate).unwrap();
+            let after = value(&owner);
+            let expected = if op == "delete" {
+                vec!["a"]
+            } else {
+                vec!["a", "d", "native-stroke:1:0"]
+            };
+            assert_eq!(strokes_at(&after, "L0", 5), expected, "{op} v{version}");
+            assert_eq!(strokes_at(&after, "L0", 3), ["a", "d"]);
+            assert_eq!(strokes_at(&after, "L0", 0), ["a", "b", "c"]);
+            assert_eq!(strokes_at(&after, "L1", 0), ["x"]);
+            assert_eq!(
+                after["layers"][0]["timing"]["keys"],
+                json!([{"frame":0},{"frame":3},{"frame":5}])
+            );
+            if version == 2 {
+                let elements = super::object_selection_edit_tests::elements_at(&after, "L0", 5);
+                let expected: Vec<_> = expected
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, stroke)| (stroke.to_string(), slot as u64))
+                    .collect();
+                assert_eq!(elements, expected);
+            }
+            assert_eq!(
+                (owner.content_revision(), owner.history_depths()),
+                (1, (1, 0))
+            );
+        }
+    }
 }
 
 #[test]
@@ -165,6 +225,8 @@ fn a_noop_preserves_presence_bytes_history_and_redo() {
     let noops = [
         ("delete", delete("L0", 0, "motion", &[])),
         ("duplicate", duplicate("L0", 0, "animation2d", &[])),
+        ("delete", delete("L0", 5, "animation2d", &[])),
+        ("duplicate", duplicate("L0", 5, "animation2d", &[])),
     ];
     for (n, (op, payload)) in noops.iter().enumerate() {
         let candidate = prepare(&owner, op, payload).unwrap();

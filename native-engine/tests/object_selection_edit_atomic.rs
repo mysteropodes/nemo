@@ -322,3 +322,55 @@ fn an_animation_2d_hold_is_promoted_once_inside_the_same_candidate() {
     plan_delete(document, &keyed, &port).unwrap();
     assert_eq!(port.calls.get(), 0);
 }
+
+#[test]
+fn a_real_held_cut_is_sealed_atomic_and_one_undo_restores_timing_and_content() {
+    for version in [1, 2] {
+        let mut owner = owner_of(&base(version));
+        let before = frozen(&owner);
+        let payload = super::object_selection_edit_tests::selection(
+            "object.clipboard.cut",
+            "L0",
+            5,
+            "animation2d",
+            &["d"],
+        );
+        let raw = payload.to_string();
+        let (clip, candidate) = owner.prepare_clipboard_cut_json(raw.as_bytes()).unwrap();
+        assert!(candidate.promoted() && candidate.changed());
+        assert_eq!(candidate.content_frame(), 5);
+        let clip = clip.unwrap();
+        assert_eq!(clip.records.len(), 1);
+        assert_eq!(clip.records[0].target.stroke_id, "d");
+        assert_eq!(frozen(&owner), before);
+        owner.commit_selection_edit(candidate.clone()).unwrap();
+        let after = frozen(&owner);
+        let drawing = super::object_selection_edit_tests::value(&owner);
+        assert_eq!(strokes_at(&drawing, "L0", 5), ["a"]);
+        assert_eq!(strokes_at(&drawing, "L0", 3), ["a", "d"]);
+        assert_eq!(
+            drawing["layers"][0]["timing"]["keys"],
+            json!([{"frame":0},{"frame":3},{"frame":5}])
+        );
+        assert_eq!((after.1, after.2), ((1, 0), 1));
+        assert_eq!(
+            owner.commit_selection_edit(candidate),
+            Err(DispatchErrorCode::StaleRevision)
+        );
+        assert_eq!(frozen(&owner), after);
+        let reopened = owner_of(&drawing);
+        assert_eq!(frozen(&reopened).0, after.0);
+        owner.undo(1).unwrap();
+        assert_eq!(frozen(&owner).0, before.0);
+        assert_eq!(owner.history_depths(), (0, 1));
+        let (_, stale) = owner.prepare_clipboard_cut_json(raw.as_bytes()).unwrap();
+        owner.redo(2).unwrap();
+        let kept = frozen(&owner);
+        assert_eq!(kept.0, after.0);
+        assert_eq!(
+            owner.commit_selection_edit(stale),
+            Err(DispatchErrorCode::StaleRevision)
+        );
+        assert_eq!(frozen(&owner), kept);
+    }
+}

@@ -11,16 +11,14 @@ use crate::commands::object_fill_owner::selection_edit::wire::{
     clip_ok, edit_mode, parse, refusal_code, strokes_ok, target_ok, PastePayload, SelectionPayload,
 };
 use crate::commands::object_fill_owner::selection_edit::{
-    PreparedSelectionEdit, SelectionEditKind,
+    PreparedSelectionEdit, RealHeldFramePromotion, SelectionEditKind,
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_clipboard_plan::{
     copy_selection, plan_paste, ClipPayload, PasteRequest,
 };
 use crate::object_document::object_group_kernels::object_selection_edit_clones::RevisionIds;
-use crate::object_document::object_group_kernels::object_selection_edit_frames::{
-    EditMode, UnavailablePromotion,
-};
+use crate::object_document::object_group_kernels::object_selection_edit_frames::EditMode;
 use crate::object_document::object_group_kernels::object_selection_edit_plan::{
     plan_delete, SelectionRequest, MAX_REVISION,
 };
@@ -86,7 +84,7 @@ impl ObjectFillOwner {
             origin.document(),
             clip,
             &request,
-            &UnavailablePromotion,
+            &RealHeldFramePromotion,
             &mut ids,
         );
         PreparedSelectionEdit::seal(origin, SelectionEditKind::Paste, plan)
@@ -141,7 +139,7 @@ impl ObjectFillOwner {
             mode,
             stroke_ids: &payload.stroke_ids,
         };
-        let plan = plan_delete(origin.document(), &request, &UnavailablePromotion);
+        let plan = plan_delete(origin.document(), &request, &RealHeldFramePromotion);
         let prepared = PreparedSelectionEdit::seal(origin, SelectionEditKind::Cut, plan)?;
         Ok((clip, prepared))
     }
