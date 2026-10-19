@@ -97,6 +97,7 @@ fn paste_with(
 }
 fn key(id: &str) -> PasteCell {
     PasteCell {
+        order_elements: crate::object_document::Presence::Missing,
         rel_layer: 0,
         rel_frame: 0,
         keyframe: true,
@@ -262,17 +263,13 @@ fn paste_refusals_are_typed_and_publish_nothing() {
         assert_eq!(run(&mut o, operation).unwrap_err(), code);
     }
     assert_eq!(o.content_revision(), 0);
-    let mut ordered = owner(document(&parse_layers(SMALL), Build::V2));
-    for operation in [
-        paste_op(&ordered, "L1", 1, vec![key("n")]),
-        cut_op(&[("L0", 0)]),
-        duplicate_op(&[("L0", 0)], "L1"),
-    ] {
-        assert_eq!(
-            run(&mut ordered, operation).unwrap_err(),
-            DispatchErrorCode::Unavailable
-        );
-    }
+    let ordered = owner(document(&parse_layers(SMALL), Build::V2));
+    let malformed = paste_op(&ordered, "L1", 1, vec![key("n")]);
+    assert_eq!(
+        ordered.prepare_frame_clipboard(&malformed).unwrap_err(),
+        DispatchErrorCode::InvalidRequest,
+        "v1 packet metadata cannot be guessed for v2"
+    );
     assert_eq!(ordered.content_revision(), 0);
 }
 
@@ -321,4 +318,27 @@ fn locked_layers_are_skipped_by_paste_and_duplicate_and_kept_in_the_cut_packet()
             .revision,
         before
     );
+}
+
+#[test]
+fn ordered_prepared_candidates_keep_current_pins_and_locked_targets() {
+    for form in [Build::V2, Build::V2Extras] {
+        let mut value = serde_json::to_value(rows::ordered_document(form)).unwrap();
+        value["layers"][1]["locked"] = json!(true);
+        let mut o = owner(decode_storage_project(value.to_string().as_bytes()).unwrap());
+        let op = duplicate_op(&[("L0", 0)], "L1");
+        let frozen = head(&o);
+        assert_eq!(run(&mut o, op).unwrap().revision, 0);
+        assert_eq!(head(&o), frozen);
+        let op = duplicate_op(&[("L0", 0)], "L0");
+        let first = o.prepare_frame_clipboard(&op).unwrap();
+        let stale = o.prepare_frame_clipboard(&op).unwrap();
+        o.commit_frame_clipboard(first).unwrap();
+        let frozen = head(&o);
+        assert_eq!(
+            o.commit_frame_clipboard(stale).unwrap_err(),
+            DispatchErrorCode::StaleRevision
+        );
+        assert_eq!(head(&o), frozen);
+    }
 }

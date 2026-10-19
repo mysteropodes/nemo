@@ -10,7 +10,7 @@ use crate::commands::object_fill_owner::object_frame_clipboard_paste::{
     CellRef, FrameClipboardOperation, PasteCell, PasteRequest,
 };
 use crate::commands::object_fill_owner::object_frame_clipboard_paste_plan::packet_paste_cells;
-use crate::object_document::{object_deserialize, ObjectRecord, Presence};
+use crate::object_document::{object_deserialize, ObjectRecord, OrderElement, Presence};
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -23,8 +23,10 @@ struct WireCell {
     rel_frame: u32,
     keyframe: bool,
     records: Vec<ObjectRecord>,
+    order_elements: Presence<Vec<OrderElement>>,
 }
-object_deserialize!(WireCell { rel_layer: u32, rel_frame: u32, keyframe: bool, records: Vec<ObjectRecord> });
+object_deserialize!(WireCell { rel_layer: u32, rel_frame: u32, keyframe: bool, records: Vec<ObjectRecord>,
+    #[serde(default)] order_elements: Presence<Vec<OrderElement>> });
 
 #[derive(Debug)]
 struct WireRef {
@@ -96,6 +98,7 @@ pub(crate) fn parse_clipboard_payload(
                     rel_frame: cell.rel_frame,
                     keyframe: cell.keyframe,
                     records: cell.records,
+                    order_elements: cell.order_elements,
                 })
                 .collect();
             Ok(FrameClipboardOperation::Paste(PasteRequest {
@@ -139,8 +142,12 @@ pub(crate) fn paste_payload(
     let cells: Vec<Value> = packet_paste_cells(packet)
         .iter()
         .map(|cell| {
-            json!({"relLayer":cell.rel_layer,"relFrame":cell.rel_frame,
-                "keyframe":cell.keyframe,"records":cell.records})
+            let mut value = json!({"relLayer":cell.rel_layer,"relFrame":cell.rel_frame,
+                "keyframe":cell.keyframe,"records":cell.records});
+            if let Presence::Present(elements) = &cell.order_elements {
+                value["orderElements"] = json!(elements);
+            }
+            value
         })
         .collect();
     json!({"command":"object.frames.clipboard.paste",
