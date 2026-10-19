@@ -63,7 +63,9 @@ fn history(state: &ApplicationMcp, id: &str, action: &str) -> Value {
     let mut r = request(state, id, "unused");
     r["operation"] = json!(format!("command.document.object.{action}"));
     r["payload"] = json!({"command":format!("object.{action}")});
-    invoke(state, r)
+    serde_json::to_value(
+        crate::application_mcp::object_client::dispatch_raw(state, &r.to_string()).unwrap(),
+    ).unwrap()
 }
 fn depths(state: &ApplicationMcp) -> (usize, usize) {
     with_host(state, |host| host.history.history_depths())
@@ -176,9 +178,16 @@ fn public_remove_refuses_real_viewport_reference_and_placement_without_partial_p
         let state = ApplicationMcp::default();
         state.install_native_project_file(&serde_json::to_vec(&file).unwrap()).unwrap();
         let before = saved(&state);
+        let reopened: Value = serde_json::from_slice(&before).unwrap();
+        if reference {
+            assert_eq!(reopened["viewportReference"]["assetId"], "asset-blue");
+        } else {
+            assert_eq!(reopened["drawing"]["items"]["raster"][0]["item"]["assetId"], "asset-blue");
+        }
         let r = request(&state, "in-use", "asset-blue");
         let first = invoke(&state, r.clone());
-        assert_eq!(first["error"]["code"], "busy_conflict");
+        assert_eq!(first["ok"], false, "reference={reference}: {first}");
+        assert_eq!(first["error"]["code"], "busy_conflict", "reference={reference}");
         assert_eq!(first["error"]["details"]["reason"], "asset_in_use");
         assert_eq!(invoke(&state, r), first);
         assert_eq!(saved(&state), before);
