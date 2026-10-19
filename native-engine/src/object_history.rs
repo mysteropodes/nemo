@@ -52,6 +52,9 @@ mod scene_effect_layer_history;
 // L02-I (#2108): boolean tool / eraser / Flatten as owner transactions.
 #[path = "object_boolean_ops_history.rs"]
 mod boolean_history;
+// F11 cut at playhead: one existing history transaction.
+#[path = "object_layer_playhead_cut_history.rs"]
+mod object_layer_playhead_cut;
 // L05-C (lane #2111): frame-structure transactions (insert / extend / duplicate / remove frames).
 #[path = "object_frame_edit_structure_history.rs"]
 mod object_frame_edit_structure;
@@ -74,6 +77,8 @@ mod object_frame_clipboard_repeat;
 #[path = "object_frame_clipboard_tracks_history.rs"]
 mod object_frame_clipboard_tracks;
 // L09-H (#2115): placement edits as one history transaction (G42, I16b).
+#[path = "object_audio_track_edit_history.rs"]
+mod audio_track_edit;
 #[path = "object_media_link_history.rs"]
 #[allow(dead_code)]
 mod object_media_link_history;
@@ -458,3 +463,8 @@ impl NativeObjectHistory {
         Ok(restored)
     }
 }
+
+#[path = "object_frame_bulk_move_history.rs"]
+mod object_frame_bulk_move;
+#[path = "object_layer_shift_history.rs"]
+mod object_layer_shift;

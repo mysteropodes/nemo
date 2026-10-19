@@ -9,11 +9,12 @@
 //! same verdicts as data, with the reason, and the evaluation join decides what to do with an
 //! unlinked bind.
 //!
-//! Resolution scope: a stroke bind resolves against the authored object record of the SAME layer, the
+//! Resolution scope: this root-document provider resolves SCENE_CONTEXT authored records of the SAME layer, the
 //! stable stroke identity and the frame the caller names (the baseline links against the current
 //! frame's children); held-frame resolution through layer timing, component contexts and the raster
 //! that carries a mesh are joins of later leaves (L03-P/L03-R). The mesh store is a port: `None`
 //! means "no mesh provider is wired" and is reported as unavailable, never as success or as missing.
+use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 use crate::object_document::object_rig_record::{BindTarget, RigBind, RigRecord, PATH_FAMILIES};
 use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectRecord};
 
@@ -55,7 +56,8 @@ pub(crate) fn bind_link(
         Some(BindTarget::Stroke(stroke_id)) => {
             let record = objects.iter().find(|record| {
                 let target = record.target();
-                target.layer_uid() == layer_uid
+                target.context_id() == SCENE_CONTEXT
+                    && target.layer_uid() == layer_uid
                     && target.stroke_id() == stroke_id
                     && target.frame() == frame
                     && *target.scope_kind() == FrameScopeKind::Authored

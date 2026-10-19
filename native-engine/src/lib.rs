@@ -94,3 +94,7 @@ mod object_expression_pin_tests;
 #[cfg(all(test, feature = "test-object_expression_runtime"))]
 #[path = "../tests/object_expression_runtime.rs"]
 mod object_expression_runtime_tests;
+
+#[cfg(all(test, feature = "export_job", feature = "project_media_codec"))]
+#[path = "../tests/object_stored_gradient.rs"]
+mod object_stored_gradient_tests;

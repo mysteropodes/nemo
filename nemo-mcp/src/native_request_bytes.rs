@@ -14,7 +14,9 @@ fn string_is(bytes: Option<&[u8]>, expected: &str) -> bool {
 }
 pub(super) const MAX_REQUEST_BYTES: usize = 65_536;
 pub(super) fn request_limit(operation: &str) -> usize {
-    if operation == "command.document.object.vector.edit" {
+    if super::native_clipboard_transport::owns(operation) {
+        super::native_clipboard_transport::MESSAGE_BYTES
+    } else if operation == "command.document.object.vector.edit" {
         MAX_REQUEST_BYTES
     } else {
         crate::contract::NATIVE_MAX_MESSAGE_BYTES
@@ -57,3 +59,28 @@ mod framing_tests;
 #[cfg(test)]
 #[path = "native_request_limit_tests.rs"]
 mod limit_tests;
+
+/// Exact existing MCP tools/call or authenticated TCP path, never arbitrary nested JSON.
+/// Native inner bytes and bounded wrapper bytes are charged separately, LF excluded.
+pub(super) fn clipboard_wrapper_admitted(bytes: &[u8], stdio: bool, prefix_bytes: usize) -> bool {
+    let request = if stdio {
+        string_is(member(bytes, "method"), "tools/call")
+            .then(|| member(bytes, "params"))
+            .flatten()
+            .filter(|p| string_is(member(p, "name"), "nemo_command"))
+            .and_then(|p| member(p, "arguments"))
+    } else {
+        member(bytes, "nativeRequest")
+    };
+    request.filter(|v| native(v)).is_some_and(|request| {
+        member(request, "operation")
+            .and_then(|v| serde_json::from_slice::<String>(v).ok())
+            .is_some_and(|op| super::native_clipboard_transport::owns(&op))
+            && request.len() <= super::native_clipboard_transport::MESSAGE_BYTES
+            && bytes
+                .len()
+                .saturating_sub(request.len())
+                .saturating_add(prefix_bytes)
+                <= super::native_clipboard_transport::WRAPPER_BYTES
+    })
+}

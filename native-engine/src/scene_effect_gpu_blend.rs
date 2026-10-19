@@ -61,6 +61,10 @@ fn encode_straight_paints(
     let mut swatches = BTreeMap::new();
     for paint in paints {
         for fill in &paint.fills {
+            if let Some(prepared) = &fill.prepared {
+                prepared.draw(scene, Affine::IDENTITY, fill.path);
+                continue;
+            }
             if (fill.rgba[3] * 255.0).round() == 0.0 {
                 continue;
             }

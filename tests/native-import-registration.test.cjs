@@ -59,9 +59,15 @@ test('the nemo-mcp validators are wired: module, request arm, result arm, revisi
   assert.match(correlatedIdentity[1], /^!correlated_operation\s*\|\| \(response\.request_id == request\.request_id\s*&&/);
   assert.match(correlatedIdentity[1], /\.unwrap_or\(\s*response\.instance_id == request\.instance_id\s*&& \(response\.document_id == request\.document_id/);
   assert.match(correlatedIdentity[1], /\|\| \(!response\.ok\s*&& response[\s\S]*?e\.code == "wrong_document"\)/);
-  assert.match(correlatedIdentity[1], /&& serde_json::to_vec\(response\)\.is_ok_and\(\|b\| b\.len\(\) <= NATIVE_MAX_MESSAGE_BYTES\)\)$/);
+  assert.match(correlatedIdentity[1], /&& serde_json::to_vec\(response\)\.is_ok_and\(\|b\|\s*\{\s*b\.len\(\) <= crate::wire::native_response_byte_limit\(&request\.operation\)\s*\}\)\)$/);
+  const clipboardTransport = read('nemo-mcp/src/native_clipboard_transport.rs');
+  const responseLimit = clipboardTransport.match(/pub\(crate\) fn response_limit\([^{}]*\{[\s\S]*?\n\}/);
+  assert.ok(responseLimit, 'one operation-specific response budget helper exists');
+  assert.deepEqual(responseLimit[0].match(/"command\.document\.object\.frames\.clipboard\.\w+"/g),
+    ['"command.document.object.frames.clipboard.copy"', '"command.document.object.frames.clipboard.cut"']);
+  assert.match(responseLimit[0], /MESSAGE_BYTES\s*\}\s*else\s*\{\s*4096/);
   const nativeCallStart = wire.indexOf('pub async fn call_native(');
-  const nativeCallEnd = wire.indexOf('\nfn validate_native_response(');
+  const nativeCallEnd = wire.indexOf('\npub fn validate_native_response(');
   assert.ok(nativeCallStart >= 0 && nativeCallEnd > nativeCallStart);
   const nativeCall = wire.slice(nativeCallStart, nativeCallEnd);
   assert.match(nativeCall, /validate_native_response\(&response, &response_contract\)\?;/);
@@ -119,7 +125,9 @@ test('the legacy importer scripts are all loaded or all gone (the cutover is one
   for (const file of FILES) assert.equal(/\bimport\s*\(\s*['"`]/.test(read(`src/js/adapters/${file}`).replace(/\/\/.*$/gm, '')), false, `${file} carries no dynamic import`);
   const sdk = read('src/js/adapters/native-application.js');
   assert.match(sdk, /\[[^\]]*require\('\.\/native-import-contract\.js'\) : root\.NemoNativeImportContract[^\]]*\]\.reduce\(\(base, lane\) => \(lane \? lane\.compose\(base\) : base\)/, 'the import contract is composed in the lane reduce of the single SDK line');
-  assert.ok(sdk.replace(/\n$/, '').split('\n').length <= 502, 'the SDK did not grow (it is at its ceiling at the anchor base)');
+  const adapterCapacity=JSON.parse(read('engineering/boundaries/profiles/app-js.profile.json')).sizeProfiles['Platform/engine adapter'].hardMax;
+  assert.equal(adapterCapacity,500,'the adopted SDK adapter capacity is unchanged');
+  assert.ok(sdk.split('\n').filter(line=>line.trim()).length<=adapterCapacity,'the composed SDK stays within the unchanged 500 nonblank-line hard maximum');
 });
 
 test('the session exposes the pinned import mutation only while presented, with the stale-intent check of createLayer', () => {

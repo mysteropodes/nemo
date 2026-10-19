@@ -162,6 +162,9 @@ pub(crate) fn holders_fully_consumed(document: &ObjectDocument) -> bool {
 }
 
 fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+    if let Some(consumed) = crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::component_holder_consumed(document, holder) {
+        return consumed;
+    }
     let target = holder.target();
     if holder
         .controls

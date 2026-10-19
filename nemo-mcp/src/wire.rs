@@ -1,4 +1,6 @@
 //! Bounded local IPC; no shell, eval, document mirror, or public network listener.
+#[path = "native_clipboard_transport.rs"]
+pub(crate) mod native_clipboard_transport;
 #[path = "native_request_bytes.rs"]
 mod native_request_bytes;
 #[path = "raw_envelope.rs"]
@@ -136,7 +138,7 @@ pub async fn read_json<T: serde::de::DeserializeOwned>(
 pub fn guarded_stdio_input<R: AsyncRead + Unpin + Send + 'static>(
     reader: R,
 ) -> impl AsyncRead + Unpin + Send + 'static {
-    raw_envelope::GuardedInput::new(reader, MAX_MESSAGE_BYTES - 2)
+    raw_envelope::GuardedInput::new(reader, native_clipboard_transport::FRAME_BYTES)
 }
 
 /// Production stdio path: SDK codec and one cancellation-safe output owner.
@@ -164,7 +166,8 @@ async fn read_json_bounded<T: serde::de::DeserializeOwned>(
     if bytes.last() != Some(&b'\n') || bytes.len() > limit {
         return Err(io::Error::other("incomplete or oversized message"));
     }
-    decode_json_bounded(&bytes, limit)
+    bytes.pop(); // LF is framing, not part of the encoded JSON envelope.
+    decode_json_bounded(&bytes, max_content_bytes)
 }
 
 /// Decode complete original bytes with a caller's bound and recursive duplicate
@@ -186,13 +189,17 @@ pub fn decode_json_bounded<T: serde::de::DeserializeOwned>(
     Ok(serde_json::from_slice(bytes)?)
 }
 
-/// Full original/typed vector request limit; every reply and other request stays4096.
+/// Full original/typed operation budget; unrelated requests/replies stay4096.
 pub fn native_request_byte_limit(operation: &str) -> usize {
     native_request_bytes::request_limit(operation)
 }
+pub use native_clipboard_transport::{
+    native_response_byte_limit, read_authenticated, write_native_response,
+};
 /// Original-byte, duplicate-first, map-only admission; not execution availability.
 pub fn decode_native_request(bytes: &[u8]) -> io::Result<NativeApplicationRequest> {
-    let request: NativeApplicationRequest = decode_json_bounded(bytes, MAX_MESSAGE_BYTES - 2)?;
+    let request: NativeApplicationRequest =
+        decode_json_bounded(bytes, native_clipboard_transport::MESSAGE_BYTES)?;
     if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
         return Err(io::Error::other("native request must be an object"));
     }
@@ -240,7 +247,7 @@ pub async fn call_native(
     let response_contract = request.clone();
     let round_trip = async {
         let mut stream = TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, endpoint.port)).await?;
-        write_json(
+        native_clipboard_transport::write_request(
             &mut stream,
             &NativeWireRequest {
                 secret: endpoint.secret.clone(),
@@ -248,8 +255,11 @@ pub async fn call_native(
             },
         )
         .await?;
-        let response: NativeApplicationResponse =
-            read_json_bounded(stream, NATIVE_MAX_MESSAGE_BYTES).await?;
+        let response: NativeApplicationResponse = read_json_bounded(
+            stream,
+            native_response_byte_limit(&response_contract.operation),
+        )
+        .await?;
         validate_native_response(&response, &response_contract)?;
         let reports_replacement = response_owner::reports_document(&response_contract, &response);
         if response.api_version != NATIVE_API_VERSION
@@ -264,10 +274,17 @@ pub async fn call_native(
     cancellable(round_trip, cancel).await
 }
 
-fn validate_native_response(
+pub fn validate_native_response(
     response: &NativeApplicationResponse,
     request: &NativeApplicationRequest,
 ) -> io::Result<()> {
+    if !serde_json::to_vec(response)
+        .is_ok_and(|bytes| bytes.len() <= native_response_byte_limit(&request.operation))
+    {
+        return Err(io::Error::other(
+            "native response exceeds operation encoded byte bound",
+        ));
+    }
     let policy_command = request.operation == crate::native_contract::layer_policy::OP;
     let track_command = request.operation == crate::native_contract::property_track::OP;
     let property_edit = request.operation == crate::native_contract::property_edit::OP;

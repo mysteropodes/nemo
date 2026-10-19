@@ -17,8 +17,8 @@
 //!
 //! Deliberate differences, each pinned by a test: an empty `mattesMore` and an empty UID reference are refused
 //! (the baseline import silently drops the former and treats the latter as the legacy marker), an effect
-//! entry is exactly `{type, enabled, p1..p8}` (no `keys`: keyed effect parameters are property tracks and stay
-//! with the property owners), `blendKeys` is not admitted (animated blend belongs to the property provider),
+//! entry retains `{type, enabled, p1..p8, keys}` with typed ordered scalar tracks; keyed evaluation is a
+//! separately admitted reader and cannot fall back to static parameters, `blendKeys` is not admitted (animated blend belongs to the property provider),
 //! `folderCollapsed` needs a folder layer, a layer is not both an effect layer and a folder, and an effect or
 //! folder layer owns no drawing objects (the baseline never renders their content: `getEffectiveStrokes`
 //! returns `[]` for an effect layer and the folder wire entry carries no items).
@@ -29,6 +29,10 @@ use crate::object_document::{object_deserialize, ObjectLayer, ObjectRecord, Pres
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use std::collections::HashSet;
+
+#[path = "object_effect_key_tracks.rs"]
+mod key_tracks;
+use key_tracks::EffectKeyTracks;
 
 /// The 16 baseline blend names, in the order of `BLEND_MODE_LABELS` (`timeline.js`).
 pub(crate) const BLEND_MODE_NAMES: [&str; 16] = [
@@ -90,6 +94,9 @@ pub(crate) struct LayerEffect {
     pub(crate) p7: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) p8: Presence<Option<Number>>,
+    /// Original eff.keys; absent/null/empty and parameter insertion order are retained.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) keys: Presence<Option<EffectKeyTracks>>,
 }
 object_deserialize!(LayerEffect {
     #[serde(rename = "type")] effect_type: String,
@@ -101,10 +108,26 @@ object_deserialize!(LayerEffect {
     #[serde(default)] p5: Presence<Option<Number>>,
     #[serde(default)] p6: Presence<Option<Number>>,
     #[serde(default)] p7: Presence<Option<Number>>,
-    #[serde(default)] p8: Presence<Option<Number>>
+    #[serde(default)] p8: Presence<Option<Number>>,
+    #[serde(default)] keys: Presence<Option<EffectKeyTracks>>
 });
 
 impl LayerEffect {
+    /// Current static compositor cannot silently substitute static values for authored parameter keys.
+    pub(crate) fn has_keyed_params(&self) -> bool {
+        self.keys
+            .value()
+            .and_then(Option::as_ref)
+            .is_some_and(|map| {
+                map.entries().iter().any(|(name, track)| {
+                    matches!(
+                        name.as_str(),
+                        "p1" | "p2" | "p3" | "p4" | "p5" | "p6" | "p7" | "p8"
+                    ) && track.as_ref().is_some_and(|track| !track.keys.is_empty())
+                })
+            })
+    }
+
     /// The stored number of `p<index+1>`; an absent member and an explicit null both give `None`.
     pub(crate) fn param(&self, index: usize) -> Option<f64> {
         let slot = match index {

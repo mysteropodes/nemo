@@ -1,28 +1,26 @@
-//! A layer whose stored range hides frames keeps the exposure producer typed unavailable: the native
-//! evaluator does not consume in/out points or time links yet (D27), and painting every frame of such a
-//! layer would be a fake success. Ranges that gate nothing (null members, markers only) do not block it.
-//! Needs the `evaluation` feature (run with `--features test-history,evaluation`).
+//! Real range admission now reaches immutable exposure selection; original 21 controls retained.
 use super::{document, head, owner, Build};
 use crate::object_document::FrameScopeKind;
-use crate::object_frame_packet::{
-    prepare_object_exposure_frame, ObjectFrameError, ObjectFrameSelector,
-};
+use crate::object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector};
 use serde_json::{json, Value};
 
 #[test]
-fn a_range_that_hides_frames_keeps_the_exposure_packet_unavailable() {
+fn admitted_ranges_select_the_literal_exposed_sources() {
     let mut checked = 0;
-    for (range, gates) in [
-        (json!({"inPoint":1}), true),
-        (json!({"outPoint":0}), true),
-        (json!({"timeLink":{"uid":"L1"}}), true),
+    for (range, visible) in [
+        (json!({"inPoint":1}), [false, true, true]),
+        (json!({"outPoint":0}), [true, false, false]),
+        (json!({"timeLink":{"uid":"L1"}}), [true, true, true]),
         (
             json!({"inPoint":null,"outPoint":null,"timeLink":null}),
-            false,
+            [true, true, true],
         ),
-        (json!({"markers":[{"frame":1,"name":"m"}]}), false),
-        (json!({}), false),
-        (Value::Null, false),
+        (
+            json!({"markers":[{"frame":1,"name":"m"}]}),
+            [true, true, true],
+        ),
+        (json!({}), [true, true, true]),
+        (Value::Null, [true, true, true]),
     ] {
         let o = owner(document(
             3,
@@ -40,11 +38,20 @@ fn a_range_that_hides_frames_keeps_the_exposure_packet_unavailable() {
                 scope_kind: FrameScopeKind::Authored,
                 frame,
             };
-            let result = prepare_object_exposure_frame(&snapshot, &selector);
-            assert_eq!(result.is_err(), gates, "{range} frame {frame}");
-            if gates {
-                assert_eq!(result.err(), Some(ObjectFrameError::Unavailable), "{range}");
-            }
+            let packet =
+                prepare_object_exposure_frame(&snapshot, &selector).expect("range evaluated");
+            let shown = visible[frame as usize];
+            assert_eq!(
+                packet.source_frame_for_layer(0),
+                shown.then_some(0),
+                "{range} @{frame}"
+            );
+            assert_eq!(packet.source_frame_for_layer(1), Some(0));
+            let layers: Vec<_> = packet
+                .records()
+                .map(|record| record.record().target().layer_uid().to_owned())
+                .collect();
+            assert_eq!(layers, if shown { vec!["L0", "L1"] } else { vec!["L1"] });
             checked += 1;
         }
     }

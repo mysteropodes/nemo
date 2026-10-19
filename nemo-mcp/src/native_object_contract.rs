@@ -62,10 +62,16 @@ fn timing_selector(value: &Value) -> Option<u64> {
 }
 
 pub(super) fn timing_request(value: &Value) -> bool {
+    if value.get("view").is_some() {
+        return layer_range::request(value);
+    }
     timing_selector(value).is_some()
 }
 
 pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if payload.get("view").is_some() {
+        return layer_range::result(document_id, payload, result);
+    }
     let Some(requested) = timing_selector(payload) else {
         return false;
     };
@@ -258,3 +264,6 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
 #[cfg(test)]
 #[path = "native_object_contract_tests.rs"]
 mod tests;
+
+#[path = "native_layer_range_contract.rs"]
+mod layer_range;

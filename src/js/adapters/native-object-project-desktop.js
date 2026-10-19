@@ -5,7 +5,21 @@
   else root.NemoNativeObjectProjectDesktop=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
-  var openLogs=new WeakMap();
+  var openLogs=new WeakMap(),uiCompositions=new WeakMap();
+  function bindUIComposition(root,compose){
+    if(!root||!root.document||typeof compose!=='function')throw new TypeError('Native UI composition is unavailable');
+    var bound=uiCompositions.get(root);
+    if(bound){
+      if(bound.document!==root.document||bound.compose!==compose)throw new Error('Native UI composition is already bound');
+      return true;
+    }
+    uiCompositions.set(root,{document:root.document,compose:compose});return true;
+  }
+  function composeUI(root,base,policy){
+    var bound=uiCompositions.get(root);
+    if(!bound||bound.document!==root.document)throw new Error('Native UI composition is unavailable');
+    return bound.compose(base,policy);
+  }
   var stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
   var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation',
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
@@ -49,6 +63,11 @@
     }catch(_){}
     // Preserve the existing optional fixture observer; it is never required to collect production evidence.
     try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){}
+  }
+  // The captured read proof exists only during this action's synchronous guard.
+  function withActionPresentation(origin,current,action){
+    var running=true,lease=Object.freeze({readPresentedObjectSession:function(){return running&&origin&&current()===true?origin:null;}});
+    try{return action(lease);}finally{running=false;}
   }
   function createPorts(root){
     var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
@@ -117,5 +136,5 @@
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
   }
-  return Object.freeze({createPorts:createPorts,openDiagnostic:openDiagnostic});
+  return Object.freeze({createPorts:createPorts,openDiagnostic:openDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation});
 }));

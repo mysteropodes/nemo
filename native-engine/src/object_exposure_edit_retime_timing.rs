@@ -313,3 +313,9 @@ impl LayerTiming {
 #[cfg(test)]
 #[path = "../tests/object_exposure_edit_retime_timing.rs"]
 mod tests;
+
+#[path = "object_frame_bulk_move_document.rs"]
+mod object_frame_bulk_move_document;
+pub(crate) use object_frame_bulk_move_document::{
+    plan_move_frames, plan_shift_frames, BulkCell, BulkMoveLayer, BulkMovePlan, BulkRetimePair,
+};

@@ -2,12 +2,15 @@
 use crate::commands::MAX_VECTOR_REQUEST_BYTES;
 use crate::history::object_history::object_exposure_edit_key::is_exposure_key_operation;
 use crate::history::object_history::object_exposure_edit_retime::is_exposure_retime_operation;
+use crate::history::object_history::object_frame_bulk_move::is_frame_bulk_move_operation;
 use crate::history::object_history::object_frame_clipboard_paste::is_frame_clipboard_operation;
 use crate::history::object_history::object_frame_clipboard_repeat::is_frame_repeat_operation;
 use crate::history::object_history::object_frame_edit_structure::is_frame_structure_operation;
+use crate::history::object_history::object_layer_shift::is_layer_shift_operation;
 use crate::history::object_history::object_rig_edit_history::is_rig_edit_operation;
 use crate::history::object_history::object_rig_pose_history::is_rig_pose_operation;
 use crate::history::NativeObjectHistory;
+use crate::request_receipts::frame_clipboard_transport;
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,
     APPLICATION_API_VERSION,
@@ -18,11 +21,20 @@ use crate::transaction::{CompactFailure, CompactResult, ReceiptLookup, RetainedD
 #[path = "object_command_dispatch_edits.rs"]
 mod edits;
 
+// #2207 staged placement producer; public capability admission remains separate.
+#[path = "object_media_link_command.rs"]
+mod placement;
+use placement::OP_PLACEMENT_EDIT;
+#[path = "object_audio_track_edit_command.rs"]
+mod audio_track;
+use audio_track::OP_AUDIO_TRACK_EDIT;
+
 const OP_OBJECT_FILL: &str = "command.document.object.fill.set";
 const OP_OBJECT_UNDO: &str = "command.document.object.undo";
 const OP_OBJECT_REDO: &str = "command.document.object.redo";
 const OP_LAYER_VISIBILITY: &str = "command.document.object.layer.visibility.set";
 const OP_LAYER_CREATE: &str = "command.document.object.layer.create";
+const OP_LAYER_PLAYHEAD_CUT: &str = "command.document.object.layer.cut";
 const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
@@ -38,7 +50,9 @@ const MAX_MESSAGE_BYTES: usize = 4096;
 /// Request-envelope bound per operation: only the vector and image-mesh edits may carry a bounded body
 /// (a hand-drawn mask outline is hundreds of points).
 fn request_limit(operation: &str) -> usize {
-    if operation == OP_OBJECT_VECTOR || operation == OP_IMAGE_MESH_EDIT {
+    if frame_clipboard_transport::owns(operation) {
+        frame_clipboard_transport::request_limit(operation)
+    } else if operation == OP_OBJECT_VECTOR || operation == OP_IMAGE_MESH_EDIT {
         MAX_VECTOR_REQUEST_BYTES
     } else {
         MAX_MESSAGE_BYTES
@@ -92,10 +106,13 @@ impl NativeObjectHistory {
                     | OP_OBJECT_REDO
                     | OP_LAYER_VISIBILITY
                     | OP_LAYER_CREATE
+                    | OP_LAYER_PLAYHEAD_CUT
                     | OP_LAYER_POLICY
                     | OP_PROPERTY_EDIT
                     | OP_PROPERTY_TRACK_EDIT
                     | OP_PROJECT_SETTINGS
+                    | OP_PLACEMENT_EDIT
+                    | OP_AUDIO_TRACK_EDIT
                     | OP_OBJECT_VECTOR
                     | OP_IMAGE_MESH_EDIT
                     | OP_WIDGET_CREATE
@@ -110,6 +127,8 @@ impl NativeObjectHistory {
             && !is_rig_edit_operation(request.operation.as_str())
             && !is_rig_pose_operation(request.operation.as_str())
             && !is_frame_repeat_operation(request.operation.as_str())
+            && !is_frame_bulk_move_operation(request.operation.as_str())
+            && !is_layer_shift_operation(request.operation.as_str())
         {
             return Ok(None);
         }
@@ -139,6 +158,10 @@ impl NativeObjectHistory {
                 OP_WIDGET_CREATE | OP_WIDGET_WRITE | OP_WIDGET_SETTINGS
             ) {
                 "Widget request refused."
+            } else if request.operation == OP_AUDIO_TRACK_EDIT {
+                "AudioTrack edit request refused."
+            } else if request.operation == OP_PLACEMENT_EDIT {
+                "Placement edit request refused."
             } else if request.operation == OP_PROJECT_SETTINGS {
                 "Project settings request refused."
             } else if is_frame_structure_operation(request.operation.as_str()) {
@@ -166,6 +189,10 @@ impl NativeObjectHistory {
                 "Exposure key request refused."
             } else if is_exposure_retime_operation(request.operation.as_str()) {
                 "Key retime request refused."
+            } else if is_layer_shift_operation(request.operation.as_str()) {
+                "Layer range drag request refused."
+            } else if is_frame_bulk_move_operation(request.operation.as_str()) {
+                "Frame move request refused."
             } else if is_frame_repeat_operation(request.operation.as_str()) {
                 "Frame repeat request refused."
             } else if Self::import_batch_operation(&request.operation) {
@@ -280,6 +307,8 @@ impl NativeObjectHistory {
                 self.dispatch_vector_edit_command(request, &payload)
             } else if Self::vector_param_operation(&request.operation) {
                 self.dispatch_vector_param(&request.operation, &request.payload)
+            } else if request.operation == OP_LAYER_PLAYHEAD_CUT {
+                self.dispatch_layer_playhead_cut(&request.operation, &request.payload)
             } else if Self::layer_lifecycle_operation(&request.operation) {
                 self.dispatch_layer_lifecycle(&request.operation, &request.payload)
             } else if Self::component_setup_operation(&request.operation) {
@@ -314,6 +343,10 @@ impl NativeObjectHistory {
                 self.dispatch_rig_pose(&request.payload)
             } else if is_rig_edit_operation(request.operation.as_str()) {
                 self.dispatch_rig_edit(&request.payload)
+            } else if is_layer_shift_operation(request.operation.as_str()) {
+                self.dispatch_layer_shift(request)
+            } else if is_frame_bulk_move_operation(request.operation.as_str()) {
+                self.dispatch_frame_bulk_move(request)
             } else if is_frame_repeat_operation(request.operation.as_str()) {
                 self.dispatch_frame_repeat(request.operation.as_str(), &request.payload)
             } else if request.operation == OP_LAYER_VISIBILITY {
@@ -331,6 +364,10 @@ impl NativeObjectHistory {
                 self.dispatch_widget_command(request.operation.as_str(), &payload)
             } else if is_frame_clipboard_operation(request.operation.as_str()) {
                 self.dispatch_frame_clipboard(request)
+            } else if request.operation == OP_AUDIO_TRACK_EDIT {
+                self.dispatch_audio_track_edit(&request.payload)
+            } else if request.operation == OP_PLACEMENT_EDIT {
+                self.dispatch_placement_edit(&request.payload)
             } else if request.operation == OP_PROJECT_SETTINGS {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -437,10 +474,9 @@ impl NativeObjectHistory {
         let response = disposition
             .response(request, self.instance_id(), self.document_id())
             .ok_or(DispatchErrorCode::Internal)?;
-        if !matches!(
-            serde_json::to_vec(&response).map(|bytes| bytes.len()),
-            Ok(0..=MAX_MESSAGE_BYTES)
-        ) {
+        if !serde_json::to_vec(&response).is_ok_and(|bytes| {
+            bytes.len() <= frame_clipboard_transport::response_limit(&request.operation)
+        }) {
             return Err(DispatchErrorCode::Internal);
         }
         Ok(response)

@@ -227,13 +227,9 @@ fn unsupported_properties_controls_enabled_expressions_and_nonordinary_layers_st
         value["objects"] = json!([]);
         value["compositionOrder"]["contexts"][0]["scopes"] = json!([]);
     }
-    let mut range = base.clone();
-    range["layers"][0]["range"] = json!({"inPoint":1});
     let mut empty = base.clone();
     empty["propertyHolders"][0]["properties"] = json!([]);
-    for value in [
-        position, element, active, controls, folder, effect, range, empty,
-    ] {
+    for value in [position, element, active, controls, folder, effect, empty] {
         let o = owner(&value);
         let s = o.acquire_snapshot(0).unwrap();
         let bytes = encode_storage_project(s.document()).unwrap();
@@ -338,3 +334,36 @@ fn fractional_authored_key_times_survive_the_integer_presentation_clock() {
 ))]
 #[path = "object_layer_opacity_gpu.rs"]
 mod gpu;
+
+#[test]
+fn admitted_native_range_selects_exposure_and_samples_opacity_at_the_immutable_query_frame() {
+    let mut value = source(json!([{"property":"opacity","track":{"keys":[
+        {"frame":0,"v":[20],"curvePoints":[]},{"frame":10,"v":[80]}]}}]));
+    value["layers"][0]["range"] = json!({"inPoint":3,"outPoint":7});
+    let o = owner(&value);
+    let s = o.acquire_snapshot(0).unwrap();
+    let before = encode_storage_project(s.document()).unwrap();
+    let pin = s.snapshot_id().to_owned();
+    for (frame, visible, factor) in [
+        (2, false, 0.32),
+        (3, true, 0.38),
+        (5, true, 0.5),
+        (7, true, 0.62),
+        (8, false, 0.68),
+        (3, true, 0.38),
+    ] {
+        let packet = prepare_object_exposure_frame(&s, &pins(&s, frame)).unwrap();
+        assert_eq!(packet.frame(), frame);
+        assert_eq!(packet.source_frame_for_layer(0), visible.then_some(0));
+        assert_eq!(packet.records().len(), if visible { 2 } else { 0 });
+        close(packet.layer_opacity(0).unwrap(), factor);
+        let painted = alpha(&plan(&s, frame));
+        assert_eq!(painted.len(), if visible { 2 } else { 0 });
+        for alpha in painted {
+            close(alpha, 0.75 * factor);
+        }
+        assert_eq!(packet.document_snapshot_id(), pin);
+        assert_eq!(encode_storage_project(s.document()).unwrap(), before);
+        assert_eq!(o.history_depths(), (0, 0));
+    }
+}

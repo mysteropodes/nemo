@@ -290,3 +290,30 @@ test('negative controls: the oracle discriminates the rules a careless mapper wo
   const wrongFlag = pick(cases.get('real-stroke-false-other-color').out, Stroke.CARRIED); wrongFlag.hasRealStroke = true;
   assert.notDeepEqual(Stroke.normalize(cases.get('real-stroke-false-other-color').in), wrongFlag);
 });
+
+
+test('stored baseline two-stop gradients travel through the real mapper and inverse without normalization', () => {
+  const base=JSON.parse(JSON.stringify(cases.values().next().value.in));
+  for (const kind of ['linear','radial']) {
+    const gradient={kind,from:[1.25,-2],to:[31.25,12],stops:[{offset:1,color:'#11223380'},{offset:0,color:'#AAbbCC'}]};
+    const dict=Object.assign({},base,{fillGradient:gradient,hasRealStroke:false,fillColor:'#ff0000'});
+    const before=JSON.stringify(dict), mapped=Stroke.toRecord(dict,WHERE);
+    assert.equal(mapped.ok,true); assert.deepEqual(mapped.unmapped,[]);
+    assert.deepEqual(mapped.record.vectorExt.fillGradient,gradient);
+    assert.doesNotThrow(()=>Contract.record(mapped.record,true));
+    assert.deepEqual(Stroke.toDict(mapped.record).fillGradient,gradient);
+    assert.equal(JSON.stringify(dict),before);
+    gradient.from[0]=999; assert.equal(mapped.record.vectorExt.fillGradient.from[0],1.25,'no mutable source alias');
+  }
+});
+
+test('stored gradient mapping refuses unsupported stop counts, malformed fields and pressure without dropping paint', () => {
+  const base=JSON.parse(JSON.stringify(cases.values().next().value.in));
+  const good={kind:'linear',from:[0,0],to:[10,0],stops:[{offset:0,color:'#ff0000'},{offset:1,color:'#0000ff'}]};
+  for (const change of [g=>{g.stops.pop();},g=>{g.stops.push({offset:0.5,color:'#00ff00'});},g=>{g.kind='conic';},
+    g=>{g.from=[0,Infinity];},g=>{g.stops[0].color='url(secret)';},g=>{g.extra=true;}]) {
+    const gradient=JSON.parse(JSON.stringify(good));change(gradient);
+    assert.equal(Stroke.toRecord(Object.assign({},base,{fillGradient:gradient}),WHERE).ok,false);
+  }
+  assert.equal(Stroke.toRecord(Object.assign({},base,{fillGradient:good,isVectorBrush:true}),WHERE).ok,false);
+});

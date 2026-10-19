@@ -89,10 +89,13 @@ impl NativeApplicationRequest {
             self.operation.as_str(),
             "command.document.object.layer.visibility.set"
                 | crate::native_contract::layer_policy::OP
+                | crate::native_contract::layer_cut::OP
                 | crate::native_contract::property_track::OP
                 | crate::native_contract::property_edit::OP
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
+                | crate::native_contract::placement::OP
+                | crate::native_contract::audio_track::OP
                 | crate::native_contract::brush::PUBLISH
                 | crate::native_contract::font::IMPORT
                 | crate::native_contract::item::ITEM
@@ -112,10 +115,16 @@ impl NativeApplicationRequest {
                 "item or asset"
             } else if crate::native_contract::vector::owns(&self.operation) {
                 "vector"
+            } else if self.operation == crate::native_contract::layer_cut::OP {
+                "layer cut"
             } else if self.operation == crate::native_contract::layer_policy::OP {
                 "layer policy"
             } else if self.operation == crate::native_contract::brush::PUBLISH {
                 "brush publication"
+            } else if self.operation == crate::native_contract::audio_track::OP {
+                "AudioTrack metadata edit"
+            } else if self.operation == crate::native_contract::placement::OP {
+                "project placement"
             } else if self.operation.ends_with(".settings.edit") {
                 "project settings"
             } else if self.operation.ends_with(".create") {

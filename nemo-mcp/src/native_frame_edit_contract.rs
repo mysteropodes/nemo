@@ -16,11 +16,13 @@ pub(crate) const KEY_CLEAR_CELLS: &str = "command.document.object.layer.key.clea
 pub(crate) const TWEEN_REMOVE: &str = "command.document.object.layer.tween.remove";
 pub(crate) const KEY_MOVE: &str = "command.document.object.layer.key.move";
 pub(crate) const SELECTION_DUPLICATE: &str = "command.document.object.frames.clipboard.duplicate";
+pub(crate) const RANGE_DRAG: &str = "command.document.object.layer.range.drag";
+pub(crate) const MOVE: &str = "command.document.object.frames.move";
 pub(crate) const REPEAT: &str = "command.document.object.frames.repeat";
 pub(crate) const CLIPBOARD_COPY: &str = "command.document.object.frames.clipboard.copy";
 pub(crate) const CLIPBOARD_CUT: &str = "command.document.object.frames.clipboard.cut";
 pub(crate) const CLIPBOARD_PASTE: &str = "command.document.object.frames.clipboard.paste";
-const OPERATIONS: [&str; 15] = [
+const OPERATIONS: [&str; 17] = [
     INSERT,
     EXTEND,
     DUPLICATE,
@@ -35,9 +37,12 @@ const OPERATIONS: [&str; 15] = [
     CLIPBOARD_COPY,
     CLIPBOARD_CUT,
     CLIPBOARD_PASTE,
+    MOVE,
+    RANGE_DRAG,
     REPEAT,
 ];
 const MAX_LIST: usize = 4096;
+const MAX_DATA_ITEMS: usize = crate::wire::native_clipboard_transport::DATA_BYTES / 32;
 const MAX_EXTEND: u64 = 999;
 const MAX_SAFE: i64 = 9_007_199_254_740_991;
 
@@ -95,28 +100,29 @@ fn unique_cells(value: Option<&Value>) -> bool {
 fn object_list(value: Option<&Value>) -> bool {
     value
         .and_then(Value::as_array)
-        .is_some_and(|items| items.len() <= MAX_LIST && items.iter().all(Value::is_object))
+        .is_some_and(|items| items.len() <= MAX_DATA_ITEMS && items.iter().all(Value::is_object))
 }
 fn clipboard_cells(value: Option<&Value>) -> bool {
-    value.and_then(Value::as_array).is_some_and(|cells| {
-        cells.len() <= MAX_LIST
-            && cells.iter().all(|cell| {
-                exact(
-                    cell,
-                    &["relLayer", "relFrame", "keyframe", "records"],
-                    &["orderElements"],
-                )
-                .is_some_and(|cell| {
-                    frame(cell.get("relLayer")).is_some()
-                        && frame(cell.get("relFrame")).is_some()
-                        && cell.get("keyframe").is_some_and(Value::is_boolean)
-                        && object_list(cell.get("records"))
-                        && cell
-                            .get("orderElements")
-                            .is_none_or(|v| object_list(Some(v)))
+    value.is_some_and(crate::wire::native_clipboard_transport::data_admitted)
+        && value.and_then(Value::as_array).is_some_and(|cells| {
+            cells.len() <= MAX_LIST
+                && cells.iter().all(|cell| {
+                    exact(
+                        cell,
+                        &["relLayer", "relFrame", "keyframe", "records"],
+                        &["orderElements"],
+                    )
+                    .is_some_and(|cell| {
+                        frame(cell.get("relLayer")).is_some()
+                            && frame(cell.get("relFrame")).is_some()
+                            && cell.get("keyframe").is_some_and(Value::is_boolean)
+                            && object_list(cell.get("records"))
+                            && cell
+                                .get("orderElements")
+                                .is_none_or(|v| object_list(Some(v)))
+                    })
                 })
-            })
-    })
+        })
 }
 fn clipboard_selection(value: Option<&Value>) -> bool {
     value.and_then(Value::as_array).is_some_and(Vec::is_empty) || unique_cells(value)
@@ -208,8 +214,17 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
         }),
         TWEEN_REMOVE => exact(value, &["command", "layerUid", "from", "to"], &[])
             .is_some_and(|p| command_is(p, "object.layer.tween.remove") && span(p)),
-        KEY_MOVE => exact(value, &["command", "layerUid", "from", "to"], &[])
-            .is_some_and(|p| command_is(p, "object.layer.key.move") && span(p)),
+        KEY_MOVE => exact(
+            value,
+            &["command", "layerUid", "from", "to"],
+            &["activeLayerUid"],
+        )
+        .is_some_and(|p| {
+            command_is(p, "object.layer.key.move")
+                && span(p)
+                && p.get("activeLayerUid")
+                    .is_none_or(|value| name(Some(value)))
+        }),
         SELECTION_DUPLICATE => exact(value, &["command", "layerUid", "selection"], &[])
             .is_some_and(|p| {
                 command_is(p, "object.frames.clipboard.duplicate")
@@ -246,6 +261,15 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                 && frame(p.get("frame")).is_some()
                 && clipboard_cells(p.get("cells"))
         }),
+        RANGE_DRAG => layer_shift::request(value),
+        MOVE => {
+            exact(value, &["command", "selection", "layerUid", "frame"], &[]).is_some_and(|p| {
+                command_is(p, "object.frames.move")
+                    && clipboard_selection(p.get("selection"))
+                    && name(p.get("layerUid"))
+                    && frame(p.get("frame")).is_some()
+            })
+        }
         REPEAT => exact(
             value,
             &[
@@ -279,7 +303,19 @@ pub(crate) fn result_for_operation(operation: &str, value: &Value) -> bool {
     if matches!(operation, CLIPBOARD_COPY | CLIPBOARD_CUT) {
         return clipboard_result(operation, value);
     }
-    if operation == KEY_BLANK {
+    if operation == MOVE {
+        return exact(value, &["applied", "historyEntriesAdded", "selection"], &[]).is_some_and(
+            |p| match (
+                p.get("applied").and_then(Value::as_bool),
+                p.get("historyEntriesAdded").and_then(Value::as_u64),
+            ) {
+                (Some(true), Some(1)) => clipboard_selection(p.get("selection")),
+                (Some(false), Some(0)) => p.get("selection").is_some_and(Value::is_null),
+                _ => false,
+            },
+        );
+    }
+    if matches!(operation, KEY_BLANK | RANGE_DRAG) {
         return result(value) && value["applied"] == true;
     }
     if operation != REPEAT {
@@ -331,3 +367,6 @@ pub(crate) fn revision_matches(expected: Option<u64>, revision: u64, value: &Val
 #[cfg(test)]
 #[path = "native_frame_edit_contract_tests.rs"]
 mod tests;
+
+#[path = "native_layer_shift_contract.rs"]
+mod layer_shift;

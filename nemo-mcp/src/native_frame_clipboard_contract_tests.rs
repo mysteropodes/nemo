@@ -60,13 +60,14 @@ fn clipboard_selection_is_closed_unique_bounded_and_allows_empty_selection() {
             .map(|frame| json!({"layerUid":"a","frame":frame}))
             .collect();
         assert!(!request(operation, &selection(operation, json!(over))));
-        // Structural list bound does not grant a larger complete transport envelope.
+        // F12 admits the full4096-cell selection, independently of the unchanged cell cap.
         let large = (0..4096)
             .map(|frame| json!({"layerUid":"a","frame":frame}))
             .collect::<Vec<_>>();
-        assert!(envelope(operation, selection(operation, json!(large)))
-            .validate_input()
-            .is_err());
+        let complete = envelope(operation, selection(operation, json!(large)));
+        let bytes = serde_json::to_vec(&complete).unwrap().len();
+        assert!(bytes > 4096 && bytes < crate::wire::native_request_byte_limit(operation));
+        assert!(complete.validate_input().is_ok());
     }
 }
 
@@ -118,14 +119,29 @@ fn clipboard_paste_accepts_blank_and_plain_empty_cells_with_closed_order_shells_
         bad[field] = Value::Null;
         assert!(!request(CLIPBOARD_PASTE, &bad), "paste {field}");
     }
+    // Count cells separately from record/order shells; native storage still owns record grammar.
+    assert_eq!(MAX_DATA_ITEMS, 131_072);
     for field in ["records", "orderElements"] {
-        let mut at_limit = cell.clone();
-        at_limit[field] = json!(vec![json!({}); 4096]);
-        assert!(request(CLIPBOARD_PASTE, &paste(json!([at_limit]))));
+        for count in [4096, 4097, MAX_DATA_ITEMS] {
+            let mut at_limit = cell.clone();
+            at_limit[field] = json!(vec![json!({}); count]);
+            assert!(request(CLIPBOARD_PASTE, &paste(json!([at_limit]))));
+        }
         let mut over = cell.clone();
-        over[field] = json!(vec![json!({}); 4097]);
+        over[field] = json!(vec![json!({}); MAX_DATA_ITEMS + 1]);
         assert!(!request(CLIPBOARD_PASTE, &paste(json!([over]))));
     }
+    // Count admission does not waive aggregate serialized record+order bytes.
+    let data_bytes = crate::wire::native_clipboard_transport::DATA_BYTES;
+    assert_eq!(data_bytes, 4_194_304);
+    let mut data = cell.clone();
+    data["records"] = json!([{"padding":""}]);
+    let fixed = serde_json::to_vec(&data["records"][0]).unwrap().len()
+        + serde_json::to_vec(&data["orderElements"]).unwrap().len();
+    data["records"][0]["padding"] = json!("x".repeat(data_bytes - fixed));
+    assert!(request(CLIPBOARD_PASTE, &paste(json!([data.clone()]))));
+    data["records"][0]["padding"] = json!("x".repeat(data_bytes - fixed + 1));
+    assert!(!request(CLIPBOARD_PASTE, &paste(json!([data]))));
     let full = (0..4096)
         .map(|frame| json!({"relLayer":0,"relFrame":frame,"keyframe":false,"records":[]}))
         .collect::<Vec<_>>();
@@ -265,33 +281,53 @@ fn clipboard_inner_identity_and_packet_structure_cannot_be_forged() {
 }
 
 #[test]
-fn clipboard_complete_request_bound_is_4096_not_the_typed_packet_budget() {
+fn clipboard_complete_request_bound_is_the_declared_full_envelope_not_the_data_budget() {
+    let limit = crate::wire::native_clipboard_transport::MESSAGE_BYTES;
+    assert_eq!(limit, 5_246_976);
     for operation in [CLIPBOARD_COPY, CLIPBOARD_CUT, CLIPBOARD_PASTE] {
         let payload = if operation == CLIPBOARD_PASTE {
             paste(json!([]))
         } else {
             selection(operation, json!([{"layerUid":"a","frame":0}]))
         };
-        let mut value = envelope(operation, payload);
-        let size = serde_json::to_vec(&value).unwrap().len();
-        let key = if operation == CLIPBOARD_PASTE {
-            &mut value.payload["layerUid"]
-        } else {
-            &mut value.payload["selection"][0]["layerUid"]
-        };
-        let original = key.as_str().unwrap().to_owned();
-        *key = json!(original + &"x".repeat(4096 - size));
-        assert_eq!(serde_json::to_vec(&value).unwrap().len(), 4096);
-        assert!(value.validate_input().is_ok());
-        let key = if operation == CLIPBOARD_PASTE {
-            &mut value.payload["layerUid"]
-        } else {
-            &mut value.payload["selection"][0]["layerUid"]
-        };
-        *key = json!(key.as_str().unwrap().to_owned() + "x");
-        assert_eq!(serde_json::to_vec(&value).unwrap().len(), 4097);
-        assert!(value.validate_input().is_err());
+        assert_eq!(crate::wire::native_request_byte_limit(operation), limit);
+        let original = envelope(operation, payload);
+        let fixed = serde_json::to_vec(&original).unwrap().len();
+        for length in [4096, 4097, limit] {
+            let mut value = original.clone();
+            let key = if operation == CLIPBOARD_PASTE {
+                &mut value.payload["layerUid"]
+            } else {
+                &mut value.payload["selection"][0]["layerUid"]
+            };
+            *key = json!(key.as_str().unwrap().to_owned() + &"x".repeat(length - fixed));
+            assert_eq!(serde_json::to_vec(&value).unwrap().len(), length);
+            assert!(value.validate_input().is_ok());
+            if length == limit {
+                let key = if operation == CLIPBOARD_PASTE {
+                    &mut value.payload["layerUid"]
+                } else {
+                    &mut value.payload["selection"][0]["layerUid"]
+                };
+                *key = json!(key.as_str().unwrap().to_owned() + "x");
+                assert_eq!(serde_json::to_vec(&value).unwrap().len(), limit + 1);
+                assert!(value.validate_input().is_err());
+            }
+        }
     }
+    // The F12 message budget never enlarges another frame-edit operation.
+    let mut other = envelope(
+        KEY_BLANK,
+        json!({"command":"object.layer.key.blank","layerUid":"a","cell":0}),
+    );
+    let fixed = serde_json::to_vec(&other).unwrap().len();
+    other.payload["layerUid"] = json!("a".to_owned() + &"x".repeat(4096 - fixed));
+    assert_eq!(crate::wire::native_request_byte_limit(KEY_BLANK), 4096);
+    assert_eq!(serde_json::to_vec(&other).unwrap().len(), 4096);
+    assert!(other.validate_input().is_ok());
+    other.payload["layerUid"] = json!(other.payload["layerUid"].as_str().unwrap().to_owned() + "x");
+    assert_eq!(serde_json::to_vec(&other).unwrap().len(), 4097);
+    assert!(other.validate_input().is_err());
 }
 
 #[path = "native_frame_clipboard_response_schema_tests.rs"]

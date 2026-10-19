@@ -37,8 +37,20 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
             "vectorExt requires the editable-vector-path family",
         ));
     }
-    if ext.pressure.missing() && ext.param_shape.missing() && ext.box_angle.missing() {
+    if ext.pressure.missing()
+        && ext.param_shape.missing()
+        && ext.box_angle.missing()
+        && ext.fill_gradient.missing()
+    {
         return Err(invalid("an empty vectorExt must be omitted"));
+    }
+    if let Some(gradient) = ext.fill_gradient.value() {
+        if !gradient.valid() {
+            return Err(invalid("invalid stored two-stop gradient"));
+        }
+        if !ext.pressure.missing() {
+            return Err(unsupported("pressure-gradient consumer is unavailable"));
+        }
     }
     if let Some(pressure) = ext.pressure.value() {
         validate_pressure(pressure)?;

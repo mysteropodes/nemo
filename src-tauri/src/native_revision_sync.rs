@@ -403,7 +403,7 @@ pub(super) async fn serve_native_scoped(
                 "native command committed but consumer synchronization is indeterminate; do not execute again; release before re-entry", true);
         }
     }
-    wire::write_json(stream, &delivery.response)
+    wire::write_native_response(stream, &delivery.response, &request)
         .await
         .map_err(|error| error.to_string())
 }

@@ -1,6 +1,6 @@
 /* N15 pure v2 transport/validation adapter. N16 owns host bindings. */
 (function (root, factory) {
-  const vectorContract = typeof module === 'object' && module.exports ? require('./native-object-vector-contract.js') : root.NemoNativeObjectVectorContract, fontContract = [typeof module === 'object' && module.exports ? require('./native-text-read-contract.js') : root.NemoNativeTextReadContract, typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract, vectorContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
+  const vectorContract = typeof module === 'object' && module.exports ? require('./native-object-vector-contract.js') : root.NemoNativeObjectVectorContract, fontContract = [typeof module === 'object' && module.exports ? require('./native-audio-track-contract.js') : root.NemoNativeAudioTrackContract, typeof module === 'object' && module.exports ? require('./native-layer-playhead-cut-contract.js') : root.NemoNativeLayerPlayheadCutContract, typeof module === 'object' && module.exports ? require('./native-project-placement-contract.js') : root.NemoNativeProjectPlacementContract, typeof module === 'object' && module.exports ? require('./native-text-read-contract.js') : root.NemoNativeTextReadContract, typeof module === 'object' && module.exports ? require('./native-object-rig-contract.js') : root.NemoNativeObjectRigContract, typeof module === 'object' && module.exports ? require('./native-object-component-contract.js') : root.NemoNativeObjectComponentContract, typeof module === 'object' && module.exports ? require('./native-media-export-contract.js') : root.NemoNativeMediaExportContract, typeof module === 'object' && module.exports ? require('./native-import-contract.js') : root.NemoNativeImportContract, typeof module === 'object' && module.exports ? require('./native-bitmap-brush-resources-contract.js') : root.NemoNativeBitmapBrushResourcesContract, vectorContract].reduce((base, lane) => (lane ? lane.compose(base) : base), ((base, item) => item ? item.compose(base) : base)(typeof module === 'object' && module.exports ? require('./native-object-edit-seam.js') : root.NemoNativeObjectEditSeam, typeof module === 'object' && module.exports ? require('./native-object-item-contract.js') : root.NemoNativeObjectItemContract));
   const propertyContract = typeof module === 'object' && module.exports ? require('./native-property-contract.js') : root.NemoNativePropertyContract;
   const api = factory((typeof module === 'object' && module.exports ? require('./native-frame-edit-contract.js') : root.NemoNativeFrameEditContract || { join: (base) => base }).join(fontContract), vectorContract, propertyContract);
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -169,7 +169,8 @@
       exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
       revision(payload.atRevision, 'atRevision'); objectTarget(payload.stableTarget);
     } else if (operation === 'query.document.object.layer.timing') {
-      exact(payload, ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'], [], 'timing selector');
+      exact(payload, ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'], ['view'], 'timing selector');
+      if(has(payload,'view')&&payload.view!=='range')throw new TypeError('invalid timing view');
       revision(payload.atRevision, 'atRevision'); frame(payload.frame);
       ['documentSnapshotId', 'contextId', 'layerUid'].forEach(key => objectUid(payload[key]));
     } else if (operation === 'command.document.object.project.settings.edit') {
@@ -249,7 +250,8 @@
     validatePayload(value.operation, value.payload, value);
     const encoded = JSON.stringify(value);
     const encodedBytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
-    const limit = vectorContract ? vectorContract.requestByteLimit(value.operation) : 4096;
+    const limit = Math.max(vectorContract ? vectorContract.requestByteLimit(value.operation) : 4096,
+      fontContract && fontContract.requestByteLimit ? fontContract.requestByteLimit(value.operation) : 4096);
     if (typeof encoded !== 'string' || encodedBytes > limit) throw new TypeError(`request exceeds ${limit} encoded bytes`);
     return value;
   }
@@ -312,6 +314,7 @@
     });
   }
   function validateNativeObjectLayerTimingResult(value) {
+    if(value&&value.kind==='layerRange')return property.rangeResult(value);
     exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame',
       'cellKind', 'sourceFrame', 'hasContent', 'manualEdit'], [], 'timing result');
     id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId'); revision(value.atRevision, 'atRevision');
@@ -413,7 +416,8 @@
     'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation, readOperation, 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
-      if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
+      const limit = fontContract && fontContract.responseByteLimit ? fontContract.responseByteLimit(operation) : 4096;
+      if (bytes > limit) throw new TypeError(`response exceeds ${limit} encoded bytes`);
     }
     exact(value, ['apiVersion', 'requestId', 'instanceId', 'documentId', 'contentRevision', 'ok'], value.ok ? ['result'] : ['error'], 'response');
     if (value.apiVersion !== 2 || value.requestId !== requestId || typeof value.ok !== 'boolean') throw new TypeError('response identity is invalid');
@@ -471,7 +475,7 @@
             if (response.ok && outbound.operation==='query.document.object.property.metadata') property.metadataCorrelated(outbound.payload,response.result);
             if (response.ok && outbound.operation === readOperation) property.readCorrelated(outbound.payload, response.result);
             if (response.ok && outbound.operation === 'query.document.object.layer.timing' &&
-                ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key])) throw new TypeError('timing read selector mismatch');
+                (['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key]) || (outbound.payload.view==='range')!==(response.result.kind==='layerRange'))) throw new TypeError('timing read selector mismatch');
             if (response.ok && outbound.operation === 'command.document.object.layer.create' &&
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError('creation receipt revision mismatch');
             if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation].includes(outbound.operation) &&

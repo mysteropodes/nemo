@@ -1,9 +1,10 @@
 //! Text selection from the same immutable source and authored exposure as other families.
 // Borrowed immutable source types for consumers of the retained frame packet.
 // The scene reads these through this port; document publication stays with its owner.
+pub(crate) use crate::object_document::object_component_record_kernels::object_component_records::SCENE_CONTEXT;
 pub(crate) use crate::object_document::{
-    text_holder_id, ObjectLayer, ObjectPoint, ObjectTarget, Presence, PropertyHolderTarget,
-    TextEntry,
+    text_holder_id, FrameScopeKind, ObjectLayer, ObjectPoint, ObjectTarget, Presence,
+    PropertyHolderTarget, TextEntry,
 };
 use crate::object_frame_packet::{ObjectFrameError, ObjectFramePacket, ObjectFrameSelector};
 use crate::revision::ObjectSnapshot;
@@ -39,8 +40,8 @@ impl ObjectFramePacket {
     ) -> impl ExactSizeIterator<Item = ObjectFrameTextRecord<'_>> + '_ {
         let items = self.snapshot.document().item_records();
         let entries = items.map_or(&[][..], |items| items.text_entries());
-        let offset = self.snapshot.document().objects().len()
-            + items.map_or(0, |items| items.raster_entries().len());
+        let offset =
+            self.source_objects().len() + items.map_or(0, |items| items.raster_entries().len());
         self.text_records
             .iter()
             .map(move |index| ObjectFrameTextRecord {
@@ -53,6 +54,7 @@ impl ObjectFramePacket {
 pub(super) fn select(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
+    layers: &[ObjectLayer],
     sources: &[Option<u32>],
 ) -> Result<Vec<TextIndex>, ObjectFrameError> {
     let doc = snapshot.document();
@@ -65,12 +67,11 @@ pub(super) fn select(
             {
                 continue;
             }
-            let layer = doc
-                .layers()
+            let layer = layers
                 .iter()
                 .position(|layer| layer.layer_uid() == target.layer_uid())
                 .ok_or(ObjectFrameError::InvalidSource)?;
-            if sources[layer] == Some(target.frame()) && doc.layers()[layer].visible() {
+            if sources[layer] == Some(target.frame()) && layers[layer].visible() {
                 selected.push(TextIndex { layer, entry });
             }
         }

@@ -97,7 +97,10 @@ fn a_zero_default_would_be_a_different_inventory_than_the_refusal() {
     let missing = SAVED.replace(r#","offsetFrames":5"#, "");
     assert_ne!(explicit, missing);
     assert_eq!(
-        decode(&explicit).asset_inventory().unwrap().placements()[0].offset_frames(),
+        decode(&explicit).asset_inventory().unwrap().placements()[0]
+            .offset_frames()
+            .as_i64()
+            .expect("original integer fixture"),
         0
     );
     assert_eq!(

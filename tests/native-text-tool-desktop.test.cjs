@@ -13,10 +13,10 @@ class Element{
  addEventListener(k,fn,o){const capture=typeof o==='boolean'?o:!!o?.capture;const list=this.listeners.get(k)||[];list.push({fn,capture});this.listeners.set(k,list);}
  removeEventListener(k,fn,o){const capture=typeof o==='boolean'?o:!!o?.capture;this.listeners.set(k,(this.listeners.get(k)||[]).filter(x=>x.fn!==fn||x.capture!==capture));}
  focus(){this.ownerDocument.activeElement=this;}
- fire(kind,data={}){const e={target:this,type:kind,key:'',button:0,pointerId:1,isPrimary:true,buttons:kind==='pointerup'?0:1,clientX:100,clientY:100,...data,stopped:false,prevented:false,stopImmediatePropagation(){this.stopped=true;},preventDefault(){this.prevented=true;}};
+ fire(kind,data={}){const e={target:this,type:kind,bubbles:kind!=='blur'&&kind!=='focus',key:'',button:0,pointerId:1,isPrimary:true,buttons:kind==='pointerup'?0:1,clientX:100,clientY:100,...data,stopped:false,prevented:false,stopImmediatePropagation(){this.stopped=true;},preventDefault(){this.prevented=true;}};
   const ancestors=[];for(let p=this.parentNode;p;p=p.parentNode)ancestors.push(p);
   const run=(n,capture)=>{e.currentTarget=n;for(const r of n.listeners.get(kind)||[]){if(r.capture===capture)r.fn(e);if(e.stopped)return;}};
-  for(const n of ancestors.slice().reverse()){run(n,true);if(e.stopped)return e;}run(this,true);if(!e.stopped)run(this,false);if(!e.stopped)for(const n of ancestors){run(n,false);if(e.stopped)break;}return e;
+  for(const n of ancestors.slice().reverse()){run(n,true);if(e.stopped)return e;}run(this,true);if(!e.stopped)run(this,false);if(!e.stopped&&e.bubbles)for(const n of ancestors){run(n,false);if(e.stopped)break;}return e;
  }
 }
 async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
@@ -268,4 +268,83 @@ test('invalid down mask2 keeps original guard getter order/count and eager immut
  assert.deepEqual(reads,['pointerId','isPrimary','altKey','ctrlKey','metaKey','shiftKey','button','clientX','clientY','buttons']);
  const rejected=rows.find(r=>r.decision==='reject.buttons.down');assert.ok(rejected);assert.equal(rejected.buttons,2);assert.equal('isTrusted' in rejected,false);
  assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);
+});
+
+test('app-owned hex field creates #123456 through ordinary Apply while retaining the native picker',async()=>{
+ const f=await fixture();f.root.state.strokeColor='#000000';await f.click();
+ const hex=f.get('native-text-color-hex'),picker=f.get('text-color');assert.ok(hex);assert.ok(picker);assert.equal(hex.getAttribute('aria-label'),'Text color hex');assert.equal(hex.value,'#000000');assert.equal(hex.disabled,false);
+ f.input('text-input','Hex point');f.input('native-text-color-hex','#123456');assert.equal(picker.value,'#123456');assert.equal(hex.getAttribute('aria-invalid'),'false');assert.equal(f.owner.log.executed.length,0);
+ f.apply();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#123456');assert.equal([...f.owner.items.values()][0].color,'#123456');assert.equal(f.logs.legacy,0);
+});
+test('hex edit publishes #224466 alongside mixed edits and preserves the existing alpha and other properties',async()=>{
+ const f=await fixture(),t=target('hex-alpha-text'),original={...block('Original'),color:'#11223380'};f.seed(t,original);await f.binding.core.openExisting(t);
+ assert.equal(f.get('native-text-color-hex').value,'#112233');assert.equal(f.get('text-color').value,'#112233');
+ f.input('native-text-color-hex','#224466');f.input('text-input','Mixed edit');f.input('text-size','56');f.apply();await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.patch,{color:'#22446680',text:'Mixed edit',size:56});
+ const saved=f.owner.items.get(t.strokeId);assert.equal(saved.color,'#22446680');assert.equal(saved.bold,true);assert.equal(saved.letterSpacing,2);assert.deepEqual(saved.font,original.font);assert.deepEqual(saved.anchorTopLeft,original.anchorTopLeft);assert.equal(f.logs.legacy,0);
+ await f.binding.core.openExisting(t);assert.equal(f.get('native-text-color-hex').value,'#224466');assert.equal(f.get('text-color').value,'#224466');
+ f.input('text-input','Text only');f.apply();await f.turn();assert.deepEqual(f.owner.log.received[1].payload.patch,{text:'Text only'});assert.equal(f.owner.items.get(t.strokeId).color,'#22446680');
+});
+test('invalid hex blocks Apply and keyboard submission without committing the last valid picker color',async()=>{
+ const f=await fixture();await f.click();f.input('text-input','Keep draft');f.input('native-text-color-hex','#123456');
+ for(const invalid of ['', '#12', '#gggggg', '224466', '#22446680', ' #224466']){
+  f.input('native-text-color-hex',invalid);assert.equal(f.get('text-color').value,'#123456');assert.equal(f.get('native-text-color-hex').getAttribute('aria-invalid'),'true');assert.equal(f.get('text-apply').disabled,true);
+  f.apply();f.get('native-text-color-hex').fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();
+  assert.equal(f.owner.log.received.length,0);assert.equal(f.owner.log.executed.length,0);assert.equal(f.owner.items.size,0);assert.ok(f.binding.core.snapshot().draft);assert.equal(f.get('text-input').value,'Keep draft');
+ }
+ f.input('native-text-color-hex','#224466');assert.equal(f.get('text-apply').disabled,false);f.apply();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#224466');assert.equal(f.owner.log.received[0].payload.block.text,'Keep draft');assert.equal(f.logs.legacy,0);
+});
+test('both picker events synchronize hex, repair invalid input and preserve alpha on publication',async()=>{
+ for(const event of ['input','change']){
+  const f=await fixture(),t=target('picker-'+event);f.seed(t,{...block(),color:'#11223340'});await f.binding.core.openExisting(t);
+  f.input('native-text-color-hex','#broken');const picker=f.get('text-color');picker.value='#abcdef';picker.fire(event);
+  assert.equal(f.get('native-text-color-hex').value,'#abcdef');assert.equal(f.get('native-text-color-hex').getAttribute('aria-invalid'),'false');assert.equal(f.get('text-apply').disabled,false);
+  f.apply();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.deepEqual(f.owner.log.received[0].payload.patch,{color:'#abcdef40'});assert.equal(f.logs.legacy,0);
+ }
+});
+test('cancel and reopen reset invalid hex without duplicating controls or publishing a stale color',async()=>{
+ const f=await fixture();await f.click();const hex=f.get('native-text-color-hex');f.input('text-input','Cancelled');f.input('native-text-color-hex','#bad');f.get('text-cancel').fire('click');
+ assert.equal(f.owner.log.executed.length,0);assert.equal(f.get('text-popover').style.display,'none');assert.equal(hex.disabled,true);assert.equal(hex.getAttribute('aria-invalid'),'false');
+ f.root.state.strokeColor='#224466';await f.click();assert.equal(f.get('native-text-color-hex'),hex);assert.equal(hex.value,'#224466');assert.equal(hex.disabled,false);assert.equal(f.get('text-apply').disabled,false);
+ const same=Desktop.mount(f.root,f.binding.container,f.binding.ports);assert.equal(same,f.binding);
+ const count=n=>(n.id==='native-text-color-hex'?1:0)+n.children.reduce((sum,c)=>sum+count(c),0);assert.equal(count(f.doc.body),1);
+ f.input('text-input','Reopened');f.apply();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#224466');assert.equal(f.logs.legacy,0);
+});
+test('busy hex edits cannot alter an in-flight publication or dispatch a second command',async()=>{
+ const f=await fixture();await f.click();f.input('text-input','Queued hex');f.input('native-text-color-hex','#123456');const gate=deferred();f.hold(gate.promise);f.apply();await Promise.resolve();
+ assert.equal(f.binding.core.snapshot().busy,true);assert.equal(f.get('native-text-color-hex').disabled,true);assert.equal(f.get('text-apply').disabled,true);
+ f.input('native-text-color-hex','#224466');f.apply();f.get('native-text-color-hex').fire('keydown',{key:'Enter',metaKey:true});gate.resolve();await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#123456');assert.equal(f.get('text-popover').style.display,'none');assert.equal(f.logs.legacy,0);
+});
+test('retire removes hex input and its listeners while a replacement editor retains independent color state',async()=>{
+ const f=await fixture();await f.click();const oldHex=f.get('native-text-color-hex');f.input('native-text-color-hex','#123456');f.binding.retire();assert.equal(f.get('native-text-color-hex'),null);
+ for(const event of ['input','change','keydown'])assert.equal((oldHex.listeners.get(event)||[]).length,0);
+ const next=Desktop.mount(f.root,f.binding.container,f.binding.ports);await f.turn();await next.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:null});
+ const hex=f.get('native-text-color-hex');assert.ok(hex);assert.notEqual(hex,oldHex);f.input('native-text-color-hex','#224466');oldHex.value='#bad';oldHex.fire('input');oldHex.fire('keydown',{key:'Enter',ctrlKey:true});
+ assert.equal(hex.value,'#224466');assert.equal(hex.disabled,false);assert.equal(f.get('text-color').value,'#224466');assert.equal(f.get('text-apply').disabled,false);assert.equal(f.owner.log.executed.length,0);
+ f.input('text-input','New owner');f.apply();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#224466');assert.equal(f.logs.legacy,0);
+});
+test('area draft refuses invalid hex on blur then publishes #336699 by the existing keyboard route',async()=>{
+ const f=await fixture();f.canvas.fire('pointerdown',{clientX:100,clientY:110});f.canvas.fire('pointermove',{clientX:300,clientY:190});f.canvas.fire('pointerup',{clientX:300,clientY:190});await f.turn();
+ const area=f.get('native-text-area-draft');assert.ok(area);area.value='Hex area';area.fire('input');f.input('native-text-color-hex','#invalid');area.fire('blur');await f.turn();assert.equal(f.owner.log.executed.length,0);assert.ok(f.binding.core.snapshot().draft);
+ f.input('native-text-color-hex','#336699');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.log.received[0].payload.block.color,'#336699');assert.equal(f.owner.log.received[0].payload.block.fixedWidth,100);assert.equal(f.owner.log.received[0].payload.block.text,'Hex area');assert.equal(f.logs.legacy,0);
+});
+
+test('native hex layout preserves existing controls and restores prior inline wrapping across remounts',async()=>{
+ const f=await fixture(),parent=f.get('text-color').parentNode,controls=parent.children.filter(n=>n!==f.get('native-text-color-hex').parentNode);
+ f.binding.retire();assert.deepEqual(parent.children,controls);parent.style.flexWrap='wrap-reverse';
+ const binding=Desktop.mount(f.root,f.binding.container,f.binding.ports);await f.turn();
+ const label=f.get('native-text-color-hex').parentNode;assert.equal(label.parentNode,parent);assert.equal(parent.style.flexWrap,'wrap');assert.equal(label.style.flexBasis,'100%','hex takes a separate full row instead of squeezing original size/font/picker');
+ assert.deepEqual(parent.children.filter(n=>n!==label),controls,'the original controls retain their nodes and order');
+ await binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:null});assert.equal(f.get('native-text-color-hex').disabled,false);
+ binding.retire();assert.equal(parent.style.flexWrap,'wrap-reverse','native mount restores pre-existing inline layout');assert.deepEqual(parent.children,controls);assert.equal(f.get('native-text-color-hex'),null);assert.equal(f.owner.log.executed.length,0);
+});
+
+
+test('element blur keeps an invalid area draft while real window blur cancels it without publication',async()=>{
+ const f=await fixture();let windowBlur=0,capturedBlur=0;f.root.addEventListener('blur',()=>windowBlur++);f.root.addEventListener('blur',()=>capturedBlur++,true);
+ f.canvas.fire('pointerdown',{clientX:100,clientY:110});f.canvas.fire('pointermove',{clientX:300,clientY:190});f.canvas.fire('pointerup',{clientX:300,clientY:190});await f.turn();
+ const area=f.get('native-text-area-draft');area.value='Pending color';area.fire('input');f.input('native-text-color-hex','#invalid');
+ const event=area.fire('blur');await f.turn();assert.equal(event.bubbles,false);assert.equal(capturedBlur,1);assert.equal(windowBlur,0);assert.ok(f.binding.core.snapshot().draft);assert.equal(f.owner.log.executed.length,0);
+ f.root.fire('blur');await f.turn();assert.equal(windowBlur,1);assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
 });

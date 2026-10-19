@@ -36,7 +36,6 @@ pub(crate) const MAX_ASSET_RECORDS: usize = 1024;
 /// Most placements the project wire admits.
 pub(crate) const MAX_PLACEMENTS: usize = 1024;
 /// `AssetPlacement::new` bound: `|offsetFrames| <= 2^53 - 1`.
-const MAX_FRAME_OFFSET: u64 = 9_007_199_254_740_991;
 
 /// Why a placement cannot enter the owner (typed; the message is stable).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,6 +46,7 @@ pub(crate) enum PlacementRefusal {
     ImageOwner,
     /// Audio placements need a native audio-track record; none exists.
     AudioTrackOwner,
+    AudioTrackTarget,
     /// Font placements belong to the retained-font owner.
     FontOwner,
     /// The context is not a context of the document.
@@ -63,6 +63,7 @@ impl PlacementRefusal {
             Self::Asset => "asset placement asset unresolved",
             Self::ImageOwner => "asset image placement unavailable",
             Self::AudioTrackOwner => "asset audio track unavailable",
+            Self::AudioTrackTarget => "asset audio track unresolved",
             Self::FontOwner => "asset font placement unavailable",
             Self::Context => "asset placement context unresolved",
             Self::Layer => "asset placement layer unresolved",
@@ -75,7 +76,7 @@ impl PlacementRefusal {
     pub(crate) fn unresolved(self) -> bool {
         matches!(
             self,
-            Self::Asset | Self::Context | Self::Layer | Self::Element
+            Self::Asset | Self::AudioTrackTarget | Self::Context | Self::Layer | Self::Element
         )
     }
 }
@@ -163,6 +164,26 @@ pub(crate) fn check_placement(
             }
         }
         (AssetTarget::Drawing { .. }, _) => Err(PlacementRefusal::ImageOwner),
+        (AssetTarget::AudioTrack { track_uid }, AssetKind::Audio) => {
+            let tracks = document
+                .audio_tracks
+                .value()
+                .ok_or(PlacementRefusal::AudioTrackOwner)?;
+            let track = tracks
+                .get(track_uid)
+                .ok_or(PlacementRefusal::AudioTrackTarget)?;
+            if track.asset_id != placement.asset_id().as_str() {
+                return Err(PlacementRefusal::Asset);
+            }
+            let source = inventory
+                .get(placement.asset_id())
+                .ok_or(PlacementRefusal::Asset)?
+                .source();
+            if !source.has_audio_admission() {
+                return Err(PlacementRefusal::AudioTrackOwner);
+            }
+            Ok(())
+        }
         (AssetTarget::AudioTrack { .. }, _) => Err(PlacementRefusal::AudioTrackOwner),
         (AssetTarget::Text { .. }, _) => Err(PlacementRefusal::FontOwner),
     }
@@ -173,6 +194,18 @@ pub(crate) fn check_inventory(
     document: &ObjectDocument,
     inventory: &AssetInventory,
 ) -> Result<(), PlacementRefusal> {
+    if let Some(tracks) = document.audio_tracks.value() {
+        for track in tracks.records() {
+            if inventory
+                .records()
+                .iter()
+                .find(|r| r.id().as_str() == track.asset_id)
+                .is_none_or(|r| r.kind() != AssetKind::Audio)
+            {
+                return Err(PlacementRefusal::Asset);
+            }
+        }
+    }
     for placement in inventory.placements() {
         check_placement(document, inventory, placement)?;
     }
@@ -201,17 +234,17 @@ pub(crate) enum PlacementEdit {
         placement_id: String,
         asset_id: String,
         target: AssetTarget,
-        offset_frames: i64,
+        offset_frames: serde_json::Number,
     },
     /// Set the offset to an absolute number of frames.
     SetOffset {
         placement_id: String,
-        offset_frames: i64,
+        offset_frames: serde_json::Number,
     },
     /// Add a signed number of frames to the offset (the timeline drag).
     ShiftOffset {
         placement_id: String,
-        delta_frames: i64,
+        delta_frames: serde_json::Number,
     },
     /// Remove a placement; the catalog records stay.
     Remove { placement_id: String },
@@ -249,9 +282,9 @@ fn position(placements: &[AssetPlacement], id: &str) -> Result<usize, PlacementE
 
 fn with_offset(
     placement: &AssetPlacement,
-    offset_frames: i64,
+    offset_frames: serde_json::Number,
 ) -> Result<AssetPlacement, PlacementEditError> {
-    AssetPlacement::new(
+    AssetPlacement::new_number(
         placement.id().to_owned(),
         placement.asset_id().clone(),
         placement.target().clone(),
@@ -264,7 +297,7 @@ fn with_offset(
 fn replace_offset(
     placements: &mut [AssetPlacement],
     at: usize,
-    offset_frames: i64,
+    offset_frames: serde_json::Number,
 ) -> Result<bool, PlacementEditError> {
     let next = with_offset(&placements[at], offset_frames)?;
     if next == placements[at] {
@@ -290,8 +323,9 @@ pub(crate) fn apply_edit(
             offset_frames,
         } => {
             let asset_id = AssetId::new(asset_id).map_err(|_| PlacementEditError::Invalid)?;
-            let candidate = AssetPlacement::new(placement_id, asset_id, target, offset_frames)
-                .map_err(|_| PlacementEditError::Invalid)?;
+            let candidate =
+                AssetPlacement::new_number(placement_id, asset_id, target, offset_frames)
+                    .map_err(|_| PlacementEditError::Invalid)?;
             if let Some(existing) = placements.iter().find(|p| p.id() == candidate.id()) {
                 return if *existing == candidate {
                     Ok(PlacementOutcome::Unchanged)
@@ -329,11 +363,12 @@ pub(crate) fn apply_edit(
             delta_frames,
         } => {
             let at = position(&placements, &placement_id)?;
-            let sum = placements[at]
-                .offset_frames()
-                .checked_add(delta_frames)
-                .filter(|sum| sum.unsigned_abs() <= MAX_FRAME_OFFSET)
-                .ok_or(PlacementEditError::Overflow)?;
+            let sum = crate::object_document::placement_offset::shifted(
+                placements[at].target(),
+                placements[at].offset_frames(),
+                &delta_frames,
+            )
+            .ok_or(PlacementEditError::Overflow)?;
             if !replace_offset(&mut placements, at, sum)? {
                 return Ok(PlacementOutcome::Unchanged);
             }

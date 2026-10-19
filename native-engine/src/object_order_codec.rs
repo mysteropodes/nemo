@@ -5,11 +5,30 @@ use crate::object_codec::{
     ObjectDocument,
 };
 use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ItemRecords, ObjectLayer, ObjectRecord, OrderContext,
-    OrderCurvePoint, OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
+    AuthoredOrder, ComponentTables, FrameScopeKind, ItemRecords, ObjectLayer, ObjectRecord,
+    OrderContext, OrderCurvePoint, OrderPlan, OrderTrack, OrderedObjectDocument, Presence,
+    OBJECT_DOCUMENT_FORMAT,
 };
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
+
+pub(super) fn validate_audio_tracks(
+    tracks: Option<&crate::object_document::AudioTracks>,
+) -> Result<(), ObjectCodecError> {
+    if let Some(tracks) = tracks {
+        tracks.validate(validate_effect_track).map_err(|message| {
+            ObjectCodecError::new(
+                if message == "unsupported audio Motion property" {
+                    ObjectCodecErrorKind::Unsupported
+                } else {
+                    ObjectCodecErrorKind::Invalid
+                },
+                message,
+            )
+        })?;
+    }
+    Ok(())
+}
 
 fn invalid(message: &str) -> ObjectCodecError {
     ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message)
@@ -59,26 +78,53 @@ fn curve(points: &[OrderCurvePoint]) -> Result<(), ObjectCodecError> {
     }
     Ok(())
 }
+pub(super) fn validate_scalar_track(track: &OrderTrack) -> Result<(), ObjectCodecError> {
+    scalar_track(track, curve)
+}
+/// Effects use Motion's shared curve admission, including the original zero/one-point passthrough.
+/// The Order-specific predicate above stays unchanged for every existing order caller.
+pub(super) fn validate_effect_track(track: &OrderTrack) -> Result<(), ObjectCodecError> {
+    scalar_track(track, |points| {
+        let points: Vec<_> = points
+            .iter()
+            .map(|p| crate::document::CurvePoint {
+                x: p.x.clone(),
+                y: p.y.clone(),
+                tx: p.tx.value().cloned(),
+                ty: p.ty.value().cloned(),
+            })
+            .collect();
+        crate::document::validate_curve_points(&points).map_err(invalid)
+    })
+}
+fn scalar_track(
+    track: &OrderTrack,
+    check_curve: impl Fn(&[OrderCurvePoint]) -> Result<(), ObjectCodecError>,
+) -> Result<(), ObjectCodecError> {
+    let mut previous = None;
+    for key in &track.keys {
+        let frame = finite(&key.frame)?;
+        if previous.is_some_and(|v| frame <= v) {
+            return Err(invalid("order keys must strictly increase"));
+        }
+        previous = Some(frame);
+        numbers(&key.v, 1)?;
+        if let Some(Some(points)) = key.curve_points.value() {
+            check_curve(points)?;
+        }
+        for value in [key.h_in.value(), key.h_out.value()].into_iter().flatten() {
+            numbers(value, 2)?;
+        }
+    }
+    Ok(())
+}
+
 fn authored(order: &AuthoredOrder) -> Result<(), ObjectCodecError> {
     if let Some(value) = order.static_value.value() {
         numbers(value, 1)?;
     }
     if let Some(track) = order.track.value() {
-        let mut previous = None;
-        for key in &track.keys {
-            let frame = finite(&key.frame)?;
-            if previous.is_some_and(|v| frame <= v) {
-                return Err(invalid("order keys must strictly increase"));
-            }
-            previous = Some(frame);
-            numbers(&key.v, 1)?;
-            if let Some(Some(points)) = key.curve_points.value() {
-                curve(points)?;
-            }
-            for value in [key.h_in.value(), key.h_out.value()].into_iter().flatten() {
-                numbers(value, 2)?;
-            }
-        }
+        validate_scalar_track(track)?;
     }
     if let Some(expression) = order.expression.value() {
         if expression.code.len() > 4096 {
@@ -115,6 +161,7 @@ fn validate_order(
     layers: &[ObjectLayer],
     objects: &[ObjectRecord],
     items: Option<&ItemRecords>,
+    component_tables: &Presence<ComponentTables>,
 ) -> Result<(), ObjectCodecError> {
     if plan.format != "nemo.native-object-order-plan"
         || plan.format_version != 1
@@ -124,9 +171,23 @@ fn validate_order(
     {
         return Err(unsupported("unsupported order plan version or policy"));
     }
-    let declared: HashSet<_> = layers.iter().map(|l| l.layer_uid.as_str()).collect();
+    let components = component_tables
+        .value()
+        .and_then(|tables| tables.components.value());
+    // Optional explicit inner plans do not create a migration requirement for
+    // native component records whose owner already defines natural order.
+    let inner_records = components
+        .into_iter()
+        .flat_map(|set| set.components.iter())
+        .filter(|component| {
+            plan.contexts
+                .iter()
+                .any(|context| context.context_id == component.symbol_id())
+        })
+        .flat_map(|component| component.objects());
     let expected: HashSet<_> = objects
         .iter()
+        .chain(inner_records)
         .map(|r| &r.target)
         .chain(items.into_iter().flat_map(|items| items.targets()))
         .filter(|target| target.frame_scope.kind == FrameScopeKind::Authored)
@@ -148,13 +209,26 @@ fn validate_order(
         if !contexts.insert(context.context_id.as_str()) {
             return Err(duplicate("duplicate order context"));
         }
+        let component = components.and_then(|set| {
+            set.components
+                .iter()
+                .find(|component| component.symbol_id() == context.context_id)
+        });
+        // Storage historically preserves other opaque contexts. They remain
+        // non-executable: ContextSource admits only root or declared components.
+        let local_layers = component.map_or(layers, |component| component.layers());
+        let local_frames = component.map_or(total_frames, |component| component.total_frames());
+        let declared: HashSet<_> = local_layers
+            .iter()
+            .map(|layer| layer.layer_uid.as_str())
+            .collect();
         layer_stack(context, &declared)?;
         let mut scopes = HashSet::new();
         for scope in &context.scopes {
             if scope.frame_scope.kind != FrameScopeKind::Authored {
                 return Err(unsupported("Reference order is unavailable"));
             }
-            if scope.frame_scope.frame >= total_frames {
+            if scope.frame_scope.frame >= local_frames {
                 return Err(invalid("invalid authored order source frame"));
             }
             if !scopes.insert(scope.frame_scope.frame) {
@@ -218,6 +292,7 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.layers,
         &document.objects,
         document.items.value(),
+        &document.component_tables,
     )?;
     crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
@@ -225,6 +300,7 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.layers,
         &document.objects,
         Some(&document.composition_order),
+        document.component_tables.value(),
     )?;
     validate_image_meshes(&document.image_meshes)?;
     validate_component_tables(&document.component_tables, &document.layers)
@@ -234,6 +310,7 @@ pub(crate) fn validate_storage_order(
     document: &ObjectDocument,
     plan: &OrderPlan,
 ) -> Result<(), ObjectCodecError> {
+    validate_audio_tracks(document.audio_tracks.value())?;
     if document.format != OBJECT_DOCUMENT_FORMAT || document.format_version != 2 {
         return Err(unsupported("unsupported ordered object format or version"));
     }
@@ -256,6 +333,7 @@ pub(crate) fn validate_storage_order(
         &document.layers,
         &document.objects,
         document.items.value(),
+        &document.component_tables,
     )?;
     crate::object_codec::validate_layer_organization(&document.layers, &document.layer_folders)?;
     validate_property_holders(
@@ -263,18 +341,21 @@ pub(crate) fn validate_storage_order(
         &document.layers,
         &document.objects,
         Some(plan),
+        document.component_tables.value(),
     )?;
     validate_image_meshes(&document.image_meshes)
 }
 
 pub fn decode_ordered_project(bytes: &[u8]) -> Result<OrderedObjectDocument, ObjectCodecError> {
-    let document = parse(bytes)?;
+    let document: OrderedObjectDocument = parse(bytes)?;
+    validate_audio_tracks(document.audio_tracks.value())?;
     ordered(&document)?;
     Ok(document)
 }
 pub fn encode_ordered_project(
     document: &OrderedObjectDocument,
 ) -> Result<Vec<u8>, ObjectCodecError> {
+    validate_audio_tracks(document.audio_tracks.value())?;
     ordered(document)?;
     serde_json::to_vec(document).map_err(|e| invalid(&e.to_string()))
 }
@@ -297,6 +378,8 @@ pub fn migrate_ordered_project(
         image_meshes: document.image_meshes.clone(),
         items: document.items.clone(),
         component_tables: document.component_tables.clone(),
+        motion_arcs: document.motion_arcs.clone(),
+        audio_tracks: document.audio_tracks.clone(),
     };
     ordered(&migrated)?;
     Ok(migrated)

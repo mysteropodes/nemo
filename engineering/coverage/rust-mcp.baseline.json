@@ -463,6 +463,108 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "Measured clean 3518d24faa0888dbfca834a78a36422934f18bc3, MCP tree 4e5ce73c1a1f8702d7f6d76d40fc2b78ebee455c; standard cargo-llvm-cov 0.9.1 JSON 30832afc023601a1b9a7a005cfd3079843aea1047b8d80bb99d44c675d0c52e5, actual full unfiltered suites 337 tests/0 failed across 20 binaries, booking 1062/6258656915. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_audio_track_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_audio_track_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_audio_track_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_clipboard_stdio_output_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_clipboard_transport_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_clipboard_transport.rs": {
+      "lines": 91.66,
+      "regions": 90.44,
+      "functions": 100,
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_frame_bulk_move_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_frame_bulk_move_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_playhead_cut_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_playhead_cut_contract.rs": {
+      "lines": 97.67,
+      "regions": 98.7,
+      "functions": 100,
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_playhead_cut_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_range_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_range_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_shift_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_shift_contract.rs": {
+      "lines": 96.66,
+      "regions": 97.28,
+      "functions": 100,
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_layer_shift_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_project_placement_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_project_placement_contract.rs": {
+      "lines": 96.82,
+      "regions": 98.61,
+      "functions": 100,
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_vector_contract_shapes.rs": {
+      "lines": 100,
+      "regions": 99.74,
+      "functions": 100,
+      "note": "Measured clean 0d9d27afe099dd6b7e04a5dfd9b6efb67abdbd04, MCP tree 48544feda0957b2a58f24484b371ebd1f2b9757f; standard cargo-llvm-cov 0.9.1 JSON fb17c9bf66a9b6366d3b0fed34d9995e3909bbba6bf434854a9b6f6f869e50e1, actual full unfiltered suites 385 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6276790656. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
     }
   },
   "nativeObjectContractRegistration": {

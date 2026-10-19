@@ -70,12 +70,14 @@ fn key(value: &Value, dimension: usize) -> bool {
     exact(
         value,
         &["frame", "v"],
-        &["hold", "curvePoints", "hIn", "hOut"],
+        &["hold", "curvePoints", "hIn", "hOut", "lockTo"],
     )
     .is_some_and(|k| {
         finite(&k["frame"])
             && vector(&k["v"], dimension)
             && k.get("hold").is_none_or(Value::is_boolean)
+            && k.get("lockTo")
+                .is_none_or(|v| v.is_null() || matches!(v.as_str(), Some("in" | "out" | "layer")))
             && k.get("curvePoints").is_none_or(curve)
             && ["hIn", "hOut"]
                 .iter()

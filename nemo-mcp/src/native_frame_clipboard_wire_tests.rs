@@ -176,8 +176,7 @@ fn clipboard_raw_request_and_response_reject_duplicate_unknown_and_positional_by
 }
 
 #[tokio::test]
-async fn clipboard_wire_preserves_complete_4096_byte_response_and_refuses_4097_without_truncation()
-{
+async fn clipboard_wire_preserves_4096_compatibility_and_an_explicit_4096_reader_stays_bounded() {
     let (request, _) = clipboard_pair(CLIPBOARD_COPY);
     let mut packet = empty_packet(&request);
     // An opaque object tests the public shell's byte boundary, not native record admission.

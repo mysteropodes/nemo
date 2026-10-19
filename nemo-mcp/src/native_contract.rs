@@ -23,6 +23,10 @@ mod object;
 #[path = "native_text_read_contract.rs"]
 pub(crate) mod text_read;
 
+#[path = "native_audio_track_contract.rs"]
+pub(crate) mod audio_track;
+#[path = "native_project_placement_contract.rs"]
+pub(crate) mod placement;
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
 
@@ -34,6 +38,8 @@ pub(crate) mod frame_edit;
 pub(crate) mod import;
 #[path = "native_item_contract.rs"]
 pub(crate) mod item;
+#[path = "native_layer_playhead_cut_contract.rs"]
+pub(crate) mod layer_cut;
 #[path = "native_layer_policy_contract.rs"]
 pub(crate) mod layer_policy;
 #[path = "native_object_component_contract.rs"]
@@ -124,7 +130,10 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
+        placement::OP => placement::request(payload),
+        audio_track::OP => audio_track::request(payload),
         layer_policy::OP => layer_policy::request(payload),
+        layer_cut::OP => layer_cut::request(payload),
         property_track::OP => property_track::request(payload),
         property_edit::OP => property_edit::request(payload),
         op if frame_edit::declares(op) => frame_edit::request(op, payload),
@@ -307,6 +316,9 @@ pub(crate) fn validate_result(
     if operation == layer_policy::OP {
         return layer_policy::result(result);
     }
+    if operation == layer_cut::OP {
+        return layer_cut::result(result);
+    }
     if frame_edit::declares(operation) {
         return frame_edit::result_for_operation(operation, result);
     }
@@ -324,6 +336,12 @@ pub(crate) fn validate_result(
     }
     if vector::owns(operation) {
         return vector::result(operation, payload, result);
+    }
+    if operation == placement::OP {
+        return placement::result(result);
+    }
+    if operation == audio_track::OP {
+        return audio_track::result(result);
     }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);

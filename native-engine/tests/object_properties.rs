@@ -1,6 +1,9 @@
 //! Literal Motion metadata and identity oracles through the production codecs.
 use super::*;
-use crate::object_codec::{decode_storage_project, encode_storage_project};
+use crate::object_codec::{
+    decode_ordered_project, decode_storage_project, encode_ordered_project, encode_storage_project,
+    ObjectCodecErrorKind,
+};
 use serde_json::{json, Value};
 
 fn source(version: u32) -> Value {
@@ -349,4 +352,91 @@ fn both_real_frame_producers_refuse_unconsumed_properties_without_affecting_old_
             );
         }
     }
+}
+
+fn component_holder_source() -> Value {
+    let row = include_str!("fixtures/object-component-document/oracle.txt")
+        .lines()
+        .find(|line| line.starts_with("G\t"))
+        .unwrap();
+    serde_json::from_str(row.split('\t').nth(1).unwrap()).unwrap()
+}
+fn component_holder(context: &str, stroke: Option<&str>, opacity: f64) -> Value {
+    let mut target = json!({"contextId":context,"layerUid":"ly_comp_ia"});
+    if let Some(stroke) = stroke {
+        target["strokeId"] = json!(stroke);
+    }
+    json!({"target":target,"properties":[{"property":"opacity","static":[opacity]}]})
+}
+#[test]
+fn declared_components_persist_same_local_holder_ids_without_a_component_order_plan() {
+    let mut value = component_holder_source();
+    value["propertyHolders"] = json!([
+        component_holder("sym_comp", None, 25.),
+        component_holder("sym_comp", Some("s_comp_a_0"), 35.),
+        component_holder("sym_comp_b", Some("s_comp_a_0"), 70.)
+    ]);
+    let document = admitted(&value);
+    assert_eq!(image(&document), value);
+    let ordered = decode_ordered_project(value.to_string().as_bytes()).unwrap();
+    let ordered_bytes = encode_ordered_project(&ordered).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<Value>(&ordered_bytes).unwrap(),
+        value
+    );
+    let saved = encode_storage_project(&document).unwrap();
+    assert_eq!(
+        encode_storage_project(&decode_storage_project(&saved).unwrap()).unwrap(),
+        saved
+    );
+    assert_eq!(document.property_holders().unwrap().len(), 3);
+}
+#[test]
+fn component_holder_admission_does_not_borrow_root_or_another_components_identities() {
+    for target in [
+        json!({"contextId":"scene-root","layerUid":"ly_comp_ia"}),
+        json!({"contextId":"sym_comp","layerUid":"ly_toggle"}),
+        json!({"contextId":"missing","layerUid":"ly_comp_ia"}),
+        json!({"contextId":"sym_comp","layerUid":"ly_comp_ia","strokeId":"missing"}),
+    ] {
+        let mut value = component_holder_source();
+        value["propertyHolders"] = json!([{"target":target,"properties":[]}]);
+        assert_eq!(
+            decode_storage_project(value.to_string().as_bytes())
+                .unwrap_err()
+                .kind(),
+            ObjectCodecErrorKind::Invalid
+        );
+    }
+    let mut value = component_holder_source();
+    value["componentTables"]["components"]["components"][1]["objects"] = json!([]);
+    value["componentTables"]["components"]["components"][1]["exposedProps"] = json!([]);
+    value["propertyHolders"] = json!([component_holder("sym_comp_b", Some("s_comp_a_0"), 70.)]);
+    assert_eq!(
+        decode_storage_project(value.to_string().as_bytes())
+            .unwrap_err()
+            .kind(),
+        ObjectCodecErrorKind::Invalid
+    );
+}
+#[test]
+fn nested_holders_keep_duplicate_and_original_v1_component_storage_refusals() {
+    let mut value = component_holder_source();
+    let holder = component_holder("sym_comp", Some("s_comp_a_0"), 35.);
+    value["propertyHolders"] = json!([holder.clone(), holder]);
+    assert_eq!(
+        decode_storage_project(value.to_string().as_bytes())
+            .unwrap_err()
+            .kind(),
+        ObjectCodecErrorKind::DuplicateId
+    );
+    value["propertyHolders"] = json!([component_holder("sym_comp", None, 35.)]);
+    value["formatVersion"] = json!(1);
+    value.as_object_mut().unwrap().remove("compositionOrder");
+    assert_eq!(
+        decode_storage_project(value.to_string().as_bytes())
+            .unwrap_err()
+            .kind(),
+        ObjectCodecErrorKind::Unsupported
+    );
 }

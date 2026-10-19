@@ -299,6 +299,8 @@ pub(crate) enum SceneEffectJoinError {
     NoNumericOrder,
     /// The order plan does not list every document layer exactly once, or an entry names a foreign layer.
     InvalidOrder,
+    /// Stored keys need their actual parameter sampler; static substitution is forbidden.
+    EffectParametersUnavailable { layer: usize },
 }
 
 /// Document layers in paint order, read from the packet that carries the pinned snapshot.
@@ -318,6 +320,12 @@ pub(crate) fn layer_inputs(
             .ok_or(SceneEffectJoinError::InvalidOrder)?;
         if std::mem::replace(&mut seen[index], true) {
             return Err(SceneEffectJoinError::InvalidOrder);
+        }
+        if layer
+            .effects()
+            .is_some_and(|stack| stack.iter().any(|e| e.enabled && e.has_keyed_params()))
+        {
+            return Err(SceneEffectJoinError::EffectParametersUnavailable { layer: index });
         }
         let effects = layer
             .effects()

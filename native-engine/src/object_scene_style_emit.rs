@@ -17,8 +17,8 @@
 //! Interpretation (lane acceptance "unavailable geometry never silently disappears"): the baseline keeps the
 //! flat fill, or nothing, when a gradient cannot be built (`gradient_brush` returns `None`). A scene that
 //! asked for a gradient must not degrade to a flat or missing fill, so `FillResolution::Fallback` is the typed
-//! `EmitError::GradientRejected` instead; the document model cannot express a gradient yet, so no stored
-//! document reaches this branch today. For the same reason a stroke that Vello would skip silently (width
+//! `EmitError::GradientRejected` instead. Stored two-stop vector gradients now use this same emitter.
+//! For the same reason a stroke that Vello would skip silently (width
 //! zero: `Scene::stroke` returns early) or never finish (a dash pattern without a positive finite length) is
 //! a typed error; the style kernel's `width || 1` rule already turns an authored zero width into width 1.
 

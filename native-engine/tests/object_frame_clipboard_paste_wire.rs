@@ -1,6 +1,6 @@
 //! Strict payload tests for the frame-clipboard commands: each command admits exactly its own fields, every malformed
-//! input is `InvalidRequest`, a real packet round-trips through its wire form, and the existing 4096-byte message
-//! bound applies unchanged.
+//! input is `InvalidRequest`, a real packet round-trips through its wire form, and the operation-specific full-message
+//! bound is paired with the unchanged native data ceiling.
 use super::*;
 use crate::commands::ObjectFillOwner;
 use crate::object_document::ObjectDocument;
@@ -186,7 +186,7 @@ fn a_real_packet_round_trips_through_the_wire_form() {
 }
 
 #[test]
-fn the_existing_message_bound_refuses_a_packet_that_does_not_fit() {
+fn clipboard_pairing_accepts_original_eight_stroke_packet_above_4096() {
     let many = "K=a.1.1,b.1.2,c.1.3,d.1.4,e.1.5,f.1.6,g.1.7,h.1.8;.;.;.";
     let owner = ObjectFillOwner::new("wire", doc(many)).unwrap();
     let packet = owner
@@ -200,10 +200,7 @@ fn the_existing_message_bound_refuses_a_packet_that_does_not_fit() {
         payload.to_string().len() > 4096,
         "eight strokes exceed the bound"
     );
-    assert_eq!(
-        parse(&payload).unwrap_err(),
-        DispatchErrorCode::InvalidRequest
-    );
+    assert!(parse(&payload).is_ok());
 }
 
 #[test]

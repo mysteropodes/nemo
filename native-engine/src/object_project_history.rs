@@ -108,6 +108,8 @@ fn blank_project(
         image_meshes: Presence::Missing,
         items: Presence::Missing,
         component_tables: Presence::Missing,
+        motion_arcs: Presence::Missing,
+        audio_tracks: Presence::Missing,
     };
     Ok(ProjectEnvelope::no_media(metadata, drawing))
 }

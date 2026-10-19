@@ -7,7 +7,7 @@ const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const nonblank = (text) => text.split('\n').filter((line) => line.trim()).length;
 const OPERATIONS = ['command.document.object.vector.edit', 'command.document.object.parametric.edit', 'command.document.object.path.effects.edit'];
-const RUST = ['src/native_vector_contract.rs', 'src/native_vector_contract_tests.rs'];
+const RUST = ['src/native_vector_contract.rs', 'src/native_vector_contract_shapes.rs', 'src/native_vector_contract_tests.rs'];
 const MODULES = [
   ['app.native.object.vector.contract', 'domain', 'native-object-vector-contract.js', 'Domain/application'],
   ['app.native.object.vector.stroke', 'domain', 'native-object-vector-stroke.js', 'Domain/application'],
@@ -96,6 +96,11 @@ test('the Rust contract and its test child are members of the MCP transport modu
   const production = read('nemo-mcp/src/native_vector_contract.rs');
   assert.ok(nonblank(production) <= 350, 'production contract below the warning size');
   assert.equal(/\bsuper::/.test(production), false, 'the production contract imports through crate paths');
+  assert.match(production, /#\[path = "native_vector_contract_shapes\.rs"\]\s*mod shapes;/);
+  const shapes = read('nemo-mcp/src/native_vector_contract_shapes.rs');
+  assert.ok(nonblank(shapes) <= 350, 'private shape admission below the warning size');
+  assert.doesNotMatch(shapes, /\bsuper::/, 'private shape admission imports through crate paths');
+  assert.match(production, /use shapes::\{record_shape, shape\};/);
   const contract = read('nemo-mcp/src/native_contract.rs');
   assert.equal(contract.split('pub(crate) mod vector;').length - 1, 1);
   assert.match(contract, /vector::VECTOR \| vector::PARAMETRIC \| vector::EFFECTS => \{\s+vector::request\(operation, payload\)/);

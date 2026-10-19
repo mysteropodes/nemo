@@ -709,10 +709,19 @@
         },
         "boxAngle": {
           "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "fillGradient": {
+          "$ref": "#/$defs/ObjectVectorFillGradient"
         }
       },
       "minProperties": 1,
-      "description": "Omitted when empty."
+      "description": "Omitted when empty.",
+      "not": {
+        "required": [
+          "pressure",
+          "fillGradient"
+        ]
+      }
     },
     "ObjectVectorRecord": {
       "type": "object",
@@ -1067,109 +1076,24 @@
       "maximum": 4294967295
     },
     "ObjectLayerTimingPayload": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "atRevision",
-        "documentSnapshotId",
-        "contextId",
-        "layerUid",
-        "frame"
-      ],
-      "properties": {
-        "atRevision": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectLayerTimingCellPayload"
         },
-        "documentSnapshotId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "contextId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "layerUid": {
-          "type": "string",
-          "minLength": 1
-        },
-        "frame": {
-          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        {
+          "$ref": "#/$defs/ObjectLayerRangePayload"
         }
-      },
-      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+      ]
     },
     "ObjectLayerTimingResult": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "instanceId",
-        "documentId",
-        "atRevision",
-        "documentSnapshotId",
-        "contextId",
-        "layerUid",
-        "frame",
-        "cellKind",
-        "sourceFrame",
-        "hasContent",
-        "manualEdit"
-      ],
-      "properties": {
-        "instanceId": {
-          "type": "string",
-          "minLength": 1
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectLayerTimingCellResult"
         },
-        "documentId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "atRevision": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "documentSnapshotId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "contextId": {
-          "const": "scene-root"
-        },
-        "layerUid": {
-          "type": "string",
-          "minLength": 1
-        },
-        "frame": {
-          "$ref": "#/$defs/ObjectLayerTimingFrame"
-        },
-        "cellKind": {
-          "enum": [
-            "key",
-            "interpolated",
-            "held",
-            "unexposed"
-          ]
-        },
-        "sourceFrame": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/ObjectLayerTimingFrame"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "hasContent": {
-          "type": "boolean"
-        },
-        "manualEdit": {
-          "type": "boolean"
+        {
+          "$ref": "#/$defs/ObjectLayerRangeResult"
         }
-      },
-      "description": "Actual immutable identity and selected source; complete encoded result <=4096bytes or typed Unavailable. A core read is not live host/UI epoch admission or rendering/export acceptance."
+      ]
     },
     "ObjectQueryPayload": {
       "type": "object",
@@ -1186,6 +1110,214 @@
           "$ref": "#/$defs/ObjectTarget"
         }
       }
+    },
+    "ObjectProjectPlacementPayload": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "place"
+            },
+            "placement": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "assetId",
+                "target",
+                "offsetFrames"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                },
+                "assetId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                },
+                "target": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "contextId",
+                    "layerUid"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "drawing"
+                    },
+                    "contextId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                    },
+                    "layerUid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                    },
+                    "strokeId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                    }
+                  }
+                },
+                "offsetFrames": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placement"
+          ],
+          "properties": {
+            "kind": {
+              "const": "place"
+            },
+            "placement": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "assetId",
+                "target",
+                "offsetFrames"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                },
+                "assetId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                },
+                "target": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "trackUid"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "audioTrack"
+                    },
+                    "trackUid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255,
+                      "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+                    }
+                  }
+                },
+                "offsetFrames": {
+                  "type": "number",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placementId",
+            "offsetFrames"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setOffset"
+            },
+            "placementId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+            },
+            "offsetFrames": {
+              "type": "number",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placementId",
+            "deltaFrames"
+          ],
+          "properties": {
+            "kind": {
+              "const": "shiftOffset"
+            },
+            "placementId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+            },
+            "deltaFrames": {
+              "type": "number",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placementId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "remove"
+            },
+            "placementId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+            }
+          }
+        }
+      ]
     },
     "ObjectProjectSettingsPayload": {
       "type": "object",
@@ -3271,6 +3403,10 @@
         },
         "to": {
           "$ref": "#/$defs/ObjectFrame"
+        },
+        "activeLayerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId",
+          "description": "Captured active layer for the original motionArc prefix default; may differ from dragged layerUid. Required by native when a changed edit has stored Arc entries."
         }
       }
     },
@@ -4493,6 +4629,23 @@
     },
     "Request": {
       "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.placement.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectPlacementPayload"
+                }
+              }
+            }
+          ]
+        },
         {
           "allOf": [
             {
@@ -6004,6 +6157,74 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.frames.move"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectFramesMovePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.range.drag"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerRangeDragPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.cut"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerPlayheadCutPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.audio.track.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectAudioTrackPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -6839,6 +7060,9 @@
             },
             {
               "$ref": "#/$defs/ObjectFrameClipboardCutResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectFrameBulkMoveResult"
             }
           ]
         },
@@ -7258,6 +7482,14 @@
             "minimum": -1.7976931348623157e+308,
             "maximum": 1.7976931348623157e+308
           }
+        },
+        "lockTo": {
+          "enum": [
+            null,
+            "in",
+            "out",
+            "layer"
+          ]
         }
       }
     },
@@ -8283,20 +8515,20 @@
         },
         "records": {
           "type": "array",
-          "maxItems": 4096,
+          "maxItems": 131072,
           "items": {
             "type": "object"
           }
         },
         "orderElements": {
           "type": "array",
-          "maxItems": 4096,
+          "maxItems": 131072,
           "items": {
             "type": "object"
           }
         }
       },
-      "description": "Bounded structural DTO shell only. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped."
+      "description": "Bounded structural DTO shell only. Native strict decoding validates full record/order grammar, offsets, key/record and version/order relationships atomically; no record/order data is dropped. Records/order arrays use nativeDataBytes/32=131072 entries to avoid rejecting native-valid packets above4096 objects; cell/selection counts stay4096 and aggregate native data bytes remain4MiB."
     },
     "ObjectFrameClipboardPacket": {
       "type": "object",
@@ -8320,7 +8552,8 @@
             "$ref": "#/$defs/ObjectFrameClipboardCell"
           }
         }
-      }
+      },
+      "description": "Native detached packet; aggregate serialized records plus complete orderElements arrays <=4194304 UTF8 bytes, independently of full correlated envelope. Runtime validators enforce byte accounting."
     },
     "ObjectFramesClipboardCopyPayload": {
       "type": "object",
@@ -8341,7 +8574,9 @@
             "$ref": "#/$defs/ObjectFrameEditCell"
           }
         }
-      }
+      },
+      "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedRequestBytes": 5246976
     },
     "ObjectFramesClipboardCutPayload": {
       "type": "object",
@@ -8362,7 +8597,9 @@
             "$ref": "#/$defs/ObjectFrameEditCell"
           }
         }
-      }
+      },
+      "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedRequestBytes": 5246976
     },
     "ObjectFramesClipboardPastePayload": {
       "type": "object",
@@ -8398,7 +8635,9 @@
             "$ref": "#/$defs/ObjectFrameClipboardCell"
           }
         }
-      }
+      },
+      "description": "Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedRequestBytes": 5246976
     },
     "ObjectFrameClipboardCopyResult": {
       "type": "object",
@@ -8426,7 +8665,8 @@
           ]
         }
       },
-      "description": "Native retained clipboard result; null means no new packet and preserves the existing UI clipboard. Inner packet instance/document must match the actual invoking owner; complete correlated reply remains bounded to4096 encoded bytes."
+      "description": "Native retained clipboard result; inner instance/document must match invoking owner; null means no new packet. Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedResponseBytes": 5246976
     },
     "ObjectFrameClipboardCutResult": {
       "type": "object",
@@ -8500,7 +8740,757 @@
           }
         }
       ],
-      "description": "Native retained clipboard result; null means no new packet and preserves the existing UI clipboard. Inner packet instance/document must match the actual invoking owner; complete correlated reply remains bounded to4096 encoded bytes."
+      "description": "Native retained clipboard result; inner instance/document must match invoking owner; null means no new packet. Operation-specific complete original UTF8 envelope limit5246976; native serialized record+complete order-array data limit4194304; cell/container reserve1048576 and correlated-header reserve4096. Runtime byte admission, not JSON character length, enforces these limits. Other operations retain4096.",
+      "x-maxEncodedResponseBytes": 5246976
+    },
+    "ObjectVectorGradientStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offset",
+        "color"
+      ],
+      "properties": {
+        "offset": {
+          "type": "number",
+          "minimum": -3.4028234663852886e+38,
+          "maximum": 3.4028234663852886e+38
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        }
+      }
+    },
+    "ObjectVectorFillGradient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "from",
+        "to",
+        "stops"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "linear",
+            "radial"
+          ]
+        },
+        "from": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -3.4028234663852886e+38,
+            "maximum": 3.4028234663852886e+38
+          }
+        },
+        "to": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": -3.4028234663852886e+38,
+            "maximum": 3.4028234663852886e+38
+          }
+        },
+        "stops": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/ObjectVectorGradientStop"
+          }
+        }
+      },
+      "description": "Bounded stored baseline fillGradient. Document-world coordinates and stop/color order retained; item/layer opacity folds once in native style production. Other stop counts remain unavailable."
+    },
+    "ObjectFramesMovePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "selection",
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.frames.move"
+        },
+        "selection": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectFrameEditCell"
+          }
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectFrameBulkMoveResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "selection"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "selection": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "maxItems": 4096,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/ObjectFrameEditCell"
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applied": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 1
+              },
+              "selection": {
+                "type": "array",
+                "maxItems": 4096,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/$defs/ObjectFrameEditCell"
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "historyEntriesAdded": {
+                "const": 0
+              },
+              "selection": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "description": "Ordinary Move actual native destination cells after locks/crop/ripple. Eligible checkpoint publishes true/1 even if bytes unchanged; early no-op false/0/null preserves UI selection. Complete correlated reply is admitted before commit."
+    },
+    "ObjectLayerShiftTrackTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "property"
+          ],
+          "properties": {
+            "kind": {
+              "const": "property"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid"
+          ],
+          "properties": {
+            "kind": {
+              "const": "layerOrder"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid"
+          ],
+          "properties": {
+            "kind": {
+              "const": "timeRemap"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid",
+            "frameScope",
+            "strokeId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "elementOrder"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frameScope": {
+              "$ref": "#/$defs/ObjectFrameScope"
+            },
+            "strokeId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "ObjectLayerRangeDragPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "activeLayerUid",
+        "part",
+        "barSelection",
+        "samples",
+        "plainClick",
+        "alt",
+        "frame",
+        "selectedKeys"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.range.drag"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "activeLayerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "part": {
+          "enum": [
+            "in",
+            "out",
+            "both"
+          ]
+        },
+        "barSelection": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "layerUid",
+              "part"
+            ],
+            "properties": {
+              "layerUid": {
+                "type": "string",
+                "minLength": 1
+              },
+              "part": {
+                "enum": [
+                  "in",
+                  "out",
+                  "both"
+                ]
+              }
+            }
+          }
+        },
+        "samples": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "plainClick": {
+          "type": "boolean"
+        },
+        "alt": {
+          "type": "boolean"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "selectedKeys": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "frame"
+            ],
+            "properties": {
+              "target": {
+                "$ref": "#/$defs/ObjectLayerShiftTrackTarget"
+              },
+              "frame": {
+                "type": "number",
+                "minimum": -1.7976931348623157e+308,
+                "maximum": 1.7976931348623157e+308
+              }
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerRangePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "view": {
+          "const": "range"
+        }
+      },
+      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+    },
+    "ObjectLayerTimingCellPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        }
+      },
+      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+    },
+    "ObjectLayerRangeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "range"
+      ],
+      "properties": {
+        "kind": {
+          "const": "layerRange"
+        },
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rawInPoint",
+            "rawOutPoint",
+            "inPoint",
+            "outPoint",
+            "hasCustomRange",
+            "hasTimeLink"
+          ],
+          "properties": {
+            "rawInPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "rawOutPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "inPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "outPoint": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "hasCustomRange": {
+              "type": "boolean"
+            },
+            "hasTimeLink": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "ObjectLayerTimingCellResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "cellKind",
+        "sourceFrame",
+        "hasContent",
+        "manualEdit"
+      ],
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "cellKind": {
+          "enum": [
+            "key",
+            "interpolated",
+            "held",
+            "unexposed"
+          ]
+        },
+        "sourceFrame": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectLayerTimingFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasContent": {
+          "type": "boolean"
+        },
+        "manualEdit": {
+          "type": "boolean"
+        }
+      },
+      "description": "Actual immutable identity and selected source; complete encoded result <=4096bytes or typed Unavailable. A core read is not live host/UI epoch admission or rendering/export acceptance."
+    },
+    "ObjectLayerPlayheadCutPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "contextId",
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.cut"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authored context identity; Rust/JS enforce128 UTF8bytes. Only scene-root has an admitted positive copy owner; other contexts return typed unavailable."
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Original opaque authored layer identity; no identifier grammar invented. Native/JS enforce128 UTF8bytes."
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectAudioTrackPayload": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId",
+            "muted"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setMuted"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "muted": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rename"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setTrim"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "trimStart": {
+              "type": "number"
+            },
+            "trimEnd": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": [
+                "trimStart"
+              ]
+            },
+            {
+              "required": [
+                "trimEnd"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "audioId",
+            "field"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unset"
+            },
+            "audioId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "field": {
+              "enum": [
+                "name",
+                "muted",
+                "trimStart",
+                "trimEnd"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

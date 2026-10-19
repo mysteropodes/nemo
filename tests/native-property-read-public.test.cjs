@@ -227,3 +227,8 @@ test('classic browser helper/SDK expose the same read with the literal finite na
   })()`, context);
   assert.equal(value.result.value[0], 20); assert.equal(value.contentRevision, 7);
 });
+
+test('authored-key read accepts only actual nullable standing lock modes while preserving DTO shape',async()=>{
+ for(const lockTo of [null,'in','out','layer']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;assert.deepEqual((await read(q,r)).result.items[0],r.result.items[0]);}
+ for(const lockTo of [false,0,'',{},'unknown']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;await assert.rejects(read(q,r),TypeError);}
+});

@@ -42,6 +42,10 @@ pub(crate) use object_frame_clipboard_paste_wire::{cut_clipboard_payload, paste_
 mod component_tables;
 #[allow(unused_imports)]
 pub(crate) use component_tables::{ComponentTablesEdit, PreparedComponentTables};
+// F11 cut-at-playhead through the existing sealed revision owner.
+#[path = "object_layer_playhead_cut_owner.rs"]
+mod layer_playhead_cut;
+pub(crate) use layer_playhead_cut::PreparedLayerPlayheadCut;
 #[path = "object_layer_lifecycle_ops.rs"]
 mod layer_lifecycle;
 pub(crate) use layer_lifecycle::PreparedLayerLifecycle;
@@ -109,6 +113,9 @@ mod object_raster_asset_owner;
 #[allow(dead_code)]
 mod object_media_link_owner;
 pub(crate) use object_media_link_owner::PreparedPlacementEdit;
+#[path = "object_audio_track_edit_owner.rs"]
+mod audio_track_edit;
+pub(crate) use audio_track_edit::PreparedAudioTrackEdit;
 // L01-F (#2107): sealed vector create/replace/delete over the same revision owner.
 #[path = "object_vector_edit.rs"]
 mod vector_edit;
@@ -453,3 +460,8 @@ mod tests {
         assert_eq!(after.encoded_png().as_ptr(), pointer);
     }
 }
+
+// Whole-cell Move and atomic bar Shift share this existing native owner.
+#[path = "object_frame_bulk_move.rs"]
+mod object_frame_bulk_move;
+pub(crate) use object_frame_bulk_move::{PreparedBulkFrameEdit, PreparedLayerShift};

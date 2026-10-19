@@ -4,10 +4,9 @@
 //! revision, snapshot id), checked in the frame packet's order before any lookup.
 //! `admit_frame_context` answers whether a frame query is admissible for
 //! `scene-root` OR a declared component, against that context's own frame count;
-//! it admits only. Producing the frame (component playback, overrides, camera) is
-//! the evaluation join (L04-K), so `prepare_object_frame` is NOT routed here: it
-//! keeps answering `Unavailable` for every non-root context of a v2 document, which
-//! existing tests pin (`object_exposure.rs`, `object_order_evaluation.rs`).
+//! it admits only. The immutable frame packet reuses these pins and local bounds
+//! for entered component drawing records with an admitted timing provider.
+//! Placed playback, overrides and camera remain separate evaluation joins.
 use crate::evaluation::object_component_kernels::object_context_resolver::{
     ContextKind, ContextSource, ResolveError, ResolvedContext, ResolvedTarget,
 };
@@ -86,8 +85,8 @@ pub(crate) struct AdmittedFrame<'a> {
 /// Frame-query admission for `scene-root` AND declared component contexts: the four
 /// pins, then the context (`InvalidContext` when undeclared), then the scope (`Unavailable`
 /// for a Reference scope in a v2 document or a component, as the packet answers for v2),
-/// then the frame against that context's own `totalFrames`. It admits only; producing the
-/// frame is the evaluation join's work, so `prepare_object_frame` is not routed here.
+/// then the frame against that context's own `totalFrames`. Content selection and
+/// provider completeness remain the immutable frame producer's responsibility.
 pub(crate) fn admit_frame_context<'a>(
     snapshot: &'a ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,

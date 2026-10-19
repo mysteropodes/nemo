@@ -108,6 +108,7 @@ function desktop(initial=[A,B]){
   require('./helpers/native-viewport-underlay.cjs').install(root);
   const session=Project.desktop(root);
   const render=UI.render;root.NemoNativeObjectUI={...UI,render(r,i,frameOnly,ports){log.push('UI:'+i.contentRevision);return render(r,i,frameOnly,ports);}};
+  require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(root);
   root.SMProjectDocument={baseName:()=> 'Project'};root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
   root.requestAnimationFrame=f=>setImmediate(f);
   const file=Files.bind(root,{read:()=>({tabId:'tab',name:'Project'}),touchRecent(){},commit(){},renderRecents(){},

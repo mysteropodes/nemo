@@ -190,6 +190,7 @@ pub(crate) fn island_record(
             fill: Presence::Present(Some(style.fill.clone())),
             vector: Presence::Missing,
             vector_ext: Presence::Missing,
+            effects: style.source.effects.clone(),
         });
     }
     let carried = if style.keep_source_stroke_style && build == IslandBuild::Single {
@@ -222,13 +223,18 @@ pub(crate) fn island_record(
         paint_order: Presence::Missing,
         opacity: style.opacity.clone(),
     };
-    let ext = match &style.box_angle {
-        Some(angle) => Presence::Present(VectorExt {
-            pressure: Presence::Missing,
-            param_shape: Presence::Missing,
-            box_angle: Presence::Present(angle.clone()),
-        }),
-        None => Presence::Missing,
+    // Baseline BOOL_KEEP_DATA_ALL carries the style source's gradient through Boolean/erase/Flatten.
+    let gradient = style.source.fill_gradient().cloned();
+    let ext = match (&style.box_angle, gradient) {
+        (angle, gradient) if angle.is_some() || gradient.is_some() => {
+            Presence::Present(VectorExt {
+                pressure: Presence::Missing,
+                param_shape: Presence::Missing,
+                box_angle: angle.clone().map_or(Presence::Missing, Presence::Present),
+                fill_gradient: gradient.map_or(Presence::Missing, Presence::Present),
+            })
+        }
+        _ => Presence::Missing,
     };
     Some(ObjectRecord {
         schema_version: 1,
@@ -238,6 +244,7 @@ pub(crate) fn island_record(
         fill: Presence::Present(Some(style.fill.clone())),
         vector: Presence::Present(body),
         vector_ext: ext,
+        effects: style.source.effects.clone(),
     })
 }
 

@@ -13300,6 +13300,19 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // moved the layer range while in Motion — same priority call as the
   // canvas, where drag-anywhere marquee wins over object-move unless you
   // grab an actual object. Superseded by the entry above.
+  function routeNativeLayerBarMarquee(e) {
+    var owned=false;
+    try {
+      var project=window.NemoNativeObjectProject,session=project&&project.desktop(window),cutover=window.NemoNativeOpacityCutover;
+      owned=!!(session&&(session.isActive()||session.blocksLegacy&&session.blocksLegacy())||cutover&&cutover.blocksLegacy&&cutover.blocksLegacy());
+    } catch (_) { owned=true; }
+    if(!owned)return false;
+    e.stopPropagation();e.preventDefault();
+    var helper=window.NemoNativeLayerRangeDesktop;
+    if(helper&&typeof helper.startMarquee==='function')helper.startMarquee(window,e);
+    else if(window.showToast)window.showToast('Native layer range selection is unavailable.');
+    return true;
+  }
   function initGridMarquee() {
     var wrap = document.getElementById('fg-wrap');
     if (!wrap) return;
@@ -13324,6 +13337,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();
       if (e.clientX > r.left + wrap.clientWidth || e.clientY > r.top + wrap.clientHeight) return;
+      if(routeNativeLayerBarMarquee(e))return;
       e.stopPropagation(); e.preventDefault();
       startMarquee(e);
     }, true);

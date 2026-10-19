@@ -276,7 +276,7 @@ fn admission_refusals_have_typed_kinds_and_nothing_is_rewritten() {
         ),
         (r#""effects":[["blur",true]]"#, Invalid),
         (
-            r#""effects":[{"type":"blur","enabled":true,"keys":{}}]"#,
+            r#""effects":[{"type":"blur","enabled":true,"keys":{"p1":{"keys":[],"extra":1}}}]"#,
             Unsupported,
         ),
         (

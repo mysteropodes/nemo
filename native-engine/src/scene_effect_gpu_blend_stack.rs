@@ -7,10 +7,12 @@
 //! this leaf does not render (effect stacks, element effects, folders, mask
 //! feather) is a typed `Unavailable` refusal, never a silent drop.
 
+use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
 use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
     CompositionPlan, LayerStep, MatteStep, PaintSource,
 };
-use crate::object_render_scene::ObjectPaintPlan;
+use crate::object_render_scene::{ObjectPaintCommand, ObjectPaintPlan};
+use std::collections::BTreeMap;
 use vello::kurbo::BezPath;
 
 /// Baseline `if feather > 0.01` threshold of `composite_scene`: a feather above
@@ -18,10 +20,42 @@ use vello::kurbo::BezPath;
 const FEATHER_PASS_THRESHOLD: f32 = 0.01;
 
 /// One closed contour with straight (non-premultiplied) RGBA in `0..=1`.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct GpuFill<'a> {
     pub(crate) path: &'a BezPath,
     pub(crate) rgba: [f32; 4],
+    // A prevalidated full style for gradient, stroke and empty vector paint.
+    // None preserves the original straight-image solid precision path.
+    pub(crate) prepared: Option<PreparedItem>,
+}
+
+impl<'a> GpuFill<'a> {
+    pub(crate) fn solid(path: &'a BezPath, rgba: [f32; 4]) -> Self {
+        Self {
+            path,
+            rgba,
+            prepared: None,
+        }
+    }
+
+    fn from_command(command: ObjectPaintCommand<'a>) -> Result<Self, GpuBlendError> {
+        let layer = command.source().source_layer_index();
+        let invalid = || GpuBlendError::InvalidPaint { layer };
+        let style = command.style().map_err(|_| invalid())?;
+        // Always prepare first: Fallback must refuse rather than retaining
+        // its flat paint merely because FillResolution::solid returns it.
+        let full = prepare_item(&style).map_err(|_| invalid())?;
+        let prepared = if style.stroke.is_none() && style.fill.solid().is_some() {
+            None
+        } else {
+            Some(full)
+        };
+        Ok(Self {
+            path: command.path(),
+            rgba: command.solid().rgba_f32().map_err(|_| invalid())?,
+            prepared,
+        })
+    }
 }
 
 /// Fills painted in order into one transparent-backed texture.
@@ -254,26 +288,37 @@ impl<'a> GpuLayerStack<'a> {
 
     /// True when the layers' own fills are, as a multiset, exactly the witness
     /// plan's paint commands: the same contour (by address, the plan owns the
-    /// path) and the same straight-RGBA bits. A duplicated run paired with a
+    /// path) and the same straight-RGBA bits and full prepared gradient/stroke style. A duplicated run paired with a
     /// dropped one, a foreign path or a changed colour all keep the fill COUNT
     /// and are caught here. Layer order is a plan matter and is not compared.
     pub(crate) fn covers_plan(&self, plan: &ObjectPaintPlan) -> bool {
-        let mut wanted: Vec<FillKey> = Vec::new();
+        // Group by exact path and scalar bits first. This keeps the usual
+        // one-command-per-path case O(n log n), while matching duplicate
+        // commands as a multiset, including their complete prepared style.
+        let mut wanted: BTreeMap<FillKey, Vec<Option<PreparedItem>>> = BTreeMap::new();
         for command in plan.commands() {
-            let Ok(rgba) = command.solid().rgba_f32() else {
+            let Ok(fill) = GpuFill::from_command(command) else {
                 return false;
             };
-            wanted.push(fill_key(command.contour().path(), rgba));
+            wanted
+                .entry(fill_key(fill.path, fill.rgba))
+                .or_default()
+                .push(fill.prepared);
         }
-        let mut held: Vec<FillKey> = self
+        for fill in self
             .inputs
             .iter()
             .flat_map(|input| input.paint.fills.iter())
-            .map(|fill| fill_key(fill.path, fill.rgba))
-            .collect();
-        wanted.sort_unstable();
-        held.sort_unstable();
-        wanted == held
+        {
+            let Some(group) = wanted.get_mut(&fill_key(fill.path, fill.rgba)) else {
+                return false;
+            };
+            let Some(index) = group.iter().position(|style| style == &fill.prepared) else {
+                return false;
+            };
+            group.swap_remove(index);
+        }
+        wanted.values().all(Vec::is_empty)
     }
 }
 
@@ -298,10 +343,7 @@ pub(crate) fn layer_runs_from_plan(
     let mut runs: Vec<GpuLayerRun<'_>> = Vec::new();
     for command in plan.commands() {
         let layer = command.source().source_layer_index();
-        let rgba = command
-            .solid()
-            .rgba_f32()
-            .map_err(|_| GpuBlendError::InvalidPaint { layer })?;
+        let fill = GpuFill::from_command(command)?;
         if runs.last().map(|run| run.source_layer_index) != Some(layer) {
             if runs.iter().any(|run| run.source_layer_index == layer) {
                 return Err(GpuBlendError::NonContiguousLayer {
@@ -314,10 +356,7 @@ pub(crate) fn layer_runs_from_plan(
             });
         }
         if let Some(run) = runs.last_mut() {
-            run.paint.fills.push(GpuFill {
-                path: command.contour().path(),
-                rgba,
-            });
+            run.paint.fills.push(fill);
         }
     }
     Ok(runs)

@@ -394,11 +394,13 @@ async fn serve_connection(
     native: NativeState,
     revisions: RevisionSync,
 ) -> Result<(), String> {
-    let message: wire::AuthenticatedWireRequest =
-        tokio::time::timeout(Duration::from_secs(5), wire::read_json(&mut stream))
-            .await
-            .map_err(|_| "connection initialization timed out")?
-            .map_err(|e| e.to_string())?;
+    let message: wire::AuthenticatedWireRequest = tokio::time::timeout(
+        Duration::from_secs(5),
+        wire::read_authenticated(&mut stream),
+    )
+    .await
+    .map_err(|_| "connection initialization timed out")?
+    .map_err(|e| e.to_string())?;
     let secret = match &message {
         wire::AuthenticatedWireRequest::Legacy(message) => &message.secret,
         wire::AuthenticatedWireRequest::Native(message) => &message.secret,
@@ -528,3 +530,7 @@ mod object_serialization_tests;
 #[cfg(test)]
 #[path = "native_project_settings_public_tests.rs"]
 mod project_settings_public_tests;
+
+#[cfg(test)]
+#[path = "native_frame_clipboard_transport_tests.rs"]
+mod clipboard_transport_tests;

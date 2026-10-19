@@ -364,3 +364,7 @@ fn gpu_scheduled_layered_entry_keeps_the_work_identity_and_refuses_stale_pixels(
         assert_eq!(textures(&gpu), baseline, "terminal {terminal}");
     }
 }
+
+#[cfg(feature = "project_media_codec")]
+#[path = "object_stored_gradient_layered.rs"]
+mod stored_gradients;

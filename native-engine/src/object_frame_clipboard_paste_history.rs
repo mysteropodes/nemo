@@ -141,7 +141,7 @@ impl NativeObjectHistory {
                 clipboard: cut_clipboard_payload(candidate.packet()),
             };
             // Include all actual correlation/header fields, not just clipboard
-            // bytes: a legal packet alone may overflow the 4096-byte response.
+            // bytes: a legal packet alone may overflow the operation-specific full response.
             let revision = before.checked_add(u64::from(applied)).ok_or((
                 DispatchErrorCode::Unavailable,
                 "Frame clipboard revision is exhausted.",
@@ -169,3 +169,7 @@ impl NativeObjectHistory {
 #[cfg(test)]
 #[path = "../tests/object_frame_clipboard_paste_history.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/object_frame_clipboard_transport.rs"]
+mod transport_tests;

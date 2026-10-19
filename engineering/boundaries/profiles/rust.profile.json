@@ -23,6 +23,7 @@
         "project_media_envelope.rs",
         "object_order_document.rs",
         "object_layer_timing.rs",
+        "object_layer_range_evaluate.rs",
         "object_media_timing_core.rs",
         "object_media_timing_video.rs",
         "object_properties.rs",
@@ -106,7 +107,14 @@
         "object_rig_record_admission.rs",
         "object_rig_record_links.rs",
         "object_frame_edit_range_records.rs",
-        "object_frame_edit_ranges.rs"
+        "object_frame_edit_ranges.rs",
+        "object_motion_arcs.rs",
+        "object_effect_key_tracks.rs",
+        "object_frame_bulk_move_document.rs",
+        "object_audio_track_record.rs",
+        "object_media_placement_offset.rs",
+        "audio_wave_admission.rs",
+        "object_audio_track_edit.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -139,7 +147,11 @@
         "object_raster_asset_codec.rs",
         "object_component_codec.rs",
         "object_frame_edit_range_codec.rs",
-        "object_parent_links.rs"
+        "object_parent_links.rs",
+        "object_effect_stack_codec.rs",
+        "object_audio_track_baseline.rs",
+        "project_audio_asset_wire.rs",
+        "project_asset_source_wire.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -153,7 +165,8 @@
       "layer": "native-request-receipts",
       "dir": "native-engine/src",
       "files": [
-        "request_receipts.rs"
+        "request_receipts.rs",
+        "object_frame_clipboard_transport.rs"
       ],
       "publicApi": [
         "request_receipts.rs"
@@ -240,6 +253,7 @@
         "object_rig_pose_commit_rules.rs",
         "object_component_convert_support.rs",
         "object_component_convert.rs",
+        "object_component_convert_holders.rs",
         "object_component_place.rs",
         "object_duplicator_convert.rs",
         "object_component_convert_owner.rs",
@@ -252,7 +266,15 @@
         "object_path_effects_edit.rs",
         "object_raster_image_import_owner.rs",
         "object_raster_image_import_wire.rs",
-        "object_blank_key_edit.rs"
+        "object_blank_key_edit.rs",
+        "object_effect_key_shift.rs",
+        "object_frame_bulk_move.rs",
+        "object_layer_shift.rs",
+        "object_layer_shift_motion.rs",
+        "object_layer_shift_range.rs",
+        "object_layer_playhead_cut.rs",
+        "object_layer_playhead_cut_owner.rs",
+        "object_audio_track_edit_owner.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -316,7 +338,13 @@
         "object_component_convert_history.rs",
         "object_frame_clipboard_tracks_history.rs",
         "object_parametric_edit_history.rs",
-        "object_raster_image_import_history.rs"
+        "object_raster_image_import_history.rs",
+        "object_frame_bulk_move_history.rs",
+        "object_layer_shift_history.rs",
+        "object_media_link_command.rs",
+        "object_layer_playhead_cut_history.rs",
+        "object_audio_track_edit_history.rs",
+        "object_audio_track_edit_command.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -333,6 +361,7 @@
         "evaluation.rs",
         "animation_curve.rs",
         "object_frame_packet.rs",
+        "object_frame_sources.rs",
         "object_order_evaluation.rs",
         "expression_noise.rs",
         "expression_random.rs",
@@ -452,7 +481,9 @@
         "object_scene_producer_brush.rs",
         "object_parametric_transform.rs",
         "object_text_frame.rs",
-        "property_expression_lookup.rs"
+        "property_expression_lookup.rs",
+        "object_frame_context.rs",
+        "object_audio_track_sampling.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -494,6 +525,7 @@
         "render_scene.rs",
         "render_geometry.rs",
         "object_render_scene.rs",
+        "object_component_render_scene.rs",
         "object_paint_plan.rs",
         "object_scheduled_scene.rs",
         "object_reference_scene.rs",
@@ -668,7 +700,8 @@
         "object_rig_pose_read.rs",
         "object_parametric_edit_read.rs",
         "object_text_read.rs",
-        "object_text_font_resources.rs"
+        "object_text_font_resources.rs",
+        "object_layer_range_snapshot.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -734,6 +767,8 @@
         "object_exposure.rs",
         "object_order_evaluation.rs",
         "object_render_scene.rs",
+        "object_component_render_scene.rs",
+        "object_component_render_scene_fixture.rs",
         "object_reference_viewport.rs",
         "object_compositor.rs",
         "object_scheduled_compositor.rs",
@@ -1413,6 +1448,7 @@
         "render_image_mesh_scene_widget.rs",
         "object_component_convert.rs",
         "object_component_convert_controls.rs",
+        "object_component_convert_motion.rs",
         "object_component_convert_fixture.rs",
         "object_component_convert_verify.rs",
         "object_component_convert_history.rs",
@@ -1475,7 +1511,46 @@
         "object_blank_key_history.rs",
         "object_blank_key_history_controls.rs",
         "object_parent_links.rs",
-        "object_frame_clipboard_copy_dispatch.rs"
+        "object_frame_clipboard_copy_dispatch.rs",
+        "object_stored_gradient.rs",
+        "object_stored_gradient_gpu.rs",
+        "object_stored_gradient_layered.rs",
+        "rig_pose_scene_join.rs",
+        "rig_pose_scene_join_fixture.rs",
+        "object_layer_range_evaluate.rs",
+        "object_layer_range_frames.rs",
+        "object_motion_arcs.rs",
+        "object_exposure_edit_retime_arcs.rs",
+        "object_frame_clipboard_transport.rs",
+        "object_effect_key_provider.rs",
+        "object_effect_key_tracks.rs",
+        "object_frame_bulk_move.rs",
+        "object_frame_bulk_move_build.rs",
+        "object_frame_bulk_move_history.rs",
+        "object_frame_bulk_move_history_controls.rs",
+        "object_layer_range_snapshot.rs",
+        "object_layer_shift.rs",
+        "object_layer_shift_build.rs",
+        "object_layer_shift_history.rs",
+        "object_layer_shift_history_controls.rs",
+        "object_layer_shift_motion.rs",
+        "object_frame_bulk_move_fixture.rs",
+        "object_layer_shift_motion_fixture.rs",
+        "object_context_frame_packet.rs",
+        "object_media_link_command.rs",
+        "object_audio_track_record.rs",
+        "object_audio_track_sampling.rs",
+        "object_audio_track_baseline.rs",
+        "object_audio_track_owner.rs",
+        "object_media_placement_offset.rs",
+        "project_audio_retention.rs",
+        "audio_wave_admission.rs",
+        "project_audio_retention_fixture.rs",
+        "object_layer_playhead_cut.rs",
+        "object_layer_playhead_cut_history.rs",
+        "object_audio_track_edit.rs",
+        "object_audio_track_edit_history.rs",
+        "object_audio_track_edit_fixture.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1574,6 +1649,7 @@
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
         "src/native_vector_contract.rs",
+        "src/native_vector_contract_shapes.rs",
         "src/native_vector_contract_tests.rs",
         "src/native_request_bytes.rs",
         "src/native_request_spans.rs",
@@ -1589,7 +1665,25 @@
         "src/native_frame_edit_blank_wire_tests.rs",
         "src/native_frame_clipboard_contract_tests.rs",
         "src/native_frame_clipboard_wire_tests.rs",
-        "src/native_frame_clipboard_response_schema_tests.rs"
+        "src/native_frame_clipboard_response_schema_tests.rs",
+        "src/native_clipboard_transport.rs",
+        "src/native_clipboard_transport_tests.rs",
+        "src/native_clipboard_stdio_output_tests.rs",
+        "src/native_frame_bulk_move_contract_tests.rs",
+        "src/native_frame_bulk_move_wire_tests.rs",
+        "src/native_layer_range_contract.rs",
+        "src/native_layer_range_contract_tests.rs",
+        "src/native_layer_shift_contract.rs",
+        "src/native_layer_shift_contract_tests.rs",
+        "src/native_layer_shift_wire_tests.rs",
+        "src/native_project_placement_contract.rs",
+        "src/native_project_placement_contract_tests.rs",
+        "src/native_layer_playhead_cut_contract.rs",
+        "src/native_layer_playhead_cut_contract_tests.rs",
+        "src/native_layer_playhead_cut_wire_tests.rs",
+        "src/native_audio_track_contract.rs",
+        "src/native_audio_track_contract_tests.rs",
+        "src/native_audio_track_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1843,7 +1937,12 @@
         "native_property_edit_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
-        "native_asset_remove_dispatch_tests.rs"
+        "native_asset_remove_dispatch_tests.rs",
+        "native_frame_clipboard_transport_tests.rs",
+        "native_project_placement_public_tests.rs",
+        "native_project_placement_audio_fixture.rs",
+        "native_layer_playhead_cut_public_tests.rs",
+        "native_audio_track_public_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

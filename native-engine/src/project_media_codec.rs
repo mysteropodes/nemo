@@ -45,6 +45,7 @@ impl From<ImageAssetError> for ProjectWireError {
 /// Explicit caller limits cannot exceed the staged file ceilings.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ProjectWireLimits {
+    audio: Option<usize>,
     envelope_bytes: usize,
     drawing_bytes: usize,
     #[cfg(feature = "project_media_codec")]
@@ -53,6 +54,13 @@ pub(crate) struct ProjectWireLimits {
     font: Option<crate::object_codec::FontAssetLimits>,
 }
 impl ProjectWireLimits {
+    pub(crate) fn with_audio_limit(mut self, encoded: usize) -> Result<Self, ProjectWireError> {
+        if encoded == 0 || encoded > 16 * 1024 * 1024 {
+            return Err(ProjectWireError::Budget);
+        }
+        self.audio = Some(encoded);
+        Ok(self)
+    }
     #[cfg(feature = "font_asset_wire")]
     pub(crate) fn with_font_limits(mut self, font: crate::object_codec::FontAssetLimits) -> Self {
         self.font = Some(font);
@@ -70,6 +78,7 @@ impl ProjectWireLimits {
             return Err(ProjectWireError::Budget);
         }
         Ok(Self {
+            audio: None,
             envelope_bytes,
             drawing_bytes,
             #[cfg(feature = "project_media_codec")]

@@ -67,6 +67,11 @@ test('opacity application slice declares native workflows, compatibility, bootst
     assert.deepEqual(module.publicApi, module.files);
     return module;
   });
+  // The real bootstrap now binds the existing UI composition adapter explicitly.
+  for(const id of ['app.native.object.ui.adapter','app.native.layer.playhead.cut.contract']){
+    const dependency=applicationProfile.modules.find(module=>module.id===id);
+    assert.ok(dependency,id);modules.push(dependency);
+  }
   const result = checkProfile({ ...applicationProfile, modules, exceptions: [] }, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   const size = checkSourceSizes({ ...applicationProfile, modules, exceptions: [] }, { root });

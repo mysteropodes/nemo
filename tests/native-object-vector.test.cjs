@@ -156,7 +156,8 @@ test('desktop() binds one client per host window', () => {
 test('a stroke the record cannot carry, or the owner could not store, is named and never sent', async () => {
   const a = adapter();
   const refused = await a.vector.createStroke('L1', 3, Object.assign(dict('open-line'), { fillGradient: { kind: 'linear' } }));
-  assert.deepEqual([refused.status, refused.code, refused.members], ['unavailable', 'unavailable', ['fillGradient']]);
+  assert.deepEqual([refused.status, refused.code], ['unavailable', 'unavailable']);
+  assert.equal(refused.reason, 'only two-stop linear/radial fillGradient is admitted');
   const tooFew = await a.vector.createStroke('L1', 3, dict('single-anchor-open'));
   assert.deepEqual([tooFew.status, tooFew.code], ['unmapped', 'unsupported_geometry']);
   const colour = await a.vector.createStroke('L1', 3, Object.assign(dict('open-line'), { strokeColor: 'red' }));
@@ -169,6 +170,31 @@ test('a stroke the record cannot carry, or the owner could not store, is named a
   assert.equal(badDelta.status, 'invalid');
   assert.deepEqual(a.owner.log.received, []);
   assert.equal(a.events.runs, 2, 'only the requests that reached the validator entered the route');
+});
+
+test('supported two-stop gradients are preserved while malformed gradients never dispatch', async () => {
+  for (const kind of ['linear', 'radial']) {
+    const a = adapter();
+    const gradient = { kind, from: [0, 0], to: [100, 50], stops: [{ offset: 0, color: '#123456' }, { offset: 1, color: '#abcdef' }] };
+    const accepted = await a.vector.createStroke('L1', 3, Object.assign(dict('open-line'), { fillGradient: gradient }));
+    assert.equal(accepted.status, 'applied');
+    assert.equal(a.owner.log.received.length, 1);
+    assert.deepEqual(a.owner.log.received[0].payload.record.vectorExt.fillGradient, gradient);
+    assert.deepEqual(a.owner.records.get(accepted.strokeId).vectorExt.fillGradient, gradient);
+    for (const bad of [
+      { kind },
+      { ...gradient, stops: [] },
+      { ...gradient, stops: gradient.stops.concat({ offset: 2, color: '#fff' }) },
+      { ...gradient, from: [NaN, 0] },
+      { ...gradient, stops: [{ offset: 0, color: 'red' }, gradient.stops[1]] },
+    ]) {
+      const refusal = await a.vector.createStroke('L1', 3, Object.assign(dict('open-line'), { fillGradient: bad }));
+      assert.notEqual(refusal.status, 'applied');
+      assert.ok(['unavailable', 'invalid_gradient'].includes(refusal.code));
+      assert.equal(a.owner.log.received.length, 1, 'malformed gradient adds no dispatch');
+      assert.equal(a.owner.records.size, 1, 'malformed gradient adds no native record');
+    }
+  }
 });
 
 test('the complete 256-anchor vector is sent once and an envelope above 65536 bytes is never split or truncated', async () => {

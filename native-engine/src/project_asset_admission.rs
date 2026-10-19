@@ -22,6 +22,14 @@ pub(super) fn pending_charges(
     // BEFORE any retention ticket exists, so a refusal charges nothing.
     if let Some(assets) = project.asset_inventory() {
         check_inventory(project.drawing(), assets).map_err(PlacementRefusal::message)?;
+    } else if project
+        .drawing()
+        .audio_tracks
+        .value()
+        .is_some_and(|tracks| !tracks.records().is_empty())
+    {
+        // No catalog is not an escape from the persistent AudioTrack source join.
+        return Err(PlacementRefusal::Asset.message());
     }
     // A source's codec precondition does not establish its record's kind.
     // Keep typed entry as strict as wire admission BEFORE charging/identity.
@@ -31,6 +39,9 @@ pub(super) fn pending_charges(
                 && !((record.kind() == AssetKind::Image
                     && record.source().media_type() == Some("image/png")
                     && !record.source().has_font_admission())
+                    || (record.kind() == AssetKind::Audio
+                        && record.source().has_audio_admission()
+                        && record.source().media_type() == Some("audio/wav"))
                     || (record.kind() == AssetKind::Font
                         && record.source().has_font_admission()
                         && record.source().media_type() == Some("font/ttf")))
@@ -71,3 +82,7 @@ pub(super) fn pending_charges(
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/project_asset_join.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/project_audio_retention.rs"]
+mod audio_retention_tests;

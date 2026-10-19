@@ -1,9 +1,9 @@
 /* Ordinary file UI consumes native pins/digests; never project/media bytes. */
 (function(root,factory){
-  var api=factory();
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-layer-splice.js'):root.NemoNativeObjectLayerSplice);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProjectFile=api;
-}(typeof globalThis==='object'?globalThis:this,function(){
+}(typeof globalThis==='object'?globalThis:this,function(Splice){
   'use strict';
   var projections=new WeakMap();
   var settingsKeys=['canvasW','canvasH','fps','totalFrames','canvasBg','waIn','waOut'];
@@ -89,22 +89,14 @@
     var next=layerTable(info.layers),delta=next.length-rows.length;
     if(info.contentRevision===pin.contentRevision&&next.some(function(l,i){return rows[i]&&
       (parentValue(l)!==pin.layerParents[i]||['locked','shy'].some(function(k){return rows[i][k]!== (l[k]===true);}));}))return false;
-    if(Math.abs(delta)>1||delta!==0&&info.contentRevision===pin.contentRevision||
-      !next.slice(0,Math.min(next.length,rows.length)).every(function(row,i){return row.layerUid===pin.layerUids[i];}))return false;
-    // Prepare all metadata and selection before changing this read-side table.
-    var active=s.activeLayerIdx,selection=root._layerSel;
-    if(delta<0){
-      var previousSelection=selection;
-      selection=Array.isArray(selection)?selection.filter(function(i){return Number.isInteger(i)&&i>=0&&i<next.length;}):[];
-      if(!Number.isInteger(active)||active<0||active>=next.length)active=selection.length?selection[0]:Math.max(0,next.length-1);
-      if(!selection.length&&next.length&&previousSelection&&previousSelection.length)selection=[active];
-      else if(previousSelection&&selection.length===previousSelection.length)selection=previousSelection;
-    }
-    if(delta>0){var added=next[next.length-1];rows.push({layerUid:added.layerUid,
-      name:added.name===undefined?'Layer '+next.length:added.name,visible:added.visible});}
-    else if(delta<0)rows.pop();
+    if(!Splice||typeof Splice.plan!=='function'||delta!==0&&info.contentRevision===pin.contentRevision)return false;
+    var splice=Splice.plan(pin.layerUids,rows,next,s.activeLayerIdx,root._layerSel,root._layerSelAnchor);
+    if(!splice)return false;
+    // Prepare the detached UID plan before changing this read-side table.
+    if(delta>0)rows.splice(splice.at,0,splice.added);
+    else if(delta<0)rows.splice(splice.at,1);
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
-    if(delta<0){s.activeLayerIdx=active;root._layerSel=selection;}
+    if(delta!==0){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
     projectSettings(root,info,pin);
     projections.set(root,pinSettings(Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
       contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId,layerParents:next.map(parentValue)}),info));

@@ -407,3 +407,70 @@ fn a_receipt_advances_the_revision_by_exactly_its_own_disposition() {
         "other operations are not this hook's"
     );
 }
+
+#[test]
+fn stored_gradient_public_vector_and_read_record_shapes_match_the_closed_native_extension() {
+    let mut value = record(created());
+    let gradient = json!({"kind":"linear","from":[0,0],"to":[8,0],"stops":[
+        {"offset":0,"color":"#11223380"},{"offset":1,"color":"#AAbbCC"}]});
+    value["vectorExt"] = json!({"fillGradient":gradient});
+    let payload = json!({"command":"object.vector.create","record":value});
+    assert!(request(VECTOR, &payload));
+    for key in ["kind", "from", "to", "stops"] {
+        let mut bad = payload.clone();
+        bad["record"]["vectorExt"]["fillGradient"]
+            .as_object_mut()
+            .unwrap()
+            .remove(key);
+        assert!(!request(VECTOR, &bad));
+    }
+    for bad in [
+        json!(null),
+        json!({"kind":"linear","from":[0,0],"to":[8,0],"stops":[]}),
+    ] {
+        let mut wrong = payload.clone();
+        wrong["record"]["vectorExt"]["fillGradient"] = bad;
+        assert!(!request(VECTOR, &wrong));
+    }
+    let mut extra = payload.clone();
+    extra["record"]["vectorExt"]["fillGradient"]["stops"][0]["extra"] = json!(1);
+    assert!(!request(VECTOR, &extra));
+    let mut invalid = payload.clone();
+    invalid["record"]["vectorExt"]["fillGradient"]["stops"][0]["color"] = json!("data:paint");
+    assert!(!request(VECTOR, &invalid));
+}
+
+#[test]
+fn a_well_formed_vector_receipt_cannot_bless_a_missing_or_foreign_command() {
+    let valid = json!({"command":"object.vector.create","record":record(created())});
+    let receipt = json!({
+        "applied":true,
+        "historyEntriesAdded":1,
+        "operation":"create",
+        "strokeId":"native-stroke:8:0"
+    });
+    assert!(request(VECTOR, &valid));
+    assert!(result(VECTOR, &valid, &receipt));
+
+    let mut missing = valid.clone();
+    missing.as_object_mut().unwrap().remove("command");
+    assert!(!request(VECTOR, &missing));
+    assert!(!result(VECTOR, &missing, &receipt));
+
+    for command in [Value::Null, json!(7), json!("object.parametric.set")] {
+        let mut forged = valid.clone();
+        forged["command"] = command;
+        assert!(!request(VECTOR, &forged));
+        assert!(!result(VECTOR, &forged, &receipt));
+    }
+
+    let mut unknown = valid;
+    unknown["command"] = json!("object.vector.retarget");
+    let mut echoed = receipt;
+    echoed["operation"] = json!("retarget");
+    assert!(!request(VECTOR, &unknown));
+    assert!(
+        !result(VECTOR, &unknown, &echoed),
+        "echoing an unknown operation with a valid-looking native stroke is not admission"
+    );
+}

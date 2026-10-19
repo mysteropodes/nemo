@@ -11,15 +11,17 @@
 //! layer refuses (typed `Unavailable`, the baseline returns silently); a source that is not a key and a target
 //! outside the timeline refuse (`InvalidRequest`, the baseline returns silently); a ripple that clamps to a zero
 //! move is a semantic no-op. The consumer port for the motion-arc owner is `PreparedExposureRetime::pairs`: the
-//! baseline hands every consecutive key pair, old and new frames, to `rekeyTweenPairData` (src/js/tweens.js),
-//! and that bookkeeping has no native owner yet, so this file reports the pairs and rewrites nothing. Markers,
-//! in/out points, time links, Motion tracks and component layers (`blankOverride`, I14) have no native records
-//! here; a timing of another family or context is refused `Unavailable`, never invented.
+//! baseline hands every consecutive key pair, old and new frames, to `rekeyTweenPairData` (src/js/tweens.js).
+//! The captured activeLayerUid preserves the baseline Arc-layer default even for a nonactive target.
+//! The document kernel applies those pairs through the same document's bounded motion-arc port before
+//! final validation; its complete content/order/Arc replacement publishes once. This operation does not
+//! author markers, in/out points, time links, Motion tracks or component-layer `blankOverride` (I14).
+//! Its existing timing-family and scene-context admission remains unchanged; broader joins are separate.
 use crate::commands::object_fill_owner::object_frame_edit_document::{
-    retime_key, FrameEditError, RetimeOutcome,
+    retime_key_with_active, FrameEditError, RetimeOutcome,
 };
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{object_deserialize, ObjectDocument, RetimePair};
+use crate::object_document::{object_deserialize, ObjectDocument, Presence, RetimePair};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -31,12 +33,14 @@ const COMMAND: &str = "object.layer.key.move";
 struct RetimePayload {
     command: String,
     layer_uid: String,
+    active_layer_uid: Presence<String>,
     from: u32,
     to: u32,
 }
 object_deserialize!(RetimePayload {
     command: String,
     layer_uid: String,
+    #[serde(default)] active_layer_uid: Presence<String>,
     from: u32,
     to: u32
 });
@@ -72,7 +76,14 @@ fn plan(
     if found.locked.value().copied().unwrap_or(false) {
         return Err(DispatchErrorCode::Unavailable);
     }
-    retime_key(document, layer, payload.from, payload.to).map_err(refusal)
+    retime_key_with_active(
+        document,
+        layer,
+        payload.from,
+        payload.to,
+        payload.active_layer_uid.value().map(String::as_str),
+    )
+    .map_err(refusal)
 }
 
 /// Detached, non-Clone candidate sealed to the snapshot it was prepared from; only this file can build one.
@@ -109,7 +120,13 @@ impl ObjectFillOwner {
         }
         let payload: RetimePayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        if payload.command != COMMAND || payload.layer_uid.is_empty() {
+        if payload.command != COMMAND
+            || payload.layer_uid.is_empty()
+            || payload
+                .active_layer_uid
+                .value()
+                .is_some_and(|uid| uid.is_empty())
+        {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let origin = self.current_snapshot();

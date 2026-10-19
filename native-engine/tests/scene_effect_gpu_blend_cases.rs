@@ -20,6 +20,7 @@ fn fill(path: &BezPath) -> GpuFill<'_> {
     GpuFill {
         path,
         rgba: [0.2, 0.4, 0.6, 1.0],
+        prepared: None,
     }
 }
 

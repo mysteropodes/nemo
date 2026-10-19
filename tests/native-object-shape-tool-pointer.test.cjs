@@ -178,8 +178,8 @@ test('all42 retained bootstrap identities match their explicit amended ordinal l
  assert.deepEqual(paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal),expected);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
- assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[222,223,224]);
- assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,111);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,112);
- assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 111/);
- assert.match(fixture,/assert\.deepEqual\(positions, \[13, 15, 16, 17, 18, 19, 20, 21, 22\]/);
+ assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[228,229,231]);
+ assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,116);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,117);
+ assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 116/);
+ assert.match(fixture,/assert\.deepEqual\(positions, \[13, 15, 16, 17, 18, 19, 20, 22, 23\]/);
 });
