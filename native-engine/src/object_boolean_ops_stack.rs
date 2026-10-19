@@ -225,13 +225,20 @@ pub(crate) fn island_record(
     };
     // Baseline BOOL_KEEP_DATA_ALL carries the style source's gradient through Boolean/erase/Flatten.
     let gradient = style.source.fill_gradient().cloned();
+    let trace = style
+        .source
+        .vector_ext
+        .value()
+        .and_then(|ext| ext.fill_trace.value())
+        .cloned();
     let ext = match (&style.box_angle, gradient) {
-        (angle, gradient) if angle.is_some() || gradient.is_some() => {
+        (angle, gradient) if angle.is_some() || gradient.is_some() || trace.is_some() => {
             Presence::Present(VectorExt {
                 pressure: Presence::Missing,
                 param_shape: Presence::Missing,
                 box_angle: angle.clone().map_or(Presence::Missing, Presence::Present),
                 fill_gradient: gradient.map_or(Presence::Missing, Presence::Present),
+                fill_trace: trace.map_or(Presence::Missing, Presence::Present),
             })
         }
         _ => Presence::Missing,

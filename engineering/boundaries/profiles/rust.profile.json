@@ -114,7 +114,19 @@
         "object_audio_track_record.rs",
         "object_media_placement_offset.rs",
         "audio_wave_admission.rs",
-        "object_audio_track_edit.rs"
+        "object_audio_track_edit.rs",
+        "object_fill_geometry.rs",
+        "object_fill_geometry_curve.rs",
+        "object_fill_geometry_graph.rs",
+        "object_fill_geometry_math.rs",
+        "object_fill_geometry_walk.rs",
+        "object_fill_native_crossings.rs",
+        "object_fill_native_merge.rs",
+        "object_fill_native_provider.rs",
+        "object_fill_native_raster.rs",
+        "object_fill_regenerate.rs",
+        "object_fill_trace_plan.rs",
+        "object_fill_trace_record.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -274,7 +286,8 @@
         "object_layer_shift_range.rs",
         "object_layer_playhead_cut.rs",
         "object_layer_playhead_cut_owner.rs",
-        "object_audio_track_edit_owner.rs"
+        "object_audio_track_edit_owner.rs",
+        "object_fill_trace_owner.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -1550,7 +1563,9 @@
         "object_layer_playhead_cut_history.rs",
         "object_audio_track_edit.rs",
         "object_audio_track_edit_history.rs",
-        "object_audio_track_edit_fixture.rs"
+        "object_audio_track_edit_fixture.rs",
+        "object_fill_trace_history.rs",
+        "object_fill_trace_native.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1683,7 +1698,9 @@
         "src/native_layer_playhead_cut_wire_tests.rs",
         "src/native_audio_track_contract.rs",
         "src/native_audio_track_contract_tests.rs",
-        "src/native_audio_track_wire_tests.rs"
+        "src/native_audio_track_wire_tests.rs",
+        "src/native_fill_trace_contract_tests.rs",
+        "src/native_fill_trace_wire.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

@@ -239,8 +239,8 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 127, 128, 129, 130, 131, 175, 227, 228, 251, 252, 253, 254, 257, 258, 259, 260]);
-  // One frame helper follows its SDK; all 42 pre-existing identities remain frozen above.
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 127, 128, 129, 130, 131, 175, 227, 228, 252, 253, 254, 255, 258, 259, 260, 261]);
+  // Frame helper follows its SDK; Fill adds one loader at230, shifting only later identities.
   assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 229);
   assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 229);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal

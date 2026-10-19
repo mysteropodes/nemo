@@ -96,6 +96,34 @@ pub(crate) fn shift_record(record: &mut ObjectRecord, offset: f64) -> Result<(),
         shift_point(&mut segment.point, offset)?;
     }
     if let Presence::Present(ext) = &mut record.vector_ext {
+        if let Presence::Present(trace) = &mut ext.fill_trace {
+            for seed in trace
+                .seed
+                .value()
+                .into_iter()
+                .chain(trace.seeds.value().into_iter().flatten())
+            {
+                if seed.iter().any(|n| {
+                    n.as_f64()
+                        .and_then(|v| Number::from_f64(v + offset))
+                        .is_none()
+                }) {
+                    return Err(SelectionError::NonFiniteCoordinate);
+                }
+            }
+            if let Presence::Present(seed) = &mut trace.seed {
+                for n in seed {
+                    *n = Number::from_f64(n.as_f64().unwrap() + offset).unwrap();
+                }
+            }
+            if let Presence::Present(seeds) = &mut trace.seeds {
+                for seed in seeds {
+                    for n in seed {
+                        *n = Number::from_f64(n.as_f64().unwrap() + offset).unwrap();
+                    }
+                }
+            }
+        }
         if let Presence::Present(pressure) = &mut ext.pressure {
             if let Presence::Present(center) = &mut pressure.center_segments {
                 for segment in center.iter_mut() {
@@ -162,6 +190,21 @@ pub(crate) fn apply_clones(
             frame,
         };
         record.target.stroke_id = item.stroke_id.clone();
+        if let Presence::Present(ext) = &mut record.vector_ext {
+            if let Presence::Present(trace) = &mut ext.fill_trace {
+                if let Presence::Present(walls) = &mut trace.walls {
+                    for wall in walls {
+                        if let Some(copy) = plan
+                            .items
+                            .iter()
+                            .find(|candidate| records[candidate.source].target.stroke_id == *wall)
+                        {
+                            *wall = copy.stroke_id.clone();
+                        }
+                    }
+                }
+            }
+        }
         shift_record(&mut record, offset)?;
         copies.push(record);
     }

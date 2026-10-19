@@ -6,13 +6,21 @@
 //! and `src/js/tools.js` at fbe4b8a3), composed with the same-colour merge
 //! predicates of `object_boolean_topology` (L02-D).
 //!
-//! The tracer itself (`fill_find`, curve crossings and gap bridging) and the
-//! curved union are NOT here: they are typed ports with a production provider
-//! that reports `Unavailable`, so nothing is traced, stamped or merged until a
-//! geometry provider is admitted. A provider that fails one step (the baseline
+//! The retained tracer and native union are connected through the typed ports
+//! below by the native provider children. A provider that fails one step (the baseline
 //! `catch`) simply finds nothing at that gap; the baseline's second, stale JS
 //! tracer has no native twin and is not reproduced.
 use crate::object_document::object_group_kernels::object_boolean_ops::RingSeg;
+#[path = "object_fill_trace_plan.rs"]
+pub(crate) mod document;
+#[path = "object_fill_geometry.rs"]
+mod geometry;
+#[path = "object_fill_native_provider.rs"]
+pub(crate) mod native;
+#[path = "object_fill_native_merge.rs"]
+mod native_merge;
+#[path = "object_fill_regenerate.rs"]
+pub(crate) mod regenerate;
 use crate::object_document::object_group_kernels::object_boolean_topology::{
     merge_candidates, plan_union, resolve_union, select_absorbed, Absorbed, AreaFacts, Bounds,
     FillFacts, MergeDecision, MergeError, TouchProbe, UnionPlan,
@@ -54,7 +62,7 @@ pub(crate) trait FillTraceProvider {
     fn raster(&mut self) -> Result<Option<TraceHit>, TraceFailure>;
 }
 
-/// The production tracer until a geometry provider is admitted.
+/// Explicit unavailable port retained for refusal controls; production uses `native::NativeTrace`.
 pub(crate) struct UnavailableTrace;
 
 impl FillTraceProvider for UnavailableTrace {
@@ -201,7 +209,7 @@ pub(crate) trait UnionProvider {
     fn unite(&mut self, step: usize) -> Result<bool, MergeError>;
 }
 
-/// The production union until a geometry provider is admitted.
+/// Explicit unavailable union retained for refusal controls; production uses the native union provider.
 pub(crate) struct UnavailableUnion;
 
 impl UnionProvider for UnavailableUnion {
@@ -325,6 +333,9 @@ pub(crate) fn plan_fill_trace_commit<P: TouchProbe, U: UnionProvider>(
 #[cfg(test)]
 #[path = "../tests/object_fill_trace_ops_commit.rs"]
 mod commit_tests;
+#[cfg(test)]
+#[path = "../tests/object_fill_trace_native.rs"]
+mod native_tests;
 #[cfg(test)]
 #[path = "../tests/object_fill_trace_ops.rs"]
 mod tests;

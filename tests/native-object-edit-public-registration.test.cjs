@@ -5,7 +5,7 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const nonblank = (text) => text.split('\n').filter((line) => line.trim()).length;
-const FAMILIES = ['layer-lifecycle', 'group', 'selection-edit', 'boolean'];
+const FAMILIES = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill'];
 const RUST = ['src/native_object_edit_contract.rs', 'src/native_object_edit_contract_tests.rs', 'src/native_object_edit_receipt_tests.rs'];
 const MODULES = [
   ['app.native.object.edit.contract', 'domain', 'native-object-edit-contract.js', 'Domain/application'],
@@ -32,7 +32,7 @@ function assertBootstrap(html) {
   assert.equal(new Set(positions).size, ORDER.length);
 }
 
-test('the four capability descriptors are embedded exactly once and declare 17 unique operations', () => {
+test('the five capability descriptors are embedded exactly once and declare 18 unique operations', () => {
   const rust = read('nemo-mcp/src/capabilities.rs');
   const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
   assert.ok(start >= 0);
@@ -46,7 +46,7 @@ test('the four capability descriptors are embedded exactly once and declare 17 u
   const operations = descriptors.flatMap((entry) => entry.operations);
   assert.equal(new Set(operations).size, operations.length, 'a native operation is declared by one descriptor only');
   assert.equal(new Set(descriptors.map((entry) => entry.id)).size, descriptors.length);
-  assert.equal(operations.filter((operation) => /^command\.document\.object\.(?:layer\.(?:delete|duplicate|rename|reorder|split)|group\.|selection\.|clipboard\.paste|boolean\.)/.test(operation)).length, 17);
+  assert.equal(operations.filter((operation) => /^command\.document\.object\.(?:layer\.(?:delete|duplicate|rename|reorder|split)|group\.|selection\.|clipboard\.paste|boolean\.|fill\.trace)/.test(operation)).length, 18);
   const policy = descriptors.find((entry) => entry.id === 'native.layer-policy');
   assert.deepEqual(policy.operations, ['command.document.object.layer.policy.edit'], 'the F06 declaration is untouched');
 });
