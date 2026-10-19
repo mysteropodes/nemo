@@ -1,8 +1,7 @@
 //! Strict disjoint asset source preparation; shared PNG/font/linked rules preserved.
-use super::{
-    audio, object, payload, text, AssetKind, AssetSource, ProjectWireError, ProjectWireLimits,
-    Source, MAX_LOCATOR,
-};
+use crate::object_codec::project::asset_wire::{audio, payload, Source, MAX_LOCATOR};
+use crate::object_codec::project::{object, text, ProjectWireError, ProjectWireLimits};
+use crate::object_document::{AssetKind, AssetSource};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 

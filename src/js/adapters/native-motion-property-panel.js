@@ -97,17 +97,30 @@
       var keys=[];view.tracks.forEach(function(track){track.items.forEach(function(item){if(item.selected)keys.push(Object.freeze({target:Object.freeze({kind:'property',target:track.target,property:track.property}),frame:item.frame}));});});
       if(keys.length>32)return null;Object.freeze(keys);
       var value={pin:view.pin,frame:view.frame,viewGeneration:view.viewGeneration,keys:keys};
-      Object.defineProperty(value,'isCurrent',{value:view.isCurrent});return Object.freeze(value);
+      var capturedAccepted=accepted,ticket=serial,entries=keyEditors.filter(function(entry){return entry.id!==null;}),ids=entries.map(function(entry){return entry.id;});
+      var proofs=entries.map(function(entry){return entry.editor.captureSelectedKeys();});
+      if(proofs.some(function(proof){return !proof||typeof proof.isSelectionCurrent!=='function'||proof.isSelectionCurrent()!==true;})||
+        JSON.stringify(proofs.flatMap(function(proof){return proof.keys;}))!==JSON.stringify(keys)||view.isCurrent()!==true)return null;
+      function isSelectionCurrent(lease){try{
+        var now=ports.readContext(lease),p=now&&now.pin;
+        return !retired&&accepted===capturedAccepted&&serial===ticket&&section.parentNode===container&&(!ports.isMotion||ports.isMotion())&&
+          selectionInfo(lease).signature===capturedAccepted.selection.signature&&now&&now.frame===value.frame&&now.viewGeneration===value.viewGeneration&&p&&
+          ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return p[k]===value.pin[k];})&&
+          entries.length===keyEditors.filter(function(entry){return entry.id!==null;}).length&&entries.every(function(entry,i){
+            return keyEditors.includes(entry)&&entry.id===ids[i]&&proofs[i].isSelectionCurrent(lease)===true;});
+      }catch(_){return false;}}
+      // The strict public predicate still requires a currently presented view, including ready(false) refusals.
+      Object.defineProperties(value,{isCurrent:{value:view.isCurrent},isSelectionCurrent:{value:isSelectionCurrent}});return Object.freeze(value);
     }
     function make(tag,text){var node=doc.createElement(tag);node.textContent=text;return node;}
     function notify(message){if(!retired)status.textContent=message;}
-    function selectionInfo(){
-      var value=ports.readSelection(),primary=value==null?null:View.normalizeTarget(value);
+    function selectionInfo(lease){
+      var value=ports.readSelection(lease),primary=value==null?null:View.normalizeTarget(value);
       if(value!=null&&!primary)throw new Error('Invalid active native target');
-      var values=ports.readSelections?ports.readSelections():(primary?[primary]:[]);
+      var values=ports.readSelections?ports.readSelections(lease):(primary?[primary]:[]);
       if(!Array.isArray(values))throw new Error('Invalid native selection');
       var selected=[],seen=new Set();values.forEach(function(value){var t=View.normalizeTarget(value);if(!t||seen.has(key(t)))throw new Error('Invalid selected native target');seen.add(key(t));selected.push(t);});
-      var contextId=ports.readContextId?ports.readContextId():primary?primary.contextId:selected[0]&&selected[0].contextId;
+      var contextId=ports.readContextId?ports.readContextId(lease):primary?primary.contextId:selected[0]&&selected[0].contextId;
       if(typeof contextId!=='string'||!contextId||primary&&primary.contextId!==contextId||selected.some(function(t){return t.contextId!==contextId;}))throw new Error('Uncorrelated native selection context');
       return Object.freeze({primary:primary,selected:Object.freeze(selected),contextId:contextId,signature:JSON.stringify([contextId,primary?key(primary):null,Array.from(seen).sort()])});
     }

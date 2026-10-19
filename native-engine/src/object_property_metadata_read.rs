@@ -1,8 +1,8 @@
 //! Snapshot-pinned property metadata and authored facts without dispatch activation.
 use crate::object_codec::{
-    object_deserialize, FrameScopeKind, Presence, PropertyHolder, PropertyHolderTarget,
+    object_deserialize, FrameScopeKind, ObjectDocument, ObjectLayer, ObjectRecord, Presence,
+    PropertyHolder, PropertyHolderTarget,
 };
-use crate::object_document::{ObjectDocument, ObjectLayer, ObjectRecord};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::revision::ObjectSnapshot;
 use serde::Deserialize;

@@ -1,9 +1,6 @@
 //! Placed-component paints from the same immutable packet used by viewport/export.
 //! Geometry is already camera -> symMatrix evaluated. Source style remains the
 //! post-override record: gradients and stroke widths are not transformed again.
-use super::object_scene_style_emit::{prepare_item, PreparedItem};
-use super::render_vector_path::VectorShape;
-use super::{validate_pins, ObjectSceneError};
 use crate::evaluation::object_component_kernels::object_component_evaluate::evaluate_packet;
 use crate::evaluation::object_component_kernels::object_component_exposed::{
     ExposedEntry, ExposedValue,
@@ -23,12 +20,15 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::FillResolution;
 use crate::evaluation::object_vector_kernels::render_vector_stroke::stroke_reach;
-use crate::object_document::{
-    FrameScopeKind, ObjectLayer, ObjectTarget, Presence, PropertyHolderTarget, VECTOR_FAMILY,
-};
 use crate::object_frame_packet::{
     prepare_scoped_order_from_sources, sample_property_raw, ObjectFramePacket, ObjectFrameSelector,
 };
+use crate::object_frame_packet::{
+    FrameScopeKind, ObjectLayer, ObjectTarget, Presence, PropertyHolderTarget, VECTOR_FAMILY,
+};
+use crate::object_render_scene::object_scene_style_emit::{prepare_item, PreparedItem};
+use crate::object_render_scene::render_vector_path::VectorShape;
+use crate::object_render_scene::{validate_pins, ObjectSceneError};
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::collections::{HashMap, HashSet};
 use vello::kurbo::BezPath;

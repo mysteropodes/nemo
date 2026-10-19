@@ -78,7 +78,7 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.match(project, /function\(Metadata,Desktop,Properties,FrameEdit,Exposure\)\{/);
   assert.ok(project.split('\n').filter((line) => line.trim()).length <= 500, 'native-object-project.js stays within its 500 nonblank-line hard maximum');
   assert.match(project, /get editFrames\(\)\{return FrameEdit&&typeof ports\.dispatchApplication==='function'&&subscription/);
-  assert.match(project, /'nemo_native_dispatch'\);\}\n\s*function editProjectSettings/, 'the frame edit goes through the public application client only');
+  assert.match(project, /'nemo_native_dispatch',typeof current==='function'\);\}\n\s*function editProjectSettings/, 'the frame edit goes through the public application client only');
   assert.equal(count(text('nemo-mcp/src/capabilities.rs'), 'capabilities-v2/native-frame-edit.json'), 1);
   const contract = text('nemo-mcp/src/native_contract.rs');
   assert.match(contract, /#\[path = "native_frame_edit_contract\.rs"\]\s*pub\(crate\) mod frame_edit;/);

@@ -5,10 +5,10 @@
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
   var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
   var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,typeof module==='object'&&module.exports?require('./native-layer-playhead-cut-ui.js'):undefined);
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,CutUI){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -260,11 +260,12 @@
       return rendering;
     }
     function changed(){if(ports.changed)ports.changed(info);}
-    function mutation(makeRequest,command){
+    function mutation(makeRequest,command,needsPresentation){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       if(synchronizing)return Promise.reject(new Error('Native object revision synchronization is in progress'));
-      var submitted=epoch(info);return enqueue(async function(){
-      guardEpoch(submitted);var pin=requireActive(),request=makeRequest(pin);presentation=null;
+      var submitted=epoch(info),origin=needsPresentation?freeze(presentedSession()):null,ticket=subscriptionTicket;return enqueue(async function(){
+      guardEpoch(submitted);var pin=requireActive(),request=needsPresentation?Desktop.withActionPresentation(origin,function(){return pending===1&&currentPresentation(origin,ticket)&&
+        origin.presentation.frame===(ports.frame?ports.frame():0);},function(lease){return makeRequest(pin,lease);}):makeRequest(pin);presentation=null;
       var receipt;
       try{receipt=await raw(command,request);}catch(error){
         // A transport error cannot establish whether a native command committed.
@@ -281,16 +282,16 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
+    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&origin.presentation===presentation&&same(info,origin)&&ticket===subscriptionTicket&&
+      (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
+      typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
     function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
       var submitted=epoch(info),origin=freeze(presentedSession()),ticket=subscriptionTicket;
       return enqueue(async function(){guardEpoch(submitted);var running=true;
         try{return await action({
           // Read-only and action-local: only this operation's own pending entry is exempted.
           // Captured presentation/subscription identity must survive; the public getter stays fenced.
-          readPresentedObjectSession:function(){return running&&pending===1&&!openingRequested&&!synchronizing&&active()&&origin&&
-            origin.presentation===presentation&&same(info,origin)&&ticket===subscriptionTicket&&
-            (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
-            typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true?origin:null;},
+          readPresentedObjectSession:function(){return running&&pending===1&&currentPresentation(origin,ticket)?origin:null;},
           dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
           reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
             changed();await present(ports.frame?ports.frame():0,next);return next;}});
@@ -328,7 +329,7 @@
         operation:'command.document.object.layer.policy.edit',expectedRevision:pin.contentRevision,
         payload:{command:'object.layer.policy.edit',layerUid:payload.layerUid,flag:payload.flag,value:payload.value}};
     },'nemo_native_dispatch');}
-    function editFrames(operation,payload,expected,current){return mutation(function(pin){if(typeof current==='function'&&current()!==true)throw new Error('Native frame edit intent is stale');if(!same(pin,expected)||!FrameEdit||!FrameEdit.valid(operation,payload))throw new Error('Native frame edit intent is '+(same(pin,expected)?'invalid':'stale'));return {apiVersion:2,requestId:requestId('frame-edit'),instanceId:pin.instanceId,documentId:pin.documentId,operation:operation,expectedRevision:pin.contentRevision,payload:JSON.parse(JSON.stringify(payload))};},'nemo_native_dispatch');}
+    function editFrames(operation,payload,expected,current){return mutation(function(pin,lease){if(typeof current==='function'&&(!lease.readPresentedObjectSession()||current(lease)!==true||!lease.readPresentedObjectSession()))throw new Error('Native frame edit intent is stale');if(!same(pin,expected)||!FrameEdit||!FrameEdit.valid(operation,payload))throw new Error('Native frame edit intent is '+(same(pin,expected)?'invalid':'stale'));return {apiVersion:2,requestId:requestId('frame-edit'),instanceId:pin.instanceId,documentId:pin.documentId,operation:operation,expectedRevision:pin.contentRevision,payload:JSON.parse(JSON.stringify(payload))};},'nemo_native_dispatch',typeof current==='function');}
     function editProjectSettings(action,expected){return mutation(function(pin){
       if(!same(pin,expected))throw new Error('Native project settings intent is stale');
       return {apiVersion:2,requestId:requestId('project-settings'),instanceId:pin.instanceId,documentId:pin.documentId,
@@ -464,7 +465,7 @@
       repaint:function(frameOnly){return paintUI(root,frameOnly);}
     };
     if(root.NemoNativeObjectUI&&typeof root.NemoNativeObjectUI.createPolicyPorts==='function')
-      Object.assign(ports,(root.NemoNativeLayerPlayheadCutUI||CutUI).compose(root,ports,root.NemoNativeObjectUI.createPolicyPorts(root,ports)));
+      Object.assign(ports,Desktop.composeUI(root,ports,root.NemoNativeObjectUI.createPolicyPorts(root,ports)));
     Object.freeze(ports);uiBindings.set(root,ports);return ports;
   }
   function uiFailure(root,error){
@@ -494,5 +495,5 @@
     catch(error){return uiFailure(root,error);}
     return true; // An unconfirmed selection is consumed, never a legacy fallback.
   }
-  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI});
+  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI,bindUIComposition:function(root,compose){return Desktop.bindUIComposition(root,compose);}});
 }));

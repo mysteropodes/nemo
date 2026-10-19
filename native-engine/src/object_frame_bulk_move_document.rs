@@ -1,6 +1,8 @@
 //! Private child of the existing key-retime timing owner. Reuse its exact span algorithm;
 //! never normalize copied samples/plain cells through the clipboard paste representation.
-use super::*;
+use crate::object_document::timing::object_exposure_edit_retime_timing::Working;
+use crate::object_document::timing::{LayerTiming, LayerTimingError, MAX_ENTRIES};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct BulkCell {

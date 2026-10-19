@@ -1,6 +1,8 @@
 //! One sealed layer-bar gesture: range, Motion, drawn content and Arc share the existing owner.
 //! This private consumer is not a public Shift declaration or an installed acceptance result.
-use super::{prepare as prepare_content, Payload as ContentPayload, SHIFT};
+use crate::commands::object_fill_owner::object_frame_bulk_move::{
+    prepare as prepare_content, Payload as ContentPayload, SHIFT,
+};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{object_deserialize, KeyLockMode, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;

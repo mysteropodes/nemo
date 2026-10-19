@@ -2642,7 +2642,7 @@ test('G14/G22/G13 vector extension records stay private document and codec child
     assert.match(documentText, new RegExp(`#\\[path = "${file}\\.rs"\\]\\s*#\\[allow\\(dead_code\\)\\]\\s*mod ${name};`));
   }
   const codecText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_codec.rs'), 'utf8');
-  assert.match(codecText, /#\[path = "object_vector_ext_codec\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_vector_ext_codec;/);
+  assert.match(codecText, /#\[path = "object_vector_ext_codec\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_vector_ext_codec;/);
   const extText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_vector_ext_codec.rs'), 'utf8');
   assert.match(extText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_vector_extensions\.rs"\]\s*mod object_vector_extensions_tests;/);
   const hostText = fs.readFileSync(path.join(ROOT, 'native-engine/tests/object_vector_extensions.rs'), 'utf8');
@@ -5727,7 +5727,7 @@ test('L05-G layer range records stay a private document child with a codec admis
   assert.match(documentText, /#\[path = "object_frame_edit_range_records\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod range_records;/);
   assert.match(documentText, /pub\(crate\) range: Presence<LayerRange>,/);
   assert.match(documentText, /#\[serde\(default\)\] range: Presence<LayerRange> \}\);/);
-  assert.match(read('native-engine/src/object_codec.rs'), /#\[path = "object_frame_edit_range_codec\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_frame_edit_range_codec;/);
+  assert.match(read('native-engine/src/object_codec.rs'), /#\[path = "object_frame_edit_range_codec\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_frame_edit_range_codec;/);
   assert.match(read('native-engine/src/object_codec.rs'), /object_frame_edit_range_codec::validate_layer_range\(layer\)\?;/);
   assert.match(read('native-engine/src/object_frame_edit_structure.rs'), /#\[path = "object_frame_edit_range_join\.rs"\]\s*#\[allow\(dead_code\)\]\s*mod object_frame_edit_range_join;/);
   assert.match(read('native-engine/src/object_frame_edit_structure.rs'), /join_document_ranges\(after, total, &edit\)/);
@@ -5744,7 +5744,7 @@ test('L05-G layer range records stay a private document child with a codec admis
     assert.doesNotMatch(read(`native-engine/src/${file}`).split('#[cfg(test)]')[0], /super::/);
   }
   // D27 now consumes admitted ranges through the same snapshot before packet publication.
-  assert.match(read('native-engine/src/object_frame_packet.rs'), /let source_frames = sources::select\(snapshot, selector, exposure\)\?;/);
+  assert.match(read('native-engine/src/object_frame_packet.rs'), /let source_frames = sources::select\(\s*snapshot,\s*selector,\s*context_layers,\s*exposure,\s*context\.is_component\(\),?\s*\)\?;/);
   const sources = read('native-engine/src/object_frame_sources.rs');
   assert.match(sources, /RangeEvaluator::new\(snapshot, selector\.context_id, selector\.frame\)\s*\.map_err\(\|_\| ObjectFrameError::Unavailable\)\?;/);
   assert.match(sources, /ranges\s*\.gates\(layer\.layer_uid\(\)\)\s*\.map_err\(\|_\| ObjectFrameError::Unavailable\)\?;/);

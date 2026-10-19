@@ -1,14 +1,31 @@
 /* N20 desktop-only composition for the accepted native opacity ports. */
 (function (root, factory) {
-  var install = factory();
+  var install = factory(typeof module === 'object' && module.exports ? require('../adapters/native-layer-playhead-cut-ui.js') : undefined);
   if (typeof module === 'object' && module.exports) module.exports = install;
   else install(root);
-}(typeof globalThis === 'object' ? globalThis : this, function () {
+}(typeof globalThis === 'object' ? globalThis : this, function (CutUI) {
   'use strict';
 
-  return function installNativeOpacity(root) {
+  var bindings = new WeakMap();
+  function bindObjectUI(root) {
+    var project = root.NemoNativeObjectProject, previous = bindings.get(root);
+    if (!project || typeof project.bindUIComposition !== 'function') throw new Error('Native Project UI binding is unavailable');
+    if (previous) {
+      if (previous.project !== project || previous.document !== root.document) throw new Error('Native Project UI binding changed');
+      return project.bindUIComposition(root, previous.compose);
+    }
+    var compose = function (base, policy) {
+      var child = root.NemoNativeLayerPlayheadCutUI || CutUI;
+      if (!child || typeof child.compose !== 'function') throw new Error('Native cut UI composition is unavailable');
+      return child.compose(root, base, policy);
+    };
+    project.bindUIComposition(root, compose);
+    bindings.set(root, {project:project, document:root.document, compose:compose});return true;
+  }
+  function installNativeOpacity(root) {
     var tauri = root.__TAURI__;
     if (!tauri || !tauri.core) return;
+    if (root.NemoNativeObjectUI && typeof root.NemoNativeObjectUI.createPolicyPorts === 'function') bindObjectUI(root);
     root.NemoNativeOpacityLegacySurface.defer(root, function () {
       var transport = root.NemoApplicationMcpTransport.createNativeTauriTransport(tauri.core.invoke);
       var ports = root.NemoNativeOpacityLegacySurface.desktopPorts(root, transport);
@@ -22,5 +39,7 @@
         motionSurface: root.NemoNativeOpacityMotionSurface
       }).install();
     });
-  };
+  }
+  installNativeOpacity.bindObjectUI = bindObjectUI;
+  return Object.freeze(installNativeOpacity);
 }));

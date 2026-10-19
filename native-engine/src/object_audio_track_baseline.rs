@@ -1,7 +1,7 @@
 //! Lossless baseline-field normalization to the EXISTING project source/catalog owner.
 //! This constructs wire candidates only; callers must use managed project admission.
 //! dataB64 is represented by ONE retained asset, offsetFrames by ONE placement.
-use super::AudioTrackRecord;
+use crate::object_document::audio_tracks::{valid_audio_id, AudioTrackRecord};
 use crate::object_document::{AssetId, AssetInventory, AssetPlacement, AssetTarget, Presence};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Deserialize;
@@ -30,10 +30,16 @@ struct Baseline {
     trim_start: Presence<Number>,
     #[serde(default)]
     trim_end: Presence<Option<Number>>,
-    #[serde(default, deserialize_with = "super::unique_optional_map")]
+    #[serde(
+        default,
+        deserialize_with = "crate::object_document::audio_tracks::unique_optional_map"
+    )]
     motion:
         Presence<Option<std::collections::BTreeMap<String, crate::object_document::OrderTrack>>>,
-    #[serde(default, deserialize_with = "super::unique_optional_map")]
+    #[serde(
+        default,
+        deserialize_with = "crate::object_document::audio_tracks::unique_optional_map"
+    )]
     motion_static: Presence<Option<std::collections::BTreeMap<String, Vec<Number>>>>,
 }
 pub(crate) struct NormalizedAudioTrack {
@@ -61,7 +67,7 @@ pub(crate) fn normalize_baseline_track(
     let uid = input
         .audio_id
         .value()
-        .filter(|id| super::valid_audio_id(id))
+        .filter(|id| valid_audio_id(id))
         .ok_or(AudioBaselineError::Unavailable)?;
     let data = input
         .data_b64

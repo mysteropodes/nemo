@@ -125,7 +125,9 @@ test('the legacy importer scripts are all loaded or all gone (the cutover is one
   for (const file of FILES) assert.equal(/\bimport\s*\(\s*['"`]/.test(read(`src/js/adapters/${file}`).replace(/\/\/.*$/gm, '')), false, `${file} carries no dynamic import`);
   const sdk = read('src/js/adapters/native-application.js');
   assert.match(sdk, /\[[^\]]*require\('\.\/native-import-contract\.js'\) : root\.NemoNativeImportContract[^\]]*\]\.reduce\(\(base, lane\) => \(lane \? lane\.compose\(base\) : base\)/, 'the import contract is composed in the lane reduce of the single SDK line');
-  assert.ok(sdk.replace(/\n$/, '').split('\n').length <= 502, 'the SDK did not grow (it is at its ceiling at the anchor base)');
+  const adapterCapacity=JSON.parse(read('engineering/boundaries/profiles/app-js.profile.json')).sizeProfiles['Platform/engine adapter'].hardMax;
+  assert.equal(adapterCapacity,500,'the adopted SDK adapter capacity is unchanged');
+  assert.ok(sdk.split('\n').filter(line=>line.trim()).length<=adapterCapacity,'the composed SDK stays within the unchanged 500 nonblank-line hard maximum');
 });
 
 test('the session exposes the pinned import mutation only while presented, with the stale-intent check of createLayer', () => {

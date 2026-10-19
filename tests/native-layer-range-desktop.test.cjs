@@ -29,12 +29,12 @@ function actualHandlers(root,legacy){
  return {onDown:context.onDown,buildBar:context.buildBar,marqueeSelect:context.applyMarqueeSelection,readBars:()=>context._barSel,writeBars:v=>{context._barSel=v;}};
 }
 async function harness(options={}){
- let active=false,revision=0,gate=null,legacyKeys=[],localKeys=[],keyEpoch=0,barSel=[],legacy=0,keyEditor=null,propertyPanel=null,leftRows=null;
+ let active=false,revision=0,gate=null,legacyKeys=[],localKeys=[],keyEpoch=0,barSel=[],legacy=0,keyEditor=null,propertyPanel=null,leftRows=null,guardDrifted=false;
  const doc=new Node('document');doc.createElement=tag=>new Node(tag);doc.body=doc.createElement('body');doc.appendChild(doc.body);const grid=doc.createElement('div');doc.body.appendChild(grid);grid.appendChild(doc.createElement('div'));
  const root={document:doc,NemoLayerInOutSelection:Selection,FC:10,state:{currentFrame:2,activeLayerIdx:0,totalFrames:12,appMode:'motion',activeSymbolId:null,activeCompositionId:null,layers:[{layerUid:'alpha'},{layerUid:'beta'}]},_layerSel:[],_sel:{frames:[]},events:new Map(),notices:[]};
  root.addEventListener=(k,f)=>root.events.set(k,f);root.showToast=m=>root.notices.push(m);
  for(const layer of root.state.layers)for(const field of ['inPoint','outPoint','frames','timeLink'])Object.defineProperty(layer,field,{get(){legacy++;throw Error('LEGACY '+field);}});
- const calls=[],info=()=>({apiVersion:2,instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,documentSnapshotId:'range-snapshot-'+revision,
+ const queuedPublic=[],calls=[],info=()=>({apiVersion:2,instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,documentSnapshotId:'range-snapshot-'+revision,
   documentDigest:String(revision).repeat(64),byteCount:1200,canvasW:320,canvasH:180,fps:24,totalFrames:12,layers:[{layerUid:'alpha'},{layerUid:'beta'}],reference:null,undoDepth:revision,redoDepth:0});
  const resolved={rawInPoint:-2.5,rawOutPoint:14,inPoint:0,outPoint:11,hasCustomRange:true,hasTimeLink:false};
  async function invoke(command,args){const q=args&&(args.request||JSON.parse(args.requestJson));calls.push({command,q});
@@ -51,12 +51,12 @@ async function harness(options={}){
   assert.equal(q.operation,OP);if(gate)await gate.promise;revision++;
   return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
  }
- const s=Project.create({invoke,frame:()=>root.state.currentFrame,projectionReady:()=>true,changed:()=>{},publishRevision:()=>true,
+ const s=Project.create({invoke,frame:()=>root.state.currentFrame,projectionReady:()=>{if(root.NemoNativeFrameEditController&&root.NemoNativeFrameEditController.isPending()){queuedPublic.push(root.NemoNativeObjectProject.desktop(root).readPresentedObjectSession());if(options.beforeQueuedGuard&&!guardDrifted){guardDrifted=true;options.beforeQueuedGuard(root);}}return true;},changed:()=>{},publishRevision:()=>true,
   mapping:i=>({cssBounds:{x:0,y:0,width:320,height:180},physicalExtent:{width:320,height:180},compositionExtent:{width:i.canvasW,height:i.canvasH},reportedDpr:1}),
   subscribeRevisions:async()=>({instanceId:'range-instance',documentId:'range-document',lifecycleGeneration:1,contentRevision:revision,subscriptionId:'ranges'}),
   dispatchApplication:q=>SDK.createNativeApplicationAdapter('range-test',{dispatch:value=>invoke('nemo_native_dispatch',{request:value})}).dispatch(q)});
  Object.assign(root,{NemoNativeObjectProject:{desktop:()=>s},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>true},NemoNativeLayerRangeDesktop:Range,NemoNativeFrameEditDesktop:Desktop,NemoNativeFrameEditIntent:Intent,NemoNativeApplicationAdapter:SDK,
-  NemoNativeObjectUI:{readSelectedMotionKeys(r,pin){if(propertyPanel)return propertyPanel.captureSelectedKeys();if(keyEditor)return keyEditor.captureSelectedKeys();if(options.staleKeys)return null;const epoch=keyEpoch,v={pin,frame:root.state.currentFrame,viewGeneration:epoch,keys:structuredClone(localKeys)};Object.defineProperty(v,'isCurrent',{value:()=>epoch===keyEpoch});return Object.freeze(v);}},
+  NemoNativeObjectUI:{readSelectedMotionKeys(r,pin){if(propertyPanel)return propertyPanel.captureSelectedKeys();if(keyEditor)return keyEditor.captureSelectedKeys();if(options.staleKeys)return null;const epoch=keyEpoch,v={pin,frame:root.state.currentFrame,viewGeneration:epoch,keys:structuredClone(localKeys)};Object.defineProperties(v,{isCurrent:{value:()=>epoch===keyEpoch},isSelectionCurrent:{value:()=>epoch===keyEpoch}});return Object.freeze(v);}},
   SMMotion:{getKeySelection:()=>legacyKeys}});
  const legacyFn=()=>{legacy++;throw Error('LEGACY WRITER');},actual=actualHandlers(root,legacyFn);
  root.SMLayerInOut={...actual,getBarSelection:()=>Array.from(actual.readBars(),v=>({...v})),setBarSelection(v){barSel=v.slice();actual.writeBars(v.slice());}};
@@ -91,7 +91,7 @@ async function harness(options={}){
   Range.refreshKeys(root);
  }
 
- return {root,doc,grid,s,controller,calls,info,ports,keyEditor,propertyPanel,leftRows,keyNodes:()=>grid.querySelectorAll('.native-motion-property-key'),commands:()=>calls.filter(c=>c.q?.operation===OP),legacy:()=>legacy,
+ return {root,doc,grid,s,controller,calls,info,ports,keyEditor,propertyPanel,leftRows,queuedPublic,keyNodes:()=>grid.querySelectorAll('.native-motion-property-key'),commands:()=>calls.filter(c=>c.q?.operation===OP),legacy:()=>legacy,
   rows:()=>grid.children[1].children,bar:i=>grid.children[1].children[i].querySelector('.layer-inout-bar'),
   down(i=0,part='both',event={}){actual.onDown(i,this.rows()[i],part,{clientX:100,preventDefault(){},stopPropagation(){},...event});},
   move:x=>doc.fire('mousemove',{clientX:x}),up:x=>doc.fire('mouseup',{clientX:x}),
@@ -266,4 +266,19 @@ test('multi-property whole-projection coordinate overflow refuses all lanes with
   {target,property:'position',dimension:2,items:[{frame:1e308,v:[3,7]}]}]});
  assert.equal(h.keyNodes().length,0);assert.equal(h.rows()[0].style.height,'22px');assert.equal(h.leftRows[0].style.height,'22px');
  assert.equal(h.propertyPanel.readKeyTimelines().tracks[1].items[0].frame,1e308);assert.ok(h.root.notices.some(v=>/coordinates/.test(v)));assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+});
+
+test('plural key range dispatch uses only its action-local lease while the public presentation getter remains fenced',async()=>{
+ const target={contextId:'scene-root',layerUid:'alpha'},h=await harness({propertyTracks:[
+  {target,property:'opacity',dimension:1,items:[{frame:2.25,v:[50]}]},
+  {target,property:'position',dimension:2,items:[{frame:4.5,v:[3,7]}]}]});
+ const keys=[{target:{kind:'property',target,property:'opacity'},frame:2.25},{target:{kind:'property',target,property:'position'},frame:4.5}];
+ assert.equal(h.propertyPanel.readKeyTimelines().selectKeys(keys),true);h.down(0,'both');h.move(120);h.up(120);await h.settle();
+ assert.equal(h.commands().length,1);assert.deepEqual(h.commands()[0].q.payload.selectedKeys,keys);
+ assert.ok(h.queuedPublic.length>0);assert.ok(h.queuedPublic.every(value=>value===null));assert.equal(h.legacy(),0);
+});
+test('frame drift during queued lease validation refuses before a native range dispatch',async()=>{
+ const h=await harness({beforeQueuedGuard:root=>{root.state.currentFrame++;}});h.down(0,'both');h.move(120);h.up(120);await h.settle();
+ assert.ok(h.queuedPublic.length>0);assert.ok(h.queuedPublic.every(value=>value===null));assert.equal(h.commands().length,0);
+ assert.equal(h.s.info().contentRevision,0);assert.equal(h.legacy(),0);
 });

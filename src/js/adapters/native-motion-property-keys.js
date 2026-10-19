@@ -165,8 +165,15 @@
         var keys=selected.size?accepted.items.filter(function(k){return selected.has(k.frame);}).map(function(k){
           return {target:{kind:'property',target:accepted.target,property:accepted.property},frame:k.frame};}):[];
         if(keys.length!==selected.size)return null;
-        var capturedSerial=serial,capturedFrames=JSON.stringify(Array.from(selected)),value={pin:Object.assign({},token.pin),frame:context.frame,viewGeneration:context.viewGeneration,keys:keys};
+        var capturedSerial=serial,capturedEpoch=selectionEpoch,capturedAccepted=accepted,capturedFrames=JSON.stringify(Array.from(selected)),value={pin:Object.assign({},token.pin),frame:context.frame,viewGeneration:context.viewGeneration,keys:keys};
         Object.defineProperty(value,'isCurrent',{value:function(){return mounted()&&!retired&&!busy&&serial===capturedSerial&&JSON.stringify(Array.from(selected))===capturedFrames;}});
+        // A local selection proof only. A queued writer must independently prove its own captured presentation.
+        Object.defineProperty(value,'isSelectionCurrent',{value:function(lease){try{
+          var now=ports.readContext(lease),p=now&&now.pin;
+          return mounted()&&!retired&&!busy&&serial===capturedSerial&&accepted===capturedAccepted&&selectionEpoch===capturedEpoch&&
+            JSON.stringify(Array.from(selected))===capturedFrames&&now&&now.frame===value.frame&&now.viewGeneration===value.viewGeneration&&p&&
+            ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return p[k]===token.pin[k];});
+        }catch(_){return false;}}});
         return freeze(value);
       }catch(_){return null;}
     }

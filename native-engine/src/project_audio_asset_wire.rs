@@ -1,6 +1,7 @@
 //! Encoded Audio joins the SAME managed asset decoder/allocation callbacks.
 //! Byte admission is strict WAV container admission, not native playback/decode.
-use super::{payload, ProjectWireError};
+use crate::object_codec::project::asset_wire::payload;
+use crate::object_codec::project::ProjectWireError;
 use crate::object_document::{audio_wave, AssetSource};
 use serde_json::value::RawValue;
 use std::sync::Arc;

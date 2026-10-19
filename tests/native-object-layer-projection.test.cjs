@@ -55,14 +55,37 @@ test('last removal preserves surviving UID selection and picks a remaining UI ro
   const root=view([A,B,C]),empty=[];root._layerSel=empty;root.state.activeLayerIdx=0;
   assert.equal(Files.refreshLayerTable(root,info([A,B],1)),true);assert.equal(root._layerSel,empty);
 });
-for(const [name,layers] of [
-  ['reordered',[B,A]],['middle deletion',[B]],['replaced',[A,C]],['two appends',[A,B,C,{layerUid:'D'}]],
+// The admitted single-splice projection now supports head, middle and tail removal.
+// Require exact surviving UID/row identity and remap indices, rather than blessing deletion generally.
+for(const [at,active,selected,anchor] of [[0,1,[1],1],[1,1,[0,1],1],[2,0,[0],0]])test('single native removal at '+at+' preserves surviving UID identities and remaps the exact layer selection',()=>{
+  const root=view([A,B,C]),rows=root.state.layers,original=rows.slice(),reference=root.state.refMedia,paths=root.selectedPaths;
+  const frames=original.map(row=>row.frames),motion=original.map(row=>row.motion),next=clone([A,B,C]);next.splice(at,1);
+  root.state.activeLayerIdx=2;root._layerSel=[0,2];root._layerSelAnchor=2;
+  const beforeMetadata=JSON.stringify(next);
+  assert.equal(Files.refreshLayerTable(root,info(next,1)),true);
+  assert.strictEqual(root.state.layers,rows);assert.deepEqual(rows.map(row=>row.layerUid),next.map(row=>row.layerUid));
+  const survivors=original.filter((_,i)=>i!==at);
+  rows.forEach((row,i)=>{const old=original.indexOf(survivors[i]);assert.strictEqual(row,survivors[i]);assert.strictEqual(row.frames,frames[old]);assert.strictEqual(row.motion,motion[old]);});
+  assert.equal(root.state.activeLayerIdx,active);assert.deepEqual(root._layerSel,selected);assert.equal(root._layerSelAnchor,anchor);
+  assert.equal(root.state.currentFrame,7);assert.equal(root.state.waIn,3);assert.equal(root.state.waOut,19);
+  assert.strictEqual(root.state.refMedia,reference);assert.strictEqual(root.selectedPaths,paths);
+  assert.equal(JSON.stringify(next),beforeMetadata);assert.equal(Files.projectionMatches(root,info(next,1)),true);
+});
+test('single removal cannot reorder surviving UIDs or change rows before a confirmed revision',()=>{
+  for(const [next,revision] of [[[C,A],1],[[A,C],0]]){
+    const root=view([A,B,C]),rows=root.state.layers,original=rows.slice(),before=snapshot(root);
+    assert.equal(Files.refreshLayerTable(root,info(next,revision)),false);
+    assert.equal(snapshot(root),before);assert.strictEqual(root.state.layers,rows);original.forEach((row,i)=>assert.strictEqual(rows[i],row));
+  }
+});
+for(const [name,layers,revision=1] of [
+  ['reordered',[B,A]],['same-revision single removal',[B],0],['replaced',[A,C]],['two appends',[A,B,C,{layerUid:'D'}]],
   ['two removals',[]],['duplicate',[A,B,A]],['empty UID',[A,B,{layerUid:''}]],
   ['late malformed visibility',[{...A,visible:false},{...B,visible:'false'}]],
   ['late malformed name',[{...A,visible:false},{...B,name:null}]],['document payload',[A,B,{...C,frames:[]}]],
 ])test('unsupported '+name+' refuses without partial row, selection or reference mutation',()=>{
   const root=view(),before=snapshot(root),rows=root.state.layers,first=rows[0],second=rows[1];
-  try{assert.equal(Files.refreshLayerTable(root,info(layers,1)),false);}catch(error){if(error.code==='ERR_ASSERTION')throw error;assert.match(error.message,/Native layer/);}
+  try{assert.equal(Files.refreshLayerTable(root,info(layers,revision)),false);}catch(error){if(error.code==='ERR_ASSERTION')throw error;assert.match(error.message,/Native layer/);}
   assert.equal(snapshot(root),before);assert.equal(root.state.layers,rows);assert.equal(rows[0],first);assert.equal(rows[1],second);
 });
 for(const [key,value] of [['instanceId','foreign'],['documentId','foreign'],['lifecycleGeneration',2],['canvasW',321],['fps',30],['totalFrames',25]]){

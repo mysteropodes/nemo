@@ -1,5 +1,5 @@
 //! One lossless placement offset value. Drawing/Video keeps the original integer wire.
-use super::{valid_id, AssetError, AssetId};
+use crate::object_document::assets::{valid_id, AssetError, AssetId};
 use crate::object_document::AssetTarget;
 use serde_json::Number;
 const MAX: f64 = 9_007_199_254_740_991.;

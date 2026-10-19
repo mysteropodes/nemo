@@ -196,11 +196,24 @@ function actualDesktopFixture(ProjectOverride){
   const start=source.indexOf('function desktop(initial=[A,B]){'),end=source.indexOf("\ntest('actual Open/New",start);
   assert.ok(prefixEnd>0&&start>prefixEnd&&end>start);
   const localRequire=require('node:module').createRequire(filename);
-  const context={require(name){return ProjectOverride&&name==='../src/js/adapters/native-object-project.js'?ProjectOverride:localRequire(name);},
+  const context={require(name){
+    if(ProjectOverride&&name==='../src/js/adapters/native-object-project.js')return ProjectOverride;
+    if(ProjectOverride&&name==='../src/js/bootstrap/native-opacity-application.js')return {bindObjectUI:installBrowserBootstrap};
+    return localRequire(name);
+  },
     console,setImmediate,setTimeout,clearTimeout};
   vm.createContext(context);
   vm.runInContext(source.slice(0,prefixEnd)+'\n'+source.slice(start,end)+'\nglobalThis.makeDesktop=desktop;',context);
   return context.makeDesktop();
+}
+function installBrowserBootstrap(root){
+  const deferred=[];
+  root.NemoNativeOpacityLegacySurface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  root.setTimeout=(callback,delay)=>{assert.equal(delay,0);deferred.push(callback);return deferred.length;};
+  // Keep the bootstrap's window identity equal to the fixture's actual root.
+  const bootstrapContext=vm.createContext({globalThis:root});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/js/bootstrap/native-opacity-application.js'),'utf8'),bootstrapContext);
+  assert.equal(deferred.length,1,'actual classic bootstrap defers unrelated opacity activation without executing it');
 }
 function browserProjectBeforeCut(){
   const context={NemoNativeObjectProjectMetadata:require('../src/js/adapters/native-object-project-metadata.js'),
@@ -311,4 +324,19 @@ test('failed inspection after post-transport SDK rejection fences existing owner
   assert.ok(h.log.includes('inspect-after-uncertain-cut'));assert.equal(h.paper(),0);
   assert.equal(await h.root.SM.splitLayerAtPlayhead(),false,'indeterminate owner cannot retry the mutation');
   assert.equal(h.log.filter(entry=>entry==='malformed-cut-committed:1').length,1);
+});
+
+test('actual bootstrap composition is per-root idempotent and refuses replaced document or registration',async()=>{
+  const Bootstrap=require('../src/js/bootstrap/native-opacity-application.js');
+  const Desktop=require('../src/js/adapters/native-object-project-desktop.js');
+  const Project=require('../src/js/adapters/native-object-project.js');
+  const a=actualDesktopFixture(),b=actualDesktopFixture();
+  assert.notStrictEqual(a.root,b.root);assert.equal(Bootstrap.bindObjectUI(a.root),true);
+  await a.open();await b.open();assert.equal(Project.paintUI(a.root),true);assert.equal(Project.paintUI(b.root),true);
+  assert.throws(()=>Project.bindUIComposition(a.root,()=>{}),/already bound/);
+  const document=a.root.document;a.root.document={};
+  assert.throws(()=>Bootstrap.bindObjectUI(a.root),/binding changed/);
+  assert.throws(()=>Desktop.composeUI(a.root,{},{}),/unavailable/);
+  a.root.document=document;assert.equal(Bootstrap.bindObjectUI(a.root),true);
+  assert.equal(Project.paintUI(a.root),true);assert.equal(Project.paintUI(b.root),true);
 });

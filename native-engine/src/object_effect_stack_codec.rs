@@ -1,5 +1,6 @@
 //! Actual stored effect stacks use the existing scalar-track predicate before admission.
-use super::{ObjectCodecError, ObjectCodecErrorKind};
+use crate::object_codec::order::validate_effect_track;
+use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::{LayerEffect, ObjectLayer, ObjectRecord};
 
 fn validate_stack(stack: &[LayerEffect]) -> Result<(), ObjectCodecError> {
@@ -13,7 +14,7 @@ fn validate_stack(stack: &[LayerEffect]) -> Result<(), ObjectCodecError> {
             })?;
             for (_, track) in tracks.entries() {
                 if let Some(track) = track {
-                    super::order::validate_effect_track(track)?;
+                    validate_effect_track(track)?;
                 }
             }
         }

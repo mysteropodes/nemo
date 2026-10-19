@@ -471,3 +471,32 @@ test('Desktop range action preserves its own selected-key token through real Int
  const out=await h.controller.run({kind:'rangeDrag',gesture,capture:token});assert.equal(out.status,'applied-presented');assert.equal(h.commands().length,1);assert.deepEqual(h.commands()[0].q.payload,gesture);assert.deepEqual(h.navigation,[]);
  current=false;assert.equal((await h.controller.run({kind:'rangeDrag',gesture,capture:token})).status,'unavailable');assert.equal(h.commands().length,1);
 });
+
+test('Project queued guard grants only its own current presentation lease and retires it before dispatch',async()=>{
+  const op=P+'frames.extend',payload={command:'object.frames.extend',cell:2,count:1};
+  let escaped,dispatched=false;const h=harness({beforeAck(){dispatched=true;assert.equal(escaped.readPresentedObjectSession(),null);}});
+  await h.open();const origin=h.session.readPresentedObjectSession();
+  const out=await h.session.editFrames(op,payload,h.session.info(),lease=>{
+    escaped=lease;assert.equal(Object.isFrozen(lease),true);assert.equal(h.session.readPresentedObjectSession(),null);
+    const shown=lease.readPresentedObjectSession();assert.ok(shown);assert.strictEqual(shown.presentation,origin.presentation);
+    assert.equal(shown.documentSnapshotId,origin.documentSnapshotId);assert.equal(shown.presentation.frame,2);return true;
+  });
+  assert.equal(out.ok,true);assert.equal(out.result.applied,true);assert.equal(h.commands().length,1);assert.equal(dispatched,true);
+  assert.equal(escaped.readPresentedObjectSession(),null);assert.equal(h.session.readPresentedObjectSession().contentRevision,1);
+  for(const fault of ['frame-before','projection','extra-pending','current-false','frame-in-guard','throwing-guard']){
+    const options={},g=harness(options);await g.open();let checked=0,lease;
+    const action=g.session.editFrames(op,payload,g.session.info(),proof=>{
+      checked++;lease=proof;assert.equal(g.session.readPresentedObjectSession(),null);
+      assert.ok(proof.readPresentedObjectSession());
+      if(fault==='frame-in-guard')g.root.state.currentFrame++;
+      if(fault==='throwing-guard')throw Error('guard threw');return fault!=='current-false';
+    });
+    if(fault==='frame-before')g.root.state.currentFrame++;
+    if(fault==='projection')options.ready=false;
+    const competing=fault==='extra-pending'?g.session.presentPreview(2):null;
+    await assert.rejects(action,/intent is stale|guard threw/);if(competing)await competing;
+    assert.equal(g.commands().length,0);assert.equal(g.session.info().contentRevision,0);
+    assert.equal(checked,['frame-before','projection','extra-pending'].includes(fault)?0:1);
+    if(lease)assert.equal(lease.readPresentedObjectSession(),null);
+  }
+});

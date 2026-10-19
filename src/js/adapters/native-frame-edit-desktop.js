@@ -99,7 +99,7 @@
       cellSelection:function(){return root._sel&&root._sel.frames;},available:available,
       readClipboard:readClipboard,acceptClipboard:acceptClipboard,acceptPaste:acceptPaste,acceptMove:acceptMove,
       captureClipboard:captureClipboard,clipboardUnchanged:clipboardUnchanged,
-      rangeCurrent:function(capture,info,after,queued){return !!capture&&typeof capture.isCurrent==='function'&&capture.isCurrent(info,after,queued)===true;}});
+      rangeCurrent:function(capture,info,after,queued,lease){return !!capture&&typeof capture.isCurrent==='function'&&capture.isCurrent(info,after,queued,lease)===true;}});
     function capture(){
       try{
         var session=current(),info=session&&session.info(),state=root.state;

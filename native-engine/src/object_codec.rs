@@ -23,9 +23,9 @@ pub(crate) use crate::object_document::AssetRecord;
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};
 use crate::object_document::{
-    ImageMeshStore, ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+    ImageMeshStore, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
 };
-pub(crate) use crate::object_document::{Presence, PropertyHolder};
+pub(crate) use crate::object_document::{ObjectLayer, Presence, PropertyHolder};
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -112,11 +112,11 @@ mod object_group_codec;
 // L01-E (#2107): admission of the vector extension slot and of the per-layer pathFx stack.
 #[path = "object_vector_ext_codec.rs"]
 #[allow(dead_code)]
-mod object_vector_ext_codec;
+pub(crate) mod object_vector_ext_codec;
 // L05-G (#2111): admission of the per-layer range record (inPoint, outPoint, timeLink, markers).
 #[path = "object_frame_edit_range_codec.rs"]
 #[allow(dead_code)]
-mod object_frame_edit_range_codec;
+pub(crate) mod object_frame_edit_range_codec;
 // L06-L (#2112): admission of the lane-6 `items` document member (raster items and text blocks).
 #[path = "object_raster_asset_codec.rs"]
 #[allow(dead_code)]

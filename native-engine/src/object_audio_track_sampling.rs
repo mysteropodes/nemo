@@ -1,6 +1,6 @@
 //! Stored AudioTrack volume sampling: actual native curve math, never a fabricated layer holder.
-use super::AudioTrackRecord;
 use crate::animation_curve::{evaluate_curve, CurveSample};
+use crate::object_document::audio_tracks::AudioTrackRecord;
 use crate::object_document::media_timing::object_media_timing_audio::VolumeSampler;
 use crate::object_document::OrderKey;
 

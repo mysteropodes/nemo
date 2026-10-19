@@ -73,14 +73,14 @@ async function multiFixture(options={}){
  const container=doc.createElement('div'),header=doc.createElement('div');doc.body.appendChild(header);doc.body.appendChild(container);
  const layer={contextId:'scene-root',layerUid:'layer:opaque'},element={...layer,strokeId:'element:opaque'};
  const targets=[layer,element],properties=['opacity','position'];
- let info={instanceId:'multi-instance',documentId:'multi-document',lifecycleGeneration:1,contentRevision:7,documentSnapshotId:'multi-snapshot',totalFrames:96,layers:[{layerUid:layer.layerUid,name:'Blue',visible:true}]},ready=true,held=null;
+ let info={instanceId:'multi-instance',documentId:'multi-document',lifecycleGeneration:1,contentRevision:7,documentSnapshotId:'multi-snapshot',totalFrames:96,layers:[{layerUid:layer.layerUid,name:'Blue',visible:true}]},ready=true,pending=false,held=null;
  const root={document:doc,state:{appMode:'motion',activeLayerIdx:0,currentFrame:10,activeSymbolId:null},_layerSel:[0]},writes=[],events=[],reads=[];
  const records=new Map(targets.flatMap((target,i)=>properties.map(property=>{
   const n=options.count||3;return [JSON.stringify([target,property]),Array.from({length:n},(_,j)=>({frame:j+0.25,v:property==='position'?[j+i,j-i]:[j+i]}))];})));
  const categories=copy(oracle.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories);
  const authored=oracle.cases.filter(c=>c.documentVariant==='authored-facts').flatMap(c=>c.expectedResult.items);
  const rows=properties.map(property=>copy(authored.find(row=>row.property===property)));assert.ok(rows.every(Boolean));
- const session={isActive:()=>true,blocksLegacy:()=>true,info:()=>info,readPresentedObjectSession:()=>ready?{...info,kind:'native-object',available:true,presentation:{...info,owner:'native',status:'presented',frame:root.state.currentFrame}}:null};
+ const session={isActive:()=>true,blocksLegacy:()=>true,info:()=>info,readPresentedObjectSession:()=>ready&&!pending?{...info,kind:'native-object',available:true,presentation:{...info,owner:'native',status:'presented',frame:root.state.currentFrame}}:null};
  const ui={currentSession:()=>session,projectionReady:value=>ready&&value===info,
   async readPropertyMetadata(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.kind==='targets'?null:copy(q.view.target),items:q.view.kind==='targets'?[{kind:'context',contextId:layer.contextId},{kind:'layer',target:copy(layer)},{kind:'element',target:copy(element)}]:copy(rows),nextOffset:null,unavailableCategories:copy(categories)};},
   async readProperty(q){if(q.view.kind!=='authoredKeys')throw Error('Only authored-key I/O modeled');reads.push(copy(q));
@@ -98,6 +98,9 @@ async function multiFixture(options={}){
   inspectors:()=>tree(container).filter(n=>n.className==='native-motion-property-keys'&&!n.hidden),
   checks(index){return tree(this.inspectors()[index]).filter(n=>n.type==='checkbox');},
   hold(property){let resolve;const promise=new Promise(r=>resolve=r);held={property,promise,resolve};return ()=>{const wait=held;held=null;wait.resolve();};},
+  ownAction(){const origin=session.readPresentedObjectSession();assert.ok(origin);pending=true;let running=true;
+   return {lease:Object.freeze({readPresentedObjectSession:()=>running&&pending&&ready?origin:null}),retire(){running=false;pending=false;}};},
+  publicPresentation:()=>session.readPresentedObjectSession(),
   ready(value){ready=value;},replace(){info={...info,lifecycleGeneration:info.lifecycleGeneration+1};},
   refresh(){ordinary.retire();assert.equal(ordinary.paint(ui,container,header),true);return settle();},retire(){ordinary.dispose();}};
 }
@@ -204,4 +207,22 @@ test('reusable real Panel fixture projects two properties for a shared native ti
  assert.equal(await h.ready,true);await h.openProperty(target,'opacity');await h.openProperty(target,'position');const view=h.readKeyTimelines();
  assert.deepEqual(view.tracks.map(track=>track.property),['opacity','position']);assert.equal(view.selectKeys([address(target,'opacity',2.5),address(target,'position',4.5)]),true);
  assert.deepEqual(copy(h.captureSelectedKeys()).keys,[address(target,'opacity',2.5),address(target,'position',4.5)]);h.dispose();assert.equal(view.isCurrent(),false);
+});
+
+test('real Binding propagates an own-action lease to plural selection while the public presentation stays fenced',async()=>{
+ const h=await multiFixture();await h.open();await h.open(h.layer,'position');
+ assert.equal(h.ordinary.readKeyTimelines().selectKeys([address(h.layer,'opacity',0.25)]),true);
+ const capture=h.ordinary.captureSelectedKeys();assert.equal(capture.isCurrent(),true);assert.equal(capture.isSelectionCurrent(),true);
+ const action=h.ownAction();assert.equal(h.publicPresentation(),null);
+ assert.equal(capture.isSelectionCurrent(action.lease),true,'real Binding/Panel/Keys use only the supplied action-local presentation');
+ assert.equal(capture.isCurrent(),false,'ordinary public context remains fenced');
+ action.retire();assert.equal(capture.isSelectionCurrent(action.lease),false,'a retired lease cannot restore captured readiness');h.retire();
+});
+
+test('leased plural selection refuses real readiness loss, changed frame/pin/selection and disposal',async()=>{
+ for(const drift of [h=>h.ready(false),h=>h.root.state.currentFrame++,h=>h.replace(),async h=>{h.checks(1)[0].checked=true;await h.checks(1)[0].fire('change');},h=>h.retire()]){
+   const h=await multiFixture();await h.open();await h.open(h.layer,'position');const capture=h.ordinary.captureSelectedKeys();
+   const action=h.ownAction();assert.equal(capture.isSelectionCurrent(action.lease),true);
+   await drift(h);assert.equal(capture.isSelectionCurrent(action.lease),false);action.retire();h.retire();
+ }
 });

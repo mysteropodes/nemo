@@ -67,6 +67,7 @@ function harness(){
   }
   root.__TAURI__={core:{invoke},event:{listen:async(name,fn)=>{listeners.set(name,fn);return ()=>listeners.delete(name);}}};
   require('./helpers/native-viewport-underlay.cjs').install(root);
+  require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(root);
   const session=Project.desktop(root);root.updateUI=()=>Project.paintUI(root,true);
   function poison(){root.state.layers.forEach(layer=>Object.defineProperty(layer,'frames',{configurable:true,get(){throw Error('legacy frame read');}}));}
   const open=async()=>{await session.openPath('/timed.json',{commit(info){Files.projectView(root,info);}});poison();await turn();await turn();};

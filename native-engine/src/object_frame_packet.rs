@@ -1,8 +1,9 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
-use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, Presence, PropertyHolderTarget,
+pub(crate) use crate::object_document::{
+    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget, Presence,
+    PropertyHolderTarget, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
 use std::collections::HashMap;

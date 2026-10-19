@@ -1,6 +1,7 @@
 //! Actual AudioTrack metadata edits in the existing persistent record table.
 //! Source bytes, the sole placement offset, and Motion fields are never rewritten.
-use super::{AudioTracks, Presence};
+use crate::object_document::audio_tracks::{valid_audio_id, AudioTracks};
+use crate::object_document::Presence;
 use serde::Deserialize;
 use serde_json::Number;
 
@@ -63,7 +64,7 @@ impl AudioTrackEdit {
             | Self::SetTrim { audio_id, .. }
             | Self::Unset { audio_id, .. } => audio_id,
         };
-        if !super::valid_audio_id(id) {
+        if !valid_audio_id(id) {
             return Err(AudioTrackEditError::Invalid);
         }
         if let Self::Rename { name, .. } = &edit {

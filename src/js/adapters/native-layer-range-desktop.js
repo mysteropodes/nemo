@@ -37,14 +37,21 @@
       return v;
     }catch(_){return null;}
   }
-  function isGestureCurrent(root,capture,info,after,queued){
+  function isGestureCurrent(root,capture,info,after,queued,lease){
     try{
       var w=works.get(root),s=session(root);
       if(!w||w.capture!==capture||!capture.valid||s!==capture.session||!s.isActive()||!owner(info,capture.info)||
          info.contentRevision!==capture.info.contentRevision+(after?1:0)||(!after&&!same(info,capture.info))||
          signature(root,info)!==capture.ui||JSON.stringify(bars(root,info))!==capture.bars||root.FC!==capture.fc||
          root.state.activeSymbolId!=null||root.state.activeCompositionId!=null)return false;
-      if(!after){if(capture.keyCurrent()!==true)return false;if(!queued){var keys=selected(root,info);if(!keys||JSON.stringify(keys)!==capture.keySignature)return false;}}
+      if(!after){
+        if(queued){
+          var origin=lease&&typeof lease.readPresentedObjectSession==='function'&&lease.readPresentedObjectSession();
+          if(!origin||origin.available!==true||origin.kind!=='native-object'||!same(origin,capture.info)||!same(origin.presentation,capture.info)||
+            origin.presentation!==capture.presentation||origin.presentation.owner!=='native'||origin.presentation.status!=='presented'||
+            origin.presentation.frame!==root.state.currentFrame||capture.keySelectionCurrent(lease)!==true)return false;
+        }else{if(capture.keyCurrent()!==true)return false;var keys=selected(root,info);if(!keys||JSON.stringify(keys)!==capture.keySignature)return false;}
+      }
       return root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true;
     }catch(_){return false;}
   }
@@ -170,11 +177,13 @@
     }
     var keys=selected(root,info),barSelection;
     try{barSelection=bars(root,info);}catch(_){}
-    if(!keys||!barSelection||!row.nativeRange||!same(row.nativeRange.pin,info)||!signature(root,info)){notice(root);return true;}
+    if(!keys||typeof keys.isSelectionCurrent!=='function'||!barSelection||!row.nativeRange||!same(row.nativeRange.pin,info)||!signature(root,info)){notice(root);return true;}
     if(barSelection.some(function(v){var index=info.layers.findIndex(function(l){return l.layerUid===v.layerUid;});return !w.rows[index]||!w.rows[index].nativeRange||!same(w.rows[index].nativeRange.pin,info);})){notice(root);return true;}
-    var capture={valid:true,session:s,info:info,ui:signature(root,info),bars:JSON.stringify(barSelection),keySignature:JSON.stringify(keys),keyCurrent:keys.isCurrent,
+    var origin=s.readPresentedObjectSession();
+    if(!origin||!same(origin,info)||!same(origin.presentation,info)||origin.presentation.frame!==root.state.currentFrame){notice(root);return true;}
+    var capture={valid:true,session:s,info:info,presentation:origin.presentation,ui:signature(root,info),bars:JSON.stringify(barSelection),keySignature:JSON.stringify(keys),keyCurrent:keys.isCurrent,keySelectionCurrent:keys.isSelectionCurrent,
       fc:root.FC,startX:event.clientX,row:row,li:li,part:part,samples:[],alt:!!event.altKey};
-    Object.defineProperty(capture,'isCurrent',{value:function(info,after,queued){return isGestureCurrent(root,capture,info,after,queued);}});
+    Object.defineProperty(capture,'isCurrent',{value:function(info,after,queued,lease){return isGestureCurrent(root,capture,info,after,queued,lease);}});
     capture.gesture=freeze({command:'object.layer.range.drag',contextId:'scene-root',layerUid:info.layers[li].layerUid,
       activeLayerUid:info.layers[root.state.activeLayerIdx].layerUid,part:part,barSelection:barSelection,frame:root.state.currentFrame,selectedKeys:keys.keys});
     w.capture=capture;w.down=true;return true;

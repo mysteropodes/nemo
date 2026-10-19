@@ -1,5 +1,7 @@
 //! Layer-bar writes reuse the actual immutable D27 range resolver and existing property owner.
-use super::{integer, invalid, Gesture, Member, Part};
+use crate::commands::object_fill_owner::object_frame_bulk_move::object_layer_shift::{
+    integer, invalid, Gesture, Member, Part,
+};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
     LayerRange, ObjectDocument, Presence, RangeError, RangeEvaluator, TimeLinkRecord,

@@ -1,7 +1,11 @@
 //! Same-query, snapshot-pinned range projection for the actual native layer-bar consumer.
 //! Does not require drawing LayerTiming or invent an exposure for no-timing layers.
-use super::*;
-use crate::object_document::{RangeError, RangeEvaluator};
+use crate::object_codec::object_deserialize;
+use crate::object_codec::object_frame_edit_range_codec::{RangeError, RangeEvaluator};
+use crate::object_snapshot::MAX_MESSAGE_BYTES;
+use crate::request_receipts::DispatchErrorCode;
+use crate::revision::ObjectSnapshot;
+use serde::Deserialize;
 use serde_json::{json, Value};
 #[derive(Debug)]
 struct RangeSelector {

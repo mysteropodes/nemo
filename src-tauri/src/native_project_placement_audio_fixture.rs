@@ -1,5 +1,6 @@
 //! Real WAV/Audio record/placement fixtures for the actual shared-host controls.
-use super::*;
+use crate::{application_mcp::ApplicationMcp, native_object_bootstrap::bootstrap_raw};
+use serde_json::{json, Value};
 
 pub(super) const AUDIO_WAV: &[u8] = &[
     82, 73, 70, 70, 44, 0, 0, 0, 87, 65, 86, 69, 102, 109, 116, 32, 16, 0, 0, 0, 1, 0, 2, 0, 128,

@@ -226,7 +226,7 @@
       pending = true;
       var applied = null, frame = state.frame, layers = before.layers.map(function (row) { return row.layerUid; });
       try {
-        var receipt = await write.call(session, step.op, step.payload, before, intent.kind==='rangeDrag'?function(){return ports.rangeCurrent(intent.capture,before,false,true)===true;}:undefined), result = receipt && receipt.result;
+        var receipt = await write.call(session, step.op, step.payload, before, intent.kind==='rangeDrag'?function(lease){return ports.rangeCurrent(intent.capture,before,false,true,lease)===true;}:undefined), result = receipt && receipt.result;
         try { Contract.result(step.op, result); } catch (_) { return Object.freeze({ status: 'unconfirmed' }); }
         if (!receipt || receipt.apiVersion !== 2 || receipt.ok !== true || receipt.instanceId !== before.instanceId || receipt.documentId !== before.documentId ||
             !result || typeof result.applied !== 'boolean' || result.historyEntriesAdded !== (result.applied ? 1 : 0) ||
