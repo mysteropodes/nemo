@@ -211,7 +211,10 @@ test('members the record cannot carry without changing the look refuse; the rest
   assert.equal(Stroke.toRecord(Object.assign({}, base, { effects: [], fillGradient: null, isMask: false }), WHERE).ok, true, 'empty, null and false members are the baseline absent');
   const kept = Stroke.toRecord(Object.assign({}, base, { fillSeed: [1, 2], fillGapPx: 0, groupId: 'g_9', tweenOn: true, ownerId: 'u1', xformAnchorKey: 'tl' }), WHERE);
   assert.equal(kept.ok, true);
-  assert.deepEqual(kept.unmapped, ['fillSeed', 'fillGapPx', 'groupId', 'tweenOn', 'ownerId', 'xformAnchorKey'], 'zero is a value (fillGapPx), the report keeps dictionary order');
+  assert.deepEqual(kept.record.vectorExt.fillTrace, { seed: [1, 2], gapPx: 0 }, 'zero is persisted as a value');
+  assert.deepEqual(Stroke.toDict(kept.record).fillSeed, [1, 2]);
+  assert.equal(Stroke.toDict(kept.record).fillGapPx, 0);
+  assert.deepEqual(kept.unmapped, ['groupId', 'tweenOn', 'ownerId', 'xformAnchorKey'], 'only fields without native storage stay explicitly unmapped');
   assert.equal(Stroke.toRecord(cases.get('stroke-id-kept').in, WHERE).authoredStrokeId, 'st_01');
   assert.deepEqual(Stroke.toRecord(cases.get('stroke-id-kept').in, WHERE).unmapped, ['groupId']);
   assert.equal(Stroke.toRecord(base, WHERE).authoredStrokeId, null);
