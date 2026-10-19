@@ -178,8 +178,8 @@ test('classic UMD installs one controller and actual Main shortcut handler route
   const context={...h.root,window:null};context.window=context;
   const text=fs.readFileSync(require.resolve('../src/js/adapters/native-frame-edit-desktop.js'),'utf8');
   vm.runInNewContext(text,context);
-  const first=context.NemoNativeFrameEditController;
-  assert.equal(context.NemoNativeFrameEditDesktop.install(context),first);
+  assert.equal(vm.runInNewContext(
+    'NemoNativeFrameEditDesktop.install(globalThis) === NemoNativeFrameEditController',context),true);
   const main=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8');
   const start=main.indexOf('function runCommandShortcutAction(action,e){');assert.ok(start>=0);
   const line=main.slice(start,main.indexOf('\n',start));
@@ -233,13 +233,14 @@ test('actual legacy surface never falls through when helper is missing, broken o
   const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
   for(const mode of ['missing','broken','inactive','missingHostActive']){
     const h=harness();if(mode!=='inactive')await h.open();let legacy=0,guards=0;
-    if(mode!=='missingHostActive')h.root.__TAURI__={core:{invoke(){throw Error('Unexpected surface I/O');}}};
+    h.root.__TAURI__={core:{invoke(){throw Error('Unexpected surface I/O');}}};
     h.root.SM={importJSON(){},copyFrames(){legacy++;}};
     h.root.insertFrame=function(){legacy++;};
     if(mode==='broken')h.root.NemoNativeFrameEditDesktop={install(){throw Error('Missing intent dependency');}};
     if(mode==='inactive')h.root.NemoNativeFrameEditDesktop=Desktop;
     const surface=Surface.desktopPorts(h.root,{}).surface;
     const dispose=surface.wrap('global',[],'app-',()=>{guards++;return true;});
+    if(mode==='missingHostActive')delete h.root.__TAURI__;
     const result=await h.root.insertFrame();
     assert.ok(['unavailable','unconfirmed'].includes(result.status));
     assert.deepEqual([legacy,guards,h.commands().length],[0,0,0]);dispose();
