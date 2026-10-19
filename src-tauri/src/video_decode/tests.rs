@@ -208,5 +208,3 @@ pub(super) fn make_indexed_media() -> String {
         target_s
     }).clone()
 }
-
-

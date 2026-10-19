@@ -32,7 +32,7 @@ pub(super) struct ConvProc {
 }
 
 /// Random-access frame index over a raw MJPEG stream file — the format
-/// this module's create_optimized_media produces (concatenated baseline
+/// the sibling `optimized` module's create_optimized_media produces (concatenated baseline
 /// JPEGs + a sidecar `.idx` JSON with per-frame byte offsets). Built
 /// because live profiling showed the ONLY remaining scrub cost on
 /// all-intra optimized media was the ~20ms process-spawn tax paid on

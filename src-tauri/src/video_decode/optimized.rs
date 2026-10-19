@@ -143,7 +143,7 @@ pub(super) fn index_mjpeg_stream(path: &str) -> Result<Vec<u64>, String> {
 /// Transcode `src` to an indexed optimized-media pair: `target` (raw MJPEG
 /// stream, same `-q:v 3` near-visually-lossless setting the previous .mov
 /// flavor used) and `target + ".idx"` (JSON: fps/width/height/count +
-/// per-frame byte offsets). Tauri-free core, wrapped by the command below.
+/// per-frame byte offsets). Tauri-free core, wrapped by the parent module's command.
 pub(super) fn create_optimized_media_core(src: &str, target: &str) -> Result<(), String> {
     // Probe the SOURCE for fps (a raw MJPEG stream carries no timing
     // metadata of its own — the sidecar is the only place it survives).

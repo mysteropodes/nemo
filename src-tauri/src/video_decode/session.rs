@@ -91,7 +91,7 @@ pub(super) fn would_need_respawn(s: &VideoSession, target: i64) -> bool {
 /// Insert a decoded frame into the session cache (skipping if that index is
 /// already present) and evict oldest entries past the session's budget.
 /// Shared by foreground decode, the readahead thread, and decode_at's
-/// walk-prefetch (see below) so eviction policy lives in exactly one place.
+/// walk-prefetch (see decode.rs) so eviction policy lives in exactly one place.
 pub(super) fn cache_insert(s: &mut VideoSession, idx: i64, bytes: Vec<u8>) {
     if s.cache.iter().any(|(i, _)| *i == idx) {
         return;
@@ -144,7 +144,7 @@ pub(super) fn is_all_intra_codec(codec: &str) -> bool {
 }
 
 // Core open logic, tauri-free so `cargo test` can exercise it directly
-// (the #[tauri::command] wrappers below only add State registry plumbing).
+// (the #[tauri::command] wrappers in the parent module only add State registry plumbing).
 pub(super) fn open_session_core(path: &str) -> Result<(VideoSession, u64, f64), String> {
     // Our own indexed optimized-media streams short-circuit the probe
     // entirely (a raw MJPEG stream has no duration/fps metadata anyway —

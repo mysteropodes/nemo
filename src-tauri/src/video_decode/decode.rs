@@ -56,7 +56,7 @@ pub(super) fn decode_at(s: &mut VideoSession, frame_index: i64, caller: &str) ->
     // logged on the CHEAP gap=0 path too (origin ends up equal to
     // frame_index in that case regardless of whether reuse "did anything",
     // since there was nothing to skip), which is why the isolated 3-session
-    // Rust repro below looked alarming at a glance but was actually fine
+    // Rust repro (tests_sessions.rs) looked alarming at a glance but was actually fine
     // (2.5% respawn rate — see three_simultaneous_sessions_playback_
     // mostly_avoids_respawns). This version distinguishes the two.
     let gap_for_diag = s.proc.as_ref().map(|p| frame_index - p.next_frame);
