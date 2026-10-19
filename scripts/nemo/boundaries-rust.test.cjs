@@ -314,6 +314,14 @@ test('P37C1C4A CPU payload children stay private within revision and read-query 
 });
 
 
+const EXPECTED_DESKTOP_PORT_BORROW_VIOLATIONS = [
+  ['rust.desktop.native.application', 'commands::DispatchErrorCode'],
+  ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
+  ['rust.desktop.native.application.tests', 'commands::DispatchErrorCode'],
+  ['rust.desktop.native.application.tests', 'desktop_viewport::CssPoint'],
+  ['rust.desktop.native.viewport', 'codec::decode_project'],
+  ['rust.desktop.native.viewport', 'commands::DispatchErrorCode'],
+];
 test('desktop native-engine grants are module-local: host, host tests and viewport cannot borrow another module item', (t) => {
   const root = desktopFixture(t);
   appendSource(root, 'src-tauri/src/native_application.rs', 'use native_engine::desktop_viewport::SurfacePort;\nuse native_engine::commands::DispatchErrorCode;');
@@ -323,14 +331,7 @@ test('desktop native-engine grants are module-local: host, host tests and viewpo
   const r = R.checkRustCrate(read('rust.profile.json'), policy, { root });
   assert.equal(r.ok, false);
   assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
-    .map((v) => [v.module, v.detail.path]).sort(), [
-    ['rust.desktop.native.application', 'commands::DispatchErrorCode'],
-    ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
-    ['rust.desktop.native.application.tests', 'commands::DispatchErrorCode'],
-    ['rust.desktop.native.application.tests', 'desktop_viewport::CssPoint'],
-    ['rust.desktop.native.viewport', 'codec::decode_project'],
-    ['rust.desktop.native.viewport', 'commands::DispatchErrorCode'],
-  ]);
+    .map((v) => [v.module, v.detail.path]).sort(), EXPECTED_DESKTOP_PORT_BORROW_VIOLATIONS);
 });
 
 test('raw identifiers cannot bypass desktop native-engine ports in the host, focused tests or viewport', (t) => {
@@ -342,14 +343,7 @@ test('raw identifiers cannot bypass desktop native-engine ports in the host, foc
   const r = R.checkRustCrate(read('rust.profile.json'), read('nemo-desktop.edges.json'), { root });
   assert.equal(r.ok, false);
   assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
-    .map((v) => [v.module, v.detail.path]).sort(), [
-    ['rust.desktop.native.application', 'commands::DispatchErrorCode'],
-    ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
-    ['rust.desktop.native.application.tests', 'commands::DispatchErrorCode'],
-    ['rust.desktop.native.application.tests', 'desktop_viewport::CssPoint'],
-    ['rust.desktop.native.viewport', 'codec::decode_project'],
-    ['rust.desktop.native.viewport', 'commands::DispatchErrorCode'],
-  ]);
+    .map((v) => [v.module, v.detail.path]).sort(), EXPECTED_DESKTOP_PORT_BORROW_VIOLATIONS);
 });
 
 test('desktop policy rejects a native_engine extern-crate alias before it can hide item access', (t) => {
