@@ -82,9 +82,17 @@
       var path=await ports.pick();
       return path==null?null:attachPath(path);
     }
+    function removalRouted(){
+      var route=Object.prototype.hasOwnProperty.call(ports,'removeRoute')?ports.removeRoute:ports.assetRoute;
+      return (typeof route==='function'?route():route)===true;
+    }
+    function removalGate(){return removalRouted()?null:Promise.reject(fault('unavailable','asset_remove_host_route_unavailable','Native asset removal is unavailable'));}
     function remove(assetId){
-      var blocked=gate();if(blocked)return blocked;
-      return commands.execute(Contract.REMOVE,function(pin){return {documentSnapshotId:pin.documentSnapshotId,assetId:assetId};});
+      var blocked=removalGate();if(blocked)return blocked;
+      return commands.execute(Contract.REMOVE,function(pin){
+        if(!removalRouted())throw fault('unavailable','asset_remove_host_route_unavailable','Native asset removal is unavailable');
+        return {documentSnapshotId:pin.documentSnapshotId,assetId:assetId};
+      });
     }
     // Raster ITEM edits (L06-L). Same route and receipt rules; the owner allocates the id of a created item.
     function item(build){return commands.execute(Contract.ITEM,build);}
@@ -107,8 +115,9 @@
     var pin=session.info(),key=JSON.stringify([pin.instanceId,pin.documentId,pin.lifecycleGeneration]);
     var entry=bindings.get(host);
     if(!entry||entry.ownerKey!==key){
-      entry={ownerKey:key,route:false,imageRoute:false};
+      entry={ownerKey:key,route:false,imageRoute:false,removeRoute:true};
       entry.binding=create(session,{assetRoute:function(){var route=entry.route;return (typeof route==='function'?route():route)===true;},
+        removeRoute:function(){var route=entry.removeRoute;return (typeof route==='function'?route():route)===true;},
         imageRoute:function(){var route=entry.imageRoute;return (typeof route==='function'?route():route)===true;},
         pickImage:function(){return host.__TAURI__.dialog.open({title:'Import Image',multiple:false,filters:[{name:'PNG Image',extensions:['png']}]});},pick:function(){
         return host.__TAURI__.dialog.open({title:'Import Image',multiple:false,filters:[{name:'Images',extensions:IMAGE_EXTENSIONS.slice()},{name:'All files',extensions:['*']}]});
@@ -117,6 +126,7 @@
     }
     if(options&&Object.prototype.hasOwnProperty.call(options,'assetRoute'))entry.route=options.assetRoute;
     if(options&&Object.prototype.hasOwnProperty.call(options,'imageRoute'))entry.imageRoute=options.imageRoute;
+    if(options&&Object.prototype.hasOwnProperty.call(options,'removeRoute'))entry.removeRoute=options.removeRoute;
     return entry.binding;
   }
   return Object.freeze({create:create,desktop:desktop,describePath:describePath,mintedAssetId:mintedAssetId,IMAGE_EXTENSIONS:IMAGE_EXTENSIONS});

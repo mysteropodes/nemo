@@ -1,7 +1,8 @@
 //! Typed refusals of the raster transactions: every refusal leaves revision, history depths, snapshot id and the
 //! canonical bytes exactly as they were (no partial publication).
 use super::super::support::{
-    drawing, layers_with_widget, legacy_record, owner, prepare, raster_item, run, state, target,
+    drawing, head, layers_with_widget, legacy_record, owner, prepare, raster_item, run, state,
+    target,
 };
 use crate::history::object_history::NativeObjectHistory;
 use crate::request_receipts::DispatchErrorCode as E;
@@ -274,4 +275,131 @@ fn a_prepared_candidate_pins_its_origin_and_a_stale_or_foreign_commit_publishes_
     let before = state(&o);
     assert_eq!(o.commit_item_edit(foreign), Err(E::WrongDocument));
     assert_eq!(state(&o), before);
+}
+
+#[cfg(feature = "project_media_codec")]
+fn remove_asset_request(
+    o: &NativeObjectHistory,
+    id: &str,
+) -> crate::request_receipts::OpacityRequest {
+    let current = head(o);
+    serde_json::from_value(json!({"apiVersion":2,"requestId":id,
+        "instanceId":o.instance_id(),"documentId":o.document_id(),
+        "expectedRevision":o.content_revision(),"operation":"command.document.object.asset.remove",
+        "payload":{"documentSnapshotId":current.snapshot_id(),"assetId":"img-1"}}))
+    .unwrap()
+}
+
+#[test]
+#[cfg(feature = "project_media_codec")]
+fn stored_raster_references_refuse_asset_removal_without_publication_or_history_change() {
+    for (layer, frame, hidden, locked) in [
+        ("L0", 0, false, false),
+        ("L1", 0, false, true),
+        ("L2", 7, true, false),
+    ] {
+        let mut item_target = target(layer, "held-raster");
+        item_target["frameScope"]["frame"] = json!(frame);
+        let mut doc = drawing(json!({"items":{"raster":[
+            {"target":item_target,"item":raster_item("img-1",1,2,3,4)}]}}));
+        let layer_value = doc["layers"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|value| value["layerUid"] == layer)
+            .unwrap();
+        layer_value["visible"] = json!(!hidden);
+        layer_value["locked"] = json!(locked);
+        let mut o = owner(&doc);
+        let before = state(&o);
+        let held = head(&o);
+        let refusal = held.prepare_asset_removal("img-1").unwrap_err();
+        assert_eq!(
+            (refusal.code(), refusal.reason()),
+            (E::BusyConflict, "asset_in_use")
+        );
+        assert_eq!(state(&o), before);
+        let request = remove_asset_request(&o, "remove-stored-raster");
+        let first = o.dispatch_asset_command(&request, None).unwrap();
+        assert_eq!(first.error().unwrap().code(), E::BusyConflict);
+        assert_eq!(
+            serde_json::to_value(&first).unwrap()["error"]["details"]["reason"],
+            "asset_in_use"
+        );
+        assert_eq!(o.dispatch_asset_command(&request, None).unwrap(), first);
+        assert_eq!(state(&o), before, "layer={layer}, frame={frame}");
+        let after = head(&o);
+        assert!(std::sync::Arc::ptr_eq(
+            &held.project().unwrap().asset_inventory().unwrap().records()[0],
+            &after
+                .project()
+                .unwrap()
+                .asset_inventory()
+                .unwrap()
+                .records()[0]
+        ));
+    }
+}
+
+#[test]
+#[cfg(feature = "project_media_codec")]
+fn deleting_the_last_raster_allows_removal_and_undo_redo_restore_both_owners() {
+    let mut o = owner(&drawing(json!({"items":{"raster":[
+        {"target":target("L0","r0"),"item":raster_item("img-1",1,2,3,4)}]}})));
+    let original = state(&o);
+    let held = head(&o);
+    assert_eq!(
+        run(
+            &mut o,
+            &json!({"command":"object.raster.delete","stableTarget":target("L0","r0")})
+        ),
+        Ok(1)
+    );
+    let deleted = state(&o);
+    assert_eq!(o.history_depths(), (1, 0));
+    assert!(head(&o).prepare_asset_removal("img-1").is_ok());
+    let response = o
+        .dispatch_asset_command(&remove_asset_request(&o, "remove-unreferenced"), None)
+        .unwrap();
+    assert!(response.is_ok());
+    assert_eq!(o.content_revision(), 2);
+    assert_eq!(o.history_depths(), (2, 0));
+    let id = crate::object_document::AssetId::new("img-1".into()).unwrap();
+    assert!(head(&o)
+        .project()
+        .unwrap()
+        .asset_inventory()
+        .unwrap()
+        .get(&id)
+        .is_none());
+    o.undo(2).unwrap();
+    assert_eq!(state(&o).3, deleted.3);
+    assert!(std::sync::Arc::ptr_eq(
+        &held.project().unwrap().asset_inventory().unwrap().records()[0],
+        &head(&o)
+            .project()
+            .unwrap()
+            .asset_inventory()
+            .unwrap()
+            .records()[0]
+    ));
+    o.undo(3).unwrap();
+    assert_eq!(state(&o).3, original.3);
+    assert_eq!(o.history_depths(), (0, 2));
+    assert_eq!(
+        head(&o).prepare_asset_removal("img-1").unwrap_err().code(),
+        E::BusyConflict
+    );
+    assert_eq!(o.history_depths(), (0, 2));
+    o.redo(4).unwrap();
+    o.redo(5).unwrap();
+    assert_eq!(state(&o).3, deleted.3);
+    assert!(head(&o)
+        .project()
+        .unwrap()
+        .asset_inventory()
+        .unwrap()
+        .get(&id)
+        .is_none());
+    assert_eq!(o.history_depths(), (2, 0));
 }

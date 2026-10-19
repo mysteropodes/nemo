@@ -1,7 +1,7 @@
 'use strict';
 /* Lane-6 image import / removal / raster-item adapter. Real adapter, command and contract modules over a session double
  * with the real route semantics (see native-object-item-support.cjs). Nothing here establishes native or installed
- * execution: the owner is a double and the host byte-source route is not registered. */
+ * execution: these controls use a double at the native owner boundary. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -80,9 +80,10 @@ test('queued commands read the current pin at execution, never the values of the
 test('absent native support is typed unavailability: no route, no dispatch, no request id', async () => {
   for (const route of [undefined, false, 1, 'yes', () => false, () => 1]) {
     const f = adapter({}, { assetRoute: route });
-    for (const call of [() => f.raster.attachPath(PATH), () => f.raster.remove('asset-x')]) {
+    for (const [call, reason] of [[() => f.raster.attachPath(PATH), 'asset_host_route_unavailable'],
+      [() => f.raster.remove('asset-x'), 'asset_remove_host_route_unavailable']]) {
       const error = await rejection(call());
-      assert.deepEqual([error.code, error.reason], ['unavailable', 'asset_host_route_unavailable']);
+      assert.deepEqual([error.code, error.reason], ['unavailable', reason]);
     }
     assert.deepEqual([f.owner.log.received.length, f.events.runs, f.events.ids.length], [0, 0, 0]);
   }
@@ -299,8 +300,8 @@ test('desktop binding: needs the native session, is cached per host and cancels 
   assert.equal((await rejection(unrouted.attachPath(PATH))).reason, 'asset_host_route_unavailable');
   assert.equal(Raster.desktop(host, { assetRoute: true }), unrouted, 'flipping the route later keeps the one binding');
   assert.equal((await unrouted.attachPath(PATH)).applied, true, 'and the route is read at call time, not pinned by the first caller');
-  assert.equal(Raster.desktop(host, { assetRoute: false }), unrouted);
-  assert.equal((await rejection(unrouted.remove('asset-project-asset-1'))).reason, 'asset_host_route_unavailable');
+  assert.equal(Raster.desktop(host, { assetRoute: false, removeRoute: false }), unrouted);
+  assert.equal((await rejection(unrouted.remove('asset-project-asset-1'))).reason, 'asset_remove_host_route_unavailable');
   const routedHost = Object.assign({}, host);
   const routed = Raster.desktop(routedHost, { assetRoute: true });
   const receipt = await routed.importPicked();
@@ -313,4 +314,70 @@ test('desktop binding: needs the native session, is cached per host and cancels 
   assert.equal(Raster.desktop({}), null);
   const noPicker = Raster.create(f.session, { assetRoute: true });
   assert.equal((await rejection(noPicker.importPicked())).reason, 'picker_unavailable');
+});
+
+test('separate removal route reaches the shared SDK without opening catalog-only attach', async () => {
+  const SDK = require('../src/js/adapters/native-application.js');
+  const f = createFixture();
+  const adapter = SDK.createNativeApplicationAdapter('asset-remove', { dispatch: f.owner.dispatch });
+  const session = Object.assign({}, f.session, {
+    runResourceCommand: (action) => f.session.runResourceCommand((ctx) => action(Object.assign({}, ctx, { dispatch: q => adapter.dispatch(q) }))),
+  });
+  const raster = Raster.create(session, { removeRoute: true });
+  await assert.rejects(raster.attachPath(PATH), e => e.reason === 'asset_host_route_unavailable');
+  const receipt = await raster.remove('absent');
+  assert.deepEqual(receipt, { requestId: 'project-asset-1', contentRevision: 7, applied: false, historyEntriesAdded: 0 });
+  assert.equal(f.owner.log.received.length, 1);
+  assert.equal(f.owner.log.received[0].operation, REMOVE);
+});
+
+test('removal route is checked again inside the serialized queue before dispatch', async () => {
+  const f = createFixture();
+  let enabled = true;
+  const raster = Raster.create(f.session, { removeRoute: () => enabled });
+  const pending = raster.remove('absent');
+  enabled = false;
+  await assert.rejects(pending, e => e.reason === 'asset_remove_host_route_unavailable');
+  assert.equal(f.owner.log.received.length, 0);
+});
+
+test('desktop exposes the registered removal route independently of PNG and catalog attach flags', async () => {
+  const f = createFixture();
+  const host = { NemoNativeObjectProject: { desktop: () => Object.assign({ blocksLegacy: () => true }, f.session) } };
+  const raster = Raster.desktop(host);
+  assert.equal((await raster.remove('absent')).applied, false);
+  await assert.rejects(raster.attachPath(PATH), e => e.reason === 'asset_host_route_unavailable');
+  assert.equal(Raster.desktop(host, { removeRoute: false }), raster);
+  await assert.rejects(raster.remove('absent'), e => e.reason === 'asset_remove_host_route_unavailable');
+  assert.equal(f.owner.log.received.length, 1);
+});
+
+
+test('removal lost acknowledgement reuses the exact SDK request and retained result', async () => {
+  const SDK = require('../src/js/adapters/native-application.js');
+  const f = createFixture({ faults: ['after'] });
+  f.owner.assets.set(PATH, 'asset-blue');
+  const sdk = SDK.createNativeApplicationAdapter('asset-remove', { dispatch: f.owner.dispatch });
+  const session = Object.assign({}, f.session, {
+    runResourceCommand: action => f.session.runResourceCommand(ctx => action(Object.assign({}, ctx, { dispatch: q => sdk.dispatch(q) }))),
+  });
+  const raster = Raster.create(session, { removeRoute: true });
+  const receipt = await raster.remove('asset-blue');
+  assert.deepEqual(receipt, { requestId: 'project-asset-1', contentRevision: 8, applied: true, historyEntriesAdded: 1 });
+  assert.deepEqual(f.owner.log.received[0], f.owner.log.received[1]);
+  assert.deepEqual(f.owner.log.executed, ['project-asset-1']);
+  assert.equal(f.owner.assets.size, 0);
+});
+
+test('removal in-use refusal passes through the shared SDK without retry or fallback', async () => {
+  const SDK = require('../src/js/adapters/native-application.js');
+  const f = createFixture({ refuse: () => ({ code: 'busy_conflict', message: 'in use', details: { reason: 'asset_in_use' } }) });
+  const sdk = SDK.createNativeApplicationAdapter('asset-remove', { dispatch: f.owner.dispatch });
+  const session = Object.assign({}, f.session, {
+    runResourceCommand: action => f.session.runResourceCommand(ctx => action(Object.assign({}, ctx, { dispatch: q => sdk.dispatch(q) }))),
+  });
+  const raster = Raster.create(session, { removeRoute: true });
+  await assert.rejects(raster.remove('asset-blue'), e => e.code === 'busy_conflict' && e.reason === 'asset_in_use');
+  assert.equal(f.owner.log.received.length, 1);
+  assert.equal(f.state.revision, 7);
 });
