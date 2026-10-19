@@ -2,15 +2,16 @@
 //!
 //! `ORACLE` below was produced by a Node 22.22 (Unicode 16.0) generator kept
 //! outside the repo (`gen.js`, sha256
-//! 9c7435470fe2b4f8486f2c22e8dcfa780ce264f32abcf42bddaf7debd1047435) that cuts `controlsOf`,
+//! 830a348ca257798c379d6bf50f9c0170bf808c54f7bb41437122951de567f272) that cuts `controlsOf`,
 //! `normalizeControlName`, `findControl`, `trackFor`, `_exprFps`, `_num`,
 //! `findLayerIndexByRef`, `findLayerIndexByUid`, `exprLayerControl`,
 //! `exprKeyAt`, `exprNumKeys`, `nearestKeyIndex`, `exprNearestKeyAtFrame`,
-//! `_markerEntry`, `_markerApi` and `_aliasMarkerApi` VERBATIM from
+//! `aliasKey`, `aliasNearestKey`, `_markerEntry`, `_markerApi` and
+//! `_aliasMarkerApi` VERBATIM from
 //! `src/js/motion.js` (sha256
 //! d38fcb0502e395045543a571531b15a1185c04106e04db165bd2949ed863d7ec), with
-//! shims only for `state`, `SM.t`, `_exprTick` and `_controlValue` (which
-//! reports the resolved layer and `findControl` index instead of sampling).
+//! shims only for `state`, `SM.t`, `_exprTick`, `_ectx` and `_controlValue`
+//! (which reports the resolved layer and `findControl` index, not a sample).
 //!
 //! A line is `HEAD | TOKEN..`; a token is `input=output`. Strings are `~`
 //! (null) or `'` + text with every char outside `[A-Za-z0-9_.-]` as `%{hex}`.
@@ -20,17 +21,19 @@
 //! * `R doc`: ref = `findLayerIndexByRef,findLayerIndexByUid,layerControl`.
 //! * `F doc layer`: control name = `findControl` index (`-1` none).
 //! * `T id`: keys `frame/v_v..`; `n`: track = count; `K id fps`: i = key;
-//!   `Q id fps`: frame = nearest key. A key is `frame,time,S<v>|V<v:..>,index`.
+//!   `Q id fps`: frame = nearest key; `X id fps ctxfps`: `k:i` = `aliasKey`,
+//!   `s:t` = `aliasNearestKey`. A key is `frame,time,S<v>|V<v:..>,index`.
 //! * `M id`: markers `frame,name,color`; `c`: list = count; `A id fps`: query
 //!   (string or number) = marker; `P`: frame = nearest; `L`: seconds = alias
 //!   `nearestKey`. A marker is `frame,time,name,color,index`. `~` is no track
-//!   or no list.
+//!   or no list. `H`: the Unicode fingerprint (see its test).
 
 use crate::evaluation::property_expression_lookup::{
-    find_control, key_at, nearest_key_at_frame, normalize_control_name, num_keys, ControlRecord,
-    Fps, KeyEntry, KeyRecord, KeyTrack, KeyValue, LayerRecord, LayerTable, LookupError,
-    LookupRefusal as R, MarkerEntry, MarkerList, MarkerQuery as Q, MarkerRecord, MAX_CONTROLS,
-    MAX_KEYS, MAX_LAYERS, MAX_MARKERS, MAX_NAME_BYTES, MAX_VALUE_DIMS,
+    find_control, key_at, key_at_floored, nearest_key_at_frame, nearest_key_seconds,
+    normalize_control_name, num_keys, ControlRecord, Fps, KeyEntry, KeyRecord, KeyTrack, KeyValue,
+    LayerRecord, LayerTable, LookupError, LookupRefusal as R, MarkerEntry, MarkerList,
+    MarkerQuery as Q, MarkerRecord, MAX_CONTROLS, MAX_KEYS, MAX_LAYERS, MAX_MARKERS,
+    MAX_NAME_BYTES, MAX_VALUE_DIMS,
 };
 use std::collections::HashMap;
 
@@ -63,29 +66,29 @@ T t3 | -12/1 2.5/2 2.5/3 7/4
 T t4 | 10/1 0/2 30/3 5/4 20/5
 n | ~=0 t0=0 t1=1 t2=5 t3=4 t4=5
 K ~ 24 | 0=- 1=- 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
-Q ~ 24 | -12=- -4.75=- 0=- 2.5=- 4.75=- 5=- 7=- 10=- 12.5=- 15=- 25=- 30=- 30.5=- 31=- -0=- 1e+300=-
+Q ~ 24 | -12=- -4.75=- 0=- 2.5=- 4.75=- 5=- 7=- 10=- -Infinity=- 15=- 25=- 30=- 30.5=- 31=- -0=- Infinity=-
+X ~ 24 30 | k:1.5=- k:2.9=- k:-0.5=- k:NaN=- k:Infinity=- k:1e+300=- k:0=- k:5=- s:0.2=- s:0.3333333333333333=- s:1e+307=- s:-1e+307=- s:NaN=- s:Infinity=- s:-Infinity=- s:0.5=-
 K ~ 29.97 | 0=- 1=- 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
-K ~ 1e-300 | 0=- 1=- 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
 K t0 24 | 0=- 1=- 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
-Q t0 24 | -12=- -4.75=- 0=- 2.5=- 4.75=- 5=- 7=- 10=- 12.5=- 15=- 25=- 30=- 30.5=- 31=- -0=- 1e+300=-
+Q t0 24 | -12=- -4.75=- 0=- 2.5=- 4.75=- 5=- 7=- 10=- -Infinity=- 15=- 25=- 30=- 30.5=- 31=- -0=- Infinity=-
+X t0 24 30 | k:1.5=- k:2.9=- k:-0.5=- k:NaN=- k:Infinity=- k:1e+300=- k:0=- k:5=- s:0.2=- s:0.3333333333333333=- s:1e+307=- s:-1e+307=- s:NaN=- s:Infinity=- s:-Infinity=- s:0.5=-
 K t0 29.97 | 0=- 1=- 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
-K t0 1e-300 | 0=- 1=- 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
 K t1 24 | 0=- 1=0,0,S5,1 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
-Q t1 24 | -12=0,0,S5,1 -4.75=0,0,S5,1 0=0,0,S5,1 2.5=0,0,S5,1 4.75=0,0,S5,1 5=0,0,S5,1 7=0,0,S5,1 10=0,0,S5,1 12.5=0,0,S5,1 15=0,0,S5,1 25=0,0,S5,1 30=0,0,S5,1 30.5=0,0,S5,1 31=0,0,S5,1 -0=0,0,S5,1 1e+300=0,0,S5,1
+Q t1 24 | -12=0,0,S5,1 -4.75=0,0,S5,1 0=0,0,S5,1 2.5=0,0,S5,1 4.75=0,0,S5,1 5=0,0,S5,1 7=0,0,S5,1 10=0,0,S5,1 -Infinity=0,0,S5,1 15=0,0,S5,1 25=0,0,S5,1 30=0,0,S5,1 30.5=0,0,S5,1 31=0,0,S5,1 -0=0,0,S5,1 Infinity=0,0,S5,1
+X t1 24 30 | k:1.5=0,0,S5,1 k:2.9=- k:-0.5=- k:NaN=- k:Infinity=- k:1e+300=- k:0=- k:5=- s:0.2=0,0,S5,1 s:0.3333333333333333=0,0,S5,1 s:1e+307=0,0,S5,1 s:-1e+307=0,0,S5,1 s:NaN=0,0,S5,1 s:Infinity=0,0,S5,1 s:-Infinity=0,0,S5,1 s:0.5=0,0,S5,1
 K t1 29.97 | 0=- 1=0,0,S5,1 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
-K t1 1e-300 | 0=- 1=0,0,S5,1 2=- 3=- 4=- 5=- 6=- -1=- -0=- 1.5=- 0.5=- 4.999=- 5.5=- 2.0000001=- 1e+300=- -1e+300=-
 K t2 24 | 0=- 1=0,0,V1:2,1 2=10,0.4166666666666667,S3,2 3=20,0.8333333333333334,V-0:0.1,3 4=30,1.25,V,4 5=31,1.2916666666666667,V7:8:9,5 6=- -1=- -0=- 1.5=E 0.5=- 4.999=E 5.5=- 2.0000001=E 1e+300=- -1e+300=-
-Q t2 24 | -12=0,0,V1:2,1 -4.75=0,0,V1:2,1 0=0,0,V1:2,1 2.5=0,0,V1:2,1 4.75=0,0,V1:2,1 5=0,0,V1:2,1 7=10,0.4166666666666667,S3,2 10=10,0.4166666666666667,S3,2 12.5=10,0.4166666666666667,S3,2 15=10,0.4166666666666667,S3,2 25=20,0.8333333333333334,V-0:0.1,3 30=30,1.25,V,4 30.5=30,1.25,V,4 31=31,1.2916666666666667,V7:8:9,5 -0=0,0,V1:2,1 1e+300=31,1.2916666666666667,V7:8:9,5
+Q t2 24 | -12=0,0,V1:2,1 -4.75=0,0,V1:2,1 0=0,0,V1:2,1 2.5=0,0,V1:2,1 4.75=0,0,V1:2,1 5=0,0,V1:2,1 7=10,0.4166666666666667,S3,2 10=10,0.4166666666666667,S3,2 -Infinity=0,0,V1:2,1 15=10,0.4166666666666667,S3,2 25=20,0.8333333333333334,V-0:0.1,3 30=30,1.25,V,4 30.5=30,1.25,V,4 31=31,1.2916666666666667,V7:8:9,5 -0=0,0,V1:2,1 Infinity=31,1.2916666666666667,V7:8:9,5
+X t2 24 30 | k:1.5=0,0,V1:2,1 k:2.9=10,0.4166666666666667,S3,2 k:-0.5=- k:NaN=- k:Infinity=- k:1e+300=- k:0=- k:5=31,1.2916666666666667,V7:8:9,5 s:0.2=10,0.4166666666666667,S3,2 s:0.3333333333333333=10,0.4166666666666667,S3,2 s:1e+307=31,1.2916666666666667,V7:8:9,5 s:-1e+307=0,0,V1:2,1 s:NaN=0,0,V1:2,1 s:Infinity=0,0,V1:2,1 s:-Infinity=0,0,V1:2,1 s:0.5=10,0.4166666666666667,S3,2
 K t2 29.97 | 0=- 1=0,0,V1:2,1 2=10,0.33366700033366703,S3,2 3=20,0.6673340006673341,V-0:0.1,3 4=30,1.001001001001001,V,4 5=31,1.0343677010343677,V7:8:9,5 6=- -1=- -0=- 1.5=E 0.5=- 4.999=E 5.5=- 2.0000001=E 1e+300=- -1e+300=-
-K t2 1e-300 | 0=- 1=0,0,V1:2,1 2=10,9.999999999999999e+300,S3,2 3=20,1.9999999999999999e+301,V-0:0.1,3 4=30,3e+301,V,4 5=31,3.1e+301,V7:8:9,5 6=- -1=- -0=- 1.5=E 0.5=- 4.999=E 5.5=- 2.0000001=E 1e+300=- -1e+300=-
 K t3 24 | 0=- 1=-12,-0.5,S1,1 2=2.5,0.10416666666666667,S2,2 3=2.5,0.10416666666666667,S3,3 4=7,0.2916666666666667,S4,4 5=- 6=- -1=- -0=- 1.5=E 0.5=- 4.999=- 5.5=- 2.0000001=E 1e+300=- -1e+300=-
-Q t3 24 | -12=-12,-0.5,S1,1 -4.75=-12,-0.5,S1,1 0=2.5,0.10416666666666667,S2,2 2.5=2.5,0.10416666666666667,S2,2 4.75=2.5,0.10416666666666667,S3,3 5=7,0.2916666666666667,S4,4 7=7,0.2916666666666667,S4,4 10=7,0.2916666666666667,S4,4 12.5=7,0.2916666666666667,S4,4 15=7,0.2916666666666667,S4,4 25=7,0.2916666666666667,S4,4 30=7,0.2916666666666667,S4,4 30.5=7,0.2916666666666667,S4,4 31=7,0.2916666666666667,S4,4 -0=2.5,0.10416666666666667,S2,2 1e+300=7,0.2916666666666667,S4,4
+Q t3 24 | -12=-12,-0.5,S1,1 -4.75=-12,-0.5,S1,1 0=2.5,0.10416666666666667,S2,2 2.5=2.5,0.10416666666666667,S2,2 4.75=2.5,0.10416666666666667,S3,3 5=7,0.2916666666666667,S4,4 7=7,0.2916666666666667,S4,4 10=7,0.2916666666666667,S4,4 -Infinity=-12,-0.5,S1,1 15=7,0.2916666666666667,S4,4 25=7,0.2916666666666667,S4,4 30=7,0.2916666666666667,S4,4 30.5=7,0.2916666666666667,S4,4 31=7,0.2916666666666667,S4,4 -0=2.5,0.10416666666666667,S2,2 Infinity=7,0.2916666666666667,S4,4
+X t3 24 30 | k:1.5=-12,-0.5,S1,1 k:2.9=2.5,0.10416666666666667,S2,2 k:-0.5=- k:NaN=- k:Infinity=- k:1e+300=- k:0=- k:5=- s:0.2=7,0.2916666666666667,S4,4 s:0.3333333333333333=7,0.2916666666666667,S4,4 s:1e+307=7,0.2916666666666667,S4,4 s:-1e+307=-12,-0.5,S1,1 s:NaN=2.5,0.10416666666666667,S2,2 s:Infinity=2.5,0.10416666666666667,S2,2 s:-Infinity=2.5,0.10416666666666667,S2,2 s:0.5=7,0.2916666666666667,S4,4
 K t3 29.97 | 0=- 1=-12,-0.4004004004004004,S1,1 2=2.5,0.08341675008341676,S2,2 3=2.5,0.08341675008341676,S3,3 4=7,0.2335669002335669,S4,4 5=- 6=- -1=- -0=- 1.5=E 0.5=- 4.999=- 5.5=- 2.0000001=E 1e+300=- -1e+300=-
-K t3 1e-300 | 0=- 1=-12,-1.2e+301,S1,1 2=2.5,2.4999999999999998e+300,S2,2 3=2.5,2.4999999999999998e+300,S3,3 4=7,7e+300,S4,4 5=- 6=- -1=- -0=- 1.5=E 0.5=- 4.999=- 5.5=- 2.0000001=E 1e+300=- -1e+300=-
 K t4 24 | 0=- 1=10,0.4166666666666667,S1,1 2=0,0,S2,2 3=30,1.25,S3,3 4=5,0.20833333333333334,S4,4 5=20,0.8333333333333334,S5,5 6=- -1=- -0=- 1.5=E 0.5=- 4.999=E 5.5=- 2.0000001=E 1e+300=- -1e+300=-
-Q t4 24 | -12=10,0.4166666666666667,S1,1 -4.75=10,0.4166666666666667,S1,1 0=10,0.4166666666666667,S1,1 2.5=0,0,S2,2 4.75=0,0,S2,2 5=0,0,S2,2 7=0,0,S2,2 10=0,0,S2,2 12.5=0,0,S2,2 15=0,0,S2,2 25=30,1.25,S3,3 30=30,1.25,S3,3 30.5=20,0.8333333333333334,S5,5 31=20,0.8333333333333334,S5,5 -0=10,0.4166666666666667,S1,1 1e+300=20,0.8333333333333334,S5,5
+Q t4 24 | -12=10,0.4166666666666667,S1,1 -4.75=10,0.4166666666666667,S1,1 0=10,0.4166666666666667,S1,1 2.5=0,0,S2,2 4.75=0,0,S2,2 5=0,0,S2,2 7=0,0,S2,2 10=0,0,S2,2 -Infinity=10,0.4166666666666667,S1,1 15=0,0,S2,2 25=30,1.25,S3,3 30=30,1.25,S3,3 30.5=20,0.8333333333333334,S5,5 31=20,0.8333333333333334,S5,5 -0=10,0.4166666666666667,S1,1 Infinity=20,0.8333333333333334,S5,5
+X t4 24 30 | k:1.5=10,0.4166666666666667,S1,1 k:2.9=0,0,S2,2 k:-0.5=- k:NaN=- k:Infinity=- k:1e+300=- k:0=- k:5=20,0.8333333333333334,S5,5 s:0.2=0,0,S2,2 s:0.3333333333333333=0,0,S2,2 s:1e+307=20,0.8333333333333334,S5,5 s:-1e+307=10,0.4166666666666667,S1,1 s:NaN=10,0.4166666666666667,S1,1 s:Infinity=10,0.4166666666666667,S1,1 s:-Infinity=10,0.4166666666666667,S1,1 s:0.5=0,0,S2,2
 K t4 29.97 | 0=- 1=10,0.33366700033366703,S1,1 2=0,0,S2,2 3=30,1.001001001001001,S3,3 4=5,0.16683350016683351,S4,4 5=20,0.6673340006673341,S5,5 6=- -1=- -0=- 1.5=E 0.5=- 4.999=E 5.5=- 2.0000001=E 1e+300=- -1e+300=-
-K t4 1e-300 | 0=- 1=10,9.999999999999999e+300,S1,1 2=0,0,S2,2 3=30,3e+301,S3,3 4=5,4.9999999999999997e+300,S4,4 5=20,1.9999999999999999e+301,S5,5 6=- -1=- -0=- 1.5=E 0.5=- 4.999=E 5.5=- 2.0000001=E 1e+300=- -1e+300=-
 M m0 | 
 M m1 | 10,'Hit,'%{23}f00 0,',~ 20,'Hit,' 5,~,'%{23}0f0 15,'hit,~ -5,'Pr%{e9}%{20}roll,~
 M m2 | 4,'a,~ 8,'b,~ 6,'c,~ 6,'d,~
@@ -115,6 +118,7 @@ A m3 24 | 0=- 1=1e+308,4.1666666666666665e+306,'far,~,1 2=-1e+308,-4.16666666666
 A m3 24 | NaN=- Infinity=- -Infinity=- '=- 'Hit=- 'hit=- 'HIT=- 'Pr%{e9}%{20}roll=- 'a=- 'c=- 'd=- 'zzz=- '1=- '%{20}Hit=-
 P m3 24 | -5=1e+308,4.1666666666666665e+306,'far,~,1 -2.5=1e+308,4.1666666666666665e+306,'far,~,1 0=1e+308,4.1666666666666665e+306,'far,~,1 2.5=1e+308,4.1666666666666665e+306,'far,~,1 5=1e+308,4.1666666666666665e+306,'far,~,1 6=1e+308,4.1666666666666665e+306,'far,~,1 7=1e+308,4.1666666666666665e+306,'far,~,1 7.5=1e+308,4.1666666666666665e+306,'far,~,1 12.5=1e+308,4.1666666666666665e+306,'far,~,1 17.5=1e+308,4.1666666666666665e+306,'far,~,1 -0=1e+308,4.1666666666666665e+306,'far,~,1 NaN=1e+308,4.1666666666666665e+306,'far,~,1 Infinity=1e+308,4.1666666666666665e+306,'far,~,1 -Infinity=1e+308,4.1666666666666665e+306,'far,~,1 1e+308=1e+308,4.1666666666666665e+306,'far,~,1 -1e+308=-1e+308,-4.1666666666666665e+306,'neg,~,2
 L m3 24 | 0=1e+308,4.1666666666666665e+306,'far,~,1 0.25=1e+308,4.1666666666666665e+306,'far,~,1 0.3125=1e+308,4.1666666666666665e+306,'far,~,1 0.3333333333333333=1e+308,4.1666666666666665e+306,'far,~,1 -1=1e+308,4.1666666666666665e+306,'far,~,1 1e+306=1e+308,4.1666666666666665e+306,'far,~,1 1e+308=1e+308,4.1666666666666665e+306,'far,~,1 -1e+308=1e+308,4.1666666666666665e+306,'far,~,1 NaN=1e+308,4.1666666666666665e+306,'far,~,1 Infinity=1e+308,4.1666666666666665e+306,'far,~,1
+H | d23c7984
 "#;
 
 fn s(tok: &str) -> Option<String> {
@@ -199,24 +203,18 @@ fn fps(tok: &str) -> Fps {
 }
 
 fn ctl(name: Option<&str>) -> ControlRecord {
-    ControlRecord {
-        name: name.map(Into::into),
-    }
+    let name = name.map(Into::into);
+    ControlRecord { name }
 }
 
 fn mk(frame: f64, name: Option<&str>) -> MarkerRecord {
-    MarkerRecord {
-        frame,
-        name: name.map(Into::into),
-        color: None,
-    }
+    let (name, color) = (name.map(Into::into), None);
+    MarkerRecord { frame, name, color }
 }
 
 fn kr(frame: f64, value: &[f64]) -> KeyRecord {
-    KeyRecord {
-        frame,
-        value: value.to_vec(),
-    }
+    let value = value.to_vec();
+    KeyRecord { frame, value }
 }
 
 type Row = (Vec<String>, String, String);
@@ -228,6 +226,7 @@ struct Oracle {
     tracks: HashMap<String, KeyTrack>,
     markers: HashMap<String, MarkerList>,
     rows: Vec<Row>,
+    fingerprint: String,
 }
 
 fn load() -> Oracle {
@@ -263,19 +262,17 @@ fn load() -> Oracle {
             "M" => {
                 let ms = toks.map(|t| {
                     let p: Vec<&str> = t.split(',').collect();
-                    MarkerRecord {
-                        frame: f(p[0]),
-                        name: s(p[1]),
-                        color: s(p[2]),
-                    }
+                    let (frame, name, color) = (f(p[0]), s(p[1]), s(p[2]));
+                    MarkerRecord { frame, name, color }
                 });
                 o.markers.insert(id, MarkerList::new(ms.collect()).unwrap());
             }
+            "H" => o.fingerprint = toks.collect(),
             kind => {
                 for t in toks {
                     let (i, e) = t.split_once('=').unwrap();
                     let e = match kind {
-                        "K" | "Q" => bits_of(e, true),
+                        "K" | "Q" | "X" => bits_of(e, true),
                         "A" | "P" | "L" => bits_of(e, false),
                         _ => e.to_owned(),
                     };
@@ -291,7 +288,7 @@ fn run(o: &Oracle, head: &[String], i: &str) -> String {
     let track = |id: &str| o.tracks.get(id);
     let empty = MarkerList::new(vec![]).unwrap();
     let list = || o.markers.get(&head[1]).unwrap_or(&empty);
-    let fps = || fps(&head[2]);
+    let (fps, ctx) = (|| fps(&head[2]), || fps(&head[3]));
     match head[0].as_str() {
         "N" => enc(Some(&normalize_control_name(s(i).as_deref()).unwrap())),
         "R" => {
@@ -310,6 +307,10 @@ fn run(o: &Oracle, head: &[String], i: &str) -> String {
         "n" => num_keys(track(i)).to_string(),
         "K" => key(key_at(track(&head[1]), f(i), fps())),
         "Q" => key(nearest_key_at_frame(track(&head[1]), f(i), fps())),
+        "X" => match i.split_once(':').unwrap() {
+            ("k", i) => key(Ok(key_at_floored(track(&head[1]), f(i), fps()))),
+            (_, t) => key(Ok(nearest_key_seconds(track(&head[1]), f(t), ctx(), fps()))),
+        },
         "c" => o.markers.get(i).map_or(0, MarkerList::count).to_string(),
         "A" => {
             let name = s(i);
@@ -394,20 +395,28 @@ fn oracle_rejects_rule_misreadings() {
     }
 }
 
-/// The two pinned Unicode tables are relative to this exact toolchain.
+/// Toolchain tripwire, no version check: Node's FNV-1a over every scalar `c` of
+/// `c`, `normalizeControlName(c)`, `0x110000` and (but U+03A3) the final-sigma
+/// pair `2 * [ΑΣc ends in ς] + [ΑcΣ ends in ς]` fails only on a real mismatch.
 #[test]
-fn unicode_tables_are_pinned_to_the_toolchain() {
-    assert_eq!(char::UNICODE_VERSION, (17, 0, 0), "re-measure");
+fn unicode_results_match_node_on_this_toolchain() {
     let n = |x: &str| normalize_control_name(Some(x)).unwrap();
-    eq! {
-        n("\u{feff} Ab\u{3000}") => "ab";
-        n("\u{85}Ab") => "\u{85}ab";
-        n("\u{a7ce}\u{16ea0}") => "\u{a7ce}\u{16ea0}";
-        n("ΟΔΟΣ ΟΔΟΣ") => "οδος οδος";
-        n("\u{391}\u{295}\u{3a3}") => "\u{3b1}\u{295}\u{3c2}";
-        n("\u{391}\u{3a3}\u{295}") => "\u{3b1}\u{3c3}\u{295}";
-        n("\u{130}") => "i\u{307}";
+    let sig = |x: String| u32::from(n(&x).contains('\u{3c2}'));
+    let mut h: u32 = 0x811c_9dc5;
+    let mut feed = |x: u32| h = (h ^ x).wrapping_mul(0x0100_0193);
+    for ch in (0..=0x10_ffff).filter_map(char::from_u32) {
+        feed(ch as u32);
+        n(&ch.to_string()).chars().for_each(|o| feed(o as u32));
+        feed(0x11_0000);
+        if ch != '\u{3a3}' {
+            feed(2 * sig(format!("\u{391}\u{3a3}{ch}")) + sig(format!("\u{391}{ch}\u{3a3}")));
+        }
     }
+    assert_eq!(
+        format!("{h:x}"),
+        load().fingerprint,
+        "re-measure JS_* tables"
+    );
 }
 
 #[test]
@@ -472,7 +481,10 @@ fn refusals_are_typed() {
     );
     let ml = MarkerList::new(vec![mk(0.0, None)]).unwrap();
     eq! {
-        layers(vec![named(&long[1..])]) => None;
+        layers(vec![named(&long[1..]); MAX_LAYERS]) => None;
+        layers(vec![LayerRecord { controls: vec![ctl(None); MAX_CONTROLS], ..named("a") }]) => None;
+        keys(vec![kr(0.0, &[0.0; MAX_VALUE_DIMS]); MAX_KEYS]) => None;
+        markers(vec![mk(0.0, Some(&long[1..])); MAX_MARKERS]) => None;
         layers(vec![named(&long)]) => Some(R::NameTooLong);
         layers(vec![named("a"); MAX_LAYERS + 1]) => Some(R::TooManyLayers);
         layers(vec![busy]) => Some(R::TooManyControls);
@@ -494,9 +506,7 @@ fn refusals_are_typed() {
     }
     for q in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert_eq!(key_at(Some(&tr), q, fps), Err(R::NonFiniteQuery.into()));
-        assert_eq!(
-            nearest_key_at_frame(None, q, fps),
-            Err(R::NonFiniteQuery.into())
-        );
     }
+    let near = |q: f64| nearest_key_at_frame(Some(&tr), q, fps).map(|k| k.map(|k| k.index));
+    eq! { near(f64::NAN) => Err(R::NonFiniteQuery.into()); near(f64::INFINITY) => Ok(Some(1)); }
 }

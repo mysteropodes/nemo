@@ -1,43 +1,40 @@
 //! Expression lookup kernel over supplied immutable records (D16-K1, #2278).
 //!
-//! Mirrors the name, uid, control, keyframe and marker lookups of
-//! `src/js/motion.js`: `findLayerIndexByRef`, `findLayerIndexByUid`, the
-//! resolution order of `exprLayerControl`, `normalizeControlName`,
+//! Mirrors `src/js/motion.js`: `findLayerIndexByRef`, `findLayerIndexByUid`,
+//! `exprLayerControl`'s resolution order, `normalizeControlName`,
 //! `findControl`, `exprKeyAt`, `exprNumKeys`, `nearestKeyIndex`,
-//! `exprNearestKeyAtFrame`, `_markerEntry`, `_markerApi` and
-//! `_aliasMarkerApi`. Every input is a caller-owned record copied into a
-//! validated table; nothing here samples a track, evaluates a guest, builds a
-//! snapshot, persists, or owns document state.
+//! `exprNearestKeyAtFrame`, `aliasKey`, `aliasNearestKey`, `_markerEntry`,
+//! `_markerApi` and `_aliasMarkerApi`, over validated caller-owned records. Nothing
+//! here samples, evaluates a guest, builds a snapshot, persists or owns state.
 //!
 //! Motion semantics kept on purpose:
-//! - a layer reference is the FIRST exact (case-sensitive) name match, then
-//!   the first uid match; `layerControl` tries the uid FIRST, so a layer whose
-//!   name equals another layer's uid resolves differently through the two;
-//! - control names compare after JS `trim()` + `toLowerCase()`, reproduced
-//!   here exactly (see [`normalize_control_name`]), and the first match wins;
-//! - `keys.at(i)` is 1-based and does not floor: an in-range non-integer index
-//!   makes Motion throw, which is [`LookupError::KeyIndexNotInteger`];
-//! - the nearest key is a binary search where the earlier key wins a tie; the
-//!   nearest marker is a linear scan where the first marker wins a tie, and
-//!   markers may be unsorted;
-//! - marker indexes and frames go through Motion's `_num` (a non-finite number
-//!   reads 0) and `Math.floor`; the alias `nearestKey` takes seconds × fps and
-//!   re-applies `_num`, so an overflowing product reads frame 0.
+//! - a layer reference is the FIRST exact name match, then the first uid
+//!   match; `layerControl` tries the uid FIRST, so the two can disagree;
+//! - control names compare after JS `trim()` + `toLowerCase()` with the Node 22
+//!   (Unicode 16.0) results on any toolchain the pinned tables cover; the first
+//!   match wins;
+//! - keys are 1-based. The raw `exprKeyAt` does not floor (an in-range
+//!   fraction throws there: [`LookupError::KeyIndexNotInteger`]), but its
+//!   guest callers `self.keys.at` and `aliasKey` floor `_num(i)` first
+//!   ([`key_at_floored`]), so no guest reaches that error;
+//! - the nearest key is a binary search (earlier key wins a tie; ±Infinity
+//!   clamps to an end); the nearest marker is a linear scan over possibly
+//!   unsorted markers (first wins a tie);
+//! - marker indexes and frames go through `_num` (non-finite reads 0) and
+//!   `Math.floor`. Both `nearestKey` aliases take seconds × fps: the marker one
+//!   re-applies `_num`, so an overflow reads frame 0; the key one does not.
 //!
-//! Bounds are this kernel's own contract, not Motion's: records and queries
-//! beyond them are refused with a typed [`LookupRefusal`].
+//! Bounds are this kernel's own contract: beyond them input is refused with
+//! a typed [`LookupRefusal`].
 
-/// Most layers a table may hold.
+// Inclusive bounds: layers per table, controls per layer, keys per track,
+// components per key value, markers per list, and UTF-8 bytes per name, uid,
+// color or query string.
 pub(crate) const MAX_LAYERS: usize = 4096;
-/// Most expression controls one layer may declare.
 pub(crate) const MAX_CONTROLS: usize = 256;
-/// Most keys one track may hold.
 pub(crate) const MAX_KEYS: usize = 65_536;
-/// Most components one key value may hold.
 pub(crate) const MAX_VALUE_DIMS: usize = 16;
-/// Most markers one list may hold.
 pub(crate) const MAX_MARKERS: usize = 4096;
-/// Longest name, uid, color or query string, in UTF-8 bytes.
 pub(crate) const MAX_NAME_BYTES: usize = 1024;
 
 /// Input this kernel refuses before looking anything up.
@@ -51,7 +48,7 @@ pub(crate) enum LookupRefusal {
     NameTooLong,
     /// A key frame, key value or marker frame is NaN or infinite.
     NonFiniteRecord,
-    /// A key index or key frame query is NaN or infinite.
+    /// A raw key index is NaN or infinite, or a key frame query is NaN.
     NonFiniteQuery,
     /// The frame rate is not finite and positive.
     InvalidFps,
@@ -326,6 +323,9 @@ pub(crate) struct KeyEntry {
     pub(crate) index: usize,
 }
 
+/// A raw key lookup: an entry, null, or Motion's throw.
+pub(crate) type KeyResult = Result<Option<KeyEntry>, LookupError>;
+
 /// A validated, immutable key list in stored order (sorting is not assumed).
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct KeyTrack {
@@ -355,11 +355,7 @@ pub(crate) fn num_keys(track: Option<&KeyTrack>) -> usize {
 }
 
 /// `exprKeyAt`: 1-based and unfloored; out of range or no track is `None`.
-pub(crate) fn key_at(
-    track: Option<&KeyTrack>,
-    i: f64,
-    fps: Fps,
-) -> Result<Option<KeyEntry>, LookupError> {
+pub(crate) fn key_at(track: Option<&KeyTrack>, i: f64, fps: Fps) -> KeyResult {
     if !i.is_finite() {
         return Err(LookupRefusal::NonFiniteQuery.into());
     }
@@ -407,13 +403,29 @@ fn nearest_key_index(keys: &[KeyRecord], target: f64) -> usize {
     lo - usize::from(next >= prev)
 }
 
-/// `exprNearestKeyAtFrame`; an empty or missing track is `None`.
-pub(crate) fn nearest_key_at_frame(
+/// `self.keys.at(i)` and the alias `key(i)`: `exprKeyAt(Math.floor(_num(i)))`,
+/// whose index is always an integer, so it never errs.
+pub(crate) fn key_at_floored(track: Option<&KeyTrack>, i: f64, fps: Fps) -> Option<KeyEntry> {
+    key_at(track, js_num(i).floor(), fps).ok().flatten()
+}
+
+/// The alias `nearestKey(t)`: `exprNearestKeyAtFrame(_num(t) * ctx.fps)` with
+/// no second `_num`, so an overflowing product clamps to the last or first key.
+pub(crate) fn nearest_key_seconds(
     track: Option<&KeyTrack>,
-    frame: f64,
+    t: f64,
+    ctx_fps: Fps,
     fps: Fps,
-) -> Result<Option<KeyEntry>, LookupError> {
-    if !frame.is_finite() {
+) -> Option<KeyEntry> {
+    nearest_key_at_frame(track, js_num(t) * ctx_fps.get(), fps)
+        .ok()
+        .flatten()
+}
+
+/// `exprNearestKeyAtFrame`; an empty or missing track is `None`. ±Infinity
+/// clamps to the last or first key as Motion's binary search does.
+pub(crate) fn nearest_key_at_frame(track: Option<&KeyTrack>, frame: f64, fps: Fps) -> KeyResult {
+    if frame.is_nan() {
         return Err(LookupRefusal::NonFiniteQuery.into());
     }
     match track {
@@ -452,6 +464,8 @@ pub(crate) enum MarkerQuery<'a> {
     Name(&'a str),
     Number(f64),
 }
+
+type MarkerAt = Result<Option<MarkerEntry>, LookupRefusal>;
 
 /// `_markerApi(list)`; a missing list is empty. Order is as stored.
 #[derive(Debug, Clone, PartialEq)]
@@ -497,11 +511,7 @@ impl MarkerList {
 
     /// `at(i)` (and the alias `key`): the first marker named exactly `i`
     /// (no name reads `''`), or `Math.floor(_num(i))`, 1-based.
-    pub(crate) fn at(
-        &self,
-        q: MarkerQuery<'_>,
-        fps: Fps,
-    ) -> Result<Option<MarkerEntry>, LookupRefusal> {
+    pub(crate) fn at(&self, q: MarkerQuery<'_>, fps: Fps) -> MarkerAt {
         Ok(match q {
             MarkerQuery::Name(n) => {
                 bounded(n)?;
