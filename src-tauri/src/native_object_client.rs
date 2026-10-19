@@ -122,6 +122,13 @@ pub(super) fn client_status(state: &ApplicationMcp) -> Result<Value, String> {
 }
 
 impl ApplicationMcp {
+    pub(crate) fn dispatch_object_request_json(
+        &self,
+        raw: &str,
+    ) -> Result<NativeApplicationResponse, String> {
+        dispatch_raw(self, raw)
+    }
+
     pub(crate) fn serialize_object_file_snapshot(
         &self,
         raw: &str,
@@ -175,7 +182,7 @@ pub(crate) fn nemo_native_object_dispatch(
     request_json: String,
 ) -> Result<NativeApplicationResponse, String> {
     require_main(&window)?;
-    dispatch_raw(&state, &request_json)
+    state.dispatch_object_request_json(&request_json)
 }
 
 #[tauri::command]
