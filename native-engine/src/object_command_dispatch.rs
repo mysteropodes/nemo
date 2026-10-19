@@ -330,7 +330,7 @@ impl NativeObjectHistory {
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 self.dispatch_widget_command(request.operation.as_str(), &payload)
             } else if is_frame_clipboard_operation(request.operation.as_str()) {
-                self.dispatch_frame_clipboard(request.operation.as_str(), &request.payload)
+                self.dispatch_frame_clipboard(request)
             } else if request.operation == OP_PROJECT_SETTINGS {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -429,7 +429,7 @@ impl NativeObjectHistory {
         }
     }
 
-    fn object_reply(
+    pub(super) fn object_reply(
         &self,
         request: &OpacityRequest,
         disposition: &RetainedDisposition,

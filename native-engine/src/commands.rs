@@ -28,6 +28,8 @@ pub(crate) use object_fill_owner::component_owner::{
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::scene_effect_layer_edit::PreparedLayerCompositing;
 #[cfg(feature = "history")]
+pub(crate) use object_fill_owner::PreparedBlankKey;
+#[cfg(feature = "history")]
 pub(crate) use object_fill_owner::PreparedExposureKey;
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::PreparedExposureRetime;
@@ -48,8 +50,8 @@ pub(crate) use object_fill_owner::{
 };
 #[cfg(feature = "history")]
 pub(crate) use object_fill_owner::{
-    packet_paste_cells, paste_payload, CellRef, FrameClipboardOperation, FrameClipboardOutcome,
-    FrameClipboardPacket, PasteCell, PasteRequest, PreparedFrameClipboard,
+    cut_clipboard_payload, packet_paste_cells, paste_payload, CellRef, FrameClipboardOperation,
+    FrameClipboardOutcome, FrameClipboardPacket, PasteCell, PasteRequest, PreparedFrameClipboard,
 };
 
 use crate::document::OpacityDocument;

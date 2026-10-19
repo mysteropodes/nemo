@@ -5,7 +5,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
 const original=require('./p38-owned-window-build.cjs');
-const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift','ui32-owned-picker.swift','ui32-owned-readiness.swift','ui32-owned-profile.swift','ui32-owned-phase2.swift','ui32-owned-content.swift']);
+const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift','ui32-owned-picker.swift','ui32-owned-readiness.swift','ui32-owned-profile.swift','ui32-owned-phase2.swift','ui32-owned-content.swift','f03-owned-opacity.swift','f03-owned-opacity-controls.swift','f03-owned-save.swift','f03-owned-save-controls.swift','ui32-owned-fixture-controls.swift']);
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function requireValid(ok){if(!ok)throw Error('ui32-helper-build-refused');}
 function fresh(file){
@@ -47,12 +47,13 @@ function buildUI32Helper(output,proofFile){
       const test=spawnSync(executable,[flag],{encoding:'utf8',timeout:30000,maxBuffer:16384});
       requireValid(!test.error&&test.status===0);const result=JSON.parse(test.stdout);
       requireValid(result.status===(flag==='--self-test'?'static-model-pass':'ui32-static-model-pass')&&result.runtimeAX===false&&result.foreignReads===0);
+      if(flag==='--ui32-self-test')requireValid(result.f03?.opacity===140&&result.f03?.save===126&&result.f03?.total===266&&result.f03?.join===107&&result.f03?.all===373);
       controls.push({flag,result});
     }
     const after=identity.sourceIdentity();requireValid(!after.dirty&&after.head===source.head&&manifest().sourceSha256===frozen.sourceSha256);
     fresh(output);fresh(proofFile);fs.copyFileSync(executable,output,fs.constants.COPYFILE_EXCL);published=true;fs.chmodSync(output,0o700);
     const proof={schema:'nemo.ui32-window-helper/1',purpose:'UI32',sourceHead:source.head,sourceSha256:frozen.sourceSha256,
-      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (twelve frozen inputs)',
+      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (seventeen frozen inputs)',
       runtimeAX:false,foreignReads:0,controls};
     fs.writeFileSync(proofFile,JSON.stringify(proof,null,2)+'\n',{flag:'wx',mode:0o600});return proof;
   }catch(e){if(published)fs.rmSync(output,{force:true});throw e;}

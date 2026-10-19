@@ -15,11 +15,15 @@
     "command.document.object.frames.duplicate",
     "command.document.object.frames.remove",
     "command.document.object.layer.key.promote",
+    "command.document.object.layer.key.blank",
     "command.document.object.layer.key.clear",
     "command.document.object.layer.key.clear_cells",
     "command.document.object.layer.tween.remove",
     "command.document.object.layer.key.move",
     "command.document.object.frames.clipboard.duplicate",
+    "command.document.object.frames.clipboard.copy",
+    "command.document.object.frames.clipboard.cut",
+    "command.document.object.frames.clipboard.paste",
     "command.document.object.frames.repeat"
   ],
   "input": {
@@ -40,6 +44,9 @@
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyPromotePayload"
       },
       {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyBlankPayload"
+      },
+      {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyClearPayload"
       },
       {
@@ -55,6 +62,15 @@
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesClipboardDuplicatePayload"
       },
       {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesClipboardCopyPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesClipboardCutPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesClipboardPastePayload"
+      },
+      {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFramesRepeatPayload"
       }
     ]
@@ -67,9 +83,9 @@
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained frame-edit receipt or typed refusal; no document, packet or resource payload. Lists are bounded by the 4096-byte request."
+    "policy": "Complete request and correlated retained reply remain bounded to4096 encoded UTF-8 bytes. Copy/Cut may return the existing detached native clipboard DTO inline; an oversized complete reply refuses before mutation. No truncation, chunking, cap increase or alternative clipboard owner."
   },
-  "semantics": "Eleven frame, key and exposure edits of the dense editor (F5/F6, extend, duplicate key, remove frame(s), clear key, delete frames, remove tween, move key, duplicate selection, repeat selection). Each is prepared against the retained snapshot and published through the shared revision, history and request-receipt owner: one changed operation adds one revision and one undo entry; a semantic no-op adds neither and keeps redo; a locked layer is skipped or refused exactly as the baseline does. Frame numbers are zero-based u32 cells; layers are named by their opaque stable layerUid. The result is the compact receipt only; cut, copy and paste are not declared because a clipboard packet is produced by the typed native API. F7 blank key is not declared. No JS/Paper writer, optimistic mutation or fallback.",
+  "semantics": "Fifteen frame, key, exposure and clipboard operations of the dense editor (F5/F6/F7, extend, duplicate key, remove frame(s), clear key, delete frames, remove tween, move key, duplicate selection, repeat selection). Each is prepared against the retained snapshot and published through the shared revision, history and request-receipt owner: one changed operation adds one revision and one undo entry; a semantic no-op adds neither and keeps redo, except F7 deliberately adds one revision and undo checkpoint for every successful blank key including already blank; a locked layer is skipped or refused exactly as the baseline does. Frame numbers are zero-based u32 cells; layers are named by their opaque stable layerUid. Copy and Cut return exactly applied/historyEntriesAdded/clipboard; clipboard is null (no new packet, preserve the existing UI clipboard) or the detached native source instanceId/documentId/cells packet. Copy is read-only and always applied=false/historyEntriesAdded=0 with the same revision. Cut reports its actual change with zero or one history entry and matching revision, including an unchanged locked source that still returns a packet. Paste returns the compact two-field receipt and consumes the exact existing packet cells, including optional orderElements. Empty selection and empty paste cells are admitted by the native API; ordinary UI selection refusal stays in its caller. The bounded public DTO shell checks containers; full record/order grammar and semantic relationships are validated atomically by the native owner. Complete correlated replies are size-admitted before any commit. F7 targets only the active layer; locked ordinary layers refuse, component outer keys may be blanked even when locked. Preserved-holder and nested-context cases may remain unavailable and are not full desktop acceptance. No JS/Paper writer, optimistic mutation or fallback. Repeat alone returns native cycledLayers and skippedComponentLayers, including unchanged cycles; an applied global timeline growth may have zero cycled layers. The UI consumes confirmed counts rather than inferring them from selection or applied.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -232,6 +248,34 @@
       }
     },
     {
+      "label": "F7 blank key: active layer only, one undo checkpoint even for an already blank key; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-key-blank-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.key.blank",
+        "payload": {
+          "command": "object.layer.key.blank",
+          "layerUid": "layer-a",
+          "cell": 3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-key-blank-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
       "label": "Clear keyframe: demote a key to a hold; installed/UI acceptance remains pending",
       "request": {
         "apiVersion": 2,
@@ -383,6 +427,135 @@
       }
     },
     {
+      "label": "Copy native clipboard through the shared owner; original ordinary/client/installed acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-copy-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.clipboard.copy",
+        "payload": {
+          "command": "object.frames.clipboard.copy",
+          "selection": [
+            {
+              "layerUid": "layer-a",
+              "frame": 2
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-copy-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "applied": false,
+          "historyEntriesAdded": 0,
+          "clipboard": {
+            "instanceId": "instance-A",
+            "documentId": "document-A",
+            "cells": [
+              {
+                "relLayer": 0,
+                "relFrame": 0,
+                "keyframe": true,
+                "records": [],
+                "orderElements": []
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "label": "Cut native clipboard through the shared owner; original ordinary/client/installed acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-cut-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.clipboard.cut",
+        "payload": {
+          "command": "object.frames.clipboard.cut",
+          "selection": [
+            {
+              "layerUid": "layer-a",
+              "frame": 2
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-cut-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "clipboard": {
+            "instanceId": "instance-A",
+            "documentId": "document-A",
+            "cells": [
+              {
+                "relLayer": 0,
+                "relFrame": 0,
+                "keyframe": true,
+                "records": [],
+                "orderElements": []
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "label": "Paste native clipboard through the shared owner; original ordinary/client/installed acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-paste-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.frames.clipboard.paste",
+        "payload": {
+          "command": "object.frames.clipboard.paste",
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "cells": [
+            {
+              "relLayer": 0,
+              "relFrame": 0,
+              "keyframe": true,
+              "records": [],
+              "orderElements": []
+            }
+          ],
+          "layerUid": "layer-a",
+          "frame": 4
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "frames-clipboard-paste-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
       "label": "Repeat selection N times, growing the timeline when needed; installed/UI acceptance remains pending",
       "request": {
         "apiVersion": 2,
@@ -409,7 +582,9 @@
         "ok": true,
         "result": {
           "applied": true,
-          "historyEntriesAdded": 1
+          "historyEntriesAdded": 1,
+          "cycledLayers": 1,
+          "skippedComponentLayers": 0
         }
       }
     }

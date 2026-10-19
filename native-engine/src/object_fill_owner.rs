@@ -35,7 +35,7 @@ pub(crate) use object_frame_clipboard_paste::{
 pub(crate) use object_frame_clipboard_paste_plan::{
     packet_paste_cells, FrameClipboardOutcome, PreparedFrameClipboard,
 };
-pub(crate) use object_frame_clipboard_paste_wire::paste_payload;
+pub(crate) use object_frame_clipboard_paste_wire::{cut_clipboard_payload, paste_payload};
 // L04-I (#2110): sealed replacement of the lane-4 component/StoryBoard/duplicator tables.
 #[path = "object_component_commit.rs"]
 #[allow(dead_code)]
@@ -60,6 +60,10 @@ pub(crate) use object_frame_edit_structure::PreparedFrameStructure;
 #[path = "object_exposure_edit_key.rs"]
 mod object_exposure_edit_key;
 pub(crate) use object_exposure_edit_key::PreparedExposureKey;
+// F7 uses the same revision owner with an always-checkpoint blank-key candidate.
+#[path = "object_blank_key_edit.rs"]
+mod object_blank_key_edit;
+pub(crate) use object_blank_key_edit::PreparedBlankKey;
 // L05-E (lane #2111): sealed key-retime (moveKeyframe) transaction.
 #[path = "object_exposure_edit_retime.rs"]
 mod object_exposure_edit_retime;

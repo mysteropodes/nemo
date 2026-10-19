@@ -10,19 +10,22 @@
   'use strict';
   var MAX_U32 = 4294967295, MAX_LIST = 4096, MAX_EXTEND = 999;
   var PREFIX = 'command.document.object.';
-  // operation -> payload `command` member. Cut/copy/paste are deliberately absent: a clipboard packet is produced by the
-  // typed native API only, so there is no public declaration for them yet (see HANDOFF, remaining obligations).
+  // Operation -> native payload command. Clipboard records remain detached data; Rust alone validates/publishes them.
   var COMMANDS = Object.freeze({
     'command.document.object.frames.insert': 'object.frames.insert',
     'command.document.object.frames.extend': 'object.frames.extend',
     'command.document.object.frames.duplicate': 'object.frames.duplicate',
     'command.document.object.frames.remove': 'object.frames.remove',
     'command.document.object.layer.key.promote': 'object.layer.key.promote',
+    'command.document.object.layer.key.blank': 'object.layer.key.blank',
     'command.document.object.layer.key.clear': 'object.layer.key.clear',
     'command.document.object.layer.key.clear_cells': 'object.layer.key.clear_cells',
     'command.document.object.layer.tween.remove': 'object.layer.tween.remove',
     'command.document.object.layer.key.move': 'object.layer.key.move',
     'command.document.object.frames.clipboard.duplicate': 'object.frames.clipboard.duplicate',
+    'command.document.object.frames.clipboard.copy': 'object.frames.clipboard.copy',
+    'command.document.object.frames.clipboard.cut': 'object.frames.clipboard.cut',
+    'command.document.object.frames.clipboard.paste': 'object.frames.clipboard.paste',
     'command.document.object.frames.repeat': 'object.frames.repeat'
   });
   var OPERATIONS = Object.freeze(Object.keys(COMMANDS));
@@ -66,7 +69,36 @@
   }
   function cellKey(value) { return JSON.stringify([value.layerUid, value.frame]); }
 
+  // Bounded structural shell, matching the existing native clipboard DTO. Rust validates
+  // every record and authored-order value before atomic publication; this is not a JS document owner.
+  function selectedCells(value) {
+    if (!Array.isArray(value) || value.length > MAX_LIST) fail('clipboard selection must be bounded');
+    var seen = new Set();
+    value.forEach(function (v) { cell(v); var k = cellKey(v); if (seen.has(k)) fail('duplicate clipboard cell'); seen.add(k); });
+  }
+  function packetCells(value) {
+    if (!Array.isArray(value) || value.length > MAX_LIST) fail('clipboard cells must be bounded');
+    value.forEach(function (v) {
+      exact(v, ['relLayer', 'relFrame', 'keyframe', 'records'], ['orderElements'], 'clipboard cell');
+      u32(v.relLayer, 'relLayer'); u32(v.relFrame, 'relFrame');
+      if (typeof v.keyframe !== 'boolean' || !Array.isArray(v.records) || v.records.length > MAX_LIST ||
+          !v.records.every(plain)) fail('invalid clipboard records');
+      if (has(v, 'orderElements') && (!Array.isArray(v.orderElements) || v.orderElements.length > MAX_LIST ||
+          !v.orderElements.every(plain))) fail('invalid clipboard order');
+    });
+  }
+  function clipboard(value) {
+    exact(value, ['instanceId', 'documentId', 'cells'], [], 'clipboard packet');
+    uid(value.instanceId, 'clipboard instanceId'); uid(value.documentId, 'clipboard documentId'); packetCells(value.cells);
+  }
+  function packetResult(operation) { return operation === PREFIX + 'frames.clipboard.copy' || operation === PREFIX + 'frames.clipboard.cut'; }
   var SHAPES = {
+    'object.frames.clipboard.copy': function (p) { exact(p, ['command', 'selection'], [], 'clipboard copy'); selectedCells(p.selection); },
+    'object.frames.clipboard.cut': function (p) { exact(p, ['command', 'selection'], [], 'clipboard cut'); selectedCells(p.selection); },
+    'object.frames.clipboard.paste': function (p) {
+      exact(p, ['command', 'instanceId', 'documentId', 'layerUid', 'frame', 'cells'], [], 'clipboard paste');
+      uid(p.instanceId, 'instanceId'); uid(p.documentId, 'documentId'); uid(p.layerUid, 'layerUid'); u32(p.frame, 'frame'); packetCells(p.cells);
+    },
     'object.frames.insert': function (p) {
       exact(p, ['command', 'cell'], ['layerUids'], 'frames insert');
       u32(p.cell, 'cell'); if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
@@ -86,6 +118,9 @@
       exact(p, ['command', 'cells'], ['layerUids'], 'key promote');
       list(p.cells, 'cells', function (item) { u32(item, 'cell'); });
       if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
+    },
+    'object.layer.key.blank': function (p) {
+      exact(p, ['command', 'layerUid', 'cell'], [], 'key blank'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
     'object.layer.key.clear': function (p) {
       exact(p, ['command', 'layerUid', 'cell'], [], 'key clear'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
@@ -112,11 +147,15 @@
     }
   };
   var EXAMPLES = {
+    'object.frames.clipboard.copy': function () { return {"command":"object.frames.clipboard.copy","selection":[{"layerUid":"layer-a","frame":2}]}; },
+    'object.frames.clipboard.cut': function () { return {"command":"object.frames.clipboard.cut","selection":[{"layerUid":"layer-a","frame":2}]}; },
+    'object.frames.clipboard.paste': function () { return {"command":"object.frames.clipboard.paste","instanceId":"instance-A","documentId":"document-A","cells":[{"relLayer":0,"relFrame":0,"keyframe":true,"records":[],"orderElements":[]}],"layerUid":"layer-a","frame":4}; },
     'object.frames.insert': function () { return { command: 'object.frames.insert', cell: 3 }; },
     'object.frames.extend': function () { return { command: 'object.frames.extend', cell: 3, count: 1 }; },
     'object.frames.duplicate': function () { return { command: 'object.frames.duplicate', layerUid: 'layer-a', cell: 3 }; },
     'object.frames.remove': function () { return { command: 'object.frames.remove', from: 3, to: 3 }; },
     'object.layer.key.promote': function () { return { command: 'object.layer.key.promote', cells: [3] }; },
+    'object.layer.key.blank': function () { return { command: 'object.layer.key.blank', layerUid: 'layer-a', cell: 3 }; },
     'object.layer.key.clear': function () { return { command: 'object.layer.key.clear', layerUid: 'layer-a', cell: 3 }; },
     'object.layer.key.clear_cells': function () {
       return { command: 'object.layer.key.clear_cells', targets: [{ layerUid: 'layer-a', frame: 3 }] };
@@ -150,7 +189,14 @@
   }
   function result(operation, value) {
     if (!admitted(operation)) fail('frame edit operation is not declared');
-    exact(value, ['applied', 'historyEntriesAdded'], [], 'frame edit result');
+    var repeat = operation === PREFIX + 'frames.repeat';
+    exact(value, ['applied', 'historyEntriesAdded'].concat(repeat ? ['cycledLayers', 'skippedComponentLayers'] : packetResult(operation) ? ['clipboard'] : []), [], 'frame edit result');
+    if (packetResult(operation) && value.clipboard !== null) clipboard(value.clipboard);
+    if (operation === PREFIX + 'frames.clipboard.cut' && value.applied === true && value.clipboard === null) fail('applied cut must carry its packet');
+    if (operation === PREFIX + 'frames.clipboard.copy' && (value.applied !== false || value.historyEntriesAdded !== 0)) fail('copy cannot mutate history');
+    if (repeat) { u32(value.cycledLayers, 'cycledLayers'); u32(value.skippedComponentLayers, 'skippedComponentLayers'); }
+    // F7 preserves the unconditional baseline checkpoint, including an already blank key.
+    if (operation === PREFIX + 'layer.key.blank' && value.applied !== true) fail('blank key must add one history entry');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) {
       fail('invalid frame edit disposition');
     }
@@ -159,13 +205,18 @@
     if (response.instanceId !== request.instanceId) fail('frame edit response owner mismatch');
     var replaced = !response.ok && response.error && response.error.code === 'wrong_document';
     if (response.documentId !== request.documentId && !replaced) fail('frame edit response owner mismatch');
+    if (response.ok && packetResult(request.operation) && response.result.clipboard !== null &&
+        (response.result.clipboard.instanceId !== request.instanceId || response.result.clipboard.documentId !== request.documentId)) fail('clipboard response owner mismatch');
     if (response.ok && response.contentRevision !== request.expectedRevision + (response.result.applied ? 1 : 0)) {
       fail('frame edit receipt revision mismatch');
     }
   }
   // Layer UIDs are opaque authored bytes: a `data:`-prefixed UID is a name, not a resource payload.
   function paths(operation) {
-    return admitted(operation) ? { has: function (path) { return OPAQUE_PATH.test(path); } } : null;
+    return admitted(operation) ? { has: function (path) {
+      return OPAQUE_PATH.test(path) || /^payload\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path) ||
+        /^result\.clipboard\.cells\.\d+\.(?:records\.\d+\.target\.(?:contextId|layerUid|strokeId)|orderElements\.\d+\.(?:layerUid|strokeId))$/.test(path);
+    } } : null;
   }
   // The SDK holds one contract object. join() adds these operations to whichever contract it already has (fonts).
   function join(base) {

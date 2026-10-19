@@ -653,6 +653,7 @@ dependencies = [
  "base64",
  "flate2",
  "i_overlay",
+ "libm",
  "miniz_oxide 0.9.1",
  "png",
  "pollster",

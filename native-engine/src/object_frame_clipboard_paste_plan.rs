@@ -161,6 +161,10 @@ impl PreparedFrameClipboard {
     pub(crate) fn command(&self) -> &'static str {
         self.command
     }
+    /// Whether the sealed edit would publish a document; preparing still mutates nothing.
+    pub(crate) fn changes_document(&self) -> bool {
+        self.document.is_some()
+    }
     /// The clipboard a cut produced (also when the cut blanked nothing); none for paste and duplicate.
     pub(crate) fn packet(&self) -> Option<&FrameClipboardPacket> {
         self.packet.as_ref()

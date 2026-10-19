@@ -85,3 +85,221 @@ fn gpu_one_compositor_composes_every_case_repeatedly_with_identical_pixels() {
         check_case(case, &again).unwrap();
     }
 }
+
+#[test]
+fn gpu_all_forty_original_images_meet_the_strict_one_byte_contract() {
+    // Oracle rows and their legacy per-case tolerance are unchanged. This is the
+    // separate original leaf acceptance bound, including the two observed failures.
+    let mut gpu = super::support::headless();
+    let cases = oracle();
+    assert_eq!(cases.len(), 40);
+    for case in &cases {
+        let first = super::support::render(&mut gpu, case);
+        assert_eq!(first.len(), case.expect.len());
+        for (index, (actual, expected)) in first.iter().zip(&case.expect).enumerate() {
+            assert!(
+                actual.abs_diff(*expected) <= 1,
+                "{} pixel ({}, {}) channel {}: actual {} expected {} exceeds ORIGINAL 1/255",
+                case.name,
+                (index / 4) % SIDE,
+                (index / 4) / SIDE,
+                index % 4,
+                actual,
+                expected
+            );
+        }
+        assert_eq!(
+            super::support::render(&mut gpu, case),
+            first,
+            "{} repeatability",
+            case.name
+        );
+    }
+}
+
+fn isolated_paint(
+    gpu: &mut crate::compositor::Compositor,
+    paths: &[vello::kurbo::BezPath],
+    colors: &[[f32; 4]],
+) -> Vec<u8> {
+    let paint = super::GpuLayerPaint {
+        fills: paths
+            .iter()
+            .zip(colors)
+            .map(|(path, rgba)| super::GpuFill { path, rgba: *rgba })
+            .collect(),
+    };
+    let mut target = gpu.make_object_target(8, 8).unwrap();
+    target
+        .render(|view| gpu.render_paints(&[&paint], view, (8, 8)))
+        .unwrap();
+    let bytes = gpu.readback_texture(target.texture(), 8, 8).unwrap();
+    let raw: &[u8] = &bytes;
+    raw.to_vec()
+}
+
+fn assert_pixel(actual: &[u8], x: usize, y: usize, expected: [u8; 4]) {
+    let at = (y * SIDE + x) * 4;
+    for (channel, expected) in expected.iter().enumerate() {
+        assert!(
+            actual[at + channel].abs_diff(*expected) <= 1,
+            "({x}, {y}) channel {channel}: {} vs {expected}",
+            actual[at + channel]
+        );
+    }
+}
+
+#[test]
+fn gpu_isolation_does_not_quantise_color_in_premultiplied_low_alpha() {
+    use vello::kurbo::{Rect, Shape};
+    let mut gpu = super::support::headless();
+    let paths = [Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1)];
+    let actual = isolated_paint(&mut gpu, &paths, &[[0.2, 0.6, 0.4, 0.1]]);
+    // Independent straight-RGBA byte oracle: [51,153,102], round(0.1*255)=26.
+    // Premultiplying to u8 first produces [5,15,10,26], which cannot recover this RGB.
+    for y in 0..SIDE {
+        for x in 0..SIDE {
+            assert_pixel(&actual, x, y, [51, 153, 102, 26]);
+        }
+    }
+}
+
+#[test]
+fn gpu_isolation_keeps_partial_coverage_and_translucent_overlap_order() {
+    use vello::kurbo::{Rect, Shape};
+    let mut gpu = super::support::headless();
+    let edge = [Rect::new(0.5, 0.0, 7.5, 8.0).to_path(0.1)];
+    let actual = isolated_paint(&mut gpu, &edge, &[[0.2, 0.6, 0.4, 0.6]]);
+    for y in 0..SIDE {
+        for x in 0..SIDE {
+            let alpha = if x == 0 || x == 7 { 77 } else { 153 };
+            assert_pixel(&actual, x, y, [51, 153, 102, alpha]);
+        }
+    }
+    let paths = [
+        Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1),
+        Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1),
+    ];
+    let red = [1.0, 0.0, 0.0, 0.5];
+    let blue = [0.0, 0.0, 1.0, 0.5];
+    let forward = isolated_paint(&mut gpu, &paths, &[red, blue]);
+    let reverse = isolated_paint(&mut gpu, &paths, &[blue, red]);
+    // Source-over: alpha .75, blue/red contribute .5/.25 before unpremultiply.
+    for y in 0..SIDE {
+        for x in 0..SIDE {
+            assert_pixel(&forward, x, y, [85, 0, 170, 192]);
+            assert_pixel(&reverse, x, y, [170, 0, 85, 192]);
+        }
+    }
+    assert_ne!(forward, reverse, "fill order must remain observable");
+    let hidden = isolated_paint(
+        &mut gpu,
+        &paths,
+        &[[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]],
+    );
+    assert!(
+        hidden.iter().all(|byte| *byte == 0),
+        "zero-alpha colors cannot leave RGB residue"
+    );
+}
+
+// The original Vello path accumulates Area coverage in float for the whole
+// scene; these analytic controls are NOT a claim that GPU observations ran.
+fn original_repeated_edge_alpha(coverage: f64, count: i32) -> u8 {
+    ((1.0 - (1.0 - coverage).powi(count)) * 255.0).round() as u8
+}
+
+#[test]
+fn original_float_edge_oracle_rejects_per_fill_rgba8_and_tiny_coverage_rounding() {
+    let mut rounded = 0.0_f64;
+    for _ in 0..100 {
+        rounded = (16.0 + (239.0 / 255.0) * rounded).round();
+    }
+    assert_eq!(original_repeated_edge_alpha(1.0 / 16.0, 100), 255);
+    assert!(
+        (255.0 - rounded) >= 7.0,
+        "per-fill RGBA8 must fail this original-math control"
+    );
+    assert_eq!(((1.0_f64 / 4096.0) * 255.0).round(), 0.0);
+    assert_eq!(original_repeated_edge_alpha(1.0 / 4096.0, 10_000), 233);
+}
+
+#[test]
+fn gpu_repeated_area_edges_accumulate_before_the_single_isolation_write() {
+    use vello::kurbo::{Rect, Shape};
+    let mut gpu = super::support::headless();
+    for (coverage, count) in [(1.0 / 16.0, 100), (1.0 / 4096.0, 10_000)] {
+        let path = Rect::new(1.0 - coverage, 0.0, 8.0, 8.0).to_path(0.1);
+        let paths = vec![path; count];
+        let colors = vec![[1.0, 0.0, 0.0, 1.0]; count];
+        let actual = isolated_paint(&mut gpu, &paths, &colors);
+        let expected_alpha = original_repeated_edge_alpha(coverage, count as i32);
+        for y in 0..SIDE {
+            assert_pixel(&actual, 0, y, [255, 0, 0, expected_alpha]);
+            assert_pixel(&actual, 1, y, [255, 0, 0, 255]);
+        }
+        assert_eq!(isolated_paint(&mut gpu, &paths, &colors), actual);
+    }
+}
+
+#[test]
+fn scene_swatches_are_deduplicated_locally_and_scene_drop_releases_its_own_blob_refs() {
+    use vello::kurbo::{Rect, Shape};
+    let path = Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1);
+    let paint = super::GpuLayerPaint {
+        fills: (0..10_000)
+            .map(|_| super::GpuFill {
+                path: &path,
+                rgba: [0.2, 0.6, 0.4, 0.8],
+            })
+            .collect(),
+    };
+    let mut scene = vello::Scene::new();
+    let swatches = super::encode_straight_paints(&mut scene, &[&paint]);
+    assert_eq!(
+        swatches.len(),
+        1,
+        "one exact RGB8 per scene, not one blob per fill"
+    );
+    let image = swatches.values().next().unwrap();
+    assert_eq!(image.data.data(), &[51, 153, 102, 255]);
+    let weak = image.data.downgrade();
+    drop(swatches);
+    assert!(
+        weak.upgrade().is_some(),
+        "encoded Scene retains its brushes"
+    );
+    scene.reset();
+    assert!(
+        weak.upgrade().is_none(),
+        "no renderer was invoked: local Scene refs are gone"
+    );
+    // After an actual render Vello's existing atlas may also retain the blob;
+    // this control deliberately does not claim or fake a public atlas-purge API.
+}
+
+#[test]
+fn gpu_repeated_swatches_keep_target_retirement_without_claiming_atlas_byte_retirement() {
+    use super::support::{complete, find, headless, textures};
+    let mut gpu = headless();
+    let case = find("blend-multiply-translucent");
+    drop(super::support::render(&mut gpu, &case));
+    complete(&gpu);
+    let warm_textures = textures(&gpu);
+    for _ in 0..8 {
+        drop(super::support::render(&mut gpu, &case));
+        complete(&gpu);
+        assert_eq!(
+            textures(&gpu),
+            warm_textures,
+            "temporary targets retire; existing atlas texture count stays stable here"
+        );
+    }
+    // Texture count is not residency bytes: pressure growth/eviction still needs
+    // separately booked resource evidence; no immediate cache eviction is asserted.
+}
+
+// These real-image pressure inputs consume the SAME Vello resolver as the
+// straight RGB swatches. No cache purge or immediate atlas release is assumed.
+#[path = "scene_effect_gpu_blend_atlas.rs"]
+mod atlas;

@@ -404,3 +404,86 @@ fn an_object_edit_receipt_is_correlated_and_a_flawed_one_is_refused_as_an_invali
         assert_eq!(error.to_string(), "invalid native application response");
     }
 }
+
+#[test]
+fn repeat_wire_accepts_actual_catalog_counts_and_rejects_shape_revision_or_identity_drift() {
+    let catalog = crate::capabilities::native_catalog();
+    let descriptor = catalog
+        .capability_for_operation(crate::native_contract::frame_edit::REPEAT)
+        .unwrap();
+    let example = descriptor["examples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|example| {
+            example["request"]["operation"] == crate::native_contract::frame_edit::REPEAT
+        })
+        .unwrap();
+    let request: NativeApplicationRequest =
+        serde_json::from_value(example["request"].clone()).unwrap();
+    let response: NativeApplicationResponse =
+        serde_json::from_value(example["response"].clone()).unwrap();
+    assert!(request.validate_input().is_ok());
+    assert!(validate_native_response(&response, &request).is_ok());
+    let mut growth = response.clone();
+    growth.result.as_mut().unwrap()["cycledLayers"] = json!(0);
+    growth.result.as_mut().unwrap()["skippedComponentLayers"] = json!(3);
+    assert!(validate_native_response(&growth, &request).is_ok());
+    let mut noop = growth.clone();
+    noop.content_revision = request.expected_revision.unwrap();
+    noop.result.as_mut().unwrap()["applied"] = json!(false);
+    noop.result.as_mut().unwrap()["historyEntriesAdded"] = json!(0);
+    assert!(validate_native_response(&noop, &request).is_ok());
+    for mut bad in [response.clone(), noop.clone()] {
+        bad.content_revision += 1;
+        assert!(validate_native_response(&bad, &request).is_err());
+    }
+    for field in ["cycledLayers", "skippedComponentLayers"] {
+        let mut missing = response.clone();
+        missing
+            .result
+            .as_mut()
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .remove(field);
+        assert!(validate_native_response(&missing, &request).is_err());
+        for bad in [json!(-1), json!(1.5), json!(4294967296u64), json!(null)] {
+            let mut wrong = response.clone();
+            wrong.result.as_mut().unwrap()[field] = bad;
+            assert!(validate_native_response(&wrong, &request).is_err());
+        }
+    }
+    let mut extra = response.clone();
+    extra.result.as_mut().unwrap()["clipboard"] = json!(null);
+    assert!(validate_native_response(&extra, &request).is_err());
+    for field in ["requestId", "instanceId", "documentId"] {
+        let mut wrong = serde_json::to_value(&response).unwrap();
+        wrong[field] = json!("foreign");
+        let wrong: NativeApplicationResponse = serde_json::from_value(wrong).unwrap();
+        assert!(validate_native_response(&wrong, &request).is_err());
+    }
+    let insert = descriptor["examples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|example| {
+            example["request"]["operation"] == crate::native_contract::frame_edit::INSERT
+        })
+        .unwrap();
+    let insert_request: NativeApplicationRequest =
+        serde_json::from_value(insert["request"].clone()).unwrap();
+    let mut insert_response: NativeApplicationResponse =
+        serde_json::from_value(insert["response"].clone()).unwrap();
+    assert!(validate_native_response(&insert_response, &insert_request).is_ok());
+    insert_response.result = response.result;
+    assert!(validate_native_response(&insert_response, &insert_request).is_err());
+}
+
+#[cfg(test)]
+#[path = "native_frame_edit_blank_wire_tests.rs"]
+mod blank_key;
+
+#[cfg(test)]
+#[path = "native_frame_clipboard_wire_tests.rs"]
+mod clipboard;

@@ -443,6 +443,26 @@
       "regions": 100,
       "functions": 100,
       "note": "Measured clean 8c8a6f5a88a7a33d5fb63504f2504357177f8dbc, MCP tree f7acc3f36f23e1b23fa886d9be37ade009b91116; standard cargo-llvm-cov 0.9.1 JSON 2590dff1c3824a737398717075987df614f65f4618c2040a13243253b223f8ef, actual full unfiltered suites 313 tests/0 failed across 20 binaries, booking 1062/6245971235. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_frame_clipboard_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 3518d24faa0888dbfca834a78a36422934f18bc3, MCP tree 4e5ce73c1a1f8702d7f6d76d40fc2b78ebee455c; standard cargo-llvm-cov 0.9.1 JSON 30832afc023601a1b9a7a005cfd3079843aea1047b8d80bb99d44c675d0c52e5, actual full unfiltered suites 337 tests/0 failed across 20 binaries, booking 1062/6258656915. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_frame_clipboard_response_schema_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 3518d24faa0888dbfca834a78a36422934f18bc3, MCP tree 4e5ce73c1a1f8702d7f6d76d40fc2b78ebee455c; standard cargo-llvm-cov 0.9.1 JSON 30832afc023601a1b9a7a005cfd3079843aea1047b8d80bb99d44c675d0c52e5, actual full unfiltered suites 337 tests/0 failed across 20 binaries, booking 1062/6258656915. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_frame_clipboard_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 3518d24faa0888dbfca834a78a36422934f18bc3, MCP tree 4e5ce73c1a1f8702d7f6d76d40fc2b78ebee455c; standard cargo-llvm-cov 0.9.1 JSON 30832afc023601a1b9a7a005cfd3079843aea1047b8d80bb99d44c675d0c52e5, actual full unfiltered suites 337 tests/0 failed across 20 binaries, booking 1062/6258656915. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_frame_edit_blank_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Measured clean 3518d24faa0888dbfca834a78a36422934f18bc3, MCP tree 4e5ce73c1a1f8702d7f6d76d40fc2b78ebee455c; standard cargo-llvm-cov 0.9.1 JSON 30832afc023601a1b9a7a005cfd3079843aea1047b8d80bb99d44c675d0c52e5, actual full unfiltered suites 337 tests/0 failed across 20 binaries, booking 1062/6258656915. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
     }
   },
   "nativeObjectContractRegistration": {

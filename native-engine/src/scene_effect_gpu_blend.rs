@@ -35,9 +35,53 @@ pub(crate) use crate::compositor::scene_effect_gpu_blend::stack::{
 use crate::compositor::object_target::{reserve_target_bytes, ObjectTarget, TargetReservation};
 use crate::compositor::scene_effect_gpu_blend::pool::{Pool, Role};
 use crate::compositor::{Compositor, CompositorError};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use vello::kurbo::Affine;
-use vello::peniko::{Color, Fill};
+use vello::peniko::{
+    Blob, Color, Extend, Fill, ImageAlphaType, ImageBrush, ImageData, ImageFormat, ImageQuality,
+};
+
+/// Encode original fill order in ONE Vello scene using straight RGB swatches.
+/// Vello's solid brush quantises premultiplied RGB before coverage is applied.
+/// Its image brush instead loads straight RGB8 and premultiplies in the fine
+/// shader. Coverage and every overlapping fill accumulate in f32 until the
+/// single final isolation write. No RGBA8 coverage or per-fill output is used.
+///
+/// Image alpha multiplication is encoded as u8 by Vello 0.9: this deliberately
+/// preserves the original solid-brush alpha8, rather than promising float alpha.
+/// One four-byte opaque swatch is shared for each exact RGB8 within this scene.
+/// Vello may retain those blobs in its EXISTING pressure-evicted image atlas;
+/// dropping this map/scene is not a promise of immediate renderer-cache eviction.
+fn encode_straight_paints(
+    scene: &mut vello::Scene,
+    paints: &[&GpuLayerPaint<'_>],
+) -> BTreeMap<[u8; 3], ImageData> {
+    scene.reset();
+    let mut swatches = BTreeMap::new();
+    for paint in paints {
+        for fill in &paint.fills {
+            if (fill.rgba[3] * 255.0).round() == 0.0 {
+                continue;
+            }
+            let rgb = [fill.rgba[0], fill.rgba[1], fill.rgba[2]]
+                .map(|channel| (channel * 255.0).round() as u8);
+            let image = swatches.entry(rgb).or_insert_with(|| ImageData {
+                data: Blob::new(Arc::new([rgb[0], rgb[1], rgb[2], 255])),
+                format: ImageFormat::Rgba8,
+                alpha_type: ImageAlphaType::Alpha,
+                width: 1,
+                height: 1,
+            });
+            let brush = ImageBrush::new(image.clone())
+                .with_extend(Extend::Pad)
+                .with_quality(ImageQuality::Low)
+                .multiply_alpha(fill.rgba[3]);
+            scene.fill(Fill::NonZero, Affine::IDENTITY, &brush, None, fill.path);
+        }
+    }
+    swatches
+}
 
 /// Composited pixels owned by the charged target allocator. Dropping it (or a
 /// failed composition) retires every texture behind the queue's completion
@@ -200,26 +244,20 @@ impl Compositor {
         )
     }
 
-    /// Paint fills in order into `view` through the compositor's one Scene.
+    /// Keep the whole isolated layer in Vello's Area-AA/f32 accumulation path.
     fn render_paints(
         &mut self,
         paints: &[&GpuLayerPaint<'_>],
         view: &wgpu::TextureView,
         (width, height): (u32, u32),
     ) -> Result<(), CompositorError> {
+        let swatches = encode_straight_paints(&mut self.scene, paints);
+        let rendered = self.render_target(view, width, height, Color::TRANSPARENT);
+        // Release our own references on both success and Vello error. The existing
+        // renderer atlas can retain a swatch until pressure eviction or renderer drop.
         self.scene.reset();
-        for paint in paints {
-            for fill in &paint.fills {
-                self.scene.fill(
-                    Fill::NonZero,
-                    Affine::IDENTITY,
-                    Color::new(fill.rgba),
-                    None,
-                    fill.path,
-                );
-            }
-        }
-        self.render_target(view, width, height, Color::TRANSPARENT)
+        drop(swatches);
+        rendered
     }
 
     /// Baseline mask combine: Add masks union (one Scene), none -> fully

@@ -76,7 +76,7 @@
   }
 
   // intent + editor state -> { op, payload } | { code }. Pure: no port, no session.
-  function plan(intent, state, info) {
+  function plan(intent, state, info, clipboard) {
     function uid(index) { return info.layers[index].layerUid; }
     function selected(command, extra) {
       var payload = Object.assign({ command: command }, extra);
@@ -84,9 +84,19 @@
       return payload;
     }
     function cellRefs() { return state.cells.map(function (cell) { return { layerUid: uid(cell.layer), frame: cell.frame }; }); }
-    if (PACKET[intent.kind]) return { code: CODES.packet };
+    if (intent.kind === 'copyFrames' || intent.kind === 'cutFrames') {
+      if (!state.cells.length) return { code: CODES.selection };
+      var command = intent.kind === 'copyFrames' ? 'object.frames.clipboard.copy' : 'object.frames.clipboard.cut';
+      return { op: 'command.document.' + command, payload: { command: command, selection: cellRefs() } };
+    }
+    if (intent.kind === 'pasteFrames') {
+      if (!clipboard) return { code: CODES.packet };
+      if (clipboard.instanceId !== info.instanceId || clipboard.documentId !== info.documentId) return { code: CODES.stale };
+      return { op: P + 'frames.clipboard.paste', payload: { command: 'object.frames.clipboard.paste',
+        instanceId: clipboard.instanceId, documentId: clipboard.documentId, layerUid: uid(state.active), frame: state.frame, cells: clipboard.cells } };
+    }
     switch (intent.kind) {
-      case 'insertBlankKey': return { code: CODES.blankKey };
+      case 'insertBlankKey': return { op: P + 'layer.key.blank', payload: { command: 'object.layer.key.blank', layerUid: uid(state.active), cell: state.frame } };
       case 'insertFrame': return { op: P + 'frames.insert', payload: selected('object.frames.insert', { cell: state.frame }) };
       case 'insertKey': return { op: P + 'layer.key.promote', payload: selected('object.layer.key.promote', { cells: [state.frame] }) };
       case 'insertKeyAt':
@@ -170,19 +180,21 @@
     async function run(value) {
       if (retired) return unavailable(CODES.retired);
       if (pending) return Object.freeze({ status: 'busy' });
-      var intent, session, before, state, write, step;
+      var intent, session, before, state, write, step, clipboardToken;
       try {
         intent = action(value);
         if (!intent) return unavailable(CODES.invalid);
         // Kinds native has no operation for answer before any session or selection is consulted.
-        if (PACKET[intent.kind]) return unavailable(CODES.packet);
-        if (intent.kind === 'insertBlankKey') return unavailable(CODES.blankKey);
+        if (PACKET[intent.kind] && (typeof ports.captureClipboard !== 'function' || typeof ports.clipboardUnchanged !== 'function')) return unavailable(CODES.packet);
+        if (PACKET[intent.kind] && (intent.kind === 'pasteFrames' ? typeof ports.readClipboard !== 'function' || typeof ports.acceptPaste !== 'function' :
+            typeof ports.acceptClipboard !== 'function')) return unavailable(CODES.packet);
         session = ports.currentSession(); before = session && session.info();
         if (!session || !before || !Array.isArray(before.layers) || !whole(before.totalFrames, 1, 4294967295) ||
             ports.available(session, before) !== true || typeof session.readPresentedObjectSession !== 'function') return unavailable(CODES.session);
         state = readState(ports, before);
         if (!state) return unavailable(CODES.invalid);
-        step = plan(intent, state, before);
+        clipboardToken = PACKET[intent.kind] ? ports.captureClipboard() : null;
+        step = plan(intent, state, before, intent.kind === 'pasteFrames' ? ports.readClipboard() : null);
         if (step.code) return unavailable(step.code);
         write = session.editFrames;
         if (typeof write !== 'function' || !presented(session, before, state.frame)) return unavailable(CODES.session);
@@ -196,8 +208,10 @@
       var applied = null, frame = state.frame, layers = before.layers.map(function (row) { return row.layerUid; });
       try {
         var receipt = await write.call(session, step.op, step.payload, before), result = receipt && receipt.result;
+        try { Contract.result(step.op, result); } catch (_) { return Object.freeze({ status: 'unconfirmed' }); }
         if (!receipt || receipt.apiVersion !== 2 || receipt.ok !== true || receipt.instanceId !== before.instanceId || receipt.documentId !== before.documentId ||
-            !result || Object.keys(result).length !== 2 || typeof result.applied !== 'boolean' || result.historyEntriesAdded !== (result.applied ? 1 : 0) ||
+            !result || typeof result.applied !== 'boolean' || result.historyEntriesAdded !== (result.applied ? 1 : 0) ||
+            (step.op === P + 'layer.key.blank' && result.applied !== true) ||
             receipt.contentRevision !== before.contentRevision + (result.applied ? 1 : 0)) return Object.freeze({ status: 'unconfirmed' });
         applied = result.applied;
         if (retired || ports.currentSession() !== session) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
@@ -210,6 +224,20 @@
             (length === null ? !(after.totalFrames >= before.totalFrames) : after.totalFrames !== length) || ports.available(session, after) !== true ||
             !whole(playhead, 0, after.totalFrames - 1) || !presented(session, after, playhead)) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
         var out = { status: applied ? 'applied-presented' : 'unchanged', applied: applied }, hint = applied ? playheadHint(step.op, frame, after.totalFrames) : null;
+        if (PACKET[intent.kind]) {
+          var current = readState(ports, after);
+          if (ports.clipboardUnchanged(clipboardToken) !== true || !current || current.frame !== state.frame || current.active !== state.active || !sameList(current.layers, state.layers) ||
+              JSON.stringify(current.cells) !== JSON.stringify(state.cells)) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
+          if (intent.kind === 'pasteFrames') {
+            if (ports.acceptPaste(step.payload, after) !== true) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
+          } else if (result.clipboard !== null) {
+            if (result.clipboard.instanceId !== before.instanceId || result.clipboard.documentId !== before.documentId ||
+                ports.acceptClipboard(result.clipboard, intent.kind, after) !== true) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });
+          }
+        }
+        if (step.op === P + 'frames.repeat') {
+          out.cycledLayers = result.cycledLayers; out.skippedComponentLayers = result.skippedComponentLayers;
+        }
         if (hint !== null) out.playhead = hint;
         return Object.freeze(out);
       } catch (error) {

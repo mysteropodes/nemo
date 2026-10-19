@@ -138,7 +138,8 @@
         "object_group_codec.rs",
         "object_raster_asset_codec.rs",
         "object_component_codec.rs",
-        "object_frame_edit_range_codec.rs"
+        "object_frame_edit_range_codec.rs",
+        "object_parent_links.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -250,7 +251,8 @@
         "object_parametric_edit.rs",
         "object_path_effects_edit.rs",
         "object_raster_image_import_owner.rs",
-        "object_raster_image_import_wire.rs"
+        "object_raster_image_import_wire.rs",
+        "object_blank_key_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -264,6 +266,7 @@
       "files": [
         "history.rs",
         "transaction.rs",
+        "transaction_receipt_result.rs",
         "object_history.rs",
         "object_project_history.rs",
         "object_reference_dispatch.rs",
@@ -448,7 +451,8 @@
         "object_scene_producer_brush_slot.rs",
         "object_scene_producer_brush.rs",
         "object_parametric_transform.rs",
-        "object_text_frame.rs"
+        "object_text_frame.rs",
+        "property_expression_lookup.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -517,7 +521,9 @@
         "object_raster_scene_join.rs",
         "object_text_scene_join.rs",
         "object_text_scene_fonts.rs",
-        "object_text_scene_bundled.rs"
+        "object_text_scene_bundled.rs",
+        "object_scene_parent_chain.rs",
+        "object_scene_parent_curve.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -1247,6 +1253,7 @@
         "object_scene_producer_text_rows.rs",
         "object_scene_producer_text_controls.rs",
         "scene_effect_gpu_blend.rs",
+        "scene_effect_gpu_blend_atlas.rs",
         "scene_effect_gpu_blend_cases.rs",
         "scene_effect_gpu_blend_controls.rs",
         "scene_effect_gpu_blend_owner.rs",
@@ -1457,7 +1464,18 @@
         "object_text_scene_join.rs",
         "object_text_scene_gpu.rs",
         "object_text_scene_history.rs",
-        "object_text_scene_svg.rs"
+        "object_text_scene_svg.rs",
+        "object_scene_parent_chain.rs",
+        "object_scene_parent_chain_pixels.rs",
+        "property_expression_lookup.rs",
+        "object_frame_clipboard_cut_dispatch.rs",
+        "object_frame_clipboard_cut_wire.rs",
+        "object_blank_key_edit.rs",
+        "object_blank_key_edit_build.rs",
+        "object_blank_key_history.rs",
+        "object_blank_key_history_controls.rs",
+        "object_parent_links.rs",
+        "object_frame_clipboard_copy_dispatch.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1567,7 +1585,11 @@
         "src/native_text_read_wire_tests.rs",
         "src/native_image_import_contract_tests.rs",
         "src/native_wire_response_owner.rs",
-        "src/native_image_import_owner_wire_tests.rs"
+        "src/native_image_import_owner_wire_tests.rs",
+        "src/native_frame_edit_blank_wire_tests.rs",
+        "src/native_frame_clipboard_contract_tests.rs",
+        "src/native_frame_clipboard_wire_tests.rs",
+        "src/native_frame_clipboard_response_schema_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1820,7 +1842,8 @@
         "native_text_read_dispatch_tests.rs",
         "native_property_edit_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
-        "native_raster_image_preview_tests.rs"
+        "native_raster_image_preview_tests.rs",
+        "native_asset_remove_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

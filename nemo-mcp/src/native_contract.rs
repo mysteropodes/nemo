@@ -308,7 +308,7 @@ pub(crate) fn validate_result(
         return layer_policy::result(result);
     }
     if frame_edit::declares(operation) {
-        return frame_edit::result(result);
+        return frame_edit::result_for_operation(operation, result);
     }
     if object_component::admitted(operation) {
         return object_component::result(operation, result);

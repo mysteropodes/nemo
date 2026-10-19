@@ -98,9 +98,24 @@ fn lock_absence_false_true_are_strict_and_roundtrip_both_native_versions() {
                 serde_json::from_slice::<Value>(&encode_storage_project(&doc).unwrap()).unwrap(),
                 source
             );
-            let mut invalid = source.clone();
-            invalid["layers"][0]["parentLayerUid"] = json!("L1");
-            assert!(decode_storage_project(invalid.to_string().as_bytes()).is_err());
+            let mut parented = source.clone();
+            parented["layers"][0]["parentLayerUid"] = json!("L1");
+            if version == 2 {
+                assert_eq!(
+                    serde_json::from_slice::<Value>(
+                        &encode_storage_project(&document(&parented)).unwrap()
+                    )
+                    .unwrap(),
+                    parented
+                );
+            } else {
+                assert!(decode_storage_project(parented.to_string().as_bytes()).is_err());
+            }
+            for parent in ["", "L0", "absent"] {
+                let mut invalid = source.clone();
+                invalid["layers"][0]["parentLayerUid"] = json!(parent);
+                assert!(decode_storage_project(invalid.to_string().as_bytes()).is_err());
+            }
         }
         for family in ["symbolId", "isFolderLayer", "isNullLayer", "isGuideLayer"] {
             let mut unsupported = fixture(version, Some(true));

@@ -55,8 +55,9 @@ impl NativeObjectHistory {
         self.commit_frame_repeat(candidate)
     }
 
-    /// Prepare and commit the operation named by the dispatcher. The reply is the compact command result the other
-    /// object commands use. Replay is the caller's receipt store.
+    /// Prepare and commit the operation named by the dispatcher. Repeat alone retains its
+    /// prepared cycle/skip counts; every other command keeps its existing compact result.
+    /// Replay is the caller's receipt store, not another execution or count calculation.
     pub(crate) fn dispatch_frame_repeat(
         &mut self,
         operation: &str,
@@ -74,11 +75,17 @@ impl NativeObjectHistory {
                 "Frame repeat payload is invalid or its target is unavailable.",
             )
         })?;
+        // Counts describe the immutable admitted input, including visited no-op layers
+        // and component-only timeline growth. Read before the sealed commit consumes it.
+        let cycled_layers = candidate.cycled_layers();
+        let skipped_component_layers = candidate.skipped_component_layers();
         let before = self.content_revision();
         self.commit_frame_repeat(candidate)
-            .map(|revision| CompactResult::Command {
+            .map(|revision| CompactResult::FrameRepeat {
                 applied: revision != before,
                 history_entries_added: u64::from(revision != before),
+                cycled_layers,
+                skipped_component_layers,
             })
             .map_err(|code| (code, "Frame repeat could not commit."))
     }

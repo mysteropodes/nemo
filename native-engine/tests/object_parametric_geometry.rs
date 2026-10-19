@@ -110,6 +110,7 @@ fn magnitude(a: &[GeomSegment], b: &[GeomSegment]) -> f64 {
 pub(crate) struct Check {
     label: String,
     pub(crate) bad: Option<String>,
+    trig_ulps: f64,
 }
 
 impl Check {
@@ -117,6 +118,14 @@ impl Check {
         Check {
             label: label.to_string(),
             bad: None,
+            trig_ulps: TRIG_ULPS,
+        }
+    }
+
+    fn with_trig_ulps(label: &str, trig_ulps: f64) -> Check {
+        Check {
+            trig_ulps,
+            ..Check::new(label)
         }
     }
 
@@ -155,7 +164,7 @@ impl Check {
             return self.fail(format!("{} segments vs {}", got.len(), want.len()));
         }
         let tol = if trig {
-            TRIG_ULPS * magnitude(got, want) * f64::EPSILON
+            self.trig_ulps * magnitude(got, want) * f64::EPSILON
         } else {
             0.0
         };
@@ -173,9 +182,14 @@ pub(crate) struct Report {
     pub(crate) counts: BTreeMap<String, usize>,
     pub(crate) ticks: BTreeMap<String, usize>,
     pub(crate) failures: Vec<String>,
+    trig_ulps: Option<f64>,
 }
 
 impl Report {
+    fn check(&self, label: &str) -> Check {
+        Check::with_trig_ulps(label, self.trig_ulps.unwrap_or(TRIG_ULPS))
+    }
+
     pub(crate) fn done(&mut self, op: &str, c: Check) {
         *self.counts.entry(op.to_string()).or_insert(0) += 1;
         if let Some(bad) = c.bad {
@@ -194,7 +208,7 @@ fn floats(t: &[&str]) -> Vec<f64> {
 
 fn row_rr(r: &mut Report, t: &[&str], out: &str, m: Mutation) {
     let n = floats(&t[1..9]);
-    let mut c = Check::new(&format!("rr {}", t[1..9].join(" ")));
+    let mut c = r.check(&format!("rr {}", t[1..9].join(" ")));
     match m.round_rect(n[0], n[1], n[2], n[3], [n[4], n[5], n[6], n[7]]) {
         Ok(got) => c.segments(&geom(&got), &segs_of(out), false),
         Err(e) => c.fail(format!("refused: {e:?}")),
@@ -204,7 +218,7 @@ fn row_rr(r: &mut Report, t: &[&str], out: &str, m: Mutation) {
 
 fn row_arc(r: &mut Report, t: &[&str], out: &str, m: Mutation) {
     let n = floats(&t[1..7]);
-    let mut c = Check::new(&format!("arc {}", t[1..8].join(" ")));
+    let mut c = r.check(&format!("arc {}", t[1..8].join(" ")));
     match m.arc(n[0], n[1], n[2], n[3], n[4], n[5], opt(t[7])) {
         Ok(got) => c.segments(&geom(&got), &segs_of(out), true),
         Err(e) => c.fail(format!("refused: {e:?}")),
@@ -214,7 +228,7 @@ fn row_arc(r: &mut Report, t: &[&str], out: &str, m: Mutation) {
 
 fn row_star(r: &mut Report, t: &[&str], out: &str, m: Mutation) {
     let n = floats(&t[1..4]);
-    let mut c = Check::new(&format!("star {}", t[1..7].join(" ")));
+    let mut c = r.check(&format!("star {}", t[1..7].join(" ")));
     match m.star(n[0], n[1], n[2], opt(t[4]), opt(t[5]), opt(t[6])) {
         Ok(got) => c.segments(&geom(&got), &segs_of(out), true),
         Err(e) => c.fail(format!("refused: {e:?}")),
@@ -246,7 +260,7 @@ fn row_sg(r: &mut Report, t: &[&str], out: &str, m: Mutation) {
         inner_ratio: opt(t[7]),
     };
     let (closed, segs) = out.split_once(' ').expect("closed flag");
-    let mut c = Check::new(&format!("sg {}", t[1..9].join(" ")));
+    let mut c = r.check(&format!("sg {}", t[1..9].join(" ")));
     let got: Result<ShapeGeom, _> = m.shape_geom(tool, n[0], n[1], n[2], n[3], star, source);
     match got {
         Ok(g) => {
@@ -262,7 +276,14 @@ fn row_sg(r: &mut Report, t: &[&str], out: &str, m: Mutation) {
 
 /// Replay every oracle row through the kernel with `m` applied around it.
 pub(crate) fn run(m: Mutation) -> Report {
-    let mut r = Report::default();
+    run_with_trig_ulps(m, TRIG_ULPS)
+}
+
+fn run_with_trig_ulps(m: Mutation, trig_ulps: f64) -> Report {
+    let mut r = Report {
+        trig_ulps: Some(trig_ulps),
+        ..Report::default()
+    };
     for line in ORACLE.lines() {
         let rest = line.strip_prefix("pgeo1 ").expect("row prefix");
         let (head, out) = rest.split_once(" > ").expect("row output");
@@ -310,4 +331,58 @@ fn generated_oracle_matches_the_baseline() {
         .map(|(k, v)| (k.to_string(), *v))
         .collect();
     assert_eq!(r.counts, want);
+}
+
+/// This is the original acceptance bound, independent of the retained 16-unit
+/// portability/mutation controls. Curved bounds remain explicit unavailable
+/// branches; their None result is not counted as numerical geometry parity.
+#[test]
+fn generated_oracle_matches_original_one_unit_bound() {
+    let r = run_with_trig_ulps(Mutation::None, 1.0);
+    let want: BTreeMap<String, usize> = EXPECTED_ROWS
+        .iter()
+        .map(|(k, v)| (k.to_string(), *v))
+        .collect();
+    assert_eq!(ORACLE.lines().count(), 1184);
+    assert_eq!(r.counts, want, "every original row, including duplicates");
+    assert_eq!(r.ticks.get("bnd:curved"), Some(&4));
+    assert_eq!(r.ticks.get("bnd:straight"), Some(&9));
+    assert!(
+        r.failures.is_empty(),
+        "original one-unit failures: {:?}",
+        r.failures
+    );
+}
+
+/// The qualified pre-fix native receipt at #2130/6251345829 must fail the strict gate
+/// even though the existing 16-unit portability control accepts it. Expected
+/// coordinates still come from the immutable original row, never this receipt.
+#[test]
+fn original_one_unit_bound_rejects_measured_rotation_counterexample() {
+    let line = ORACLE.lines().nth(1069).expect("original row 1070");
+    let (head, out) = line.split_once(" > ").unwrap();
+    assert!(head.starts_with("pgeo1 rot "));
+    let want = segs_of(out);
+    assert_eq!(want[0].point[1].to_bits(), 0x4056810a82be98e8);
+    let mut measured = want.clone();
+    measured[0].point[1] = f64::from_bits(0x4056810a82be98ea);
+    let mut strict = Check::with_trig_ulps("measured original row 1070", 1.0);
+    strict.segments(&measured, &want, true);
+    assert!(strict.bad.is_some());
+    let mut portability = Check::new("retained 16-unit control");
+    portability.segments(&measured, &want, true);
+    assert!(portability.bad.is_none());
+
+    // The actual production rotation must now match the immutable original row,
+    // including every handle and signed zero, rather than the retained bad receipt.
+    let inputs: Vec<&str> = head.strip_prefix("pgeo1 ").unwrap().split(' ').collect();
+    let got = super::boxed::rotate_segments(
+        &params_of(inputs[4]),
+        hex(inputs[1]),
+        [hex(inputs[2]), hex(inputs[3])],
+    )
+    .unwrap();
+    let mut actual = Check::new("production rotation matches original Paper row 1070");
+    actual.segments(&geom(&got), &want, false);
+    assert!(actual.bad.is_none(), "{:?}", actual.bad);
 }

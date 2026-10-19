@@ -2450,6 +2450,18 @@
       ]
     },
     {
+      "id": "app.native.frame-edit.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-frame-edit-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-frame-edit-desktop.js"
+      ]
+    },
+    {
       "id": "app.native.viewport.underlay.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

@@ -239,6 +239,10 @@ impl Compositor {
                 "reference image is unavailable on the layered path",
             ));
         }
+        // All layered/style/reference admission above must precede retiring
+        // a prior native image that could fill Vello's private atlas.
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        self.retire_object_reference_for(plan, (output.width, output.height))?;
         let background = if output.project_background {
             prepared.canvas_background_rgba8()
         } else {

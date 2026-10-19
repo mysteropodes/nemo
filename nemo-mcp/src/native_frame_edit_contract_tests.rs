@@ -22,6 +22,10 @@ fn examples() -> Vec<(&'static str, Value)> {
             json!({"command":"object.layer.key.promote","cells":[3,5]}),
         ),
         (
+            KEY_BLANK,
+            json!({"command":"object.layer.key.blank","layerUid":"layer-a","cell":3}),
+        ),
+        (
             KEY_CLEAR,
             json!({"command":"object.layer.key.clear","layerUid":"layer-a","cell":3}),
         ),
@@ -41,6 +45,19 @@ fn examples() -> Vec<(&'static str, Value)> {
             SELECTION_DUPLICATE,
             json!({"command":"object.frames.clipboard.duplicate","layerUid":"layer-a",
                 "selection":[{"layerUid":"layer-a","frame":2}]}),
+        ),
+        (
+            CLIPBOARD_COPY,
+            json!({"command":"object.frames.clipboard.copy","selection":[]}),
+        ),
+        (
+            CLIPBOARD_CUT,
+            json!({"command":"object.frames.clipboard.cut","selection":[{"layerUid":"layer-a","frame":2}]}),
+        ),
+        (
+            CLIPBOARD_PASTE,
+            json!({"command":"object.frames.clipboard.paste","instanceId":"instance","documentId":"document",
+            "layerUid":"layer-a","frame":3,"cells":[{"relLayer":0,"relFrame":0,"keyframe":true,"records":[],"orderElements":[]}]}),
         ),
         (
             REPEAT,
@@ -198,16 +215,21 @@ fn a_data_prefixed_layer_uid_is_an_opaque_name() {
 }
 
 #[test]
-fn clipboard_cut_copy_and_paste_are_not_declared() {
+fn clipboard_copy_cut_and_paste_are_declared_without_legacy_aliases() {
+    assert_eq!(OPERATIONS.len(), 15);
+    for (operation, payload) in examples().into_iter().filter(|(operation, _)| {
+        [CLIPBOARD_COPY, CLIPBOARD_CUT, CLIPBOARD_PASTE].contains(operation)
+    }) {
+        assert!(declares(operation));
+        assert!(envelope(operation, payload).validate_input().is_ok());
+    }
     for operation in [
-        "command.document.object.frames.clipboard.paste",
-        "command.document.object.frames.clipboard.cut",
-        "command.document.object.frames.clipboard.copy",
+        "command.document.object.frames.copy",
+        "command.document.object.frames.cut",
+        "command.document.object.frames.paste",
     ] {
         assert!(!declares(operation));
-        let payload =
-            json!({"command":"object.frames.clipboard.paste","layerUid":"a","frame":0,"cells":[]});
-        assert!(envelope(operation, payload).validate_input().is_err());
+        assert!(envelope(operation, json!({})).validate_input().is_err());
     }
 }
 
@@ -230,3 +252,201 @@ fn results_correlate_applied_history_and_exact_revision() {
         assert!(!result(&bad));
     }
 }
+
+#[test]
+fn actual_catalog_repeat_result_and_other_receipts_remain_operation_closed() {
+    let catalog = crate::capabilities::native_catalog();
+    let descriptor = catalog.capability_for_operation(REPEAT).unwrap();
+    let examples = descriptor["examples"].as_array().unwrap();
+    assert_eq!(examples.len(), OPERATIONS.len());
+    for example in examples {
+        let request: NativeApplicationRequest =
+            serde_json::from_value(example["request"].clone()).unwrap();
+        assert!(request.validate_input().is_ok());
+        let receipt = &example["response"]["result"];
+        assert!(crate::native_contract::validate_result(
+            &request.operation,
+            &request.document_id,
+            &request.payload,
+            receipt,
+        ));
+        assert!(revision_matches_for_operation(
+            &request.operation,
+            request.expected_revision,
+            example["response"]["contentRevision"].as_u64().unwrap(),
+            receipt,
+        ));
+        let compact = json!({"applied":true,"historyEntriesAdded":1});
+        let repeat = json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":1,"skippedComponentLayers":0});
+        assert_eq!(
+            result_for_operation(&request.operation, &compact),
+            ![REPEAT, CLIPBOARD_COPY, CLIPBOARD_CUT].contains(&request.operation.as_str())
+        );
+        assert_eq!(
+            result_for_operation(&request.operation, &repeat),
+            request.operation == REPEAT
+        );
+    }
+    assert!(!result_for_operation(
+        "command.document.object.frames.clipboard.cut",
+        &json!({"applied":false,"historyEntriesAdded":0})
+    ));
+}
+
+#[test]
+fn repeat_counts_are_required_closed_u32_without_inventing_cycle_to_applied_rules() {
+    let valid =
+        json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":0,"skippedComponentLayers":2});
+    assert!(
+        result_for_operation(REPEAT, &valid),
+        "global growth may cycle no drawing layer"
+    );
+    assert!(revision_matches_for_operation(REPEAT, Some(7), 8, &valid));
+    assert!(!revision_matches_for_operation(REPEAT, Some(7), 7, &valid));
+    assert!(!revision_matches_for_operation(REPEAT, None, 8, &valid));
+    assert!(!revision_matches_for_operation(
+        REPEAT,
+        Some(u64::MAX),
+        0,
+        &valid
+    ));
+    let noop = json!({"applied":false,"historyEntriesAdded":0,"cycledLayers":1,"skippedComponentLayers":0});
+    assert!(revision_matches_for_operation(REPEAT, Some(7), 7, &noop));
+    assert!(!revision_matches_for_operation(REPEAT, Some(7), 8, &noop));
+    for field in [
+        "applied",
+        "historyEntriesAdded",
+        "cycledLayers",
+        "skippedComponentLayers",
+    ] {
+        let mut missing = valid.clone();
+        missing.as_object_mut().unwrap().remove(field);
+        assert!(!result_for_operation(REPEAT, &missing), "missing {field}");
+    }
+    for field in ["cycledLayers", "skippedComponentLayers"] {
+        for bad in [
+            json!(-1),
+            json!(0.5),
+            json!(4294967296u64),
+            json!(null),
+            json!(true),
+            json!("1"),
+        ] {
+            let mut value = valid.clone();
+            value[field] = bad;
+            assert!(!result_for_operation(REPEAT, &value), "{field}: {value}");
+        }
+        let mut maximum = valid.clone();
+        maximum[field] = json!(u32::MAX);
+        assert!(result_for_operation(REPEAT, &maximum));
+    }
+    for (field, bad) in [
+        ("applied", json!(1)),
+        ("historyEntriesAdded", json!(0)),
+        ("historyEntriesAdded", json!(2)),
+    ] {
+        let mut value = valid.clone();
+        value[field] = bad;
+        assert!(!result_for_operation(REPEAT, &value));
+    }
+    let mut extra = valid;
+    extra["clipboard"] = json!(null);
+    assert!(!result_for_operation(REPEAT, &extra));
+}
+
+#[test]
+fn blank_key_uses_closed_opaque_active_layer_payload_and_public_byte_bound() {
+    let payload = json!({"command":"object.layer.key.blank","layerUid":"data:opaque authored layer","cell":0});
+    assert!(request(KEY_BLANK, &payload));
+    assert!(envelope(KEY_BLANK, payload.clone())
+        .validate_input()
+        .is_ok());
+    for cell in [
+        json!(-1),
+        json!(1.5),
+        json!(4294967296u64),
+        json!("0"),
+        Value::Null,
+    ] {
+        let mut bad = payload.clone();
+        bad["cell"] = cell;
+        assert!(!request(KEY_BLANK, &bad));
+    }
+    let mut maximum = payload.clone();
+    maximum["cell"] = json!(u32::MAX);
+    assert!(request(KEY_BLANK, &maximum));
+    for layer in [json!(""), json!(1), json!(["layer-a"]), Value::Null] {
+        let mut bad = payload.clone();
+        bad["layerUid"] = layer;
+        assert!(!request(KEY_BLANK, &bad));
+    }
+    for field in ["layerUids", "cells", "targets", "blankOverride", "document"] {
+        let mut bad = payload.clone();
+        bad[field] = json!([]);
+        assert!(envelope(KEY_BLANK, bad).validate_input().is_err());
+    }
+    let mut full = envelope(KEY_BLANK, payload);
+    let padding =
+        crate::contract::NATIVE_MAX_MESSAGE_BYTES - serde_json::to_vec(&full).unwrap().len();
+    let layer = full.payload["layerUid"].as_str().unwrap().to_owned();
+    full.payload["layerUid"] = json!(format!("{layer}{}", "x".repeat(padding)));
+    assert_eq!(serde_json::to_vec(&full).unwrap().len(), 4096);
+    assert!(full.validate_input().is_ok());
+    full.payload["layerUid"] = json!(format!("{}x", full.payload["layerUid"].as_str().unwrap()));
+    assert_eq!(serde_json::to_vec(&full).unwrap().len(), 4097);
+    assert!(full.validate_input().is_err());
+}
+
+#[test]
+fn blank_key_success_requires_one_checkpoint_and_revision_even_if_already_blank() {
+    let changed = json!({"applied":true,"historyEntriesAdded":1});
+    assert!(result_for_operation(KEY_BLANK, &changed));
+    assert!(revision_matches_for_operation(
+        KEY_BLANK,
+        Some(7),
+        8,
+        &changed
+    ));
+    assert!(!revision_matches_for_operation(
+        KEY_BLANK,
+        Some(7),
+        7,
+        &changed
+    ));
+    assert!(!revision_matches_for_operation(
+        KEY_BLANK, None, 8, &changed
+    ));
+    assert!(!revision_matches_for_operation(
+        KEY_BLANK,
+        Some(u64::MAX),
+        0,
+        &changed
+    ));
+    for bad in [
+        json!({"applied":false,"historyEntriesAdded":0}),
+        json!({"applied":true,"historyEntriesAdded":0}),
+        json!({"applied":false,"historyEntriesAdded":1}),
+        json!({"applied":true,"historyEntriesAdded":1,"cycledLayers":0,"skippedComponentLayers":0}),
+        json!({"applied":true,"historyEntriesAdded":1,"document":{}}),
+    ] {
+        assert!(!result_for_operation(KEY_BLANK, &bad));
+        assert!(!crate::native_contract::validate_result(
+            KEY_BLANK,
+            "document",
+            &json!({}),
+            &bad
+        ));
+        assert!(!revision_matches_for_operation(KEY_BLANK, Some(7), 7, &bad));
+    }
+    // Other compact operations retain their existing no-op semantics.
+    assert!(revision_matches_for_operation(
+        KEY_CLEAR,
+        Some(7),
+        7,
+        &json!({"applied":false,"historyEntriesAdded":0})
+    ));
+}
+
+#[cfg(test)]
+#[path = "native_frame_clipboard_contract_tests.rs"]
+mod clipboard;

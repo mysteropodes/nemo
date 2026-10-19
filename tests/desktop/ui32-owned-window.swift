@@ -4,6 +4,32 @@ import ApplicationServices
 import CoreGraphics
 import Darwin
 
+// Finite fixture admission belongs to this runner's entry policy. Every
+// caller selects one fixed source artifact; picker/file ownership stays separate.
+let ui32FixtureHash="642bc4c681373c9a4e7ab3c1795f024ee1c7f277ac255298c5fdf8e1f57c8831"
+let ui32F03FixtureHash="7fba834f64254aa27b828e0fc0fb7e2715977aea282a2b188c09782cb258bed2"
+let ui32F03InitialFixtureHash="f3d471501a1e0fcfdd8add247b1e63f363541b025e72db3fa5ef5efb308fcddd"
+func ui32FixedFixture(_ raw:String?) throws -> (name:String,size:Int,hash:String,f03:Bool) {
+  if raw == nil || raw == "initial-text" { return ("Initial-text.json",7791,ui32FixtureHash,false) }
+  if raw == "f03-original" { return ("candidate.project.json",7744,ui32F03FixtureHash,true) }
+  if raw == "f03-initial" { return ("initial.project.json",5721,ui32F03InitialFixtureHash,true) }
+  throw Refusal(code:"adapter-refused")
+}
+func ui32UsesF03Fixture(_ raw:String?) throws -> Bool {try ui32FixedFixture(raw).f03}
+func ui32FixedFixtureSelfTest() throws {
+  try check(try ui32UsesF03Fixture(nil) == false)
+  try check(try ui32UsesF03Fixture("initial-text") == false)
+  try check(try ui32UsesF03Fixture("f03-original") == true)
+  try check(try ui32UsesF03Fixture("f03-initial") == true)
+  let initial=try ui32FixedFixture("f03-initial"),terminal=try ui32FixedFixture("f03-original"),text=try ui32FixedFixture(nil)
+  try check(initial.name == "initial.project.json" && initial.size == 5721 && initial.hash == ui32F03InitialFixtureHash)
+  try check(terminal.name == "candidate.project.json" && terminal.size == 7744 && terminal.hash == ui32F03FixtureHash)
+  try check(text.name == "Initial-text.json" && text.size == 7791 && text.hash == ui32FixtureHash)
+  for unknown in ["","Initial-text","f03","F03-initial","f03-initial ","/private/tmp/candidate.project.json","other"] {
+    var refused=false;do { _ = try ui32UsesF03Fixture(unknown) } catch { refused=true };try check(refused)
+  }
+}
+
 func runUI32(_ args:[String], _ environment:[String:String]) throws {
   let pinned:OwnedInitialWindow
   do { pinned=try discoverOwnedInitialWindow(args,environment,scopeCheck:ui32Scope) }
@@ -16,11 +42,12 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   var currentCommand:String?
   let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0,sourceCaptureStage = -1,newSettingsOpen=false
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
+  let f03=try f03Operator(pinned,environment)
   var retainedWebArea:AXUIElement?, latest:UI32ContentCertificate<AXUIElement>?
   func nativeIdentity() throws { try verifyOwnedWindow(pinned) }
   func identity() throws {
     try nativeIdentity()
-    let phase=try ui32IdentityPhase(currentCommand,
+    let phase=try f03IdentityPhase(f03,currentCommand,
       fixtureActive:fixture?.attempted == true && fixture?.completed != true,
       syncActive:syncPanel?.attempted == true && syncPanel?.completed != true)
     // Native picker commands prove their existing attached owner/context before
@@ -177,6 +204,9 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     let rectangle=CGRect(origin:p,size:size), window=CGRect(origin:origin,size:extent)
     try check(size.width > 0 && size.height > 0 && window.contains(rectangle))
   }
+  func f03Member(_ node:AXUIElement) throws {
+    let current=try tree();try check(owns(node,pid) && current.contains {CFEqual($0,node)})
+  }
   try identity()
   try emit(["status":"pinned","purpose":"UI32","pid":pid,"windowId":pinned.number,
     "processStartSeconds":pinned.start.seconds,"processStartMicroseconds":pinned.start.microseconds,"matchedAX":true])
@@ -259,6 +289,14 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       result["capture"]=name; try emit(result); continue
     }
     try ui32RequireObserved(observed)
+    if command.hasPrefix("f03.") {
+      try check(request["option"] == nil && request["value"] == nil)
+      guard let f03 else {throw Refusal(code:"adapter-refused")}
+      result=f03Result(result,try f03.perform(command,fixture:{fixture},setFixture:{fixture=$0},
+        syncActive:syncPanel?.attempted == true && syncPanel?.completed != true,
+        resolve:resolve,visible:enabledVisible,member:f03Member,afterDismissal:{_ = try tree()}))
+      try emit(result);continue
+    }
     if command == "selection.toggle.B" {
       try check(request["option"] == nil && request["value"] == nil && fixture?.completed == true && fixture?.confirmed == true)
       _ = try tree()

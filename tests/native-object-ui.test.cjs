@@ -417,13 +417,16 @@ test('native optional Drawing fields retain exact values and absent old metadata
 });
 test('Drawing field projection refresh preserves rows and rejects invalid tables before any publication',()=>{
   const invalid=[{locked:null},{locked:0},{shy:null},{shy:0},{color:null},{color:123},{color:'#fff'},{color:'#GG0000'},
-    {color:'123456'},{parentLayerUid:'B'},{parentLayerUid:false}];
+    {color:'123456'},{parentLayerUid:''},{parentLayerUid:false},{parentLayerUid:0},{parentLayerUid:[]},{parentLayerUid:{}},
+    {unsupportedDrawingField:true}];
   for(const fields of invalid){
     const root=view(),before=JSON.stringify(root.state),rows=root.state.layers,selection=root._layerSel;
     const info=metadata([{...A,color:'#123456'},{...B,...fields}],1);
     assert.throws(()=>Files.refreshLayerTable(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
     assert.equal(root.state.layers,rows);assert.equal(root._layerSel,selection);assert.equal(Files.projectionReadyForUI(root,info),false);
-    assert.throws(()=>Files.refreshVisibility(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
+    if(Object.hasOwn(fields,'parentLayerUid'))assert.equal(Files.refreshVisibility(root,info),false);
+    else assert.throws(()=>Files.refreshVisibility(root,info),/Native layer/);
+    assert.equal(JSON.stringify(root.state),before);
     assert.throws(()=>Files.projectView(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
   }
   const root=view(),row=root.state.layers[0],next=metadata([{...A,locked:false,color:'#b49Be6',parentLayerUid:null},B],1);
@@ -440,7 +443,8 @@ test('Drawing field projection refresh preserves rows and rejects invalid tables
   assert.equal(root.state.layers[2].color,'#7EA0FA');assert.equal(root.state.layers[2].locked,false);assert.equal(root.state.layers[2].parentLayerUid,null);
 });
 test('unsupported Drawing fields are rejected by the session before detached metadata or UI publication',async()=>{
-  for(const fields of [{locked:null},{locked:'false'},{shy:null},{shy:'false'},{color:null},{color:'#123'},{color:'#12345G'},{parentLayerUid:'B'}]){
+  for(const fields of [{locked:null},{locked:'false'},{shy:null},{shy:'false'},{color:null},{color:'#123'},{color:'#12345G'},
+    {parentLayerUid:''},{parentLayerUid:false},{parentLayerUid:0},{parentLayerUid:[]},{parentLayerUid:{}}]){
     const h=desktop([{...A,...fields},B]),before=JSON.stringify(h.root.state),rows=h.root.state.layers;
     assert.equal(await h.file.openPath('/native.json'),false);assert.equal(h.session.info(),null);
     assert.equal(JSON.stringify(h.root.state),before);assert.equal(h.root.state.layers,rows);assert.equal(h.log.includes('ACK'),false);
@@ -527,4 +531,43 @@ test('native modified row refuses an actual in-flight external revision until fi
   try{pick(root,2).dispatch('click',{shiftKey:true});assert.equal(root._layerSel,selection);assert.equal(root.state.activeLayerIdx,active);assert.equal(root._layerSelAnchor,anchor);}
   finally{release();await change;}
   pick(root,2).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);
+});
+
+// Parent metadata is an admitted native read-side field. Graph validity (unknown/self/cycle)
+// stays in the real native owner; these literals use an existing, distinct parent UID.
+test('Drawing projection admits an existing opaque parent and retains row selection and revision fences',()=>{
+  const parent=A.layerUid,root=view(),rows=root.state.layers,child=rows[1],selection=root._layerSel,frame=root.state.currentFrame;
+  const next=metadata([A,{...B,parentLayerUid:parent}],1);
+  assert.equal(Files.refreshLayerTable(root,next),true);
+  assert.equal(root.state.layers,rows);assert.equal(root.state.layers[1],child);
+  assert.equal(child.parentLayerUid,parent);assert.equal(root._layerSel,selection);assert.equal(root.state.currentFrame,frame);
+  assert.equal(Files.projectionReadyForUI(root,next),true);
+  const prior=JSON.stringify(root.state),drift={...next,layers:[A,{...B,parentLayerUid:null}]};
+  assert.equal(Files.refreshLayerTable(root,drift),false);assert.equal(Files.refreshVisibility(root,drift),false);
+  assert.equal(JSON.stringify(root.state),prior);assert.equal(Files.projectionReadyForUI(root,drift),false);
+  assert.equal(Files.projectionReadyForUI(root,next),true);
+  for(const layers of [[A,{...B,parentLayerUid:null}],[A,{...B,parentLayerUid:parent}],[A,B]]){
+    const revision=next.contentRevision+1;next.contentRevision=revision;next.documentSnapshotId='document-snapshot-'+revision;
+    const info={...next,layers};assert.equal(Files.refreshLayerTable(root,info),true);
+    assert.equal(root.state.layers,rows);assert.equal(root.state.layers[1],child);
+    assert.equal(child.parentLayerUid,Object.hasOwn(layers[1],'parentLayerUid')?layers[1].parentLayerUid:null);
+    assert.equal(root._layerSel,selection);assert.equal(root.state.currentFrame,frame);assert.equal(Files.projectionReadyForUI(root,info),true);
+  }
+});
+test('Drawing session publishes frozen admitted parent metadata only through the confirmed native presentation',async()=>{
+  const parent=A.layerUid,h=desktop([A,{...B,parentLayerUid:parent}]);await h.open();
+  const root=h.root,meta=h.session.info(),rows=root.state.layers,child=rows[1],selection=root._layerSel,frame=root.state.currentFrame;
+  assert.equal(meta.layers[1].parentLayerUid,parent);assert.equal(Object.isFrozen(meta.layers[1]),true);
+  assert.equal(child.parentLayerUid,parent);assert.equal(Files.projectionReadyForUI(root,meta),true);
+  let release;h.hold(new Promise(resolve=>{release=resolve;}));
+  const change=h.external([A,{...B,parentLayerUid:null}]);await new Promise(setImmediate);
+  assert.equal(h.log.includes('ACK'),false);assert.equal(h.session.readPresentedObjectSession(),null);
+  pick(root,1).click();assert.equal(root._layerSel,selection);assert.equal(root.state.activeLayerIdx,0);
+  release();await change;
+  const next=h.session.info();assert.equal(next.contentRevision,meta.contentRevision+1);assert.equal(next.layers[1].parentLayerUid,null);
+  assert.equal(Object.isFrozen(next.layers[1]),true);assert.equal(meta.layers[1].parentLayerUid,parent,'old detached metadata remains exact');
+  assert.equal(root.state.layers,rows);assert.equal(root.state.layers[1],child);assert.equal(child.parentLayerUid,null);
+  assert.equal(root._layerSel,selection);assert.equal(root.state.currentFrame,frame);assert.equal(Files.projectionReadyForUI(root,next),true);
+  assert.ok(h.log.indexOf('preview')<h.log.indexOf('ACK'));
+  assert.equal(h.calls.some(call=>call.request&&call.request.operation&&call.request.operation.startsWith('command.')),false);
 });

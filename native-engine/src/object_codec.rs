@@ -330,11 +330,32 @@ pub(crate) fn validate_property_holders(
     )
 }
 
+/// Legacy and component-symbol content retain their original parent refusal.
 pub(crate) fn validate_content(
     total_frames: u32,
     declared_layers: &[ObjectLayer],
     objects: &[ObjectRecord],
     complete_contexts: bool,
+) -> Result<(), ObjectCodecError> {
+    validate_content_inner(
+        total_frames,
+        declared_layers,
+        objects,
+        complete_contexts,
+        false,
+    )
+}
+
+#[path = "object_parent_links.rs"]
+mod parent_links;
+pub(crate) use parent_links::validate_scene_content;
+
+fn validate_content_inner(
+    total_frames: u32,
+    declared_layers: &[ObjectLayer],
+    objects: &[ObjectRecord],
+    complete_contexts: bool,
+    scene_parents: bool,
 ) -> Result<(), ObjectCodecError> {
     use ObjectCodecErrorKind::{DuplicateId, Invalid, Unsupported};
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
@@ -347,8 +368,8 @@ pub(crate) fn validate_content(
     let mut layers = HashSet::new();
     for layer in declared_layers {
         // Drawing Fill enforces its own lock guard. Generic Motion actions
-        // retain their permissive baseline semantics; parenting remains separate.
-        if layer.parent_layer_uid.value().is_some_and(Option::is_some) {
+        // retain their permissive baseline semantics; only the explicit scene codec admits parents.
+        if !scene_parents && layer.parent_layer_uid.value().is_some_and(Option::is_some) {
             return Err(reject(Unsupported, "layer parenting is unavailable"));
         }
         if let Some(color) = layer.color.value() {

@@ -1,7 +1,7 @@
 //! Explicit v2 admission/migration core; existing v1 host codecs do not opt in.
 use crate::object_codec::{
-    parse, validate, validate_component_tables, validate_content, validate_image_meshes,
-    validate_item_parts, validate_property_holders, ObjectCodecError, ObjectCodecErrorKind,
+    parse, validate, validate_component_tables, validate_image_meshes, validate_item_parts,
+    validate_property_holders, validate_scene_content, ObjectCodecError, ObjectCodecErrorKind,
     ObjectDocument,
 };
 use crate::object_document::{
@@ -199,7 +199,7 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
     if document.format != OBJECT_DOCUMENT_FORMAT || document.format_version != 2 {
         return Err(unsupported("unsupported ordered object format or version"));
     }
-    validate_content(
+    validate_scene_content(
         document.total_frames,
         &document.layers,
         &document.objects,
@@ -237,7 +237,7 @@ pub(crate) fn validate_storage_order(
     if document.format != OBJECT_DOCUMENT_FORMAT || document.format_version != 2 {
         return Err(unsupported("unsupported ordered object format or version"));
     }
-    validate_content(
+    validate_scene_content(
         document.total_frames,
         &document.layers,
         &document.objects,

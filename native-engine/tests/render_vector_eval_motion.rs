@@ -243,3 +243,35 @@ fn parent_pivot_input_keeps_true_evaluated_geometry_before_layer_position() {
         }
     }
 }
+
+#[test]
+fn top_level_v2_parent_storage_is_preserved_but_visible_vector_parenting_never_paints_raw() {
+    let mut v = original_initial();
+    let mut parent = v["layers"][0].clone();
+    parent["layerUid"] = json!("parent");
+    parent["visible"] = json!(false);
+    parent.as_object_mut().unwrap().remove("parentLayerUid");
+    v["layers"].as_array_mut().unwrap().push(parent);
+    v["layers"][0]["parentLayerUid"] = json!("parent");
+    v["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"parent","naturalPosition":1,"order":{}}));
+    let s = snap(&v);
+    let stored = encode_storage_project(s.document()).unwrap();
+    assert_eq!(decode_storage_project(&stored).unwrap(), *s.document());
+    assert_eq!(
+        prepare_object_exposure_frame(&s, &pins(&s, 0)).unwrap_err(),
+        ObjectFrameError::Unavailable
+    );
+    // The SAME original content port used by v1 and component-symbol admission
+    // still refuses parents; only the explicit top-level ordered scene opts in.
+    assert!(crate::object_codec::validate_content(
+        s.document().total_frames(),
+        s.document().layers(),
+        s.document().objects(),
+        true
+    )
+    .is_err());
+    assert_eq!(encode_storage_project(s.document()).unwrap(), stored);
+}

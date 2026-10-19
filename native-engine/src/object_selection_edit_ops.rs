@@ -14,7 +14,9 @@
 //! and the one history entry comes from `NativeObjectHistory`. The Animation 2D
 //! hold promotion uses the existing L05 frame kernel inside the same detached
 //! candidate, so promotion and the selected edit publish together.
-use super::object_frame_edit_document::{promote_cells, DocumentEdit, FrameEditError};
+use crate::commands::object_fill_owner::object_frame_edit_document::{
+    promote_cells, DocumentEdit, FrameEditError,
+};
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_selection_edit_clones::RevisionIds;
 use crate::object_document::object_group_kernels::object_selection_edit_frames::{

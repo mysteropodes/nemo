@@ -425,6 +425,7 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
       'property_follow_path_sample_tests = "../tests/property_follow_path_sample.rs"',
       'property_follow_path_sample_controls_tests = "../tests/property_follow_path_sample_controls.rs"',
       'property_expression_views_tests = "../tests/property_expression_views.rs"',
+      'property_expression_lookup_tests = "../tests/property_expression_lookup.rs"',
       'property_expression_views_controls_tests = "../tests/property_expression_views_controls.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"',
       'object_render_scene_compositor_tests = "../tests/object_render_scene.rs"');
@@ -4491,7 +4492,7 @@ test('L05-I frame-clipboard transactions stay sealed children of the fill owner 
   assert.match(read('native-engine/src/object_history.rs'), /#\[path = "object_frame_clipboard_paste_history\.rs"\]\s*mod object_frame_clipboard_paste;/);
   const dispatch = read('native-engine/src/object_command_dispatch.rs');
   assert.match(dispatch, /is_frame_clipboard_operation\(request\.operation\.as_str\(\)\)/);
-  assert.match(dispatch, /self\.dispatch_frame_clipboard\(request\.operation\.as_str\(\), &request\.payload\)/);
+  assert.match(dispatch, /self\.dispatch_frame_clipboard\(request\)/);
   for (const [file, tests] of [
     ['native-engine/src/object_frame_clipboard_paste.rs', 'object_frame_clipboard_paste'],
     ['native-engine/src/object_frame_clipboard_paste_plan.rs', 'object_frame_clipboard_paste_plan'],
