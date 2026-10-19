@@ -23,7 +23,7 @@
     "adapterOwnsWritableMirror": false,
     "fallback": "none"
   },
-  "readPolicy": "Existing sole native owner selects the current immutable revision/snapshot. rawSample reuses native raw self sampling and deliberately ignores active expressions. authoredKeys returns admitted OrderKey DTOs with authored missing/null/empty fields unchanged; fixed-count pinned pages or unavailable, never a JS evaluator, mirror, default curve substitution, publication or ACK.",
+  "readPolicy": "Existing sole native owner selects the current immutable revision/snapshot. rawSample reuses native raw self sampling and deliberately ignores active expressions. authoredKeys returns admitted OrderKey DTOs with authored missing/null/empty fields unchanged; fixed-count pinned pages or unavailable, never a JS evaluator, mirror, default curve substitution, publication or ACK. expressionContext reads actual retained comp/self/key-count providers with explicit project-metadata unavailability; it grants no expression execution or writable authority.",
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
@@ -158,6 +158,72 @@
             }
           ],
           "nextOffset": null
+        }
+      }
+    },
+    {
+      "label": "Pinned native project context and holder identity",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "property-context",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.read",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "view": {
+            "kind": "expressionContext",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0"
+            },
+            "property": "opacity",
+            "frame": -1.5
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "property-context",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "d11-read-fixture",
+          "documentId": "native-object-document-1",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "kind": "expressionContext",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "property": "opacity",
+          "dimension": 1,
+          "frame": -1.5,
+          "self": {
+            "name": "Ball",
+            "index": 0,
+            "isShape": false,
+            "hasParent": false,
+            "property": "opacity",
+            "parent": null
+          },
+          "comp": {
+            "width": 320,
+            "height": 180,
+            "fps": 25,
+            "frames": 21,
+            "layers": 2,
+            "name": "Scene",
+            "frameDuration": 0.04,
+            "duration": 0.84,
+            "numLayers": 2
+          },
+          "keyCount": 0,
+          "compUnavailable": null
         }
       }
     }

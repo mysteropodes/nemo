@@ -123,13 +123,13 @@
       exact(value, ['atRevision', 'documentSnapshotId', 'view'], [], 'property read');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
       const view = value.view;
-      if (!plain(view) || !['rawSample', 'authoredKeys'].includes(view.kind)) {
+      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext'].includes(view.kind)) {
         throw new TypeError('unsupported property read view');
       }
-      const fields = view.kind === 'rawSample' ? ['frame'] : ['offset', 'limit'];
+      const fields = view.kind !== 'authoredKeys' ? ['frame'] : ['offset', 'limit'];
       exact(view, ['kind', 'target', 'property', ...fields], [], 'property read view');
       readTarget(view.target); objectUid(view.property);
-      if (view.kind === 'rawSample') {
+      if (view.kind !== 'authoredKeys') {
         if (!Number.isFinite(view.frame)) throw new TypeError('invalid raw sample frame');
       } else {
         frame(view.offset);
@@ -165,9 +165,36 @@
         }
       }
     }
+    function expressionContextResult(value) {
+      if (!Number.isFinite(value.frame)) throw new TypeError('invalid context frame');
+      frame(value.keyCount);
+      if (value.keyCount > 65536) throw new TypeError('invalid context key count');
+      if (value.self !== null) {
+        const s = value.self;
+        exact(s, ['name','index','isShape','hasParent','property','parent'], [], 'expression self');
+        frame(s.index);
+        if (!(s.name === null || typeof s.name === 'string') || typeof s.isShape !== 'boolean' ||
+            typeof s.hasParent !== 'boolean' || s.property !== value.property) throw new TypeError('invalid self identity');
+        if (s.parent !== null) {
+          exact(s.parent, ['name','index'], [], 'expression parent'); frame(s.parent.index);
+          if (typeof s.parent.name !== 'string') throw new TypeError('invalid parent name');
+        }
+      }
+      if (value.comp === null) {
+        if (value.compUnavailable !== 'projectMetadata') throw new TypeError('unowned comp view');
+      } else {
+        const c = value.comp;
+        exact(c, ['width','height','fps','frames','layers','name','frameDuration','duration','numLayers'], [], 'expression comp');
+        for (const k of ['width','height','frames','layers','numLayers']) frame(c[k]);
+        if (c.width === 0 || c.height === 0 || typeof c.name !== 'string' || !Number.isFinite(c.fps) || c.fps <= 0 ||
+            c.frameDuration !== 1/c.fps || c.duration !== Math.max(c.frames,1)/c.fps ||
+            c.numLayers !== c.layers || value.compUnavailable !== null) throw new TypeError('invalid comp metadata');
+      }
+    }
     function readResult(value) {
       const raw = value && value.kind === 'rawSample';
-      const fields = raw ? ['frame', 'value'] : ['trackPresent', 'items', 'nextOffset'];
+      const context = value && value.kind === 'expressionContext';
+      const fields = raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : ['trackPresent', 'items', 'nextOffset'];
       exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId',
         'kind', 'target', 'property', 'dimension', ...fields], [], 'property read result');
       id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
@@ -176,7 +203,9 @@
       if (!Number.isInteger(value.dimension) || value.dimension < 1 || value.dimension > 4) {
         throw new TypeError('invalid property read dimension');
       }
-      if (raw) {
+      if (context) {
+        expressionContextResult(value);
+      } else if (raw) {
         if (!Number.isFinite(value.frame)) throw new TypeError('invalid sampled frame');
         readVector(value.value, value.dimension);
       } else {
@@ -204,14 +233,14 @@
           result.kind !== view.kind || result.property !== view.property ||
           ['contextId', 'layerUid', 'strokeId'].some(key => result.target[key] !== view.target[key] ||
             has(result.target, key) !== has(view.target, key))) throw new TypeError('property read selector mismatch');
-      if (view.kind === 'rawSample') {
+      if (view.kind !== 'authoredKeys') {
         if (result.frame !== view.frame) throw new TypeError('raw sample frame mismatch');
       } else if (result.items.length > view.limit || result.nextOffset !== null &&
           (result.items.length !== view.limit || result.nextOffset !== view.offset + result.items.length)) {
         throw new TypeError('authored page cursor mismatch');
       }
     }
-    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
+    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.self\.property|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
     return Object.freeze({ rangeResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }

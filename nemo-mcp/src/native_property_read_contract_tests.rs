@@ -27,6 +27,51 @@ fn output(keys: bool) -> Value {
     }
     v
 }
+
+#[test]
+fn actual_context_view_is_closed_and_correlated_in_the_mcp_contract() {
+    let descriptor: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/capabilities-v2/native-property-read.json"
+    ))
+    .unwrap();
+    let example = descriptor["examples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["request"]["payload"]["view"]["kind"] == "expressionContext")
+        .unwrap();
+    let p = &example["request"]["payload"];
+    let v = &example["response"]["result"];
+    let document = v["documentId"].as_str().unwrap();
+    assert!(request(p));
+    assert!(result(document, p, v));
+    for (pointer, replacement) in [
+        ("/frame", json!(99)),
+        ("/self/property", json!("foreign")),
+        ("/self/index", json!(-1)),
+        ("/comp/numLayers", json!(99)),
+        ("/comp/frameDuration", json!(0)),
+        ("/comp/duration", json!(99)),
+        ("/compUnavailable", json!("projectMetadata")),
+        ("/keyCount", json!(65537)),
+        ("/target/layerUid", json!("foreign")),
+    ] {
+        let mut bad = v.clone();
+        *bad.pointer_mut(pointer).unwrap() = replacement;
+        assert!(!result(document, p, &bad), "{pointer}");
+    }
+    for pointer in ["", "/self", "/comp"] {
+        let mut bad = v.clone();
+        bad.pointer_mut(pointer).unwrap()["extra"] = json!(true);
+        assert!(!result(document, p, &bad), "{pointer}");
+    }
+    let mut unavailable = v.clone();
+    unavailable["comp"] = Value::Null;
+    unavailable["compUnavailable"] = json!("projectMetadata");
+    assert!(result(document, p, &unavailable));
+    unavailable["compUnavailable"] = Value::Null;
+    assert!(!result(document, p, &unavailable));
+}
 #[test]
 fn property_read_shapes_and_presence_are_closed_without_inventing_track_defaults() {
     for keys in [false, true] {

@@ -49,6 +49,31 @@ test('D11 descriptor and inline schema declare only the exact pinned native prop
   assert.deepEqual(d.examples[0].response.result.value, [20]);
 });
 
+test('native context view crosses the actual SDK validator with closed fields and full correlation', async () => {
+  const d = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-property-read.json')));
+  const example = d.examples.find(e => e.request.payload.view.kind === 'expressionContext');
+  const q = example.request, r = example.response;
+  assert.deepEqual(await read(q,r),r);
+  for (const mutate of [
+    x => x.result.frame++, x => x.result.self.property = 'foreign',
+    x => x.result.comp.numLayers++, x => x.result.comp.frameDuration = 0,
+    x => x.result.comp.duration++, x => x.result.compUnavailable = 'projectMetadata',
+    x => x.result.self.extra = true, x => x.result.comp.extra = true,
+    x => x.result.self.parent = {name:'Parent',index:-1}, x => x.result.keyCount = 65537,
+    x => x.result.target.layerUid = 'foreign'
+  ]) {
+    const bad = structuredClone(r); mutate(bad); await assert.rejects(read(q,bad),TypeError);
+  }
+  const unavailable = structuredClone(r);
+  unavailable.result.comp = null; unavailable.result.compUnavailable = 'projectMetadata';
+  assert.deepEqual(await read(q,unavailable),unavailable);
+  unavailable.result.compUnavailable = null; await assert.rejects(read(q,unavailable),TypeError);
+  for (const mutate of [x => x.payload.view.extra=true, x => delete x.payload.view.frame,
+    x => x.payload.view.frame=null, x => x.expectedRevision=0]) {
+    const bad=structuredClone(q);mutate(bad);assert.throws(()=>adapter(()=>r).readProperty(bad),TypeError);
+  }
+});
+
 test('raw reads preserve finite signed fractional frames and all dimensions without evaluating in JS', async () => {
   for (const frame of [-100, -1.5, 0, 0.25, 12]) for (const dimension of [1, 2, 3, 4]) {
     const q = request(); q.payload.view.frame = frame;

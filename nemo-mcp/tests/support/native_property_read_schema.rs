@@ -14,7 +14,10 @@ pub(super) fn check(valid: impl Fn(&Value) -> bool) {
     keys["payload"]["view"]["offset"] = json!(u32::MAX);
     keys["payload"]["view"]["limit"] = json!(8);
     assert!(valid(&keys));
-    for source in [q, keys] {
+    let mut context = q.clone();
+    context["payload"]["view"]["kind"] = json!("expressionContext");
+    assert!(valid(&context));
+    for source in [q, keys, context] {
         let mut bad = source.clone();
         bad["expectedRevision"] = json!(7);
         assert!(!valid(&bad));
