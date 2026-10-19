@@ -69,6 +69,9 @@ pub(super) fn labels(plan: &ObjectPaintPlan) -> Vec<String> {
             PaintEntry::Contour(c) => c.source().record().target().stroke_id().to_owned(),
             PaintEntry::Raster(_) => "image".into(),
             PaintEntry::Text(t) => t.item.group_id().to_owned(),
+            PaintEntry::Component(_) => {
+                panic!("component-free Text fixture gained unexpected Component")
+            }
         })
         .collect()
 }

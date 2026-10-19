@@ -26,16 +26,16 @@
 //! because every native group table is per layer and context (the baseline remap
 //! only avoids collisions in the flattened outer registry); the outer instance keeps
 //! no copy of the groups (that copy was a rendering detail of the flattened
-//! registry); an unknown layer is refused instead of silently skipped; and Motion
-//! holders that would have to land inside a component are refused (`Unavailable`)
-//! because the component record has no holder member yet, never dropped; and a layer
-//! with raster items or text blocks is refused (`Unavailable`, `component-convert-items`)
+//! registry); an unknown layer is refused instead of silently skipped. Motion holders
+//! follow their stable identities through the existing native holder table; the first
+//! merged layer's expression/control chain belongs to the outer instance exactly once.
+//! A layer with raster items or text blocks is refused (`Unavailable`, `component-convert-items`)
 //! because the component record has no `items` member (the baseline carries a raster
 //! with its frames), never left behind on an instance that no longer owns the strokes.
 use crate::commands::object_fill_owner::component_owner::object_component_convert_support::{
-    add_instance_module, append_layer, empty_component_set, holders_on, items_on, layer_index,
-    lift_window, mint_layer_uid, mint_symbol_id, new_instance, require_v2, update, with_tables,
-    PermitAll, SetupError, SetupPlan, SourceRefusal,
+    add_instance_module, append_layer, empty_component_set, items_on, layer_index, lift_window,
+    mint_layer_uid, mint_symbol_id, new_instance, require_v2, update, with_tables, PermitAll,
+    SetupError, SetupPlan, SourceRefusal,
 };
 use crate::commands::remove_order_element;
 use crate::object_document::object_component_record_kernels::object_component_records::{
@@ -49,6 +49,9 @@ use crate::object_document::{
     FrameScopeKind, GroupTable, LayerTiming, ObjectDocument, ObjectLayer, ObjectRecord,
     ObjectTarget, Presence,
 };
+
+#[path = "object_component_convert_holders.rs"]
+mod holders;
 
 /// What a layer is, as far as the baseline refusal list needs it. The native
 /// document stores a record for three of the eight kinds (a component instance in
@@ -192,13 +195,10 @@ fn convert_single(
         .name
         .value()
         .ok_or_else(|| SetupError::Unnamed(uid.clone()))?;
-    if holders_on(document, &uid).1 {
-        return Err(SetupError::ElementHoldersUnavailable { layer_uid: uid });
-    }
     let symbol_id = mint_symbol_id(document, next_revision)?;
     let inner_uid = format!("{symbol_id}:layer-1");
     let moved = retarget_objects(document, &uid, &symbol_id, &inner_uid)?;
-    let mut inner = ObjectLayer::identified(inner_uid);
+    let mut inner = ObjectLayer::identified(inner_uid.clone());
     inner.name = Presence::Present("Layer 1".to_string());
     inner.visible = Presence::Present(true);
     inner.locked = Presence::Present(false);
@@ -216,6 +216,7 @@ fn convert_single(
         exposed_props: Presence::Missing,
     };
     let mut candidate = document.clone();
+    candidate.property_holders = holders::single(document, &uid, &symbol_id, &inner_uid);
     drop_scene_objects(&mut candidate, &uid)?;
     let instance = &mut candidate.layers[index];
     instance.timing = Presence::Present(LayerTiming::blank_drawing());
@@ -263,15 +264,6 @@ fn convert_merge(
     next_revision: u64,
     indices: &[usize],
 ) -> Result<SetupPlan, SetupError> {
-    for &index in indices {
-        let uid = &document.layers[index].layer_uid;
-        let (layer_level, element_level) = holders_on(document, uid);
-        if layer_level || element_level {
-            return Err(SetupError::HoldersUnavailable {
-                layer_uid: uid.clone(),
-            });
-        }
-    }
     let symbol_id = mint_symbol_id(document, next_revision)?;
     let instance_uid = mint_layer_uid(document, next_revision)?;
     let mut inner_layers: Vec<ObjectLayer> = Vec::new();
@@ -356,11 +348,14 @@ fn convert_merge(
     .map_err(SetupError::Lifecycle)?;
     let selection = LayerSelection {
         active: gone[0].clone(),
-        selected: gone,
+        selected: gone.clone(),
         anchor: None,
     };
-    let removed =
+    let mut removed =
         plan_delete(&placed.document, &selection, &PermitAll).map_err(SetupError::Lifecycle)?;
+    // Root-layer deletion cannot identify a same-UID holder in another context.
+    // Restore the complete scoped transform of the retained origin after deletion.
+    removed.document.property_holders = holders::merged(document, &gone, &symbol_id, &instance_uid);
     Ok(SetupPlan {
         document: removed.document,
         changed: true,
@@ -382,3 +377,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/object_component_convert_verify.rs"]
 mod verify;
+
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_component_convert_motion.rs"]
+mod motion_tests;

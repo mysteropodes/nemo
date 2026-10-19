@@ -251,32 +251,38 @@ fn holder(layer: &str, stroke: Option<&str>) -> Value {
 }
 
 #[test]
-fn motion_that_cannot_enter_a_component_is_refused_never_dropped() {
-    let element = decode(&s1_document(holder("ly_hand", Some("sa"))));
-    assert_eq!(
-        plan_convert(&element, 1, &uids(&["ly_hand"])).unwrap_err(),
-        SetupError::ElementHoldersUnavailable {
-            layer_uid: "ly_hand".into()
-        }
-    );
+fn motion_follows_converted_content_and_unselected_holders_are_preserved() {
+    let input = s1_document(holder("ly_hand", Some("sa")));
+    let element = decode(&input);
+    let element_before = wire(&element);
+    let plan = plan_convert(&element, 1, &uids(&["ly_hand"])).unwrap();
+    let mut expected = input["propertyHolders"].clone();
+    expected[0]["target"]["contextId"] = json!(S1_SYMBOL);
+    expected[0]["target"]["layerUid"] = json!("native-component:1:0:layer-1");
+    assert_eq!(wire(&plan.document)["propertyHolders"], expected);
+    assert_eq!(wire(&element), element_before, "preparation is detached");
     let mut merged = s2_document();
     merged["propertyHolders"] = holder("ly_b", None)["propertyHolders"].clone();
+    let input = decode(&merged);
+    let plan = plan_convert(&input, 5, &uids(&["ly_a", "ly_b"])).unwrap();
+    let mut expected = merged["propertyHolders"].clone();
+    expected[0]["target"]["contextId"] = json!(S2_SYMBOL);
+    assert_eq!(wire(&plan.document)["propertyHolders"], expected);
+    assert_eq!(wire(&input), merged);
+    // The single source's layer holder stays on its outer instance; unrelated
+    // roots retain their complete holders even while other layers are deleted.
+    let kept = s1_document(holder("ly_hand", None));
+    let plan = plan_convert(&decode(&kept), 1, &uids(&["ly_hand"])).unwrap();
     assert_eq!(
-        plan_convert(&decode(&merged), 5, &uids(&["ly_a", "ly_b"])).unwrap_err(),
-        SetupError::HoldersUnavailable {
-            layer_uid: "ly_b".into()
-        }
+        wire(&plan.document)["propertyHolders"],
+        kept["propertyHolders"]
     );
-    // A layer-level holder of a single conversion stays on the instance, and a
-    // holder on a layer that is not part of the merge is untouched.
-    let kept = decode(&s1_document(holder("ly_hand", None)));
-    assert!(plan_convert(&kept, 1, &uids(&["ly_hand"])).is_ok());
     let mut elsewhere = s2_document();
     elsewhere["propertyHolders"] = holder("ly_y", None)["propertyHolders"].clone();
     let plan = plan_convert(&decode(&elsewhere), 5, &uids(&["ly_a", "ly_b"])).unwrap();
     assert_eq!(
-        wire(&plan.document)["propertyHolders"][0]["target"]["layerUid"],
-        "ly_y"
+        wire(&plan.document)["propertyHolders"],
+        elsewhere["propertyHolders"]
     );
 }
 

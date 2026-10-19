@@ -34,6 +34,11 @@ pub(crate) enum SvgExportError {
         source_object_index: usize,
         reason: &'static str,
     },
+    /// A placed component has layer/inner-target provenance, not a root object index.
+    UnsupportedComponent {
+        source_layer_index: usize,
+        reason: &'static str,
+    },
     /// A straight RGBA channel is not a finite number in 0..=1.
     UnrepresentablePaint { source_object_index: usize },
     /// The exact serialized size exceeds the caller's cap.
@@ -260,11 +265,25 @@ fn emit_contour(
     contour: &ClosedCubicPath,
     rgba: [f64; 4],
 ) -> Result<(), SvgExportError> {
+    emit_contour_with_error(
+        sink,
+        contour,
+        rgba,
+        SvgExportError::Unsupported {
+            source_object_index,
+            reason: "empty contour",
+        },
+    )
+}
+
+fn emit_contour_with_error(
+    sink: &mut Sink,
+    contour: &ClosedCubicPath,
+    rgba: [f64; 4],
+    invalid: SvgExportError,
+) -> Result<(), SvgExportError> {
     let segments = contour.segments();
-    let first = segments.first().ok_or(SvgExportError::Unsupported {
-        source_object_index,
-        reason: "empty contour",
-    })?;
+    let first = segments.first().ok_or(invalid)?;
     sink.put("<path d=\"M")?;
     sink.point(first.point)?;
     for (index, from) in segments.iter().enumerate() {
@@ -315,6 +334,18 @@ fn emit_frame(
     }) {
         return Err(unsupported_raster(plan, index));
     }
+    // Refuse an unsupported component paint before counting/writing ANY header,
+    // matching the existing all-or-nothing mixed raster policy.
+    for entry in ordered_entries(plan) {
+        if let PaintEntry::Component(component) = entry {
+            if component.contour.is_none() || component.svg_rgba.is_none() {
+                return Err(SvgExportError::UnsupportedComponent {
+                    source_layer_index: component.host_layer_index,
+                    reason: "component style has no admitted SVG representation",
+                });
+            }
+        }
+    }
     sink.put(&document_head(spec.width, spec.height))?;
     let mut count = 0;
     for entry in ordered_entries(plan) {
@@ -337,6 +368,19 @@ fn emit_frame(
                     emit_contour(sink, text.source_index, &contour.contour, rgba)?;
                     count += 1;
                 }
+            }
+            PaintEntry::Component(component) => {
+                let refusal = SvgExportError::UnsupportedComponent {
+                    source_layer_index: component.host_layer_index,
+                    reason: "component style has no admitted SVG representation",
+                };
+                let contour = component.contour.as_ref().ok_or(refusal)?;
+                let rgba = component.svg_rgba.ok_or(refusal)?;
+                if count > 0 {
+                    sink.put("\n")?;
+                }
+                emit_contour_with_error(sink, contour, rgba, refusal)?;
+                count += 1;
             }
             PaintEntry::Raster(index) => return Err(unsupported_raster(plan, index)),
         }

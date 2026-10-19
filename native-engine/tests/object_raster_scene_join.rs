@@ -99,6 +99,7 @@ fn real_import_joins_vector_and_raster_in_one_pinned_order_and_keeps_contour_api
                 }
                 PaintEntry::Raster(index) => format!("raster:{index}"),
                 PaintEntry::Text(_) => panic!("PNG-only fixture gained unexpected Text"),
+                PaintEntry::Component(_) => panic!("PNG-only fixture gained unexpected Component"),
             })
             .collect();
         assert_eq!(sequence, ["vector:red-square", "raster:0"]);
@@ -299,6 +300,9 @@ fn unsupported_raster_brush_range_and_context_are_refused_by_the_actual_producti
                         PaintEntry::Contour(_) => "vector",
                         PaintEntry::Raster(_) => "raster",
                         PaintEntry::Text(_) => panic!("PNG-only fixture gained unexpected Text"),
+                        PaintEntry::Component(_) => {
+                            panic!("PNG-only fixture gained unexpected Component")
+                        }
                     })
                     .collect();
                 let expected = if visible {

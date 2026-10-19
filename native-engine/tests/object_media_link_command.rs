@@ -244,12 +244,58 @@ fn cancelled_and_stale_requests_are_retained_without_publication_or_retry() {
         let after = state(&o);
         assert_eq!(dispatch(&mut o, &req), first);
         assert_eq!(state(&o), after);
-        let corrected = request(&o, "refused", shift(3));
-        assert_eq!(
-            dispatch(&mut o, &corrected)["error"]["code"],
-            "invalid_request"
-        );
+        // At revision 1 the rebuilt stale request is byte-for-byte identical
+        // to its original envelope. It must replay its terminal refusal even
+        // though that expected revision now matches the current owner.
+        let refreshed = request(&o, "refused", shift(3));
+        if expected == "stale_revision" {
+            assert_eq!(refreshed, req);
+            assert_eq!(dispatch(&mut o, &refreshed), first);
+        } else {
+            assert_ne!(refreshed, req);
+            assert_eq!(
+                dispatch(&mut o, &refreshed)["error"]["code"],
+                "invalid_request"
+            );
+        }
         assert_eq!(state(&o), after);
+        // Both a different relative edit and a would-be no-op are genuinely
+        // changed bodies. Neither may replace the original same-ID receipt.
+        for payload in [shift(4), shift(0)] {
+            let changed = request(&o, "refused", payload);
+            assert_ne!(changed, req);
+            assert_eq!(
+                dispatch(&mut o, &changed)["error"]["code"],
+                "invalid_request"
+            );
+            assert_eq!(state(&o), after);
+            assert_eq!(dispatch(&mut o, &req), first);
+            assert_eq!(state(&o), after);
+        }
+        // A fresh identity can execute the formerly refused edit. This rules
+        // out a blanket-refusal implementation passing the negative controls.
+        let fresh = request(&o, "fresh-after-refusal", shift(3));
+        let applied = dispatch(&mut o, &fresh);
+        assert_eq!(applied["ok"], true);
+        assert_eq!(applied["contentRevision"], 2);
+        assert_eq!(
+            applied["result"],
+            json!({"applied":true,"historyEntriesAdded":1})
+        );
+        assert_eq!(offset(&o), 10);
+        assert_eq!(o.history_depths(), (2, 0));
+        let advanced = state(&o);
+        let noop = request(&o, "fresh-noop-after-refusal", shift(0));
+        let unchanged = dispatch(&mut o, &noop);
+        assert_eq!(unchanged["ok"], true);
+        assert_eq!(unchanged["contentRevision"], 2);
+        assert_eq!(
+            unchanged["result"],
+            json!({"applied":false,"historyEntriesAdded":0})
+        );
+        assert_eq!(state(&o), advanced);
+        assert_eq!(dispatch(&mut o, &req), first);
+        assert_eq!(state(&o), advanced);
     }
 }
 

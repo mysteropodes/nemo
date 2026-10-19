@@ -316,6 +316,17 @@ impl ObjectFramePacket {
     }
 }
 
+/// Reuse the scoped order producer with a caller-validated source selection.
+/// Placed symbols intentionally select timing without entered-layer range gates.
+pub(crate) fn prepare_scoped_order_from_sources(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    frame: u32,
+    sources: &[Option<u32>],
+) -> Result<NumericOrderPlan, ObjectFrameError> {
+    order::prepare_context(snapshot, context_id, frame, sources, true)
+}
+
 /// Explicit exact-scoped native query, not a temporal desktop fallback.
 /// A valid selection may contain zero records; no authored timing is inferred.
 pub fn prepare_object_frame(

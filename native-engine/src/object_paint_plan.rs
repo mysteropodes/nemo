@@ -110,7 +110,10 @@ pub fn prepare_object_paint_plan(
     // Authored v2. v1/no-plan and all Reference/nonroot inputs are unavailable.
     // L07-F: the retained scene is reported as the contour producer output and joined
     // through the pinned registry (pin check once, NumericOrderPlan order).
-    let (indices, mixed) = if scene.rasters.is_empty() && scene.texts.entries.is_empty() {
+    let (indices, mixed) = if scene.rasters.is_empty()
+        && scene.texts.entries.is_empty()
+        && scene.components.scene.is_none()
+    {
         let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
         let indices = join(scene, &sequence)?;
         let mixed = indices.iter().copied().map(PaintIndex::Contour).collect();

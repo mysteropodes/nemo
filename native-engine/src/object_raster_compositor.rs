@@ -40,6 +40,11 @@ impl Compositor {
                     command.path(),
                 ),
                 PaintEntry::Text(source) => source.draw(&mut self.scene),
+                PaintEntry::Component(source) => {
+                    source
+                        .prepared
+                        .draw(&mut self.scene, Affine::IDENTITY, &source.path)
+                }
                 PaintEntry::Raster(index) => {
                     #[cfg(all(feature = "application", feature = "project_media_codec"))]
                     {

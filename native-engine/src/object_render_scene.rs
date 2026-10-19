@@ -6,6 +6,12 @@ use crate::render_geometry::ClosedCubicPath;
 use std::sync::Arc;
 use vello::kurbo::BezPath;
 
+#[path = "object_component_render_scene.rs"]
+pub(crate) mod component_scene;
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_component_render_scene.rs"]
+mod component_tests;
+
 use scene_effect_kernels::object_scene_resource_set::{
     same_scene_resources, SceneResourceMismatch,
 };
@@ -210,6 +216,10 @@ impl ObjectCompositionWitness {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectSceneError {
     ReferenceUnavailable,
+    UnsupportedComponent {
+        source_layer_index: usize,
+        reason: &'static str,
+    },
     WrongInstance,
     WrongDocument,
     WrongRevision,
@@ -264,6 +274,7 @@ pub struct ObjectRenderScene {
     contours: Arc<[CompiledContour]>,
     rasters: Arc<[raster_scene::RasterSource]>,
     texts: text_scene::TextSources,
+    components: component_scene::ComponentSources,
 }
 impl ObjectRenderScene {
     pub fn packet(&self) -> &ObjectFramePacket {
@@ -298,6 +309,7 @@ pub fn prepare_object_render_scene(
         contours: contours.into(),
         rasters: raster_scene::sources(packet)?.into(),
         texts: text_scene::prepare(packet)?,
+        components: component_scene::prepare(packet, expected)?,
     })
 }
 

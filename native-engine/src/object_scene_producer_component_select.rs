@@ -42,6 +42,7 @@ use crate::object_document::{
 };
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// The dense L04-A outer-key row costs one `OuterKey` per frame up to the held key, so a
 /// key beyond this frame is a typed unavailable slot until the kernel takes a sparse row.
@@ -111,6 +112,8 @@ pub(crate) struct ComponentShape {
     /// Detached transformed copy (L07-H); the stored record is untouched.
     pub(crate) shape: EvaluatedShape,
     pub(crate) paint: ShapePaint,
+    /// Immutable post-override source style; never a second document authority.
+    pub(crate) source: Arc<ObjectRecord>,
 }
 
 /// `held` is the greatest timing key at or before `main_frame`; interpolated
@@ -328,6 +331,15 @@ pub(crate) fn evaluate_records(
     records: &[ObjectRecord],
     placement: &ResolvedComponentPlacement,
 ) -> Result<Vec<ComponentShape>, ComponentUnavailable> {
+    evaluate_owned_records(records.to_vec(), placement)
+}
+
+/// Production transfers its detached post-override records into immutable
+/// source handles, preserving full typed style without another geometry copy.
+pub(crate) fn evaluate_owned_records(
+    records: Vec<ObjectRecord>,
+    placement: &ResolvedComponentPlacement,
+) -> Result<Vec<ComponentShape>, ComponentUnavailable> {
     if let Some(record) = records.iter().find(|record| record.has_enabled_effects()) {
         return Err(ComponentUnavailable::InnerFeature {
             layer_uid: record.target().layer_uid().to_owned(),
@@ -348,12 +360,56 @@ pub(crate) fn evaluate_records(
         }
     })?;
     Ok(records
-        .iter()
+        .into_iter()
         .zip(evaluated.shapes)
-        .map(|(record, shape)| ComponentShape {
-            target: record.target().clone(),
-            shape,
-            paint: shape_paint(record),
+        .map(|(record, shape)| {
+            let target = record.target().clone();
+            let paint = shape_paint(&record);
+            ComponentShape {
+                target,
+                shape,
+                paint,
+                source: Arc::new(record),
+            }
         })
         .collect())
+}
+
+/// Shared admission/consumer declaration for declared component holders only.
+/// None preserves the caller's existing root/order-only policy. Element values
+/// stay unavailable until BOTH entered and placed paints consume them.
+pub(crate) fn component_holder_consumed(
+    document: &crate::object_document::ObjectDocument,
+    holder: &crate::object_document::PropertyHolder,
+) -> Option<bool> {
+    let target = holder.target();
+    let component = document.component_set()?.component(target.context_id())?;
+    let local = component
+        .layers()
+        .iter()
+        .any(|layer| layer.layer_uid() == target.layer_uid())
+        && target.stroke_id().is_none_or(|stroke| {
+            component.objects().iter().any(|record| {
+                let item = record.target();
+                item.context_id() == target.context_id()
+                    && item.layer_uid() == target.layer_uid()
+                    && item.stroke_id() == stroke
+                    && item.scope_kind() == &FrameScopeKind::Authored
+            })
+        });
+    Some(
+        local
+            && !holder
+                .controls
+                .value()
+                .is_some_and(|controls| !controls.is_empty())
+            && holder.properties().iter().all(|record| {
+                target.stroke_id().is_none()
+                    && record.property() == "opacity"
+                    && !record
+                        .expression
+                        .value()
+                        .is_some_and(|expression| expression.enabled)
+            }),
+    )
 }

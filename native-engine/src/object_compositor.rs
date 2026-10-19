@@ -228,6 +228,11 @@ impl Compositor {
                 "native Text layered effects are unavailable",
             ));
         }
+        if plan.has_components() {
+            return Err(CompositorError::new(
+                "native component layered effects are unavailable",
+            ));
+        }
         if !stack.covers_plan(plan) {
             return Err(CompositorError::new(
                 "layer stack does not cover the composition plan",

@@ -38,7 +38,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_producer_compone
     ComponentLayerEntry, ComponentOutcome, ComponentProduction, PlacedComponent,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::{
-    evaluate_records, playback_input, select_records, sym_matrix, ComponentUnavailable,
+    evaluate_owned_records, playback_input, select_records, sym_matrix, ComponentUnavailable,
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::ScenePin;
 use crate::evaluation::property_camera_eval::CameraKey;
@@ -215,7 +215,7 @@ fn evaluate_instance(
         inputs.canvas.0,
         inputs.canvas.1,
     );
-    let shapes = evaluate_records(&records, &placement)?;
+    let shapes = evaluate_owned_records(records, &placement)?;
     Ok(ComponentOutcome::Shapes(PlacedComponent {
         inner_frame: resolved,
         shapes,
