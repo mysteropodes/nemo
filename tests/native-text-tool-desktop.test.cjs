@@ -95,7 +95,7 @@ test('tool retirement while discovery is pending rejects the late draft after re
  f.root.state.tool='select';f.canvas.fire('pointermove');f.root.state.tool='text';gate.resolve();await f.turn();assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.get('text-popover').style.display,'none');
 });
 test('nonprimary, modified and nonleft Text downs cannot stage a draft',async()=>{
- for(const props of [{isPrimary:false},{ctrlKey:true},{metaKey:true},{altKey:true},{shiftKey:true},{button:2,buttons:2},{buttons:0}]){
+ for(const props of [{isPrimary:false},{ctrlKey:true},{metaKey:true},{altKey:true},{shiftKey:true},{button:2,buttons:2},{buttons:2},{buttons:3}]){
   const f=await fixture();f.canvas.fire('pointerdown',props);f.canvas.fire('pointerup');await f.turn();assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);
  }
 });
@@ -159,9 +159,9 @@ test('browser Text bootstrap injects actual existing reader and writer modules i
 
 test('temporary pointer diagnostics eagerly retain the actual rejected scalars without opening or mutating',async()=>{
  const f=await fixture(),rows=[];f.root.console={info:line=>rows.push(line)};
- const e=f.canvas.fire('pointerdown',{buttons:0,isTrusted:true,pointerType:'mouse'});e.buttons=1;
+ const e=f.canvas.fire('pointerdown',{buttons:2,isTrusted:true,pointerType:'mouse'});e.buttons=1;
  const rejected=rows.map(line=>JSON.parse(line.slice('[nemo-native-text-input] '.length))).find(row=>row.decision==='reject.buttons.down');
- assert.ok(rejected);assert.equal(rejected.buttons,0);assert.equal(rejected.isPrimary,true);assert.equal(rejected.button,0);assert.equal('isTrusted' in rejected,false);assert.equal('targetId' in rejected,false);
+ assert.ok(rejected);assert.equal(rejected.buttons,2);assert.equal(rejected.isPrimary,true);assert.equal(rejected.button,0);assert.equal('isTrusted' in rejected,false);assert.equal('targetId' in rejected,false);
  assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
  assert.ok(rows.every(line=>typeof line==='string'&&!line.includes('Native point')));
 });
@@ -179,4 +179,93 @@ test('diagnostics preserve original short-circuit reads for rejected stage and n
  const other={get id(){untouched++;throw new Error('foreign target id');}};
  assert.equal(Desktop.handle(f.root,'down',{target:other,stopImmediatePropagation(){},preventDefault(){}}),true);assert.equal(untouched,0);
  assert.ok(rows.some(line=>line.includes('reject.primary')));assert.ok(rows.some(line=>line.includes('reject.stage')));assert.equal(f.owner.log.executed.length,0);
+});
+
+test('actual bridge pairs zero-mask primary click into point-only draft and one explicit native Apply',async()=>{
+ const f=await fixture(),rows=[];f.root.console={info:line=>rows.push(JSON.parse(line.slice('[nemo-native-text-input] '.length)))};
+ const before=f.reads.length,e=f.canvas.fire('pointerdown',{button:0,buttons:0,clientX:100,clientY:110});await f.turn();
+ assert.equal(e.buttons,0,'the original mask is never rewritten to fabricate a held press');
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.get('text-popover').style.display,'none');assert.equal(f.reads.length,before);
+ assert.equal(f.owner.items.size,0);assert.equal(f.owner.log.executed.length,0);
+ f.canvas.fire('pointerup',{button:0,buttons:0,clientX:100,clientY:110});await f.turn();
+ assert.equal(f.get('text-popover').style.display,'block');assert.equal(f.get('native-text-area-draft'),null);
+ assert.deepEqual(f.binding.core.snapshot().draft.block.anchorTopLeft,{x:40,y:40});assert.equal(f.binding.core.snapshot().draft.block.fixedWidth,null);
+ assert.equal(f.owner.items.size,0,'paired click stages only; native content still requires Apply');
+ const down=rows.find(r=>r.decision==='down.clickOnly');assert.ok(down);assert.equal(down.buttons,0);assert.equal(rows.some(r=>r.decision==='down.accepted'),false);
+ f.input('text-input','Paired native point');f.apply();await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.equal(f.owner.items.size,1);assert.equal(f.owner.log.received[0].payload.block.fixedWidth,null);
+ assert.deepEqual(f.owner.log.received[0].payload.block.anchorTopLeft,{x:40,y:40});assert.equal(f.logs.legacy,0);
+});
+test('zero-mask paired point requires a real matching up; down alone or orphan up cannot open',async()=>{
+ const f=await fixture(),before=f.reads.length;f.canvas.fire('pointerdown',{buttons:0});await f.turn();
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.binding.core.snapshot().discovering,false);assert.equal(f.reads.length,before);
+ f.root.fire('blur');f.canvas.fire('pointerup',{buttons:0});await f.turn();assert.equal(f.binding.core.snapshot().draft,null);
+ const g=await fixture();g.canvas.fire('pointerup',{buttons:0});await g.turn();assert.equal(g.binding.core.snapshot().draft,null);assert.equal(g.get('text-popover').style.display,'none');
+ assert.equal(f.owner.log.executed.length+g.owner.log.executed.length,0);assert.equal(f.logs.legacy+g.logs.legacy,0);
+});
+test('zero-mask down never becomes a held area on any move mask',async()=>{
+ for(const buttons of [0,1,2,3]){
+  const f=await fixture();f.canvas.fire('pointerdown',{buttons:0,clientX:100,clientY:110});
+  f.canvas.fire('pointermove',{buttons,clientX:300,clientY:190});f.canvas.fire('pointerup',{buttons:0,clientX:300,clientY:190});await f.turn();
+  assert.equal(f.binding.core.snapshot().draft,null,'move mask '+buttons);assert.equal(f.get('native-text-area-draft'),null);assert.equal(f.get('text-popover').style.display,'none');
+  assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
+ }
+});
+test('zero-mask release has a 20px point slop and never invents area width',async()=>{
+ for(const [dx,dy,allowed]of [[20,0,true],[0,20,true],[21,0,false],[0,21,false],[20,20,false],[-21,0,false],[0,-21,false]]){
+  const f=await fixture();f.canvas.fire('pointerdown',{buttons:0,clientX:100,clientY:110});f.canvas.fire('pointerup',{buttons:0,clientX:100+dx,clientY:110+dy});await f.turn();
+  const draft=f.binding.core.snapshot().draft;assert.equal(!!draft,allowed,JSON.stringify({dx,dy}));
+  if(draft){assert.equal(draft.block.fixedWidth,null);assert.deepEqual(draft.block.anchorTopLeft,{x:40,y:40});}
+  assert.equal(f.get('native-text-area-draft'),null);assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
+ }
+});
+test('zero-mask pair preserves release button, mask, pointer, primary, modifiers and stage refusals',async()=>{
+ for(const props of [{buttons:1},{buttons:2},{buttons:3},{button:2,buttons:0},{pointerId:2},{isPrimary:false},{altKey:true},{ctrlKey:true},{metaKey:true},{shiftKey:true}]){
+  const f=await fixture();f.canvas.fire('pointerdown',{buttons:0,pointerId:1});f.canvas.fire('pointerup',{buttons:0,...props});await f.turn();
+  assert.equal(f.binding.core.snapshot().draft,null,JSON.stringify(props));assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
+ }
+ const f=await fixture();f.canvas.fire('pointerdown',{buttons:0});f.zoom.fire('pointerup',{buttons:0});await f.turn();
+ assert.equal(f.binding.core.snapshot().draft,null,'stage chrome up cannot complete a zero-mask point intent');assert.equal(f.owner.log.executed.length,0);
+});
+test('zero-mask pair cancels on Escape, capture loss, pointercancel, blur and tool roundtrip',async()=>{
+ for(const cancel of ['Escape','lostpointercapture','pointercancel','blur','tool']){
+  const f=await fixture(true);f.canvas.fire('pointerdown',{buttons:0});
+  if(cancel==='Escape')f.doc.fire('keydown',{key:'Escape'});
+  else if(cancel==='blur')f.root.fire('blur');
+  else if(cancel==='tool'){f.root.state.tool='select';f.canvas.fire('pointermove',{buttons:0});f.root.state.tool='text';}
+  else f.canvas.fire(cancel,{pointerId:1});
+  f.canvas.fire('pointerup',{buttons:0});await f.turn();assert.equal(f.binding.core.snapshot().draft,null,cancel);assert.equal(f.get('text-popover').style.display,'none');
+  assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
+ }
+});
+test('zero-mask pair cannot open against changed native pin, frame, selection, view or presentation',async()=>{
+ for(const change of ['owner','revision','frame','selection','view','unpresented','symbol','inactive']){
+  const f=await fixture();f.canvas.fire('pointerdown',{buttons:0});
+  if(change==='owner'){f.state.document='replaced-document';f.state.generation++;}
+  if(change==='revision')f.state.revision++;
+  if(change==='frame')f.root.state.currentFrame=1;
+  if(change==='selection')f.root._layerSel=[];
+  if(change==='view')f.resize({left:20,top:30,width:600,height:360});
+  if(change==='unpresented')f.session.readPresentedObjectSession=()=>null;
+  if(change==='symbol')f.root.state.activeSymbolId='other-context';
+  if(change==='inactive')f.state.active=false;
+  f.canvas.fire('pointerup',{buttons:0});await f.turn();assert.equal(f.binding.core.snapshot().draft,null,change);assert.equal(f.get('text-popover').style.display,'none');
+  assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
+ }
+});
+test('zero-mask paired discovery cancellation cannot publish a late editor',async()=>{
+ const f=await fixture(),gate=deferred();f.hold(gate.promise);f.canvas.fire('pointerdown',{buttons:0});f.canvas.fire('pointerup',{buttons:0});await Promise.resolve();
+ assert.equal(f.binding.core.snapshot().discovering,true);f.root.fire('blur');gate.resolve();await f.turn();
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.get('text-popover').style.display,'none');assert.equal(f.owner.log.executed.length,0);
+});
+test('invalid down mask2 keeps original guard getter order/count and eager immutable sampled value',async()=>{
+ const f=await fixture(),reads=[],rows=[],values={pointerId:1,isPrimary:true,altKey:false,ctrlKey:false,metaKey:false,shiftKey:false,button:0,clientX:100,clientY:110,buttons:2};
+ f.root.console={info:line=>rows.push(JSON.parse(line.slice('[nemo-native-text-input] '.length)))};
+ const e={target:f.canvas,stopImmediatePropagation(){},preventDefault(){}};
+ for(const key of Object.keys(values))Object.defineProperty(e,key,{get(){reads.push(key);return values[key];}});
+ for(const key of ['isTrusted','pointerType','timeStamp'])Object.defineProperty(e,key,{get(){assert.fail('unread input '+key);}});
+ assert.equal(Desktop.handle(f.root,'down',e),true);values.buttons=0;
+ assert.deepEqual(reads,['pointerId','isPrimary','altKey','ctrlKey','metaKey','shiftKey','button','clientX','clientY','buttons']);
+ const rejected=rows.find(r=>r.decision==='reject.buttons.down');assert.ok(rejected);assert.equal(rejected.buttons,2);assert.equal('isTrusted' in rejected,false);
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);
 });

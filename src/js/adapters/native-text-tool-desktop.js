@@ -124,10 +124,14 @@
       if(read('altKey')||read('ctrlKey')||read('metaKey')||read('shiftKey')||read('button')!==0&&(method==='down'||method==='up')){trace(root,'reject.modifierOrButton',method,sampled);cancelIntent();return true;}
       if(modelState.busy||modelState.unknown){trace(root,'reject.pending',method,sampled);return true;}if(!Number.isFinite(read('clientX'))||!Number.isFinite(read('clientY'))){trace(root,'reject.coordinates',method,sampled);cancelIntent();return true;}var c=context(true);
       if(!c){trace(root,'reject.context',method,sampled);cancelIntent();notify('Native Text is unavailable.');return true;}
-      if(method==='down'){if(read('buttons')!==1){trace(root,'reject.buttons.down',method,sampled);cancelIntent();return true;}trace(root,'down.accepted',method,sampled);drag={id:read('pointerId'),context:c,point:point(e,c),x:read('clientX'),y:read('clientY')};}
-      else if(method==='move'&&drag&&read('buttons')!==1){trace(root,'reject.buttons.move',method,sampled);cancelIntent();}
+      if(method==='down'){var mask=read('buttons');if(mask!==0&&mask!==1){trace(root,'reject.buttons.down',method,sampled);cancelIntent();return true;}
+        // A zero-mask primary edge is only a paired point click, never evidence of a held drag.
+        trace(root,mask===0?'down.clickOnly':'down.accepted',method,sampled);drag={id:read('pointerId'),context:c,point:point(e,c),x:read('clientX'),y:read('clientY'),clickOnly:mask===0};}
+      else if(method==='move'&&drag&&(read('buttons')!==1||drag.clickOnly)){trace(root,drag.clickOnly?'reject.clickOnly.move':'reject.buttons.move',method,sampled);cancelIntent();}
       else if(method==='up'&&drag){var held=drag;drag=null;if(read('buttons')!==0||!Tool.samePin(held.context.pin,c.pin)||held.context.selectionKey!==c.selectionKey||held.context.viewKey!==c.viewKey){trace(root,'reject.releaseOrPin',method,sampled);return true;}
-        var end=point(e,c),wide=Math.abs(read('clientX')-held.x)>20,token={id:held.id};discovery=token;trace(root,'openNew.start',method,sampled);
+        var end=point(e,c),wide=Math.abs(read('clientX')-held.x)>20,token={id:held.id};
+        if(held.clickOnly&&(!stage||wide||Math.hypot(sampled.clientX-held.x,read('clientY')-held.y)>20||held.context.frame!==c.frame||held.context.layerUid!==c.layerUid)){trace(root,'reject.clickOnly.release',method,sampled);return true;}
+        discovery=token;trace(root,'openNew.start',method,sampled);
         core.openNew({anchorTopLeft:wide?{x:Math.min(held.point.x,end.x),y:Math.min(held.point.y,end.y)}:held.point,fixedWidth:wide?Math.abs(end.x-held.point.x):null})
           .catch(function(error){trace(root,'openNew.error',null);if(discovery===token)notify(error.message);}).finally(function(){trace(root,'openNew.finished',null,{current:discovery===token,shown:!!shown});if(discovery===token)discovery=null;});
       }return true;};
