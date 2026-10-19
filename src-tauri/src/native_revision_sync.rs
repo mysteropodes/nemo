@@ -296,6 +296,28 @@ fn invoke_dispatch(
     let native_request: OpacityRequest =
         serde_json::from_value(serde_json::to_value(request).map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
+    if request.operation == "command.document.object.asset.remove" {
+        let owner = application
+            .as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
+            .ok_or("native asset removal owner unavailable")?;
+        return match owner.remove_asset(&native_request) {
+            Ok(response) => serde_json::from_value(
+                serde_json::to_value(response).map_err(|error| error.to_string())?,
+            )
+            .map_err(|error| error.to_string()),
+            Err(code) => serde_json::from_value(serde_json::json!({
+                "apiVersion": NATIVE_API_VERSION,
+                "requestId": request.request_id,
+                "instanceId": owner.instance_id(),
+                "documentId": owner.document_id(),
+                "contentRevision": owner.content_revision(),
+                "ok": false,
+                "error": {"code": code, "message": "Native asset removal refused."}
+            }))
+            .map_err(|error| error.to_string()),
+        };
+    }
     let response = if request.operation == crate::application_mcp::font_source::QUERY {
         application
             .as_any_mut()

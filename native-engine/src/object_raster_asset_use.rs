@@ -5,6 +5,7 @@
 //! store right before publication (defence in depth), so both layers share one
 //! definition and cannot drift. An asset is in use when
 //! * an asset placement names it, or
+//! * any stored raster item names it, regardless of layer visibility or frame, or
 //! * the project's still-image viewport reference carries its id, or
 //! * the viewport reference shares its encoded allocation (pointer identity, the
 //!   rule the owner ledger uses to charge shared bytes once).
@@ -36,6 +37,14 @@ pub(crate) fn asset_in_use(project: &ProjectEnvelope, id: &AssetId) -> bool {
         .iter()
         .any(|placement| placement.asset_id() == id)
     {
+        return true;
+    }
+    if project.drawing().item_records().is_some_and(|items| {
+        items
+            .raster_entries()
+            .iter()
+            .any(|entry| entry.item.asset_id() == id)
+    }) {
         return true;
     }
     let ProjectReferenceState::StillImage(reference) = project.reference_state() else {

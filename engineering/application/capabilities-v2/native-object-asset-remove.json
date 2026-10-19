@@ -5,8 +5,8 @@
   "version": 1,
   "status": "active",
   "availability": {
-    "state": "unavailable",
-    "reason": "native asset removal host route is not registered"
+    "state": "available",
+    "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
@@ -28,12 +28,13 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained receipt or typed refusal; no document, glyph or pixel payload in either direction."
   },
-  "semantics": "Remove remains typed unavailable. A PNG placement import does not register or activate catalog removal.",
+  "semantics": "Remove an unreferenced embedded image through the existing native asset transaction/history owner. In-use assets are refused. Exact request replay returns the retained receipt; an absent asset is a no-op. Catalog-only attach remains unavailable.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
     "wrong_document",
     "stale_revision",
+    "busy_conflict",
     "unavailable",
     "not_found",
     "cancelled_before_dispatch",

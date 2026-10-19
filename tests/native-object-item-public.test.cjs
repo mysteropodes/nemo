@@ -244,14 +244,14 @@ test('a no-op receipt keeps the revision and a refusal is a plain typed error', 
   assert.equal((await adapter.dispatch(q)).error.code, 'unavailable');
 });
 
-test('descriptors: item and bounded PNG attach are available, asset removal stays unavailable, none has a fallback', () => {
+test('descriptors: item, bounded PNG attach and separate asset removal are available with no fallback', () => {
   assert.deepEqual([item.id, item.operations, item.availability], ['native.object.item', [ITEM], { state: 'available', reason: null }]);
   assert.deepEqual([asset.id, asset.operations, asset.availability], ['native.object.asset', [ATTACH], { state: 'available', reason: null }]);
   assert.deepEqual([assetRemove.id, assetRemove.operations, assetRemove.availability], ['native.object.asset.remove', [REMOVE],
-    { state: 'unavailable', reason: 'native asset removal host route is not registered' }]);
+    { state: 'available', reason: null }]);
   // Common catalog shape compatibility does not admit host execution before source I/O.
   assert.match(asset.semantics, /Catalog-only attach retains compatibility validation but refuses unavailable before source I\/O/);
-  assert.match(assetRemove.semantics, /Remove remains typed unavailable/);
+  assert.match(assetRemove.semantics, /Remove an unreferenced embedded image through the existing native asset transaction\/history owner/);
   for (const d of [item, asset, assetRemove]) {
     assert.deepEqual([d.schemaVersion, d.apiVersion, d.version, d.status], [2, 2, 1, 'active']);
     assert.deepEqual(d.authority, { document: 'native-engine::history::NativeObjectHistory', adapterOwnsWritableMirror: false, fallback: 'none' });
