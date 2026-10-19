@@ -111,6 +111,12 @@ fileprivate func f03ReadFixed(_ file:URL, _ name:String) throws -> (Data,stat) {
   try check(path.st_dev == before.st_dev && path.st_ino == before.st_ino && (path.st_mode & S_IFMT) == S_IFREG)
   return (Data(storage),after)
 }
+// The real single press and fault controls share the final monotonic fence.
+// Identity/file proof may consume the budget; no AX effect starts afterward.
+func f03BoundedPress(_ deadline:UInt64, clock:()->UInt64={DispatchTime.now().uptimeNanoseconds},
+  owned:()->Bool, post:() throws -> Void) throws {
+  try check(clock() < deadline);try check(owned());try check(clock() < deadline);try post()
+}
 final class F03OwnedSave {
   let pinned:OwnedInitialWindow,output:URL,expectedDrawing:Data
   private var reopenIssued=false
@@ -219,9 +225,12 @@ final class F03OwnedSave {
           try check(try supports(node,pid,kAXPressAction as String));return true
         })
       }
+      func publicationContext() throws {try check(DispatchTime.now().uptimeNanoseconds < deadline);try rootProof();try check(DispatchTime.now().uptimeNanoseconds < deadline)}
       func press(_ selected:AXUIElement, _ owner:pid_t, publishes:Bool=false, _ proof:() throws -> Void) throws {
-        try kernel.effect(command,identity:{if publishes {try rootProof()}else{try context()}},before:{try proof();try bind(selected,owner)},write:{
-          try check(owns(selected,owner));try check(AXUIElementPerformAction(selected,kAXPressAction as CFString) == .success)
+        try kernel.effect(command,identity:{if publishes {try publicationContext()}else{try context()}},before:{try proof();try bind(selected,owner)},write:{
+          try f03BoundedPress(deadline,owned:{owns(selected,owner)},post:{
+            try check(AXUIElementPerformAction(selected,kAXPressAction as CFString) == .success)
+          })
         },after:{try verifyOwnedWindow(pinned)})
       }
       let (rows,pid)=try panel()

@@ -47,7 +47,7 @@ function buildUI32Helper(output,proofFile){
       const test=spawnSync(executable,[flag],{encoding:'utf8',timeout:30000,maxBuffer:16384});
       requireValid(!test.error&&test.status===0);const result=JSON.parse(test.stdout);
       requireValid(result.status===(flag==='--self-test'?'static-model-pass':'ui32-static-model-pass')&&result.runtimeAX===false&&result.foreignReads===0);
-      if(flag==='--ui32-self-test')requireValid(result.f03?.opacity===140&&result.f03?.save===122&&result.f03?.total===262&&result.f03?.join===107&&result.f03?.all===369);
+      if(flag==='--ui32-self-test')requireValid(result.f03?.opacity===140&&result.f03?.save===126&&result.f03?.total===266&&result.f03?.join===107&&result.f03?.all===373);
       controls.push({flag,result});
     }
     const after=identity.sourceIdentity();requireValid(!after.dirty&&after.head===source.head&&manifest().sourceSha256===frozen.sourceSha256);

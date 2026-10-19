@@ -37,6 +37,21 @@ func f03OwnedSaveSelfTest() throws -> Int {
     try check(accepted == (status == .success) && events == ["owner","context"])
     if accepted {try check(result == "value")};count += 1
   }
+  // Exercise the actual final press fence after expensive identity proof.
+  // The old route could post after its prior bind had consumed the budget.
+  for fault in ["none","expired-before-proof","expired-by-proof","lost-owner"] {
+    var now:UInt64=fault == "expired-before-proof" ? 10 : 9
+    var events=[String](),accepted=false,posts=0
+    do {
+      try f03BoundedPress(10,clock:{now},owned:{
+        events.append("owner");if fault == "expired-by-proof" {now=10}
+        return fault != "lost-owner"
+      },post:{events.append("post");posts += 1});accepted=true
+    }catch{}
+    try check(accepted == (fault == "none") && posts == (fault == "none" ? 1 : 0))
+    try check(events == (fault == "none" ? ["owner","post"] : fault == "expired-before-proof" ? [] : ["owner"]))
+    count += 1
+  }
   let commands=["f03.save.goto","f03.save.directory","f03.save.name","f03.save.confirm","f03.save.receipt"]
   for phase in 0...5 {
     for command in commands+["f03.save.path","f03.save.reopen","", "f03.save.confirm "] {
@@ -173,6 +188,6 @@ func f03JoinSelfTest() throws -> Int {
 // The real UI32 selftest caller reports these returned counts; no synthetic pass.
 func f03SelfTests() throws -> [String:Int] {
   let opacity=try f03OwnedOpacitySelfTest(),save=try f03OwnedSaveSelfTest(),join=try f03JoinSelfTest()
-  try check(opacity == 140 && save == 122 && join == 107)
+  try check(opacity == 140 && save == 126 && join == 107)
   return ["opacity":opacity,"save":save,"total":opacity+save,"join":join,"all":opacity+save+join]
 }
