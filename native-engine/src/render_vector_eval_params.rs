@@ -146,9 +146,9 @@ fn track_value(
 
 /// True when every property holder of the document is one this join consumes: an element holder of a stroke whose every
 /// authored record is a vector record with a `paramShape`, holding only keys of that shape's kind, no enabled expression
-/// and no expression controls. Layer holders are consumed only for raw opacity in scene-root: no controls,
-/// no other property and no enabled expression. An absent or empty table is trivially consumed.
-/// Transform/effective evaluation and all other holders still keep the packet unavailable.
+/// and no expression controls. Ordinary root layer holders admit raw opacity; Position is additionally
+/// consumed only where every content record is a vector reaching the Motion join (no raster/text siblings).
+/// Other transforms, parent/effective evaluation and expressions remain unavailable. Empty tables are consumed.
 pub(crate) fn holders_fully_consumed(document: &ObjectDocument) -> bool {
     document.property_holders().is_none_or(|holders| {
         holders
@@ -167,22 +167,7 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
         return false;
     }
     let Some(stroke_id) = target.stroke_id() else {
-        return target.context_id() == "scene-root"
-            && document.layers().iter().any(|layer| {
-                layer.layer_uid() == target.layer_uid()
-                    && !layer.is_effect_layer()
-                    && !layer.is_folder_layer()
-                    && layer.widget.value().is_none()
-                    && layer
-                        .parent_layer_uid
-                        .value()
-                        .is_none_or(|parent| parent.is_none())
-            })
-            && !holder.properties().is_empty()
-            && holder.properties().iter().all(|property| {
-                property.property() == "opacity"
-                    && !property.expression.value().is_some_and(|code| code.enabled)
-            });
+        return super::motion::layer_holder_consumed(document, holder);
     };
     let mut matched = false;
     for record in document.objects() {

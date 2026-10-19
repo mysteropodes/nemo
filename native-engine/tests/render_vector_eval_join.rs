@@ -156,9 +156,12 @@ fn the_holder_predicate_admits_only_what_the_join_consumes() {
         .expect("holders")
         .push(
             json!({"target": {"contextId": "scene-root", "layerUid": "L1"},
-               "properties": [{"property": "position", "static": [50, 0]}]}),
+               "properties": [{"property": "rotation", "static": [50]}]}),
         );
-    assert!(!consumed(&layer), "a layer holder is not consumed");
+    assert!(
+        !consumed(&layer),
+        "unsupported layer rotation is not consumed"
+    );
 
     let mut controls = rect.clone();
     controls["propertyHolders"][0]["controls"] =

@@ -17,7 +17,8 @@
 //! value, so a caller can neither reach nor change rest geometry. Frames 0, 10, 0 give the same frame-0 vector.
 //!
 //! Not delivered here (typed, never faked): a parameter track carrying an enabled expression needs the expression
-//! evaluator (`ExpressionUnavailable`); the layer Motion transform, camera and 3D stage are applied by their own owners.
+//! evaluator (`ExpressionUnavailable`); raw Position of ordinary root vector layers is consumed after the rebuild.
+//! Other Motion transforms, parents, camera and 3D remain unavailable until their own native consumers join.
 use crate::evaluation::object_vector_kernels::object_parametric_geometry::boxed::{
     apply_param_shape_animated, has_param_shape_motion,
 };
@@ -33,6 +34,9 @@ use crate::object_document::{
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, PropertySampleError};
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
+
+#[path = "render_vector_eval_motion.rs"]
+mod motion;
 
 #[path = "render_vector_eval_params.rs"]
 pub(crate) mod params;
@@ -71,6 +75,7 @@ pub(crate) enum VectorEvalError {
         property: &'static str,
         error: PropertySampleError,
     },
+    LayerMotionUnavailable,
     ExpressionUnavailable {
         property: &'static str,
     },
@@ -88,6 +93,7 @@ impl VectorEvalError {
             Self::PathFx(_) => "path effect exceeds the native sample budget",
             Self::Rebuild(_) => "parametric rebuild refused its input",
             Self::Sample { .. } => "animated shape parameter could not be sampled",
+            Self::LayerMotionUnavailable => "layer Motion has no admitted native vector consumer",
             Self::ExpressionUnavailable { .. } => {
                 "a shape parameter carries an expression and the expression evaluator is not joined"
             }
@@ -264,8 +270,9 @@ pub(crate) fn from_param(segment: &ParamSegment) -> EvalSegment {
     }
 }
 
-/// The evaluated vector of record `object_index` of `snapshot` at `frame`: path effects, then the parametric rebuild.
-pub(crate) fn evaluate_vector(
+/// Exact pinned path-effect/rebuild geometry BEFORE layer pose, for native parent-pivot consumers.
+/// Owned output cannot mutate the snapshot; callers still obtain true curve bounds in their geometry consumer.
+pub(crate) fn evaluate_vector_rest(
     snapshot: &ObjectSnapshot,
     object_index: usize,
     frame: u32,
@@ -282,6 +289,22 @@ pub(crate) fn evaluate_vector(
         closed: after_effects.closed,
         segments,
     })
+}
+
+/// The same evaluated vector after its own raw layer Position, never a rest-bounds source.
+pub(crate) fn evaluate_vector(
+    snapshot: &ObjectSnapshot,
+    object_index: usize,
+    frame: u32,
+) -> Result<EvaluatedVector, VectorEvalError> {
+    let mut evaluated = evaluate_vector_rest(snapshot, object_index, frame)?;
+    let record = snapshot
+        .document()
+        .objects()
+        .get(object_index)
+        .ok_or(VectorEvalError::MissingRecord)?;
+    evaluated.segments = motion::apply_layer_position(snapshot, record, frame, evaluated.segments)?;
+    Ok(evaluated)
 }
 
 /// The packet entry used by the scene producer: the packet's retained snapshot at the packet's evaluation frame.

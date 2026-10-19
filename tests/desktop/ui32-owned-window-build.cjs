@@ -5,7 +5,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
 const original=require('./p38-owned-window-build.cjs');
-const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift']);
+const EXTRA=Object.freeze(['ui32-owned-policy.swift','ui32-owned-window.swift','ui32-owned-fixture.swift','ui32-owned-keys.swift','ui32-owned-picker.swift','ui32-owned-readiness.swift','ui32-owned-profile.swift','ui32-owned-phase2.swift','ui32-owned-content.swift']);
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function requireValid(ok){if(!ok)throw Error('ui32-helper-build-refused');}
 function fresh(file){
@@ -14,14 +14,15 @@ function fresh(file){
   requireValid(s.isDirectory()&&!s.isSymbolicLink()&&fs.realpathSync(parent)===parent);
   try{fs.lstatSync(file);throw Error('ui32-helper-build-refused');}catch(e){if(e.code!=='ENOENT')throw e;}
 }
-function manifest(){
-  const base=original.sourceManifest();
+function manifest(directory=__dirname){
+  requireValid(fs.realpathSync(directory)===directory);const base=original.sourceManifest(directory);
   const extra=EXTRA.map(name=>{
-    const file=path.join(__dirname,name);requireValid(fs.realpathSync(file)===file);
+    const file=path.join(directory,name);requireValid(fs.realpathSync(file)===file);
     const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
     try{
       const before=fs.fstatSync(fd);requireValid(before.isFile()&&before.size>0&&before.size<=32000);
       const bytes=fs.readFileSync(fd),after=fs.lstatSync(file);
+      requireValid(bytes.toString('utf8').split(/\r?\n/).filter(line=>line.trim()).length<=500);
       requireValid(after.isFile()&&!after.isSymbolicLink()&&after.dev===before.dev&&after.ino===before.ino&&bytes.length===before.size);
       return {name,bytes,sha256:hash(bytes)};
     }finally{fs.closeSync(fd);}
@@ -51,7 +52,7 @@ function buildUI32Helper(output,proofFile){
     const after=identity.sourceIdentity();requireValid(!after.dirty&&after.head===source.head&&manifest().sourceSha256===frozen.sourceSha256);
     fresh(output);fresh(proofFile);fs.copyFileSync(executable,output,fs.constants.COPYFILE_EXCL);published=true;fs.chmodSync(output,0o700);
     const proof={schema:'nemo.ui32-window-helper/1',purpose:'UI32',sourceHead:source.head,sourceSha256:frozen.sourceSha256,
-      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (seven frozen inputs)',
+      inputs:frozen.inputs,executableSha256:hash(fs.readFileSync(output)),compiler:'swiftc -parse-as-library -D UI32_VALIDATION (twelve frozen inputs)',
       runtimeAX:false,foreignReads:0,controls};
     fs.writeFileSync(proofFile,JSON.stringify(proof,null,2)+'\n',{flag:'wx',mode:0o600});return proof;
   }catch(e){if(published)fs.rmSync(output,{force:true});throw e;}
