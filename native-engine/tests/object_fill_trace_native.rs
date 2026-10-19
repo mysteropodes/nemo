@@ -194,3 +194,36 @@ fn a_self_crossing_stroke_has_a_real_node_at_its_own_intersection() {
     );
     assert_eq!(hit.wall_ids, ["self"]);
 }
+
+fn twice_wound_square(opposite: bool) -> ObjectDocument {
+    let mut points = vec![[0.0, 0.0], [100.0, 0.0], [100.0, 100.0], [0.0, 100.0], [0.0, 0.0]];
+    points.extend(if opposite {
+        vec![[0.0, 100.0], [100.0, 100.0], [100.0, 0.0]]
+    } else {
+        vec![[100.0, 0.0], [100.0, 100.0], [0.0, 100.0]]
+    });
+    let mut obstacle = record("painted", points.into_iter()
+        .map(|p| segment(p, [0.0; 2], [0.0; 2])).collect(), true);
+    obstacle["fill"] = json!({"kind":"solid","r":1,"g":0,"b":0,"a":1});
+    doc(vec![obstacle])
+}
+
+#[test]
+fn raster_nonzero_blocks_a_same_direction_twice_wound_existing_fill() {
+    let d = twice_wound_square(false);
+    let mut provider = NativeTrace::new(&d, &scope(), [50.0, 50.0], None, None).unwrap();
+    assert!(provider.raster().unwrap().is_none(),
+        "winding two is already painted under retained Canvas default nonzero");
+}
+
+#[test]
+fn raster_nonzero_cancellation_leaves_the_opposite_direction_interior_empty() {
+    let d = twice_wound_square(true);
+    let mut provider = NativeTrace::new(&d, &scope(), [50.0, 50.0], None, None).unwrap();
+    let hit = provider.raster().unwrap().expect("opposite winding cancels the filled interior");
+    let b = bounds(&hit.ring);
+    assert_eq!(hit.wall_ids, ["painted"]);
+    assert_eq!(hit.gap_px, 24);
+    assert!(b.x >= 24.0 && b.x <= 27.0 && b.y >= 24.0 && b.y <= 27.0);
+    assert!(hit.area > 2000.0 && hit.area < 2700.0);
+}

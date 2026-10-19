@@ -20,17 +20,20 @@ fn distance(p: Point, a: Point, b: Point) -> f64 {
     (p[0] - a[0] - t * d[0]).hypot(p[1] - a[1] - t * d[1])
 }
 fn inside(poly: &[Point], p: Point) -> bool {
-    let mut yes = false;
+    // Existing painted obstacles use Canvas fill()'s default nonzero rule.
+    // Repeated same-direction loops stay painted; opposite windings cancel.
+    // This predicate does not change the graph walk's face-selection policy.
+    let mut winding = 0i32;
     for i in 0..poly.len() {
         let a = poly[i];
         let b = poly[(i + 1) % poly.len()];
         if (a[1] > p[1]) != (b[1] > p[1])
             && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]
         {
-            yes = !yes;
+            winding += if b[1] > a[1] { 1 } else { -1 };
         }
     }
-    yes
+    winding != 0
 }
 
 type Pixel = (usize, usize);
