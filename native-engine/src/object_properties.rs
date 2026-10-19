@@ -277,7 +277,12 @@ impl PropertyHolder {
             // tables or another component when a local layer/element is absent.
             // Legacy order-only contexts retain their previous storage admission.
             let component = components.and_then(|set| set.component(&target.context_id));
-            if targets::ambiguous(items,meshes,component.map_or(records,|c|c.objects()),target) {
+            if targets::ambiguous(
+                items,
+                meshes,
+                component.map_or(records, |c| c.objects()),
+                target,
+            ) {
                 return Err(unsupported("ambiguous path/item and mesh holder identity"));
             }
             let layer_exists = component.map_or_else(
