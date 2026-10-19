@@ -132,7 +132,7 @@ func ui32NewPostCreateRead(_ command:String, _ enabled:Bool, _ attempted:Bool, _
       // Only the whole read probe can restart; identity/deadline callbacks cannot.
       if case .failure(let error)=outcome {
         if slot == 1 && reads == 1 && now() < deadline &&
-          (ui32NewInvalidReference(error) || ui32NewContentComparison(error) || ui32NewNativeReadInvalidation(error)) {
+          (ui32NewInvalidReference(error) || ui32NewContentComparison(error) || ui32NewNativeReadInvalidation(error) || ui32NewFinalNativeBusy(error)) {
           first=ui32ActionCause(error);continue
         }
         throw error
@@ -201,6 +201,7 @@ func ui32NewPostCreateReadSelfTest() throws {
     if scenario == "first-pass" {try check(proof["firstReadFailure"] == nil)}
   }
   try ui32NewContentComparisonSelfTest();try ui32NewNativeReadInvalidationSelfTest();try ui32PostedNewContentReproofSelfTest();try ui32PostedNewContentReadSelfTest()
+  try ui32NewFinalNativeBusySelfTest()
 }
 
 // Actual certificate producer feeds the actual finite post-Create reader.
