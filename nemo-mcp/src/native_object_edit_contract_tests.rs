@@ -144,7 +144,7 @@ fn the_eighteen_declared_commands_are_exactly_the_admitted_operations() {
         "command.document.object.layer.policy.edit",
         "command.document.object.clipboard.copy",
         "command.document.object.clipboard.cut",
-        "command.document.object.fill.trace",
+        "command.document.object.fill.trace.extra",
         "query.document.object",
         "command.document.object.group",
         "command.document.object.layer.delete.extra",
