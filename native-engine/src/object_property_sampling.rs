@@ -44,13 +44,15 @@ fn target_exists(document: &ObjectDocument, target: &PropertyHolderTarget) -> bo
             .iter()
             .any(|layer| layer.layer_uid() == target.layer_uid())
             && target.stroke_id().is_none_or(|stroke| {
-                PropertyHolder::item_target_exists(document, target) || component.objects().iter().any(|record| {
-                    let item = record.target();
-                    item.context_id() == target.context_id()
-                        && item.layer_uid() == target.layer_uid()
-                        && item.stroke_id() == stroke
-                        && item.scope_kind() == &crate::object_document::FrameScopeKind::Authored
-                })
+                PropertyHolder::item_target_exists(document, target)
+                    || component.objects().iter().any(|record| {
+                        let item = record.target();
+                        item.context_id() == target.context_id()
+                            && item.layer_uid() == target.layer_uid()
+                            && item.stroke_id() == stroke
+                            && item.scope_kind()
+                                == &crate::object_document::FrameScopeKind::Authored
+                    })
             });
     }
     let context_exists =
@@ -68,13 +70,14 @@ fn target_exists(document: &ObjectDocument, target: &PropertyHolderTarget) -> bo
             .iter()
             .any(|layer| layer.layer_uid() == target.layer_uid())
         && target.stroke_id().is_none_or(|stroke| {
-            PropertyHolder::item_target_exists(document, target) || document.objects.iter().any(|object| {
-                object.target.context_id == target.context_id()
-                    && object.target.layer_uid == target.layer_uid()
-                    && object.target.stroke_id == stroke
-                    && object.target.frame_scope.kind
-                        == crate::object_document::FrameScopeKind::Authored
-            })
+            PropertyHolder::item_target_exists(document, target)
+                || document.objects.iter().any(|object| {
+                    object.target.context_id == target.context_id()
+                        && object.target.layer_uid == target.layer_uid()
+                        && object.target.stroke_id == stroke
+                        && object.target.frame_scope.kind
+                            == crate::object_document::FrameScopeKind::Authored
+                })
         })
 }
 pub(crate) fn default_curve() -> Vec<CurveSample> {

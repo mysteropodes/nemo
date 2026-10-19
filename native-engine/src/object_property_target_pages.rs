@@ -71,19 +71,37 @@ impl ObjectSnapshot {
                         break 'contexts;
                     }
                 }
-                if let Some(stored)=document.items.value() {
+                if let Some(stored) = document.items.value() {
                     for t in stored.targets() {
-                        if t.context_id()==context && t.layer_uid()==layer.layer_uid()
-                            && t.scope_kind()==&FrameScopeKind::Authored && seen.insert(t.stroke_id())
-                            && emit(json!({"kind":"element","target":{"contextId":context,"layerUid":layer.layer_uid(),"strokeId":t.stroke_id()}})) {
+                        if t.context_id() == context
+                            && t.layer_uid() == layer.layer_uid()
+                            && t.scope_kind() == &FrameScopeKind::Authored
+                            && seen.insert(t.stroke_id())
+                            && emit(
+                                json!({"kind":"element","target":{"contextId":context,"layerUid":layer.layer_uid(),"strokeId":t.stroke_id()}}),
+                            )
+                        {
                             break 'contexts;
                         }
                     }
                     for entry in stored.raster_entries() {
-                        let t=&entry.target;
-                        if t.context_id()!=context || t.layer_uid()!=layer.layer_uid() || t.scope_kind()!=&FrameScopeKind::Authored { continue; }
-                        if let Some(id)=entry.item.mesh_id().filter(|id|document.image_meshes().is_some_and(|store|store.get(id).is_some())) {
-                            if seen.insert(id) && emit(json!({"kind":"element","target":{"contextId":context,"layerUid":layer.layer_uid(),"strokeId":id}})) {
+                        let t = &entry.target;
+                        if t.context_id() != context
+                            || t.layer_uid() != layer.layer_uid()
+                            || t.scope_kind() != &FrameScopeKind::Authored
+                        {
+                            continue;
+                        }
+                        if let Some(id) = entry.item.mesh_id().filter(|id| {
+                            document
+                                .image_meshes()
+                                .is_some_and(|store| store.get(id).is_some())
+                        }) {
+                            if seen.insert(id)
+                                && emit(
+                                    json!({"kind":"element","target":{"contextId":context,"layerUid":layer.layer_uid(),"strokeId":id}}),
+                                )
+                            {
                                 break 'contexts;
                             }
                         }

@@ -198,24 +198,36 @@ impl SnapshotReads {
             "parent":me.parent().map(|p|json!({"name":p.name(),"index":p.index()}))}),
         )
     }
-    pub(crate) fn vertex_index(&self) -> Result<i64,&'static str> {
+    pub(crate) fn vertex_index(&self) -> Result<i64, &'static str> {
         match PropertyHolder::vertex_index(&self.property) {
-            Some(index) => i64::try_from(index).ok().filter(|i|*i<=i64::from(u32::MAX))
+            Some(index) => i64::try_from(index)
+                .ok()
+                .filter(|i| *i <= i64::from(u32::MAX))
                 .ok_or("Unsupported vertex index"),
             None => Ok(-1),
         }
     }
     /// A compact rest-vertex view, not a mesh copy or evaluated pose. Native
     /// raw vtx tracks stay percent offsets added to the separate rest sculpt.
-    pub(crate) fn mesh(&self) -> Result<Option<Value>,&'static str> {
-        let Some(mesh)=PropertyHolder::bound_mesh(self.snapshot.document(),&self.target) else { return Ok(None) };
-        let index=self.vertex_index()?;
-        let vertex=usize::try_from(index).ok().and_then(|i|mesh.verts.get(i));
-        let uv=vertex.map(|p|[p[0].as_f64().expect("admitted mesh x"),p[1].as_f64().expect("admitted mesh y")])
-            .unwrap_or([0.,0.]);
-        Ok(Some(json!({"meshId":self.target.stroke_id(),"vertexIndex":index,
+    pub(crate) fn mesh(&self) -> Result<Option<Value>, &'static str> {
+        let Some(mesh) = PropertyHolder::bound_mesh(self.snapshot.document(), &self.target) else {
+            return Ok(None);
+        };
+        let index = self.vertex_index()?;
+        let vertex = usize::try_from(index).ok().and_then(|i| mesh.verts.get(i));
+        let uv = vertex
+            .map(|p| {
+                [
+                    p[0].as_f64().expect("admitted mesh x"),
+                    p[1].as_f64().expect("admitted mesh y"),
+                ]
+            })
+            .unwrap_or([0., 0.]);
+        Ok(Some(
+            json!({"meshId":self.target.stroke_id(),"vertexIndex":index,
             "vertexCount":mesh.verts.len(),"outlineVertexCount":mesh.outline.len(),
-            "vertexUV":uv,"isOutlineVertex":index>=0 && (index as usize)<mesh.outline.len()})))
+            "vertexUV":uv,"isOutlineVertex":index>=0 && (index as usize)<mesh.outline.len()}),
+        ))
     }
     pub(crate) fn parent(&self, uid: &str) -> Result<Value, &'static str> {
         let target = self.target(uid)?;
@@ -244,8 +256,11 @@ impl SnapshotReads {
         )
     }
     pub(crate) fn public_comp(&self) -> Result<Value, &'static str> {
-        let comp=self.comp()?;
-        if ["frameDuration","duration"].iter().any(|p|comp[*p].as_f64().is_none_or(|n|!n.is_finite())) {
+        let comp = self.comp()?;
+        if ["frameDuration", "duration"]
+            .iter()
+            .any(|p| comp[*p].as_f64().is_none_or(|n| !n.is_finite()))
+        {
             return Err("Unavailable project metadata");
         }
         Ok(comp)

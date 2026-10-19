@@ -1,5 +1,8 @@
 //! Codec error adaptation for the existing property-holder admission.
-use super::{ObjectCodecError, ObjectCodecErrorKind, ObjectLayer, ObjectRecord, PropertyHolder, Presence, ImageMeshStore};
+use super::{
+    ImageMeshStore, ObjectCodecError, ObjectCodecErrorKind, ObjectLayer, ObjectRecord, Presence,
+    PropertyHolder,
+};
 pub(crate) fn validate_property_holders(
     holders: &Presence<Vec<PropertyHolder>>,
     layers: &[ObjectLayer],
@@ -26,4 +29,3 @@ pub(crate) fn validate_property_holders(
             ObjectCodecError::new(kind, message)
         })
 }
-

@@ -92,7 +92,9 @@ fn descriptor(
     property: &str,
     applicable: bool,
 ) -> Result<Value, DispatchErrorCode> {
-    let metadata = holder.metadata_in_document(document,property).ok_or_else(unavailable)?;
+    let metadata = holder
+        .metadata_in_document(document, property)
+        .ok_or_else(unavailable)?;
     let mut value = serde_json::to_value(metadata).map_err(|_| unavailable())?;
     let fields = value.as_object_mut().ok_or_else(unavailable)?;
     fields.insert("property".into(), json!(property));
@@ -235,12 +237,14 @@ impl ObjectSnapshot {
             return Err(DispatchErrorCode::NotFound);
         }
         if let Some(stroke) = target.stroke_id() {
-            if !PropertyHolder::item_target_exists(document,target) && !records.iter().any(|r| {
-                r.target.context_id == target.context_id()
-                    && r.target.layer_uid == target.layer_uid()
-                    && r.target.stroke_id == stroke
-                    && r.target.frame_scope.kind == FrameScopeKind::Authored
-            }) {
+            if !PropertyHolder::item_target_exists(document, target)
+                && !records.iter().any(|r| {
+                    r.target.context_id == target.context_id()
+                        && r.target.layer_uid == target.layer_uid()
+                        && r.target.stroke_id == stroke
+                        && r.target.frame_scope.kind == FrameScopeKind::Authored
+                })
+            {
                 return Err(DispatchErrorCode::NotFound);
             }
         }
@@ -340,22 +344,41 @@ impl ObjectSnapshot {
                 if let Some(paint) = paint {
                     keys.push(paint);
                 }
-                let vertices=PropertyHolder::vertex_count(self.document(),&target).unwrap_or(0);
-                let extra: Vec<_>=holder.properties().iter().filter_map(|p| {
-                    let i=PropertyHolder::vertex_index(p.property())?;
-                    (i>=vertices || p.property()!=format!("vtx{i}")).then_some(p.property())
-                }).collect();
-                let total=keys.len().checked_add(vertices).and_then(|n|n.checked_add(extra.len())).ok_or_else(unavailable)?;
-                let start=offset as usize;
-                if start>total { return Err(invalid()); }
+                let vertices = PropertyHolder::vertex_count(self.document(), &target).unwrap_or(0);
+                let extra: Vec<_> = holder
+                    .properties()
+                    .iter()
+                    .filter_map(|p| {
+                        let i = PropertyHolder::vertex_index(p.property())?;
+                        (i >= vertices || p.property() != format!("vtx{i}")).then_some(p.property())
+                    })
+                    .collect();
+                let total = keys
+                    .len()
+                    .checked_add(vertices)
+                    .and_then(|n| n.checked_add(extra.len()))
+                    .ok_or_else(unavailable)?;
+                let start = offset as usize;
+                if start > total {
+                    return Err(invalid());
+                }
                 // Allocate only this bounded page, not one string per mesh vertex.
-                let names: Vec<String>=(start..total.min(start+limit as usize)).map(|i| {
-                    if i<keys.len() { keys[i].to_owned() }
-                    else if i<keys.len()+vertices { format!("vtx{}",i-keys.len()) }
-                    else { extra[i-keys.len()-vertices].to_owned() }
-                }).collect();
-                let items=names.iter().map(|p|descriptor(self.document(),&holder,p,true)).collect::<Result<Vec<_>,_>>()?;
-                let more=start+items.len()<total;
+                let names: Vec<String> = (start..total.min(start + limit as usize))
+                    .map(|i| {
+                        if i < keys.len() {
+                            keys[i].to_owned()
+                        } else if i < keys.len() + vertices {
+                            format!("vtx{}", i - keys.len())
+                        } else {
+                            extra[i - keys.len() - vertices].to_owned()
+                        }
+                    })
+                    .collect();
+                let items = names
+                    .iter()
+                    .map(|p| descriptor(self.document(), &holder, p, true))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let more = start + items.len() < total;
                 ("properties", Some(target), offset, items, more)
             }
             ViewFields::StoredProperty { target, property } => {

@@ -301,7 +301,7 @@ fn resolve_self(
         index,
         has_parent,
         parent,
-        is_mesh: crate::object_document::PropertyHolder::bound_mesh(document,target).is_some(),
+        is_mesh: crate::object_document::PropertyHolder::bound_mesh(document, target).is_some(),
     })
 }
 
