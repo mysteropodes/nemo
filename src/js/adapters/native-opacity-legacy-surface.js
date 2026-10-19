@@ -67,10 +67,56 @@
     }
     return result && typeof result.then === 'function' ? result.then(continued) : continued(result);
   }
-  function wrapWriter(target, name, allow, kind, admitted) {
+  var frameGlobals = ['insertFrame', 'insertKeyframe', 'insertKeyframeAt', 'insertBlankKeyframe',
+    'clearKeyframe', 'convertToKeyframes', 'removeFrame', 'removeFrameSpan', 'removeTweenSpan',
+    'duplicateSelectedFrames'];
+  var frameTimeline = frameGlobals.filter(function (name) { return name !== 'insertKeyframeAt'; }).concat([
+    'deleteSelectedFrames', 'moveKeyframe', 'moveFrames', 'shiftLayerFrames', 'duplicateKeyframe',
+    'extendExposure', 'repeatSelection', 'copyFrames', 'cutFrames', 'pasteFrames']);
+  function frameWriterNames(root, target) {
+    var names = target === 'global' ? frameGlobals.slice() : target === 'timeline' ? frameTimeline.slice() : [];
+    var api = root.NemoNativeFrameEditDesktop;
+    if (api && typeof api.writerNames === 'function') {
+      api.writerNames(target).forEach(function (name) { if (!names.includes(name)) names.push(name); });
+    }
+    return names;
+  }
+  function routeFrameWriter(root, target, name, args) {
+    if (!frameWriterNames(root, target).includes(name)) return null;
+    var native = hasNativeHost(root), controller = root.NemoNativeOpacityCutover;
+    try {
+      var project = root.NemoNativeObjectProject;
+      var session = project && typeof project.desktop === 'function' && project.desktop(root);
+      native = native || !!(controller && controller.blocksLegacy()) ||
+        !!(session && (session.isActive() || typeof session.blocksLegacy === 'function' && session.blocksLegacy()));
+    }
+    catch (_) { native = true; }
+    if (!native) return null;
+    var api = root.NemoNativeFrameEditDesktop;
+    function unavailable() {
+      try { if (root.showToast) root.showToast('Native frame editing is unavailable.'); } catch (_) {}
+      return { handled: true, result: Promise.resolve({ status: 'unavailable', code: 'frame_edit_session_unavailable' }) };
+    }
+    if (!api || typeof api.install !== 'function') return unavailable();
+    try {
+      var route = api.install(root).routeWriter(target, name, Array.from(args));
+      if (!route || route.handled !== true) return unavailable();
+      return { handled: true, result: Promise.resolve(route.result).catch(function () {
+        try { if (root.showToast) root.showToast('Frame editing was not confirmed. Wait for synchronization.'); } catch (_) {}
+        return { status: 'unconfirmed' };
+      }) };
+    } catch (_) {
+      // A broken consumer cannot fall through to the captured Paper writer.
+      try { if (root.showToast) root.showToast('Frame editing was not confirmed. Wait for synchronization.'); } catch (_) {}
+      return { handled: true, result: Promise.resolve({ status: 'unconfirmed' }) };
+    }
+  }
+  function wrapWriter(target, name, allow, kind, admitted, route) {
     var original = target && target[name];
     if (typeof original !== 'function') return function () {};
     function wrapped() {
+      var routed = route && route(arguments);
+      if (routed && routed.handled === true) return routed.result;
       if (allow(kind) !== true) return false;
       if (admitted) admitted();
       return original.apply(this, arguments);
@@ -328,8 +374,12 @@
         },
         wrap: function (target, names, prefix, allow, admitted) {
           var targets = { global: root, timeline: root.SM, motion: root.SMMotion, script: root.SMScript, plugin: root.SMPlugin };
-          var receipts = Object.freeze(names.map(function (name) {
-            return wrapWriter(targets[target], name, allow, prefix + name, admitted);
+          var routedNames = names.slice();
+          frameWriterNames(root, target).forEach(function (name) { if (!routedNames.includes(name)) routedNames.push(name); });
+          var receipts = Object.freeze(routedNames.map(function (name) {
+            return wrapWriter(targets[target], name, allow, prefix + name, admitted, function (args) {
+              return routeFrameWriter(root, target, name, args);
+            });
           }));
           return function () { receipts.forEach(function (dispose) { dispose(); }); };
         },
