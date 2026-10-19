@@ -6,8 +6,6 @@ use crate::evaluation::property_expression_lookup::{
 };
 use crate::evaluation::property_expression_views::ExpressionContextView;
 use crate::object_document::{ObjectLayer, Presence, PropertyHolder, PropertyHolderTarget};
-#[cfg(feature = "object_expression_pin")]
-use crate::object_expression_pin::PropertyExpressionRequest;
 use crate::object_frame_packet::sample_property_raw;
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
@@ -32,15 +30,6 @@ impl SnapshotReads {
             target: target.clone(),
             property: property.to_owned(),
             frame,
-        }
-    }
-    #[cfg(feature = "object_expression_pin")]
-    pub(crate) fn new(request: &PropertyExpressionRequest) -> Self {
-        Self {
-            snapshot: request.snapshot().clone(),
-            target: request.target().clone(),
-            property: request.property().to_owned(),
-            frame: request.frame(),
         }
     }
     pub(crate) fn snapshot(&self) -> &ObjectSnapshot {

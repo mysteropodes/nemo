@@ -136,11 +136,16 @@ fn evaluate_property_in_context(
     state: ReadState,
 ) -> Result<Outcome, ExpressionRefusal> {
     with_context_budget(rt, limits, Arc::clone(&state.polls), |ctx, fail| {
-        let time = reads::SnapshotReads::new(request)
-            .comp()
-            .ok()
-            .and_then(|c| c["fps"].as_f64())
-            .map(|fps| request.frame() / fps);
+        let time = reads::SnapshotReads::bind(
+            request.snapshot(),
+            request.target(),
+            request.property(),
+            request.frame(),
+        )
+        .comp()
+        .ok()
+        .and_then(|c| c["fps"].as_f64())
+        .map(|fps| request.frame() / fps);
         let function = match compile_property(ctx, request.code(), fail, time.is_some()) {
             Ok(function) => function,
             Err((ExpressionRefusal::Interrupted, _)) => return Ok(Outcome::Timeout),

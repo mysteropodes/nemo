@@ -87,7 +87,12 @@ pub(super) fn bind<'js>(
     limits: ExpressionLimits,
     state: ReadState,
 ) -> Result<Function<'js>, ExpressionRefusal> {
-    let reads = SnapshotReads::new(request);
+    let reads = SnapshotReads::bind(
+        request.snapshot(),
+        request.target(),
+        request.property(),
+        request.frame(),
+    );
     let depth = request.depth() + 1;
     Function::new(
         ctx.clone(),
