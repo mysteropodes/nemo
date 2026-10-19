@@ -222,7 +222,7 @@ impl ObjectFillOwner {
         )
         .map_err(|_| DispatchErrorCode::NotFound)?;
         let metadata = holder
-            .metadata_in_document(document, &payload.property)
+            .metadata_in_document(&document, &payload.property)
             .ok_or(DispatchErrorCode::Unavailable)?;
         let record_index = holder
             .properties
