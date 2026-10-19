@@ -47,7 +47,27 @@ fn path_vertices(records: &[ObjectRecord], target: &PropertyHolderTarget) -> Opt
         .max()
 }
 
+/// The public target has no kind discriminator. Never reinterpret a real
+/// path/text/other raster as a mesh merely because its ID matches a mesh key.
+pub(super) fn ambiguous(
+    items: Option<&ItemRecords>, meshes: Option<&ImageMeshStore>,
+    records: &[ObjectRecord], target: &PropertyHolderTarget,
+) -> bool {
+    if mesh(items,meshes,target).is_none() { return false; }
+    let id=target.stroke_id().expect("bound mesh identity");
+    path_vertices(records,target).is_some() || items.is_some_and(|items| {
+        items.text_entries().iter().any(|r|same_layer(&r.target,target) && r.target.stroke_id()==id)
+            || items.raster_entries().iter().any(|r|same_layer(&r.target,target)
+                && r.target.stroke_id()==id && r.item.mesh_id()!=Some(id))
+    })
+}
+
 impl PropertyHolder {
+    pub(crate) fn target_ambiguous(document:&ObjectDocument,target:&PropertyHolderTarget) -> bool {
+        let records=document.component_set().and_then(|set|set.component(target.context_id()))
+            .map_or(document.objects(),|c|c.objects());
+        ambiguous(document.items.value(),document.image_meshes(),records,target)
+    }
     pub(crate) fn vertex_index(property: &str) -> Option<usize> {
         super::catalog::vertex_index(property)
     }
@@ -55,6 +75,7 @@ impl PropertyHolder {
         document: &'a ObjectDocument,
         target: &PropertyHolderTarget,
     ) -> Option<&'a ImageMesh> {
+        if Self::target_ambiguous(document,target) { return None; }
         mesh(document.items.value(), document.image_meshes(), target)
     }
     pub(crate) fn item_target_exists(
@@ -67,6 +88,7 @@ impl PropertyHolder {
         document: &ObjectDocument,
         target: &PropertyHolderTarget,
     ) -> Option<usize> {
+        if Self::target_ambiguous(document,target) { return None; }
         if let Some(mesh) = Self::bound_mesh(document, target) {
             return Some(mesh.verts.len());
         }
@@ -83,6 +105,7 @@ impl PropertyHolder {
         document: &ObjectDocument,
         property: &str,
     ) -> Option<super::PropertyMetadata> {
+        if Self::target_ambiguous(document,self.target()) { return None; }
         let mut metadata = self.metadata(property)?;
         if let Some(index) = super::catalog::vertex_index(property) {
             let count = Self::vertex_count(document, self.target())?;

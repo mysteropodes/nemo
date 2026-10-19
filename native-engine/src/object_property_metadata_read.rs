@@ -218,6 +218,9 @@ impl ObjectSnapshot {
         target: &PropertyHolderTarget,
     ) -> Result<Cow<'a, PropertyHolder>, DispatchErrorCode> {
         let document = self.document();
+        if PropertyHolder::target_ambiguous(document,target) {
+            return Err(unavailable());
+        }
         let context_exists = document.composition_order.value().map_or(
             target.context_id() == "scene-root",
             |plan| {

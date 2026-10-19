@@ -162,7 +162,8 @@ fn target_pages_discover_only_real_frame_independent_item_and_mesh_keys() {
     }
     let mesh = target("L0", Some("im_1"));
     let mut names = vec![];
-    for offset in [0, 8] {
+    let mut offset=0;
+    loop {
         let page = metadata(
             &pin,
             json!({"kind":"properties","target":mesh,"offset":offset,"limit":8}),
@@ -174,6 +175,9 @@ fn target_pages_discover_only_real_frame_independent_item_and_mesh_keys() {
                 .iter()
                 .map(|p| p["property"].as_str().unwrap().to_owned()),
         );
+        let Some(next)=page["nextOffset"].as_u64() else {break};
+        assert!(next>offset && next<=offset+8);
+        offset=next;
     }
     assert_eq!(&names[6..], ["vtx0", "vtx1", "vtx2"]);
 }
@@ -288,6 +292,47 @@ fn old_authored_vertex_tracks_are_not_discarded_after_a_topology_shrink() {
         decode_storage_project(&encode_storage_project(pin.document()).unwrap()).unwrap(),
         *pin.document()
     );
+}
+
+#[test]
+fn colliding_path_item_and_mesh_keys_refuse_without_reinterpreting_stored_tracks() {
+    let mut path=fixture();
+    path["objects"][0]["target"]["strokeId"]=json!("im_1");
+    path["propertyHolders"][0]["target"]["strokeId"]=json!("im_1");
+    path["propertyHolders"].as_array_mut().unwrap().remove(1);
+    assert!(decode_storage_project(path.to_string().as_bytes()).is_err());
+    // Legacy drawings without that ambiguous holder remain losslessly stored,
+    // but no query may silently choose the mesh over the real path.
+    path["propertyHolders"].as_array_mut().unwrap().remove(0);
+    let owner=owner(&path);let pin=owner.acquire_snapshot(0).unwrap();let t=target("L0",Some("im_1"));
+    assert_eq!(pin.sample_property_raw(&t,"vtx0",0.),Err(DispatchErrorCode::Unavailable));
+    let mut q=json!({"instanceId":pin.instance_id(),"documentId":pin.document_id(),"atRevision":0,
+        "documentSnapshotId":pin.snapshot_id(),"view":{"kind":"properties","target":t,"offset":0,"limit":8}});
+    assert_eq!(pin.query_property_metadata_json(q.to_string().as_bytes()),Err(DispatchErrorCode::Unavailable));
+    q["view"]=json!({"kind":"expressionContext","target":t,"property":"vtx0","frame":0});
+    assert_eq!(pin.query_property_read_json(q.to_string().as_bytes()),Err(DispatchErrorCode::Unavailable));
+    assert_eq!(decode_storage_project(&encode_storage_project(pin.document()).unwrap()).unwrap(),*pin.document());
+    let mut text=fixture();text["items"]["text"][0]["target"]=object_target("L0","im_1");
+    text["propertyHolders"].as_array_mut().unwrap().remove(3);
+    assert!(decode_storage_project(text.to_string().as_bytes()).is_err());
+    let mut raster=fixture();let mut other=raster["items"]["raster"][0].clone();
+    other["target"]["strokeId"]=json!("im_1");other["item"].as_object_mut().unwrap().remove("meshId");
+    raster["items"]["raster"].as_array_mut().unwrap().push(other);
+    assert!(decode_storage_project(raster.to_string().as_bytes()).is_err());
+}
+
+#[test]
+fn real_mesh_binding_and_foreign_layer_path_are_not_over_rejected() {
+    let mut v=fixture();v["items"]["raster"][0]["target"]["strokeId"]=json!("im_1");
+    v["propertyHolders"].as_array_mut().unwrap().remove(2);
+    let o=owner(&v);let p=o.acquire_snapshot(0).unwrap();
+    assert_eq!(p.sample_property_raw(&target("L0",Some("im_1")),"vtx1",0.).unwrap(),vec![10.,-20.]);
+    let mut v=fixture();v["objects"][0]["target"]=object_target("L1","im_1");
+    v["propertyHolders"][0]["target"]=json!({"contextId":"scene-root","layerUid":"L1","strokeId":"im_1"});
+    let o=owner(&v);let p=o.acquire_snapshot(0).unwrap();let t=target("L1",Some("im_1"));
+    assert_eq!(p.sample_property_raw(&t,"vtx0",0.).unwrap(),vec![2.,3.]);
+    let page=metadata(&p,json!({"kind":"storedProperty","target":t,"property":"vtx0"}));
+    assert_eq!(page["items"][0]["unit"],"px");
 }
 
 #[cfg(feature = "object_expression_runtime")]
