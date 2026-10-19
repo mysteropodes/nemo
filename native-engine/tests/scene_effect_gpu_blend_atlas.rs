@@ -187,6 +187,20 @@ fn gpu_max_native_reference_atlas_then_layered_colors_retire_without_missing_pix
         .dispatch_reference_command(&request, Some(&encoded))
         .unwrap()
         .is_ok());
+    assert_eq!(owner.content_revision(), 1);
+    // Native attachment defaults to 50%; this pressure fixture requires opaque blue.
+    let settings = OpacityRequest::history_stage(
+        "atlas-ref-opaque",
+        owner.instance_id(),
+        owner.document_id(),
+        Some(owner.content_revision()),
+        "command.document.reference.settings",
+        json!({"name":"blue.png","visible":true,"opacity":1.0,"offsetFrames":0}),
+    );
+    let response = owner.dispatch_reference_command(&settings, None).unwrap();
+    assert!(response.is_ok());
+    assert_eq!(response.content_revision(), 2);
+    assert_eq!(owner.content_revision(), 2);
     let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
     let pins = ObjectFrameSelector {
         instance_id: snapshot.instance_id(),
@@ -201,7 +215,8 @@ fn gpu_max_native_reference_atlas_then_layered_colors_retire_without_missing_pix
     let scene = prepare_object_render_scene(&packet, &pins).unwrap();
     let plan = prepare_object_paint_plan(&scene, &pins).unwrap();
     let reference = prepare_object_viewport_composition(&plan, &pins, None).unwrap();
-    let (image, _, _) = reference.reference_image().unwrap();
+    let (image, _, opacity) = reference.reference_image().unwrap();
+    assert_eq!(opacity, 1.0);
     assert_eq!((image.width, image.height), (8192, 8192));
     let weak = image.data.downgrade();
     let output = || ObjectOutputSpec::new(64, 64, "white-srgb-normal-rgba8-area").unwrap();
