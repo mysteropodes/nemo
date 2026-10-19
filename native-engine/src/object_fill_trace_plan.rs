@@ -1,8 +1,8 @@
 //! Detached paint-bucket document transactions. Real tracing, recolour and same-colour
 //! merge enter the existing immutable native revision/history owner as one candidate.
-use super::native::{self, NativeTrace};
-use super::native_merge::{polygons, NativeProbe, NativeUnion};
-use super::{find_fill_region, plan_fill_trace_commit, ChildFacts, CommitInput, FillTracePlan};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{self, NativeTrace};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native_merge::{polygons, NativeProbe, NativeUnion};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{find_fill_region, plan_fill_trace_commit, ChildFacts, CommitInput, FillTracePlan};
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
     check_scope, detach, finish, unchanged, BooleanPlan, PlanError,
 };
@@ -44,7 +44,7 @@ fn body(opacity: f64) -> VectorBody {
 pub(crate) fn fill_record(
     scope: &Scope,
     id: &str,
-    hit: &super::TraceHit,
+    hit: &crate::object_document::object_group_kernels::object_fill_trace_ops::TraceHit,
     click: [f64; 2],
     paint: &SolidFill,
     opacity: f64,
@@ -202,7 +202,7 @@ pub(crate) fn plan_trace(
             ..FillFacts::default()
         })
         .collect();
-    let at = super::fill_insert_index(&children);
+    let at = crate::object_document::object_group_kernels::object_fill_trace_ops::fill_insert_index(&children);
     let mut all_rings = rings.clone();
     all_rings.insert(at, hit.ring.clone());
     let mut stroked: Vec<_> = facts.iter().map(|f| f.stroked).collect();

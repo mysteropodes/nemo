@@ -1,7 +1,7 @@
 //! Actual stored-vector walls for the retained fill graph. Inputs are immutable native
 //! records in one context/layer/frame; the provider has no writable document or JS port.
-use super::geometry::{self, FillInput, FillResult, Wall};
-use super::{FillTraceProvider, RingSeg, TraceFailure, TraceHit, RASTER_GAP};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::geometry::{self, FillInput, FillResult, Wall};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{FillTraceProvider, RingSeg, TraceFailure, TraceHit, RASTER_GAP};
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope;
 use crate::object_document::object_group_kernels::object_boolean_ops::{Point, MAX_ABS_COORD};
 use crate::object_document::object_group_kernels::object_boolean_topology::Bounds;

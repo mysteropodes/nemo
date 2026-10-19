@@ -1,5 +1,5 @@
 //! Retained planar-face walk and topology checks from geometry-wasm/src/fill.rs at52425370.
-use super::*;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::geometry::*;
 pub(super) fn edge_dir(nodes: &[Node], edge: &Edge, node: usize) -> Vec2 {
     if edge.kind == EdgeType::Gap {
         let other = if edge.a == node { edge.b } else { edge.a };

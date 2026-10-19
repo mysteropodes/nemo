@@ -1,8 +1,8 @@
 //! Real curved-outline probes and union for the retained same-colour fill policy.
 //! Curves use the retained kurbo adaptive flattener before the existing i_overlay
 //! owner; inputs never discard handles as if the anchors were a straight ring.
-use super::native::{bounds, contains, interior, polygon};
-use super::{RingSeg, UnionProvider};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{bounds, contains, interior, polygon};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{RingSeg, UnionProvider};
 use crate::object_document::object_group_kernels::object_boolean_ops::{
     flatten_polygons, fold_multi, BoolOp, Island, MultiPolygon, Point,
 };

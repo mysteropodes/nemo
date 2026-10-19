@@ -1,6 +1,6 @@
 //! Native retained fill geometry, adapted from geometry-wasm/src/fill.rs at protected52425370.
 //! Pure geometry only: no document state, Paper, WASM transport or renderer.
-use super::RingSeg;
+use crate::object_document::object_group_kernels::object_boolean_ops::RingSeg;
 use kurbo::BezPath;
 #[path = "object_fill_geometry_curve.rs"]
 mod curve;

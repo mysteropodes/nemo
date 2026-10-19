@@ -1,9 +1,9 @@
 //! Linked-fill regeneration in the caller's detached native document candidate.
 //! A wall edit and every dependent fill therefore publish together through the
 //! existing sealed vector transaction, with one revision and one undo entry.
-use super::native::{self, NativeTrace};
-use super::native_merge::polygons;
-use super::{find_fill_region, TraceHit};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{self, NativeTrace};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native_merge::polygons;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{find_fill_region, TraceHit};
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::PlanError;
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::{finish, opacity_of};
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::{

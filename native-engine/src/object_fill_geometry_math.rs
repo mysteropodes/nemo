@@ -1,6 +1,6 @@
 //! Native retained fill geometry, adapted from geometry-wasm/src/fill.rs at protected52425370.
 //! Pure geometry only: no document state, Paper, WASM transport or renderer.
-use super::*;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::geometry::*;
 #[derive(Clone, Copy, PartialEq)]
 pub(super) struct Vec2 {
     pub(super) x: f64,

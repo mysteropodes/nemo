@@ -1,6 +1,6 @@
 //! Native retained fill geometry, adapted from geometry-wasm/src/fill.rs at protected52425370.
 //! Pure geometry only: no document state, Paper, WASM transport or renderer.
-use super::*;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::geometry::*;
 use kurbo::{ParamCurve, ParamCurveArclen, PathEl, PathSeg};
 pub(super) fn build_bezpath_from_segments(segments: &[RingSeg], closed: bool) -> BezPath {
     let mut path = BezPath::new();

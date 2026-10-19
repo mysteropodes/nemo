@@ -1,5 +1,5 @@
 //! Bounded public paint-bucket payload -> the existing sealed boolean/history candidate.
-use super::{BooleanEditKind, PreparedBooleanEdit};
+use crate::commands::object_fill_owner::group_edit::boolean_edit::{BooleanEditKind, PreparedBooleanEdit};
 use crate::commands::object_fill_owner::object_frame_edit_document::{
     promote_cells, DocumentEdit, FrameEditError,
 };
@@ -30,15 +30,15 @@ struct Payload {
 
 impl ObjectFillOwner {
     pub(crate) fn fill_plan_error(error: &PlanError) -> DispatchErrorCode {
-        super::refusal_code(error)
+        crate::commands::object_fill_owner::group_edit::boolean_edit::refusal_code(error)
     }
     pub(crate) fn prepare_fill_trace_json(
         &self,
         bytes: &[u8],
     ) -> Result<PreparedBooleanEdit, DispatchErrorCode> {
-        let p: Payload = super::wire::parse(bytes)?;
+        let p: Payload = crate::commands::object_fill_owner::group_edit::boolean_edit::wire::parse(bytes)?;
         if p.command != "object.fill.trace"
-            || !super::target_ok(&p.layer_uid, &p.context_id)
+            || !crate::commands::object_fill_owner::group_edit::boolean_edit::target_ok(&p.layer_uid, &p.context_id)
             || !p.point.iter().all(|n| n.is_finite() && n.abs() <= 1.0e12)
             || !p.opacity.is_finite()
             || !(0.0..=1.0).contains(&p.opacity)

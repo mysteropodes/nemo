@@ -1,6 +1,6 @@
 //! Native retained fill geometry, adapted from geometry-wasm/src/fill.rs at protected52425370.
 //! Pure geometry only: no document state, Paper, WASM transport or renderer.
-use super::*;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::geometry::*;
 pub(super) fn build_graph(
     open_pts: &[Vec<[f64; 2]>],
     gap_thr: f64,
