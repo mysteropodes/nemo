@@ -73,8 +73,11 @@ test('install is idempotent and five shortcuts synchronously consume one real na
     assert.equal(Desktop.install(h.root),h.controller);
     assert.equal(h.controller.shortcut(action,{preventDefault(){prevented++;}}),true);
     assert.equal(prevented,1);await turn();await turn();
-    assert.equal(h.commands().length,action==='cmdInsertBlankKey'?0:1,action);
-    if(action==='cmdInsertBlankKey')assert.match(h.notices.at(-1),/unavailable/i);
+    assert.equal(h.commands().length,1,action);
+    if(action==='cmdInsertBlankKey'){
+      assert.deepEqual(h.commands()[0].q.payload,{command:'object.layer.key.blank',layerUid:'beta',cell:2});
+      assert.deepEqual(h.navigation,[]);assert.equal(h.session.info().totalFrames,12);
+    }
     assert.equal(h.controller.shortcut('not-a-frame-action',{}),false);
   }
 });
@@ -96,6 +99,8 @@ test('every mapped writer uses the actual signature and reaches exactly its expe
   const cases=[
     ['global','insertFrame',[],P+'frames.insert',{cell:2,layerUids:['beta']}],
     ['global','insertKeyframe',[],P+'layer.key.promote',{cells:[2],layerUids:['beta']}],
+    ['global','insertBlankKeyframe',[],P+'layer.key.blank',{layerUid:'beta',cell:2}],
+    ['timeline','insertBlankKeyframe',[],P+'layer.key.blank',{layerUid:'beta',cell:2}],
     ['global','insertKeyframeAt',[0,4],P+'layer.key.promote',{layerUids:['alpha'],cells:[4]}],
     ['timeline','clearKeyframe',[],P+'layer.key.clear',{layerUid:'beta',cell:2}],
     ['timeline','convertToKeyframes',[],P+'layer.key.promote',{layerUids:['beta'],cells:[2]}],
@@ -118,14 +123,14 @@ test('every mapped writer uses the actual signature and reaches exactly its expe
   }
 });
 
-test('F7, clipboard packets and unsupported multi-cell moves consume without any legacy or native write',async()=>{
+test('clipboard packets and unsupported multi-cell moves consume without any legacy or native write',async()=>{
   const h=harness();await h.open();
-  for(const name of ['insertBlankKeyframe','copyFrames','cutFrames','pasteFrames','moveFrames','shiftLayerFrames']){
+  for(const name of ['copyFrames','cutFrames','pasteFrames','moveFrames','shiftLayerFrames']){
     const route=h.controller.routeWriter('timeline',name,[[],1,1]);
     assert.equal(route.handled,true);assert.equal((await route.result).status,'unavailable');
   }
   assert.equal(h.commands().length,0);
-  assert.equal(h.notices.length,6);assert.ok(h.notices.every(message=>/unavailable/i.test(message)));
+  assert.equal(h.notices.length,5);assert.ok(h.notices.every(message=>/unavailable/i.test(message)));
   assert.equal(h.controller.routeWriter('timeline','notAWriter',[]),null);
   assert.equal(h.controller.routeWriter('global','moveKeyframe',[0,1,2]),null);
   assert.ok(Object.isFrozen(Desktop.writerNames('timeline')));
@@ -273,4 +278,55 @@ test('shipped loader installs the desktop consumer once after its actual depende
     const dependency=html.indexOf(tag(name));
     assert.ok(dependency>=0&&dependency<at,name+' must exist before immediate install');
   }
+});
+
+
+test('ordinary Main F7 and wrapped global/SM F7 dispatch active UID once, ignoring another selected layer',async()=>{
+  const main=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8');
+  const start=main.indexOf('function runCommandShortcutAction(action,e){');assert.ok(start>=0);
+  const line=main.slice(start,main.indexOf('\n',start));
+  const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  for(const route of ['main','global','timeline']){
+    const h=harness();await h.open();h.root._layerSel=[0];h.root._sel.frames=[{layer:0,frame:8}];
+    let legacy=0,guards=0,prevented=0;
+    if(route==='main'){
+      const context={...h.root,window:null,insertBlankKeyframe(){legacy++;}};context.window=context;
+      vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/adapters/native-frame-edit-desktop.js'),'utf8'),context);
+      vm.runInNewContext(line,context);
+      context.runCommandShortcutAction('cmdInsertBlankKey',{preventDefault(){prevented++;}});
+      await turn();await turn();assert.equal(prevented,1);
+    }else{
+      h.root.__TAURI__={core:{invoke(){throw Error('No private surface transport');}}};
+      h.root.NemoNativeFrameEditDesktop=Desktop;
+      h.root.insertBlankKeyframe=()=>{legacy++;};h.root.SM={importJSON(){},insertBlankKeyframe(){legacy++;}};
+      const surface=Surface.desktopPorts(h.root,{}).surface;
+      const stop=surface.wrap(route,[],route+'-',()=>{guards++;return true;});
+      try{
+        const object=route==='global'?h.root:h.root.SM;
+        assert.deepEqual({...await object.insertBlankKeyframe()},{status:'applied-presented',applied:true});
+      }finally{stop();}
+    }
+    assert.deepEqual([legacy,guards,h.commands().length],[0,0,1],route);
+    assert.equal(h.commands()[0].q.operation,P+'layer.key.blank');assert.equal(h.commands()[0].q.expectedRevision,0);
+    assert.deepEqual(h.commands()[0].q.payload,{command:'object.layer.key.blank',layerUid:'beta',cell:2});
+    assert.equal(h.session.info().contentRevision,1);assert.equal(h.session.info().undoDepth,1);
+    assert.equal(h.session.readPresentedObjectSession().presentation.frame,2);
+    assert.equal(h.root.state.currentFrame,2);assert.equal(h.root.state.totalFrames,12);assert.deepEqual(h.navigation,[]);
+    assert.deepEqual(h.root._layerSel,[0]);assert.deepEqual(h.root._sel.frames,[{layer:0,frame:8}]);
+  }
+});
+
+test('F7 pending, native refusal and malformed ACK consume without fallback or playhead mutation',async()=>{
+  for(const [options,status]of [[{refusal:true},'refused'],[{badAck:true},'unconfirmed'],[{noop:true},'unconfirmed']]){
+    const h=harness(options);await h.open();
+    const route=h.controller.routeWriter('global','insertBlankKeyframe',[]);
+    assert.equal(route.handled,true);assert.equal((await route.result).status,status);
+    assert.equal(h.commands().length,1);assert.deepEqual(h.navigation,[]);assert.equal(h.root.state.currentFrame,2);
+  }
+  const h=harness();await h.open();const gate=h.hold();
+  const first=h.controller.routeWriter('timeline','insertBlankKeyframe',[]);await turn();
+  assert.equal((await h.controller.routeWriter('global','insertBlankKeyframe',[]).result).status,'busy');
+  assert.equal(h.commands().length,1);assert.equal(h.root.state.currentFrame,2);
+  gate.resolve();assert.equal((await first.result).status,'applied-presented');
+  assert.equal(h.session.info().contentRevision,1);assert.deepEqual(h.navigation,[]);
 });

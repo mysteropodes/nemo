@@ -250,7 +250,8 @@
         "object_parametric_edit.rs",
         "object_path_effects_edit.rs",
         "object_raster_image_import_owner.rs",
-        "object_raster_image_import_wire.rs"
+        "object_raster_image_import_wire.rs",
+        "object_blank_key_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -1466,7 +1467,11 @@
         "object_scene_parent_chain_pixels.rs",
         "property_expression_lookup.rs",
         "object_frame_clipboard_cut_dispatch.rs",
-        "object_frame_clipboard_cut_wire.rs"
+        "object_frame_clipboard_cut_wire.rs",
+        "object_blank_key_edit.rs",
+        "object_blank_key_edit_build.rs",
+        "object_blank_key_history.rs",
+        "object_blank_key_history_controls.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1576,7 +1581,8 @@
         "src/native_text_read_wire_tests.rs",
         "src/native_image_import_contract_tests.rs",
         "src/native_wire_response_owner.rs",
-        "src/native_image_import_owner_wire_tests.rs"
+        "src/native_image_import_owner_wire_tests.rs",
+        "src/native_frame_edit_blank_wire_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

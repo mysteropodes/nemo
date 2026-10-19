@@ -479,3 +479,7 @@ fn repeat_wire_accepts_actual_catalog_counts_and_rejects_shape_revision_or_ident
     insert_response.result = response.result;
     assert!(validate_native_response(&insert_response, &insert_request).is_err());
 }
+
+#[cfg(test)]
+#[path = "native_frame_edit_blank_wire_tests.rs"]
+mod blank_key;

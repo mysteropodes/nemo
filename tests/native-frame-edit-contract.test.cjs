@@ -18,15 +18,15 @@ const request = (operation, payload, extra) => Object.assign({ apiVersion: 2, re
 const reply = (q, applied) => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId, contentRevision: q.expectedRevision + (applied ? 1 : 0), ok: true, result: Object.assign({ applied, historyEntriesAdded: applied ? 1 : 0 }, q.operation === P + 'frames.repeat' ? { cycledLayers: 1, skippedComponentLayers: 0 } : {}) });
 const OPTIONAL = { 'object.frames.insert': ['layerUids'], 'object.layer.key.promote': ['layerUids'] };
 
-test('the descriptor, the schema and the contract declare the same eleven operations', () => {
-  assert.equal(OPS.length, 11);
+test('the descriptor, the schema and the contract declare the same twelve operations', () => {
+  assert.equal(OPS.length, 12);
   assert.deepEqual(descriptor.operations, OPS);
   assert.equal(descriptor.id, 'native.frame-edit');
   assert.equal(descriptor.availability.state, 'available');
   assert.equal(descriptor.authority.adapterOwnsWritableMirror, false);
   assert.equal(descriptor.authority.fallback, 'none');
   assert.equal(descriptor.resourceBoundary.maxRequestBytes, 4096);
-  assert.equal(descriptor.input.oneOf.length, 11);
+  assert.equal(descriptor.input.oneOf.length, 12);
   assert.deepEqual(descriptor.examples.map((e) => e.request.operation), OPS);
   for (const op of OPS) {
     const sample = Contract.example(op), command = Contract.commandOf(op);
@@ -94,6 +94,10 @@ test('numbers, lists and opaque names follow the owner parsers', () => {
   const promote = (cells) => ({ command: 'object.layer.key.promote', cells });
   bad(P + 'layer.key.promote', promote([])); bad(P + 'layer.key.promote', promote([2, 2])); bad(P + 'layer.key.promote', promote([-1]));
   ok(P + 'layer.key.promote', promote([2, 5])); ok(P + 'layer.key.promote', { command: 'object.layer.key.promote', cells: [2], layerUids: ['a'] });
+  const blank = (layerUid, cell) => ({ command: 'object.layer.key.blank', layerUid, cell });
+  ok(P + 'layer.key.blank', blank('layer-a', 0)); ok(P + 'layer.key.blank', blank('data:opaque', 4294967295));
+  for (const cell of [-1, 1.5, 4294967296, '3', null]) bad(P + 'layer.key.blank', blank('layer-a', cell));
+  for (const layerUid of ['', null, 3]) bad(P + 'layer.key.blank', blank(layerUid, 2));
   const clear = (targets) => ({ command: 'object.layer.key.clear_cells', targets });
   bad(P + 'layer.key.clear_cells', clear([]));
   bad(P + 'layer.key.clear_cells', clear([{ layerUid: 'a', frame: 1 }, { layerUid: 'a', frame: 1 }]));
@@ -122,7 +126,7 @@ test('a request over the 4096-byte message bound is refused before transport', (
   assert.doesNotThrow(() => SDK.validateRequest(request(P + 'layer.key.clear_cells', { command: 'object.layer.key.clear_cells', targets: targets.slice(0, 20) })));
 });
 
-test('clipboard cut, copy and paste and the F7 blank key are not admitted', () => {
+test('clipboard packets and unsupported blank-key aliases are not admitted', () => {
   for (const op of [P + 'frames.clipboard.paste', P + 'frames.clipboard.cut', P + 'frames.clipboard.copy', P + 'layer.key.insert_blank', P + 'frames.insert_blank']) {
     assert.equal(Contract.admitted(op), false);
     assert.throws(() => SDK.validateRequest(request(op, { command: 'object.frames.clipboard.paste' })), /not admitted/);
@@ -132,7 +136,7 @@ test('clipboard cut, copy and paste and the F7 blank key are not admitted', () =
 test('receipts must carry exactly one revision per applied change and the same owner', async () => {
   for (const op of OPS) {
     const q = request(op, Contract.example(op));
-    for (const applied of [true, false]) {
+    for (const applied of op === P + 'layer.key.blank' ? [true] : [true, false]) {
       const adapter = SDK.createNativeApplicationAdapter('frame-edit-test', { dispatch() { return reply(q, applied); } });
       assert.deepEqual(await adapter.dispatch(q), reply(q, applied));
     }
@@ -212,4 +216,16 @@ test('repeat counts are required, closed, bounded and exclusive to repeat, inclu
   for(const other of OPS.filter(x=>x!==op))assert.throws(()=>Contract.result(other,reply(q,true).result),TypeError);
   assert.deepEqual(schema.$defs.ObjectFrameRepeatResult.required,['applied','historyEntriesAdded','cycledLayers','skippedComponentLayers']);
   assert.equal(schema.$defs.ObjectFrameRepeatResult.additionalProperties,false);
+});
+
+
+test('F7 success always checkpoints once, including an already blank key; no-op and extra-field receipts refuse', async () => {
+  const op = P + 'layer.key.blank', q = request(op, { command: 'object.layer.key.blank', layerUid: 'active', cell: 2 });
+  const adapter = (response) => SDK.createNativeApplicationAdapter('frame-edit-test', { dispatch() { return response; } });
+  assert.deepEqual(await adapter(reply(q, true)).dispatch(q), reply(q, true));
+  await assert.rejects(adapter(reply(q, false)).dispatch(q));
+  const extra = reply(q, true); extra.result.cycledLayers = 0;
+  await assert.rejects(adapter(extra).dispatch(q));
+  assert.throws(() => SDK.validateRequest(request(op, { command: 'object.layer.key.blank', layerUid: 'active', cell: 2, layerUids: ['other'] })), TypeError);
+  assert.throws(() => SDK.validateRequest(request(op, { command: 'object.layer.key.blank', layerUid: 'x'.repeat(4096), cell: 2 })), /4096/);
 });

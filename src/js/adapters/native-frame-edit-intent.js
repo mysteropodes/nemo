@@ -86,7 +86,7 @@
     function cellRefs() { return state.cells.map(function (cell) { return { layerUid: uid(cell.layer), frame: cell.frame }; }); }
     if (PACKET[intent.kind]) return { code: CODES.packet };
     switch (intent.kind) {
-      case 'insertBlankKey': return { code: CODES.blankKey };
+      case 'insertBlankKey': return { op: P + 'layer.key.blank', payload: { command: 'object.layer.key.blank', layerUid: uid(state.active), cell: state.frame } };
       case 'insertFrame': return { op: P + 'frames.insert', payload: selected('object.frames.insert', { cell: state.frame }) };
       case 'insertKey': return { op: P + 'layer.key.promote', payload: selected('object.layer.key.promote', { cells: [state.frame] }) };
       case 'insertKeyAt':
@@ -176,7 +176,6 @@
         if (!intent) return unavailable(CODES.invalid);
         // Kinds native has no operation for answer before any session or selection is consulted.
         if (PACKET[intent.kind]) return unavailable(CODES.packet);
-        if (intent.kind === 'insertBlankKey') return unavailable(CODES.blankKey);
         session = ports.currentSession(); before = session && session.info();
         if (!session || !before || !Array.isArray(before.layers) || !whole(before.totalFrames, 1, 4294967295) ||
             ports.available(session, before) !== true || typeof session.readPresentedObjectSession !== 'function') return unavailable(CODES.session);
@@ -199,6 +198,7 @@
         try { Contract.result(step.op, result); } catch (_) { return Object.freeze({ status: 'unconfirmed' }); }
         if (!receipt || receipt.apiVersion !== 2 || receipt.ok !== true || receipt.instanceId !== before.instanceId || receipt.documentId !== before.documentId ||
             !result || typeof result.applied !== 'boolean' || result.historyEntriesAdded !== (result.applied ? 1 : 0) ||
+            (step.op === P + 'layer.key.blank' && result.applied !== true) ||
             receipt.contentRevision !== before.contentRevision + (result.applied ? 1 : 0)) return Object.freeze({ status: 'unconfirmed' });
         applied = result.applied;
         if (retired || ports.currentSession() !== session) return Object.freeze({ status: 'applied-unconfirmed', applied: applied });

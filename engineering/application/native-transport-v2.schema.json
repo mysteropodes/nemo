@@ -3164,6 +3164,26 @@
         }
       }
     },
+    "ObjectLayerKeyBlankPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "layerUid",
+        "cell"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.layer.key.blank"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "cell": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
     "ObjectLayerKeyClearPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -4587,6 +4607,23 @@
                 },
                 "payload": {
                   "$ref": "#/$defs/ObjectLayerKeyPromotePayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.layer.key.blank"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectLayerKeyBlankPayload"
                 }
               }
             }

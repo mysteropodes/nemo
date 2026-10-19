@@ -18,6 +18,7 @@
     'command.document.object.frames.duplicate': 'object.frames.duplicate',
     'command.document.object.frames.remove': 'object.frames.remove',
     'command.document.object.layer.key.promote': 'object.layer.key.promote',
+    'command.document.object.layer.key.blank': 'object.layer.key.blank',
     'command.document.object.layer.key.clear': 'object.layer.key.clear',
     'command.document.object.layer.key.clear_cells': 'object.layer.key.clear_cells',
     'command.document.object.layer.tween.remove': 'object.layer.tween.remove',
@@ -87,6 +88,9 @@
       list(p.cells, 'cells', function (item) { u32(item, 'cell'); });
       if (has(p, 'layerUids')) layerList(p.layerUids, 'layerUids');
     },
+    'object.layer.key.blank': function (p) {
+      exact(p, ['command', 'layerUid', 'cell'], [], 'key blank'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
+    },
     'object.layer.key.clear': function (p) {
       exact(p, ['command', 'layerUid', 'cell'], [], 'key clear'); uid(p.layerUid, 'layerUid'); u32(p.cell, 'cell');
     },
@@ -117,6 +121,7 @@
     'object.frames.duplicate': function () { return { command: 'object.frames.duplicate', layerUid: 'layer-a', cell: 3 }; },
     'object.frames.remove': function () { return { command: 'object.frames.remove', from: 3, to: 3 }; },
     'object.layer.key.promote': function () { return { command: 'object.layer.key.promote', cells: [3] }; },
+    'object.layer.key.blank': function () { return { command: 'object.layer.key.blank', layerUid: 'layer-a', cell: 3 }; },
     'object.layer.key.clear': function () { return { command: 'object.layer.key.clear', layerUid: 'layer-a', cell: 3 }; },
     'object.layer.key.clear_cells': function () {
       return { command: 'object.layer.key.clear_cells', targets: [{ layerUid: 'layer-a', frame: 3 }] };
@@ -153,6 +158,8 @@
     var repeat = operation === PREFIX + 'frames.repeat';
     exact(value, ['applied', 'historyEntriesAdded'].concat(repeat ? ['cycledLayers', 'skippedComponentLayers'] : []), [], 'frame edit result');
     if (repeat) { u32(value.cycledLayers, 'cycledLayers'); u32(value.skippedComponentLayers, 'skippedComponentLayers'); }
+    // F7 preserves the unconditional baseline checkpoint, including an already blank key.
+    if (operation === PREFIX + 'layer.key.blank' && value.applied !== true) fail('blank key must add one history entry');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) {
       fail('invalid frame edit disposition');
     }

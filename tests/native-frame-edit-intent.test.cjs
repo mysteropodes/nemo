@@ -194,6 +194,7 @@ test('literal requests for every dense-editor action', async () => {
     [{ kind: 'insertFrame' }, P + 'frames.insert', { command: 'object.frames.insert', cell: 2 }],
     [{ kind: 'insertKey' }, P + 'layer.key.promote', { command: 'object.layer.key.promote', cells: [2] }],
     [{ kind: 'insertKeyAt', layer: 1, frame: 6 }, P + 'layer.key.promote', { command: 'object.layer.key.promote', layerUids: ['layer-uid-1'], cells: [6] }],
+    [{ kind: 'insertBlankKey' }, P + 'layer.key.blank', { command: 'object.layer.key.blank', layerUid: 'layer-uid-1', cell: 2 }],
     [{ kind: 'duplicateKey' }, P + 'frames.duplicate', { command: 'object.frames.duplicate', layerUid: 'layer-uid-1', cell: 2 }],
     [{ kind: 'extendExposure' }, P + 'frames.extend', { command: 'object.frames.extend', cell: 2, count: 1 }],
     [{ kind: 'extendExposure', count: 0 }, P + 'frames.extend', { command: 'object.frames.extend', cell: 2, count: 1 }],
@@ -235,7 +236,7 @@ test('every request the adapter emits is accepted by the shared application clie
       emitted++;
     } else assert.equal(out.status, 'unavailable', kind);
   }
-  assert.equal(emitted, 14, 'fourteen actions reach a write; copy, cut, paste and F7 do not');
+  assert.equal(emitted, 15, 'fifteen actions reach a write; only copy, cut and paste do not');
 });
 
 test('statuses: applied, unchanged, unconfirmed and applied-unconfirmed are decided from the receipt and the published state', async () => {
@@ -306,7 +307,7 @@ test('actions native has no operation for report typed unavailability before any
     layerSelection() { throw new Error('no'); }, cellSelection() { throw new Error('no'); }, available() { throw new Error('no'); } };
   const intent = Intent.create(hostile);
   for (const kind of ['copyFrames', 'cutFrames', 'pasteFrames']) assert.deepEqual({ ...await intent.run({ kind }) }, { status: 'unavailable', code: 'frame_edit_packet_unavailable' });
-  assert.deepEqual({ ...await intent.run({ kind: 'insertBlankKey' }) }, { status: 'unavailable', code: 'frame_edit_blank_key_unavailable' });
+  assert.deepEqual({ ...await intent.run({ kind: 'insertBlankKey' }) }, { status: 'unavailable', code: 'frame_edit_session_unavailable' }, 'F7 now requires a real presented session');
   // The shared client really declares none of them, so no later wiring can reach a write by accident.
   for (const operation of [P + 'frames.clipboard.paste', P + 'frames.clipboard.cut', P + 'frames.clipboard.copy', P + 'layer.key.insert_blank']) {
     assert.throws(() => SDK.validateRequest({ apiVersion: 2, requestId: 'req-1', instanceId: 'instance-A', documentId: 'document-A', expectedRevision: 1, operation, payload: { command: 'x' } }), /not admitted/);
@@ -376,4 +377,44 @@ test('repeat intent exposes only native confirmed cycle/skip counts and does not
     const r=rig({cells:selected,write:(s,op,p,receipt)=>{s.rev++;const value=receipt(true,op);mutate(value);return value;}});
     assert.deepEqual(await r.intent.run({kind:'repeatSelection',times:2}),{status:'unconfirmed'});
   }
+});
+
+
+test('F7 targets only the current active UID/frame and checkpoints repeatedly without a playhead hint', async () => {
+  const r = rig({ active: 1, frame: 3, layerSel: [2, 0], cells: [{ layer: 0, frame: 7 }] });
+  for (let revision = 7; revision < 9; revision++) {
+    assert.deepEqual({ ...await r.intent.run({ kind: 'insertBlankKey' }) }, { status: 'applied-presented', applied: true });
+    assert.deepEqual(r.s.writes.at(-1).payload, { command: 'object.layer.key.blank', layerUid: 'layer-uid-1', cell: 3 });
+    assert.equal(r.s.writes.at(-1).op, P + 'layer.key.blank');
+    assert.equal(r.s.writes.at(-1).expected.contentRevision, revision);
+  }
+  assert.equal(r.s.rev, 9); assert.equal(r.s.total, 10); assert.equal(r.s.frame, 3);
+  assert.deepEqual(r.s.layerSel, [2, 0]); assert.deepEqual(r.s.cells, [{ layer: 0, frame: 7 }]);
+});
+
+test('F7 preserves missing declaration/session, stale, refusal, busy and unconfirmed dispositions', async () => {
+  for (const options of [{ noSession: true }, { noWrite: true }, { unavailable: true }]) {
+    const r = rig(options);
+    assert.equal((await r.intent.run({ kind: 'insertBlankKey' })).code, 'frame_edit_session_unavailable');
+    assert.equal(r.s.writes.length, 0);
+  }
+  const absent = rig({ application: { validateRequest() { throw new TypeError('not admitted'); } } });
+  assert.equal((await absent.intent.run({ kind: 'insertBlankKey' })).code, 'frame_edit_declaration_missing');
+  assert.equal(absent.s.writes.length, 0);
+  for (const [message, expected] of [['Native frame edit intent is stale', { status: 'unavailable', code: 'frame_edit_stale_intent' }],
+    ['Native command refused: unavailable', { status: 'refused', code: 'unavailable' }], ['IPC lost', { status: 'unconfirmed' }]]) {
+    const r = rig({ write() { throw new Error(message); } });
+    assert.deepEqual({ ...await r.intent.run({ kind: 'insertBlankKey' }) }, expected);
+    assert.equal(r.s.writes.length, 1);
+  }
+  const noop = rig({ write: (s, op, p, receipt) => receipt(false, op) });
+  assert.deepEqual({ ...await noop.intent.run({ kind: 'insertBlankKey' }) }, { status: 'unconfirmed' });
+  assert.equal(noop.s.writes.length, 1); assert.equal(noop.s.rev, 7); assert.equal(noop.s.total, 10);
+  assert.equal(noop.s.frame, 2); assert.equal(noop.intent.isPending(), false);
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  const held = rig({ write: async (s, op, p, receipt) => { await gate; s.rev++; return receipt(true, op); } });
+  const first = held.intent.run({ kind: 'insertBlankKey' });
+  assert.deepEqual({ ...await held.intent.run({ kind: 'insertBlankKey' }) }, { status: 'busy' });
+  assert.equal(held.s.writes.length, 1); release();
+  assert.equal((await first).status, 'applied-presented'); assert.equal(held.s.rev, 8);
 });

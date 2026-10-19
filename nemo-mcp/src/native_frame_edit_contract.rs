@@ -1,6 +1,6 @@
 //! L05-K public contract of the native frame-edit operations (F09-F13): closed request shapes and the one compact
 //! result, with Repeat-only cycle/skip counts. Storage, history, locks and receipts stay in the native owner; every shape mirrors the strict payload
-//! parser of the owner of that operation (structure, key, retime, selection duplicate, repeat). Cut, copy and paste
+//! parser of the owner of that operation (structure, key, retime, selection duplicate, repeat). F7 always publishes one checkpoint. Cut, copy and paste
 //! have no declaration here: a clipboard packet is produced by the typed native API only.
 use crate::native_contract::{exact, frame, object};
 use serde_json::{Map, Value};
@@ -11,18 +11,20 @@ pub(crate) const EXTEND: &str = "command.document.object.frames.extend";
 pub(crate) const DUPLICATE: &str = "command.document.object.frames.duplicate";
 pub(crate) const REMOVE: &str = "command.document.object.frames.remove";
 pub(crate) const KEY_PROMOTE: &str = "command.document.object.layer.key.promote";
+pub(crate) const KEY_BLANK: &str = "command.document.object.layer.key.blank";
 pub(crate) const KEY_CLEAR: &str = "command.document.object.layer.key.clear";
 pub(crate) const KEY_CLEAR_CELLS: &str = "command.document.object.layer.key.clear_cells";
 pub(crate) const TWEEN_REMOVE: &str = "command.document.object.layer.tween.remove";
 pub(crate) const KEY_MOVE: &str = "command.document.object.layer.key.move";
 pub(crate) const SELECTION_DUPLICATE: &str = "command.document.object.frames.clipboard.duplicate";
 pub(crate) const REPEAT: &str = "command.document.object.frames.repeat";
-const OPERATIONS: [&str; 11] = [
+const OPERATIONS: [&str; 12] = [
     INSERT,
     EXTEND,
     DUPLICATE,
     REMOVE,
     KEY_PROMOTE,
+    KEY_BLANK,
     KEY_CLEAR,
     KEY_CLEAR_CELLS,
     TWEEN_REMOVE,
@@ -115,6 +117,11 @@ pub(super) fn request(operation: &str, value: &Value) -> bool {
                 && unique_frames(p.get("cells"))
                 && p.get("layerUids").is_none_or(|v| unique_names(Some(v)))
         }),
+        KEY_BLANK => exact(value, &["command", "layerUid", "cell"], &[]).is_some_and(|p| {
+            command_is(p, "object.layer.key.blank")
+                && name(p.get("layerUid"))
+                && frame(p.get("cell")).is_some()
+        }),
         KEY_CLEAR => exact(value, &["command", "layerUid", "cell"], &[]).is_some_and(|p| {
             command_is(p, "object.layer.key.clear")
                 && name(p.get("layerUid"))
@@ -163,6 +170,9 @@ pub(super) fn result(value: &Value) -> bool {
 }
 /// Repeat alone exposes native cycle/skip counts; no other operation accepts them.
 pub(crate) fn result_for_operation(operation: &str, value: &Value) -> bool {
+    if operation == KEY_BLANK {
+        return result(value) && value["applied"] == true;
+    }
     if operation != REPEAT {
         return declares(operation) && result(value);
     }

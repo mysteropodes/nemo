@@ -15,6 +15,7 @@
     "command.document.object.frames.duplicate",
     "command.document.object.frames.remove",
     "command.document.object.layer.key.promote",
+    "command.document.object.layer.key.blank",
     "command.document.object.layer.key.clear",
     "command.document.object.layer.key.clear_cells",
     "command.document.object.layer.tween.remove",
@@ -38,6 +39,9 @@
       },
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyPromotePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyBlankPayload"
       },
       {
         "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerKeyClearPayload"
@@ -69,7 +73,7 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated retained frame-edit receipt or typed refusal; no document, packet or resource payload. Lists are bounded by the 4096-byte request."
   },
-  "semantics": "Eleven frame, key and exposure edits of the dense editor (F5/F6, extend, duplicate key, remove frame(s), clear key, delete frames, remove tween, move key, duplicate selection, repeat selection). Each is prepared against the retained snapshot and published through the shared revision, history and request-receipt owner: one changed operation adds one revision and one undo entry; a semantic no-op adds neither and keeps redo; a locked layer is skipped or refused exactly as the baseline does. Frame numbers are zero-based u32 cells; layers are named by their opaque stable layerUid. The result is the compact receipt only; cut, copy and paste are not declared because a clipboard packet is produced by the typed native API. F7 blank key is not declared. No JS/Paper writer, optimistic mutation or fallback. Repeat alone returns native cycledLayers and skippedComponentLayers, including unchanged cycles; an applied global timeline growth may have zero cycled layers. The UI consumes confirmed counts rather than inferring them from selection or applied.",
+  "semantics": "Twelve frame, key and exposure edits of the dense editor (F5/F6/F7, extend, duplicate key, remove frame(s), clear key, delete frames, remove tween, move key, duplicate selection, repeat selection). Each is prepared against the retained snapshot and published through the shared revision, history and request-receipt owner: one changed operation adds one revision and one undo entry; a semantic no-op adds neither and keeps redo, except F7 deliberately adds one revision and undo checkpoint for every successful blank key including already blank; a locked layer is skipped or refused exactly as the baseline does. Frame numbers are zero-based u32 cells; layers are named by their opaque stable layerUid. The result is the compact receipt only; cut, copy and paste are not declared because a clipboard packet is produced by the typed native API. F7 targets only the active layer; locked ordinary layers refuse, component outer keys may be blanked even when locked. Preserved-holder and nested-context cases may remain unavailable and are not full desktop acceptance. No JS/Paper writer, optimistic mutation or fallback. Repeat alone returns native cycledLayers and skippedComponentLayers, including unchanged cycles; an applied global timeline growth may have zero cycled layers. The UI consumes confirmed counts rather than inferring them from selection or applied.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -221,6 +225,34 @@
       "response": {
         "apiVersion": 2,
         "requestId": "layer-key-promote-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "F7 blank key: active layer only, one undo checkpoint even for an already blank key; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-key-blank-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.key.blank",
+        "payload": {
+          "command": "object.layer.key.blank",
+          "layerUid": "layer-a",
+          "cell": 3
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-key-blank-7",
         "instanceId": "instance-A",
         "documentId": "document-A",
         "contentRevision": 8,

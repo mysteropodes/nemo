@@ -137,3 +137,30 @@ test('the shared client loads in a bare vm context without the contract and keep
   vm.runInContext(source('native-application.js'), classic, { filename: 'native-application.js' });
   for (const op of OPS) assert.doesNotThrow(() => classic.NemoNativeApplicationAdapter.validateRequest(request(classic, op)), op);
 });
+
+
+test('F7 real Project/SDK chain uses active UID, one ACK/inspect/presentation per checkpoint, including repeated blank', async () => {
+  const h = scenario(); await h.open();
+  h.ui.layerSel = [2, 0]; h.ui.cells = [{ layer: 0, frame: 3 }];
+  for (let revision = 0; revision < 2; revision++) {
+    assert.deepEqual({ ...await h.intent.run({ kind: 'insertBlankKey' }) }, { status: 'applied-presented', applied: true });
+    const { r } = h.commands().at(-1);
+    assert.equal(r.operation, P + 'layer.key.blank'); assert.equal(r.expectedRevision, revision);
+    assert.deepEqual(r.payload, { command: 'object.layer.key.blank', layerUid: 'layer-beta', cell: 5 });
+    assert.equal(h.session.info().contentRevision, revision + 1);
+    assert.equal(h.session.info().undoDepth, revision + 1, 'modeled native metadata, not a real undo execution');
+    assert.equal(h.session.readPresentedObjectSession().contentRevision, revision + 1);
+    assert.equal(h.calls.at(-1).command, 'nemo_native_object_preview');
+  }
+  assert.equal(h.commands().length, 2); assert.equal(h.ui.frame, 5); assert.equal(h.session.info().totalFrames, 21);
+  assert.deepEqual(h.ui.layerSel, [2, 0]); assert.deepEqual(h.ui.cells, [{ layer: 0, frame: 3 }]);
+  const bare = scenario({ noClient: true }); await bare.open();
+  assert.equal((await bare.intent.run({ kind: 'insertBlankKey' })).code, 'frame_edit_session_unavailable');
+  assert.equal(bare.commands().length, 0);
+  const stale = scenario({ failure: 'stale' }); await stale.open();
+  assert.deepEqual({ ...await stale.intent.run({ kind: 'insertBlankKey' }) }, { status: 'refused', code: 'stale_revision' });
+  assert.equal(stale.session.info().contentRevision, 0);
+  const noop = scenario({ failure: 'noop' }); await noop.open();
+  assert.equal((await noop.intent.run({ kind: 'insertBlankKey' })).status, 'unconfirmed');
+  assert.equal(noop.session.info().contentRevision, 0);
+});
