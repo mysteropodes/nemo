@@ -1,9 +1,9 @@
 //! Real admitted records -> native read providers -> guest -> owner pin.
 //! No test supplies a sampler, context port or lookup response.
 use super::*;
-use crate::object_document::{Presence, PropertyHolderTarget};
+use crate::object_document::{Presence, ProjectEnvelope, ProjectMetadata, PropertyHolderTarget};
 use crate::object_expression_pin::{prepare_property_expression_request, PropertyEvaluation};
-use serde_json::{json, Value};
+use serde_json::json;
 
 fn target() -> PropertyHolderTarget {
     PropertyHolderTarget {
@@ -38,10 +38,14 @@ fn owner(code: &str) -> NativeObjectHistory {
             {"property":"position","static":[8,9]}, {"property":"opacity","static":[70]},
             {"property":"rotation","track":{"keys":[{"frame":0,"v":[0]},{"frame":10,"v":[100]}]}}]
     }));
-    let envelope = json!({"format":"nemo.native-project-document","formatVersion":1,
-        "project":{"canvasW":320,"canvasH":180,"fps":25.0},"drawing":drawing,"viewportReference":null,"assets":[]});
-    NativeObjectHistory::from_project_file("provider-test", &serde_json::to_vec(&envelope).unwrap())
-        .unwrap()
+    let drawing =
+        crate::object_codec::decode_ordered_project(&serde_json::to_vec(&drawing).unwrap())
+            .unwrap();
+    let envelope = ProjectEnvelope::no_media(
+        ProjectMetadata::new(320, 180, 25.).unwrap(),
+        drawing.into_storage(),
+    );
+    NativeObjectHistory::from_admitted_project("provider-test", envelope).unwrap()
 }
 fn limits() -> ExpressionLimits {
     ExpressionLimits::new(4096, 8_388_608, 262_144, 32).unwrap()
@@ -49,17 +53,19 @@ fn limits() -> ExpressionLimits {
 fn run(code: &str) -> PropertyEvaluation {
     let owner = owner(code);
     let snapshot = owner.acquire_snapshot(0).unwrap();
-    let before = owner
-        .serialize_project_file(0, snapshot.snapshot_id())
-        .unwrap();
+    let before = crate::object_codec::encode_storage_project(snapshot.document()).unwrap();
+    let project = snapshot.project().cloned();
     let result =
         evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
             .unwrap();
     assert_eq!(
-        owner
-            .serialize_project_file(0, snapshot.snapshot_id())
+        crate::object_codec::encode_storage_project(owner.acquire_snapshot(0).unwrap().document())
             .unwrap(),
         before
+    );
+    assert_eq!(
+        owner.acquire_snapshot(0).unwrap().project().cloned(),
+        project
     );
     assert_eq!(owner.history_depths(), (0, 0));
     result
@@ -124,16 +130,14 @@ fn lookup_uses_the_real_authored_key_track_and_fps() {
         .find(|p| p["property"] == "opacity")
         .unwrap();
     p["track"] = json!({"keys":[{"frame":2,"v":[20]},{"frame":12,"v":[80]}]});
-    let mut project: Value = serde_json::from_slice(
-        &seed
-            .serialize_project_file(0, snapshot.snapshot_id())
-            .unwrap(),
-    )
-    .unwrap();
-    project["drawing"] = drawing;
-    let owner =
-        NativeObjectHistory::from_project_file("keys", &serde_json::to_vec(&project).unwrap())
+    let drawing =
+        crate::object_codec::decode_ordered_project(&serde_json::to_vec(&drawing).unwrap())
             .unwrap();
+    let project = snapshot
+        .project()
+        .unwrap()
+        .with_drawing(drawing.into_storage());
+    let owner = NativeObjectHistory::from_admitted_project("keys", project).unwrap();
     let snapshot = owner.acquire_snapshot(0).unwrap();
     let result =
         evaluate_property_for_owner(&owner, &snapshot, &target(), "opacity", 5., 0, limits())
