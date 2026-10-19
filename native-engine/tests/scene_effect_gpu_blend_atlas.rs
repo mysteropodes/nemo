@@ -161,7 +161,7 @@ fn gpu_max_native_reference_atlas_then_layered_colors_retire_without_missing_pix
         let mut encoder = png::Encoder::new(&mut encoded, 8192, 8192);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
-        encoder.set_compression(png::Compression::Fastest);
+        encoder.set_compression(png::Compression::Balanced);
         encoder.set_filter(png::Filter::NoFilter);
         let mut writer = encoder.write_header().unwrap();
         let mut stream = writer.stream_writer().unwrap();

@@ -107,10 +107,16 @@ fn real_v1_explicit_migration_metal_pixels_equal_existing_unparented_scene() {
 #[test]
 fn real_parented_text_and_raster_metal_viewport_export_and_original_h_oracle() {
     let mut doc = drawing();
-    // Keep the raster probes outside every glyph: the original image location
-    // would overlap the translated H crossbar and could hide a raster-join failure.
-    doc["items"]["raster"][0]["item"]["x"] = json!(240);
-    doc["items"]["raster"][0]["item"]["y"] = json!(130);
+    // Persisted raster x/y are the centre (original serR). For the original
+    // 2x2 PNG, centre(241,131) places its display top-left at(240,130),
+    // outside every glyph; the parent's(40,0) then puts its first texel at(280,130).
+    doc["items"]["raster"][0]["item"]["x"] = json!(241);
+    doc["items"]["raster"][0]["item"]["y"] = json!(131);
+    let raw_raster = &doc["items"]["raster"][0]["item"];
+    assert_eq!(raw_raster["x"], 241);
+    assert_eq!(raw_raster["y"], 131);
+    assert_eq!(raw_raster["width"], 2);
+    assert_eq!(raw_raster["height"], 2);
     let case: Value = include_str!("fixtures/text-glyph-source/oracle.txt")
         .lines()
         .filter_map(|l| l.strip_prefix("CASE "))
