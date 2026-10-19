@@ -29,11 +29,23 @@
   "profileModulesNote": "The seventeen profile modules under sourceDir include the private, default-off O1 Play observer. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
   "layerRules": {
     "desktop-shell": {
-      "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-seam", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
+      "allowedLayers": [
+        "desktop-shell",
+        "mcp-adapter",
+        "bootstrap",
+        "command-adapter",
+        "host-seam",
+        "host-contract",
+        "host-ports",
+        "viewport-owner",
+        "viewport-adapter"
+      ],
       "meaning": "lib.rs/main.rs (shell), media_probe.rs/vectorize.rs/video_decode.rs (media), task_runtime.rs (tasks) and the default-off test_play_observer.rs may depend on each other and declare the dormant host modules, never directly on tests"
     },
     "mcp-adapter": {
-      "allowedLayers": ["host-seam"],
+      "allowedLayers": [
+        "host-seam"
+      ],
       "meaning": "application_mcp.rs owns transport and may depend on the shared boxed native-dispatch seam, but not on bootstrap or sibling presentation/resource adapters"
     },
     "viewport-adapter": {
@@ -45,19 +57,35 @@
       "meaning": "native_application_ports.rs owns concrete resource, artifact and shared-compositor ports without reaching host orchestration"
     },
     "host-contract": {
-      "allowedLayers": ["host-ports"],
+      "allowedLayers": [
+        "host-ports"
+      ],
       "meaning": "native_application_contract.rs validates versioned requests and admitted resources through the concrete resource resolver without reaching transport, bootstrap or presentation owners"
     },
     "viewport-owner": {
-      "allowedLayers": ["host-contract", "viewport-adapter"],
+      "allowedLayers": [
+        "host-contract",
+        "viewport-adapter"
+      ],
       "meaning": "native_application_viewport.rs retains the main-thread viewport and uses only the strict host contract plus platform viewport adapter"
     },
     "bootstrap": {
-      "allowedLayers": ["host-contract", "host-ports", "host-seam"],
+      "allowedLayers": [
+        "host-contract",
+        "host-ports",
+        "host-seam"
+      ],
       "meaning": "native_application.rs and native_application_release.rs own the dormant application core and terminal release lifecycle through the strict contract, concrete ports and shared dispatch seam; command and presentation concerns live in their own modules"
     },
     "command-adapter": {
-      "allowedLayers": ["mcp-adapter", "bootstrap", "host-contract", "host-ports", "viewport-owner", "host-seam"],
+      "allowedLayers": [
+        "mcp-adapter",
+        "bootstrap",
+        "host-contract",
+        "host-ports",
+        "viewport-owner",
+        "host-seam"
+      ],
       "meaning": "native_application_commands.rs is the dormant Tauri command surface and composes existing owners without becoming another state authority"
     },
     "host-seam": {
@@ -65,11 +93,28 @@
       "meaning": "native_dispatch.rs owns the shared boxed application seam and export pump. It is depended on by owners, but does not reach back into the MCP adapter, application bootstrap or viewport."
     },
     "host-release-tests": {
-      "allowedLayers": ["bootstrap", "host-contract", "host-seam", "mcp-adapter", "command-adapter", "viewport-owner", "host-ports"],
+      "allowedLayers": [
+        "bootstrap",
+        "host-contract",
+        "host-seam",
+        "mcp-adapter",
+        "command-adapter",
+        "viewport-owner",
+        "host-ports"
+      ],
       "meaning": "Private host lifecycle tests reach the application owner, strict host contract, boxed dispatch seam and production typed installation adapter. Raw-bootstrap controls reach the command owner; desktop-preview tests reach the original viewport owner. N25F3D3C2B/#1832 export controls alone pass the real DesktopArtifactPort through the original host seam. Production layer permissions are unchanged."
     },
     "tests": {
-      "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
+      "allowedLayers": [
+        "desktop-shell",
+        "mcp-adapter",
+        "bootstrap",
+        "command-adapter",
+        "host-contract",
+        "host-ports",
+        "viewport-owner",
+        "viewport-adapter"
+      ],
       "meaning": "Focused tests may reach their declared owners but not the shared host-seam directly: task-runtime, MCP, application and concrete-port tests each name the production module they exercise"
     }
   },
@@ -126,7 +171,11 @@
     "items": []
   },
   "features": {
-    "declared": ["test-play-publication-observer", "test-object-window-probe", "test-p38-fixture-open-probe"],
+    "declared": [
+      "test-play-publication-observer",
+      "test-object-window-probe",
+      "test-p38-fixture-open-probe"
+    ],
     "declaredNote": "O1/#1708, N25F3D3B2D2A/#1834 and P38/#1858 declare three separate default-off, private test-package features in src-tauri/Cargo.toml. Normal desktop builds expose none of these probes. The Linux target cfg selects the correct no-follow open flag for the private P38 fixture bridge; all other cfg predicates remain unchanged.",
     "allowedCfgs": [
       "test",
@@ -138,7 +187,13 @@
   },
   "externalCratePorts": {
     "nemo_mcp": {
-      "allowedModules": ["rust.desktop.mcp.adapter", "rust.desktop.native.application.contract", "rust.desktop.native.application.commands", "rust.desktop.native.application.tests", "rust.desktop.native.host.release.tests"],
+      "allowedModules": [
+        "rust.desktop.mcp.adapter",
+        "rust.desktop.native.application.contract",
+        "rust.desktop.native.application.commands",
+        "rust.desktop.native.application.tests",
+        "rust.desktop.native.host.release.tests"
+      ],
       "items": [
         "BUILD_SOURCE_ID",
         "contract::ApplicationRequest",
@@ -303,98 +358,103 @@
           "desktop_viewport::ViewportMapping",
           "export_job::JobStatus"
         ],
-    "rust.desktop.native.host.release.tests": [
-      "application::ApplicationReleaseReceipt",
-      "codec::decode_project",
-      "commands::NativeOpacityApplication",
-      "commands::OpacityRequest",
-      "commands::ResponseEnvelope",
-      "compositor::Compositor",
-      "desktop_viewport::AcquiredSurfaceFrame",
-      "desktop_viewport::CssBounds",
-      "desktop_viewport::DesktopViewportHost",
-      "desktop_viewport::PhysicalExtent",
-      "desktop_viewport::PresentationReceipt",
-      "desktop_viewport::SettledSurfaceFrame",
-      "desktop_viewport::SurfaceAttempt",
-      "desktop_viewport::SurfacePort",
-      "desktop_viewport::SurfacePresentation",
-      "desktop_viewport::SurfaceRecoveryError",
-      "desktop_viewport::ViewportMapping",
-      "desktop_viewport::ViewportStatus",
-      "document::OpacityDocument",
-      "export_job::CleanupStatus",
-      "export_job::ExportArtifact",
-      "export_job::ExportReleaseReconciliation",
-      "export_job::ExternalEffectDisposition",
-      "export_job::JobReceipt",
-      "export_job::JobStatus",
-      "export_job::PendingFrame",
-      "export_job::ReconciliationStage",
-      "export_job::StagedArtifactPort",
-      "history::PreparedProjectReplacement",
-      "object_codec::decode_project",
-      "object_codec::decode_storage_project",
-      "object_document::FrameScopeKind",
-      "object_frame_packet::ObjectFrameSelector",
-      "object_snapshot::ObjectSnapshot",
-      "render_scene::ScheduledFrameIdentity",
-      "resource_leases::WorkId",
-      "scheduler::OutputSpec"
-    ],
-    "rust.desktop.native.dispatch": [
-      "application::ApplicationReleaseReceipt",
-      "application::ExportResourceResolver",
-      "application::NativeApplication",
-      "commands::OpacityRequest",
-      "commands::ResponseEnvelope",
-      "compositor::Compositor",
-      "desktop_viewport::DesktopViewportHost",
-      "desktop_viewport::ObjectViewportFrame",
-      "desktop_viewport::PresentationReceipt",
-      "desktop_viewport::SurfacePort",
-      "desktop_viewport::ViewportStatus",
-      "document::OpacityDocument",
-      "export_job::CleanupStatus",
-      "export_job::ExportCompositor",
-      "export_job::ExportReleaseReconciliation",
-      "export_job::ExternalEffectDisposition",
-      "export_job::JobReceipt",
-      "export_job::JobStatus",
-      "export_job::ObjectHostExportOutcome",
-      "export_job::ObjectHostExportRequest",
-      "export_job::PendingFrame",
-      "export_job::ReconciliationStage",
-      "export_job::StagedArtifactPort",
-      "export_job::export_object_frames",
-      "export_job::export_object_svg_frames",
-      "history::InactiveProject",
-      "history::NativeObjectHistory",
-      "history::PreparedProjectReplacement",
-      "object_document::ObjectDocument",
-      "object_frame_packet::ObjectFrameSelector",
-      "object_frame_packet::prepare_object_exposure_frame",
-      "object_render_scene::prepare_object_paint_plan",
-      "object_render_scene::ObjectPaintPlan",
-      "object_render_scene::prepare_object_composition",
-      "object_render_scene::prepare_object_render_scene",
-      "object_render_scene::prepare_object_viewport_composition",
-      "object_render_scene::prepare_scheduled_object_composition_from_witness",
-      "object_render_scene::ObjectCompositionWitness",
-      "object_snapshot::ObjectSnapshot",
-      "resource_leases::WorkId",
-      "scheduler::EvaluationKey",
-      "scheduler::FrameScheduler",
-      "scheduler::ObjectSchedulePins",
-      "scheduler::ObjectScheduleScope",
-      "scheduler::OutputSpec",
-      "scheduler::ScheduledFrame"
-    ]
+        "rust.desktop.native.host.release.tests": [
+          "application::ApplicationReleaseReceipt",
+          "codec::decode_project",
+          "commands::NativeOpacityApplication",
+          "commands::OpacityRequest",
+          "commands::ResponseEnvelope",
+          "compositor::Compositor",
+          "desktop_viewport::AcquiredSurfaceFrame",
+          "desktop_viewport::CssBounds",
+          "desktop_viewport::DesktopViewportHost",
+          "desktop_viewport::PhysicalExtent",
+          "desktop_viewport::PresentationReceipt",
+          "desktop_viewport::SettledSurfaceFrame",
+          "desktop_viewport::SurfaceAttempt",
+          "desktop_viewport::SurfacePort",
+          "desktop_viewport::SurfacePresentation",
+          "desktop_viewport::SurfaceRecoveryError",
+          "desktop_viewport::ViewportMapping",
+          "desktop_viewport::ViewportStatus",
+          "document::OpacityDocument",
+          "export_job::CleanupStatus",
+          "export_job::ExportArtifact",
+          "export_job::ExportReleaseReconciliation",
+          "export_job::ExternalEffectDisposition",
+          "export_job::JobReceipt",
+          "export_job::JobStatus",
+          "export_job::PendingFrame",
+          "export_job::ReconciliationStage",
+          "export_job::StagedArtifactPort",
+          "history::PreparedProjectReplacement",
+          "object_codec::decode_project",
+          "object_codec::decode_storage_project",
+          "object_document::FrameScopeKind",
+          "object_frame_packet::ObjectFrameSelector",
+          "object_snapshot::ObjectSnapshot",
+          "render_scene::ScheduledFrameIdentity",
+          "resource_leases::WorkId",
+          "scheduler::OutputSpec"
+        ],
+        "rust.desktop.native.dispatch": [
+          "application::ApplicationReleaseReceipt",
+          "application::ExportResourceResolver",
+          "application::NativeApplication",
+          "commands::DispatchErrorCode",
+          "commands::OpacityRequest",
+          "commands::ResponseEnvelope",
+          "compositor::Compositor",
+          "desktop_viewport::DesktopViewportHost",
+          "desktop_viewport::ObjectViewportFrame",
+          "desktop_viewport::PresentationReceipt",
+          "desktop_viewport::SurfacePort",
+          "desktop_viewport::ViewportStatus",
+          "document::OpacityDocument",
+          "export_job::CleanupStatus",
+          "export_job::ExportCompositor",
+          "export_job::ExportReleaseReconciliation",
+          "export_job::ExternalEffectDisposition",
+          "export_job::JobReceipt",
+          "export_job::JobStatus",
+          "export_job::ObjectHostExportOutcome",
+          "export_job::ObjectHostExportRequest",
+          "export_job::PendingFrame",
+          "export_job::ReconciliationStage",
+          "export_job::StagedArtifactPort",
+          "export_job::export_object_frames",
+          "export_job::export_object_svg_frames",
+          "history::InactiveProject",
+          "history::NativeObjectHistory",
+          "history::PreparedProjectReplacement",
+          "object_document::ObjectDocument",
+          "object_frame_packet::ObjectFrameSelector",
+          "object_frame_packet::prepare_object_exposure_frame",
+          "object_render_scene::prepare_object_paint_plan",
+          "object_render_scene::ObjectPaintPlan",
+          "object_render_scene::prepare_object_composition",
+          "object_render_scene::prepare_object_render_scene",
+          "object_render_scene::prepare_object_viewport_composition",
+          "object_render_scene::prepare_scheduled_object_composition_from_witness",
+          "object_render_scene::ObjectCompositionWitness",
+          "object_snapshot::ObjectSnapshot",
+          "resource_leases::WorkId",
+          "scheduler::EvaluationKey",
+          "scheduler::FrameScheduler",
+          "scheduler::ObjectSchedulePins",
+          "scheduler::ObjectScheduleScope",
+          "scheduler::OutputSpec",
+          "scheduler::ScheduledFrame"
+        ]
       },
       "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."
     }
   },
-  "unanalyzedModules": ["rust.desktop.build", "rust.mcp.transport", "rust.native.engine"],
+  "unanalyzedModules": [
+    "rust.desktop.build",
+    "rust.mcp.transport",
+    "rust.native.engine"
+  ],
   "unanalyzedModulesNote": "Census entries only, never graphed by this analyzer: rust.desktop.build is the Cargo build script outside sourceDir; rust.mcp.transport and rust.native.engine are separate crates referenced only as targets of the declared external-crate ports and are not given intra-crate policies by this file.",
   "exceptions": []
 }

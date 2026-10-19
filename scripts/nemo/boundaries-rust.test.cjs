@@ -316,33 +316,39 @@ test('P37C1C4A CPU payload children stay private within revision and read-query 
 
 test('desktop native-engine grants are module-local: host, host tests and viewport cannot borrow another module item', (t) => {
   const root = desktopFixture(t);
-  appendSource(root, 'src-tauri/src/native_application.rs', 'use native_engine::desktop_viewport::SurfacePort;');
-  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::desktop_viewport::CssPoint;');
-  appendSource(root, 'src-tauri/src/native_viewport.rs', 'use native_engine::codec::decode_project;');
+  appendSource(root, 'src-tauri/src/native_application.rs', 'use native_engine::desktop_viewport::SurfacePort;\nuse native_engine::commands::DispatchErrorCode;');
+  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::desktop_viewport::CssPoint;\nuse native_engine::commands::DispatchErrorCode;');
+  appendSource(root, 'src-tauri/src/native_viewport.rs', 'use native_engine::codec::decode_project;\nuse native_engine::commands::DispatchErrorCode;');
   const policy = read('nemo-desktop.edges.json');
   const r = R.checkRustCrate(read('rust.profile.json'), policy, { root });
   assert.equal(r.ok, false);
   assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
     .map((v) => [v.module, v.detail.path]).sort(), [
+    ['rust.desktop.native.application', 'commands::DispatchErrorCode'],
     ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.application.tests', 'commands::DispatchErrorCode'],
     ['rust.desktop.native.application.tests', 'desktop_viewport::CssPoint'],
     ['rust.desktop.native.viewport', 'codec::decode_project'],
+    ['rust.desktop.native.viewport', 'commands::DispatchErrorCode'],
   ]);
 });
 
 test('raw identifiers cannot bypass desktop native-engine ports in the host, focused tests or viewport', (t) => {
   const root = desktopFixture(t);
-  appendSource(root, 'src-tauri/src/native_application.rs', 'use r#native_engine::r#desktop_viewport::SurfacePort;');
-  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::r#desktop_viewport::r#CssPoint;');
+  appendSource(root, 'src-tauri/src/native_application.rs', 'use r#native_engine::r#desktop_viewport::SurfacePort;\nuse r#native_engine::r#commands::r#DispatchErrorCode;');
+  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::r#desktop_viewport::r#CssPoint;\nuse r#native_engine::r#commands::r#DispatchErrorCode;');
   appendSource(root, 'src-tauri/src/native_viewport.rs',
-    'fn raw_port_probe() { let _ = r#native_engine::r#codec::decode_project; }');
+    'fn raw_port_probe() { let _ = r#native_engine::r#codec::decode_project; let _: Option<r#native_engine::r#commands::r#DispatchErrorCode> = None; }');
   const r = R.checkRustCrate(read('rust.profile.json'), read('nemo-desktop.edges.json'), { root });
   assert.equal(r.ok, false);
   assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
     .map((v) => [v.module, v.detail.path]).sort(), [
+    ['rust.desktop.native.application', 'commands::DispatchErrorCode'],
     ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.application.tests', 'commands::DispatchErrorCode'],
     ['rust.desktop.native.application.tests', 'desktop_viewport::CssPoint'],
     ['rust.desktop.native.viewport', 'codec::decode_project'],
+    ['rust.desktop.native.viewport', 'commands::DispatchErrorCode'],
   ]);
 });
 
@@ -362,12 +368,12 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const id = 'rust.desktop.native.host.release.tests', seam = 'rust.desktop.native.dispatch', file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_timing_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_project_replace_tests.rs', 'native_object_new_project_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs', 'native_object_preview_tests.rs', 'native_object_exposure_tests.rs', 'native_object_preview_lifecycle_tests.rs', 'native_object_preview_route_tests.rs', 'native_object_preview_route_test_support.rs', 'native_object_desktop_preview_tests.rs', 'native_object_desktop_preview_test_support.rs', 'native_object_export_tests.rs', 'native_object_desktop_export_tests.rs', 'native_object_svg_export_tests.rs', 'native_object_svg_desktop_export_tests.rs', 'native_object_desktop_preview_extent_tests.rs', 'native_object_desktop_export_extent_tests.rs', 'native_object_desktop_export_text_tests.rs', 'native_object_project_tests.rs', 'native_object_project_timing_tests.rs', 'native_object_reference_tests.rs', 'native_object_reference_preview_tests.rs', 'native_object_inactive_project_tests.rs', 'native_object_retained_tabs_tests.rs', 'native_project_settings_public_tests.rs', 'native_property_metadata_dispatch_tests.rs', 'native_property_track_dispatch_tests.rs', 'native_layer_policy_dispatch_tests.rs', 'native_property_read_dispatch_tests.rs', 'native_text_read_dispatch_tests.rs', 'native_property_edit_dispatch_tests.rs', 'native_raster_image_dispatch_tests.rs', 'native_raster_image_preview_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_timing_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_project_replace_tests.rs', 'native_object_new_project_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs', 'native_object_preview_tests.rs', 'native_object_exposure_tests.rs', 'native_object_preview_lifecycle_tests.rs', 'native_object_preview_route_tests.rs', 'native_object_preview_route_test_support.rs', 'native_object_desktop_preview_tests.rs', 'native_object_desktop_preview_test_support.rs', 'native_object_export_tests.rs', 'native_object_desktop_export_tests.rs', 'native_object_svg_export_tests.rs', 'native_object_svg_desktop_export_tests.rs', 'native_object_desktop_preview_extent_tests.rs', 'native_object_desktop_export_extent_tests.rs', 'native_object_desktop_export_text_tests.rs', 'native_object_project_tests.rs', 'native_object_project_timing_tests.rs', 'native_object_reference_tests.rs', 'native_object_reference_preview_tests.rs', 'native_object_inactive_project_tests.rs', 'native_object_retained_tabs_tests.rs', 'native_project_settings_public_tests.rs', 'native_property_metadata_dispatch_tests.rs', 'native_property_track_dispatch_tests.rs', 'native_layer_policy_dispatch_tests.rs', 'native_property_read_dispatch_tests.rs', 'native_text_read_dispatch_tests.rs', 'native_property_edit_dispatch_tests.rs', 'native_raster_image_dispatch_tests.rs', 'native_raster_image_preview_tests.rs', 'native_asset_remove_dispatch_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
   assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter', 'viewport-owner', 'host-ports']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
   for (const [owner, items] of [[seam, ['application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
-      'history::NativeObjectHistory', 'object_document::ObjectDocument', 'object_snapshot::ObjectSnapshot', 'export_job::ExportReleaseReconciliation']],
+      'history::NativeObjectHistory', 'object_document::ObjectDocument', 'object_snapshot::ObjectSnapshot', 'export_job::ExportReleaseReconciliation', 'commands::DispatchErrorCode']],
     ['rust.desktop.mcp.adapter', ['object_document::ObjectDocument']],
     [id, policy.externalCratePorts.native_engine.moduleItems[id]]]) for (const item of items) {
     const denied = structuredClone(policy);
@@ -381,7 +387,7 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const removed = structuredClone(profile);
   removed.modules = removed.modules.filter((m) => m.id !== id);
   assert.ok(require('./lib/boundaries-coverage.cjs').checkSourceCoverage(removed, { root: ROOT, sourcePaths: [file] }).violations.some((v) => v.rule === 'coverage-unprofiled-source' && v.file === file));
-  for (const source of ['native_object_host.rs', 'native_object_host_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_serialization_tests.rs', 'native_project_settings_public_tests.rs']) {
+  for (const source of ['native_object_host.rs', 'native_object_host_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_serialization_tests.rs', 'native_project_settings_public_tests.rs', 'native_asset_remove_dispatch_tests.rs']) {
     const candidate = structuredClone(profile), relative = `src-tauri/src/${source}`;
     for (const owner of candidate.modules) owner.files = owner.files.filter((x) => x !== source);
     assert.ok(require('./lib/boundaries-coverage.cjs').checkSourceCoverage(candidate, { root: ROOT, sourcePaths: [relative] }).violations.some((v) => v.rule === 'coverage-unprofiled-source' && v.file === relative));
