@@ -13,7 +13,11 @@
     "command.document.object.fill.trace"
   ],
   "input": {
-    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFillTracePayload"
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFillTracePayload"
+      }
+    ]
   },
   "authority": {
     "document": "native-engine::object_snapshot::ObjectSnapshot",

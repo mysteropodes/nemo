@@ -5,6 +5,8 @@ use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use crate::native_contract::{exact, object};
 use serde_json::Value;
 use std::collections::HashSet;
+#[path = "native_fill_trace_wire.rs"]
+mod fill;
 
 const MAX_ID: usize = 128;
 const MAX_NAME: usize = 256;
@@ -32,10 +34,7 @@ enum K {
     Labels,
     Clip,
     Footprint,
-    Point,
-    Color,
-    Opacity,
-    Flag,
+    Fill(fill::Field),
 }
 
 /// (operation suffix, command, "member:kind ..." in wire order). Every operation is a revisioned command; only a
@@ -271,11 +270,7 @@ fn kind(token: &str) -> Option<K> {
         "labels" => K::Labels,
         "clip" => K::Clip,
         "footprint" => K::Footprint,
-        "point" => K::Point,
-        "color" => K::Color,
-        "opacity" => K::Opacity,
-        "flag" => K::Flag,
-        _ => return None,
+        _ => K::Fill(fill::kind(token)?),
     })
 }
 
@@ -309,22 +304,7 @@ fn check(kind: K, value: &Value) -> bool {
         K::Labels => labels(value),
         K::Clip => clip(value),
         K::Footprint => footprint(value),
-        K::Point => value.as_array().is_some_and(|p| {
-            p.len() == 2
-                && p.iter().all(|n| {
-                    n.as_f64()
-                        .is_some_and(|n| n.is_finite() && n.abs() <= 1.0e12)
-                })
-        }),
-        K::Color => value.as_str().is_some_and(|s| {
-            s.len() == 9
-                && s.starts_with('#')
-                && s.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
-        }),
-        K::Opacity => value
-            .as_f64()
-            .is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n)),
-        K::Flag => value.is_boolean(),
+        K::Fill(field) => fill::check(field, value),
     }
 }
 

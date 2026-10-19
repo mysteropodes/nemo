@@ -158,7 +158,7 @@ test('the injected seam is the font contract composed with the edit contract and
 
 test('capability descriptors and the closed transport schema declare exactly the contract operations', () => {
   const dir = path.join(ROOT, 'engineering/application/capabilities-v2');
-  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
+  const files = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill'].map((k) => path.join(dir, 'native-object-' + k + '.json'));
   const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/native-transport-v2.schema.json'), 'utf8'));
   const declared = [];
   const ids = new Set();
@@ -178,8 +178,8 @@ test('capability descriptors and the closed transport schema declare exactly the
     declared.push(...d.operations);
   }
   assert.deepEqual(declared.slice().sort(), contract.OPERATIONS.slice().sort());
-  assert.equal(new Set(declared).size, 17);
-  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit']);
+  assert.equal(new Set(declared).size, 18);
+  assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit']);
   for (const [suffix, payload] of VALID) {
     const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === P + suffix);
     assert.equal(branches.length, 1, suffix);
