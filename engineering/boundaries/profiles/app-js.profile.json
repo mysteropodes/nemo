@@ -3315,6 +3315,18 @@
       "publicApi": [
         "native-palette-desktop.js"
       ]
+    },
+    {
+      "id": "app.native.palette.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-palette-ui.js"
+      ]
     }
   ],
   "layerRules": {

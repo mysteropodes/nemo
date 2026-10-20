@@ -7,8 +7,8 @@
 // Shade offers, scoped here to the active layer (Nemo doesn't have
 // AE's multi-layer timeline-wide selection concept).
 (function () {
-  // No native palette reader/command is admitted yet. Keep the old document
-  // writer unreachable until that field-specific consumer is joined.
+  // Native palette presentation uses its pinned consumer. Every retained browser
+  // writer below stays unreachable on desktop, including color replacement.
   function paletteNativeBlocked(notify) {
     var blocked = !!(window.__TAURI__ && window.__TAURI__.core);
     if (blocked && notify && window.showToast) showToast('Palette editing is unavailable.');
@@ -36,7 +36,11 @@
   function genId() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); }
 
   function addColor(hex) {
-    if (paletteNativeBlocked(true)) return;
+    if (paletteNativeBlocked(false)) {
+      var controller = window.NemoNativePaletteController;
+      if (controller) controller.append(hex); else paletteNativeBlocked(true);
+      return;
+    }
     var pal = activePalette();
     if (pal.colors.indexOf(hex) >= 0) { showToast(SM.t('toastAlreadyInPalette')); return; }
     pal.colors.push(hex);
@@ -176,7 +180,11 @@
   }
 
   function render() {
-    if (paletteNativeBlocked(false)) { paletteNativeUnavailable(); return; }
+    if (paletteNativeBlocked(false)) {
+      var controller = window.NemoNativePaletteController;
+      if (controller) controller.render(highlightHex); else paletteNativeUnavailable();
+      return;
+    }
     renderTabs();
     var grid = document.getElementById('palette-grid');
     if (!grid) return;
@@ -258,7 +266,11 @@
   }
 
   function newPalette() {
-    if (paletteNativeBlocked(true)) return;
+    if (paletteNativeBlocked(false)) {
+      var controller = window.NemoNativePaletteController;
+      if (controller) controller.create(); else paletteNativeBlocked(true);
+      return;
+    }
     var name = prompt('Nom de la nouvelle palette :', 'Palette ' + (palettes().length + 1));
     if (name === null) return;
     palettes().push({ id: genId(), name: name.trim() || 'Palette', colors: [] });
