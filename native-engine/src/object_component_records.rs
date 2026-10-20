@@ -27,6 +27,8 @@ mod instance;
 use instance::{bounded_entries, bounded_presence, invalid, valid_id, MAX_ENTRIES};
 #[allow(unused_imports)]
 pub(crate) use instance::{ComponentInstance, ComponentRecordError, FrameKey, SCENE_CONTEXT};
+// T12: a video placement remap is admitted exactly like an instance remap.
+pub(crate) use instance::validate_remap;
 
 pub(crate) const COMPONENT_SET_FORMAT: &str = "nemo.native-component-set";
 pub(crate) const COMPONENT_SET_FORMAT_VERSION: u32 = 1;
