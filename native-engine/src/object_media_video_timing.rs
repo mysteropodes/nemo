@@ -12,10 +12,10 @@
 //!
 //! Only a drawing placement may carry timing; that the asset is a video is the
 //! catalog's check (`object_media_link_track::validate`, the edit owner).
-#[cfg(feature = "evaluation")]
-use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::object_document::object_component_record_kernels::object_component_records::validate_remap;
-use crate::object_document::{OrderCurvePoint, OrderKey, OrderTrack};
+#[cfg(feature = "history")]
+use crate::object_document::OrderCurvePoint;
+use crate::object_document::OrderTrack;
 use serde_json::Number;
 
 /// The longest authored `interpMode` kept (the baseline values are four to six bytes).
@@ -42,30 +42,6 @@ impl VideoTiming {
             && self.interp_mode.as_ref().is_none_or(|mode| {
                 !mode.is_empty() && mode.len() <= MAX_INTERP_MODE && !mode.contains('\0')
             })
-    }
-
-    // The sampler needs the shared curve kernel, an evaluation module.
-    #[cfg(feature = "evaluation")]
-    /// `SMMotion.timeRemapValue(ld, frame)`: `None` without a track or keys
-    /// (the sampler's `null`), otherwise the eased value at `at`.
-    pub(crate) fn remap_value(&self, at: f64) -> Option<f64> {
-        let keys = self.time_remap.as_ref()?.keys.as_slice();
-        let (first, last) = (keys.first()?, keys.last()?);
-        if at <= frame(first)? {
-            return value(first);
-        }
-        if at >= frame(last)? {
-            return value(last);
-        }
-        let right = keys.partition_point(|key| frame(key).is_some_and(|f| f <= at));
-        let (a, b) = (keys.get(right.checked_sub(1)?)?, keys.get(right)?);
-        if a.hold.value().copied().unwrap_or(false) {
-            return value(a);
-        }
-        let (start, end) = (frame(a)?, frame(b)?);
-        let eased = evaluate_curve(&curve(a)?, (at - start) / (end - start));
-        let result = value(a)? + (value(b)? - value(a)?) * eased;
-        result.is_finite().then_some(result)
     }
 
     /// `enableTimeRemap` (motion.js): `{in, v:[0]}` and `{max(in + 1, out),
@@ -167,42 +143,10 @@ pub(crate) enum RemapRefusal {
     Conflict,
 }
 
+// The sampler needs the shared curve kernel, an evaluation module.
 #[cfg(feature = "evaluation")]
-fn frame(key: &OrderKey) -> Option<f64> {
-    key.frame.as_f64().filter(|f| f.is_finite())
-}
-#[cfg(feature = "evaluation")]
-fn value(key: &OrderKey) -> Option<f64> {
-    key.v.first()?.as_f64().filter(|v| v.is_finite())
-}
-#[cfg(feature = "evaluation")]
-fn curve(key: &OrderKey) -> Option<Vec<CurveSample>> {
-    match key.curve_points.value().and_then(Option::as_ref) {
-        // The baseline default ease (`object_audio_track_sampling` keeps the same table).
-        None => Some(
-            [(0., 0.), (0.25, 0.156), (0.5, 0.5), (0.75, 0.844), (1., 1.)]
-                .into_iter()
-                .map(|(x, y)| CurveSample {
-                    x,
-                    y,
-                    tx: None,
-                    ty: None,
-                })
-                .collect(),
-        ),
-        Some(points) => points
-            .iter()
-            .map(|p| {
-                Some(CurveSample {
-                    x: p.x.as_f64()?,
-                    y: p.y.as_f64()?,
-                    tx: p.tx.value().and_then(|n| n.as_f64()),
-                    ty: p.ty.value().and_then(|n| n.as_f64()),
-                })
-            })
-            .collect(),
-    }
-}
+#[path = "object_media_video_remap.rs"]
+mod remap;
 
 #[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_media_video_timing.rs"]

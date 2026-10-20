@@ -3,7 +3,6 @@
 //! address the placement edit. Key counts and flags only: the projection stays
 //! under the read budget however many remap keys the placement carries.
 use crate::object_codec::object_deserialize;
-use crate::object_document::{AssetKind, AssetTarget};
 use crate::object_snapshot::MAX_MESSAGE_BYTES;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
@@ -67,13 +66,7 @@ impl ObjectSnapshot {
         }
         let inventory = self.project().and_then(|p| p.asset_inventory());
         let video = inventory.and_then(|inventory| {
-            inventory.placements().iter().find(|placement| {
-                matches!(placement.target(), AssetTarget::Drawing { context_id, layer_uid, .. }
-                    if *context_id == selector.context_id && *layer_uid == selector.layer_uid)
-                    && inventory
-                        .get(placement.asset_id())
-                        .is_some_and(|asset| asset.kind() == AssetKind::Video)
-            })
+            inventory.video_placement_on(&selector.context_id, &selector.layer_uid)
         });
         let placement = video.map(|placement| {
             let timing = placement.timing();

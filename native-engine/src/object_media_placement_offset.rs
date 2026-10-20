@@ -1,6 +1,6 @@
 //! One lossless placement offset value. Drawing/Video keeps the original integer wire.
 use crate::object_document::assets::{valid_id, AssetError, AssetId};
-use crate::object_document::AssetTarget;
+use crate::object_document::{AssetInventory, AssetKind, AssetTarget};
 use serde_json::Number;
 // T12: the stored timing of a video placement.
 #[path = "object_media_video_timing.rs"]
@@ -93,6 +93,11 @@ impl AssetPlacement {
         self.timing = timing;
         Ok(self)
     }
+    /// Whether this placement sits on the drawing layer `layer_uid` of `context_id`.
+    pub(crate) fn on_drawing_layer(&self, context_id: &str, layer_uid: &str) -> bool {
+        matches!(&self.target, AssetTarget::Drawing { context_id: c, layer_uid: l, .. }
+            if c == context_id && l == layer_uid)
+    }
     pub(crate) fn timing(&self) -> &VideoTiming {
         &self.timing
     }
@@ -113,3 +118,20 @@ impl AssetPlacement {
 #[cfg(test)]
 #[path = "../tests/object_media_placement_offset.rs"]
 mod tests;
+
+impl AssetInventory {
+    /// T12: the video placement of one drawing layer, the pinned placement read's
+    /// lookup (read queries name no document type).
+    pub(crate) fn video_placement_on(
+        &self,
+        context_id: &str,
+        layer_uid: &str,
+    ) -> Option<&AssetPlacement> {
+        self.placements().iter().find(|placement| {
+            placement.on_drawing_layer(context_id, layer_uid)
+                && self
+                    .get(placement.asset_id())
+                    .is_some_and(|asset| asset.kind() == AssetKind::Video)
+        })
+    }
+}
