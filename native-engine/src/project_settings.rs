@@ -185,6 +185,21 @@ impl ProjectMetadata {
     pub(crate) fn composition_bpm(&self) -> (Option<f64>, Option<f64>, Option<bool>) {
         (self.bpm, self.bpm_offset, self.bpm_show)
     }
+    /// A scalar tempo edit retains the existing shared marker allocation.
+    /// Supplied finite values are storage values; UI clamps belong to intent.
+    pub(crate) fn with_composition_bpm(
+        self,
+        bpm: Option<f64>,
+        bpm_offset: Option<f64>,
+        bpm_show: Option<bool>,
+    ) -> Result<Self, ProjectMetadataError> {
+        if bpm.is_some_and(|v| !v.is_finite())
+            || bpm_offset.is_some_and(|v| !v.is_finite())
+        {
+            return Err(ProjectMetadataError::InvalidCompositionMetadata);
+        }
+        Ok(Self { bpm, bpm_offset, bpm_show, ..self })
+    }
     pub(crate) fn canvas_dimensions(&self) -> (u32, u32) {
         (self.canvas_width, self.canvas_height)
     }

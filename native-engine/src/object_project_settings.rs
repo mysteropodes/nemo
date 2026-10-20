@@ -6,6 +6,9 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_project_composition_edit.rs"]
+mod composition_delta;
+
 #[derive(Debug)]
 struct CompositionMarkerInput {
     frame: f64,

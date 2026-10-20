@@ -4,6 +4,12 @@ use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::request_receipts::DispatchErrorCode;
 
 impl NativeObjectHistory {
+    pub(crate) fn prepare_composition_delta_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
+        self.owner.prepare_composition_delta_json(bytes)
+    }
     pub(crate) fn prepare_composition_metadata_json(
         &self,
         bytes: &[u8],
@@ -32,3 +38,7 @@ impl NativeObjectHistory {
         Ok(after_revision)
     }
 }
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_composition_dispatch.rs"]
+mod composition_delta_tests;
