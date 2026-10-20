@@ -1326,11 +1326,13 @@
           "required": [
             "kind",
             "placementId",
-            "timeRemap"
+            "inFrame",
+            "outFrame",
+            "lastSourceFrame"
           ],
           "properties": {
             "kind": {
-              "const": "setTimeRemap"
+              "const": "enableTimeRemap"
             },
             "placementId": {
               "type": "string",
@@ -1338,71 +1340,56 @@
               "maxLength": 255,
               "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
             },
-            "timeRemap": {
-              "oneOf": [
-                {
-                  "type": "null"
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "keys"
-                  ],
-                  "properties": {
-                    "keys": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": [
-                          "frame",
-                          "v"
-                        ],
-                        "properties": {
-                          "frame": {
-                            "type": "number"
-                          },
-                          "v": {
-                            "type": "array",
-                            "minItems": 1,
-                            "maxItems": 1,
-                            "items": {
-                              "type": "number"
-                            }
-                          },
-                          "hold": {
-                            "type": "boolean"
-                          },
-                          "lockTo": {},
-                          "curvePoints": {
-                            "type": [
-                              "array",
-                              "null"
-                            ]
-                          },
-                          "hIn": {
-                            "type": "array",
-                            "minItems": 2,
-                            "maxItems": 2,
-                            "items": {
-                              "type": "number"
-                            }
-                          },
-                          "hOut": {
-                            "type": "array",
-                            "minItems": 2,
-                            "maxItems": 2,
-                            "items": {
-                              "type": "number"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
+            "inFrame": {
+              "type": "number"
+            },
+            "outFrame": {
+              "type": "number"
+            },
+            "lastSourceFrame": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placementId",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "removeTimeRemapKey"
+            },
+            "placementId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+            },
+            "frame": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placementId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "disableTimeRemap"
+            },
+            "placementId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
             }
           }
         },
