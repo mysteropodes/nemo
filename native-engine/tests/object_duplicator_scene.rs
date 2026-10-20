@@ -90,3 +90,32 @@ fn explicit_element_order_is_stably_applied_to_derived_paints() {
         .collect::<Vec<_>>();
     assert_eq!(indices, [1, 2, 0]); // Order5 before0, original ties stay1then2.
 }
+
+#[cfg(feature = "export_job")]
+#[test]
+fn actual_svg_serializes_each_temporal_copy_without_the_original_seed_or_persistent_changes() {
+    use crate::export_job::native_vector_export::native_vector_export_svg::{
+        serialize_svg_frame, SvgFrameSpec,
+    };
+    use crate::object_codec::encode_storage_project;
+    let snapshot = snapshot(fixture(1));
+    let before = encode_storage_project(snapshot.document()).unwrap();
+    let pin = selector(&snapshot, 2);
+    let packet = prepare_object_exposure_frame(&snapshot, &pin).unwrap();
+    let scene = prepare_object_render_scene(&packet, &pin).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &pin).unwrap();
+    let frame = serialize_svg_frame(&plan, SvgFrameSpec::new(100, 100, 65_536).unwrap()).unwrap();
+    let text = String::from_utf8(frame.bytes).unwrap();
+    let starts = text
+        .split("<path d=\"M")
+        .skip(1)
+        .map(|path| path.split(" C").next().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(starts, ["20,0", "20,0", "30,0"]);
+    assert_eq!(frame.path_count, 3);
+    assert_eq!(frame.pins.document_snapshot_id, snapshot.snapshot_id());
+    assert_eq!(frame.pins.content_revision, snapshot.content_revision());
+    assert_eq!(frame.pins.frame, 2);
+    assert_eq!(plan.packet().records().len(), 1);
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+}

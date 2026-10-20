@@ -133,7 +133,11 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                 order,
                 path: shape.path,
                 prepared,
-                svg_contour: closed.then_some(shape.contour),
+                // VectorShape's contour may be a padded clipping rectangle.
+                // SVG must use actual closed geometry, never that envelope.
+                svg_contour: closed
+                    .then(|| ClosedCubicPath::new(segments.clone()).ok())
+                    .flatten(),
                 svg_rgba,
             });
         }
