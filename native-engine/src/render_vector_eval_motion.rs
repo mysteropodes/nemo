@@ -6,12 +6,78 @@
 //! them. Opacity remains the packet's existing paint-factor responsibility.
 use crate::evaluation::motion_parent_chain::{motion_mat_from_values, transform_segments, Segment};
 use crate::evaluation::object_vector_kernels::render_vector_eval::{EvalSegment, VectorEvalError};
+use crate::object_document::object_group_kernels::object_boolean_ops::RingSeg;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::path;
 use crate::object_document::{
     FrameScopeKind, ObjectDocument, ObjectRecord, Presence, PropertyHolder, PropertyHolderTarget,
     VECTOR_FAMILY,
 };
 use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
 use crate::revision::ObjectSnapshot;
+use kurbo::Shape;
+
+/// Element Motion is nested inside layer Motion, after the original path-FX
+/// and parametric stages. Its pivot is the actual native cubic bounds centre.
+pub(super) fn apply_element_motion(
+    snapshot: &ObjectSnapshot,
+    record: &ObjectRecord,
+    frame: u32,
+    segments: Vec<EvalSegment>,
+) -> Result<Vec<EvalSegment>, VectorEvalError> {
+    let target = PropertyHolderTarget {
+        context_id: record.target.context_id.clone(),
+        layer_uid: record.target.layer_uid.clone(),
+        stroke_id: Presence::Present(record.target.stroke_id.clone()),
+    };
+    let mat = snapshot
+        .sampled_motion_2d(&target, f64::from(frame))
+        .map_err(|error| VectorEvalError::Sample {
+            property: "position",
+            error,
+        })?;
+    let Some(mat) = mat else { return Ok(segments) };
+    if segments.is_empty() {
+        return Ok(segments);
+    }
+    let ring: Vec<_> = segments
+        .iter()
+        .map(|s| RingSeg {
+            point: s.point,
+            handle_in: s.handle_in,
+            handle_out: s.handle_out,
+        })
+        .collect();
+    let centre = path(&ring, record.geometry.closed).bounding_box().center();
+    let input: Vec<_> = segments
+        .iter()
+        .map(|s| Segment {
+            point: s.point,
+            handle_in: Some(s.handle_in),
+            handle_out: Some(s.handle_out),
+        })
+        .collect();
+    transform_segments(&input, [centre.x + mat.ax, centre.y + mat.ay], &mat)
+        .into_iter()
+        .map(|s| {
+            let output = EvalSegment {
+                point: s.point,
+                handle_in: s.handle_in.unwrap_or([0., 0.]),
+                handle_out: s.handle_out.unwrap_or([0., 0.]),
+            };
+            if output
+                .point
+                .iter()
+                .chain(&output.handle_in)
+                .chain(&output.handle_out)
+                .all(|v| v.is_finite())
+            {
+                Ok(output)
+            } else {
+                Err(VectorEvalError::NonFiniteInput)
+            }
+        })
+        .collect()
+}
 
 fn ordinary_root_layer(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
     target.context_id() == "scene-root"

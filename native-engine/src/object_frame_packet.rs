@@ -416,7 +416,7 @@ where
     // geometry while silently ignoring authored Motion properties. L01-H consumes exactly
     // parametric-shape, root-vector Position and the actual Text/raster parent consumer.
     // Other holders and visible vector parenting remain unavailable (holders_fully_consumed).
-    if !holders_fully_consumed(document) {
+    if snapshot.frame_needs_camera_or_3d_join() || !holders_fully_consumed(document) {
         return Err(ObjectFrameError::Unavailable.into());
     }
     let source_frames = sources::select(
