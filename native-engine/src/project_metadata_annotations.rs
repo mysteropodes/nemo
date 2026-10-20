@@ -2,7 +2,7 @@
 //! are not copied here. Values publish only with the enclosing native revision.
 use super::{ProjectMetadata, ProjectMetadataError};
 use crate::object_document::{object_deserialize, Presence};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]

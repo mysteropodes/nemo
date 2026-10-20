@@ -3,7 +3,7 @@ use super::ProjectWireError;
 use crate::object_document::{
     Presence, ProjectCommentRecord, ProjectMetadata, ProjectPresetCatalog, ProjectWorkspaceRecord,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // Nested records are object-only and closed, just like the original metadata DTO.
 #[derive(Serialize)]
