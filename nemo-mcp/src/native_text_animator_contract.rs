@@ -253,4 +253,37 @@ mod tests {
             assert!(!edit(&action));
         }
     }
+    #[test]
+    fn text_animator_remove_request_and_receipt_are_closed_and_identity_correlated() {
+        use crate::native_contract::item;
+        let p = json!({"command":"object.text.animator.remove","layerUid":"L0","animatorId":"ta"});
+        assert!(item::request(item::ITEM, &p));
+        let r = json!({"applied":true,"historyEntriesAdded":1,"operation":"text.animator.remove","strokeId":"ta"});
+        assert!(item::result(item::ITEM, &p, &r));
+        for (key, value) in [
+            ("layerUid", json!("")),
+            ("animatorId", json!(null)),
+            ("animatorId", json!("")),
+            ("extra", json!(1)),
+        ] {
+            let mut bad = p.clone();
+            bad[key] = value;
+            assert!(!item::request(item::ITEM, &bad));
+        }
+        for key in ["layerUid", "animatorId"] {
+            let mut bad = p.clone();
+            bad.as_object_mut().unwrap().remove(key);
+            assert!(!item::request(item::ITEM, &bad));
+        }
+        for (key, value) in [
+            ("strokeId", json!("other")),
+            ("operation", json!("text.animator.edit")),
+            ("historyEntriesAdded", json!(0)),
+            ("extra", json!(1)),
+        ] {
+            let mut bad = r.clone();
+            bad[key] = value;
+            assert!(!item::result(item::ITEM, &p, &bad));
+        }
+    }
 }
