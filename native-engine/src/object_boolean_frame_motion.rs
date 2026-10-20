@@ -2,8 +2,11 @@
 use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
     ElementMotionSource, MotionUnavailable,
 };
-use crate::object_document::object_group_kernels::object_boolean_ops::ElementMat;
-use crate::object_document::{ObjectTarget, Presence, PropertyHolderTarget};
+use crate::object_document::object_group_kernels::object_boolean_ops::{ElementMat,MultiPolygon,MAX_ABS_COORD};
+use crate::object_document::object_group_kernels::object_boolean_topology::Polygon;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{native::{ring,bounds,polygon},RingSeg};
+use crate::evaluation::motion_parent_chain::{transform_segments,MotionMat,Segment};
+use crate::object_document::{ObjectRecord,ObjectTarget, Presence, PropertyHolderTarget};
 use crate::revision::ObjectSnapshot;
 
 pub(super) struct SnapshotMotion<'a> {
@@ -11,9 +14,8 @@ pub(super) struct SnapshotMotion<'a> {
     pub(super) frame: u32,
 }
 
-impl ElementMotionSource for SnapshotMotion<'_> {
-    fn consumes_authored_motion(&self) -> bool { true }
-    fn element_mat(&self, target: &ObjectTarget) -> Result<Option<ElementMat>, MotionUnavailable> {
+impl SnapshotMotion<'_> {
+    fn motion(&self,target:&ObjectTarget) -> Result<Option<MotionMat>,MotionUnavailable> {
         let holder_target = PropertyHolderTarget {
             context_id: target.context_id.clone(),
             layer_uid: target.layer_uid.clone(),
@@ -32,12 +34,37 @@ impl ElementMotionSource for SnapshotMotion<'_> {
         }) {
             return Err(MotionUnavailable);
         }
-        self.snapshot
+        let motion=self.snapshot
             .sampled_motion_2d(&holder_target, f64::from(self.frame))
-            .map(|motion| motion.map(|m| ElementMat {
-                dx: m.dx, dy: m.dy, rot: m.rot, sx: m.sx, sy: m.sy, ax: m.ax, ay: m.ay,
-            }))
-            .map_err(|_| MotionUnavailable)
+            .map_err(|_| MotionUnavailable)?;
+        // Original elementMotionBakedClone never consumes elMat.op. Do not
+        // erase non-neutral alpha as if geometry materialization had baked it.
+        if motion.is_some_and(|m|m.op!=1.) { return Err(MotionUnavailable) }
+        Ok(motion)
+    }
+}
+impl ElementMotionSource for SnapshotMotion<'_> {
+    fn consumes_authored_motion(&self) -> bool { true }
+    fn element_mat(&self, target: &ObjectTarget) -> Result<Option<ElementMat>, MotionUnavailable> {
+        Ok(self.motion(target)?.map(|m|ElementMat {
+            dx:m.dx,dy:m.dy,rot:m.rot,sx:m.sx,sy:m.sy,ax:m.ax,ay:m.ay
+        }))
+    }
+    fn materialized_polygons(&self,record:&ObjectRecord) -> Result<MultiPolygon,MotionUnavailable> {
+        if record.solid_fill().is_none() || !record.geometry.closed { return Err(MotionUnavailable) }
+        let mut input=ring(record);
+        if let Some(m)=self.motion(&record.target)? {
+            let b=bounds(&input);
+            let pivot=[b.x+b.width/2.+m.ax,b.y+b.height/2.+m.ay];
+            let segments:Vec<_>=input.iter().map(|s|Segment{point:s.point,handle_in:Some(s.handle_in),handle_out:Some(s.handle_out)}).collect();
+            input=transform_segments(&segments,pivot,&m).into_iter().map(|s|RingSeg{
+                point:s.point,handle_in:s.handle_in.unwrap_or([0.,0.]),handle_out:s.handle_out.unwrap_or([0.,0.])
+            }).collect();
+        }
+        // Refuse overflow before asking the adaptive provider to subdivide it.
+        if input.iter().flat_map(|s|s.point.into_iter().chain(s.handle_in).chain(s.handle_out))
+            .any(|v|!v.is_finite() || v.abs()>MAX_ABS_COORD) { return Err(MotionUnavailable) }
+        Ok(vec![Polygon{exterior:polygon(&input,true),holes:Vec::new()}])
     }
 }
 

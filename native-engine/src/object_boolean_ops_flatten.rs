@@ -22,8 +22,6 @@ use crate::object_document::object_group_kernels::object_group_combine_plan::{
 use crate::object_document::object_group_kernels::object_group_record::layer_stroke_ids;
 use crate::object_document::ObjectDocument;
 use crate::object_document::{Presence,FrameScopeKind};
-use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{ring,polygon};
-use crate::object_document::object_group_kernels::object_boolean_topology::Polygon;
 
 /// Precomputed (Motion-baked) operand polygons by group item.
 struct Members {
@@ -97,15 +95,12 @@ pub(super) fn plan_flatten_group(
         let at =
             find_record(document, scope, &id).ok_or_else(|| PlanError::MemberAbsent(id.clone()))?;
         let record = &document.objects[at];
-        let mut polygons = match filled_polygons(record) {
-            Err(PlanError::Curved(_)) if motion.consumes_authored_motion() => {
-                let polygons=vec![Polygon { exterior:polygon(&ring(record),true), holes:Vec::new() }];
-                admit_polygons(&polygons).map_err(PlanError::Topology)?;
-                polygons
-            },
-            value => value?,
-        };
-        if element_holder(document, &record.target) {
+        let mut polygons = if motion.consumes_authored_motion() {
+            let polygons=motion.materialized_polygons(record).map_err(|_|PlanError::MotionUnavailable(id.clone()))?;
+            admit_polygons(&polygons).map_err(PlanError::Topology)?;
+            polygons
+        } else { filled_polygons(record)? };
+        if !motion.consumes_authored_motion() && element_holder(document, &record.target) {
             let mat = motion
                 .element_mat(&record.target)
                 .map_err(|_| PlanError::MotionUnavailable(id.clone()))?;
