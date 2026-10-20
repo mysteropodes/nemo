@@ -10,6 +10,8 @@
   function install(root) {
     if (installed.has(root)) return installed.get(root);
     var retired = false, loading = null, pending = false, drag = null, highlight = null;
+    var projectionEpoch = 0, refreshNeeded = false, busyStamp = null;
+    var identityKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
     var document = root.document;
     function native() { return !!(root.__TAURI__ && root.__TAURI__.core); }
     function current() { return root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root); }
@@ -22,6 +24,23 @@
       if (typeof root.showToast === 'function') root.showToast(message || 'Palette changes are not confirmed. Wait for synchronization before trying again.');
     }
     function busy() { return retired || pending || !!loading; }
+    function identity() {
+      try {
+        var session = current(), info = session && session.info(), pin = {};
+        if (!session || !info || !session.isActive()) return null;
+        identityKeys.forEach(function (key) { pin[key] = info[key]; });
+        return { session: session, info: info, pin: pin, epoch: projectionEpoch, ticket: session.readSubscriptionGeneration() };
+      } catch (_) { return null; }
+    }
+    function changed(stamp, next) {
+      return !stamp || stamp.session !== next.session || stamp.epoch !== next.epoch || stamp.ticket !== next.ticket ||
+        identityKeys.some(function (key) { return stamp.pin[key] !== next.pin[key]; });
+    }
+    function settled() {
+      busyStamp = null;
+      var refresh = refreshNeeded; refreshNeeded = false; render();
+      if (refresh && !retired && !model.read()) presented();
+    }
     function shown(origin) { return !busy() && !!origin && model.read() === origin; }
     function element(id) { return document.getElementById(id); }
     function button(parent, className, label) {
@@ -35,14 +54,14 @@
     }
     async function edit(action, origin) {
       if (!shown(origin)) { notice(); return { status: 'unavailable' }; }
-      pending = true; drag = null; render();
+      busyStamp = identity(); pending = true; drag = null; render();
       try {
         var result = await model.edit(action, origin);
         if (!['applied-presented', 'unchanged'].includes(result.status)) notice();
         return result;
       } catch (error) {
         notice(); return { status: 'unconfirmed', code: error && error.code || 'unavailable' };
-      } finally { pending = false; render(); }
+      } finally { pending = false; settled(); }
     }
     function id() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); }
     function create() {
@@ -140,14 +159,21 @@
       }
     }
     function presented() {
-      if (!native() || retired || pending || loading || model.read()) return loading || Promise.resolve(model.read());
-      loading = model.refresh().catch(function () { return null; }).finally(function () { loading = null; render(); });
+      if (!native() || retired) return Promise.resolve(null);
+      if (pending || loading) {
+        var next = identity();
+        if (next && changed(busyStamp, next) && available(next.session, next.info)) refreshNeeded = true;
+        return loading || Promise.resolve(null);
+      }
+      if (model.read()) return Promise.resolve(model.read());
+      busyStamp = identity();
+      loading = model.refresh().catch(function () { return null; }).finally(function () { loading = null; settled(); });
       render(); return loading;
     }
     var controller = Object.freeze({ read: model.read, edit: edit, create: create, append: append, render: render,
       presented: presented, isPending: busy,
-      willProject: function () { drag = null; if (!pending) model.invalidate(); render(); },
-      dispose: function () { retired = true; drag = null; model.dispose(); render(); }
+      willProject: function () { projectionEpoch++; drag = null; if (!pending) model.invalidate(); render(); },
+      dispose: function () { retired = true; refreshNeeded = false; drag = null; model.dispose(); render(); }
     });
     installed.set(root, controller); root.NemoNativePaletteController = controller;
     if (typeof root.addEventListener === 'function') root.addEventListener('pagehide', controller.dispose, { once: true });

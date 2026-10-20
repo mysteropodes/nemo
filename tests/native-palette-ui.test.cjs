@@ -71,7 +71,9 @@ function fixture(options = {}) {
     if (block) { const held = block; block = null; held.entered(); await held.wait; }
     const response = { apiVersion: 2, requestId: request.requestId, instanceId: info.instanceId,
       documentId: info.documentId, contentRevision: revision, ok: !unavailable };
-    if (unavailable) response.error = { code: 'unavailable', message: 'Palette is unavailable' };
+    if (request.documentId !== info.documentId) {
+      response.ok = false; response.error = { code: 'wrong_document', message: 'Document was replaced' };
+    } else if (unavailable) response.error = { code: 'unavailable', message: 'Palette is unavailable' };
     else if (request.operation === Contract.EDIT) {
       assert.equal(request.expectedRevision, revision);
       const before = JSON.stringify(metadata); apply(request.payload.action);
@@ -214,6 +216,25 @@ test('retirement during paged palette read cannot publish stale controls', async
   const h = fixture(), held = h.hold(), reading = h.controller.presented(); await held.started;
   h.retire(); held.release(); assert.equal(await reading, null); await h.settled();
   assert.equal(h.controller.read(), null); assert.equal(h.elements['btn-palette-new'].disabled, true);
+});
+
+test('a new presented document during a held read is refreshed once after the stale read settles', async () => {
+  const h = fixture(), held = h.hold(), reading = h.controller.presented(); await held.started;
+  h.replace(); h.controller.presented(); held.release(); await reading; await h.settled();
+  assert.equal(h.controller.read().info.documentId, 'replacement');
+  assert.equal(h.elements['btn-palette-new'].disabled, false);
+  const settings = h.calls.filter(q => q.payload.selector && q.payload.selector.kind === 'settings');
+  assert.equal(settings.length, 2); assert.deepEqual(settings.map(q => q.documentId), ['d', 'replacement']);
+});
+
+test('unavailable read does not retry itself and a new presentation after pending failure remains consumable', async () => {
+  const unavailable = fixture({ unavailable: true }); await unavailable.ready();
+  assert.equal(unavailable.calls.length, 1); assert.equal(unavailable.controller.read(), null);
+  const h = fixture(); await h.ready(); const before = h.metadata(), held = h.hold(); h.elements['btn-palette-add-fill'].fire('click'); await held.started;
+  h.replace(); h.controller.presented(); held.release(); await h.settled();
+  assert.equal(h.controller.read().info.documentId, 'replacement');
+  assert.equal(h.edits().length, 1); assert.equal(h.elements['btn-palette-new'].disabled, false);
+  assert.deepEqual(h.metadata(), before);
 });
 
 test('palette UI installation leaves browser palette DOM and button state unchanged', async () => {
