@@ -23,6 +23,9 @@ mod property;
 pub(crate) use property::{
     evaluate_property_detached, evaluate_property_for_owner, PropertyCandidate,
 };
+#[path = "object_expression_motion_frame.rs"]
+mod motion_frame;
+pub use motion_frame::{prepare_object_motion_exposure_frame_for_owner, ObjectMotionFrameFailure};
 
 /// Bounded values must be chosen explicitly by the caller for its workload.
 /// The private feature has no production default or public host route.

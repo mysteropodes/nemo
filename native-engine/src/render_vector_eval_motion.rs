@@ -246,6 +246,34 @@ pub(super) fn apply_layer_position(
     frame: u32,
     segments: Vec<EvalSegment>,
 ) -> Result<Vec<EvalSegment>, VectorEvalError> {
+    apply_layer_position_with_consumption(snapshot, record, frame, segments, false)
+}
+
+/// The sole post-placement caller already fenced record context/host against
+/// this packet. Reuse only its exact host output's evaluated-key admission;
+/// the layer Position itself is still RAW and must pass its original guard.
+pub(super) fn apply_duplicator_layer_position(
+    packet: &crate::object_frame_packet::ObjectFramePacket,
+    record: &ObjectRecord,
+    layer_index: usize,
+    segments: Vec<EvalSegment>,
+) -> Result<Vec<EvalSegment>, VectorEvalError> {
+    apply_layer_position_with_consumption(
+        packet.snapshot(),
+        record,
+        packet.frame(),
+        segments,
+        packet.has_evaluated_duplicator_motion(layer_index),
+    )
+}
+
+fn apply_layer_position_with_consumption(
+    snapshot: &ObjectSnapshot,
+    record: &ObjectRecord,
+    frame: u32,
+    segments: Vec<EvalSegment>,
+    evaluated_duplicator: bool,
+) -> Result<Vec<EvalSegment>, VectorEvalError> {
     let target = PropertyHolderTarget {
         context_id: record.target.context_id.clone(),
         layer_uid: record.target.layer_uid.clone(),
@@ -265,8 +293,15 @@ pub(super) fn apply_layer_position(
     {
         return Ok(segments);
     }
-    let remaining =
-        crate::object_frame_packet::duplicators::remaining_holder(snapshot.document(), holder);
+    let remaining = if evaluated_duplicator {
+        crate::object_frame_packet::duplicators::remaining_holder_with_motion(
+            snapshot.document(),
+            holder,
+            true,
+        )
+    } else {
+        crate::object_frame_packet::duplicators::remaining_holder(snapshot.document(), holder)
+    };
     let consumed_holder = remaining.as_ref().unwrap_or(holder);
     if holder
         .controls

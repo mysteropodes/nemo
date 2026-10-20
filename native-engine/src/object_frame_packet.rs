@@ -6,7 +6,6 @@ pub(crate) use crate::object_document::{
     PropertyHolderTarget, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
-use std::collections::HashMap;
 
 #[path = "object_frame_context.rs"]
 mod context;
@@ -17,6 +16,9 @@ pub(crate) mod duplicators;
 #[path = "object_frame_sources.rs"]
 mod sources;
 use context::FrameContext;
+#[path = "object_frame_prepare.rs"]
+mod prepare;
+use prepare::prepare_frame_with_order;
 
 #[path = "object_order_evaluation.rs"]
 mod order;
@@ -339,7 +341,7 @@ pub fn prepare_object_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    prepare_frame_with_order(snapshot, selector, false, order::prepare_context)
+    prepare_frame_with_order(snapshot, selector, false, order::prepare_context, None)
 }
 
 /// Desktop drawing exposure requires explicit timing for every admitted layer.
@@ -348,7 +350,7 @@ pub fn prepare_object_exposure_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    prepare_frame_with_order(snapshot, selector, true, order::prepare_context)
+    prepare_frame_with_order(snapshot, selector, true, order::prepare_context, None)
 }
 
 /// Explicit exact-scoped resolver; its authored source equals the selector frame.
@@ -375,6 +377,7 @@ where
                 |_, layer, stroke| resolver(layer, stroke),
             )
         },
+        None,
     )
 }
 
@@ -397,107 +400,8 @@ where
                 snapshot, context_id, frame, sources, exposure, resolver,
             )
         },
+        None,
     )
-}
-
-fn prepare_frame_with_order<E, F>(
-    snapshot: &ObjectSnapshot,
-    selector: &ObjectFrameSelector<'_>,
-    exposure: bool,
-    prepare_order: F,
-) -> Result<ObjectFramePacket, E>
-where
-    E: From<ObjectFrameError>,
-    F: FnOnce(&ObjectSnapshot, &str, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
-{
-    let context = FrameContext::admit(snapshot, selector, exposure)?;
-    let document = snapshot.document();
-    let context_layers = context.layers(document);
-    let exposure = exposure || context.is_component();
-    let context_objects = context.objects(document);
-    let v2 = document.format_version() == 2;
-    // The typed holder table is admitted for persistence and native reads.
-    // Until its sampled values reach this producer, never paint unmodified
-    // geometry while silently ignoring authored Motion properties. L01-H consumes exactly
-    // parametric-shape, root-vector Position and the actual Text/raster parent consumer.
-    // Other holders and visible vector parenting remain unavailable (holders_fully_consumed).
-    if snapshot.frame_needs_camera_or_3d_join() || !holders_fully_consumed(document) {
-        return Err(ObjectFrameError::Unavailable.into());
-    }
-    let source_frames = sources::select(
-        snapshot,
-        selector,
-        context_layers,
-        exposure,
-        context.is_component(),
-    )?;
-    let numeric_order = if v2 {
-        Some(prepare_order(
-            snapshot,
-            selector.context_id,
-            selector.frame,
-            &source_frames,
-            exposure,
-        )?)
-    } else {
-        None
-    };
-    let layers: HashMap<_, _> = context_layers
-        .iter()
-        .enumerate()
-        .map(|(index, layer)| (layer.layer_uid(), index))
-        .collect();
-    let mut records = Vec::new();
-    for (source_object_index, record) in context_objects.iter().enumerate() {
-        let target = record.target();
-        if target.context_id() == selector.context_id && target.scope_kind() == &selector.scope_kind
-        {
-            let source_layer_index = *layers
-                .get(target.layer_uid())
-                .ok_or(ObjectFrameError::InvalidSource)?;
-            if source_frames[source_layer_index] != Some(target.frame())
-                || !context_layers[source_layer_index].visible()
-            {
-                continue;
-            }
-            records.push(ObjectFrameIndices {
-                source_layer_index,
-                source_object_index,
-            });
-        }
-    }
-    let mut raster_records = Vec::new();
-    if let Some(items) = document.item_records() {
-        for (entry, record) in items.raster_entries().iter().enumerate() {
-            let target = &record.target;
-            if target.context_id() == selector.context_id
-                && target.scope_kind() == &selector.scope_kind
-            {
-                let layer = *layers
-                    .get(target.layer_uid())
-                    .ok_or(ObjectFrameError::InvalidSource)?;
-                if source_frames[layer] == Some(target.frame()) && context_layers[layer].visible() {
-                    raster_records.push(ObjectFrameRasterIndex { layer, entry });
-                }
-            }
-        }
-    }
-    let text_records = text::select(snapshot, selector, context_layers, &source_frames)?;
-    let mut packet = ObjectFramePacket {
-        duplicators: Vec::new(),
-        text_records,
-        raster_records,
-        snapshot: snapshot.clone(),
-        context_id: selector.context_id.to_owned(),
-        context,
-        scope_kind: selector.scope_kind.clone(),
-        frame: selector.frame,
-        records,
-        source_frames,
-        numeric_order,
-    };
-    packet.duplicators = duplicators::prepare(&packet, exposure)?;
-    Ok(packet)
 }
 
 #[cfg(all(test, feature = "codec"))]

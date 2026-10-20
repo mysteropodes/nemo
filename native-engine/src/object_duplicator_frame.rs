@@ -4,6 +4,7 @@ use crate::evaluation::object_component_kernels::duplicator_placement_temporal::
 use crate::evaluation::object_component_kernels::object_duplicator_evaluate::{
     snapshot::SnapshotMotion, CopySet, Entry, Evaluation, Request,
 };
+use crate::evaluation::object_component_kernels::object_effector_layers::MotionPort;
 use crate::object_document::RangeEvaluator;
 use crate::object_frame_packet::{ObjectFrameError, ObjectFramePacket, ObjectFrameSelector};
 
@@ -12,20 +13,52 @@ pub(crate) struct LayerCopies {
     pub(crate) layer_index: usize,
     pub(crate) output: CopySet,
     pub(crate) source_indices: Vec<usize>,
+    // Admission fact of this successful output, never a document/global flag.
+    evaluated_motion: bool,
 }
 
 impl ObjectFramePacket {
     pub(crate) fn duplicator_outputs(&self) -> &[LayerCopies] {
         &self.duplicators
     }
+    /// Only this retained packet's successfully evaluated host owns the fact.
+    /// Matching a layer index in another packet does not establish coverage.
+    pub(crate) fn has_evaluated_duplicator_motion(&self, layer_index: usize) -> bool {
+        self.duplicators
+            .iter()
+            .any(|copies| copies.layer_index == layer_index && copies.evaluated_motion)
+    }
 }
 
 pub(super) fn prepare(
     packet: &ObjectFramePacket,
     exposure: bool,
+    evaluated_motion: Option<&dyn MotionPort>,
 ) -> Result<Vec<LayerCopies>, ObjectFrameError> {
     let snapshot = packet.snapshot();
-    let Some(set) = snapshot.document().duplicator_set() else {
+    let set = snapshot.document().duplicator_set();
+    // FollowPath is consumed here only by an original non-content effector.
+    // A role tag cannot claim FollowPath for another retained painter.
+    if packet.source_layers().iter().any(|layer| {
+        layer
+            .follow_path
+            .value()
+            .and_then(Option::as_ref)
+            .is_some_and(|fp| !fp.target_layer_uid().is_empty())
+            && !(set.is_some_and(|set| {
+                set.effector_layers.iter().any(|effector| {
+                    effector.context_id == packet.context_id()
+                        && effector.layer_uid == layer.layer_uid()
+                })
+            }) && effector_motion_has_no_content(
+                snapshot.document(),
+                packet.context_id(),
+                layer.layer_uid(),
+            ))
+    }) {
+        return Err(ObjectFrameError::Unavailable);
+    }
+    let Some(set) = set else {
         return Ok(Vec::new());
     };
     let active = packet
@@ -65,7 +98,8 @@ pub(super) fn prepare(
     let sources = crate::object_frame_packet::duplicator_sources::SnapshotSources::new(
         snapshot, &selector, exposure,
     )?;
-    let motion = SnapshotMotion::new(snapshot, packet.context_id(), f64::from(packet.frame()));
+    let raw_motion = SnapshotMotion::new(snapshot, packet.context_id(), f64::from(packet.frame()));
+    let motion = evaluated_motion.unwrap_or(&raw_motion);
     let ranges = RangeEvaluator::new(snapshot, packet.context_id(), packet.frame())
         .map_err(|_| ObjectFrameError::Unavailable)?;
     let mut output = Vec::with_capacity(active.len());
@@ -113,7 +147,7 @@ pub(super) fn prepare(
                 len: span.out_point - span.in_point + 1.,
             },
         };
-        if let Evaluation::Copies(copies) = sources.evaluate(&request, &motion)? {
+        if let Evaluation::Copies(copies) = sources.evaluate(&request, motion)? {
             let source_indices = copies
                 .copies
                 .iter()
@@ -128,10 +162,31 @@ pub(super) fn prepare(
                 layer_index,
                 output: copies,
                 source_indices,
+                evaluated_motion: evaluated_motion.is_some(),
             });
         }
     }
     Ok(output)
+}
+
+// Shared exact R2 non-content predicate; callers separately prove effector role.
+fn effector_motion_has_no_content(
+    document: &crate::object_document::ObjectDocument,
+    context_id: &str,
+    layer_uid: &str,
+) -> bool {
+    context_id == "scene-root"
+        && !document.objects().iter().any(|record| {
+            record.target().context_id() == context_id && record.target().layer_uid() == layer_uid
+        })
+        && document.item_records().is_none_or(|items| {
+            !items
+                .targets()
+                .any(|item| item.context_id() == context_id && item.layer_uid() == layer_uid)
+        })
+        && document
+            .component_set()
+            .is_none_or(|set| set.instance(context_id, layer_uid).is_none())
 }
 
 /// Only declared duplicator/effector keys are newly owned by this producer.
@@ -139,6 +194,16 @@ pub(super) fn prepare(
 pub(crate) fn remaining_holder(
     document: &crate::object_document::ObjectDocument,
     holder: &crate::object_document::PropertyHolder,
+) -> Option<crate::object_document::PropertyHolder> {
+    remaining_holder_with_motion(document, holder, false)
+}
+
+/// Only the actual owner-bound MotionPort admits evaluated duplicated fields.
+/// Its effect sink refuses the whole frame when diagnostics/disables are pending.
+pub(crate) fn remaining_holder_with_motion(
+    document: &crate::object_document::ObjectDocument,
+    holder: &crate::object_document::PropertyHolder,
+    evaluated: bool,
 ) -> Option<crate::object_document::PropertyHolder> {
     let target = holder.target();
     if target.stroke_id().is_some() {
@@ -151,23 +216,35 @@ pub(crate) fn remaining_holder(
     let effector = set.effector_layers.iter().any(|record| {
         record.context_id == target.context_id() && record.layer_uid == target.layer_uid()
     });
+    // Effector layers are non-content roles in the original drawing source.
+    // Do not steal a pose from another painter on a malformed mixed layer.
+    let local_effector = evaluated
+        && effector
+        && effector_motion_has_no_content(document, target.context_id(), target.layer_uid());
     let owned = |key: &str| {
-        (duplicator
+        (local_effector
             && matches!(
                 key,
-                "dupOffsetPos"
-                    | "dupOffsetRot"
-                    | "dupOffsetScale"
-                    | "dupOffsetOpacity"
-                    | "dupOffsetHue"
-                    | "dupOffsetPosZ"
-                    | "dupOffsetRotX"
-                    | "dupOffsetRotY"
+                "position" | "anchor" | "rotation" | "scale" | "opacity"
             ))
+            || (duplicator
+                && matches!(
+                    key,
+                    "dupOffsetPos"
+                        | "dupOffsetRot"
+                        | "dupOffsetScale"
+                        | "dupOffsetOpacity"
+                        | "dupOffsetHue"
+                        | "dupOffsetPosZ"
+                        | "dupOffsetRotX"
+                        | "dupOffsetRotY"
+                ))
             || (effector
                 && matches!(
                     key,
-                    "effRadius"
+                    "pathPercent"
+                        | "pathInfluence"
+                        | "effRadius"
                         | "effStrength"
                         | "effAngle"
                         | "effOffPosition"
@@ -187,14 +264,15 @@ pub(crate) fn remaining_holder(
         return None;
     }
     let mut remaining = holder.clone();
-    // Keep active expressions in ordinary admission, where they remain refused;
-    // a raw track is never substituted for an expression-backed property.
+    // Raw-only packets keep their existing strict expression refusal. The
+    // owner route actually supplies evaluated values for these exact keys.
     remaining.properties.retain(|property| {
         !owned(property.property())
-            || property
-                .expression
-                .value()
-                .is_some_and(|expression| expression.enabled)
+            || (!evaluated
+                && property
+                    .expression
+                    .value()
+                    .is_some_and(|expression| expression.enabled))
     });
     Some(remaining)
 }
@@ -278,3 +356,19 @@ pub(crate) fn paint_order(
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_duplicator_frame.rs"]
 pub(crate) mod tests;
+
+/// Existing frame construction, with the actual original Motion lookup port.
+/// Application owns the guest and every effect; evaluation never imports it.
+pub(crate) fn prepare_with_motion(
+    snapshot: &crate::revision::ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    motion: &dyn MotionPort,
+) -> Result<ObjectFramePacket, ObjectFrameError> {
+    super::prepare_frame_with_order(
+        snapshot,
+        selector,
+        true,
+        super::order::prepare_context,
+        Some(motion),
+    )
+}

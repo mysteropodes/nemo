@@ -9,8 +9,9 @@
 //! T09 binds stored self/layer/control/key/comp reads through the same native
 //! snapshot, including dependency diagnostics and the shared recursion budget.
 //! Timing is supplied only by real project metadata. Other expression helpers,
-//! compile caching, V8 message/line parity and dynamic effector/exposed dimensions
-//! remain separate named consumers; a provider increment does not accept them.
+//! compile caching, V8 message/line parity and exposed-property dimensions
+//! remain separate named consumers. Original effector dimensions are consumed
+//! by the owner-held Motion frame join; this does not accept the other gaps.
 #[cfg(all(test, feature = "test-object_expression_runtime"))]
 #[path = "../tests/object_expression_property.rs"]
 mod tests;
@@ -182,12 +183,24 @@ pub(crate) fn evaluate_property_detached(
     request: &PropertyExpressionRequest,
     limits: ExpressionLimits,
 ) -> Result<PropertyCandidate, ExpressionRefusal> {
+    detached_with_effects(request, limits).0
+}
+
+fn detached_with_effects(
+    request: &PropertyExpressionRequest,
+    limits: ExpressionLimits,
+) -> (
+    Result<PropertyCandidate, ExpressionRefusal>,
+    Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+) {
     let state = ReadState::new(Arc::new(AtomicUsize::new(0)));
-    let outcome = evaluate_shared(request, limits, state.clone())?;
-    Ok(PropertyCandidate {
+    let outcome = evaluate_shared(request, limits, state.clone());
+    let effects = state.effects();
+    let candidate = outcome.map(|outcome| PropertyCandidate {
         outcome,
-        dependencies: state.effects(),
-    })
+        dependencies: effects.clone(),
+    });
+    (candidate, effects)
 }
 
 fn evaluate_shared(
@@ -214,14 +227,39 @@ pub(crate) fn evaluate_property_for_owner(
     depth: u32,
     limits: ExpressionLimits,
 ) -> Result<PropertyEvaluation, ExpressionRefusal> {
-    let request =
-        prepare_property_expression_request(owner, snapshot, target, property, frame, depth)?;
-    let candidate = match evaluate_property_detached(&request, limits) {
-        Ok(candidate) => candidate,
-        Err(refusal) => {
-            request.revalidate(owner)?;
-            return Err(refusal);
-        }
+    evaluate_property_for_owner_with_effects(
+        owner, snapshot, target, property, frame, depth, limits,
+    )
+    .0
+}
+
+/// Same owner entry, preserving dependency effects even when retirement or the
+/// final owner check refuses. The actual frame caller retains these effects.
+pub(crate) fn evaluate_property_for_owner_with_effects(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    target: &PropertyHolderTarget,
+    property: &str,
+    frame: f64,
+    depth: u32,
+    limits: ExpressionLimits,
+) -> (
+    Result<PropertyEvaluation, ExpressionRefusal>,
+    Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+) {
+    let request = match prepare_property_expression_request(
+        owner, snapshot, target, property, frame, depth,
+    ) {
+        Ok(request) => request,
+        Err(error) => return (Err(error.into()), Vec::new()),
     };
-    request.finalize(owner, candidate)
+    let (candidate, effects) = detached_with_effects(&request, limits);
+    let result = match candidate {
+        Ok(candidate) => request.finalize(owner, candidate),
+        Err(refusal) => match request.revalidate(owner) {
+            Ok(()) => Err(refusal),
+            Err(error) => Err(error.into()),
+        },
+    };
+    (result, effects)
 }

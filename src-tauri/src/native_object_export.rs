@@ -1,13 +1,14 @@
 //! Private original-owner binding to the existing desktop artifact port.
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
+    application::prepare_object_motion_exposure_frame_for_owner,
     compositor::Compositor,
     export_job::{
         export_object_frames, export_object_svg_frames, CleanupStatus, ExportReleaseReconciliation,
         ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, ObjectHostExportRequest,
         StagedArtifactPort,
     },
-    object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector},
+    object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
         prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
     },
@@ -143,13 +144,19 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object export snapshot is unavailable")?;
-        let witness_for = |frame| {
+        let (scheduler, motion_failure) = self.preview.export_frame_ports()?;
+        let mut witness_for = |frame| {
             let selector = ObjectFrameSelector {
                 frame,
                 ..expected.clone()
             };
-            let packet = prepare_object_exposure_frame(&snapshot, &selector)
-                .map_err(|error| format!("object export selector: {error:?}"))?;
+            let packet = prepare_object_motion_exposure_frame_for_owner(
+                &self.history,
+                &snapshot,
+                &selector,
+                motion_failure,
+            )
+            .map_err(|error| format!("object export selector: {error}"))?;
             let scene = prepare_object_render_scene(&packet, &selector)
                 .map_err(|error| format!("object export scene: {error:?}"))?;
             let plan = prepare_object_paint_plan(&scene, &selector)
@@ -168,7 +175,6 @@ impl NativeObjectHost {
                 witness_for(frame)
             }
         };
-        let scheduler = self.preview.scheduler_for_export()?;
         let session_request_id = request_id.clone();
         let request = ObjectHostExportRequest {
             request_id,

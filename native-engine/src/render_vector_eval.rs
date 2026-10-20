@@ -349,7 +349,7 @@ pub(crate) fn duplicator_geometry(
         segments =
             motion::apply_element_motion(packet.snapshot(), record, packet.frame(), segments)?;
     }
-    segments = motion::apply_layer_position(packet.snapshot(), record, packet.frame(), segments)?;
+    segments = motion::apply_duplicator_layer_position(packet, record, layer_index, segments)?;
     Ok((segments, record.geometry.closed))
 }
 

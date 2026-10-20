@@ -1,13 +1,16 @@
 //! Owner-held work only: GPU and surface remain borrowed from the caller.
 use crate::native_dispatch::{NativeObjectHost, NativeReleaseProgress};
 use native_engine::{
-    application::ApplicationReleaseReceipt,
+    application::{
+        prepare_object_motion_exposure_frame_for_owner, ApplicationReleaseReceipt,
+        ObjectMotionFrameFailure,
+    },
     compositor::Compositor,
     desktop_viewport::{
         DesktopViewportHost, ObjectViewportFrame, PresentationReceipt, SurfacePort, ViewportStatus,
     },
     export_job::ReconciliationStage,
-    object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector},
+    object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
         prepare_object_viewport_composition, prepare_scheduled_object_composition_from_witness,
@@ -34,6 +37,9 @@ pub(super) struct ObjectPreview {
     scheduler: FrameScheduler,
     prepared: Option<PreparedObjectPreview>,
     reference_cache: Option<ObjectCompositionWitness>,
+    // Required original C02 effects remain at this actual owner. They never
+    // become a render-time history edit or disappear into an error string.
+    pub(super) motion_failure: Option<ObjectMotionFrameFailure>,
     pending: Option<ScheduledFrame>,
     blocked: Option<String>,
     released: bool,
@@ -49,6 +55,13 @@ impl ObjectPreview {
             return Err("native object preview work must settle before export".into());
         }
         Ok(&mut self.scheduler)
+    }
+
+    pub(super) fn export_frame_ports(
+        &mut self,
+    ) -> Result<(&mut FrameScheduler, &mut Option<ObjectMotionFrameFailure>), String> {
+        self.scheduler_for_export()?;
+        Ok((&mut self.scheduler, &mut self.motion_failure))
     }
 
     fn cancel_pending(&mut self) -> Result<(), String> {
@@ -139,7 +152,7 @@ impl NativeObjectHost {
     }
 
     fn prepare_object_preview(
-        &self,
+        &mut self,
         expected: &ObjectFrameSelector<'_>,
         output: OutputSpec,
     ) -> Result<PreparedObjectPreview, String> {
@@ -157,8 +170,13 @@ impl NativeObjectHost {
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object preview snapshot is unavailable")?;
         // Validate the complete retained source before disturbing deferred work.
-        let packet = prepare_object_exposure_frame(&snapshot, expected)
-            .map_err(|e| format!("preview selector: {e:?}"))?;
+        let packet = prepare_object_motion_exposure_frame_for_owner(
+            &self.history,
+            &snapshot,
+            expected,
+            &mut self.preview.motion_failure,
+        )
+        .map_err(|e| format!("preview selector: {e}"))?;
         let scene = prepare_object_render_scene(&packet, expected)
             .map_err(|e| format!("preview scene: {e:?}"))?;
         let plan = prepare_object_paint_plan(&scene, expected)
@@ -350,3 +368,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_raster_image_preview_tests.rs"]
 mod raster_tests;
+
+#[cfg(test)]
+#[path = "native_object_motion_tests.rs"]
+mod motion_tests;
