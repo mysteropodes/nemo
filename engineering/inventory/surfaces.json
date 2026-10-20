@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "084f8a5ea2da2419d4a20fc80bdc23c8abaa2a89",
-  "describe": "v0.7.0-alpha.4-2473-g084f8a5e"
+  "head": "f2fcf46063c3f2c02f7a10cdb50e4918caeff507",
+  "describe": "v0.7.0-alpha.4-2485-gf2fcf460"
  },
- "inputsDigest": "2f4ad1427f307e0d517b84f7fcc8edb732a3c996fd0cdc0d85de5ad49f415c93",
+ "inputsDigest": "7acee75f28a3fe14281fa5e7dedae45827d1fbf97c5c4458ca176621d19dbd8d",
  "states": [
   "inventoried",
   "characterized",
@@ -57,7 +57,7 @@
    "animation": 457,
    "history": 357,
    "selection": 381,
-   "render": 484,
+   "render": 481,
    "persist": 411
   }
  },
@@ -1072,8 +1072,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "animation": 1,
-    "render": 3
+    "animation": 1
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
@@ -1085,7 +1084,7 @@
     "container": "camera-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 59,
+    "functionsVisited": 60,
     "via": "variable editEase",
     "references": [
      "src/js/camera.js:604 updateCameraPanel()"
@@ -2041,9 +2040,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -2054,7 +2051,7 @@
     "container": "tool-opts-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 32,
+    "functionsVisited": 37,
     "via": "variable _pcurveEditBtn",
     "references": []
    },
@@ -6060,7 +6057,6 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "render": 3,
     "animation": 3
    },
    "platforms": "browser and desktop",
@@ -6073,7 +6069,7 @@
     "container": "easing-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 65,
+    "functionsVisited": 67,
     "via": "variable savePresetBtn",
     "references": []
    },
@@ -13291,7 +13287,7 @@
    "capability": "Add an animator: a range selector plus the properties it drives",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/text-animator-panel.js:467 init()"
+    "src/js/text-animator-panel.js:470 init()"
    ],
    "events": [
     "click"
@@ -13316,9 +13312,12 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 31,
+    "functionsVisited": 56,
     "via": "helper el()",
-    "references": []
+    "references": [
+     "src/js/adapters/native-text-animator-desktop.js:43 draw()",
+     "src/js/adapters/native-text-animator-desktop.js:60 render()"
+    ]
    },
    "fixtures": [
     "static-props",
