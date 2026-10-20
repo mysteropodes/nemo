@@ -4,8 +4,9 @@ use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::{ElementMat,MultiPolygon,MAX_ABS_COORD};
 use crate::object_document::object_group_kernels::object_boolean_topology::Polygon;
-use crate::object_document::object_group_kernels::object_fill_trace_ops::{native::{ring,bounds,polygon},RingSeg};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{native::{ring,path,polygon},RingSeg};
 use crate::evaluation::motion_parent_chain::{transform_segments,MotionMat,Segment};
+use kurbo::Shape;
 use crate::object_document::{ObjectRecord,ObjectTarget, Presence, PropertyHolderTarget};
 use crate::revision::ObjectSnapshot;
 
@@ -51,11 +52,11 @@ impl ElementMotionSource for SnapshotMotion<'_> {
         }))
     }
     fn materialized_polygons(&self,record:&ObjectRecord) -> Result<MultiPolygon,MotionUnavailable> {
-        if record.solid_fill().is_none() || !record.geometry.closed { return Err(MotionUnavailable) }
+        if record.solid_fill().is_none() { return Err(MotionUnavailable) }
         let mut input=ring(record);
         if let Some(m)=self.motion(&record.target)? {
-            let b=bounds(&input);
-            let pivot=[b.x+b.width/2.+m.ax,b.y+b.height/2.+m.ay];
+            let b=path(&input,record.geometry.closed).bounding_box();
+            let pivot=[b.center().x+m.ax,b.center().y+m.ay];
             let segments:Vec<_>=input.iter().map(|s|Segment{point:s.point,handle_in:Some(s.handle_in),handle_out:Some(s.handle_out)}).collect();
             input=transform_segments(&segments,pivot,&m).into_iter().map(|s|RingSeg{
                 point:s.point,handle_in:s.handle_in.unwrap_or([0.,0.]),handle_out:s.handle_out.unwrap_or([0.,0.])
@@ -64,7 +65,10 @@ impl ElementMotionSource for SnapshotMotion<'_> {
         // Refuse overflow before asking the adaptive provider to subdivide it.
         if input.iter().flat_map(|s|s.point.into_iter().chain(s.handle_in).chain(s.handle_out))
             .any(|v|!v.is_finite() || v.abs()>MAX_ABS_COORD) { return Err(MotionUnavailable) }
-        Ok(vec![Polygon{exterior:polygon(&input,true),holes:Vec::new()}])
+        // Open fills close with a straight chord, never the unused closing
+        // cubic handles. polygon(false) retains precisely that open contour;
+        // the polygon consumer supplies the implicit straight closing edge.
+        Ok(vec![Polygon{exterior:polygon(&input,record.geometry.closed),holes:Vec::new()}])
     }
 }
 

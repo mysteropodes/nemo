@@ -191,3 +191,32 @@ fn asymmetric_cubic_motion_uses_exact_pivot_and_output_space_curve_tolerance() {
         assert!((actual-expected).abs()<=0.75,"{actual} vs {expected}: retained output-space tolerance exceeded");
     }
 }
+
+#[test]
+fn open_filled_members_preserve_the_straight_closing_chord_with_and_without_motion() {
+    for motion in [false,true] {
+        let mut source=document(json!({"property":"position","static":[20,0]}));
+        if !motion { source.as_object_mut().unwrap().remove("propertyHolders"); }
+        else { source["propertyHolders"][0]["properties"].as_array_mut().unwrap()
+            .push(json!({"property":"rotation","static":[90]})); }
+        for record in source["objects"].as_array_mut().unwrap() {
+            record["family"]=json!("editable-vector-path"); record["geometry"]["closed"]=json!(false);
+            record["vector"]=json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1});
+            // These handles do not belong to an open path; using a closing
+            // Bezier would introduce a huge bulge and a wrong rotation pivot.
+            record["geometry"]["segments"][0]["handleIn"]=json!({"x":1000,"y":1000});
+            record["geometry"]["segments"][3]["handleOut"]=json!({"x":1000,"y":1000});
+        }
+        let mut o=owner(&source); let before=bytes(&o);
+        let edit=o.prepare_boolean_flatten_json(&payload()).unwrap(); o.commit_boolean_edit(edit).unwrap();
+        let after:Value=serde_json::from_slice(&bytes(&o)).unwrap();
+        assert_eq!(after["objects"].as_array().unwrap().len(),if motion{1}else{2});
+        #[cfg(feature="compositor")]
+        {
+            let actual=actual_frame_bounds(&o,1);
+            if motion { for (a,b) in actual[0].iter().zip([20.,0.,30.,10.]) { assert!((*a-b).abs()<1e-10); } }
+            else { assert_eq!(actual,vec![[0.,0.,10.,10.],[20.,0.,30.,10.]]); }
+        }
+        o.undo(o.content_revision()).unwrap(); assert_eq!(bytes(&o),before);
+    }
+}

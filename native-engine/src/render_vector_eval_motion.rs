@@ -12,7 +12,8 @@ use crate::object_document::{
 };
 use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
 use crate::revision::ObjectSnapshot;
-use kurbo::{BezPath, Shape};
+use kurbo::Shape;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::{native::path,RingSeg};
 
 /// Element Motion is nested inside layer Motion, after the original path-FX
 /// and parametric stages. Its pivot is the actual native cubic bounds centre.
@@ -30,20 +31,9 @@ pub(super) fn apply_element_motion(
     let mat = snapshot.sampled_motion_2d(&target, f64::from(frame))
         .map_err(|error| VectorEvalError::Sample { property: "position", error })?;
     let Some(mat) = mat else { return Ok(segments) };
-    let Some(first) = segments.first() else { return Ok(segments) };
-    let mut path = BezPath::new();
-    path.move_to((first.point[0], first.point[1]));
-    let count = if record.geometry.closed { segments.len() } else { segments.len().saturating_sub(1) };
-    for index in 0..count {
-        let from = &segments[index];
-        let to = &segments[(index + 1) % segments.len()];
-        path.curve_to(
-            (from.point[0] + from.handle_out[0], from.point[1] + from.handle_out[1]),
-            (to.point[0] + to.handle_in[0], to.point[1] + to.handle_in[1]),
-            (to.point[0], to.point[1]),
-        );
-    }
-    let centre = path.bounding_box().center();
+    if segments.is_empty() { return Ok(segments) }
+    let ring:Vec<_>=segments.iter().map(|s|RingSeg{point:s.point,handle_in:s.handle_in,handle_out:s.handle_out}).collect();
+    let centre = path(&ring,record.geometry.closed).bounding_box().center();
     let input: Vec<_> = segments.iter().map(|s| Segment {
         point:s.point, handle_in:Some(s.handle_in), handle_out:Some(s.handle_out)
     }).collect();
