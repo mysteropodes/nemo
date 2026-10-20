@@ -20,16 +20,9 @@
     }else if(v&&v.kind==='audioTrack'){exact(v,['kind','trackUid']);sourceId(v.trackUid);}
     else fail('invalid placement target');
   }
-  // T12 video timing: the shape of an ld.timeRemap track and of the footage mode selector; the native owner admits the values.
+  // T12 video timing: bounded remap intents (baseline enable/disable/remove key) and the footage mode selector; the native owner admits the values.
   const finite=n=>typeof n==='number'&&Number.isFinite(n);
-  const numbers=(a,n)=>Array.isArray(a)&&a.length===n&&a.every(finite);
-  function remapTrack(t){
-    exact(t,['keys']);if(!Array.isArray(t.keys))fail('invalid time remap track');
-    for(const k of t.keys){
-      exact(k,['frame','v'],['hold','lockTo','curvePoints','hIn','hOut']);
-      if(!finite(k.frame)||!numbers(k.v,1)||has(k,'hold')&&typeof k.hold!=='boolean'||['hIn','hOut'].some(h=>has(k,h)&&!numbers(k[h],2))||has(k,'curvePoints')&&k.curvePoints!==null&&!Array.isArray(k.curvePoints))fail('invalid time remap key');
-    }
-  }
+  const frames=(v,names)=>{for(const n of names)if(!finite(v[n]))fail('invalid time remap frame');};
   function interpMode(m){if(typeof m!=='string'||!m||bytes(m)>32||m.includes('\0'))fail('invalid interpolation mode');}
   function payload(op,v){
     if(op!==OP)fail('placement operation is not declared');
@@ -39,7 +32,9 @@
     }else if(v&&['setOffset','shiftOffset'].includes(v.kind)){
       const field=v.kind==='setOffset'?'offsetFrames':'deltaFrames';exact(v,['kind','placementId',field]);sourceId(v.placementId);offset(v[field]);
     }else if(v&&v.kind==='remove'){exact(v,['kind','placementId']);sourceId(v.placementId);}
-    else if(v&&v.kind==='setTimeRemap'){exact(v,['kind','placementId','timeRemap']);sourceId(v.placementId);if(v.timeRemap!==null)remapTrack(v.timeRemap);}
+    else if(v&&v.kind==='enableTimeRemap'){exact(v,['kind','placementId','inFrame','outFrame','lastSourceFrame']);sourceId(v.placementId);frames(v,['inFrame','outFrame','lastSourceFrame']);}
+    else if(v&&v.kind==='removeTimeRemapKey'){exact(v,['kind','placementId','frame']);sourceId(v.placementId);frames(v,['frame']);}
+    else if(v&&v.kind==='disableTimeRemap'){exact(v,['kind','placementId']);sourceId(v.placementId);}
     else if(v&&v.kind==='setInterpMode'){exact(v,['kind','placementId','interpMode']);sourceId(v.placementId);interpMode(v.interpMode);}
     else fail('invalid placement edit');
   }

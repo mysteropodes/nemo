@@ -3,7 +3,7 @@
 //! Audio requires its actual persisted record and sealed source; absent owners still refuse.
 use crate::history::NativeObjectHistory;
 use crate::object_document::media_timing::object_media_link_edit::PlacementEdit;
-use crate::object_document::{AssetTarget, OrderTrack};
+use crate::object_document::AssetTarget;
 use crate::request_receipts::DispatchErrorCode;
 use crate::transaction::CompactResult;
 use serde::{Deserialize, Deserializer};
@@ -34,13 +34,28 @@ enum EditIn {
         #[serde(rename = "placementId")]
         placement_id: String,
     },
-    // T12: the whole track (a key edit) or `null` (`disableTimeRemap`); required.
-    #[serde(rename = "setTimeRemap")]
-    SetTimeRemap {
+    // T12 bounded remap intents; each fits the 4 KiB request budget.
+    #[serde(rename = "enableTimeRemap")]
+    EnableTimeRemap {
         #[serde(rename = "placementId")]
         placement_id: String,
-        #[serde(rename = "timeRemap", deserialize_with = "required_or_null")]
-        time_remap: Option<OrderTrack>,
+        #[serde(rename = "inFrame")]
+        in_frame: serde_json::Number,
+        #[serde(rename = "outFrame")]
+        out_frame: serde_json::Number,
+        #[serde(rename = "lastSourceFrame")]
+        last_source_frame: serde_json::Number,
+    },
+    #[serde(rename = "disableTimeRemap")]
+    DisableTimeRemap {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+    },
+    #[serde(rename = "removeTimeRemapKey")]
+    RemoveTimeRemapKey {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        frame: serde_json::Number,
     },
     #[serde(rename = "setInterpMode")]
     SetInterpMode {
@@ -49,13 +64,6 @@ enum EditIn {
         #[serde(rename = "interpMode")]
         interp_mode: String,
     },
-}
-
-// A missing member is refused; only an explicit `null` clears the track.
-fn required_or_null<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<OrderTrack>, D::Error> {
-    Option::<OrderTrack>::deserialize(deserializer)
 }
 
 // Same required persisted placement fields; no absent/null offset coercion.
@@ -128,12 +136,26 @@ fn parse_edit(bytes: &[u8]) -> Result<PlacementEdit, DispatchErrorCode> {
             delta_frames,
         },
         EditIn::Remove { placement_id } => PlacementEdit::Remove { placement_id },
-        EditIn::SetTimeRemap {
+        EditIn::EnableTimeRemap {
             placement_id,
-            time_remap,
-        } => PlacementEdit::SetTimeRemap {
+            in_frame,
+            out_frame,
+            last_source_frame,
+        } => PlacementEdit::EnableTimeRemap {
             placement_id,
-            time_remap,
+            in_frame,
+            out_frame,
+            last_source_frame,
+        },
+        EditIn::DisableTimeRemap { placement_id } => {
+            PlacementEdit::DisableTimeRemap { placement_id }
+        }
+        EditIn::RemoveTimeRemapKey {
+            placement_id,
+            frame,
+        } => PlacementEdit::RemoveTimeRemapKey {
+            placement_id,
+            frame,
         },
         EditIn::SetInterpMode {
             placement_id,

@@ -26,8 +26,9 @@
 //! frames; like the catalog it refuses a result beyond +-(2^53 - 1) instead of
 //! rounding it the way a JS double would.
 //!
-//! T12: [`PlacementEdit::SetTimeRemap`] and [`PlacementEdit::SetInterpMode`]
-//! own a video placement's stored timing; every rebuilt placement keeps it.
+//! T12: the bounded remap intents (enable, disable, remove key) and
+//! [`PlacementEdit::SetInterpMode`] own a video placement's stored timing,
+//! each within the 4 KiB request budget; every rebuilt placement keeps it.
 
 use crate::object_document::object_raster_asset_kernels::object_raster_asset_placement::image_element_exists;
 use crate::object_document::placement_offset::VideoTiming;
@@ -253,11 +254,20 @@ pub(crate) enum PlacementEdit {
     },
     /// Remove a placement; the catalog records stay.
     Remove { placement_id: String },
-    /// T12: replace a video placement's whole time-remap track (`None` is
-    /// `disableTimeRemap`'s `delete ld.timeRemap`; any key edit sends the new track).
-    SetTimeRemap {
+    /// T12 `enableTimeRemap` (motion.js): keys `{in, v:[0]}` and
+    /// `{max(in + 1, out), v:[last]}`, linear; refused when one exists.
+    EnableTimeRemap {
         placement_id: String,
-        time_remap: Option<OrderTrack>,
+        in_frame: serde_json::Number,
+        out_frame: serde_json::Number,
+        last_source_frame: serde_json::Number,
+    },
+    /// T12 `disableTimeRemap`: `delete ld.timeRemap`.
+    DisableTimeRemap { placement_id: String },
+    /// T12: remove the remap key at `frame` (the property `removeKey` rule).
+    RemoveTimeRemapKey {
+        placement_id: String,
+        frame: serde_json::Number,
     },
     /// T12: the footage panel's mode selector (timeline.js), which writes
     /// `interpMode` and `frameBlend = interpMode !== 'none'` together.
@@ -317,14 +327,14 @@ fn replace_timing(
     inventory: &AssetInventory,
     placements: &mut [AssetPlacement],
     at: usize,
-    edit: impl FnOnce(&mut VideoTiming),
+    edit: impl FnOnce(&mut VideoTiming) -> Result<(), PlacementEditError>,
 ) -> Result<bool, PlacementEditError> {
     let kind = inventory.get(placements[at].asset_id()).map(|r| r.kind());
     if kind != Some(AssetKind::Video) {
         return Err(PlacementEditError::KindMismatch);
     }
     let mut timing = placements[at].timing().clone();
-    edit(&mut timing);
+    edit(&mut timing)?;
     let next = placements[at]
         .clone()
         .with_timing(timing)
@@ -420,12 +430,40 @@ pub(crate) fn apply_edit(
             let at = position(&placements, &placement_id)?;
             placements.remove(at);
         }
-        PlacementEdit::SetTimeRemap {
+        PlacementEdit::EnableTimeRemap {
             placement_id,
-            time_remap,
+            in_frame,
+            out_frame,
+            last_source_frame,
         } => {
             let at = position(&placements, &placement_id)?;
-            let set = |timing: &mut VideoTiming| timing.time_remap = time_remap;
+            let track = VideoTiming::enabled_track(&in_frame, &out_frame, &last_source_frame)
+                .ok_or(PlacementEditError::Invalid)?;
+            let set = |timing: &mut VideoTiming| match timing.time_remap {
+                Some(_) => Err(PlacementEditError::Conflict),
+                None => Ok(timing.time_remap = Some(track)),
+            };
+            replace_timing(inventory, &mut placements, at, set)?;
+        }
+        PlacementEdit::DisableTimeRemap { placement_id } => {
+            let at = position(&placements, &placement_id)?;
+            let set = |timing: &mut VideoTiming| Ok(timing.time_remap = None);
+            if !replace_timing(inventory, &mut placements, at, set)? {
+                return Ok(PlacementOutcome::Unchanged);
+            }
+        }
+        PlacementEdit::RemoveTimeRemapKey {
+            placement_id,
+            frame,
+        } => {
+            let at = position(&placements, &placement_id)?;
+            let frame = frame.as_f64().filter(|f| f.is_finite());
+            let set = |timing: &mut VideoTiming| {
+                let (Some(track), Some(at)) = (timing.time_remap.as_mut(), frame) else {
+                    return Err(PlacementEditError::Invalid);
+                };
+                Ok(track.keys.retain(|key| key.frame.as_f64() != Some(at)))
+            };
             if !replace_timing(inventory, &mut placements, at, set)? {
                 return Ok(PlacementOutcome::Unchanged);
             }
@@ -438,6 +476,7 @@ pub(crate) fn apply_edit(
             let set = |timing: &mut VideoTiming| {
                 timing.frame_blend = Some(interp_mode != "none");
                 timing.interp_mode = Some(interp_mode);
+                Ok(())
             };
             if !replace_timing(inventory, &mut placements, at, set)? {
                 return Ok(PlacementOutcome::Unchanged);

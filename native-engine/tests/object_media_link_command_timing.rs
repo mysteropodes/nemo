@@ -5,8 +5,6 @@ use super::*;
 use crate::request_receipts::OpacityRequest;
 use serde_json::{json, Value};
 
-const TRACK: &str = r#"{"keys":[{"frame":0,"v":[0]},{"frame":10,"v":[19]}]}"#;
-
 fn owner() -> NativeObjectHistory {
     let wire = json!({"format":"nemo.native-project-document","formatVersion":2,
         "project":{"canvasW":320,"canvasH":180,"fps":24},
@@ -35,8 +33,8 @@ fn dispatch(o: &mut NativeObjectHistory, id: &str, payload: Value) -> Value {
     let typed: OpacityRequest = serde_json::from_value(request).unwrap();
     serde_json::to_value(o.try_dispatch_object_command(&typed).unwrap().unwrap()).unwrap()
 }
-fn remap(track: Value) -> Value {
-    json!({"kind":"setTimeRemap","placementId":"p1","timeRemap":track})
+fn enable(in_frame: i64, out_frame: i64, last: i64) -> Value {
+    json!({"kind":"enableTimeRemap","placementId":"p1","inFrame":in_frame,"outFrame":out_frame,"lastSourceFrame":last})
 }
 fn mode(mode: &str) -> Value {
     json!({"kind":"setInterpMode","placementId":"p1","interpMode":mode})
@@ -45,40 +43,50 @@ fn mode(mode: &str) -> Value {
 #[test]
 fn timing_edits_persist_and_undo_redo_one_transaction_each() {
     let mut o = owner();
-    let track: Value = serde_json::from_str(TRACK).unwrap();
     assert_eq!(
-        dispatch(&mut o, "r1", remap(track.clone()))["result"]["applied"],
+        dispatch(&mut o, "e1", enable(0, 10, 19))["result"]["applied"],
         true
     );
     assert_eq!(
         dispatch(&mut o, "m1", mode("blend"))["result"]["applied"],
         true
     );
+    let remove = json!({"kind":"removeTimeRemapKey","placementId":"p1","frame":10});
+    assert_eq!(dispatch(&mut o, "k1", remove)["result"]["applied"], true);
     let timed = placement(&o);
-    assert_eq!(timed["timeRemap"], track);
+    let linear = json!([{"x":0,"y":0},{"x":1,"y":1}]);
+    assert_eq!(
+        timed["timeRemap"],
+        json!({"keys":[{"frame":0,"v":[0],"curvePoints":linear,"hIn":[0,0],"hOut":[0,0]}]})
+    );
     assert_eq!(timed["interpMode"], "blend");
     assert_eq!(timed["frameBlend"], true);
     assert_eq!(timed["offsetFrames"], 5);
-    assert_eq!(o.history_depths(), (2, 0));
+    assert_eq!(o.history_depths(), (3, 0));
     // The saved file reopens with the same timing.
     let reopened = NativeObjectHistory::from_project_file("reopen", &saved(&o)).unwrap();
     assert_eq!(placement(&reopened), timed);
     o.undo(o.content_revision()).unwrap();
+    assert_eq!(
+        placement(&o)["timeRemap"]["keys"].as_array().unwrap().len(),
+        2
+    );
+    o.undo(o.content_revision()).unwrap();
     assert!(placement(&o).get("interpMode").is_none());
     assert!(placement(&o).get("frameBlend").is_none());
-    assert_eq!(placement(&o)["timeRemap"], track);
+    o.redo(o.content_revision()).unwrap();
     o.redo(o.content_revision()).unwrap();
     assert_eq!(placement(&o), timed);
-    // The same value again is applied:false with no history entry.
+    // The same value again is applied:false with no history entry; a second
+    // enable is refused like the baseline's "already active".
     let same = dispatch(&mut o, "m2", mode("blend"));
     assert_eq!(
         same["result"],
         json!({"applied":false,"historyEntriesAdded":0})
     );
-    assert_eq!(
-        dispatch(&mut o, "r2", remap(Value::Null))["result"]["applied"],
-        true
-    );
+    assert_eq!(dispatch(&mut o, "e2", enable(0, 4, 2))["ok"], false);
+    let disable = json!({"kind":"disableTimeRemap","placementId":"p1"});
+    assert_eq!(dispatch(&mut o, "d1", disable)["result"]["applied"], true);
     assert!(placement(&o).get("timeRemap").is_none());
     assert_eq!(placement(&o)["interpMode"], "blend");
 }
@@ -95,11 +103,25 @@ fn malformed_payloads_and_non_video_placements_leave_everything_untouched() {
     );
     let before = (o.content_revision(), o.history_depths(), saved(&o));
     for (id, payload) in [
-        ("missing", json!({"kind":"setTimeRemap","placementId":"p1"})),
-        ("array", remap(json!([]))),
         (
-            "disordered",
-            remap(json!({"keys":[{"frame":3,"v":[0]},{"frame":1,"v":[1]}]})),
+            "missing",
+            json!({"kind":"enableTimeRemap","placementId":"p1","inFrame":0,"outFrame":9}),
+        ),
+        (
+            "string",
+            json!({"kind":"enableTimeRemap","placementId":"p1","inFrame":"0","outFrame":9,"lastSourceFrame":3}),
+        ),
+        (
+            "whole-track",
+            json!({"kind":"setTimeRemap","placementId":"p1","timeRemap":null}),
+        ),
+        (
+            "no-remap",
+            json!({"kind":"removeTimeRemapKey","placementId":"p1","frame":0}),
+        ),
+        (
+            "disable-extra",
+            json!({"kind":"disableTimeRemap","placementId":"p1","frame":0}),
         ),
         (
             "extra",

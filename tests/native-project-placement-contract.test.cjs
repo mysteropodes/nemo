@@ -62,23 +62,22 @@ test('registered descriptor example uses the same shared request and response co
   assert.equal(html.split('src="'+child+'"').length-1,1);assert.ok(html.indexOf(child)<html.indexOf(adapter));
 });
 
-test('T12 video timing edits: whole remap track or null, and the footage interpolation mode',()=>{
-  const key=(frame,v,extra={})=>({frame,v:[v],...extra});
+test('T12 video timing edits: bounded remap intents and the footage interpolation mode',()=>{
   for(const payload of [
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:null},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[]}},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[key(0,0,{curvePoints:[{x:0,y:0},{x:1,y:1}],hOut:[0,0],hIn:[0,0]}),key(24,47,{hold:true,curvePoints:null})]}},
+    {kind:'enableTimeRemap',placementId:'p1',inFrame:0,outFrame:24,lastSourceFrame:47},
+    {kind:'enableTimeRemap',placementId:'p1',inFrame:-3.5,outFrame:2,lastSourceFrame:0},
+    {kind:'removeTimeRemapKey',placementId:'p1',frame:24},{kind:'disableTimeRemap',placementId:'p1'},
     {kind:'setInterpMode',placementId:'p1',interpMode:'none'},{kind:'setInterpMode',placementId:'p1',interpMode:'motion'},
     {kind:'setInterpMode',placementId:'p1',interpMode:'m'.repeat(32)},
   ])assert.doesNotThrow(()=>validateRequest(request(payload)),JSON.stringify(payload));
   for(const payload of [
-    {kind:'setTimeRemap',placementId:'p1'},{kind:'setTimeRemap',placementId:'p1',timeRemap:[]},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[key(0,0)],extra:1}},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[{frame:0,v:[0,1]}]}},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[key(NaN,0)]}},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[key(0,0,{hold:1})]}},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[key(0,0,{hOut:[0]})]}},
-    {kind:'setTimeRemap',placementId:'p1',timeRemap:{keys:[key(0,0,{path:'x'})]}},
+    {kind:'setTimeRemap',placementId:'p1',timeRemap:null},
+    {kind:'enableTimeRemap',placementId:'p1',inFrame:0,outFrame:24},
+    {kind:'enableTimeRemap',placementId:'p1',inFrame:'0',outFrame:24,lastSourceFrame:47},
+    {kind:'enableTimeRemap',placementId:'p1',inFrame:0,outFrame:Infinity,lastSourceFrame:47},
+    {kind:'enableTimeRemap',placementId:'p1',inFrame:0,outFrame:24,lastSourceFrame:47,keys:[]},
+    {kind:'removeTimeRemapKey',placementId:'p1'},{kind:'removeTimeRemapKey',placementId:'p1',frame:NaN},
+    {kind:'disableTimeRemap',placementId:'p1',frame:0},{kind:'disableTimeRemap'},
     {kind:'setInterpMode',placementId:'p1'},{kind:'setInterpMode',placementId:'p1',interpMode:''},
     {kind:'setInterpMode',placementId:'p1',interpMode:1},{kind:'setInterpMode',placementId:'p1',interpMode:'a\0'},
     {kind:'setInterpMode',placementId:'p1',interpMode:'m'.repeat(33)},

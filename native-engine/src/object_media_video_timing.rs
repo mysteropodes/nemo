@@ -15,6 +15,7 @@
 use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::object_document::object_component_record_kernels::object_component_records::validate_remap;
 use crate::object_document::{OrderKey, OrderTrack};
+use serde_json::Number;
 
 /// The longest authored `interpMode` kept (the baseline values are four to six bytes).
 pub(crate) const MAX_INTERP_MODE: usize = 32;
@@ -62,6 +63,28 @@ impl VideoTiming {
         let eased = evaluate_curve(&curve(a)?, (at - start) / (end - start));
         let result = value(a)? + (value(b)? - value(a)?) * eased;
         result.is_finite().then_some(result)
+    }
+
+    /// `enableTimeRemap` (motion.js): `{in, v:[0]}` and `{max(in + 1, out),
+    /// v:[last]}`, `CURVE_LINEAR`, zero handles. Integral numbers keep an
+    /// integer spelling, like the JS numbers a saved file carries.
+    pub(crate) fn enabled_track(
+        in_frame: &Number,
+        out_frame: &Number,
+        last: &Number,
+    ) -> Option<OrderTrack> {
+        let finite = |n: &Number| n.as_f64().filter(|v| v.is_finite());
+        let (start, out, last) = (finite(in_frame)?, finite(out_frame)?, finite(last)?);
+        let n = |v: f64| match v.fract() == 0.0 && v.abs() <= 9_007_199_254_740_991.0 {
+            true => serde_json::Value::from(v as i64),
+            false => serde_json::Value::from(v),
+        };
+        let key = |frame: f64, value: f64| {
+            serde_json::json!({"frame":n(frame),"v":[n(value)],
+                "curvePoints":[{"x":0,"y":0},{"x":1,"y":1}],"hOut":[0,0],"hIn":[0,0]})
+        };
+        let keys = [key(start, 0.0), key((start + 1.0).max(out), last.max(0.0))];
+        serde_json::from_value(serde_json::json!({ "keys": keys })).ok()
     }
 
     /// Whether the time-remap sampler is consulted (`ld.timeRemap` present).
