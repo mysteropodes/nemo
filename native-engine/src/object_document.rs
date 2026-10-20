@@ -36,6 +36,9 @@ mod project;
 pub(crate) use project::{
     ProjectEnvelope, ProjectMetadata, ProjectMetadataError, ProjectReferenceState,
 };
+#[path = "project_camera_state.rs"]
+mod camera;
+pub(crate) use camera::{ProjectCameraKey, ProjectCameraState};
 
 #[path = "object_layer_timing.rs"]
 mod timing;
@@ -210,6 +213,8 @@ pub struct ObjectDocument {
 pub struct ObjectLayer {
     pub(crate) layer_uid: String,
     #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) three_d: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) name: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) visible: Presence<bool>,
@@ -303,6 +308,7 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>,
     #[serde(default)] audio_tracks: Presence<AudioTracks> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
+    #[serde(default)] three_d: Presence<bool>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
     #[serde(default)] key_lock: Presence<Option<KeyLockMode>>,
     #[serde(default)] color: Presence<String>,

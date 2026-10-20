@@ -6,6 +6,11 @@ use crate::object_document::{
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
 
+#[path = "object_frame_motion_values.rs"]
+mod frame_motion;
+#[path = "object_frame_camera.rs"]
+mod camera;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropertySampleError {
     InvalidFrame,

@@ -1,5 +1,5 @@
 //! Strict private project wire; drawing admission always sees original bytes.
-use crate::object_document::{Presence, ProjectEnvelope, ProjectMetadata, ProjectReferenceState};
+use crate::object_document::{Presence, ProjectCameraKey, ProjectEnvelope, ProjectMetadata, ProjectReferenceState};
 #[cfg(feature = "project_media_codec")]
 use crate::reference_image_asset::{ImageAssetError, ImageAssetLimits};
 use serde::{Deserialize, Serialize};
@@ -151,6 +151,10 @@ struct Metadata {
     bpm_offset: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
     bpm_show: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    camera_keys: Presence<Vec<ProjectCameraKey>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    camera_layer_on: Presence<bool>,
 }
 // Derived decoding alone admits positional arrays; reuse the drawing's
 // object-only visitor with strict duplicate/unknown/required-member checks.
@@ -164,7 +168,9 @@ crate::object_document::object_deserialize!(Metadata {
     #[serde(default)] markers: Presence<Vec<CompositionMarker>>,
     #[serde(default)] bpm: Presence<f64>,
     #[serde(default)] bpm_offset: Presence<f64>,
-    #[serde(default)] bpm_show: Presence<bool>
+    #[serde(default)] bpm_show: Presence<bool>,
+    #[serde(default)] camera_keys: Presence<Vec<ProjectCameraKey>>,
+    #[serde(default)] camera_layer_on: Presence<bool>
 });
 
 impl Metadata {
@@ -189,6 +195,7 @@ impl Metadata {
                     self.bpm_show.value().copied(),
                 )
             })
+            .and_then(|value| value.with_camera(self.camera_keys.value().cloned(), self.camera_layer_on.value().copied()))
             .map_err(|_| ProjectWireError::Invalid)
     }
     fn from_metadata(value: &ProjectMetadata) -> Self {
@@ -231,6 +238,8 @@ impl Metadata {
                 .map(Presence::Present)
                 .unwrap_or(Presence::Missing),
             bpm_show: bpm_show.map(Presence::Present).unwrap_or(Presence::Missing),
+            camera_keys: value.camera_keys().map(|keys| Presence::Present(keys.to_vec())).unwrap_or(Presence::Missing),
+            camera_layer_on: value.camera_layer_on().map(Presence::Present).unwrap_or(Presence::Missing),
         }
     }
 }

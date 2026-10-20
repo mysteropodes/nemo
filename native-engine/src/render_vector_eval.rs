@@ -336,7 +336,7 @@ fn evaluate_stored_rest(
     Ok(EvaluatedVector {
         source_object_index: object_index,
         closed: after_effects.closed,
-        segments,
+        segments: motion::apply_element_motion(snapshot, stored.record, frame, segments)?,
     })
 }
 
