@@ -1,5 +1,4 @@
 //! Pinned raw Perspective metadata and native-computed effective VP projection.
-use crate::object_document::ProjectMetadata;
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::{DispatchErrorCode as Error, OpacityRequest, ResponseEnvelope};
 use serde::Deserialize;
@@ -31,10 +30,10 @@ impl ObjectSnapshot {
     /// Pure original defaultVPs formula, shared by explicit edits and projections.
     /// Dimensions come only from admitted native metadata, never a caller array.
     pub(crate) fn perspective_default_vps(
-        metadata: &ProjectMetadata,
+        dimensions: (u32, u32),
         mode: Option<&str>,
     ) -> Result<Vec<(f64, f64, Option<bool>)>, Error> {
-        let (width, height) = metadata.canvas_dimensions();
+        let (width, height) = dimensions;
         if width == 0 || height == 0 {
             return Err(Error::Unavailable);
         }
@@ -87,7 +86,7 @@ impl ObjectSnapshot {
         let stored = supplied.flatten().unwrap_or_default();
         let defaults;
         let points = if stored.is_empty() {
-            defaults = Self::perspective_default_vps(metadata, mode)?;
+            defaults = Self::perspective_default_vps(metadata.canvas_dimensions(), mode)?;
             defaults.as_slice()
         } else {
             stored

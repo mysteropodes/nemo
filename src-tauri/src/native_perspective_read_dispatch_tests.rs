@@ -1,6 +1,9 @@
 //! Authenticated native Perspective projection/presence and imported-lock preservation.
-use super::{
-    change, document, edit, history, open, project, read, receipt, round_trip, saved, subscribe,
+use crate::application_mcp::revision_sync::dispatch_core::perspective_tests::{
+    change, document, edit, project, read, subscribe,
+};
+use crate::application_mcp::revision_sync::dispatch_core::property_edit_tests::{
+    history, open, receipt, round_trip, saved,
 };
 use crate::application_mcp::ApplicationMcp;
 use serde_json::{json, Value};

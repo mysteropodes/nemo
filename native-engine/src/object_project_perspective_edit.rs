@@ -47,7 +47,7 @@ fn change(before: &ProjectMetadata, action: Action) -> Result<ProjectMetadata, E
         let empty = source.flatten().is_none_or(|points| points.is_empty());
         if empty || matches!(&action, Action::Reset {} | Action::SetMode { .. }) {
             vps = Some(Some(ObjectSnapshot::perspective_default_vps(
-                before,
+                before.canvas_dimensions(),
                 defaults_mode,
             )?));
         }
