@@ -329,7 +329,6 @@ async fn palette_real_mcp_wire_all_field_intents_ack_replay_noop_redo_and_fresh_
     assert_eq!(saved(&fresh, &next_id), changed);
 }
 
-
 #[tokio::test]
 async fn guide_real_mcp_wire_three_ruler_intents_ack_history_and_fresh_owner_reopen() {
     let state = ApplicationMcp::default();
@@ -347,22 +346,37 @@ async fn guide_real_mcp_wire_three_ruler_intents_ack_history_and_fresh_owner_reo
         request
     };
     let make_read = |name: &str| {
-        let mut request = read(&state, &id, name,
-            json!({"kind":"axisPage","axis":"v","cursor":0,"limit":16}));
+        let mut request = read(
+            &state,
+            &id,
+            name,
+            json!({"kind":"axisPage","axis":"v","cursor":0,"limit":16}),
+        );
         request.operation = "query.document.object.project.guide.read".into();
         request
     };
-    let first_command = make_edit("guide-add", 0,
-        json!({"kind":"add","axis":"v","position":-12.25}));
+    let first_command = make_edit(
+        "guide-add",
+        0,
+        json!({"kind":"add","axis":"v","position":-12.25}),
+    );
     first_command.validate().unwrap();
     let (refused, events) = round_trip(&state, first_command.clone(), None).await;
     assert!(!refused.ok);
     assert_eq!(refused.error.unwrap().code, "unavailable");
     assert_eq!(events, 0);
     assert_eq!(saved(&state, &id), initial);
-    let binding = state.revisions.control(&state.native, RevisionControl::Binding).unwrap();
-    state.revisions.control(&state.native,
-        serde_json::from_value(json!({"action":"subscribe","binding":binding})).unwrap()).unwrap();
+    let binding = state
+        .revisions
+        .control(&state.native, RevisionControl::Binding)
+        .unwrap();
+    state
+        .revisions
+        .control(
+            &state.native,
+            serde_json::from_value(json!({"action":"subscribe","binding":binding})).unwrap(),
+        )
+        .unwrap();
     let (first, events) = round_trip(&state, first_command.clone(), Some(&binding)).await;
     receipt(&first, 1, true);
     assert_eq!(events, 1);
@@ -370,18 +384,33 @@ async fn guide_real_mcp_wire_three_ruler_intents_ack_history_and_fresh_owner_reo
     let (response, events) = round_trip(&state, old_page.clone(), None).await;
     assert!(response.ok, "{response:?}");
     assert_eq!(events, 0);
-    assert_eq!(response.result.unwrap()["result"]["items"],
-        json!([{"ordinal":1,"position":-12.25}]));
-    let (response, events) = round_trip(&state,
-        make_edit("guide-move", 1,
-            json!({"kind":"move","axis":"v","ordinal":1,"position":-8.5})),
-        Some(&binding)).await;
+    assert_eq!(
+        response.result.unwrap()["result"]["items"],
+        json!([{"ordinal":1,"position":-12.25}])
+    );
+    let (response, events) = round_trip(
+        &state,
+        make_edit(
+            "guide-move",
+            1,
+            json!({"kind":"move","axis":"v","ordinal":1,"position":-8.5}),
+        ),
+        Some(&binding),
+    )
+    .await;
     receipt(&response, 2, true);
     assert_eq!(events, 1);
     let before_remove = saved(&state, &id);
-    let (response, events) = round_trip(&state,
-        make_edit("guide-remove", 2, json!({"kind":"remove","axis":"h","ordinal":1})),
-        Some(&binding)).await;
+    let (response, events) = round_trip(
+        &state,
+        make_edit(
+            "guide-remove",
+            2,
+            json!({"kind":"remove","axis":"h","ordinal":1}),
+        ),
+        Some(&binding),
+    )
+    .await;
     receipt(&response, 3, true);
     assert_eq!(events, 1);
     let changed = saved(&state, &id);
@@ -402,9 +431,16 @@ async fn guide_real_mcp_wire_three_ruler_intents_ack_history_and_fresh_owner_reo
     assert_eq!(saved(&state, &id), changed);
     assert!(history(&state, &id, "guide-undo", 3, false).ok);
     assert_eq!(saved(&state, &id), before_remove);
-    let (noop, events) = round_trip(&state,
-        make_edit("guide-noop", 4,
-            json!({"kind":"move","axis":"v","ordinal":1,"position":-8.5})), None).await;
+    let (noop, events) = round_trip(
+        &state,
+        make_edit(
+            "guide-noop",
+            4,
+            json!({"kind":"move","axis":"v","ordinal":1,"position":-8.5}),
+        ),
+        None,
+    )
+    .await;
     receipt(&noop, 4, false);
     assert_eq!(events, 0);
     assert!(history(&state, &id, "guide-redo", 4, true).ok);
