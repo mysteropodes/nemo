@@ -1,9 +1,11 @@
 //! Real laid-out glyph contours consume the retained selector/contribution kernels.
 //! All blocks on a layer share the baseline unit-count/pivot census; decorations do not.
-use super::{fill_rgba, TextProducerError, TextSceneItem};
 use crate::evaluation::motion_parent_chain::{ChainEntry, MotionMat};
 use crate::evaluation::property_text_animator::{
     self as kernel, AnimatorStroke, TextAnimator, TextAnimatorInput,
+};
+use crate::object_render_scene::object_scene_producer_text::{
+    fill_rgba, TextProducerError, TextSceneItem,
 };
 use crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::GeometryAdmission;
 

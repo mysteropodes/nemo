@@ -108,8 +108,7 @@ pub(crate) struct TextSceneItem {
     fills: Vec<[u8; 4]>,
     color: String,
     font_resource: String,
-    units:
-        Vec<crate::object_document::object_text_layout_kernels::text_glyph_selector::UnitIndices>,
+    units: Vec<crate::evaluation::object_text_layout_kernels::text_glyph_selector::UnitIndices>,
     pulls: Vec<Option<crate::evaluation::property_text_animator::ColorPull>>,
 }
 
@@ -165,7 +164,7 @@ pub(super) fn prepare_block(
         admission: target.admission,
     };
     let scene = prepare_text_glyph_scene(&input).map_err(TextProducerError::Scene)?;
-    let glyph_units=layout.lines.iter().flat_map(|l|&l.glyphs).map(crate::object_document::object_text_layout_kernels::text_glyph_selector::UnitIndices::of_glyph).collect::<Vec<_>>();
+    let glyph_units=layout.lines.iter().flat_map(|l|&l.glyphs).map(crate::evaluation::object_text_layout_kernels::text_glyph_selector::UnitIndices::of_glyph).collect::<Vec<_>>();
     let units=scene.contours().iter().map(|c|match c.role {
         crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::SceneRole::Glyph {ordinal,..} => {
             *glyph_units.get(ordinal).expect("scene glyph belongs to layout")

@@ -319,8 +319,8 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,
     #[serde(default)] effects_from: Presence<String>,
     #[serde(default)] rig: Presence<object_rig_record::RigRecord>,
-    #[serde(default)] range: Presence<LayerRange>,
-    #[serde(default)] text_animators: Presence<object_text_layout_kernels::animator::TextAnimators> });
+    #[serde(default)] text_animators: Presence<object_text_layout_kernels::animator::TextAnimators>,
+    #[serde(default)] range: Presence<LayerRange> });
 
 impl ObjectDocument {
     /// Organizational folder metadata, not structural folder layers.
