@@ -128,3 +128,14 @@ fn an_empty_host_uses_real_hidden_pool_content_and_never_adds_synthetic_source_r
     );
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
 }
+
+#[test]
+fn a_hidden_pool_does_not_bypass_its_hosts_admitted_visible_time_window() {
+    let mut value = empty_host_pool();
+    value["layers"][1]["range"] = json!({"inPoint":0,"outPoint":1});
+    let snapshot = snapshot(value);
+    let frame = prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 2)).unwrap();
+    assert_eq!(frame.source_frame_for_layer(1), None);
+    assert!(frame.duplicator_outputs().is_empty());
+    assert_eq!(frame.records().len(), 0);
+}
