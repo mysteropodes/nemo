@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "63d4e4577bd25fa431d726c2bcc310badd6e22c8",
-  "describe": "v0.7.0-alpha.4-2442-g63d4e457"
+  "head": "2db9ca94fee2bd80316f7196472a009270f5b49b",
+  "describe": "v0.7.0-alpha.4-2463-g2db9ca94"
  },
- "inputsDigest": "fec3d680cc6cd1b44dd051f4fbecbb907ed34743cbf5c5d47e170f7748aeea68",
+ "inputsDigest": "ebe4c5df481ab94d236477b7d196b4a7e4a6fbb81a4c5a1502304d72c2224e74",
  "states": [
   "inventoried",
   "characterized",
@@ -236,7 +236,7 @@
   },
   "SMMotion": {
    "file": "src/js/motion.js",
-   "line": 13347,
+   "line": 13348,
    "members": 29
   },
   "SMNativeVideo": {
@@ -2979,7 +2979,7 @@
     "functionsVisited": 160,
     "via": "variable b",
     "references": [
-     "src/js/motion.js:13199 setAppMode()",
+     "src/js/motion.js:13200 setAppMode()",
      "src/js/timeline.js:1185 toggleLayerMotionBlur()",
      "src/js/timeline.js:1206 toggleMotionBlurComp()"
     ]
@@ -3238,7 +3238,7 @@
     "via": "variable b",
     "references": [
      "src/js/motion-graph.js:457 toggle()",
-     "src/js/motion.js:13195 setAppMode()"
+     "src/js/motion.js:13196 setAppMode()"
     ]
    },
    "fixtures": [
@@ -4824,7 +4824,7 @@
     "via": "variable b",
     "references": [
      "src/js/adapters/native-object-ui.js:350 setShyMode()",
-     "src/js/motion.js:13197 setAppMode()",
+     "src/js/motion.js:13198 setAppMode()",
      "src/js/timeline.js:1226 toggleLayerShy()"
     ]
    },
@@ -18644,7 +18644,7 @@
    "capability": "StoryBoard — in development, not yet available in this build",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13233 initModeSwitch()"
+    "src/js/motion.js:13234 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -18693,7 +18693,7 @@
    "capability": "2D Animation",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13233 initModeSwitch()"
+    "src/js/motion.js:13234 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -18742,7 +18742,7 @@
    "capability": "Motion — property keyframes (position/rotation/scale/opacity)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13233 initModeSwitch()"
+    "src/js/motion.js:13234 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -24934,7 +24934,7 @@
    "source": "src/js/motion.js:11535",
    "meta": {
     "i18n": "ctxBakeExpressionEllipsis",
-    "functionsVisited": 148
+    "functionsVisited": 150
    },
    "fixtures": [
     "static-props",
