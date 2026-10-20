@@ -182,3 +182,43 @@ fn text_animator_locked_unknown_duplicate_and_extra_command_fields_do_not_publis
     );
     assert_eq!(support::state(&locked), before);
 }
+
+#[test]
+fn text_animator_valid_zero_scale_removes_only_selected_glyph_ink() {
+    let mut doc = drawing();
+    doc["items"]["text"][0]["block"]["text"] = json!("AA");
+    let raw = owner(&doc);
+    let base = plan(&support::head(&raw), 0);
+    doc["layers"][0]["textAnimators"] = json!([{"id":"zero","selector":{"units":"index","start":0,"end":1},"props":{"scale":[0,0]}}]);
+    let o = owner(&doc);
+    let p = plan(&support::head(&o), 0);
+    let after = text_item(&p).scene().contours();
+    assert!(!after.is_empty());
+    assert!(after.iter().all(|c| c.key.contains("/glyph/1/")));
+    let expected = text_item(&base)
+        .scene()
+        .contours()
+        .iter()
+        .filter(|c| c.key.contains("/glyph/1/"))
+        .collect::<Vec<_>>();
+    assert_eq!(after.iter().collect::<Vec<_>>(), expected);
+}
+#[test]
+fn text_animator_nullable_authored_fields_have_native_effective_facts_for_keying() {
+    let raw = json!({"id":"null","selector":{"amount":null,"end":null,"smooth":null,"wiggleMin":null,"wiggleMax":null,"wigglesPerSec":null,"correlation":null},"props":{"position":[20,0]}});
+    let record: AnimatorRecord = serde_json::from_value(raw.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&record).unwrap(), raw);
+    let facts = record.selector_facts(0.).unwrap();
+    for (key, wanted) in [
+        ("amount", 100.),
+        ("end", 100.),
+        ("smooth", 100.),
+        ("wiggleMin", -50.),
+        ("wiggleMax", 50.),
+        ("wigglesPerSec", 2.),
+        ("correlation", 50.),
+    ] {
+        assert_eq!(facts[key].as_f64(), Some(wanted), "{key}");
+    }
+    assert_eq!(serde_json::to_value(&record).unwrap(), raw);
+}
