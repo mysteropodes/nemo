@@ -176,6 +176,33 @@ fn disabled_3d_does_not_evaluate_an_overflowing_dormant_track() {
 }
 
 #[test]
+fn drawing_edits_undo_redo_and_fresh_reopen_retain_camera_and_3d_state() {
+    let mut o = owner(&source());
+    let before = saved(&o);
+    let before_value: Value = serde_json::from_slice(&before).unwrap();
+    let matrix = snapshot(&o).sampled_camera_matrix(2.).unwrap();
+    let pose = snapshot(&o).sampled_pose_3d(&target(), 2.).unwrap();
+    let rename = json!({"command":"object.layer.rename","layerUid":"L0","name":"renamed"});
+    let candidate = o.prepare_layer_rename_json(rename.to_string().as_bytes()).unwrap();
+    o.commit_layer_lifecycle(candidate).unwrap();
+    assert_eq!(o.history_depths(), (1, 0));
+    let after = saved(&o);
+    let after_value: Value = serde_json::from_slice(&after).unwrap();
+    assert_eq!(after_value["project"], before_value["project"]);
+    assert_eq!(after_value["drawing"]["layers"][0]["threeD"], json!(true));
+    assert_eq!(snapshot(&o).sampled_camera_matrix(2.).unwrap(), matrix);
+    assert_eq!(snapshot(&o).sampled_pose_3d(&target(), 2.).unwrap(), pose);
+    o.undo(o.content_revision()).unwrap();
+    assert_eq!(saved(&o), before);
+    o.redo(o.content_revision()).unwrap();
+    assert_eq!(saved(&o), after);
+    let reopened = NativeObjectHistory::from_project_file("camera-edit-reopen", &after).unwrap();
+    assert_eq!(saved(&reopened), after);
+    assert_eq!(snapshot(&reopened).sampled_camera_matrix(2.).unwrap(), matrix);
+    assert_eq!(snapshot(&reopened).sampled_pose_3d(&target(), 2.).unwrap(), pose);
+}
+
+#[test]
 fn component_targets_cannot_borrow_an_opposite_root_layer_3d_flag() {
     // The native component fixture is an actually admitted context, not an
     // unknown context that would fail target validation for another reason.

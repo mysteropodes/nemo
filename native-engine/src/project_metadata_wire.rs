@@ -1,5 +1,5 @@
 //! Strict project metadata DTO shared by native project envelope versions.
-use super::ProjectWireError;
+use crate::object_codec::project::ProjectWireError;
 use crate::object_document::{Presence, ProjectCameraKey, ProjectMetadata};
 use serde::{Deserialize, Serialize};
 
