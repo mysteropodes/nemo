@@ -322,13 +322,7 @@ fn text_animator_unavailable_evaluation_does_not_hide_raw_descriptor_disable_or_
         &edit_payload(json!({"kind":"setEnabled","enabled":false})),
     )
     .unwrap();
-    assert!(
-        plan(&support::head(&o), 0)
-            .text_resources()
-            .entries()
-            .count()
-            > 0
-    );
+    assert!(plan(&support::head(&o), 0).text_resources().entries().len() > 0);
     support::run(
         &mut o,
         &json!({"command":"object.text.animator.remove","layerUid":"L0","animatorId":"long"}),
