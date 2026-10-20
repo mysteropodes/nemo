@@ -297,7 +297,8 @@
         "object_audio_track_edit_owner.rs",
         "object_fill_trace_owner.rs",
         "object_property_bake_edit.rs",
-        "object_project_composition_edit.rs"
+        "object_project_composition_edit.rs",
+        "object_project_palette_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -1594,7 +1595,8 @@
         "object_composition_dispatch.rs",
         "object_composition_read.rs",
         "object_composition_public.rs",
-        "object_composition_public_reads.rs"
+        "object_composition_public_reads.rs",
+        "object_palette_edit.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

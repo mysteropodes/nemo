@@ -7,6 +7,22 @@
 // Shade offers, scoped here to the active layer (Nemo doesn't have
 // AE's multi-layer timeline-wide selection concept).
 (function () {
+  // No native palette reader/command is admitted yet. Keep the old document
+  // writer unreachable until that field-specific consumer is joined.
+  function paletteNativeBlocked(notify) {
+    var blocked = !!(window.__TAURI__ && window.__TAURI__.core);
+    if (blocked && notify && window.showToast) showToast('Palette editing is unavailable.');
+    return blocked;
+  }
+  function paletteNativeUnavailable() {
+    replaceArmed = false; replaceSource = null; dragIdx = null;
+    var grid = document.getElementById('palette-grid'), tabs = document.getElementById('palette-tabs');
+    if (grid) { grid.textContent = 'Palette editing is unavailable.'; grid.setAttribute('role', 'status'); }
+    if (tabs) tabs.textContent = '';
+    ['btn-palette-new', 'btn-palette-add-fill', 'btn-palette-add-stroke', 'btn-palette-replace'].forEach(function (id) {
+      var button = document.getElementById(id); if (button) button.disabled = true;
+    });
+  }
   function palettes() { return state.palettes || (state.palettes = [{ id: 'p0', name: 'Palette 1', colors: [] }]); }
   function activePalette() {
     var list = palettes();
@@ -20,12 +36,14 @@
   function genId() { return 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4); }
 
   function addColor(hex) {
+    if (paletteNativeBlocked(true)) return;
     var pal = activePalette();
     if (pal.colors.indexOf(hex) >= 0) { showToast(SM.t('toastAlreadyInPalette')); return; }
     pal.colors.push(hex);
     render();
   }
   function removeColor(idx) {
+    if (paletteNativeBlocked(true)) return;
     activePalette().colors.splice(idx, 1);
     render();
   }
@@ -47,6 +65,7 @@
 
   var replaceArmed = false, replaceSource = null;
   function startReplace() {
+    if (paletteNativeBlocked(true)) return;
     replaceArmed = true; replaceSource = null;
     showToast(SM.t('hsPaletteReplaceHint'));
     render();
@@ -94,6 +113,7 @@
     return n;
   }
   function replaceAcrossFrames(fromHex, toHex) {
+    if (paletteNativeBlocked(true)) return { count: 0, layers: 0 };
     var layers = scopeLayers(), n = 0;
     if (typeof saveAllLayerFrames === 'function') saveAllLayerFrames();
     if (typeof pushUndoLayers === 'function') pushUndoLayers(true);
@@ -111,10 +131,12 @@
     return { count: n, layers: layers.length };
   }
   function replaceColor(fromHex, toHex) {
+    if (paletteNativeBlocked(true)) return { count: 0, layers: 0 };
     if (replaceScope() === 'frame') return { count: replaceInActiveLayer(fromHex, toHex), layers: 1 };
     return replaceAcrossFrames(fromHex, toHex);
   }
   function replaceInActiveLayer(fromHex, toHex) {
+    if (paletteNativeBlocked(true)) return 0;
     var layer = userLayers[state.activeLayerIdx];
     if (!layer) return 0;
     if (typeof pushUndo === 'function') pushUndo();
@@ -142,6 +164,7 @@
     btn.addEventListener('dragover', function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
     btn.addEventListener('drop', function (e) {
       e.preventDefault();
+      if (paletteNativeBlocked(true)) { dragIdx = null; return; }
       if (dragIdx === null || dragIdx === idx) return;
       var colors = activePalette().colors;
       var moved = colors.splice(dragIdx, 1)[0];
@@ -153,6 +176,7 @@
   }
 
   function render() {
+    if (paletteNativeBlocked(false)) { paletteNativeUnavailable(); return; }
     renderTabs();
     var grid = document.getElementById('palette-grid');
     if (!grid) return;
@@ -215,7 +239,7 @@
       tab.className = 'sym-tab' + (idx === state.activePaletteIdx ? ' act' : '');
       tab.textContent = pal.name;
       tab.title = pal.name;
-      tab.addEventListener('click', function () { state.activePaletteIdx = idx; cancelReplace(); });
+      tab.addEventListener('click', function () { if (paletteNativeBlocked(true)) return; state.activePaletteIdx = idx; cancelReplace(); });
       tab.addEventListener('dblclick', function () { renamePalette(idx); });
       tab.addEventListener('contextmenu', function (e) {
         e.preventDefault();
@@ -231,6 +255,7 @@
   }
 
   function newPalette() {
+    if (paletteNativeBlocked(true)) return;
     var name = prompt('Nom de la nouvelle palette :', 'Palette ' + (palettes().length + 1));
     if (name === null) return;
     palettes().push({ id: genId(), name: name.trim() || 'Palette', colors: [] });
@@ -238,6 +263,7 @@
     render();
   }
   function renamePalette(idx) {
+    if (paletteNativeBlocked(true)) return;
     var pal = palettes()[idx];
     var name = prompt('Renommer la palette :', pal.name);
     if (name === null || !name.trim()) return;
@@ -245,12 +271,14 @@
     render();
   }
   function duplicatePalette(idx) {
+    if (paletteNativeBlocked(true)) return;
     var src = palettes()[idx];
     palettes().splice(idx + 1, 0, { id: genId(), name: src.name + ' copie', colors: src.colors.slice() });
     state.activePaletteIdx = idx + 1;
     render();
   }
   function deletePalette(idx) {
+    if (paletteNativeBlocked(true)) return;
     if (palettes().length <= 1) { showToast(SM.t('hsKeepOnePalette')); return; }
     palettes().splice(idx, 1);
     if (state.activePaletteIdx >= palettes().length) state.activePaletteIdx = palettes().length - 1;
