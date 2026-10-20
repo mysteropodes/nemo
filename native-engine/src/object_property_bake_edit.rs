@@ -11,20 +11,37 @@ impl ObjectFillOwner {
         replacement: PropertyRecord,
     ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         let mut document = origin.document().clone();
-        let mut holders = document.property_holders.value().cloned()
+        let mut holders = document
+            .property_holders
+            .value()
+            .cloned()
             .ok_or(DispatchErrorCode::NotFound)?;
-        let holder = holders.iter_mut().find(|h| h.target() == target)
+        let holder = holders
+            .iter_mut()
+            .find(|h| h.target() == target)
             .ok_or(DispatchErrorCode::NotFound)?;
-        let old = holder.properties.iter_mut().find(|p| p.property == replacement.property)
+        let old = holder
+            .properties
+            .iter_mut()
+            .find(|p| p.property == replacement.property)
             .ok_or(DispatchErrorCode::NotFound)?;
         let changed = *old != replacement;
         *old = replacement;
         PropertyHolder::validate_with_items(
-            &Presence::Present(holders.clone()), &document.layers, &document.objects,
-            document.composition_order.value(), document.component_tables(),
-            document.items.value(), document.image_meshes.value(),
-        ).map_err(|_| DispatchErrorCode::Unavailable)?;
+            &Presence::Present(holders.clone()),
+            &document.layers,
+            &document.objects,
+            document.composition_order.value(),
+            document.component_tables(),
+            document.items.value(),
+            document.image_meshes.value(),
+        )
+        .map_err(|_| DispatchErrorCode::Unavailable)?;
         document.property_holders = Presence::Present(holders);
-        Ok(PreparedPropertyEdit { origin, document, changed })
+        Ok(PreparedPropertyEdit {
+            origin,
+            document,
+            changed,
+        })
     }
 }

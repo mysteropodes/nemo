@@ -1,6 +1,4 @@
-#[path = "object_expression_bake.rs"]
-mod object_expression_bake;
-pub use object_expression_bake::dispatch_object_command;
+pub use crate::object_expression_bake::dispatch_object_command;
 
 use crate::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::export_job::{

@@ -154,15 +154,18 @@ fn property_edit_receipts_bind_exact_history_and_safe_revision_without_overflow(
     }
 }
 
-
 #[test]
 fn property_bake_admits_only_the_intent_not_samples_or_replacement_keys() {
     let p = payload(json!({"kind":"bake"}));
     assert!(request(&p));
     assert!(envelope(p).validate().is_ok());
-    for action in [json!({"kind":"bake","frame":0}), json!({"kind":"bake","values":[1,2]}),
-        json!({"kind":"bake","samples":[[1,2]]}), json!({"kind":"bake","tolerance":100}),
-        json!(["bake"])] {
+    for action in [
+        json!({"kind":"bake","frame":0}),
+        json!({"kind":"bake","values":[1,2]}),
+        json!({"kind":"bake","samples":[[1,2]]}),
+        json!({"kind":"bake","tolerance":100}),
+        json!(["bake"]),
+    ] {
         assert!(!request(&payload(action.clone())));
         assert!(envelope(payload(action)).validate().is_err());
     }
