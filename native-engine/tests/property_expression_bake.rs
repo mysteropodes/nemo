@@ -87,7 +87,13 @@ fn overshoot_is_retained_in_unclamped_curve_output() {
         }]
     });
     let baked = optimize(0, &samples, 0.005, &|| false).unwrap();
-    assert!(baked.keys.iter().flat_map(|k| &k.curve).any(|p| p.y > 1.0));
+    // The original complete bake chooses frames 0,1,24. Its descending
+    // final segment represents this overshoot with NEGATIVE eased progress.
+    assert_eq!(
+        baked.keys.iter().map(|key| key.frame).collect::<Vec<_>>(),
+        vec![0, 1, 24]
+    );
+    assert!(sample(&baked, 6.0)[0] > 100.0);
     assert_reconstruction(&baked, 0, &samples, 0.005);
 }
 
