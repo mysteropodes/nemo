@@ -593,6 +593,15 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "T08: observed from the original cargo-llvm-cov report at e40199208345e2959d5f69e174f598e055354675; all prior file and aggregate floors retained."
+    },
+    "nemo-mcp/src/native_palette_contract.rs": {
+      "lines": 96.2,
+      "regions": 96.31,
+      "functions": 100
+    },
+    "nemo-mcp/src/native_palette_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report"
     }
   },
   "nativeObjectContractRegistration": {
