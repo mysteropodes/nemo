@@ -302,3 +302,49 @@ fn real_metal_temporal_copies_reach_the_viewport_texture_and_three_decoded_pngs(
         assert_eq!(snapshot.content_revision(), 0);
     }
 }
+
+#[test]
+fn retained_radial_path_and_seeded_random_literals_reach_the_actual_scene_paint_consumer() {
+    use crate::object_codec::encode_storage_project;
+    use crate::object_frame_packet::duplicators::tests::{
+        assert_original_number, original_mode_starts, retained_mode_document,
+    };
+    for name in ["radial", "path", "tangent", "random42", "random77"] {
+        let snapshot = snapshot(retained_mode_document(name));
+        let before = encode_storage_project(snapshot.document()).unwrap();
+        let pin = selector(&snapshot, 2);
+        let packet = prepare_object_exposure_frame(&snapshot, &pin).unwrap();
+        let scene = prepare_object_render_scene(&packet, &pin).unwrap();
+        let plan = prepare_object_paint_plan(&scene, &pin).unwrap();
+        let copies = ordered_entries(&plan)
+            .map(|entry| match entry {
+                PaintEntry::Duplicator(copy) => copy,
+                _ => panic!("original seed or hidden path must not add a paint"),
+            })
+            .collect::<Vec<_>>();
+        let expected = original_mode_starts(name);
+        assert_eq!(copies.len(), expected.len());
+        for (k, (copy, expected)) in copies.iter().zip(expected).enumerate() {
+            assert_eq!(copy.layer_index, 0);
+            assert_eq!(copy.source_index, 1);
+            assert_eq!(
+                copy.source_target,
+                *snapshot.document().objects()[1].target()
+            );
+            assert_eq!(copy.dup_index, k as u32);
+            assert_eq!(
+                copy.clone_id,
+                packet.duplicator_outputs()[0].output.copies[k].clone_id
+            );
+            let PathEl::MoveTo(point) = copy.path.elements()[0] else {
+                panic!("path start")
+            };
+            assert_original_number(point.x, expected[0]);
+            assert_original_number(point.y, expected[1]);
+        }
+        assert_eq!(plan.commands().len(), 0);
+        assert_eq!(plan.packet().records().len(), 1);
+        assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+        assert_eq!(snapshot.content_revision(), 0);
+    }
+}

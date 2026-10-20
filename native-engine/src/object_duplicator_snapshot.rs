@@ -65,23 +65,14 @@ impl MotionPort for SnapshotMotion<'_> {
         let context = crate::evaluation::object_component_kernels::object_context_resolver::ContextSource::of_document(self.snapshot.document())
             .context(self.context_id)
             .map_err(|_| Unavailable::LayerMotion)?;
-        let layer = context
-            .layers()
-            .iter()
-            .find(|layer| layer.layer_uid() == layer_uid)
-            .ok_or(Unavailable::LayerMotion)?;
-        if layer
-            .parent_layer_uid
-            .value()
-            .is_some_and(|parent| parent.is_some())
-        {
-            // sampled_motion_2d is a LOCAL pose. Never claim the effector's
-            // parent-resolved origin from that local translation alone.
-            return Err(Unavailable::LayerMotion);
-        }
-        // This is the same stored five-property computation as the real frame
-        // consumer: neutral Motion stays None, and unsupported live expressions
-        // stay unavailable rather than being replaced with an identity pose.
+        context.layer(layer_uid).ok_or(Unavailable::LayerMotion)?;
+        // Baseline fbe4b8a3 motion.js layerMotionAt returns the LOCAL
+        // computeMotionMat (plus FollowPath, which ObjectLayer cannot yet
+        // store). It does not call parentChainMats. effector-layer.js adds
+        // only this dx/dy to eff.pos, despite its parent-chain comment.
+        // Preserve that behavior for admitted static parent links; ancestor
+        // pivots, poses and expressions are not inputs of this lookup.
+        // Enabled expressions on the consumed local Motion still refuse.
         self.snapshot
             .sampled_motion_2d(&self.target(layer_uid), self.frame)
             .map(|mat| {

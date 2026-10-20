@@ -112,3 +112,204 @@ fn effector_static_vector_dimensions_are_enforced_by_original_storage_admission(
     let right = source(json!([{"property":"effOffPosition","static":[12,-8]}]));
     assert!(decode_project(right.to_string().as_bytes()).is_ok());
 }
+
+// Original fbe4b8a3 motion.js:3512 layerMotionAt returns computeMotionMat
+// plus optional FollowPath; its export is direct at :13468. The writer-only
+// publication wrapper (:13818, adapters/native-opacity-motion-surface.js:234)
+// does not replace it. The effector-layer.js parent-chain comment is not the
+// behavior. These real admitted graphs must not acquire a new parent pose.
+fn parented(properties: Value) -> Value {
+    let mut doc = source(properties);
+    doc["formatVersion"] = json!(2);
+    doc["layers"] = json!([
+        {"layerUid":"L0","parentLayerUid":"P"},
+        {"layerUid":"P","parentLayerUid":"G","visible":false},
+        {"layerUid":"G"}]);
+    doc["compositionOrder"] = json!({"format":"nemo.native-object-order-plan",
+        "formatVersion":1,"documentFormatVersion":2,"migration":"explicit-plan-required",
+        "referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
+        "layers":[{"layerUid":"L0","naturalPosition":0,"order":{}},
+            {"layerUid":"P","naturalPosition":1,"order":{}},
+            {"layerUid":"G","naturalPosition":2,"order":{}}],"scopes":[]}]});
+    doc["propertyHolders"].as_array_mut().unwrap().extend([
+        json!({"target":{"contextId":"scene-root","layerUid":"P"},"properties":[
+            {"property":"position","static":[1000,2000]},
+            {"property":"anchor","static":[23,-8]},
+            {"property":"rotation","static":[90]},
+            {"property":"scale","static":[-200,300]}]}),
+        json!({"target":{"contextId":"scene-root","layerUid":"G"},"properties":[
+            {"property":"position","static":[-700,900]}]}),
+    ]);
+    doc
+}
+fn stored_snapshot(doc: &Value) -> ObjectSnapshot {
+    ObjectSnapshot::new(
+        "parented-effector-native-inputs",
+        crate::object_codec::decode_storage_project(&serde_json::to_vec(doc).unwrap()).unwrap(),
+    )
+    .unwrap()
+}
+fn assert_delta(port: &SnapshotMotion<'_>, expected: [f64; 2]) {
+    let delta = port.motion_delta("L0").unwrap().unwrap();
+    assert_eq!(delta.dx, JsNumber::Value(expected[0]));
+    assert_eq!(delta.dy, JsNumber::Value(expected[1]));
+}
+
+#[test]
+fn original_local_delta_reaches_the_real_effector_origin_with_static_ancestors() {
+    use crate::evaluation::object_component_kernels::object_effector_layer::test_codec::format_resolved_list;
+    use crate::evaluation::object_component_kernels::object_effector_layers::{
+        resolved_effectors, EffectorScope,
+    };
+    let mut doc = parented(json!([
+        {"property":"position","static":[12.5,-3.25]},
+        {"property":"anchor","static":[9,17]},
+        {"property":"rotation","static":[37]},
+        {"property":"scale","static":[150,80]},
+        {"property":"effOffOpacity","static":[-5]}
+    ]));
+    doc["componentTables"] = json!({"duplicators":{"format":"nemo.native-duplicator-set",
+        "formatVersion":1,"duplicators":[],"effectorLayers":[
+            {"contextId":"scene-root","layerUid":"L0","effector":{"targetLayerUid":"G"}}]}});
+    let snap = stored_snapshot(&doc);
+    let before = crate::object_codec::encode_storage_project(snap.document()).unwrap();
+    let motion = SnapshotMotion::new(&snap, "scene-root", 7.);
+    assert_delta(&motion, [12.5, -3.25]);
+    let scope = EffectorScope {
+        context_id: "scene-root",
+        layers: snap.document().layers(),
+        set: snap.document().duplicator_set().unwrap(),
+        canvas_w: 1000.,
+        canvas_h: 500.,
+    };
+    let resolved = resolved_effectors(&scope, "G", &motion).unwrap();
+    // Literal output of the shipped baseline effector oracle. Its Motion
+    // stub supplied the exact local dx/dy above; this test supplies actual
+    // retained native Motion values to the real lookup instead.
+    let oracle = include_str!("fixtures/object-effector-layers/oracle.txt");
+    let row = oracle.split("scn ef_motion_and_defaults\n").nth(1).unwrap();
+    let expected = row
+        .lines()
+        .find_map(|line| line.strip_prefix("effs "))
+        .unwrap();
+    assert_eq!(format_resolved_list(&resolved), expected);
+    assert_eq!(
+        crate::object_codec::encode_storage_project(snap.document()).unwrap(),
+        before
+    );
+    assert_eq!(snap.content_revision(), 0);
+}
+
+#[test]
+fn a_neutral_local_pose_stays_none_even_when_both_ancestors_move() {
+    let snap = stored_snapshot(&parented(json!([])));
+    let port = SnapshotMotion::new(&snap, "scene-root", 3.);
+    assert_eq!(port.motion_delta("L0"), Ok(None));
+}
+
+#[test]
+fn parented_motion_uses_the_requested_fractional_frame_and_survives_storage_roundtrip() {
+    let doc = parented(json!([
+        {"property":"position","track":{"keys":[
+            {"frame":0,"v":[0,10],"curvePoints":[]}, {"frame":4,"v":[40,50]}]}},
+        {"property":"anchor","static":[3,-2]},
+        {"property":"rotation","static":[90]}
+    ]));
+    let snap = stored_snapshot(&doc);
+    let before = crate::object_codec::encode_storage_project(snap.document()).unwrap();
+    // Deliberately revisit an earlier frame after a later one; no live pose
+    // or ancestor cache is allowed to supply either sample.
+    for (frame, expected) in [(2.5, [25., 35.]), (0., [0., 10.]), (4., [40., 50.])] {
+        assert_delta(&SnapshotMotion::new(&snap, "scene-root", frame), expected);
+    }
+    assert_eq!(
+        crate::object_codec::encode_storage_project(snap.document()).unwrap(),
+        before
+    );
+    let reopened = ObjectSnapshot::new(
+        "parented-effector-reopened",
+        crate::object_codec::decode_storage_project(&before).unwrap(),
+    )
+    .unwrap();
+    assert_delta(
+        &SnapshotMotion::new(&reopened, "scene-root", 2.5),
+        [25., 35.],
+    );
+}
+
+#[test]
+fn only_consumed_local_motion_expressions_require_an_evaluated_provider() {
+    let mut doc = parented(json!([{"property":"position","static":[12.5,-3.25]}]));
+    doc["propertyHolders"][1]["properties"][0]["expression"] =
+        json!({"enabled":true,"code":"[999,999]"});
+    let snap = stored_snapshot(&doc);
+    assert_delta(&SnapshotMotion::new(&snap, "scene-root", 2.), [12.5, -3.25]);
+    // Every Motion property consumed by computeMotionMat still refuses its
+    // own enabled expression, including non-position properties.
+    for (key, value) in [
+        ("position", json!([1, 2])),
+        ("anchor", json!([3, 4])),
+        ("rotation", json!([90])),
+        ("scale", json!([150, 80])),
+        ("opacity", json!([50])),
+    ] {
+        let mut doc = parented(json!([{"property":key,"static":value,
+            "expression":{"enabled":true,"code":"1"}}]));
+        let snap = stored_snapshot(&doc);
+        assert_eq!(
+            SnapshotMotion::new(&snap, "scene-root", 2.).motion_delta("L0"),
+            Err(Unavailable::LayerMotion),
+            "{key}"
+        );
+        doc["propertyHolders"][0]["properties"][0]["expression"]["enabled"] = json!(false);
+        let disabled = stored_snapshot(&doc);
+        assert!(SnapshotMotion::new(&disabled, "scene-root", 2.)
+            .motion_delta("L0")
+            .is_ok());
+    }
+}
+
+#[test]
+fn parented_missing_targets_foreign_context_and_nonfinite_frames_refuse() {
+    let snap = stored_snapshot(&parented(json!([])));
+    assert_eq!(
+        SnapshotMotion::new(&snap, "scene-root", 0.).motion_delta("missing"),
+        Err(Unavailable::LayerMotion)
+    );
+    assert_eq!(
+        SnapshotMotion::new(&snap, "foreign", 0.).motion_delta("L0"),
+        Err(Unavailable::LayerMotion)
+    );
+    for frame in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert_eq!(
+            SnapshotMotion::new(&snap, "scene-root", frame).motion_delta("L0"),
+            Err(Unavailable::LayerMotion)
+        );
+    }
+}
+
+#[test]
+fn malformed_parent_links_and_unrepresented_follow_path_still_refuse_storage() {
+    for fault in [
+        "missing-parent",
+        "self-parent",
+        "cycle",
+        "follow-path",
+        "keyed-parent",
+    ] {
+        let mut doc = parented(json!([]));
+        match fault {
+            "missing-parent" => doc["layers"][0]["parentLayerUid"] = json!("missing"),
+            "self-parent" => doc["layers"][0]["parentLayerUid"] = json!("L0"),
+            "cycle" => doc["layers"][2]["parentLayerUid"] = json!("L0"),
+            "follow-path" => doc["layers"][0]["followPath"] = json!({"targetLayerUid":"P"}),
+            _ => doc["layers"][0]["parentKeys"] = json!([{"frame":0,"uid":"P"}]),
+        }
+        let before = serde_json::to_vec(&doc).unwrap();
+        assert!(
+            crate::object_codec::decode_storage_project(&before).is_err(),
+            "{fault}"
+        );
+        assert_eq!(serde_json::to_vec(&doc).unwrap(), before);
+    }
+}
