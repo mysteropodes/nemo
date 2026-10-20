@@ -1,11 +1,11 @@
 //! Immutable supplied project settings, not a document owner, wire codec or UI command.
 //! Supplied settings share the existing project revision owner.
 
-#[path = "project_metadata_fields.rs"]
-mod visual;
 #[path = "project_metadata_annotations.rs"]
 mod annotations;
-pub(crate) use annotations::{ProjectCommentRecord,ProjectWorkspaceRecord};
+#[path = "project_metadata_fields.rs"]
+mod visual;
+pub(crate) use annotations::{ProjectCommentRecord, ProjectWorkspaceRecord};
 #[path = "project_metadata_presets.rs"]
 mod presets;
 pub(crate) use presets::ProjectPresetCatalog;
