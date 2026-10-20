@@ -1,6 +1,8 @@
 //! Actual bundled MCP native wire client -> subscribed owner -> retained VM.
 //! No installed UI, filesystem SaveAs or common render/export claim.
-use super::property_edit_tests::{history, open, receipt, request, round_trip, saved};
+use crate::application_mcp::revision_sync::dispatch_core::property_edit_tests::{
+    history, open, receipt, request, round_trip, saved,
+};
 use crate::application_mcp::{revision_sync::RevisionControl, ApplicationMcp};
 use serde_json::{json, Value};
 
