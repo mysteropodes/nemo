@@ -339,12 +339,14 @@ test('timing declaration and closed transport definitions retain the accepted se
   const timingReferences = Object.fromEntries([
     ['ObjectLayerTimingFrame','Frame'], ['ObjectLayerTimingCellPayload','CellSelector'],
     ['ObjectLayerRangePayload','RangeSelector'], ['ObjectLayerTimingCellResult','CellReadResult'],
-    ['ObjectLayerRangeResult','RangeReadResult']
+    ['ObjectLayerRangeResult','RangeReadResult'], ['ObjectLayerPlacementPayload','PlacementSelector'],
+    ['ObjectLayerPlacementResult','PlacementReadResult']
   ].map(([from,to])=>['#/$defs/'+from,'#/$defs/'+to]));
   const normalize = value => JSON.parse(JSON.stringify(value),(key,entry)=>key==='$ref'&&Object.hasOwn(timingReferences,entry)?timingReferences[entry]:entry);
   // Preserve both original cell and admitted range contracts down to their closed leaf definitions.
   for(const [from,to] of [['ObjectLayerTimingCellPayload','CellSelector'],['ObjectLayerRangePayload','RangeSelector'],
-    ['ObjectLayerTimingCellResult','CellReadResult'],['ObjectLayerRangeResult','RangeReadResult']])assert.deepEqual(normalize(transport.$defs[from]),accepted[to]);
+    ['ObjectLayerTimingCellResult','CellReadResult'],['ObjectLayerRangeResult','RangeReadResult'],
+    ['ObjectLayerPlacementPayload','PlacementSelector'],['ObjectLayerPlacementResult','PlacementReadResult']])assert.deepEqual(normalize(transport.$defs[from]),accepted[to]);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingPayload), accepted.Selector);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingResult), accepted.ReadResult);
   assert.deepEqual(transport.$defs.ObjectLayerTimingFrame, accepted.Frame);
@@ -356,6 +358,20 @@ test('timing declaration and closed transport definitions retain the accepted se
   const rangeRequest={...request,payload:{...request.payload,view:'range'}};
   assert.equal(validateRequest(rangeRequest),rangeRequest);
   assert.deepEqual(validateSelector(rangeRequest.payload),[]);
+  // T12 placement view: the same selector with its own view constant.
+  const placementRequest={...request,payload:{...request.payload,view:'placement'}};
+  assert.equal(validateRequest(placementRequest),placementRequest);
+  assert.deepEqual(validateSelector(placementRequest.payload),[]);
+  const placement=timing.examples.find(e=>e.request.payload.view==='placement');
+  assert.equal(validateRequest(placement.request),placement.request);
+  assert.doesNotThrow(()=>validateResponse(placement.response,placement.request.requestId,placement.request.operation));
+  assert.deepEqual(validate(transport.$defs.ObjectLayerPlacementResult,placement.response.result,transport.$defs),[]);
+  for(const bad of [{assetKind:'image'},{offsetFrames:'0'},{interpMode:''},{frameBlend:1},{timeRemap:{keyCount:-1,keyAtFrame:true}},{timeRemap:{keyCount:1}},{extra:1}]){
+    const result={...placement.response.result,placement:{...placement.response.result.placement,...bad}};
+    assert.throws(()=>validateResponse({...placement.response,result},placement.request.requestId,placement.request.operation),TypeError,JSON.stringify(bad));
+  }
+  const empty={...placement.response,result:{...placement.response.result,placement:null}};
+  assert.doesNotThrow(()=>validateResponse(empty,placement.request.requestId,placement.request.operation));
   for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }, {...rangeRequest.payload,view:'other'}]) {
     assert.ok(validateSelector(bad).length);
   }

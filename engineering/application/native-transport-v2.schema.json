@@ -1085,6 +1085,9 @@
         },
         {
           "$ref": "#/$defs/ObjectLayerRangePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectLayerPlacementPayload"
         }
       ]
     },
@@ -1095,6 +1098,9 @@
         },
         {
           "$ref": "#/$defs/ObjectLayerRangeResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectLayerPlacementResult"
         }
       ]
     },
@@ -9738,6 +9744,44 @@
       },
       "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
     },
+    "ObjectLayerPlacementPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "view": {
+          "const": "placement"
+        }
+      },
+      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+    },
     "ObjectLayerTimingCellPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -9856,6 +9900,132 @@
               "type": "boolean"
             }
           }
+        }
+      }
+    },
+    "ObjectLayerPlacementResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "placement"
+      ],
+      "properties": {
+        "kind": {
+          "const": "layerPlacement"
+        },
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "placement": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "placementId",
+                "assetId",
+                "assetKind",
+                "offsetFrames",
+                "timeRemap",
+                "interpMode",
+                "frameBlend"
+              ],
+              "properties": {
+                "placementId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "assetId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "assetKind": {
+                  "const": "video"
+                },
+                "offsetFrames": {
+                  "type": "number"
+                },
+                "timeRemap": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "keyCount",
+                        "keyAtFrame"
+                      ],
+                      "properties": {
+                        "keyCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "keyAtFrame": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "interpMode": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32
+                    }
+                  ]
+                },
+                "frameBlend": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ],
+          "description": "T12: the layer's video drawing placement, or null. Remap keys are counted, never listed, so the read stays within 4096 bytes."
         }
       }
     },
