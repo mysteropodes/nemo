@@ -1,6 +1,6 @@
 //! Strict project metadata DTO shared by both native envelope versions.
 use super::ProjectWireError;
-use crate::object_document::{Presence, ProjectMetadata};
+use crate::object_document::{Presence, ProjectMetadata, ProjectWorkspaceRecord, ProjectCommentRecord};
 use serde::Serialize;
 
 // Nested records are object-only and closed, just like the original metadata DTO.
@@ -81,6 +81,10 @@ pub(super) struct Metadata {
     perspective_density:Presence<f64>,
     #[serde(skip_serializing_if="Presence::missing",rename="perspectiveVPs")]
     perspective_vps:Presence<Option<Vec<VanishingPoint>>>,
+    #[serde(skip_serializing_if="Presence::missing")]
+    workspace:Presence<ProjectWorkspaceRecord>,
+    #[serde(skip_serializing_if="Presence::missing")]
+    comments:Presence<Vec<ProjectCommentRecord>>,
 }
 // Derived decoding alone admits positional arrays; reuse the drawing's
 // object-only visitor with strict duplicate/unknown/required-member checks.
@@ -103,7 +107,9 @@ crate::object_document::object_deserialize!(Metadata {
     #[serde(default)] perspective_enabled:Presence<bool>,
     #[serde(default)] perspective_mode:Presence<String>,
     #[serde(default)] perspective_density:Presence<f64>,
-    #[serde(default,rename="perspectiveVPs")] perspective_vps:Presence<Option<Vec<VanishingPoint>>>
+    #[serde(default,rename="perspectiveVPs")] perspective_vps:Presence<Option<Vec<VanishingPoint>>>,
+    #[serde(default)] workspace:Presence<ProjectWorkspaceRecord>,
+    #[serde(default)] comments:Presence<Vec<ProjectCommentRecord>>
 });
 
 impl Metadata {
@@ -138,12 +144,14 @@ impl Metadata {
             .and_then(|value|value.with_perspective_metadata(
                 self.perspective_enabled.value().copied(),self.perspective_mode.value().cloned(),self.perspective_density.value().copied(),
                 self.perspective_vps.value().map(|items|items.as_ref().map(|items|items.iter().map(|p|(p.x,p.y,p.locked.value().copied())).collect()))))
+            .and_then(|value|value.with_annotations(self.workspace.value().cloned(),self.comments.value().cloned()))
             .map_err(|_| ProjectWireError::Invalid)
     }
     pub(super) fn from_metadata(value: &ProjectMetadata) -> Self {
         let (canvas_w, canvas_h) = value.canvas_dimensions();
         let (wa_in, wa_out) = value.work_area();
         let (bpm, bpm_offset, bpm_show) = value.composition_bpm();
+        let (workspace,comments)=value.annotations();
         let (palettes,active_palette_idx)=value.palette_metadata();
         let (shadow_palette,shadow_active_id)=value.shadow_palette_metadata();
         let (perspective_enabled,perspective_mode,perspective_density,perspective_vps)=value.perspective_metadata();
@@ -185,6 +193,7 @@ impl Metadata {
             bpm_show: bpm_show.map(Presence::Present).unwrap_or(Presence::Missing),
             palettes:present(palettes.map(|items|items.iter().map(|(id,name,colors)|Palette{id:id.clone(),name:name.clone(),colors:colors.clone()}).collect())),
             active_palette_idx:present(active_palette_idx),
+            workspace:present(workspace.cloned()),comments:present(comments.map(<[ProjectCommentRecord]>::to_vec)),
             shadow_palette:present(shadow_palette.map(|items|items.iter().map(|(id,color)|ShadowColor{id:id.clone(),color:color.clone()}).collect())),
             shadow_active_id:present(shadow_active_id.map(str::to_owned)),
             guides:present(value.guide_metadata().map(|(h,v)|Guides{h:present(h.map(<[f64]>::to_vec)),v:present(v.map(<[f64]>::to_vec))})),

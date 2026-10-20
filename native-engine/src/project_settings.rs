@@ -3,6 +3,9 @@
 
 #[path = "project_metadata_fields.rs"]
 mod visual;
+#[path = "project_metadata_annotations.rs"]
+mod annotations;
+pub(crate) use annotations::{ProjectCommentRecord,ProjectWorkspaceRecord};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectMetadataError {
@@ -12,6 +15,7 @@ pub(crate) enum ProjectMetadataError {
     InvalidWorkArea,
     InvalidCompositionMetadata,
     InvalidVisualMetadata,
+    InvalidAnnotations,
 }
 
 /// Exact accepted spelling plus straight sRGB RGBA8, including the source alpha.
@@ -77,6 +81,7 @@ pub(crate) struct ProjectMetadata {
     bpm_offset: Option<f64>,
     bpm_show: Option<bool>,
     visual: visual::VisualMetadata,
+    annotations: annotations::Annotations,
 }
 impl ProjectMetadata {
     /// The existing constructor API and positive finite storage FPS are preserved.
@@ -103,6 +108,7 @@ impl ProjectMetadata {
             bpm_offset: None,
             bpm_show: None,
             visual: visual::VisualMetadata::default(),
+            annotations: annotations::Annotations::default(),
         })
     }
     pub(crate) fn with_canvas_dimensions(

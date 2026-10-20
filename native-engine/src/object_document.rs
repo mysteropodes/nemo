@@ -35,6 +35,7 @@ pub(crate) use audio_tracks::{AudioTrackRecord, AudioTracks};
 mod project;
 pub(crate) use project::{
     ProjectEnvelope, ProjectMetadata, ProjectMetadataError, ProjectReferenceState,
+    ProjectCommentRecord, ProjectWorkspaceRecord,
 };
 
 #[path = "object_layer_timing.rs"]

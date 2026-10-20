@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 #[path = "project_settings.rs"]
 mod project_settings;
-pub(crate) use project_settings::{ProjectMetadata, ProjectMetadataError};
+pub(crate) use project_settings::{ProjectMetadata, ProjectMetadataError, ProjectCommentRecord, ProjectWorkspaceRecord};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectReferenceError {
