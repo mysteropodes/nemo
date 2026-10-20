@@ -127,12 +127,18 @@ impl NativeObjectHistory {
             )),
         }
     }
-    /// Project settings: the typed preparation and the sealed commit.
+    /// Settings and composition deltas use the same typed preparation/sealed commit.
     pub(super) fn dispatch_project_settings_command(
         &mut self,
         payload: &[u8],
+        composition: bool,
     ) -> Result<CompactResult, (DispatchErrorCode, &'static str)> {
-        match self.prepare_project_settings_json(payload) {
+        let prepared = if composition {
+            self.prepare_composition_delta_json(payload)
+        } else {
+            self.prepare_project_settings_json(payload)
+        };
+        match prepared {
             Ok(candidate) => {
                 let before = self.content_revision();
                 self.commit_project_settings(candidate)

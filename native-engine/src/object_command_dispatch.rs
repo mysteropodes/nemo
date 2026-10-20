@@ -39,6 +39,7 @@ const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
 const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
+const OP_PROJECT_COMPOSITION: &str = "command.document.object.project.composition.edit";
 const OP_OBJECT_ITEM: &str = "command.document.object.item.edit";
 const OP_WIDGET_CREATE: &str = "command.document.object.widget.create";
 const OP_WIDGET_WRITE: &str = "command.document.object.widget.write";
@@ -124,6 +125,7 @@ impl NativeObjectHistory {
                     | OP_PROPERTY_EDIT
                     | OP_PROPERTY_TRACK_EDIT
                     | OP_PROJECT_SETTINGS
+                    | OP_PROJECT_COMPOSITION
                     | OP_PLACEMENT_EDIT
                     | OP_AUDIO_TRACK_EDIT
                     | OP_OBJECT_VECTOR
@@ -381,10 +383,16 @@ impl NativeObjectHistory {
                 self.dispatch_audio_track_edit(&request.payload)
             } else if request.operation == OP_PLACEMENT_EDIT {
                 self.dispatch_placement_edit(&request.payload)
-            } else if request.operation == OP_PROJECT_SETTINGS {
+            } else if matches!(
+                request.operation.as_str(),
+                OP_PROJECT_SETTINGS | OP_PROJECT_COMPOSITION
+            ) {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-                self.dispatch_project_settings_command(&payload)
+                self.dispatch_project_settings_command(
+                    &payload,
+                    request.operation == OP_PROJECT_COMPOSITION,
+                )
             } else if matches!(
                 request.operation.as_str(),
                 OP_PROPERTY_EDIT | OP_PROPERTY_TRACK_EDIT

@@ -287,6 +287,12 @@ impl ObjectSnapshot {
         if request.operation == "query.document.object.property.read" {
             return self.dispatch_property_read(&request);
         }
+        if request.operation == "query.document.object.project.composition.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_composition_read(&request);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(DispatchErrorCode::Unavailable, "Native composition metadata is unavailable.");
+        }
         if request.operation != "query.document.object" {
             return failure(
                 DispatchErrorCode::InvalidRequest,

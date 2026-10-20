@@ -42,3 +42,7 @@ impl NativeObjectHistory {
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_composition_dispatch.rs"]
 mod composition_delta_tests;
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_composition_public.rs"]
+mod composition_public_tests;
