@@ -35,6 +35,7 @@ fn remove_key(frame: i64) -> PlacementEdit {
         frame: frame.into(),
     })
 }
+#[cfg(feature = "history")]
 fn set_key(frame: f64, value: f64, curve: Option<serde_json::Value>) -> PlacementEdit {
     remap(RemapIntent::SetKey {
         frame: serde_json::Number::from_f64(frame).unwrap(),
@@ -62,6 +63,7 @@ fn enable_writes_the_baseline_two_linear_keys_and_refuses_a_second_enable() {
             {"frame":23,"v":[47],"curvePoints":linear,"hIn":[0,0],"hOut":[0,0]}]})
     );
     // Linear from source 0 at the in point to 47 at the out point.
+    #[cfg(feature = "evaluation")]
     assert_eq!(timing(&enabled).remap_value(4.0 + 19.0 / 2.0), Some(23.5));
     assert_eq!(
         apply_edit(&enabled, &document(), enable(0, 10, 5)),
@@ -91,6 +93,7 @@ fn disable_and_remove_key_follow_the_baseline_and_no_ops_publish_nothing() {
     // Removing every key keeps an empty track, as `t.keys.retain` does.
     let empty = changed(&one_key, remove_key(0));
     assert!(timing(&empty).has_time_remap());
+    #[cfg(feature = "evaluation")]
     assert_eq!(timing(&empty).remap_value(3.0), None);
     let cleared = changed(&empty, disable());
     assert_eq!(cleared, catalog());
@@ -165,6 +168,7 @@ fn timing_on_a_non_video_placement_or_an_unknown_one_is_refused() {
         set_mode("blend"),
         disable(),
         remove_key(0),
+        #[cfg(feature = "history")]
         set_key(0.0, 1.0, None),
     ] {
         assert_eq!(
@@ -191,6 +195,7 @@ fn timing_on_a_non_video_placement_or_an_unknown_one_is_refused() {
     assert_eq!(floored.keys[1].v[0].as_f64(), Some(0.0));
 }
 
+#[cfg(feature = "history")]
 #[test]
 fn set_key_uses_the_shared_property_key_kernel() {
     let on = changed(&catalog(), enable(0, 10, 19));
@@ -213,6 +218,7 @@ fn set_key_uses_the_shared_property_key_kernel() {
     assert_eq!(saved["hIn"], serde_json::json!([0, 0]));
     assert_eq!(saved["hOut"], serde_json::json!([0, 0]));
     assert!(saved["curvePoints"].is_array());
+    #[cfg(feature = "evaluation")]
     assert_eq!(timing(&added).remap_value(5.0), Some(3.0));
     // Re-keying an existing frame replaces its value and keeps its handles;
     // a curve, when given, replaces the stored one.

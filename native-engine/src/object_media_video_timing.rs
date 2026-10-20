@@ -12,6 +12,7 @@
 //!
 //! Only a drawing placement may carry timing; that the asset is a video is the
 //! catalog's check (`object_media_link_track::validate`, the edit owner).
+#[cfg(feature = "evaluation")]
 use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::object_document::object_component_record_kernels::object_component_records::validate_remap;
 use crate::object_document::{OrderCurvePoint, OrderKey, OrderTrack};
@@ -43,6 +44,8 @@ impl VideoTiming {
             })
     }
 
+    // The sampler needs the shared curve kernel, an evaluation module.
+    #[cfg(feature = "evaluation")]
     /// `SMMotion.timeRemapValue(ld, frame)`: `None` without a track or keys
     /// (the sampler's `null`), otherwise the eased value at `at`.
     pub(crate) fn remap_value(&self, at: f64) -> Option<f64> {
@@ -111,6 +114,7 @@ impl VideoTiming {
             }
             // The shared property key kernel: an existing key keeps its spelling
             // and handles, a new one gets the default curve and zero handles.
+            #[cfg(feature = "history")]
             RemapIntent::SetKey {
                 frame,
                 value,
@@ -146,7 +150,9 @@ pub(crate) enum RemapIntent {
     Disable,
     /// Remove the keys at `frame` (the property `removeKey` rule).
     RemoveKey { frame: Number },
-    /// Set the key at `frame` to `value` source frames, optionally its curve.
+    /// Set the key at `frame` to `value` source frames, optionally its curve;
+    /// it exists with the history-owned property key kernel it calls.
+    #[cfg(feature = "history")]
     SetKey {
         frame: Number,
         value: Number,
@@ -161,12 +167,15 @@ pub(crate) enum RemapRefusal {
     Conflict,
 }
 
+#[cfg(feature = "evaluation")]
 fn frame(key: &OrderKey) -> Option<f64> {
     key.frame.as_f64().filter(|f| f.is_finite())
 }
+#[cfg(feature = "evaluation")]
 fn value(key: &OrderKey) -> Option<f64> {
     key.v.first()?.as_f64().filter(|v| v.is_finite())
 }
+#[cfg(feature = "evaluation")]
 fn curve(key: &OrderKey) -> Option<Vec<CurveSample>> {
     match key.curve_points.value().and_then(Option::as_ref) {
         // The baseline default ease (`object_audio_track_sampling` keeps the same table).
@@ -195,6 +204,6 @@ fn curve(key: &OrderKey) -> Option<Vec<CurveSample>> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "evaluation"))]
 #[path = "../tests/object_media_video_timing.rs"]
 mod tests;

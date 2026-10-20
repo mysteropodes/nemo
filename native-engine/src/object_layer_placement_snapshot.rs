@@ -96,6 +96,7 @@ impl ObjectSnapshot {
         Ok(value)
     }
 }
-#[cfg(test)]
+// The fixture opens a real project file through the history owner.
+#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_layer_placement_snapshot.rs"]
 mod tests;

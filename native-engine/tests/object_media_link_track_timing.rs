@@ -61,7 +61,9 @@ fn decoded_members_reach_the_placement_record() {
     let decoded = timing(&decode(&text).unwrap());
     assert_eq!(decoded.interp_mode.as_deref(), Some("blend"));
     assert_eq!(decoded.frame_blend, Some(true));
+    #[cfg(feature = "evaluation")]
     assert_eq!(decoded.remap_value(6.0), Some(10.0));
+    #[cfg(feature = "evaluation")]
     assert_eq!(decoded.remap_value(30.0), Some(16.0));
 }
 
