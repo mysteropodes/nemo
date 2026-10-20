@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "c8a7ec57f9ed03a488572a8bc8be38dd9c0ae36e",
-  "describe": "v0.7.0-alpha.4-2595-gc8a7ec57"
+  "head": "7635fcc09c6e70745e35ba0c46e9eebcfdff774d",
+  "describe": "v0.7.0-alpha.4-2598-g7635fcc0"
  },
- "inputsDigest": "e112e1255a1a8c4313d60737fa4f8ed043dc5b7d957e981ab67f7892797dea0d",
+ "inputsDigest": "444600a5e52619a699037d56db1e24f777599a00880fb92f3b266ffbe8c0401c",
  "states": [
   "inventoried",
   "characterized",
@@ -376,7 +376,7 @@
   },
   "SMTutorial": {
    "file": "src/js/tutorial.js",
-   "line": 1866,
+   "line": 1869,
    "members": 0
   },
   "SMWorkspace": {
@@ -1134,7 +1134,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 581,
+    "functionsVisited": 584,
     "via": "variable btn",
     "references": [
      "src/js/motion.js:7283 action()"
@@ -3441,7 +3441,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 156,
+    "functionsVisited": 154,
     "via": "chain",
     "references": []
    },
@@ -3457,7 +3457,7 @@
    "capability": "Discover Nemo — interactive tutorial",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/tutorial.js:1857"
+    "src/js/tutorial.js:1860"
    ],
    "events": [
     "click"
@@ -5850,7 +5850,7 @@
      "src/js/timeline.js:7854 openCommentPopover()",
      "src/js/timeline.js:7913 initCommentPopover()",
      "src/js/timeline.js:7936 initCommentPopover()",
-     "src/js/tutorial.js:1121 measure()"
+     "src/js/tutorial.js:1124 measure()"
     ]
    },
    "fixtures": [
@@ -7232,7 +7232,7 @@
     "functionsVisited": 2,
     "via": "variable fmtSel",
     "references": [
-     "src/js/tutorial.js:1157 measure()"
+     "src/js/tutorial.js:1160 measure()"
     ]
    },
    "fixtures": [
@@ -9603,7 +9603,7 @@
     "functionsVisited": 72,
     "via": "variable addBtn",
     "references": [
-     "src/js/tutorial.js:1310 check()"
+     "src/js/tutorial.js:1313 check()"
     ]
    },
    "fixtures": [
@@ -10874,7 +10874,7 @@
      "src/js/gradient-bridge.js:63 renderGradientPanel()",
      "src/js/timeline.js:8914 initFillGradientButton()",
      "src/js/timeline.js:8936 syncFillGradientButton()",
-     "src/js/tutorial.js:1269 check()"
+     "src/js/tutorial.js:1272 check()"
     ]
    },
    "fixtures": [
@@ -14546,7 +14546,7 @@
     "via": "variable nameEl",
     "references": [
      "src/js/adapters/settings-preferences-ui.js:40 syncProfileFields()",
-     "src/js/tutorial.js:1095 measure()"
+     "src/js/tutorial.js:1098 measure()"
     ]
    },
    "fixtures": []
@@ -14584,7 +14584,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 166,
+    "functionsVisited": 171,
     "via": "variable roleEl",
     "references": [
      "src/js/adapters/settings-preferences-ui.js:40 syncProfileFields()"
@@ -16569,7 +16569,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -17678,7 +17678,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -17725,7 +17725,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -17772,7 +17772,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -17819,7 +17819,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -17866,7 +17866,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -17913,7 +17913,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -17960,7 +17960,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18007,7 +18007,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18054,7 +18054,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18101,7 +18101,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18148,7 +18148,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18195,7 +18195,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18242,7 +18242,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18289,7 +18289,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18336,7 +18336,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18383,7 +18383,7 @@
     "container": "shape-tool-stack",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18430,7 +18430,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18477,7 +18477,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -18524,7 +18524,7 @@
     "container": "tools-panel",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 166,
     "via": "callback b",
     "references": []
    },
@@ -22445,7 +22445,7 @@
    "source": "src/js/labs/command-palette.js:13",
    "meta": {
     "i18n": "labsCmdToolBrush",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22478,7 +22478,7 @@
    "source": "src/js/labs/command-palette.js:14",
    "meta": {
     "i18n": "labsCmdToolPen",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22511,7 +22511,7 @@
    "source": "src/js/labs/command-palette.js:15",
    "meta": {
     "i18n": "labsCmdToolEraser",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22544,7 +22544,7 @@
    "source": "src/js/labs/command-palette.js:16",
    "meta": {
     "i18n": "labsCmdToolBucket",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22577,7 +22577,7 @@
    "source": "src/js/labs/command-palette.js:17",
    "meta": {
     "i18n": "labsCmdToolFillBrush",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22610,7 +22610,7 @@
    "source": "src/js/labs/command-palette.js:18",
    "meta": {
     "i18n": "labsCmdToolSelect",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22643,7 +22643,7 @@
    "source": "src/js/labs/command-palette.js:19",
    "meta": {
     "i18n": "labsCmdToolSubselect",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22676,7 +22676,7 @@
    "source": "src/js/labs/command-palette.js:20",
    "meta": {
     "i18n": "labsCmdToolText",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22709,7 +22709,7 @@
    "source": "src/js/labs/command-palette.js:21",
    "meta": {
     "i18n": "labsCmdToolHand",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22742,7 +22742,7 @@
    "source": "src/js/labs/command-palette.js:22",
    "meta": {
     "i18n": "labsCmdToolZoom",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22775,7 +22775,7 @@
    "source": "src/js/labs/command-palette.js:23",
    "meta": {
     "i18n": "labsCmdToolCamera",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -22808,7 +22808,7 @@
    "source": "src/js/labs/command-palette.js:24",
    "meta": {
     "i18n": "labsCmdToolComment",
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": []
   },
@@ -34958,7 +34958,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "c",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -34999,7 +34999,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "b",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35040,7 +35040,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "l",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35081,7 +35081,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "e",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35122,7 +35122,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "i",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35163,7 +35163,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "g",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35204,7 +35204,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "n",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35245,7 +35245,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "m",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35286,7 +35286,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "h",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35327,7 +35327,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "u",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35368,7 +35368,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "p",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35899,7 +35899,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "r",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35940,7 +35940,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "s",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -35981,7 +35981,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "w",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -36022,7 +36022,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "v",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -36063,7 +36063,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "d",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -36104,7 +36104,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "q",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -36145,7 +36145,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "a",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -36186,7 +36186,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "y",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -36227,7 +36227,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "o",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
@@ -36268,7 +36268,7 @@
     "table": "TOOL_SHORTCUTS",
     "key": "z",
     "cat": null,
-    "functionsVisited": 161
+    "functionsVisited": 166
    },
    "fixtures": [
     "static-props",
