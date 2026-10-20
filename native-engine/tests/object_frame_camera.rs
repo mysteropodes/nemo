@@ -162,6 +162,20 @@ fn expressions_and_nonfinite_projection_do_not_fall_back_to_raw_or_identity() {
 }
 
 #[test]
+fn disabled_3d_does_not_evaluate_an_overflowing_dormant_track() {
+    let mut value = source();
+    value["drawing"]["layers"][0]["threeD"] = json!(false);
+    value["drawing"]["propertyHolders"][0]["properties"][2]["track"]["keys"] =
+        json!([{"frame":0,"v":[1e308]},{"frame":4,"v":[-1e308]}]);
+    let o = owner(&value);
+    let s = snapshot(&o);
+    // The input is admitted and finite. Only evaluating its dormant segment
+    // overflows; a disabled 3D feature must not take that evaluation path.
+    assert!(crate::object_frame_packet::sample_property_raw(&s, &target(), "positionZ", 2.).is_err());
+    assert_eq!(s.sampled_pose_3d(&target(), 2.).unwrap(), None);
+}
+
+#[test]
 fn component_targets_cannot_borrow_an_opposite_root_layer_3d_flag() {
     // The native component fixture is an actually admitted context, not an
     // unknown context that would fail target validation for another reason.

@@ -1,5 +1,5 @@
 //! Stored camera/3D inputs joined to the existing numerical kernels at one snapshot.
-use super::{sample_property_raw, PropertySampleError};
+use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
 use crate::evaluation::property_camera_eval::{camera_matrix_at_frame, CameraKey};
 use crate::evaluation::property_projection_3d::Pose3D;
 use crate::object_document::PropertyHolderTarget;
@@ -81,8 +81,11 @@ impl ObjectSnapshot {
             .iter()
             .find(|layer| layer.layer_uid() == target.layer_uid())
             .ok_or(PropertySampleError::MissingTarget)?;
-        // Validate the full context even when the flag is off.
-        sample_property_raw(self, target, "positionZ", frame)?;
+        // Validate identity without evaluating a dormant 3D track. The active
+        // consumer below samples each required value exactly once.
+        if !crate::object_frame_packet::property_sampling::target_exists(self.document(), target) {
+            return Err(PropertySampleError::MissingTarget);
+        }
         if layer.three_d.value() != Some(&true) {
             return Ok(None);
         }

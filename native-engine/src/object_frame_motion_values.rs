@@ -1,6 +1,6 @@
 //! Snapshot-bound Motion values, shared by frame geometry and destructive Flatten.
 //! This reads the existing admitted property tracks; it never samples a UI cache.
-use super::{sample_property_raw, PropertySampleError};
+use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
 use crate::evaluation::motion_parent_chain::{motion_mat_from_values, MotionMat};
 use crate::object_document::PropertyHolderTarget;
 use crate::revision::ObjectSnapshot;
