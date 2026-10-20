@@ -1968,6 +1968,7 @@
         "native_property_read_dispatch_tests.rs",
         "native_text_read_dispatch_tests.rs",
         "native_property_edit_dispatch_tests.rs",
+        "native_property_bake_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
         "native_asset_remove_dispatch_tests.rs",

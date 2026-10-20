@@ -322,3 +322,7 @@ mod property_read_tests;
 #[cfg(test)]
 #[path = "native_property_edit_dispatch_tests.rs"]
 mod property_edit_tests;
+
+#[cfg(test)]
+#[path = "native_property_bake_dispatch_tests.rs"]
+mod property_bake_tests;
