@@ -83,9 +83,20 @@ function fixture() {
     localStorage: { getItem: key => key === 'nemo-rulers-on' ? '1' : null, setItem: (key, value) => prefs.push([key, value]) },
     showToast: value => notices.push(value), addEventListener() {} };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
-  for (const file of ['adapters/native-guide-contract.js', 'adapters/native-application.js', 'adapters/native-guide-desktop.js',
-    'adapters/native-guide-ui.js', 'rulers-bridge.js'])
-    vm.runInContext(fs.readFileSync(require.resolve('../src/js/' + file), 'utf8'), context, { filename: file });
+  const needed = ['js/adapters/native-guide-contract.js', 'js/adapters/native-application.js', 'js/adapters/native-guide-desktop.js',
+    'js/adapters/native-guide-ui.js', 'js/rulers-bridge.js'];
+  const html = fs.readFileSync(require.resolve('../src/index.html'), 'utf8');
+  const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)].map(m => ({ src: m[1].match(/\bsrc=["']([^"']+)/)?.[1], tag: m[0] }));
+  const actual = scripts.filter(script => needed.includes(script.src));
+  for (const file of needed) {
+    const selected = actual.filter(script => script.src === file); assert.equal(selected.length, 1, file);
+    assert.equal(selected[0].tag, '<script src="' + file + '">', file + ' must be a synchronous classic script');
+  }
+  const at = file => actual.findIndex(script => script.src === 'js/adapters/' + file + '.js');
+  assert(at('native-guide-contract') < at('native-application'));
+  assert(at('native-guide-desktop') < at('native-guide-ui'));
+  for (const script of actual)
+    vm.runInContext(fs.readFileSync(require.resolve('../src/' + script.src), 'utf8'), context, { filename: script.src });
   controller = root.NemoNativeGuideController; document.fire('DOMContentLoaded');
   function tick() { const frame = frames.shift(); if (frame) frame(); }
   async function settled() {
