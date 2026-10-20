@@ -10,14 +10,14 @@ use crate::object_document::{Presence, PropertyHolderTarget};
 use crate::object_frame_packet::sample_property_raw;
 use crate::revision::ObjectSnapshot;
 
-pub(super) struct SnapshotMotion<'a> {
+pub(crate) struct SnapshotMotion<'a> {
     snapshot: &'a ObjectSnapshot,
     context_id: &'a str,
     frame: f64,
 }
 
 impl<'a> SnapshotMotion<'a> {
-    pub(super) fn new(snapshot: &'a ObjectSnapshot, context_id: &'a str, frame: f64) -> Self {
+    pub(crate) fn new(snapshot: &'a ObjectSnapshot, context_id: &'a str, frame: f64) -> Self {
         Self {
             snapshot,
             context_id,
@@ -62,6 +62,23 @@ impl MotionPort for SnapshotMotion<'_> {
     }
 
     fn motion_delta(&self, layer_uid: &str) -> Result<Option<MotionDelta>, Unavailable> {
+        let context = crate::evaluation::object_component_kernels::object_context_resolver::ContextSource::of_document(self.snapshot.document())
+            .context(self.context_id)
+            .map_err(|_| Unavailable::LayerMotion)?;
+        let layer = context
+            .layers()
+            .iter()
+            .find(|layer| layer.layer_uid() == layer_uid)
+            .ok_or(Unavailable::LayerMotion)?;
+        if layer
+            .parent_layer_uid
+            .value()
+            .is_some_and(|parent| parent.is_some())
+        {
+            // sampled_motion_2d is a LOCAL pose. Never claim the effector's
+            // parent-resolved origin from that local translation alone.
+            return Err(Unavailable::LayerMotion);
+        }
         // This is the same stored five-property computation as the real frame
         // consumer: neutral Motion stays None, and unsupported live expressions
         // stay unavailable rather than being replaced with an identity pose.

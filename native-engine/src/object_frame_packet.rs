@@ -10,6 +10,8 @@ use std::collections::HashMap;
 
 #[path = "object_frame_context.rs"]
 mod context;
+#[path = "object_duplicator_snapshot_sources.rs"]
+pub(crate) mod duplicator_sources;
 #[path = "object_frame_sources.rs"]
 mod sources;
 use context::FrameContext;
