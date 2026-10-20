@@ -57,3 +57,8 @@ mod composition_public_tests;
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_palette_edit.rs"]
 mod palette_delta_tests;
+
+// Public envelope coverage shares the existing metadata/history owner.
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_palette_public.rs"]
+mod palette_public_tests;

@@ -95,6 +95,7 @@ impl NativeApplicationRequest {
                 | "command.document.object.layer.create"
                 | "command.document.object.project.settings.edit"
                 | crate::native_contract::composition::EDIT
+                | crate::native_contract::palette::EDIT
                 | crate::native_contract::placement::OP
                 | crate::native_contract::audio_track::OP
                 | crate::native_contract::brush::PUBLISH

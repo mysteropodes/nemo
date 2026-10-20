@@ -296,6 +296,15 @@ impl ObjectSnapshot {
                 "Native composition metadata is unavailable.",
             );
         }
+        if request.operation == "query.document.object.project.palette.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_palette_read(&request);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native palette metadata is unavailable.",
+            );
+        }
         if request.operation != "query.document.object" {
             return failure(
                 DispatchErrorCode::InvalidRequest,

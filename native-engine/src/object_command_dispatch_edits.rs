@@ -8,6 +8,15 @@ use crate::history::NativeObjectHistory;
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest};
 use crate::transaction::{CompactResult, RetainedDisposition};
 
+// These three field-specific namespaces share preparation/commit, not action shapes.
+pub(super) const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
+const OP_PROJECT_COMPOSITION: &str = "command.document.object.project.composition.edit";
+const OP_PROJECT_PALETTE: &str = "command.document.object.project.palette.edit";
+
+pub(super) fn is_project_settings_operation(operation: &str) -> bool {
+    matches!(operation, OP_PROJECT_SETTINGS | OP_PROJECT_COMPOSITION | OP_PROJECT_PALETTE)
+}
+
 impl NativeObjectHistory {
     /// Raster-item / text-block edit: the typed preparation, the response-bound preflight and the sealed commit.
     pub(super) fn dispatch_item_edit_command(
@@ -127,16 +136,20 @@ impl NativeObjectHistory {
             )),
         }
     }
-    /// Settings and composition deltas use the same typed preparation/sealed commit.
+    /// Field-specific metadata deltas use one existing typed preparation/sealed commit.
     pub(super) fn dispatch_project_settings_command(
         &mut self,
-        payload: &[u8],
-        composition: bool,
+        request: &OpacityRequest,
     ) -> Result<CompactResult, (DispatchErrorCode, &'static str)> {
-        let prepared = if composition {
-            self.prepare_composition_delta_json(payload)
-        } else {
-            self.prepare_project_settings_json(payload)
+        let payload = serde_json::to_vec(&request.payload).map_err(|_| (
+            DispatchErrorCode::InvalidRequest,
+            "Project settings payload cannot be encoded.",
+        ))?;
+        let prepared = match request.operation.as_str() {
+            OP_PROJECT_SETTINGS => self.prepare_project_settings_json(&payload),
+            OP_PROJECT_COMPOSITION => self.prepare_composition_delta_json(&payload),
+            OP_PROJECT_PALETTE => self.prepare_palette_delta_json(&payload),
+            _ => return Err((DispatchErrorCode::InvalidRequest, "Unsupported project metadata edit.")),
         };
         match prepared {
             Ok(candidate) => {

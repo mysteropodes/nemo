@@ -68,6 +68,7 @@ fn complete_transport_schema_reaches_one_clipboard_result_branch_without_copy_cu
         "#/$defs/ObjectFrameRepeatResult",
         "#/$defs/ObjectFrameClipboardCutResult",
         "#/$defs/ObjectFrameBulkMoveResult",
+        "#/$defs/ObjectProjectCompositionReadResult",
     ];
     assert_eq!(branches.len(), retained.len() + 1);
     for (branch, expected) in branches.iter().zip(retained) {
@@ -75,7 +76,7 @@ fn complete_transport_schema_reaches_one_clipboard_result_branch_without_copy_cu
     }
     assert_eq!(
         branches.last().unwrap(),
-        &json!({"$ref":"#/$defs/ObjectProjectCompositionReadResult"})
+        &json!({"$ref":"#/$defs/ObjectProjectPaletteReadResult"})
     );
     assert!(!branches
         .iter()

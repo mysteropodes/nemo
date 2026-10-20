@@ -108,7 +108,9 @@
         "src/native_fill_trace_wire.rs",
         "src/native_text_animator_contract.rs",
         "src/native_composition_contract.rs",
-        "src/native_composition_contract_tests.rs"
+        "src/native_composition_contract_tests.rs",
+        "src/native_palette_contract.rs",
+        "src/native_palette_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

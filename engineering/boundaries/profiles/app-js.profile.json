@@ -3291,6 +3291,30 @@
         "native-composition-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "app.native.palette.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-palette-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.palette.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-palette-desktop.js"
+      ]
     }
   ],
   "layerRules": {
