@@ -1,6 +1,6 @@
 //! Strict project metadata DTO shared by both native envelope versions.
 use super::ProjectWireError;
-use crate::object_document::{Presence, ProjectMetadata, ProjectWorkspaceRecord, ProjectCommentRecord};
+use crate::object_document::{Presence, ProjectMetadata, ProjectWorkspaceRecord, ProjectCommentRecord, ProjectPresetCatalog};
 use serde::Serialize;
 
 // Nested records are object-only and closed, just like the original metadata DTO.
@@ -85,6 +85,8 @@ pub(super) struct Metadata {
     workspace:Presence<ProjectWorkspaceRecord>,
     #[serde(skip_serializing_if="Presence::missing")]
     comments:Presence<Vec<ProjectCommentRecord>>,
+    #[serde(skip_serializing_if="Presence::missing")]
+    custom_brush_presets:Presence<ProjectPresetCatalog>,
 }
 // Derived decoding alone admits positional arrays; reuse the drawing's
 // object-only visitor with strict duplicate/unknown/required-member checks.
@@ -109,7 +111,8 @@ crate::object_document::object_deserialize!(Metadata {
     #[serde(default)] perspective_density:Presence<f64>,
     #[serde(default,rename="perspectiveVPs")] perspective_vps:Presence<Option<Vec<VanishingPoint>>>,
     #[serde(default)] workspace:Presence<ProjectWorkspaceRecord>,
-    #[serde(default)] comments:Presence<Vec<ProjectCommentRecord>>
+    #[serde(default)] comments:Presence<Vec<ProjectCommentRecord>>,
+    #[serde(default)] custom_brush_presets:Presence<ProjectPresetCatalog>
 });
 
 impl Metadata {
@@ -145,6 +148,7 @@ impl Metadata {
                 self.perspective_enabled.value().copied(),self.perspective_mode.value().cloned(),self.perspective_density.value().copied(),
                 self.perspective_vps.value().map(|items|items.as_ref().map(|items|items.iter().map(|p|(p.x,p.y,p.locked.value().copied())).collect()))))
             .and_then(|value|value.with_annotations(self.workspace.value().cloned(),self.comments.value().cloned()))
+            .and_then(|value|value.with_custom_brush_presets(self.custom_brush_presets.value().cloned()))
             .map_err(|_| ProjectWireError::Invalid)
     }
     pub(super) fn from_metadata(value: &ProjectMetadata) -> Self {
@@ -193,6 +197,7 @@ impl Metadata {
             bpm_show: bpm_show.map(Presence::Present).unwrap_or(Presence::Missing),
             palettes:present(palettes.map(|items|items.iter().map(|(id,name,colors)|Palette{id:id.clone(),name:name.clone(),colors:colors.clone()}).collect())),
             active_palette_idx:present(active_palette_idx),
+            custom_brush_presets:present(value.custom_brush_presets().cloned()),
             workspace:present(workspace.cloned()),comments:present(comments.map(<[ProjectCommentRecord]>::to_vec)),
             shadow_palette:present(shadow_palette.map(|items|items.iter().map(|(id,color)|ShadowColor{id:id.clone(),color:color.clone()}).collect())),
             shadow_active_id:present(shadow_active_id.map(str::to_owned)),
