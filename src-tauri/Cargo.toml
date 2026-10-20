@@ -76,3 +76,8 @@ block = "0.1"
 raw-window-handle = "0.6.2"
 wgpu = "29.0.4"
 pollster = "0.4"
+
+# Use the same bounded single-function parser as the native engine root.
+# See native-engine/third_party/rquickjs-sys-0.14.0.PROVENANCE.md.
+[patch.crates-io]
+rquickjs-sys = { path = "../native-engine/third_party/rquickjs-sys-0.14.0" }
