@@ -1,6 +1,6 @@
 //! Persistent camera inputs. Evaluation remains in the original camera kernel.
 use crate::object_document::Presence;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

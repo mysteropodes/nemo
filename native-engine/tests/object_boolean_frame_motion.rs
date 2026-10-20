@@ -78,3 +78,40 @@ fn a_real_intervening_publication_rejects_the_sealed_motion_candidate() {
     assert_eq!(bytes(&o), after);
     assert_eq!(o.history_depths(), (1,0));
 }
+
+#[test]
+fn the_animated_style_identity_is_not_applied_twice_and_other_frames_keep_their_motion() {
+    let mut source=document(json!({"property":"position","static":[-20,0]}));
+    source["propertyHolders"][0]["target"]["strokeId"]=json!("b");
+    let mut other=source["objects"][1].clone();
+    other["target"]["frameScope"]["frame"]=json!(0);
+    source["objects"].as_array_mut().unwrap().push(other.clone());
+    let mut o=owner(&source); let before=bytes(&o);
+    let candidate=o.prepare_boolean_flatten_json(&payload()).unwrap(); o.commit_boolean_edit(candidate).unwrap();
+    let after:Value=serde_json::from_slice(&bytes(&o)).unwrap();
+    let objects=after["objects"].as_array().unwrap();
+    let old=objects.iter().find(|r|r["target"]["frameScope"]["frame"]==0).unwrap();
+    assert_eq!(old["geometry"],other["geometry"]);
+    assert_eq!(after["propertyHolders"],source["propertyHolders"]);
+    let baked=objects.iter().find(|r|r["target"]["frameScope"]["frame"]==1).unwrap();
+    assert_ne!(baked["target"]["strokeId"],json!("b"),"the retained b holder must not move an already-baked result again");
+    for segment in baked["geometry"]["segments"].as_array().unwrap() {
+        let x=segment["point"]["x"].as_f64().unwrap(); assert!((0.0..=10.0).contains(&x));
+    }
+    o.undo(o.content_revision()).unwrap(); assert_eq!(bytes(&o),before);
+}
+
+#[test]
+fn curved_members_use_the_real_t10_geometry_before_the_motion_fold() {
+    let mut source=document(json!({"property":"position","static":[20,0]}));
+    source["objects"][0]["geometry"]["segments"][0]["handleOut"]["y"]=json!(-20);
+    source["objects"][0]["geometry"]["segments"][1]["handleIn"]["y"]=json!(-20);
+    let mut o=owner(&source); let before=bytes(&o);
+    let candidate=o.prepare_boolean_flatten_json(&payload()).unwrap(); o.commit_boolean_edit(candidate).unwrap();
+    let after:Value=serde_json::from_slice(&bytes(&o)).unwrap();
+    assert_eq!(after["objects"].as_array().unwrap().len(),1);
+    assert!(after["objects"][0]["geometry"]["segments"].as_array().unwrap().iter()
+        .any(|segment|segment["point"]["y"].as_f64().unwrap() < -10.),"curved bulge must survive; straight-anchor substitution fails");
+    assert_eq!(o.history_depths(),(1,0));
+    o.undo(o.content_revision()).unwrap(); assert_eq!(bytes(&o),before);
+}

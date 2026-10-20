@@ -96,3 +96,32 @@ fn expressions_and_nonfinite_projection_do_not_fall_back_to_raw_or_identity() {
     let o=owner(&value); assert!(snapshot(&o).sampled_camera_matrix(0.).is_err());
     assert!(snapshot(&o).sampled_camera_matrix(f64::NAN).is_err());
 }
+
+#[test]
+fn component_targets_cannot_borrow_an_opposite_root_layer_3d_flag() {
+    // The native component fixture is an actually admitted context, not an
+    // unknown context that would fail target validation for another reason.
+    let line=include_str!("fixtures/object-component-document/oracle.txt").lines()
+        .find(|line|line.starts_with("G\t")).unwrap();
+    let drawing:Value=serde_json::from_str(line.split('\t').nth(1).unwrap()).unwrap();
+    let component=&drawing["componentTables"]["components"]["components"][0];
+    let uid=component["layers"][0]["layerUid"].clone();
+    let context=component["symbolId"].clone();
+    for enabled in [false,true] {
+        let mut value=source(); value["drawing"]=drawing.clone();
+        value["drawing"]["componentTables"]["components"]["components"][0]["layers"][0]["threeD"]=json!(!enabled);
+        if let Some(index)=value["drawing"]["layers"].as_array().unwrap().iter().position(|l|l["layerUid"]==uid) {
+            value["drawing"]["layers"][index]["threeD"]=json!(enabled);
+        } else {
+            // Add a real colliding root layer with explicit order membership.
+            let index=value["drawing"]["layers"].as_array().unwrap().len();
+            value["drawing"]["layers"].as_array_mut().unwrap().push(json!({"layerUid":uid,"threeD":enabled}));
+            let root_context=value["drawing"]["compositionOrder"]["contexts"].as_array_mut().unwrap().iter_mut()
+                .find(|c|c["contextId"]=="scene-root").unwrap();
+            root_context["layers"].as_array_mut().unwrap().push(json!({"layerUid":uid,"naturalPosition":index,"order":{}}));
+        }
+        let o=owner(&value);
+        let target=serde_json::from_value(json!({"contextId":context,"layerUid":uid})).unwrap();
+        assert_eq!(snapshot(&o).sampled_pose_3d(&target,0.),Err(crate::object_frame_packet::PropertySampleError::UnsupportedProperty));
+    }
+}

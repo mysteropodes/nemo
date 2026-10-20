@@ -37,6 +37,7 @@ impl ObjectSnapshot {
     /// an old 3D key does not activate projection on an ordinary 2D layer.
     pub(crate) fn sampled_pose_3d(&self, target:&PropertyHolderTarget, frame:f64) -> Result<Option<Pose3D>,PropertySampleError> {
         if !frame.is_finite() { return Err(PropertySampleError::InvalidFrame) }
+        if target.context_id() != "scene-root" { return Err(PropertySampleError::UnsupportedProperty) }
         if target.stroke_id().is_some() { return Err(PropertySampleError::UnsupportedProperty) }
         let layer = self.document().layers().iter().find(|layer| layer.layer_uid()==target.layer_uid())
             .ok_or(PropertySampleError::MissingTarget)?;

@@ -97,6 +97,9 @@ pub(crate) enum PlanError {
 /// Element Motion at the request frame. `Ok(None)`: the element has no Motion.
 pub(crate) trait ElementMotionSource {
     fn element_mat(&self, target: &ObjectTarget) -> Result<Option<ElementMat>, MotionUnavailable>;
+    /// Only the real pinned provider may materialize and detach consumed Motion.
+    /// Supplied legacy/test ports retain the original orphan-refusal contract.
+    fn consumes_authored_motion(&self) -> bool { false }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

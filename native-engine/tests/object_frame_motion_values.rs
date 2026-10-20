@@ -4,6 +4,11 @@ use crate::object_document::PropertyHolderTarget;
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 
+// Reuse the original real stored-rig fixture builder; this file contains no tests.
+#[allow(dead_code)]
+#[path = "rig_pose_eval_rows.rs"]
+mod rig_input;
+
 fn target() -> PropertyHolderTarget {
     serde_json::from_value(json!({"contextId":"scene-root","layerUid":"L0"})).unwrap()
 }
@@ -66,4 +71,31 @@ fn actual_vector_evaluation_consumes_element_motion_about_its_native_bounds() {
         for i in 0..2 { assert!((segment.point[i]-point[i]).abs()<1e-10); }
     }
     assert_eq!(encode_storage_project(s.document()).unwrap(),before);
+}
+
+#[test]
+fn the_actual_stored_rig_pose_scene_route_also_applies_element_motion() {
+    use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{evaluate_rig_pose,RigPosePin};
+    use crate::evaluation::object_vector_kernels::render_vector_eval::evaluate_record_with_pose;
+    use crate::object_document::FrameScopeKind;
+    use crate::object_frame_packet::{prepare_object_frame,ObjectFrameSelector};
+    let mut doc=rig_input::row_document(&rig_input::row("arm_rotate_soft_bone_turned_40_degrees"));
+    let id=doc["objects"][0]["target"]["strokeId"].clone();
+    doc["propertyHolders"]=json!([{"target":{"contextId":"scene-root","layerUid":"L1","strokeId":id},
+        "properties":[{"property":"position","static":[7,-3]}]}]);
+    let s=ObjectSnapshot::new("rig-element-motion",decode_storage_project(doc.to_string().as_bytes()).unwrap()).unwrap();
+    let pose=evaluate_rig_pose(&s,&RigPosePin::of(&s),"L1",0,None).unwrap();
+    let selected=pose.strokes.iter().find(|p|p.stroke_id==id.as_str().unwrap()).unwrap();
+    let selector=ObjectFrameSelector {instance_id:s.instance_id(),document_id:s.document_id(),
+        content_revision:s.content_revision(),document_snapshot_id:s.snapshot_id(),context_id:"scene-root",
+        scope_kind:FrameScopeKind::Authored,frame:0};
+    let packet=prepare_object_frame(&s,&selector).unwrap();
+    let record=packet.records().find(|r|r.record().target().stroke_id()==id.as_str().unwrap()).unwrap();
+    let actual=evaluate_record_with_pose(&packet,record,Some(selected)).unwrap();
+    assert_eq!(actual.segments.len(),selected.segments.len());
+    for (actual,posed) in actual.segments.iter().zip(&selected.segments) {
+        assert_eq!(actual.point,[posed.point[0]+7.,posed.point[1]-3.]);
+        assert_eq!(actual.handle_in,posed.handle_in); assert_eq!(actual.handle_out,posed.handle_out);
+    }
+    assert_eq!(s.content_revision(),0);
 }

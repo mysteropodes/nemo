@@ -12,6 +12,7 @@ pub(super) struct SnapshotMotion<'a> {
 }
 
 impl ElementMotionSource for SnapshotMotion<'_> {
+    fn consumes_authored_motion(&self) -> bool { true }
     fn element_mat(&self, target: &ObjectTarget) -> Result<Option<ElementMat>, MotionUnavailable> {
         let holder_target = PropertyHolderTarget {
             context_id: target.context_id.clone(),
@@ -23,9 +24,10 @@ impl ElementMotionSource for SnapshotMotion<'_> {
         if self.snapshot.document().property_holders().is_some_and(|holders| {
             holders.iter().any(|holder| {
                 holder.target() == &holder_target
-                    && holder.properties().iter().any(|property| {
+                    && (holder.controls.value().is_some_and(|controls| !controls.is_empty())
+                    || holder.properties().iter().any(|property| {
                         !matches!(property.property(), "position" | "anchor" | "rotation" | "scale" | "opacity")
-                    })
+                    }))
             })
         }) {
             return Err(MotionUnavailable);

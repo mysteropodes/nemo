@@ -10,7 +10,7 @@ use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
     result_style, BooleanPlan, ElementMotionSource, PlanError,
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::stack::{
-    find_record, hex8, stack_of, Scope,
+    find_record, fresh_ids, hex8, stack_of, Scope,
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::{
     bake_multi, flatten_polygons, MemberSource, MultiPolygon, OverlayFold,
@@ -21,6 +21,9 @@ use crate::object_document::object_group_kernels::object_group_combine_plan::{
 };
 use crate::object_document::object_group_kernels::object_group_record::layer_stroke_ids;
 use crate::object_document::ObjectDocument;
+use crate::object_document::{Presence,FrameScopeKind};
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{ring,polygon};
+use crate::object_document::object_group_kernels::object_boolean_topology::Polygon;
 
 /// Precomputed (Motion-baked) operand polygons by group item.
 struct Members {
@@ -94,7 +97,14 @@ pub(super) fn plan_flatten_group(
         let at =
             find_record(document, scope, &id).ok_or_else(|| PlanError::MemberAbsent(id.clone()))?;
         let record = &document.objects[at];
-        let mut polygons = filled_polygons(record)?;
+        let mut polygons = match filled_polygons(record) {
+            Err(PlanError::Curved(_)) if motion.consumes_authored_motion() => {
+                let polygons=vec![Polygon { exterior:polygon(&ring(record),true), holes:Vec::new() }];
+                admit_polygons(&polygons).map_err(PlanError::Topology)?;
+                polygons
+            },
+            value => value?,
+        };
         if element_holder(document, &record.target) {
             let mat = motion
                 .element_mat(&record.target)
@@ -131,14 +141,35 @@ pub(super) fn plan_flatten_group(
         .filter(|id| member_ids.contains(id))
         .count();
     let leaves = groups.collect_group_stroke_ids(group);
-    let detached = detach(document.clone(), scope, &leaves)?;
+    let mut detached = detach(document.clone(), scope, &leaves)?;
+    let first_id = if motion.consumes_authored_motion() && element_holder(document,&style_record.target) {
+        // Never reuse a still-animated identity for an already-baked result.
+        // finish() mints its remaining n-1 IDs from the start of this same
+        // sequence; selecting the nth one here keeps all IDs disjoint.
+        fresh_ids(document,revision,islands.len()).and_then(|mut ids|ids.pop()).ok_or(PlanError::IdUnavailable)?
+    } else { style_id.clone() };
+    if motion.consumes_authored_motion() {
+        if let Presence::Present(holders)=&mut detached.property_holders {
+            holders.retain(|holder| {
+                let target=holder.target();
+                let consumed=target.context_id()==scope.context_id && target.layer_uid()==scope.layer_uid
+                    && target.stroke_id().is_some_and(|id|member_ids.iter().any(|member|member==id));
+                !consumed || document.objects().iter().any(|record| {
+                    record.target.context_id==target.context_id() && record.target.layer_uid==target.layer_uid()
+                        && Some(record.target.stroke_id.as_str())==target.stroke_id()
+                        && record.target.frame_scope.kind==FrameScopeKind::Authored
+                        && !scope.owns(&record.target)
+                })
+            });
+        }
+    }
     finish(
         detached,
         scope,
         &member_ids,
         Some(first_pos - below),
         &islands,
-        &style_id,
+        &first_id,
         &style,
         revision,
     )
