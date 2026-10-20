@@ -1,7 +1,7 @@
 //! Project custom brush definitions only; execution remains with the brush provider.
 //! Preserve catalog insertion order and native immutable revision ownership.
-use super::{ProjectMetadata, ProjectMetadataError};
 use crate::object_document::{object_deserialize, Presence};
+use crate::object_document::{ProjectMetadata, ProjectMetadataError};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;

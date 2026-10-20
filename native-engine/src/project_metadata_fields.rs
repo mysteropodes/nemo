@@ -1,6 +1,6 @@
 //! Supplied palette, guide and perspective storage. These are project fields,
 //! distinct from transient tool selection, viewport overlays or local preferences.
-use super::{ProjectMetadata, ProjectMetadataError};
+use crate::object_document::{ProjectMetadata, ProjectMetadataError};
 use std::sync::Arc;
 
 type Palette = (String, String, Vec<String>);

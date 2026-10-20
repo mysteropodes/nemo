@@ -1,7 +1,7 @@
 //! Project-saved UI workspace and comment attribution. Local identity/preferences
 //! are not copied here. Values publish only with the enclosing native revision.
-use super::{ProjectMetadata, ProjectMetadataError};
 use crate::object_document::{object_deserialize, Presence};
+use crate::object_document::{ProjectMetadata, ProjectMetadataError};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
