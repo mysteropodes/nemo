@@ -287,7 +287,7 @@ impl NativeDispatch for NativeObjectHost {
                 .map_err(|_| "native asset removal correlation is invalid".into());
         }
         let before = self.history.content_revision();
-        let command = self.history.try_dispatch_object_command(&request);
+        let command = native_engine::application::dispatch_object_command(&mut self.history, &request);
         if self.history.content_revision() != before {
             // The command already committed. Cleanup failure is retained by the
             // preview owner; it must not falsify this command's revision/result.

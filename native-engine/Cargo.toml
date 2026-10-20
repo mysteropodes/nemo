@@ -21,7 +21,7 @@ scheduler = ["evaluation"]
 compositor = ["scheduler", "dep:vello", "dep:wgpu", "dep:pollster"]
 viewport = ["compositor", "dep:raw-window-handle"]
 export_job = ["history", "compositor", "dep:png"]
-application = ["history", "export_job"]
+application = ["history", "export_job", "object_expression_runtime"]
 object_expression_pin = ["history", "evaluation"]
 object_expression_runtime = ["object_expression_pin", "dep:rquickjs"]
 # Test harness selectors are separate from production module availability.

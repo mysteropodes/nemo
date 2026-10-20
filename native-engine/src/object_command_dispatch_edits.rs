@@ -175,6 +175,19 @@ impl NativeObjectHistory {
             )),
         }
     }
+    /// The application supplies the real evaluator; this layer owns only sealing/commit.
+    pub(super) fn dispatch_property_bake_command(
+        &mut self,
+        payload: &[u8],
+        bake: impl FnOnce(&Self, &[u8]) -> Result<crate::commands::PreparedPropertyEdit, DispatchErrorCode>,
+    ) -> Result<CompactResult, (DispatchErrorCode, &'static str)> {
+        let before = self.content_revision();
+        bake(self, payload).and_then(|candidate| self.commit_property_edit(candidate))
+            .map(|revision| CompactResult::Command {
+                applied: revision != before,
+                history_entries_added: u64::from(revision != before),
+            }).map_err(|code| (code, "Property bake is invalid, unavailable or could not commit."))
+    }
     /// Object fill: the typed preparation and the sealed commit.
     pub(super) fn dispatch_fill_command(
         &mut self,

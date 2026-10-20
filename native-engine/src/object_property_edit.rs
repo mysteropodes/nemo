@@ -13,6 +13,8 @@ use serde_json::Number;
 mod curves;
 #[path = "object_property_track_edit.rs"]
 mod track_edit;
+#[path = "object_property_bake_edit.rs"]
+mod bake_edit;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]

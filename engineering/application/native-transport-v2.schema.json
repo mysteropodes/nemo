@@ -8277,6 +8277,18 @@
                   "type": "boolean"
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "bake"
+                }
+              }
             }
           ]
         }

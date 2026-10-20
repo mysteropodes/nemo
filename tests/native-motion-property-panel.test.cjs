@@ -138,3 +138,30 @@ test('actual Panel reuses first inspector and reopens identities without duplica
  await h.openProperty(target,'opacity');assert.equal(h.readKeyTimeline().property,'opacity');assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,2);
  const view=h.readKeyTimelines();h.dispose();assert.equal(view.isCurrent(),false);assert.equal(h.readKeyTimelines(),null);assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,0);
 });
+
+
+test('ordinary native Motion bake uses the existing exact pinned public intent and refuses retired UI scope',async()=>{
+ const h=host(),read=h.ports.readPropertyMetadata,writes=[];
+ h.ports.readPropertyMetadata=async selector=>{
+  const result=await read(selector);
+  if(result.kind==='properties')result.items.forEach(row=>{if(row.authored&&row.authored.availability==='available'){row.authored.expressionEnabled=true;}});
+  return result;
+ };
+ const app=SDK.createNativeApplicationAdapter('bake-ui',{dispatch:async request=>{
+  writes.push(clone(request));return {apiVersion:2,requestId:request.requestId,instanceId:request.instanceId,
+   documentId:request.documentId,contentRevision:request.expectedRevision+1,ok:true,result:{applied:true,historyEntriesAdded:1}};
+ }});
+ h.ports.editProperty=async(payload,pin,current)=>{
+  assert.equal(current(),true);
+  return app.dispatch({apiVersion:2,requestId:'ordinary-bake',instanceId:pin.instanceId,documentId:pin.documentId,
+   expectedRevision:pin.contentRevision,operation:'command.document.object.property.edit',payload});
+ };
+ h.paint();await h.settle();const button=h.button('Bake expression');assert.ok(button);
+ await button.fire('click');assert.equal(writes.length,1);
+ assert.deepEqual(writes[0].payload.action,{kind:'bake'});
+ assert.equal(writes[0].payload.command,'object.property.edit');
+ assert.equal(typeof writes[0].expectedRevision,'number');
+ const retired=h.button('Bake expression');assert.ok(retired);h.root.state.currentFrame++;
+ await retired.fire('click');assert.equal(writes.length,1,'changed frame cannot reuse the old native intent');
+ h.retire();
+});

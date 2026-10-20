@@ -61,11 +61,11 @@
       Object.values(value.target).forEach(objectUid); objectUid(value.property);
       const action = value.action;
       if (!plain(action)) throw new TypeError('property action must be an object');
-      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated']};
+      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[]};
       if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
-      exact(action, ['kind', 'frame', ...fields[action.kind]], [], 'property action');
+      exact(action, ['kind', ...(action.kind === 'bake' ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
       // Native frames are finite numbers, including negative and fractional values.
-      if (!Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (action.kind !== 'bake' && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
       if (has(action, 'values')) {
         const values = action.values;
         if (!Array.isArray(values) || values.length < 1 || values.length > 4 ||

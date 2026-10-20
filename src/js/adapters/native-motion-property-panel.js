@@ -191,6 +191,19 @@
             };
             keysButton.addEventListener('click',onOpenKeys);nextBindings.push([keysButton,onOpenKeys]);line.appendChild(keysButton);
           }
+          if(f.availability==='available'&&f.expressionEnabled&&typeof ports.editProperty==='function'){
+            var bakeButton=make('button','Bake expression'),bakeToken=accepted.token,bakeTicket=serial,bakeSignature=accepted.selection.signature;
+            bakeButton.type='button';bakeButton.setAttribute('aria-label','Bake expression for '+entry.label);
+            var onBake=async function(){
+              function isCurrent(){return current(bakeToken,bakeTicket,bakeSignature)&&bakeButton.parentNode===line;}
+              if(!isCurrent()||bakeButton.disabled)return;
+              bakeButton.disabled=true;
+              try{await ports.editProperty({command:'object.property.edit',target:group.target,property:row.property,action:{kind:'bake'}},bakeToken.pin,isCurrent);}
+              catch(_){if(isCurrent())notify('Expression could not be baked.');}
+              finally{if(isCurrent())bakeButton.disabled=false;}
+            };
+            bakeButton.addEventListener('click',onBake);nextBindings.push([bakeButton,onBake]);line.appendChild(bakeButton);
+          }
           if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:line,target:group.target,row:row});
           fragment.appendChild(line);shown++;});
       });
