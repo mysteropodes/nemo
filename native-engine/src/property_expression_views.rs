@@ -277,7 +277,9 @@ fn resolve_self(
         .position(|l| l.layer_uid() == target.layer_uid())?;
     if target.stroke_id().is_some() {
         let holders = document.property_holders().unwrap_or(&[]);
-        holders.iter().find(|h| h.target() == target)?;
+        if !holders.iter().any(|h| h.target() == target) && document.property_order(target).is_none() {
+            return None;
+        }
     }
     let layer = &layers[index];
     let parent_uid = layer.parent_layer_uid.value().and_then(Option::as_deref);

@@ -109,13 +109,16 @@ fn default_curve() -> Vec<CurveSample> {
     .collect()
 }
 pub(super) fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFrameError> {
+    numeric_at(order, f64::from(frame))
+}
+pub(super) fn numeric_at(order: &AuthoredOrder, frame: f64) -> Result<f64, ObjectFrameError> {
+    if !frame.is_finite() { return Err(ObjectFrameError::FrameOutOfRange); }
     let Some(track) = order.track.value().filter(|t| !t.keys.is_empty()) else {
         return order
             .static_value
             .value()
             .map_or(Ok(0.0), |v| number(&v[0]));
     };
-    let frame = f64::from(frame);
     let first = &track.keys[0];
     let last = &track.keys[track.keys.len() - 1];
     if frame <= number(&first.frame)? {

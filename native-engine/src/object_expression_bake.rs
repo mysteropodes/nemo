@@ -3,7 +3,8 @@ use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::evaluation::property_expression_bake::{optimize, BakedTrack};
 use crate::history::NativeObjectHistory;
 use crate::object_document::{
-    object_deserialize, OrderCurvePoint, OrderKey, OrderTrack, Presence, PropertyHolderTarget,
+    object_deserialize, AuthoredOrder, OrderCurvePoint, OrderKey, OrderTrack, Presence, PropertyHolderTarget,
+    PropertyRecord,
 };
 use crate::object_expression_runtime::{evaluate_property_for_owner, ExpressionLimits};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
@@ -14,6 +15,10 @@ use serde_json::Number;
 // This scratch admission is separate from the VM's unchanged 8 MiB heap cap.
 const MAX_SCRATCH_BYTES: usize = 8 * 1024 * 1024;
 const TOLERANCE: f64 = 0.005;
+enum Stored {
+    Property(PropertyRecord),
+    Order(AuthoredOrder),
+}
 
 #[derive(Debug)]
 struct BakeAction {
@@ -87,6 +92,13 @@ pub(super) fn prepare(
     let origin = owner
         .acquire_snapshot(owner.content_revision())
         .ok_or(Unavailable)?;
+    let (dimension, replacement) = if payload.property == "order" {
+        let order = origin.document().property_order(&payload.target).cloned().ok_or(NotFound)?;
+        if !order.expression.value().is_some_and(|e| e.enabled && !e.code.is_empty()) {
+            return Err(Unavailable);
+        }
+        (1, Stored::Order(order))
+    } else {
     let holder = origin
         .document()
         .property_holders
@@ -98,7 +110,7 @@ pub(super) fn prepare(
         .filter(|m| m.animatable())
         .ok_or(Unavailable)?
         .dimension();
-    let mut replacement = holder
+    let replacement = holder
         .properties()
         .iter()
         .find(|p| p.property() == payload.property)
@@ -111,6 +123,8 @@ pub(super) fn prepare(
     {
         return Err(Unavailable);
     }
+    (dimension, Stored::Property(replacement))
+    };
     let end = origin.document().total_frames().saturating_sub(1).max(1);
     let count = usize::try_from(end)
         .ok()
@@ -148,16 +162,22 @@ pub(super) fn prepare(
         samples.push(result.value);
     }
     let baked = optimize(0, &samples, TOLERANCE, &|| false).map_err(|_| Unavailable)?;
-    if let Some(value) = &baked.static_value {
-        replacement.static_value = Presence::Present(values(value)?);
-        replacement.track = Presence::Missing;
-    } else {
-        replacement.track = Presence::Present(track(&baked)?);
+    let static_value = baked.static_value.as_deref().map(values).transpose()?;
+    let baked_track = if static_value.is_some() { Presence::Missing } else { Presence::Present(track(&baked)?) };
+    match replacement {
+        Stored::Property(mut record) => {
+            if let Some(value) = static_value { record.static_value = Presence::Present(value); }
+            record.track = baked_track;
+            if let Presence::Present(expression) = &mut record.expression { expression.enabled = false; }
+            ObjectFillOwner::prepare_baked_property(origin, &payload.target, record)
+        }
+        Stored::Order(mut order) => {
+            if let Some(value) = static_value { order.static_value = Presence::Present(value); }
+            order.track = baked_track;
+            if let Presence::Present(expression) = &mut order.expression { expression.enabled = false; }
+            ObjectFillOwner::prepare_baked_order(origin, &payload.target, order)
+        }
     }
-    if let Presence::Present(expression) = &mut replacement.expression {
-        expression.enabled = false;
-    }
-    ObjectFillOwner::prepare_baked_property(origin, &payload.target, replacement)
 }
 
 /// One route for ordinary UI and bundled MCP; the existing dispatcher keeps

@@ -22,6 +22,7 @@
         "object_record.rs",
         "project_media_envelope.rs",
         "object_order_document.rs",
+        "object_property_order.rs",
         "object_layer_timing.rs",
         "object_layer_range_evaluate.rs",
         "object_media_timing_core.rs",

@@ -214,3 +214,93 @@ fn missing_expression_bad_action_and_scratch_overflow_refuse_before_publication(
         assert_eq!(owner.content_revision(), 0);
     }
 }
+
+fn order_owner(code: &str, element: bool) -> NativeObjectHistory {
+    let order = json!({"static":[2],"expression":{"enabled":true,"code":code}});
+    let object = json!({"schemaVersion":1,"family":"closed-solid-fill-cubic-path",
+        "target":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":7},"layerUid":"L0","strokeId":"s0"},
+        "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative",
+            "segments":[{"point":{"x":0,"y":0},"handleIn":{"x":0,"y":0},"handleOut":{"x":1,"y":0}},
+                {"point":{"x":10,"y":10},"handleIn":{"x":0,"y":-1},"handleOut":{"x":0,"y":0}}]},
+        "fill":{"kind":"solid","r":1,"g":0,"b":0,"a":0.75}});
+    let document = decode_storage_project(json!({
+        "format":"nemo.native-object-document","formatVersion":2,"totalFrames":25,
+        "layers":[{"layerUid":"L0","name":"Ball"}],"objects":[object],
+        "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+            "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,
+                "order":if element { json!({}) } else { order.clone() }}],
+                "scopes":[{"frameScope":{"kind":"authored","frame":7},"elements":[
+                    {"layerUid":"L0","strokeId":"s0","naturalPosition":0,"order":if element { order } else { json!({}) }}]}]}],
+            "migration":"explicit-plan-required","referencePolicy":"unresolved"}
+    }).to_string().as_bytes()).unwrap();
+    NativeObjectHistory::from_admitted_project("order-bake", ProjectEnvelope::no_media(
+        ProjectMetadata::new(320,180,24.0).unwrap(), document)).unwrap()
+}
+fn order_payload(element: bool) -> Value {
+    let mut p = payload();
+    p["property"] = json!("order");
+    if element { p["target"]["strokeId"] = json!("s0"); }
+    p
+}
+#[test]
+fn layer_and_element_order_bake_real_stored_provider_one_history_and_reopen() {
+    for element in [false,true] {
+        let mut owner = order_owner("value + frame / 2 + comp.fps", element);
+        let before = drawing(&owner);
+        let p = order_payload(element);
+        let target = serde_json::from_value(p["target"].clone()).unwrap();
+        let req = request(&owner,"order-bake",p);
+        let pin = owner.acquire_snapshot(0).unwrap();
+        let page = pin.query_property_metadata_json(json!({"instanceId":pin.instance_id(),
+            "documentId":pin.document_id(),"atRevision":0,"documentSnapshotId":pin.snapshot_id(),
+            "view":{"kind":"properties","target":target,"offset":5,"limit":1}}).to_string().as_bytes()).unwrap();
+        assert_eq!(page["items"][0]["property"],"order");
+        assert_eq!(page["items"][0]["authored"]["expressionEnabled"],true);
+        let result = dispatch(&mut owner,&req);
+        assert_eq!(result["ok"],true,"{result}");
+        assert_eq!(result["result"]["historyEntriesAdded"],1);
+        let after = drawing(&owner);
+        let pin = owner.acquire_snapshot(1).unwrap();
+        let order = pin.document().property_order(&target).unwrap();
+        assert_eq!(order.expression.value().unwrap().enabled,false);
+        assert_eq!(order.track.value().unwrap().keys.len(),2);
+        for frame in [0.,0.5,6.,12.,24.] {
+            assert_eq!(pin.sample_property_raw(&target,"order",frame).unwrap(),vec![26.+frame/2.]);
+        }
+        let keys = pin.query_property_read_json(json!({"instanceId":pin.instance_id(),
+            "documentId":pin.document_id(),"atRevision":1,"documentSnapshotId":pin.snapshot_id(),
+            "view":{"kind":"authoredKeys","target":target,"property":"order","offset":0,"limit":8}})
+            .to_string().as_bytes()).unwrap();
+        assert_eq!(keys["items"].as_array().unwrap().len(),2);
+        let encoded = owner.serialize_project_file(pin.content_revision(),pin.snapshot_id()).unwrap();
+        let reopened = NativeObjectHistory::from_project_file("order-reopened",&encoded).unwrap();
+        assert_eq!(drawing(&reopened),after);
+        owner.undo(owner.content_revision()).unwrap(); assert_eq!(drawing(&owner),before);
+        owner.redo(owner.content_revision()).unwrap(); assert_eq!(drawing(&owner),after);
+    }
+}
+
+#[test]
+fn order_constant_and_actual_vm_errors_never_publish_partial_state() {
+    for element in [false,true] {
+        for code in ["7", "(()=>{throw new Error('bake')})()", "while(true){}"] {
+            let mut owner = order_owner(code,element);
+            let before = drawing(&owner);
+            let p = order_payload(element);
+            let target = serde_json::from_value(p["target"].clone()).unwrap();
+            let req = request(&owner,"order-result",p);
+            let result = dispatch(&mut owner,&req);
+            if code == "7" {
+                assert_eq!(result["ok"],true,"{result}");
+                let pin = owner.acquire_snapshot(1).unwrap();
+                let order = pin.document().property_order(&target).unwrap();
+                assert!(order.track.missing());
+                assert_eq!(order.static_value.value().unwrap(),&vec![serde_json::Number::from_f64(7.).unwrap()]);
+            } else {
+                assert_eq!(result["ok"],false);
+                assert_eq!(drawing(&owner),before);
+                assert_eq!(owner.content_revision(),0);
+            }
+        }
+    }
+}

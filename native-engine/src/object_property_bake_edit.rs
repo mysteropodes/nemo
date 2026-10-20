@@ -1,10 +1,19 @@
 //! Seal a native-produced replacement in the existing property transaction.
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
-use crate::object_document::{Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord};
+use crate::object_document::{AuthoredOrder, Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord};
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 
 impl ObjectFillOwner {
+    pub(crate) fn prepare_baked_order(origin: ObjectSnapshot, target: &PropertyHolderTarget,
+        replacement: AuthoredOrder) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
+        let mut document = origin.document().clone();
+        let old = document.property_order_mut(target).ok_or(DispatchErrorCode::NotFound)?;
+        let changed = *old != replacement;
+        *old = replacement;
+        ObjectSnapshot::validate_drawing(&document).map_err(|_| DispatchErrorCode::Unavailable)?;
+        Ok(PreparedPropertyEdit { origin, document, changed })
+    }
     pub(crate) fn prepare_baked_property(
         origin: ObjectSnapshot,
         target: &PropertyHolderTarget,
