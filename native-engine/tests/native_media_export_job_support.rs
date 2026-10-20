@@ -4,7 +4,7 @@
 //! needs into the decode specs this layer speaks.
 use crate::compositor::{object_test_plan, object_test_selector};
 use crate::export_job::native_media_export::native_media_export_lease::{
-    DecodeFailure, FrameId, MediaDecodePort, SessionId, SessionInfo,
+    DecodeFailure, DecodedFrame, FrameId, MediaDecodePort, SessionId, SessionInfo,
 };
 use crate::export_job::native_media_export::native_media_export_plan::{
     ExportPins, FrameFormat, FrameRange, MediaExportPlan, OutputKind,
@@ -51,6 +51,10 @@ pub(super) struct DecoderState {
     pub(super) fail_release: bool,
     pub(super) fail_close: bool,
     pub(super) size: (u32, u32),
+    /// The source frame count every session reports.
+    pub(super) frame_count: u32,
+    /// Bytes short of `w * h * 4` in every decoded buffer (a truncated decoder).
+    pub(super) short_by: usize,
 }
 
 /// A cheap handle: the gate borrows one clone mutably while the test inspects another.
@@ -62,6 +66,7 @@ impl Decoder {
     pub(super) fn sized(width: u32, height: u32) -> Self {
         let state = DecoderState {
             size: (width, height),
+            frame_count: 1000,
             ..DecoderState::default()
         };
         Self(Rc::new(RefCell::new(state)))
@@ -89,13 +94,14 @@ impl MediaDecodePort for Decoder {
             id: SessionId(id),
             width,
             height,
+            frame_count: state.frame_count,
         })
     }
     fn decode_frame(
         &mut self,
         session: SessionId,
         source_frame: u32,
-    ) -> Result<FrameId, DecodeFailure> {
+    ) -> Result<DecodedFrame, DecodeFailure> {
         let mut state = self.0.borrow_mut();
         let asset = state
             .sessions
@@ -104,12 +110,17 @@ impl MediaDecodePort for Decoder {
             .map(|(_, asset)| asset.clone())
             .ok_or_else(|| DecodeFailure("unknown session".into()))?;
         state.events.push(format!("decode:{asset}:{source_frame}"));
-        state.decoded.push((asset, source_frame));
+        state.decoded.push((asset.clone(), source_frame));
         if state.fail_decode_at == Some(state.decoded.len()) {
             return Err(DecodeFailure("decode refused".into()));
         }
         state.next_frame += 1;
-        Ok(FrameId(state.next_frame))
+        let (width, height) = state.size;
+        let len = (width * height * 4) as usize;
+        Ok(DecodedFrame {
+            id: FrameId(state.next_frame),
+            rgba: frame_pixels(&asset, source_frame, len.saturating_sub(state.short_by)),
+        })
     }
     fn release_frame(&mut self, frame: FrameId) -> Result<(), DecodeFailure> {
         let mut state = self.0.borrow_mut();
@@ -129,6 +140,21 @@ impl MediaDecodePort for Decoder {
         state.closed.push(session.0);
         Ok(())
     }
+}
+
+/// The known pixels of `(asset, source frame)`: every pixel is
+/// `[asset byte, frame low byte, frame high byte, 255]`, so a drawn or exported
+/// pixel names the exact source frame independently of any producer.
+pub(super) fn frame_pixels(asset: &str, source_frame: u32, len: usize) -> Vec<u8> {
+    let tag = asset
+        .bytes()
+        .fold(0u8, |acc, byte| acc.wrapping_mul(31).wrapping_add(byte));
+    let [low, high, ..] = source_frame.to_le_bytes();
+    [tag, low, high, 255]
+        .into_iter()
+        .cycle()
+        .take(len)
+        .collect()
 }
 
 /// True when every id appears exactly once (the exactly-once release rule).

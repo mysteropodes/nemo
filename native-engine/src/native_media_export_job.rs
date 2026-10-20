@@ -204,11 +204,14 @@ impl<'p, D: MediaDecodePort> MediaExportGate<'p, D> {
         if resources.is_empty() {
             return Ok(witness);
         }
-        if witness.scene_resources().is_some() {
+        match witness.scene_resources() {
+            None => Ok(witness.with_scene_resources(resources)),
+            // The scene join merged this very set into its own (same entries,
+            // same retentions): nothing to attach.
+            Some(own) if carries(own, &resources) => Ok(witness),
             // Merging producers' sets is the scene join's decision, not a silent overwrite.
-            return Err("the produced witness already declares scene resources".into());
+            Some(_) => Err("the produced witness already declares scene resources".into()),
         }
-        Ok(witness.with_scene_resources(resources))
     }
 
     /// Release every parked frame, then (only when no frame can still be in use)
@@ -300,14 +303,23 @@ impl<'p, D: MediaDecodePort> MediaExportGate<'p, D> {
         // Charge BEFORE decoding: a refused budget costs no decode, and a failed
         // decode drops the charge at once (no frame existed to hold it).
         let charge = self.budget.reserve(cost).map_err(budget_error)?;
-        let frame_id = self
+        let decode_error = |failure| AcquireError::Decode {
+            resource_id: resource_id.to_owned(),
+            failure,
+        };
+        let decoded = self
             .port
             .decode_frame(session.id, frame)
-            .map_err(|failure| AcquireError::Decode {
-                resource_id: resource_id.to_owned(),
-                failure,
-            })?;
-        let token = self.ledger.token(frame_id, Some(charge));
+            .map_err(decode_error)?;
+        // The port holds the frame now: the token is minted first, so a short
+        // buffer still releases it exactly once (the token drops into the ledger).
+        let token = self.ledger.token(decoded.id, decoded.rgba, Some(charge));
+        if token.as_ref().len() as u64 != bytes {
+            return Err(decode_error(DecodeFailure(format!(
+                "decoded {} bytes, expected {bytes}",
+                token.as_ref().len()
+            ))));
+        }
         Ok(SceneResourceEntry::new(
             resource_id,
             self.version.clone(),
@@ -343,6 +355,17 @@ impl<D: MediaDecodePort> Drop for MediaExportGate<'_, D> {
     fn drop(&mut self) {
         self.finish();
     }
+}
+
+/// Every entry of `media` is in `own` with the same declaration and retention.
+fn carries(own: &ObjectSceneResourceSet, media: &ObjectSceneResourceSet) -> bool {
+    media.entries().iter().all(|entry| {
+        own.get(entry.resource_id()).is_some_and(|held| {
+            held.version() == entry.version()
+                && held.kind() == entry.kind()
+                && Arc::ptr_eq(held.retention(), entry.retention())
+        })
+    })
 }
 
 /// One batch through the existing host: what it reported and what was released.
