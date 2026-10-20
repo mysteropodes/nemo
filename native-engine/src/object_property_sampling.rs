@@ -230,3 +230,6 @@ fn sample_keys(
     }
     Ok(result)
 }
+
+#[path = "object_text_animator_evaluation.rs"]
+mod text_animator;

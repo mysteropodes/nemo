@@ -167,7 +167,7 @@ impl ObjectSnapshot {
                     let _ = records;
                     return Err(unavailable());
                 };
-                let text = serde_json::to_string(&json!({"animators":records,"selectors":facts}))
+                let text = serde_json::to_string(&json!({"animators":records,"selectors":facts,"hasText":entries.iter().any(|e|e.target.layer_uid()==layer_uid&&e.target.context_id()=="scene-root")}))
                     .map_err(|_| unavailable())?;
                 out["kind"] = json!("animators");
                 out["frame"] = json!(frame);

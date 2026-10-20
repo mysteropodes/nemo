@@ -87,11 +87,16 @@ pub(crate) fn apply_layer(
                 })
             })
             .collect::<Vec<_>>();
-        item.scene = item
+        let (scene, kept) = item
             .scene
             .transformed(&stages, &[], GeometryAdmission::DropCoincidentCurves)
             .map_err(TextProducerError::Scene)?;
-        item.pulls = local.iter().map(|m| m.and_then(|m| m.fill)).collect();
+        item.pulls = kept
+            .iter()
+            .map(|&i| local[i].and_then(|m| m.fill))
+            .collect();
+        item.units = kept.iter().map(|&i| item.units[i]).collect();
+        item.scene = scene;
         repaint(item)?;
         offset += len;
     }
@@ -102,10 +107,13 @@ pub(crate) fn apply_chain(
     chain: &[ChainEntry],
 ) -> Result<(), TextProducerError> {
     if !chain.is_empty() {
-        item.scene = item
+        let (scene, kept) = item
             .scene
             .transformed(&[], chain, GeometryAdmission::DropCoincidentCurves)
             .map_err(TextProducerError::Scene)?;
+        item.pulls = kept.iter().map(|&i| item.pulls[i]).collect();
+        item.units = kept.iter().map(|&i| item.units[i]).collect();
+        item.scene = scene;
     }
     repaint(item)
 }

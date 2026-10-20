@@ -23,7 +23,7 @@ fn nullable(v: &Value) -> bool {
 }
 fn opaque(v: &Value) -> bool {
     v.as_str()
-        .is_some_and(|s| !s.is_empty() && s.len() <= 255 && !s.contains('\0'))
+        .is_some_and(|s| !s.trim().is_empty() && s.len() <= 255 && !s.contains('\0'))
 }
 pub(super) fn record(v: &Value) -> bool {
     let Some(fields) = exact(v, &["id", "selector"], &["enabled", "props", "properties"]) else {

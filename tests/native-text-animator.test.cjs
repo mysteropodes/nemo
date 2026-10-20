@@ -42,7 +42,7 @@ test('native animator contract refuses nonfinite null-key duplicate tracks and u
  assert.doesNotThrow(()=>Item.animator({id:'ta',selector:{amount:null},props:{scale:[0,0]}}));
 });
 test('retired ordinary animator controls cannot write their old record against a refreshed context',async()=>{
- const f=fixture();Desktop.render(f.root);await turn();const old=f.input('position X');assert.ok(old);f.advance();Desktop.render(f.root);await turn();const fresh=f.input('position X');assert.notEqual(old,fresh);
- old.value='99';old.fire('change');await turn();assert.equal(f.commands.length,0,'retired control must not publish');
+ const f=fixture();Desktop.render(f.root);await turn();const old=f.input('position X'),oldKey=f.input('Animate amount'),oldRemove=find(f.doc.body,n=>n.tagName==='button'&&n.textContent==='Remove');assert.ok(old);assert.ok(oldKey);assert.ok(oldRemove);f.advance();Desktop.render(f.root);await turn();const fresh=f.input('position X');assert.notEqual(old,fresh);
+ old.value='99';old.fire('change');oldKey.fire('click');oldRemove.fire('click');await turn();assert.equal(f.commands.length,0,'retired control must not publish');
  fresh.value='25';fresh.fire('change');await turn();assert.equal(f.commands.length,1,'current mounted control still works');assert.equal(f.commands[0].animator.props.position[0],25);
 });

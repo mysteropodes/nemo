@@ -436,6 +436,8 @@
   // the two can't stomp each other regardless of call order.
   function render() {
     if(window.NemoNativeTextAnimatorDesktop&&NemoNativeTextAnimatorDesktop.render(window))return;
+    var nativeSession=window.NemoNativeObjectProject&&NemoNativeObjectProject.desktop(window);
+    if(nativeSession&&nativeSession.blocksLegacy()){var unavailable=el('p-textanim-sec');if(unavailable)unavailable.style.display='none';return;}
     var sec = el('p-textanim-sec');
     if (!sec) return;
     var ctx = activeTextLayer();
@@ -467,6 +469,7 @@
     if (add) {
       add.addEventListener('click', function () {
         if(window.NemoNativeTextAnimatorDesktop&&NemoNativeTextAnimatorDesktop.isNative(window)){NemoNativeTextAnimatorDesktop.add(window);return;}
+        var nativeSession=window.NemoNativeObjectProject&&NemoNativeObjectProject.desktop(window);if(nativeSession&&nativeSession.blocksLegacy())return;
         var ctx = activeTextLayer();
         if (!ctx || !window.SMMotion || !SMMotion.addTextAnimator) return;
         if (typeof pushUndo === 'function') pushUndo();

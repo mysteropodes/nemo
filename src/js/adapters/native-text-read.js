@@ -35,8 +35,8 @@
           total=chunk.textBytes;parts.push(chunk.text);offset=chunk.nextOffset;
         }while(offset!==null);
         var text=parts.join('');if(new TextEncoder().encode(text).length!==total)throw fault('uncorrelated','Animator data incomplete');
-        var records=JSON.parse(text);if(!records||!Array.isArray(records.animators)||!Array.isArray(records.selectors)||records.animators.length>256||records.animators.length!==records.selectors.length)throw fault('uncorrelated','Animator records invalid');
-        return freeze({pin:clone(pin),layerUid:layerUid,frame:frame,animators:records.animators,selectors:records.selectors});
+        var records=JSON.parse(text);if(!records||!Array.isArray(records.animators)||!Array.isArray(records.selectors)||records.animators.length>256||records.animators.length!==records.selectors.length||typeof records.hasText!=='boolean')throw fault('uncorrelated','Animator records invalid');
+        return freeze({pin:clone(pin),layerUid:layerUid,frame:frame,animators:records.animators,selectors:records.selectors,hasText:records.hasText});
       });},
       listPage:function(scope,offset,limit,expected){var view=clone({kind:'targets',scope:scope,offset:offset,limit:limit});return run(expected,function(read){return read(view);});},
       readBlock:function(target,expected){target=clone(target);return run(expected,async function(read,pin){

@@ -11,7 +11,7 @@
   function create(session,context){
     var reader=Read.create(session),command=Command.create(session,'item'),pending=null,busy=false;
     function current(expected){var c=context(),p=session.info();if(!session.isActive()||!c||!c.layerUid||!same(c.pin,p)||expected&&(!same(expected.pin,p)||expected.layerUid!==c.layerUid||expected.frame!==c.frame||expected.selectionKey!==c.selectionKey))throw fault('stale_revision','Text animator intent is stale');return clone(c);}
-    async function load(){var c=current(),value=await reader.readAnimators(c.layerUid,c.frame,c.pin);current(c);value.animators.forEach(Item.animator);value.selectors.forEach(function(s){Item.animator({id:"native-view",selector:s});});return {context:c,animators:clone(value.animators),selectors:clone(value.selectors)};}
+    async function load(){var c=current(),value=await reader.readAnimators(c.layerUid,c.frame,c.pin);current(c);var ids=new Set();value.animators.forEach(function(r){Item.animator(r);if(ids.has(r.id))throw fault("uncorrelated","Duplicate native animator identity");ids.add(r.id);});value.selectors.forEach(function(s){Item.animator({id:"native-view",selector:s});});return {context:c,animators:clone(value.animators),selectors:clone(value.selectors),hasText:value.hasText};}
     async function write(payload,origin){
       if(busy||pending)throw fault('unavailable','Resolve the previous animator command first');current(origin);busy=true;
       try{return await command.execute(Item.ITEM,function(){current(origin);return clone(payload);});}
