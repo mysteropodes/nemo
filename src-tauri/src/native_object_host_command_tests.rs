@@ -206,45 +206,72 @@ fn expression_bake_actual_public_host_commits_once_undoes_and_reopens_without_js
         let receipt = serde_json::to_value(bootstrap_raw(&state,&json!({"apiVersion":2,
             "requestId":"bake-install","instanceId":state.instance_id(),"documentJson":project.to_string()}).to_string()).unwrap()).unwrap();
         let id = receipt["documentId"].as_str().unwrap();
-        let snapshot = |state: &ApplicationMcp,id: &str| {
+        let snapshot = |state: &ApplicationMcp, id: &str| {
             let info = state.native_project_info(id).unwrap();
-            state.native_project_file_snapshot(id,info["contentRevision"].as_u64().unwrap(),
-                info["documentSnapshotId"].as_str().unwrap()).unwrap().unwrap()
+            state
+                .native_project_file_snapshot(
+                    id,
+                    info["contentRevision"].as_u64().unwrap(),
+                    info["documentSnapshotId"].as_str().unwrap(),
+                )
+                .unwrap()
+                .unwrap()
         };
-        let initial = snapshot(&state,id);
+        let initial = snapshot(&state, id);
         let q = json!({"apiVersion":2,"requestId":"bake-public","instanceId":state.instance_id(),
             "documentId":id,"expectedRevision":0,"operation":"command.document.object.property.edit",
             "payload":{"command":"object.property.edit","target":{"contextId":"scene-root","layerUid":"L0"},
                 "property":"opacity","action":{"kind":"bake"}}});
-        let first = state.dispatch_native(serde_json::from_value(q.clone()).unwrap()).unwrap();
+        let first = state
+            .dispatch_native(serde_json::from_value(q.clone()).unwrap())
+            .unwrap();
         let response = serde_json::to_value(&first).unwrap();
         if code.starts_with("value") {
-            assert_eq!(response["ok"],true,"{response}");
-            assert_eq!(response["result"],json!({"applied":true,"historyEntriesAdded":1}));
-            assert_eq!(response["contentRevision"],1);
-            let changed = snapshot(&state,id);
+            assert_eq!(response["ok"], true, "{response}");
+            assert_eq!(
+                response["result"],
+                json!({"applied":true,"historyEntriesAdded":1})
+            );
+            assert_eq!(response["contentRevision"], 1);
+            let changed = snapshot(&state, id);
             let saved: Value = serde_json::from_slice(&changed).unwrap();
             let property = &saved["drawing"]["propertyHolders"][0]["properties"][0];
-            assert_eq!(property["expression"],json!({"enabled":false,"code":code}));
-            assert_eq!(property["track"]["keys"].as_array().unwrap().len(),2);
-            assert_eq!(property["track"]["keys"][1]["v"],json!([32.]));
-            assert_eq!(state.dispatch_native(serde_json::from_value(q).unwrap()).unwrap(),first);
-            assert_eq!(snapshot(&state,id),changed);
-            assert_eq!(content(&state)["depths"],json!([1,0]));
+            assert_eq!(property["expression"], json!({"enabled":false,"code":code}));
+            assert_eq!(property["track"]["keys"].as_array().unwrap().len(), 2);
+            assert_eq!(property["track"]["keys"][1]["v"], json!([32.]));
+            assert_eq!(
+                state
+                    .dispatch_native(serde_json::from_value(q).unwrap())
+                    .unwrap(),
+                first
+            );
+            assert_eq!(snapshot(&state, id), changed);
+            assert_eq!(content(&state)["depths"], json!([1, 0]));
             let undo = json!({"apiVersion":2,"requestId":"undo-bake","instanceId":state.instance_id(),
                 "documentId":id,"expectedRevision":1,"operation":"command.document.object.undo",
                 "payload":{"command":"object.undo"}});
-            assert_eq!(dispatch(&state,undo)["ok"],true);
-            assert_eq!(snapshot(&state,id),initial);
+            assert_eq!(dispatch(&state, undo)["ok"], true);
+            assert_eq!(snapshot(&state, id), initial);
             let fresh = ApplicationMcp::default();
-            let reopened = serde_json::to_value(bootstrap_raw(&fresh,&json!({"apiVersion":2,
+            let reopened = serde_json::to_value(
+                bootstrap_raw(
+                    &fresh,
+                    &json!({"apiVersion":2,
                 "requestId":"reopen-bake","instanceId":fresh.instance_id(),
-                "documentJson":String::from_utf8(changed.clone()).unwrap()}).to_string()).unwrap()).unwrap();
-            assert_eq!(snapshot(&fresh,reopened["documentId"].as_str().unwrap()),changed);
+                "documentJson":String::from_utf8(changed.clone()).unwrap()})
+                    .to_string(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(
+                snapshot(&fresh, reopened["documentId"].as_str().unwrap()),
+                changed
+            );
         } else {
-            assert_eq!(response["ok"],false);
-            assert_eq!(snapshot(&state,id),initial);
-            assert_eq!(content(&state)["depths"],json!([0,0]));
+            assert_eq!(response["ok"], false);
+            assert_eq!(snapshot(&state, id), initial);
+            assert_eq!(content(&state)["depths"], json!([0, 0]));
         }
     }
 }
