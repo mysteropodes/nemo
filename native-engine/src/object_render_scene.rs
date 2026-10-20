@@ -44,6 +44,8 @@ pub(crate) use raster_scene::declared_versions as object_raster_resource_version
 #[path = "object_paint_plan.rs"]
 mod paint;
 // L07-F (#2113): contour scene producer joined through the L07-C pin registry.
+#[path = "object_duplicator_scene.rs"]
+pub(crate) mod duplicator_scene;
 #[path = "object_scene_producer_contour.rs"]
 mod object_scene_producer_contour;
 use object_scene_producer_contour::CompiledContour;
@@ -277,6 +279,7 @@ impl<'a> ObjectRenderEntry<'a> {
 #[derive(Debug, Clone)]
 pub struct ObjectRenderScene {
     packet: ObjectFramePacket,
+    duplicators: Arc<duplicator_scene::DuplicatorScene>,
     contours: Arc<[CompiledContour]>,
     rasters: Arc<[raster_scene::RasterSource]>,
     texts: text_scene::TextSources,
@@ -312,6 +315,7 @@ pub fn prepare_object_render_scene(
     validate_pins(packet, expected)?;
     let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
     Ok(ObjectRenderScene {
+        duplicators: Arc::new(duplicator_scene::prepare(packet)?),
         packet: packet.clone(),
         contours: contours.into(),
         rasters: raster_scene::sources(packet)?.into(),

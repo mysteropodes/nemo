@@ -263,6 +263,96 @@ pub(crate) fn run_path_fx(
     Ok(first)
 }
 
+/// Current-host path FX precede duplicator placement; shifted/pool source
+/// drawings intentionally do not pass through this rendered-base stage.
+pub(crate) fn duplicator_base(
+    record: &ObjectRecord,
+    layer: &ObjectLayer,
+    frame: u32,
+) -> Result<ObjectRecord, VectorEvalError> {
+    let stack = stack_of(layer);
+    if !has_any(stack.as_deref()) {
+        return Ok(record.clone());
+    }
+    let input = PathFxStroke {
+        is_raster: false,
+        closed: record.geometry.closed,
+        segments: Some(
+            record
+                .geometry
+                .segments
+                .iter()
+                .map(stored_segment)
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        rest: (),
+    };
+    let after = run_path_fx(stack.as_deref(), &input, frame)?;
+    let pair = |p: [f64; 2]| -> Result<ObjectPoint, VectorEvalError> {
+        Ok(ObjectPoint {
+            x: Number::from_f64(p[0]).ok_or(VectorEvalError::NonFiniteInput)?,
+            y: Number::from_f64(p[1]).ok_or(VectorEvalError::NonFiniteInput)?,
+        })
+    };
+    let mut output = record.clone();
+    output.geometry.closed = after.closed;
+    output.geometry.segments = after
+        .segments
+        .unwrap_or_default()
+        .into_iter()
+        .map(|segment| {
+            Ok(ObjectSegment {
+                point: pair(segment.point)?,
+                handle_in: pair(segment.handle_in.unwrap_or([0., 0.]))?,
+                handle_out: pair(segment.handle_out.unwrap_or([0., 0.]))?,
+            })
+        })
+        .collect::<Result<Vec<_>, VectorEvalError>>()?;
+    Ok(output)
+}
+
+/// Post-placement half of the ORIGINAL pathFX -> duplicator -> parametric ->
+/// element Motion -> layer Position order. `record` is a detached copy whose
+/// local render target names its host, never a rewritten document record.
+pub(crate) fn duplicator_geometry(
+    packet: &ObjectFramePacket,
+    record: &ObjectRecord,
+    layer_index: usize,
+) -> Result<(Vec<EvalSegment>, bool), VectorEvalError> {
+    let layer = packet
+        .source_layers()
+        .get(layer_index)
+        .ok_or(VectorEvalError::MissingRecord)?;
+    if record.target.context_id != packet.context_id()
+        || record.target.layer_uid != layer.layer_uid()
+    {
+        return Err(VectorEvalError::MissingRecord);
+    }
+    let stored = stored_from_record(record, Some(layer))?;
+    let anchors = stored.stroke.segments.as_deref().unwrap_or(&[]);
+    let mut segments = match run_param_shape(packet.snapshot(), record, anchors, packet.frame())? {
+        Some(rebuilt) => rebuilt.iter().map(from_param).collect(),
+        None => anchors.iter().map(from_path).collect(),
+    };
+    let authored = packet
+        .snapshot()
+        .document()
+        .property_holders()
+        .is_some_and(|holders| {
+            holders.iter().any(|holder| {
+                holder.target().context_id() == record.target.context_id
+                    && holder.target().layer_uid() == record.target.layer_uid
+                    && holder.target().stroke_id() == Some(record.target.stroke_id.as_str())
+            })
+        });
+    if authored {
+        segments =
+            motion::apply_element_motion(packet.snapshot(), record, packet.frame(), segments)?;
+    }
+    segments = motion::apply_layer_position(packet.snapshot(), record, packet.frame(), segments)?;
+    Ok((segments, record.geometry.closed))
+}
+
 /// Stage 2, `hasParamShapeMotionFor` + `applyParamShapeFor`: the rebuilt anchors, or `None` when the record has no
 /// parametric shape or none of its own parameters is animated. `anchors` are the anchors the rebuild frames itself on.
 pub(crate) fn run_param_shape(

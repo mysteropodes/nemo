@@ -310,6 +310,7 @@ pub(crate) fn insert_slots(
             PaintIndex::Text(i) => scene.texts.entries[*i].layer_index,
             PaintIndex::Component(i) => scene.components.paints[*i].host_layer_index,
             PaintIndex::Video(i) => scene.videos[*i].layer_index,
+            PaintIndex::Duplicator(i) => scene.duplicators.paints[*i].layer_index,
         })
     };
     for (slot, video) in scene.videos.iter().enumerate() {

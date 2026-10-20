@@ -518,7 +518,10 @@
         "object_text_animator_evaluation.rs",
         "object_frame_motion_values.rs",
         "object_frame_camera.rs",
-        "object_boolean_motion_eval.rs"
+        "object_boolean_motion_eval.rs",
+        "object_duplicator_snapshot.rs",
+        "object_duplicator_snapshot_sources.rs",
+        "object_duplicator_frame.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -592,7 +595,8 @@
         "object_scene_parent_chain.rs",
         "object_scene_parent_curve.rs",
         "object_media_scene_join.rs",
-        "object_scene_producer_text_animator.rs"
+        "object_scene_producer_text_animator.rs",
+        "object_duplicator_scene.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -1615,7 +1619,11 @@
         "object_text_animator.rs",
         "object_frame_motion_values.rs",
         "object_frame_camera.rs",
-        "object_boolean_frame_motion.rs"
+        "object_boolean_frame_motion.rs",
+        "object_duplicator_snapshot.rs",
+        "object_duplicator_sources.rs",
+        "object_duplicator_frame.rs",
+        "object_duplicator_scene.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -155,9 +155,18 @@ pub(crate) fn holders_fully_consumed(document: &ObjectDocument) -> bool {
         return false;
     }
     document.property_holders().is_none_or(|holders| {
-        holders
-            .iter()
-            .all(|holder| holder_consumed(document, holder))
+        holders.iter().all(|holder| {
+            let remaining =
+                crate::object_frame_packet::duplicators::remaining_holder(document, holder);
+            match remaining {
+                Some(ref remaining) if remaining.properties().is_empty() => remaining
+                    .controls
+                    .value()
+                    .is_none_or(|controls| controls.is_empty()),
+                Some(ref remaining) => holder_consumed(document, remaining),
+                None => holder_consumed(document, holder),
+            }
+        })
     })
 }
 

@@ -15,6 +15,7 @@ pub(crate) enum PaintIndex {
     Text(usize),
     Component(usize),
     Video(usize),
+    Duplicator(usize),
 }
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
@@ -22,8 +23,12 @@ pub(crate) enum PaintEntry<'a> {
     Text(&'a crate::object_render_scene::text_scene::TextSource),
     Component(&'a crate::object_render_scene::component_scene::ComponentPaint),
     Video(usize),
+    Duplicator(&'a crate::object_render_scene::duplicator_scene::DuplicatorPaint),
 }
 impl ObjectPaintPlan {
+    pub(crate) fn has_duplicators(&self) -> bool {
+        !self.scene.packet().duplicator_outputs().is_empty()
+    }
     pub(crate) fn has_components(&self) -> bool {
         !self.scene.components.paints.is_empty()
     }
@@ -71,6 +76,9 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
             PaintEntry::Component(&plan.scene.components.paints[*index])
         }
         PaintIndex::Video(index) => PaintEntry::Video(*index),
+        PaintIndex::Duplicator(index) => {
+            PaintEntry::Duplicator(&plan.scene.duplicators.paints[*index])
+        }
     })
 }
 pub(super) fn prepare(

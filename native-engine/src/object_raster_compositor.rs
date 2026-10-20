@@ -54,6 +54,11 @@ impl Compositor {
                         vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
                     self.scene.draw_image(&brush, transform);
                 }
+                PaintEntry::Duplicator(source) => {
+                    source
+                        .prepared
+                        .draw(&mut self.scene, Affine::IDENTITY, &source.path)
+                }
                 PaintEntry::Raster(index) => {
                     #[cfg(all(feature = "application", feature = "project_media_codec"))]
                     {

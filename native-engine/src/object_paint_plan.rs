@@ -121,6 +121,8 @@ pub fn prepare_object_paint_plan(
     } else {
         raster::prepare(scene, expected)?
     };
+    let (indices, mixed) =
+        crate::object_render_scene::duplicator_scene::expand_order(scene, indices, mixed)?;
     let mixed = crate::object_render_scene::media_scene::insert_slots(scene, mixed)?;
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),
