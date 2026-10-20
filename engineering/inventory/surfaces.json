@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "567208845afb53ec4e4cea3789866cc3b39ac73d",
-  "describe": "v0.7.0-alpha.4-2565-g56720884"
+  "head": "f3cfc3be4fecea571a1d669f9f84f7b5192a90a4",
+  "describe": "v0.7.0-alpha.4-2574-gf3cfc3be"
  },
- "inputsDigest": "5db762cd6fd833636a6a62c1a3accde04edefa1990d4791aac755a3c96529200",
+ "inputsDigest": "68c2f79eb8fc01cd3647005798f73d55f9770070cf02311c58ef0c7d7f427613",
  "states": [
   "inventoried",
   "characterized",
@@ -306,7 +306,7 @@
   },
   "SMRulers": {
    "file": "src/js/rulers-bridge.js",
-   "line": 408,
+   "line": 435,
    "members": 0
   },
   "SMSecondViewer": {
@@ -3015,7 +3015,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 51,
+    "functionsVisited": 52,
     "via": "variable bClean",
     "references": [
      "src/js/media-library.js:691 render()"
@@ -3275,7 +3275,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 47,
+    "functionsVisited": 48,
     "via": "chain",
     "references": []
    },
@@ -3316,7 +3316,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 73,
+    "functionsVisited": 74,
     "via": "chain",
     "references": []
    },
@@ -3477,7 +3477,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 88,
+    "functionsVisited": 81,
     "via": "callback id",
     "references": []
    },
@@ -3682,7 +3682,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 83,
+    "functionsVisited": 84,
     "via": "variable newBtn",
     "references": [
      "src/js/adapters/native-palette-ui.js:148 render()",
@@ -5044,7 +5044,7 @@
     "container": "p-toolpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 74,
+    "functionsVisited": 75,
     "via": "variable saveBtn",
     "references": []
    },
@@ -7190,7 +7190,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 16,
+    "functionsVisited": 15,
     "via": "variable cancelBtn",
     "references": []
    },
@@ -9108,7 +9108,7 @@
     "container": "assets-view-media",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 61,
+    "functionsVisited": 62,
     "via": "variable input",
     "references": []
    },
@@ -14143,7 +14143,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 43,
+    "functionsVisited": 44,
     "via": "variable scopeSel",
     "references": [
      "src/js/palette-panel.js:227 render()",
@@ -15285,7 +15285,7 @@
     "container": "render-manager-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 63,
+    "functionsVisited": 62,
     "via": "variable renderAllBtn",
     "references": [
      "src/js/render-manager.js:240 setToolbarBusy()"
@@ -27404,7 +27404,7 @@
    "source": "src/js/palette-panel.js:220",
    "meta": {
     "i18n": null,
-    "functionsVisited": 49
+    "functionsVisited": 50
    },
    "fixtures": [
     "static-props",
@@ -28867,7 +28867,7 @@
    "source": "src/js/storyboard.js:1213",
    "meta": {
     "i18n": null,
-    "functionsVisited": 52
+    "functionsVisited": 53
    },
    "fixtures": [
     "components"
@@ -28897,7 +28897,7 @@
    "source": "src/js/storyboard.js:1214",
    "meta": {
     "i18n": null,
-    "functionsVisited": 53
+    "functionsVisited": 54
    },
    "fixtures": [
     "components"
@@ -29026,7 +29026,7 @@
    "source": "src/js/storyboard.js:974",
    "meta": {
     "i18n": null,
-    "functionsVisited": 107
+    "functionsVisited": 108
    },
    "fixtures": [
     "components"
@@ -29059,7 +29059,7 @@
    "source": "src/js/storyboard.js:975",
    "meta": {
     "i18n": null,
-    "functionsVisited": 110
+    "functionsVisited": 111
    },
    "fixtures": [
     "components"
@@ -29089,7 +29089,7 @@
    "source": "src/js/storyboard.js:979",
    "meta": {
     "i18n": null,
-    "functionsVisited": 46
+    "functionsVisited": 47
    },
    "fixtures": [
     "components"
@@ -29156,7 +29156,7 @@
    "source": "src/js/storyboard.js:988",
    "meta": {
     "i18n": null,
-    "functionsVisited": 52
+    "functionsVisited": 53
    },
    "fixtures": [
     "components"
@@ -29186,7 +29186,7 @@
    "source": "src/js/storyboard.js:990",
    "meta": {
     "i18n": null,
-    "functionsVisited": 53
+    "functionsVisited": 54
    },
    "fixtures": [
     "components"
@@ -32675,7 +32675,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 425
+    "functionsVisited": 427
    },
    "fixtures": [
     "media",
@@ -34138,7 +34138,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:570",
    "meta": {
-    "functionsVisited": 42
+    "functionsVisited": 43
    },
    "fixtures": [
     "media",
