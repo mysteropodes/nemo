@@ -116,3 +116,20 @@ test('the palette seam delegates other operations and never reads accessors or r
   assert.equal(Palette.paths(Palette.EDIT).has('payload.action.name'), true);
   assert.equal(Palette.paths(Palette.EDIT).has('payload.rawDocument'), false);
 });
+
+
+test('palette and composition discriminators cannot coerce or serialize into a different native intent', () => {
+  const Composition = require('../src/js/adapters/native-composition-contract.js');
+  for (const lane of [Palette, Composition]) {
+    let calls = 0;
+    const kind = { toString() { calls++; return lane === Palette ? 'select' : 'updateMarker'; },
+      toJSON() { calls++; return lane === Palette ? 'remove' : 'removeMarker'; } };
+    const action = { kind, ordinal: 2 };
+    assert.throws(() => lane.action(action), TypeError);
+    assert.throws(() => lane.payload(lane.EDIT, { command: lane === Palette ? 'object.project.palette.edit' :
+      'object.project.composition.edit', action }), TypeError);
+    const selector = { kind: { toString() { calls++; return 'settings'; }, toJSON() { calls++; return 'settings'; } } };
+    assert.throws(() => lane.payload(lane.READ, { atRevision: 7, documentSnapshotId: 'snapshot-7', contextId: 'scene-root', selector }), TypeError);
+    assert.equal(calls, 0, 'data validation never invokes discriminator coercion/serialization code');
+  }
+});

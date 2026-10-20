@@ -29,7 +29,7 @@
     data(a);
     var required={addMarker:['frame'],updateMarker:['ordinal'],removeMarker:['ordinal'],clearMarkers:[],setBpm:[]};
     var optional={addMarker:['name','color'],updateMarker:['frame','name','color'],removeMarker:[],clearMarkers:[],setBpm:['bpm','bpmOffset','bpmShow']};
-    if(!has(required,a.kind))fail();exact(a,['kind'].concat(required[a.kind]),optional[a.kind]);
+    if(typeof a.kind!=='string'||!has(required,a.kind))fail();exact(a,['kind'].concat(required[a.kind]),optional[a.kind]);
     ['frame','bpm','bpmOffset'].forEach(function(k){if(has(a,k))finite(a[k]);});
     ['name','color'].forEach(function(k){if(has(a,k))text(a[k]);});
     if(has(a,'ordinal'))integer(a.ordinal,1,4096);
@@ -39,7 +39,7 @@
   function selector(s){
     data(s);
     var fields={settings:[],markerAt:['index'],markerNamed:['name'],markerNearest:['frame'],markerPage:['cursor','limit']};
-    if(!has(fields,s.kind))fail();exact(s,['kind'].concat(fields[s.kind]));
+    if(typeof s.kind!=='string'||!has(fields,s.kind))fail();exact(s,['kind'].concat(fields[s.kind]));
     if(s.kind==='markerAt')integer(s.index,1,Number.MAX_SAFE_INTEGER);
     if(s.kind==='markerNamed')text(s.name);if(s.kind==='markerNearest')finite(s.frame);
     if(s.kind==='markerPage'){integer(s.cursor,0,4096);integer(s.limit,1,16);}

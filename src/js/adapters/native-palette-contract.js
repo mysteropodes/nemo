@@ -53,7 +53,7 @@
       remove: ['ordinal'], select: ['ordinal'], appendColor: ['ordinal', 'color'],
       removeColor: ['ordinal', 'index'], moveColor: ['ordinal', 'from', 'to']
     };
-    if (!has(fields, value.kind)) fail();
+    if (typeof value.kind !== 'string' || !has(fields, value.kind)) fail();
     exact(value, ['kind'].concat(fields[value.kind]), value.kind === 'create' ? ['color'] : []);
     ['id', 'name', 'color'].forEach(function (key) { if (has(value, key)) text(value[key]); });
     ['ordinal', 'index', 'from', 'to'].forEach(function (key) {
@@ -64,7 +64,7 @@
   function selector(value) {
     data(value);
     var fields = { settings: [], palettePage: ['cursor', 'limit'], colorPage: ['ordinal', 'cursor', 'limit'] };
-    if (!has(fields, value.kind)) fail();
+    if (typeof value.kind !== 'string' || !has(fields, value.kind)) fail();
     exact(value, ['kind'].concat(fields[value.kind]));
     if (value.kind !== 'settings') { integer(value.cursor, 0, SAFE); integer(value.limit, 1, 16); }
     if (value.kind === 'colorPage') integer(value.ordinal, 1, SAFE);
