@@ -5,6 +5,8 @@ use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelop
 use crate::revision::ObjectSnapshot;
 use serde::{Deserialize, Serialize};
 
+#[path = "object_layer_placement_snapshot.rs"]
+mod layer_placement;
 #[path = "object_layer_range_snapshot.rs"]
 mod layer_range;
 
@@ -48,12 +50,12 @@ impl ObjectSnapshot {
     ) -> Result<ResponseEnvelope, DispatchErrorCode> {
         let payload =
             serde_json::to_vec(&request.payload).map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        let selected = if request.payload.get("view").is_some() {
-            self.query_layer_range_json(&payload)
-        } else {
-            self.query_layer_timing_json(&payload).and_then(|read| {
+        let selected = match request.payload.get("view") {
+            Some(view) if view == "placement" => self.query_layer_placement_json(&payload),
+            Some(_) => self.query_layer_range_json(&payload),
+            None => self.query_layer_timing_json(&payload).and_then(|read| {
                 serde_json::to_value(read).map_err(|_| DispatchErrorCode::Internal)
-            })
+            }),
         };
         let read = match selected {
             Ok(read) => read,
