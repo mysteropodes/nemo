@@ -36,6 +36,12 @@ object_deserialize!(Scope {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum Fields {
+    Animators {
+        layer_uid: String,
+        frame: f64,
+        offset: u32,
+        limit: u16,
+    },
     Targets {
         scope: Scope,
         offset: u32,
@@ -127,6 +133,48 @@ impl ObjectSnapshot {
             .item_records()
             .map_or(&[][..], |v| v.text_entries());
         match s.view.0 {
+            Fields::Animators {
+                layer_uid,
+                frame,
+                offset,
+                limit,
+            } => {
+                let layer = self
+                    .document()
+                    .layers()
+                    .iter()
+                    .find(|l| l.layer_uid() == layer_uid)
+                    .ok_or(NotFound)?;
+                if !frame.is_finite()
+                    || frame < 0.0
+                    || frame >= f64::from(self.document().total_frames())
+                {
+                    return Err(invalid());
+                }
+                let records = layer
+                    .text_animators
+                    .value()
+                    .map(|v| v.0.as_slice())
+                    .unwrap_or(&[]);
+                #[cfg(feature = "evaluation")]
+                let facts = records
+                    .iter()
+                    .map(|r| r.selector_facts(frame))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| unavailable())?;
+                #[cfg(not(feature = "evaluation"))]
+                let facts: Vec<Value> = {
+                    let _ = records;
+                    return Err(unavailable());
+                };
+                let text = serde_json::to_string(&json!({"animators":records,"selectors":facts}))
+                    .map_err(|_| unavailable())?;
+                out["kind"] = json!("animators");
+                out["frame"] = json!(frame);
+                out["layerUid"] = json!(layer_uid);
+                out["textBytes"] = json!(text.len());
+                chunk(&mut out, &text, offset, limit)?;
+            }
             Fields::Targets {
                 scope,
                 offset,
@@ -209,43 +257,8 @@ impl ObjectSnapshot {
                         out["block"] = block;
                     }
                     Fields::Text { offset, limit, .. } => {
-                        let start = offset as usize;
-                        if !(1..=1024).contains(&limit)
-                            || start > text.len()
-                            || !text.is_char_boundary(start)
-                        {
-                            return Err(invalid());
-                        }
-                        let mut end = (start + limit as usize).min(text.len());
-                        while !text.is_char_boundary(end) {
-                            end -= 1;
-                        }
-                        if end == start && start < text.len() {
-                            return Err(invalid());
-                        }
                         out["kind"] = json!("text");
-                        out["offset"] = json!(offset);
-                        loop {
-                            out["text"] = json!(&text[start..end]);
-                            out["nextOffset"] = if end < text.len() {
-                                json!(end)
-                            } else {
-                                Value::Null
-                            };
-                            if serde_json::to_vec(&out).map_err(|_| unavailable())?.len() <= 3072 {
-                                break;
-                            }
-                            if end == start {
-                                return Err(unavailable());
-                            }
-                            end -= 1;
-                            while !text.is_char_boundary(end) {
-                                end -= 1;
-                            }
-                            if end == start && start < text.len() {
-                                return Err(unavailable());
-                            }
-                        }
+                        chunk(&mut out, &text, offset, limit)?;
                     }
                     _ => unreachable!(),
                 }
@@ -308,4 +321,41 @@ impl ObjectSnapshot {
         }
         Ok(response)
     }
+}
+
+fn chunk(out: &mut Value, text: &str, offset: u32, limit: u16) -> Result<(), DispatchErrorCode> {
+    let start = offset as usize;
+    if !(1..=1024).contains(&limit) || start > text.len() || !text.is_char_boundary(start) {
+        return Err(invalid());
+    }
+    let mut end = (start + limit as usize).min(text.len());
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    if end == start && start < text.len() {
+        return Err(invalid());
+    }
+    out["offset"] = json!(offset);
+    loop {
+        out["text"] = json!(&text[start..end]);
+        out["nextOffset"] = if end < text.len() {
+            json!(end)
+        } else {
+            Value::Null
+        };
+        if serde_json::to_vec(&out).map_err(|_| unavailable())?.len() <= 3072 {
+            break;
+        }
+        if end == start {
+            return Err(unavailable());
+        }
+        end -= 1;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        if end == start && start < text.len() {
+            return Err(unavailable());
+        }
+    }
+    Ok(())
 }

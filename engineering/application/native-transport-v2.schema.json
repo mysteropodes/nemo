@@ -8570,6 +8570,41 @@
                   "maximum": 1024
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "offset",
+                "limit",
+                "layerUid",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "animators"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1024
+                },
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "frame": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             }
           ]
         }
@@ -8758,6 +8793,77 @@
                   "maximum": 196608
                 }
               ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "textBytes",
+            "offset",
+            "text",
+            "nextOffset",
+            "layerUid",
+            "frame"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "kind": {
+              "const": "animators"
+            },
+            "textBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "text": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "nextOffset": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              ]
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "frame": {
+              "type": "number",
+              "minimum": 0
             }
           }
         }

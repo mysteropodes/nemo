@@ -435,6 +435,7 @@
   // ever toggles its own two rows, never the section itself, precisely so
   // the two can't stomp each other regardless of call order.
   function render() {
+    if(window.NemoNativeTextAnimatorDesktop&&NemoNativeTextAnimatorDesktop.render(window))return;
     var sec = el('p-textanim-sec');
     if (!sec) return;
     var ctx = activeTextLayer();
@@ -465,6 +466,7 @@
     var add = el('p-textanim-add');
     if (add) {
       add.addEventListener('click', function () {
+        if(window.NemoNativeTextAnimatorDesktop&&NemoNativeTextAnimatorDesktop.isNative(window)){NemoNativeTextAnimatorDesktop.add(window);return;}
         var ctx = activeTextLayer();
         if (!ctx || !window.SMMotion || !SMMotion.addTextAnimator) return;
         if (typeof pushUndo === 'function') pushUndo();

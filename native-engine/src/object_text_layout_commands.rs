@@ -19,6 +19,9 @@ use crate::request_receipts::DispatchErrorCode;
 pub(crate) mod patch;
 
 /// Prefix of the native ids the owner allocates for text blocks.
+#[path = "object_text_animator_commands.rs"]
+mod animator;
+
 const ID_PREFIX: &str = "native-text";
 
 pub(crate) fn apply(
@@ -26,6 +29,9 @@ pub(crate) fn apply(
     payload: &ItemPayload,
 ) -> Result<ItemEdit, DispatchErrorCode> {
     match payload.command.as_str() {
+        "object.text.animator.upsert" | "object.text.animator.remove" => {
+            animator::apply(origin, payload)
+        }
         "object.text.create" => {
             payload.expects(&["target", "block"])?;
             create(origin, payload)

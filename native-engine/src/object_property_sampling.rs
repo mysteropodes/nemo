@@ -1,7 +1,7 @@
 //! Pure raw Motion sampling from one retained native snapshot. No expression execution.
 use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::object_document::{
-    ObjectDocument, OrderKey, Presence, PropertyHolder, PropertyHolderTarget,
+    ObjectDocument, OrderKey, Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord,
 };
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
@@ -163,6 +163,27 @@ pub fn sample_property_raw(
             .and_then(numbers);
     }
     sample_keys(property, keys, at)
+}
+/// Raw sampling shared by stored text-selector holders; no target or guest evaluation.
+impl PropertyRecord {
+    pub(crate) fn sample_scalar_raw(
+        &self,
+        fallback: f64,
+        at: f64,
+    ) -> Result<f64, PropertySampleError> {
+        if !at.is_finite() {
+            return Err(PropertySampleError::InvalidFrame);
+        }
+        let keys = self.track.value().map(|t| t.keys.as_slice()).unwrap_or(&[]);
+        if keys.is_empty() {
+            return self
+                .static_value
+                .value()
+                .map(|v| numbers(v).map(|v| v[0]))
+                .unwrap_or(Ok(fallback));
+        }
+        sample_keys(&self.property, keys, at).map(|v| v[0])
+    }
 }
 fn sample_keys(
     property: &str,

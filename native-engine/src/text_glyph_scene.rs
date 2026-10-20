@@ -110,6 +110,43 @@ pub(crate) struct TextGlyphScene {
 }
 
 impl TextGlyphScene {
+    /// Same native geometry admission after each per-contour element stage and parent chain.
+    pub(crate) fn transformed(
+        &self,
+        elements: &[Option<ChainEntry>],
+        chain: &[ChainEntry],
+        admission: GeometryAdmission,
+    ) -> Result<Self, TextSceneError> {
+        let contours = self
+            .contours
+            .iter()
+            .enumerate()
+            .map(|(index, c)| {
+                let ring = c
+                    .contour
+                    .segments()
+                    .iter()
+                    .map(|s| GlyphSegment {
+                        point: s.point,
+                        handle_in: s.handle_in,
+                        handle_out: s.handle_out,
+                    })
+                    .collect::<Vec<_>>();
+                placed(
+                    c.role,
+                    c.key.clone(),
+                    &ring,
+                    &stages_for(elements.get(index).copied().flatten(), chain),
+                    c.opacity,
+                    admission,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            holder_id: self.holder_id.clone(),
+            contours,
+        })
+    }
     pub(crate) fn holder_id(&self) -> &str {
         &self.holder_id
     }

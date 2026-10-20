@@ -66,7 +66,7 @@ fn curve(value: &Value) -> bool {
                     || p[0]["x"].as_f64() == Some(0.0) && p[p.len() - 1]["x"].as_f64() == Some(1.0))
         })
 }
-fn key(value: &Value, dimension: usize) -> bool {
+pub(super) fn key(value: &Value, dimension: usize) -> bool {
     exact(
         value,
         &["frame", "v"],
