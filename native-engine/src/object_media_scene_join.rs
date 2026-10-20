@@ -17,8 +17,9 @@
 //! A slot without its decoded frame, a frame of another size, an element-bound
 //! video placement, a video layer that also carries drawn records (baseline
 //! masks) or path effects are typed refusals: never a blank or partial frame.
-//! The baseline's interpolation modes, duplicator and 3D projection of a video
-//! layer have no native snapshot field yet; they are not invented here.
+//! A blend pair (the baseline `blend` interpolation of a remapped video) is
+//! mixed exactly like `_blendPixels`; duplicator and 3D projection of a video
+//! layer have no native snapshot field yet and are not invented here.
 use crate::evaluation::motion_parent_chain::ImageRect;
 use crate::object_frame_packet::ObjectFramePacket;
 use crate::object_render_scene::raster_scene::unavailable;
@@ -32,6 +33,25 @@ use crate::object_render_scene::{ObjectPaintPlan, ObjectSceneError, ObjectSceneR
 use std::sync::Arc;
 use vello::kurbo::Affine;
 use vello::peniko::{Blob, ImageAlphaType, ImageData, ImageFormat};
+
+/// The decoded frame (or blend pair) a frame gives one video placement:
+/// `frame` is its `media:<asset>:<source>` resource; `blend` names the `to`
+/// frame and its 1/32-step share (`_blendPixels`, native-video-bridge.js).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct VideoFrameDraw {
+    pub(crate) placement_id: String,
+    pub(crate) frame: String,
+    pub(crate) blend: Option<(String, f64)>,
+}
+
+/// `_blendPixels`: `(a * (256 - w) + b * w) >> 8` per byte, `w = round(t * 256)`.
+fn blend_rgba(a: &[u8], b: &[u8], weight: f64) -> Vec<u8> {
+    let w = (weight * 256.0).round().clamp(0.0, 256.0) as u32;
+    a.iter()
+        .zip(b)
+        .map(|(&a, &b)| ((u32::from(a) * (256 - w) + u32::from(b) * w) >> 8) as u8)
+        .collect()
+}
 
 /// One video placement the frame must draw, at its layer's slot.
 #[derive(Debug, Clone, PartialEq)]
@@ -109,15 +129,16 @@ pub(crate) fn contain_rect(canvas: (u32, u32), width: u32, height: u32) -> Image
     }
 }
 
-struct Pixels<'a>(&'a DecodedVideoFrame, &'a str);
+/// The drawn image's size under its id (a decoded frame or a blend of two).
+struct Pixels<'a>(u32, u32, &'a str);
 impl RasterPixelPort for Pixels<'_> {
     type Handle = ();
     fn pixels(&self, id: &str) -> Option<RasterPixels<()>> {
-        (id == self.1).then(|| RasterPixels {
+        (id == self.2).then(|| RasterPixels {
             handle: (),
-            width: self.0.width,
-            height: self.0.height,
-            version: self.1.to_owned(),
+            width: self.0,
+            height: self.1,
+            version: self.2.to_owned(),
         })
     }
 }
@@ -138,12 +159,12 @@ pub(crate) struct MediaDraws {
 }
 
 impl MediaDraws {
-    /// `frames` maps a placement id to the resource id of its decoded frame;
+    /// `frames` gives each placement its decoded frame (or blend pair);
     /// `media` is the set that declares and retains those frames.
     pub(crate) fn prepare(
         plan: &ObjectPaintPlan,
         media: &Arc<ObjectSceneResourceSet>,
-        frames: &[(String, String)],
+        frames: &[VideoFrameDraw],
     ) -> Result<Self, ObjectSceneError> {
         let canvas = plan
             .packet()
@@ -154,44 +175,59 @@ impl MediaDraws {
         let mut draws = Vec::new();
         for slot in plan.video_slots() {
             let missing = || unavailable(slot.layer_index, "decoded video frame is unavailable");
-            let id = frames
+            let wanted = frames
                 .iter()
-                .find(|(placement, _)| *placement == slot.placement_id)
-                .map(|(_, id)| id.as_str())
+                .find(|draw| draw.placement_id == slot.placement_id)
                 .ok_or_else(missing)?;
-            let entry = media
-                .get(id)
-                .filter(|entry| entry.kind() == SceneResourceKind::Media)
-                .ok_or_else(missing)?;
-            let frame = decoded(entry.retention()).ok_or_else(missing)?;
-            if u64::try_from(frame.rgba.len()).ok()
-                != u64::from(frame.width).checked_mul(u64::from(frame.height) * 4)
-                || frame.width == 0
-                || frame.height == 0
-            {
-                return Err(missing());
-            }
+            let fetch = |id: &str| {
+                let entry = media
+                    .get(id)
+                    .filter(|entry| entry.kind() == SceneResourceKind::Media)
+                    .ok_or_else(missing)?;
+                let frame = decoded(entry.retention()).ok_or_else(missing)?;
+                if u64::try_from(frame.rgba.len()).ok()
+                    != u64::from(frame.width).checked_mul(u64::from(frame.height) * 4)
+                    || frame.width == 0
+                    || frame.height == 0
+                {
+                    return Err(missing());
+                }
+                Ok(frame)
+            };
+            let first = fetch(&wanted.frame)?;
+            // A copy, never the leased frame: Vello's atlas keeps every drawn
+            // ImageData resident until eviction, which would hold the lease
+            // past the witness. The lease ends when the last witness drops.
+            let (rgba, id) = match &wanted.blend {
+                None => (first.rgba.clone(), wanted.frame.clone()),
+                Some((to, weight)) => {
+                    let second = fetch(to)?;
+                    if (second.width, second.height) != (first.width, first.height) {
+                        return Err(missing());
+                    }
+                    let id = format!("{}+{to}@{weight}", wanted.frame);
+                    (blend_rgba(&first.rgba, &second.rgba, *weight), id)
+                }
+            };
+            let (width, height, id) = (first.width, first.height, id.as_str());
             let chain = plan
                 .native_parent_chains()
                 .chain(slot.layer_index)
                 .map_err(|error| unavailable(slot.layer_index, error.reason()))?;
             let source = RasterSceneSource {
                 asset_id: id.to_owned(),
-                rect: contain_rect(canvas, frame.width, frame.height),
+                rect: contain_rect(canvas, width, height),
                 opacity: slot.opacity,
             };
-            let placed = prepare_raster_scene_image(&source, &chain, &Pixels(&frame, id))
+            let placed = prepare_raster_scene_image(&source, &chain, &Pixels(width, height, id))
                 .map_err(|_| unavailable(slot.layer_index, "video placement is unavailable"))?;
             draws.push(MediaDraw {
-                // A copy, never the leased frame: Vello's atlas keeps every drawn
-                // ImageData resident until eviction, which would hold the lease
-                // past the witness. The lease ends when the last witness drops.
                 image: ImageData {
-                    data: Blob::new(Arc::new(frame.rgba.clone())),
+                    data: Blob::new(Arc::new(rgba)),
                     format: ImageFormat::Rgba8,
                     alpha_type: ImageAlphaType::Alpha,
-                    width: frame.width,
-                    height: frame.height,
+                    width,
+                    height,
                 },
                 placement: placed.placement(),
                 opacity: placed.opacity_f32(),
@@ -277,7 +313,7 @@ impl crate::object_render_scene::ObjectCompositionWitness {
     pub(crate) fn with_media_frames(
         mut self,
         media: &Arc<ObjectSceneResourceSet>,
-        frames: &[(String, String)],
+        frames: &[VideoFrameDraw],
     ) -> Result<Self, ObjectSceneError> {
         if self.plan().video_slots().is_empty() {
             return Ok(self);

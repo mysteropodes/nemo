@@ -22,10 +22,14 @@
 //!    the gate's ledger releases every frame and session exactly once at
 //!    [`NativeMediaFrames::finish`] (or drop) whatever the host did.
 //!
-//! Not here: a video layer `timeRemap` and `nativeVideo.interpMode`/`frameBlend`
-//! have no native snapshot field; the plan therefore asks no time-remap sampler
-//! and selects single frames. An embedded (non-linked) video has no decodable
-//! locator for the desktop decoder and refuses as unavailable.
+//! The placement's stored timing (`timeRemap`, `interpMode`, `frameBlend`) is
+//! the plan's video facts and time-remap sampler: a remapped video selects its
+//! source frame through the track, and a `blend` pair decodes both frames and
+//! mixes them like `_blendPixels`. The `motion` mode (optical-flow
+//! interpolation, geometry-wasm `interp.rs`) has no native port yet and refuses
+//! as unavailable rather than drawing a plain blend. An embedded (non-linked)
+//! video has no decodable locator for the desktop decoder and refuses as
+//! unavailable.
 use crate::export_job::native_media_export::native_media_export_job::media_resource_id;
 use crate::export_job::native_media_export::native_media_export_job::{
     DecodeSpec, MediaExportGate, ReleaseReport,
@@ -39,12 +43,12 @@ use crate::object_document::media_timing::object_media_link_join::{
 use crate::object_document::media_timing::object_media_link_needs::{
     needs_for_frame, MediaNeed, NeedsRefusal,
 };
-use crate::object_document::media_timing::object_media_link_plan::{
-    AudioFacts, MediaFacts, PlanInput, VideoFacts,
-};
+use crate::object_document::media_timing::object_media_link_plan::{PlanInput, VideoFacts};
 use crate::object_document::media_timing::object_media_link_state::{ResolveOutcome, ResolveTable};
-use crate::object_document::media_timing::object_media_timing_audio::{PlaybackEnv, VolumeSampler};
-use crate::object_document::media_timing::object_media_timing_video::TimeRemapPort;
+use crate::object_document::media_timing::object_media_timing_audio::PlaybackEnv;
+use crate::object_render_scene::media_scene::VideoFrameDraw;
+#[path = "native_media_video_facts.rs"]
+mod video_facts;
 use crate::object_document::{AssetInventory, AssetKind};
 use crate::object_frame_packet::{
     prepare_object_exposure_frame, prepare_object_frame, ObjectFrameSelector,
@@ -52,6 +56,7 @@ use crate::object_frame_packet::{
 use crate::object_render_scene::ObjectCompositionWitness;
 use crate::revision::ObjectSnapshot;
 use std::collections::BTreeMap;
+use video_facts::{motion_mode, Facts, Remap};
 
 /// What the platform decoder reports when it opens a source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -181,33 +186,14 @@ impl From<ReleaseReport> for NativeMediaRelease {
 struct FramePlan {
     frame: u32,
     specs: Vec<DecodeSpec>,
-    /// placement id -> media resource id of its decoded source frame.
-    draws: Vec<(String, String)>,
+    /// Each drawn placement's decoded frame (or blend pair).
+    draws: Vec<VideoFrameDraw>,
 }
 
 /// The media of one export (or one preview frame), preflighted.
 pub struct NativeMediaFrames<'p, 'd> {
     gate: MediaExportGate<'p, NativeVideoPort<'d>>,
     plans: Vec<FramePlan>,
-}
-
-#[derive(Default)]
-struct Facts {
-    video: BTreeMap<String, VideoFacts>,
-}
-impl MediaFacts for Facts {
-    fn video(&self, placement_id: &str) -> Option<VideoFacts> {
-        self.video.get(placement_id).cloned()
-    }
-    fn time_remap(&self, _placement_id: &str) -> Option<&dyn TimeRemapPort> {
-        None
-    }
-    fn audio(&self, _placement_id: &str) -> Option<AudioFacts> {
-        None
-    }
-    fn volume_sampler(&self, _placement_id: &str) -> Option<&dyn VolumeSampler> {
-        None
-    }
 }
 
 fn unavailable(frame: u32, reason: impl Into<String>) -> NativeMediaRefusal {
@@ -373,15 +359,21 @@ pub fn begin_native_media_frames<'p, 'd>(
         let info = gate
             .probe(asset)
             .map_err(|error| unavailable(first, error.to_string()))?;
+        let timing = placement.timing();
         facts.video.insert(
             placement.id().to_owned(),
             VideoFacts {
                 frame_count: f64::from(info.frame_count),
-                time_remap: false,
-                interp_mode: None,
-                frame_blend: false,
+                time_remap: timing.has_time_remap(),
+                interp_mode: timing.interp_mode.clone(),
+                frame_blend: timing.frame_blend.unwrap_or(false),
             },
         );
+        if timing.has_time_remap() {
+            facts
+                .remaps
+                .insert(placement.id().to_owned(), Remap(timing.clone()));
+        }
     }
     let mut plans = Vec::with_capacity(drawn.len());
     for (frame, ids) in &drawn {
@@ -393,21 +385,37 @@ pub fn begin_native_media_frames<'p, 'd>(
             .iter()
             .filter(|need| ids.iter().any(|id| id == need.placement_id()))
         {
-            let MediaNeed::Single { frame: source, .. } = need else {
-                return Err(unavailable(
-                    *frame,
-                    "only single-frame video needs are drawn",
-                ));
-            };
             let asset = need.asset_id().as_str();
+            let draw = match need {
+                MediaNeed::Single { frame: source, .. } => VideoFrameDraw {
+                    placement_id: need.placement_id().to_owned(),
+                    frame: media_resource_id(asset, *source),
+                    blend: None,
+                },
+                MediaNeed::Blend {
+                    from, to, weight, ..
+                } => {
+                    if motion_mode(&facts, need.placement_id()) {
+                        return Err(unavailable(
+                            *frame,
+                            "motion-compensated video interpolation is not native yet",
+                        ));
+                    }
+                    VideoFrameDraw {
+                        placement_id: need.placement_id().to_owned(),
+                        frame: media_resource_id(asset, *from),
+                        blend: Some((media_resource_id(asset, *to), *weight)),
+                    }
+                }
+                MediaNeed::Still { .. } => {
+                    return Err(unavailable(*frame, "a still is not a video need"))
+                }
+            };
             specs.push(DecodeSpec {
                 asset_id: asset.to_owned(),
-                frames: vec![*source],
+                frames: need.decode_frames(),
             });
-            draws.push((
-                need.placement_id().to_owned(),
-                media_resource_id(asset, *source),
-            ));
+            draws.push(draw);
         }
         plans.push(FramePlan {
             frame: *frame,
@@ -463,3 +471,7 @@ pub fn declared_scene_resources(witness: &ObjectCompositionWitness) -> Vec<(Stri
 #[cfg(test)]
 #[path = "../tests/native_media_frame_export.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/native_media_frame_export_timing.rs"]
+mod timing_tests;

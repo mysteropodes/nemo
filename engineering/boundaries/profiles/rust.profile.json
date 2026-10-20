@@ -695,7 +695,8 @@
         "object_expression_read_bridge.rs",
         "object_expression_read_runtime.rs",
         "object_expression_harden.rs",
-        "native_media_frame_export.rs"
+        "native_media_frame_export.rs",
+        "native_media_video_facts.rs"
       ],
       "publicApi": [
         "application.rs",
@@ -1348,6 +1349,7 @@
         "native_media_export_job_lifecycle.rs",
         "native_media_export_job_support.rs",
         "native_media_frame_export.rs",
+        "native_media_frame_export_timing.rs",
         "native_import_transaction.rs",
         "native_import_transaction_atomic.rs",
         "native_import_transaction_chain.rs",

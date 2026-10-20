@@ -16,20 +16,20 @@ use std::collections::BTreeMap;
 // ---- a decoder with independently known pixels -------------------------------
 
 #[derive(Default)]
-struct Fake {
+pub(crate) struct Fake {
     /// path -> (width, height, frame count)
     sources: BTreeMap<String, (u32, u32, u32)>,
     open: BTreeMap<u64, String>,
     next: u64,
-    opened: Vec<String>,
-    closed: Vec<u64>,
-    decoded: Vec<(String, u32)>,
+    pub(crate) opened: Vec<String>,
+    pub(crate) closed: Vec<u64>,
+    pub(crate) decoded: Vec<(String, u32)>,
     /// The source frame whose decode fails.
     fail_at: Option<u32>,
 }
 
 /// Every pixel of `(path, frame)`: `[path tag, frame low, frame high, 255]`.
-fn known(path: &str, frame: u32, len: usize) -> Vec<u8> {
+pub(crate) fn known(path: &str, frame: u32, len: usize) -> Vec<u8> {
     let tag = path
         .bytes()
         .fold(7u8, |acc, b| acc.wrapping_mul(31).wrapping_add(b));
@@ -42,7 +42,7 @@ fn known(path: &str, frame: u32, len: usize) -> Vec<u8> {
 }
 
 impl Fake {
-    fn with(sources: &[(&str, u32, u32, u32)]) -> Self {
+    pub(crate) fn with(sources: &[(&str, u32, u32, u32)]) -> Self {
         Self {
             sources: sources
                 .iter()
@@ -84,7 +84,7 @@ impl NativeVideoDecoder for Fake {
 
 // ---- the project: a drawn layer under a video layer ---------------------------
 
-fn wire(asset: &str, offset: i64, video_visible: bool) -> Value {
+pub(crate) fn wire(asset: &str, offset: i64, video_visible: bool) -> Value {
     let timing = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
         "contextId":"scene-root","keys":[{"frame":0}],"samples":[]});
     let record = json!({"schemaVersion":1,"family":"closed-solid-fill-cubic-path",
@@ -122,7 +122,7 @@ fn owner(asset: &str, offset: i64, visible: bool) -> NativeObjectHistory {
     .unwrap()
 }
 
-fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
+pub(crate) fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
     ObjectFrameSelector {
         instance_id: snapshot.instance_id(),
         document_id: snapshot.document_id(),
@@ -135,7 +135,7 @@ fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
 }
 
 /// The scene producer's witness, exactly as the desktop export builds it.
-fn base(snapshot: &ObjectSnapshot, frame: u32) -> ObjectCompositionWitness {
+pub(crate) fn base(snapshot: &ObjectSnapshot, frame: u32) -> ObjectCompositionWitness {
     let selector = selector(snapshot, frame);
     let packet = prepare_object_exposure_frame(snapshot, &selector).unwrap();
     let scene = prepare_object_render_scene(&packet, &selector).unwrap();
@@ -143,11 +143,11 @@ fn base(snapshot: &ObjectSnapshot, frame: u32) -> ObjectCompositionWitness {
     prepare_object_composition(&plan, &selector).unwrap()
 }
 
-const BOTH: &[(&str, u32, u32, u32)] =
+pub(crate) const BOTH: &[(&str, u32, u32, u32)] =
     &[("clips/one.mov", 160, 120, 40), ("clips/two.mov", 8, 6, 12)];
 
 /// Export `frames` and return, per frame, the drawn video bytes (or the error).
-fn export(
+pub(crate) fn export(
     snapshot: &ObjectSnapshot,
     decoder: &mut Fake,
     frames: &[u32],
@@ -297,7 +297,14 @@ fn a_frame_without_its_decoded_video_never_draws_blank() {
     // Attaching a set that lacks the slot's frame is a typed refusal.
     let empty = std::sync::Arc::new(ObjectSceneResourceSet::empty());
     assert!(witness
-        .with_media_frames(&empty, &[("p1".into(), "media:v1:2".into())])
+        .with_media_frames(
+            &empty,
+            &[VideoFrameDraw {
+                placement_id: "p1".into(),
+                frame: "media:v1:2".into(),
+                blend: None
+            }]
+        )
         .is_err());
 }
 
