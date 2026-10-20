@@ -6,7 +6,8 @@
 //! them. Opacity remains the packet's existing paint-factor responsibility.
 use crate::evaluation::motion_parent_chain::{motion_mat_from_values, transform_segments, Segment};
 use crate::evaluation::object_vector_kernels::render_vector_eval::{EvalSegment, VectorEvalError};
-use crate::object_document::object_group_kernels::object_fill_trace_ops::{native::path, RingSeg};
+use crate::object_document::object_group_kernels::object_boolean_ops::RingSeg;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::path;
 use crate::object_document::{
     FrameScopeKind, ObjectDocument, ObjectRecord, Presence, PropertyHolder, PropertyHolderTarget,
     VECTOR_FAMILY,

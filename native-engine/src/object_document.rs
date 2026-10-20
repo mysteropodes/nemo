@@ -403,6 +403,7 @@ impl ObjectLayer {
     pub(crate) fn identified(layer_uid: String) -> Self {
         Self {
             layer_uid,
+            three_d: Presence::Missing,
             name: Presence::Missing,
             visible: Presence::Missing,
             locked: Presence::Missing,

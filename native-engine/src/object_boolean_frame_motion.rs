@@ -4,12 +4,11 @@ use crate::object_document::object_group_kernels::object_boolean_ops::plan::{
     ElementMotionSource, MotionUnavailable,
 };
 use crate::object_document::object_group_kernels::object_boolean_ops::{
-    ElementMat, MultiPolygon, MAX_ABS_COORD,
+    ElementMat, MultiPolygon, RingSeg, MAX_ABS_COORD,
 };
 use crate::object_document::object_group_kernels::object_boolean_topology::Polygon;
-use crate::object_document::object_group_kernels::object_fill_trace_ops::{
-    native::{path, polygon, ring},
-    RingSeg,
+use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{
+    path, polygon, ring,
 };
 use crate::object_document::{ObjectRecord, ObjectTarget, Presence, PropertyHolderTarget};
 use crate::revision::ObjectSnapshot;
