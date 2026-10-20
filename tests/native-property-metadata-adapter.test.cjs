@@ -8,6 +8,13 @@ const categories=['conditionalMotionRows','pathVerticesTrimStrokeBrushMesh','ref
 function request(){return {apiVersion:2,requestId:'metadata-1',instanceId:'instance',documentId:'doc',operation:op,payload:{atRevision:0,documentSnapshotId:'native-object:doc:0',view:{kind:'properties',target:{contextId:'scene-root',layerUid:'data:opaque 雪'},offset:0,limit:2}}};}
 function response(q){return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:0,ok:true,result:{instanceId:q.instanceId,documentId:q.documentId,atRevision:0,documentSnapshotId:q.payload.documentSnapshotId,kind:'properties',target:{layerUid:q.payload.view.target.layerUid,contextId:'scene-root'},items:[{property:'opacity',dimension:1,unit:'',defaultValue:[100],animatable:true,controlType:null,controlName:'  data:雪  ',authored:{availability:'available',keyCount:0,hasStaticOverride:false,expressionEnabled:false},availability:{metadata:'available',applicability:'available',propertyWrite:'unavailable',reason:'read-only-description-not-command-availability'}}],nextOffset:1,unavailableCategories:categories.map(category=>({category,state:'unavailable',reason:'not-admitted'}))}};}
 const adapter=send=>createNativeApplicationAdapter('metadata-proposal',{dispatch:async q=>send(q)});
+test('actual native Order authored facts reach the ordinary SDK while timeRemap stays unavailable',async()=>{
+  const q=request();
+  const send=q=>{const r=response(q);r.result.items[0].property='order';r.result.items[0].authored.expressionEnabled=true;return r;};
+  const r=await adapter(send).dispatch(q);
+  assert.equal(r.result.items[0].authored.expressionEnabled,true);
+  await assert.rejects(adapter(q=>{const r=send(q);r.result.items[0].property='timeRemap';return r;}).dispatch(q),TypeError);
+});
 test('vertex discovery is an explicit boolean opt-in on properties only', async()=>{
   for(const flag of [true,false]){
     const q=request();q.payload.view.includeVertices=flag;
