@@ -3231,6 +3231,30 @@
       "publicApi": [
         "native-fill-desktop.js"
       ]
+    },
+    {
+      "id": "app.native.text.animator",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-animator.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-animator.js"
+      ]
+    },
+    {
+      "id": "app.native.text.animator.desktop",
+      "layer": "bootstrap",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-animator-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-animator-desktop.js"
+      ]
     }
   ],
   "layerRules": {

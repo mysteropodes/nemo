@@ -245,3 +245,85 @@ async fn text_actual_tcp_reads_committed_head_while_ui_ack_fences_writes() {
     assert_eq!(saved(&state, &id), before);
     assert_eq!(state.native_project_info(&id).unwrap(), info);
 }
+
+#[tokio::test]
+async fn text_animator_actual_mcp_wire_owner_ack_edit_read_history_and_reopen() {
+    use crate::application_mcp::revision_sync::dispatch_core::property_edit_tests::{
+        history, open, round_trip,
+    };
+    use crate::application_mcp::revision_sync::RevisionControl;
+    let state = ApplicationMcp::default();
+    let project = json!({"format":"nemo.native-project-document","formatVersion":1,"project":{"canvasW":64,"canvasH":48,"fps":24},"viewportReference":null,"assets":[],"drawing":{"format":"nemo.native-object-document","formatVersion":1,"totalFrames":16,"layers":[{"layerUid":"L0"}],"objects":[],"items":{"text":[{"target":target(),"block":{"text":"A","font":{"kind":"bundled","fontKey":"Roboto-Regular"},"size":24,"color":"#112233","align":"left","anchorTopLeft":{"x":10,"y":20}}}]}}});
+    let id = open(&state, project.to_string());
+    let initial = saved(&state, &id);
+    let request = |rid: &str, revision: u64, payload: Value| -> NativeApplicationRequest {
+        serde_json::from_value(json!({"apiVersion":2,"requestId":rid,"instanceId":state.instance_id(),"documentId":id,"expectedRevision":revision,"operation":"command.document.object.item.edit","payload":payload})).unwrap()
+    };
+    let create = request(
+        "animator-create",
+        0,
+        json!({"command":"object.text.animator.upsert","layerUid":"L0","animator":{"id":"ta-wire","selector":{"amount":null},"props":{"position":[20,0]}}}),
+    );
+    create.validate().unwrap();
+    let (refused, events) = round_trip(&state, create.clone(), None).await;
+    assert!(!refused.ok);
+    assert_eq!(events, 0);
+    assert_eq!(saved(&state, &id), initial);
+    let binding = state
+        .revisions
+        .control(&state.native, RevisionControl::Binding)
+        .unwrap();
+    state
+        .revisions
+        .control(
+            &state.native,
+            serde_json::from_value(json!({"action":"subscribe","binding":binding})).unwrap(),
+        )
+        .unwrap();
+    let (created, events) = round_trip(&state, create, Some(&binding)).await;
+    assert!(created.ok, "{created:?}");
+    assert_eq!(events, 1);
+    assert_eq!(created.content_revision, 1);
+    assert_eq!(created.result.as_ref().unwrap()["strokeId"], "ta-wire");
+    let created_bytes = saved(&state, &id);
+    let read = query_text(
+        &state,
+        &id,
+        json!({"kind":"animators","layerUid":"L0","frame":0,"offset":0,"limit":1024}),
+    );
+    read.validate().unwrap();
+    let (read, events) = round_trip(&state, read, None).await;
+    assert!(read.ok, "{read:?}");
+    assert_eq!(events, 0);
+    let data: Value =
+        serde_json::from_str(read.result.as_ref().unwrap()["text"].as_str().unwrap()).unwrap();
+    assert_eq!(data["animators"][0]["selector"]["amount"], Value::Null);
+    assert_eq!(data["selectors"][0]["value"]["amount"], 100.0);
+    assert_eq!(data["selectors"][0]["available"], true);
+    let edit = request(
+        "animator-compact-edit",
+        1,
+        json!({"command":"object.text.animator.edit","layerUid":"L0","animatorId":"ta-wire","edit":{"kind":"setValue","property":"amount","frame":2,"values":[75]}}),
+    );
+    edit.validate().unwrap();
+    assert!(serde_json::to_vec(&edit).unwrap().len() < 4096);
+    let (edited, events) = round_trip(&state, edit.clone(), Some(&binding)).await;
+    assert!(edited.ok, "{edited:?}");
+    assert_eq!(events, 1);
+    assert_eq!(edited.content_revision, 2);
+    let changed = saved(&state, &id);
+    let body: Value = serde_json::from_slice(&changed).unwrap();
+    assert_eq!(
+        body["drawing"]["layers"][0]["textAnimators"][0]["properties"][0]["static"],
+        json!([75])
+    );
+    let (replayed, events) = round_trip(&state, edit, None).await;
+    assert_eq!(replayed, edited);
+    assert_eq!(events, 0);
+    assert_eq!(saved(&state, &id), changed);
+    assert!(history(&state, &id, "animator-undo", 2, false).ok);
+    assert_eq!(saved(&state, &id), created_bytes);
+    let reopened = ApplicationMcp::default();
+    let next = open(&reopened, String::from_utf8(changed.clone()).unwrap());
+    assert_eq!(saved(&reopened, &next), changed);
+}

@@ -124,6 +124,19 @@ impl PropertyHolder {
     }
 }
 impl PropertyRecord {
+    /// Reuse the ordinary scalar track/curve/expression admission for selector holders.
+    pub(crate) fn validate_scalar(&self) -> Result<(), PropertyAdmissionError> {
+        property(
+            self,
+            &PropertyMetadata {
+                dimension: 1,
+                unit: "",
+                default_value: None,
+                animatable: true,
+                control_type: None,
+            },
+        )
+    }
     pub fn property(&self) -> &str {
         &self.property
     }
