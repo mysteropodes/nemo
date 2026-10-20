@@ -265,11 +265,14 @@ pub(super) fn apply_layer_position(
     {
         return Ok(segments);
     }
+    let remaining =
+        crate::object_frame_packet::duplicators::remaining_holder(snapshot.document(), holder);
+    let consumed_holder = remaining.as_ref().unwrap_or(holder);
     if holder
         .controls
         .value()
         .is_some_and(|controls| !controls.is_empty())
-        || !vector_layer_holder_consumed(snapshot.document(), holder)
+        || !vector_layer_holder_consumed(snapshot.document(), consumed_holder)
     {
         return Err(VectorEvalError::LayerMotionUnavailable);
     }

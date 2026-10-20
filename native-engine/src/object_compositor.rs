@@ -233,6 +233,11 @@ impl Compositor {
                 "native component layered effects are unavailable",
             ));
         }
+        if plan.has_duplicators() {
+            return Err(CompositorError::new(
+                "native duplicator layered effects await their shared paint join",
+            ));
+        }
         if !stack.covers_plan(plan) {
             return Err(CompositorError::new(
                 "layer stack does not cover the composition plan",

@@ -193,4 +193,4 @@ impl LayerSources for SnapshotSources<'_> {
 
 #[cfg(test)]
 #[path = "../tests/object_duplicator_sources.rs"]
-mod tests;
+pub(crate) mod tests;

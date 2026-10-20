@@ -128,7 +128,7 @@ fn exact_scoped_inputs_preserve_pin_admission_and_nonexposure_source_semantics()
     assert_eq!(exact.read("L0", 2.).unwrap().len(), 1);
 }
 
-fn duplicated_document(offset: u32) -> Value {
+pub(crate) fn duplicated_document(offset: u32) -> Value {
     let mut value = document();
     let scopes = [0, 2, 6].map(|frame| {
         json!({"frameScope":{"kind":"authored","frame":frame},
