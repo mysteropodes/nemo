@@ -220,8 +220,9 @@ fn shipped_schema_and_descriptor_include_palette_without_dropping_prior_result_b
             .add(id, jsonschema::Resource::from_contents(document))
             .unwrap();
     }
+    let registry = registry.prepare().unwrap();
     let validator = jsonschema::draft202012::options()
-        .with_registry(registry.prepare().unwrap())
+        .with_registry(&registry)
         .build(&schema)
         .unwrap();
     let catalog = crate::capabilities::native_catalog();
