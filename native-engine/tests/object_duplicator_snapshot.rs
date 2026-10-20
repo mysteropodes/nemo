@@ -52,9 +52,9 @@ fn original_effector_catalog_defaults_dimensions_and_units_reach_the_real_port()
 fn actual_stored_duplicator_and_effector_tracks_sample_fractional_time_without_mutation() {
     let snap = snapshot(json!([
         {"property":"dupOffsetPos","track":{"keys":[
-            {"frame":0,"v":[0,10]}, {"frame":4,"v":[40,50]}]}},
+            {"frame":0,"v":[0,10],"curvePoints":[]}, {"frame":4,"v":[40,50]}]}},
         {"property":"effRadius","track":{"keys":[
-            {"frame":0,"v":[100]}, {"frame":4,"v":[500]}]}},
+            {"frame":0,"v":[100],"curvePoints":[]}, {"frame":4,"v":[500]}]}},
         {"property":"effOffScale","static":[-25,75]}
     ]));
     let before = encode_project(snap.document()).unwrap();
