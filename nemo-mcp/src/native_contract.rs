@@ -27,6 +27,8 @@ pub(crate) mod text_read;
 pub(crate) mod audio_track;
 #[path = "native_composition_contract.rs"]
 pub(crate) mod composition;
+#[path = "native_guide_contract.rs"]
+pub(crate) mod guide;
 #[path = "native_palette_contract.rs"]
 pub(crate) mod palette;
 #[path = "native_project_placement_contract.rs"]
@@ -111,6 +113,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | property_read::OP
             | composition::READ
             | palette::READ
+            | guide::READ
             | font::QUERY
             | brush::QUERY
             | "query.document.object.layer.timing"
@@ -138,6 +141,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "command.document.object.project.settings.edit" => settings::request(payload),
         composition::READ | composition::EDIT => composition::request(operation, payload),
         palette::READ | palette::EDIT => palette::request(operation, payload),
+        guide::READ | guide::EDIT => guide::request(operation, payload),
         placement::OP => placement::request(payload),
         audio_track::OP => audio_track::request(payload),
         layer_policy::OP => layer_policy::request(payload),
@@ -305,6 +309,9 @@ pub(crate) fn validate_result(
     }
     if matches!(operation, palette::READ | palette::EDIT) {
         return palette::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, guide::READ | guide::EDIT) {
+        return guide::result(operation, request_document_id, payload, result);
     }
     if brush::owns(operation) {
         return brush::result(operation, payload, result);

@@ -29,33 +29,60 @@ struct Query {
     selector: Selector,
 }
 fn encoded(value: &Value) -> Result<usize, Error> {
-    serde_json::to_vec(value).map(|bytes| bytes.len()).map_err(|_| Error::Internal)
+    serde_json::to_vec(value)
+        .map(|bytes| bytes.len())
+        .map_err(|_| Error::Internal)
 }
 impl ObjectSnapshot {
     pub(crate) fn query_guide_metadata_json(&self, bytes: &[u8]) -> Result<Value, Error> {
         self.guide_read_with_budget(bytes, 4096)
     }
     fn guide_read_with_budget(&self, bytes: &[u8], budget: usize) -> Result<Value, Error> {
-        if bytes.len() > 4096 { return Err(Error::InvalidRequest); }
+        if bytes.len() > 4096 {
+            return Err(Error::InvalidRequest);
+        }
         let shape: Value = serde_json::from_slice(bytes).map_err(|_| Error::InvalidRequest)?;
-        if !shape.get("selector").is_some_and(Value::is_object) { return Err(Error::InvalidRequest); }
+        if !shape.get("selector").is_some_and(Value::is_object) {
+            return Err(Error::InvalidRequest);
+        }
         let query: Query = serde_json::from_slice(bytes).map_err(|_| Error::InvalidRequest)?;
-        if query.command != "object.project.guide.read" { return Err(Error::InvalidRequest); }
-        if query.instance_id != self.instance_id() { return Err(Error::WrongInstance); }
-        if query.document_id != self.document_id() { return Err(Error::WrongDocument); }
-        if query.at_revision != self.content_revision() || query.document_snapshot_id != self.snapshot_id() {
+        if query.command != "object.project.guide.read" {
+            return Err(Error::InvalidRequest);
+        }
+        if query.instance_id != self.instance_id() {
+            return Err(Error::WrongInstance);
+        }
+        if query.document_id != self.document_id() {
+            return Err(Error::WrongDocument);
+        }
+        if query.at_revision != self.content_revision()
+            || query.document_snapshot_id != self.snapshot_id()
+        {
             return Err(Error::StaleRevision);
         }
-        if query.context_id != "scene-root" { return Err(Error::Unavailable); }
+        if query.context_id != "scene-root" {
+            return Err(Error::Unavailable);
+        }
         let metadata = self.project().ok_or(Error::Unavailable)?.project();
         let supplied = metadata.guide_metadata();
         let (h, v) = supplied.unwrap_or_default();
         let result = match query.selector {
-            Selector::Settings {} => json!({"guidesPresent":supplied.is_some(),"hPresent":h.is_some(),
-                "vPresent":v.is_some(),"hCount":h.map_or(0, |values| values.len()),"vCount":v.map_or(0, |values| values.len())}),
-            Selector::AxisPage { axis, cursor, limit } => {
-                if cursor > 9_007_199_254_740_991 || !(1..=16).contains(&limit) { return Err(Error::InvalidRequest); }
-                let (name, values) = match axis { Axis::Horizontal => ("h",h), Axis::Vertical => ("v",v) };
+            Selector::Settings {} => {
+                json!({"guidesPresent":supplied.is_some(),"hPresent":h.is_some(),
+                "vPresent":v.is_some(),"hCount":h.map_or(0, |values| values.len()),"vCount":v.map_or(0, |values| values.len())})
+            }
+            Selector::AxisPage {
+                axis,
+                cursor,
+                limit,
+            } => {
+                if cursor > 9_007_199_254_740_991 || !(1..=16).contains(&limit) {
+                    return Err(Error::InvalidRequest);
+                }
+                let (name, values) = match axis {
+                    Axis::Horizontal => ("h", h),
+                    Axis::Vertical => ("v", v),
+                };
                 let count = values.map_or(0, |values| values.len());
                 self.guide_page(json!({"kind":"guideAxisPage","axis":name,"guidesPresent":supplied.is_some(),
                     "axisPresent":values.is_some(),"guideCount":count,"cursor":cursor,"items":[],"nextCursor":null}),
@@ -63,7 +90,9 @@ impl ObjectSnapshot {
             }
         };
         let response = self.guide_response(result);
-        if encoded(&response)? > budget { return Err(Error::Unavailable); }
+        if encoded(&response)? > budget {
+            return Err(Error::Unavailable);
+        }
         Ok(response)
     }
     fn guide_page<F: FnMut(usize) -> Value>(

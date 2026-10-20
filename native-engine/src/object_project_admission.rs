@@ -234,10 +234,10 @@ impl ObjectSnapshot {
 
 #[path = "object_project_composition_read.rs"]
 mod composition;
-#[path = "object_project_palette_read.rs"]
-mod palette_read;
 #[path = "object_project_guide_read.rs"]
 mod guide_read;
+#[path = "object_project_palette_read.rs"]
+mod palette_read;
 
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_palette_read.rs"]

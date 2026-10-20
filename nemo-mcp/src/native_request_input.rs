@@ -96,6 +96,7 @@ impl NativeApplicationRequest {
                 | "command.document.object.project.settings.edit"
                 | crate::native_contract::composition::EDIT
                 | crate::native_contract::palette::EDIT
+                | crate::native_contract::guide::EDIT
                 | crate::native_contract::placement::OP
                 | crate::native_contract::audio_track::OP
                 | crate::native_contract::brush::PUBLISH
@@ -129,6 +130,8 @@ impl NativeApplicationRequest {
                 "project placement"
             } else if self.operation == crate::native_contract::composition::EDIT {
                 "composition metadata"
+            } else if self.operation == crate::native_contract::guide::EDIT {
+                "guide metadata"
             } else if self.operation.ends_with(".settings.edit") {
                 "project settings"
             } else if self.operation.ends_with(".create") {

@@ -17,6 +17,8 @@ pub(super) fn correlated(
                 | crate::native_contract::composition::EDIT
                 | crate::native_contract::palette::READ
                 | crate::native_contract::palette::EDIT
+                | crate::native_contract::guide::READ
+                | crate::native_contract::guide::EDIT
         )
         || request.operation == crate::native_contract::metadata::OP
         || request.operation == crate::native_contract::placement::OP
@@ -106,6 +108,7 @@ pub(super) fn pinned_read_correlated(
             | crate::native_contract::property_read::OP
             | crate::native_contract::composition::READ
             | crate::native_contract::palette::READ
+            | crate::native_contract::guide::READ
     ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
         == Some(response.content_revision))
         && (!matches!(
@@ -116,6 +119,7 @@ pub(super) fn pinned_read_correlated(
                 | crate::native_contract::property_read::OP
                 | crate::native_contract::composition::READ
                 | crate::native_contract::palette::READ
+                | crate::native_contract::guide::READ
         ) || (response.instance_id == request.instance_id
             && response.document_id == request.document_id
             && result.get("instanceId").and_then(serde_json::Value::as_str)

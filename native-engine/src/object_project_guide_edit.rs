@@ -17,16 +17,29 @@ enum Axis {
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum Action {
-    Add { axis: Axis, position: f64 },
-    Move { axis: Axis, ordinal: u64, position: f64 },
-    Remove { axis: Axis, ordinal: u64 },
+    Add {
+        axis: Axis,
+        position: f64,
+    },
+    Move {
+        axis: Axis,
+        ordinal: u64,
+        position: f64,
+    },
+    Remove {
+        axis: Axis,
+        ordinal: u64,
+    },
 }
 
 struct Payload {
     command: String,
     action: Action,
 }
-object_deserialize!(Payload { command: String, action: Action });
+object_deserialize!(Payload {
+    command: String,
+    action: Action
+});
 
 fn at(ordinal: u64, count: usize) -> Result<usize, Error> {
     if !(1..=9_007_199_254_740_991).contains(&ordinal) {
@@ -41,7 +54,11 @@ fn at(ordinal: u64, count: usize) -> Result<usize, Error> {
 fn change(before: &ProjectMetadata, action: Action) -> Result<ProjectMetadata, Error> {
     let (axis, ordinal, position) = match action {
         Action::Add { axis, position } => (axis, None, Some(position)),
-        Action::Move { axis, ordinal, position } => (axis, Some(ordinal), Some(position)),
+        Action::Move {
+            axis,
+            ordinal,
+            position,
+        } => (axis, Some(ordinal), Some(position)),
         Action::Remove { axis, ordinal } => (axis, Some(ordinal), None),
     };
     if position.is_some_and(|value| !value.is_finite()) {
@@ -50,7 +67,8 @@ fn change(before: &ProjectMetadata, action: Action) -> Result<ProjectMetadata, E
     if ordinal.is_some_and(|value| !(1..=9_007_199_254_740_991).contains(&value)) {
         return Err(Error::InvalidRequest);
     }
-    let mut guides = before.guide_metadata()
+    let mut guides = before
+        .guide_metadata()
         .map(|(h, v)| (h.map(<[f64]>::to_vec), v.map(<[f64]>::to_vec)))
         .unwrap_or_default();
     let values = match axis {
@@ -71,11 +89,17 @@ fn change(before: &ProjectMetadata, action: Action) -> Result<ProjectMetadata, E
         }
         (None, None) => return Err(Error::InvalidRequest),
     }
-    before.clone().with_guide_metadata(Some(guides)).map_err(|_| Error::InvalidRequest)
+    before
+        .clone()
+        .with_guide_metadata(Some(guides))
+        .map_err(|_| Error::InvalidRequest)
 }
 
 impl ObjectFillOwner {
-    pub(crate) fn prepare_guide_delta_json(&self, bytes: &[u8]) -> Result<PreparedProjectSettings, Error> {
+    pub(crate) fn prepare_guide_delta_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectSettings, Error> {
         #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
         {
             let _ = bytes;
@@ -86,11 +110,16 @@ impl ObjectFillOwner {
             if bytes.len() > 4096 {
                 return Err(Error::InvalidRequest);
             }
-            let shape: serde_json::Value = serde_json::from_slice(bytes).map_err(|_| Error::InvalidRequest)?;
-            if !shape.get("action").is_some_and(serde_json::Value::is_object) {
+            let shape: serde_json::Value =
+                serde_json::from_slice(bytes).map_err(|_| Error::InvalidRequest)?;
+            if !shape
+                .get("action")
+                .is_some_and(serde_json::Value::is_object)
+            {
                 return Err(Error::InvalidRequest);
             }
-            let payload: Payload = serde_json::from_slice(bytes).map_err(|_| Error::InvalidRequest)?;
+            let payload: Payload =
+                serde_json::from_slice(bytes).map_err(|_| Error::InvalidRequest)?;
             if payload.command != "object.project.guide.edit" {
                 return Err(Error::InvalidRequest);
             }
@@ -102,7 +131,11 @@ impl ObjectFillOwner {
             if changed {
                 ObjectSnapshot::check_candidate_saveable(&project.with_metadata(metadata.clone()))?;
             }
-            Ok(PreparedProjectSettings { origin, metadata, changed })
+            Ok(PreparedProjectSettings {
+                origin,
+                metadata,
+                changed,
+            })
         }
     }
 }

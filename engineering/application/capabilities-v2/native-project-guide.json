@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-guide",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.guide.read",
+    "command.document.object.project.guide.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectGuideReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectGuideEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
+  },
+  "semantics": "Root-scene guide add/move/remove deltas through the existing native metadata, revision and history owner. Finite negative/fractional positions, order and duplicates are preserved; one-based ordinals address guides. Reads distinguish an absent guides object, absent axes and explicit empty arrays without materializing defaults. Zero-based cursors page complete records with limit1..16 and strict forward progress inside complete4096-byte responses. Ruler visibility, snap, lock and temporary pointer ghosts remain existing presentation/session preferences. Ordinary ruler gestures use the same pinned native SDK/session command queue; no writable legacy fallback. Source candidate only; runtime, public caller, installed settings/history/save-reopen and full T08 acceptance remain open.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned guide presence without materializing defaults",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "guide-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.guide.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "guide-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "guidesPresent": false,
+            "hPresent": false,
+            "vPresent": false,
+            "hCount": 0,
+            "vCount": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "One original ruler add gesture through native history",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "guide-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.guide.edit",
+        "payload": {
+          "command": "object.project.guide.edit",
+          "action": {
+            "kind": "add",
+            "axis": "h",
+            "position": -12.25
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "guide-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

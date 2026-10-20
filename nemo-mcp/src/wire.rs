@@ -316,6 +316,7 @@ pub fn validate_native_response(
                     "command.document.object.project.settings.edit"
                         | crate::native_contract::composition::EDIT
                         | crate::native_contract::palette::EDIT
+                        | crate::native_contract::guide::EDIT
                 ) || crate::native_contract::settings::revision_matches(
                     request.expected_revision,
                     response.content_revision,

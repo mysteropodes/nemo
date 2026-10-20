@@ -33,6 +33,7 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-project-settings.json"),
     include_str!("../../engineering/application/capabilities-v2/native-project-composition.json"),
     include_str!("../../engineering/application/capabilities-v2/native-project-palette.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-guide.json"),
     include_str!("../../engineering/application/capabilities-v2/native-project-placement.json"),
     include_str!("../../engineering/application/capabilities-v2/native-audio-track.json"),
     include_str!("../../engineering/application/capabilities-v2/native-layer-policy.json"),
