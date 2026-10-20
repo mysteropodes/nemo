@@ -52,7 +52,8 @@ fn all_eight_palette_actions_are_bounded_field_intents_with_a_separate_closed_na
             EDIT,
             json!({"command":"object.project.palette.edit","action":action}),
         );
-        assert!(q.validate().is_ok(), "{}", q.payload);
+        assert!(q.validate_input().is_ok(), "{}", q.payload);
+        assert_eq!(q.validate().unwrap_err().code(), "unavailable");
     }
     for action in [
         json!({"kind":"replacePalettes","palettes":[]}),
@@ -68,23 +69,24 @@ fn all_eight_palette_actions_are_bounded_field_intents_with_a_separate_closed_na
             EDIT,
             json!({"command":"object.project.palette.edit","action":action})
         )
-        .validate()
+        .validate_input()
         .is_err());
     }
     let mut wrong = request(
         EDIT,
         json!({"command":"object.project.settings.edit","action":{"kind":"select","ordinal":1}}),
     );
-    assert!(wrong.validate().is_err());
+    assert!(wrong.validate_input().is_err());
     wrong.payload["command"] = json!("object.project.palette.edit");
     wrong.expected_revision = None;
-    assert!(wrong.validate().is_err());
+    assert!(wrong.validate_input().is_err());
 }
 
 #[test]
 fn settings_keep_absence_fractional_negative_and_upper_bound_selection_semantics() {
     let q = query(json!({"kind":"settings"}));
-    assert!(q.validate().is_ok());
+    assert!(q.validate_input().is_ok());
+    assert_eq!(q.validate().unwrap_err().code(), "unavailable");
     for body in [
         settings_value(),
         json!({"palettesPresent":false,"paletteCount":0,"activePaletteIdx":0.5,"effectiveActivePaletteIdx":0.5}),
@@ -103,7 +105,7 @@ fn settings_keep_absence_fractional_negative_and_upper_bound_selection_semantics
     }
     let mut revision = q;
     revision.expected_revision = Some(7);
-    assert!(revision.validate().is_err());
+    assert!(revision.validate_input().is_err());
 }
 
 #[test]
