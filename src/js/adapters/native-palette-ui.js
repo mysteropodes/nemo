@@ -171,7 +171,7 @@
       render(); return loading;
     }
     var controller = Object.freeze({ read: model.read, edit: edit, create: create, append: append, render: render,
-      presented: presented, isPending: busy,
+      presented: presented, isPending: function () { return pending || !!loading; },
       willProject: function () { projectionEpoch++; drag = null; if (!pending) model.invalidate(); render(); },
       dispose: function () { retired = true; refreshNeeded = false; drag = null; model.dispose(); render(); }
     });
