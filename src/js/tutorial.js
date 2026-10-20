@@ -1070,7 +1070,10 @@
         { type: 'click', target: '.tool-btn[data-tool="line"]', title: 'Choisis la Ligne', body: 'Clique sur l\'outil Ligne (raccourci U) — le panneau flottant au-dessus du canevas propose alors le guide de Perspective.' },
         stateChangedStep({
           target: '.labs-float-btn[title="Guide de perspective"]', title: 'Active le guide', body: 'Clique l\'icône Perspective dans le panneau flottant pour afficher la grille de points de fuite.', hint: 'En attente…',
-          measure: function (win) { return !!(win.state && win.state.perspectiveEnabled); }
+          measure: function (win) {
+            if (win.__TAURI__ && win.__TAURI__.core) { var p = win.readPerspectiveSettings && win.readPerspectiveSettings(); return !!(p && p.perspectiveEnabled); }
+            return !!(win.state && win.state.perspectiveEnabled);
+          }
         }),
         { type: 'click', target: '.tool-btn[data-tool="line"]', title: 'Reviens à la Ligne', body: 'Activer le guide t\'a basculé sur l\'outil Perspective (pour placer les points de fuite) — reclique Ligne pour tracer un trait qui s\'y aimante.' },
         stateIncreaseStep({

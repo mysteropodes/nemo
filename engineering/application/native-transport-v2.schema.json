@@ -6381,6 +6381,40 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.perspective.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectPerspectiveReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.perspective.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectPerspectiveEditPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -7231,6 +7265,9 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectShadowReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectPerspectiveReadResult"
             }
           ]
         },
@@ -11841,6 +11878,580 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectShadowPalettePageValue"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectPerspectiveEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "enabled"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setEnabled"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "mode"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setMode"
+            },
+            "mode": {
+              "enum": [
+                "1pt",
+                "2pt",
+                "3pt",
+                "fisheye"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "reset"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "locked"
+          ],
+          "properties": {
+            "kind": {
+              "const": "lockAll"
+            },
+            "locked": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "kind": {
+              "const": "move"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "dx",
+            "dy"
+          ],
+          "properties": {
+            "kind": {
+              "const": "translate"
+            },
+            "dx": {
+              "type": "number"
+            },
+            "dy": {
+              "type": "number"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectPerspectiveSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "settings"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "vpPage"
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectPerspectiveEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.perspective.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectPerspectiveEditAction"
+        }
+      }
+    },
+    "ObjectProjectPerspectiveReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectPerspectiveSelector"
+        }
+      }
+    },
+    "ObjectProjectPerspectiveSettingsValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "perspectiveVPsPresent",
+        "perspectiveVPsNull",
+        "perspectiveVPCount",
+        "effectiveVPCount",
+        "vpSource"
+      ],
+      "properties": {
+        "perspectiveVPsPresent": {
+          "type": "boolean"
+        },
+        "perspectiveVPsNull": {
+          "type": "boolean"
+        },
+        "perspectiveVPCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "effectiveVPCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "vpSource": {
+          "enum": [
+            "stored",
+            "default"
+          ]
+        },
+        "perspectiveEnabled": {
+          "type": "boolean"
+        },
+        "perspectiveMode": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^[^\\u0000]*$",
+          "description": "At most1024 UTF8 bytes; runtime enforces bytes without altering imported spelling."
+        },
+        "perspectiveDensity": {
+          "type": "number"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "perspectiveVPsPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "perspectiveVPsNull": {
+                "const": false
+              },
+              "perspectiveVPCount": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "perspectiveVPsNull": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "perspectiveVPsPresent": {
+                "const": true
+              },
+              "perspectiveVPCount": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "vpSource": {
+                "const": "default"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "perspectiveVPCount": {
+                "const": 0
+              },
+              "effectiveVPCount": {
+                "maximum": 3
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "perspectiveVPCount": {
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "vpSource": {
+                "const": "default"
+              }
+            }
+          },
+          "then": {
+            "if": {
+              "required": [
+                "perspectiveMode"
+              ],
+              "properties": {
+                "perspectiveMode": {
+                  "const": "3pt"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "effectiveVPCount": {
+                  "const": 3
+                }
+              }
+            },
+            "else": {
+              "if": {
+                "required": [
+                  "perspectiveMode"
+                ],
+                "properties": {
+                  "perspectiveMode": {
+                    "enum": [
+                      "1pt",
+                      "fisheye"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "effectiveVPCount": {
+                    "const": 1
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "effectiveVPCount": {
+                    "const": 2
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectPerspectiveVPPageValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "perspectiveVPsPresent",
+        "perspectiveVPsNull",
+        "perspectiveVPCount",
+        "effectiveVPCount",
+        "vpSource",
+        "cursor",
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "kind": {
+          "const": "perspectiveVPPage"
+        },
+        "perspectiveVPsPresent": {
+          "type": "boolean"
+        },
+        "perspectiveVPsNull": {
+          "type": "boolean"
+        },
+        "perspectiveVPCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "effectiveVPCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "vpSource": {
+          "enum": [
+            "stored",
+            "default"
+          ]
+        },
+        "cursor": {
+          "$ref": "#/$defs/Revision"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ordinal",
+              "x",
+              "y"
+            ],
+            "properties": {
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "locked": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "perspectiveVPsPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "perspectiveVPsNull": {
+                "const": false
+              },
+              "perspectiveVPCount": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "perspectiveVPsNull": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "perspectiveVPsPresent": {
+                "const": true
+              },
+              "perspectiveVPCount": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "vpSource": {
+                "const": "default"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "perspectiveVPCount": {
+                "const": 0
+              },
+              "effectiveVPCount": {
+                "maximum": 3
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "perspectiveVPCount": {
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "vpSource": {
+                "const": "default"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "items": {
+                "items": {
+                  "required": [
+                    "locked"
+                  ],
+                  "properties": {
+                    "locked": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectPerspectiveReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectProjectPerspectiveSettingsValue"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectPerspectiveVPPageValue"
             }
           ]
         }

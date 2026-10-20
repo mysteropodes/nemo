@@ -98,6 +98,7 @@ impl NativeApplicationRequest {
                 | crate::native_contract::palette::EDIT
                 | crate::native_contract::guide::EDIT
                 | crate::native_contract::shadow::EDIT
+                | crate::native_contract::perspective::EDIT
                 | crate::native_contract::placement::OP
                 | crate::native_contract::audio_track::OP
                 | crate::native_contract::brush::PUBLISH
@@ -131,6 +132,8 @@ impl NativeApplicationRequest {
                 "project placement"
             } else if self.operation == crate::native_contract::composition::EDIT {
                 "composition metadata"
+            } else if self.operation == crate::native_contract::perspective::EDIT {
+                "perspective metadata"
             } else if self.operation == crate::native_contract::shadow::EDIT {
                 "shadow metadata"
             } else if self.operation == crate::native_contract::guide::EDIT {

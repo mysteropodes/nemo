@@ -306,7 +306,8 @@
         "object_project_composition_edit.rs",
         "object_project_palette_edit.rs",
         "object_project_guide_edit.rs",
-        "object_project_shadow_edit.rs"
+        "object_project_shadow_edit.rs",
+        "object_project_perspective_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -754,7 +755,8 @@
         "object_project_palette_read.rs",
         "object_boolean_frame_motion.rs",
         "object_project_guide_read.rs",
-        "object_project_shadow_read.rs"
+        "object_project_shadow_read.rs",
+        "object_project_perspective_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1629,7 +1631,9 @@
         "object_duplicator_snapshot.rs",
         "object_duplicator_sources.rs",
         "object_duplicator_frame.rs",
-        "object_duplicator_scene.rs"
+        "object_duplicator_scene.rs",
+        "object_perspective_public.rs",
+        "object_perspective_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1773,7 +1777,9 @@
         "src/native_guide_contract.rs",
         "src/native_guide_contract_tests.rs",
         "src/native_shadow_contract.rs",
-        "src/native_shadow_contract_tests.rs"
+        "src/native_shadow_contract_tests.rs",
+        "src/native_perspective_contract.rs",
+        "src/native_perspective_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -2035,7 +2041,9 @@
         "native_project_placement_audio_fixture.rs",
         "native_layer_playhead_cut_public_tests.rs",
         "native_audio_track_public_tests.rs",
-        "native_shadow_dispatch_tests.rs"
+        "native_shadow_dispatch_tests.rs",
+        "native_perspective_dispatch_tests.rs",
+        "native_perspective_read_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

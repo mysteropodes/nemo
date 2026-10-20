@@ -28,9 +28,10 @@
     // StretchToSurface uses these confirmed CSS bounds, not Paper's pan/zoom view.
     function point(e,t){if(!Number.isFinite(e.clientX)||!Number.isFinite(e.clientY))fail('Pointer position is unavailable.');
       return [(e.clientX-t.bounds.left)*t.pin.canvasW/t.bounds.width,(e.clientY-t.bounds.top)*t.pin.canvasH/t.bounds.height];}
-    function style(tool){
-      var s=root.state;
-      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||s.symmetryEnabled||s.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
+    function style(tool,proof){
+      var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
+      var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
+      if(s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!same(perspective.info,ownerInfo)||perspective.perspective.settings.perspectiveEnabled||s.activeSymbolId)fail('This drawing mode is unavailable in native shape tools.');
       if(ports.freehand)return ports.style();
       if(typeof s.strokeEnabled!=='boolean'||typeof s.fillEnabled!=='boolean'||(!s.strokeEnabled&&(tool==='line'||!s.fillEnabled)))fail('Enable a supported stroke or fill to draw.');
       if(!Number.isFinite(s.brushSize)||s.brushSize<=0||!Number.isFinite(s.opacity)||s.opacity<0||s.opacity>100)fail('Native shape style is unavailable.');
@@ -57,13 +58,14 @@
       if(!s||!s.isActive()||!pin||typeof s.runResourceCommand!=='function'||!shown||!same(pin,shown)||!same(pin,shown.presentation)||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
           shown.presentation.contextId!=='scene-root'||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=pin.totalFrames||
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
-      var t={session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
+      var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
+      var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
       t.start=point(e,t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
     function current(t,requirePresentation){
       try{var s=session(),pin=s&&s.info();
         if(retired||t.cancelled||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||root.state.tool!==t.tool||selection(pin)!==t.layerUid||
-            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(style(t.tool))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
+            root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(style(t.tool,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
         var shown=requirePresentation&&s.readPresentedObjectSession();
         return !requirePresentation||!!shown&&same(shown,t.pin)&&shown.presentation===t.presentation;
       }catch(_){return false;}

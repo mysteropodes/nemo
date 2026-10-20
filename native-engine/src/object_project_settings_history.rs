@@ -4,6 +4,12 @@ use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::request_receipts::DispatchErrorCode;
 
 impl NativeObjectHistory {
+    pub(crate) fn prepare_perspective_delta_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
+        self.owner.prepare_perspective_delta_json(bytes)
+    }
     pub(crate) fn prepare_shadow_delta_json(
         &self,
         bytes: &[u8],
@@ -82,3 +88,7 @@ mod guide_public_tests;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_shadow_public.rs"]
 mod shadow_public_tests;
+
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_perspective_public.rs"]
+mod perspective_public_tests;

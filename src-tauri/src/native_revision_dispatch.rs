@@ -334,3 +334,7 @@ mod composition_tests;
 #[cfg(test)]
 #[path = "native_shadow_dispatch_tests.rs"]
 mod shadow_tests;
+
+#[cfg(test)]
+#[path = "native_perspective_dispatch_tests.rs"]
+mod perspective_tests;

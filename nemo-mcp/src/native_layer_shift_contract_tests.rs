@@ -155,7 +155,7 @@ fn full_shipped_schema_keeps_original_operation_order_and_exact_cell_query_branc
             .as_array()
             .unwrap()
             .len(),
-        32
+        33
     );
     assert_eq!(
         schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"][28],
@@ -172,6 +172,10 @@ fn full_shipped_schema_keeps_original_operation_order_and_exact_cell_query_branc
     assert_eq!(
         schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"][31],
         json!({"$ref":"#/$defs/ObjectProjectShadowReadResult"})
+    );
+    assert_eq!(
+        schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"][32],
+        json!({"$ref":"#/$defs/ObjectProjectPerspectiveReadResult"})
     );
     let q = serde_json::to_value(envelope(payload())).unwrap();
     assert!(validator.is_valid(&q));

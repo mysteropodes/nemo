@@ -323,6 +323,15 @@ impl ObjectSnapshot {
                 "Native Shadow metadata is unavailable.",
             );
         }
+        if request.operation == "query.document.object.project.perspective.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_perspective_read(&request);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native Perspective metadata is unavailable.",
+            );
+        }
         if request.operation != "query.document.object" {
             return failure(
                 DispatchErrorCode::InvalidRequest,

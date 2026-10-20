@@ -12,6 +12,8 @@ mod composition_delta;
 mod guide_delta;
 #[path = "object_project_palette_edit.rs"]
 mod palette_delta;
+#[path = "object_project_perspective_edit.rs"]
+mod perspective_delta;
 #[path = "object_project_shadow_edit.rs"]
 mod shadow_delta;
 

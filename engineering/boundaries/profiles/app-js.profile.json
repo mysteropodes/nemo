@@ -3399,6 +3399,42 @@
       "publicApi": [
         "native-shadow-ui.js"
       ]
+    },
+    {
+      "id": "app.native.perspective.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-perspective-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-perspective-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-perspective-ui.js"
+      ]
     }
   ],
   "layerRules": {

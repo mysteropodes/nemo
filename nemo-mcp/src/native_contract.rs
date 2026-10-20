@@ -31,6 +31,8 @@ pub(crate) mod composition;
 pub(crate) mod guide;
 #[path = "native_palette_contract.rs"]
 pub(crate) mod palette;
+#[path = "native_perspective_contract.rs"]
+pub(crate) mod perspective;
 #[path = "native_project_placement_contract.rs"]
 pub(crate) mod placement;
 #[path = "native_project_settings_contract.rs"]
@@ -117,6 +119,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | palette::READ
             | guide::READ
             | shadow::READ
+            | perspective::READ
             | font::QUERY
             | brush::QUERY
             | "query.document.object.layer.timing"
@@ -146,6 +149,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         palette::READ | palette::EDIT => palette::request(operation, payload),
         guide::READ | guide::EDIT => guide::request(operation, payload),
         shadow::READ | shadow::EDIT => shadow::request(operation, payload),
+        perspective::READ | perspective::EDIT => perspective::request(operation, payload),
         placement::OP => placement::request(payload),
         audio_track::OP => audio_track::request(payload),
         layer_policy::OP => layer_policy::request(payload),
@@ -313,6 +317,9 @@ pub(crate) fn validate_result(
     }
     if matches!(operation, palette::READ | palette::EDIT) {
         return palette::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, perspective::READ | perspective::EDIT) {
+        return perspective::result(operation, request_document_id, payload, result);
     }
     if matches!(operation, shadow::READ | shadow::EDIT) {
         return shadow::result(operation, request_document_id, payload, result);
