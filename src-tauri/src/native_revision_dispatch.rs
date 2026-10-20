@@ -330,3 +330,7 @@ mod property_bake_tests;
 #[cfg(test)]
 #[path = "native_composition_dispatch_tests.rs"]
 mod composition_tests;
+
+#[cfg(test)]
+#[path = "native_shadow_dispatch_tests.rs"]
+mod shadow_tests;

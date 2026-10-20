@@ -2034,7 +2034,8 @@
         "native_project_placement_public_tests.rs",
         "native_project_placement_audio_fixture.rs",
         "native_layer_playhead_cut_public_tests.rs",
-        "native_audio_track_public_tests.rs"
+        "native_audio_track_public_tests.rs",
+        "native_shadow_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
