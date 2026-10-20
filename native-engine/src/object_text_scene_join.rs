@@ -176,6 +176,7 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
                         "native retained font unavailable"
                     }
                     TextProducerError::Color => "native Text paint unavailable",
+                    TextProducerError::Animator => "native Text animator evaluation unavailable",
                 },
             )
         })
@@ -210,7 +211,34 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
         } else {
             resources.insert(id, Arc::clone(&font.resource));
         }
-        pending.push((input, font, raw));
+        pending.push((input, raw));
+    }
+    for (layer_index, layer) in packet.source_layers().iter().enumerate() {
+        let Some(records) = layer.text_animators.value().filter(|v| !v.0.is_empty()) else {
+            continue;
+        };
+        let animators = records
+            .0
+            .iter()
+            .map(|r| r.resolve(f64::from(packet.frame())))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| unavailable(0, "native Text selector evaluation unavailable"))?;
+        let fps = packet
+            .snapshot()
+            .project()
+            .map_or(24.0, |p| p.project().fps());
+        let mut blocks = pending
+            .iter_mut()
+            .filter(|(input, _)| input.layer_index == layer_index)
+            .map(|(_, item)| item)
+            .collect::<Vec<_>>();
+        crate::object_render_scene::object_scene_producer_text::animator::apply_layer(
+            &mut blocks,
+            &animators,
+            f64::from(packet.frame()),
+            fps,
+        )
+        .map_err(|_| unavailable(0, "native Text animator evaluation unavailable"))?;
     }
     let chains = Arc::new(
         chains
@@ -218,18 +246,23 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
             .map_err(|e| unavailable(e.source_index, e.reason()))?,
     );
     let mut entries = Vec::new();
-    for (input, font, raw) in pending {
+    for (input, mut raw) in pending {
         if !input.visible {
             continue;
         }
         let chain = chains
             .chain(input.layer_index)
             .map_err(|e| unavailable(input.source_index, e.reason()))?;
-        let item = if chain.is_empty() {
-            raw
-        } else {
-            make(&input, &font, &chain)?
-        };
+        crate::object_render_scene::object_scene_producer_text::animator::apply_chain(
+            &mut raw, &chain,
+        )
+        .map_err(|_| {
+            unavailable(
+                input.source_index,
+                "native Text animator parent chain unavailable",
+            )
+        })?;
+        let item = raw;
         entries.push(TextSource {
             source_index: input.source_index,
             layer_index: input.layer_index,
@@ -319,3 +352,13 @@ mod tests;
 ))]
 #[path = "../tests/object_scene_parent_chain.rs"]
 mod parent_chain_tests;
+
+#[cfg(all(
+    test,
+    feature = "font_asset_admission",
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_text_animator.rs"]
+mod animator_tests;

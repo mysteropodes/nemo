@@ -25,3 +25,6 @@ pub(crate) mod object_text_layout_retained;
 #[path = "text_glyph_selector.rs"]
 #[allow(dead_code)]
 pub(crate) mod text_glyph_selector;
+
+#[path = "object_text_animator_record.rs"]
+pub(crate) mod animator;

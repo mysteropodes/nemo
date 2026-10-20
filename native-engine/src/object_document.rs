@@ -261,6 +261,8 @@ pub struct ObjectLayer {
     /// F11 (L05-G): the stored inPoint / outPoint / timeLink / markers. Absent: the layer never had any of them.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) range: Presence<LayerRange>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) text_animators: Presence<object_text_layout_kernels::animator::TextAnimators>,
 }
 
 // Serde's derived struct decoder also accepts positional sequences. These
@@ -318,6 +320,7 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,
     #[serde(default)] effects_from: Presence<String>,
     #[serde(default)] rig: Presence<object_rig_record::RigRecord>,
+    #[serde(default)] text_animators: Presence<object_text_layout_kernels::animator::TextAnimators>,
     #[serde(default)] range: Presence<LayerRange> });
 
 impl ObjectDocument {
@@ -418,6 +421,7 @@ impl ObjectLayer {
             effects_from: Presence::Missing,
             rig: Presence::Missing,
             range: Presence::Missing,
+            text_animators: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {

@@ -110,6 +110,80 @@ pub(crate) struct TextGlyphScene {
 }
 
 impl TextGlyphScene {
+    /// Same native geometry admission after each per-contour element stage and parent chain.
+    pub(crate) fn transformed(
+        &self,
+        elements: &[Option<ChainEntry>],
+        chain: &[ChainEntry],
+        admission: GeometryAdmission,
+    ) -> Result<(Self, Vec<usize>), TextSceneError> {
+        let mut contours = Vec::new();
+        let mut kept = Vec::new();
+        for (index, c) in self.contours.iter().enumerate() {
+            let ring = c
+                .contour
+                .segments()
+                .iter()
+                .map(|s| GlyphSegment {
+                    point: s.point,
+                    handle_in: s.handle_in,
+                    handle_out: s.handle_out,
+                })
+                .collect::<Vec<_>>();
+            let stages = stages_for(elements.get(index).copied().flatten(), chain);
+            if stages.iter().any(|s| s.mat.sx == 0.0 || s.mat.sy == 0.0) {
+                let finite = stages.iter().all(|s| {
+                    [
+                        s.mat.dx, s.mat.dy, s.mat.rot, s.mat.sx, s.mat.sy, s.mat.op, s.mat.ax,
+                        s.mat.ay, s.pivot[0], s.pivot[1],
+                    ]
+                    .iter()
+                    .all(|n| n.is_finite())
+                });
+                let stored = ring
+                    .iter()
+                    .map(|s| Segment {
+                        point: s.point,
+                        handle_in: Some(s.handle_in),
+                        handle_out: Some(s.handle_out),
+                    })
+                    .collect::<Vec<_>>();
+                let moved = apply_chain_to_segments(&stored, &stages);
+                if !finite
+                    || moved.iter().any(|s| {
+                        s.point
+                            .iter()
+                            .chain(s.handle_in.iter().flatten())
+                            .chain(s.handle_out.iter().flatten())
+                            .any(|n| !n.is_finite())
+                    })
+                {
+                    return Err(TextSceneError::UnsupportedGeometry {
+                        role: c.role,
+                        flag: None,
+                        reason: "text motion must remain finite",
+                    });
+                }
+                continue; // Valid exact zero scale has no ink; retain its source unit census upstream.
+            }
+            contours.push(placed(
+                c.role,
+                c.key.clone(),
+                &ring,
+                &stages,
+                c.opacity,
+                admission,
+            )?);
+            kept.push(index);
+        }
+        Ok((
+            Self {
+                holder_id: self.holder_id.clone(),
+                contours,
+            },
+            kept,
+        ))
+    }
     pub(crate) fn holder_id(&self) -> &str {
         &self.holder_id
     }

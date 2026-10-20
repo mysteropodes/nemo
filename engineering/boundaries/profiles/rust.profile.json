@@ -130,6 +130,9 @@
         "object_fill_regenerate.rs",
         "object_fill_trace_plan.rs",
         "object_fill_trace_record.rs",
+        "object_text_animator_record.rs",
+        "object_text_animator_selector.rs",
+        "object_text_animator_props.rs",
         "project_metadata_fields.rs",
         "project_metadata_wire.rs",
         "project_metadata_annotations.rs",
@@ -297,6 +300,8 @@
         "object_audio_track_edit_owner.rs",
         "object_fill_trace_owner.rs",
         "object_property_bake_edit.rs",
+        "object_text_animator_commands.rs",
+        "object_text_animator_edit.rs",
         "object_project_composition_edit.rs",
         "object_project_palette_edit.rs"
       ],
@@ -509,7 +514,8 @@
         "object_frame_context.rs",
         "object_audio_track_sampling.rs",
         "object_expression_reads.rs",
-        "property_expression_bake.rs"
+        "property_expression_bake.rs",
+        "object_text_animator_evaluation.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -581,7 +587,8 @@
         "object_text_scene_fonts.rs",
         "object_text_scene_bundled.rs",
         "object_scene_parent_chain.rs",
-        "object_scene_parent_curve.rs"
+        "object_scene_parent_curve.rs",
+        "object_scene_producer_text_animator.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -1590,6 +1597,7 @@
         "object_fill_trace_native.rs",
         "property_expression_bake.rs",
         "object_expression_bake.rs",
+        "object_text_animator.rs",
         "project_metadata_fields.rs",
         "project_metadata_annotations.rs",
         "project_metadata_presets.rs",
@@ -1733,7 +1741,8 @@
         "src/native_audio_track_contract_tests.rs",
         "src/native_audio_track_wire_tests.rs",
         "src/native_fill_trace_contract_tests.rs",
-        "src/native_fill_trace_wire.rs"
+        "src/native_fill_trace_wire.rs",
+        "src/native_text_animator_contract.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

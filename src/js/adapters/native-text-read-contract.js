@@ -19,7 +19,8 @@
   function payload(op,p){
     exact(p,['atRevision','documentSnapshotId','view']);uint(p.atRevision,Number.MAX_SAFE_INTEGER);opaque(p.documentSnapshotId);
     var v=p.view;if(!plain(v))fail('text view invalid');
-    if(v.kind==='targets'){exact(v,['kind','scope','offset','limit']);scope(v.scope);uint(v.offset,4294967295);uint(v.limit,8);if(v.limit<1)fail('text page limit invalid');}
+    if(v.kind==='animators'){exact(v,['kind','layerUid','frame','offset','limit']);opaque(v.layerUid);if(!Number.isFinite(v.frame)||v.frame<0)fail('animator frame invalid');uint(v.offset,4294967295);uint(v.limit,1024);if(v.limit<1)fail('animator chunk limit invalid');}
+    else if(v.kind==='targets'){exact(v,['kind','scope','offset','limit']);scope(v.scope);uint(v.offset,4294967295);uint(v.limit,8);if(v.limit<1)fail('text page limit invalid');}
     else if(v.kind==='inspect'){exact(v,['kind','target']);target(v.target);}
     else if(v.kind==='text'){exact(v,['kind','target','offset','limit']);target(v.target);uint(v.offset,MAX_TEXT_BYTES);uint(v.limit,1024);if(v.limit<1)fail('text chunk limit invalid');}
     else fail('text view kind invalid');
@@ -43,8 +44,8 @@
       // Reuse the exact item block validator, with a local non-persistent text sentinel.
       if(!Item)fail('native item contract unavailable');
       Item.payload(Item.ITEM,{command:'object.text.create',target:Object.assign({},r.target,{strokeId:''}),block:Object.assign({},r.block,{text:'validation'})});
-    }else if(r.kind==='text'){
-      exact(r,base.concat(['target','textBytes','offset','text','nextOffset']));target(r.target);uint(r.textBytes,MAX_TEXT_BYTES);uint(r.offset,r.textBytes);
+    }else if(r.kind==='text'||r.kind==='animators'){
+      exact(r,base.concat([r.kind==='text'?'target':'layerUid','textBytes','offset','text','nextOffset']).concat(r.kind==='animators'?['frame']:[]));if(r.kind==='animators'&&(!Number.isFinite(r.frame)||r.frame<0))fail('animator frame invalid');if(r.kind==='text')target(r.target);else opaque(r.layerUid);uint(r.textBytes,r.kind==='text'?MAX_TEXT_BYTES:4294967295);uint(r.offset,r.textBytes);
       if(typeof r.text!=='string'||r.text.includes('\0')||bytes(r.text)>1024||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(r.text))fail('text chunk invalid');
       var end=r.offset+bytes(r.text);if(end>r.textBytes||(r.nextOffset===null?end!==r.textBytes:!r.text.length||r.nextOffset!==end||end>=r.textBytes))fail('text chunk progress invalid');
     }else fail('text result kind invalid');
@@ -62,10 +63,11 @@
     var p=q.payload,v=p.view,x=r.result;
     if(r.contentRevision!==p.atRevision||x.instanceId!==q.instanceId||x.documentId!==q.documentId||x.atRevision!==p.atRevision||x.documentSnapshotId!==p.documentSnapshotId||x.kind!==v.kind)fail('text response pin mismatch');
     if(v.kind==='targets'){if(!same(v.scope,x.scope)||x.offset!==v.offset||x.items.length>v.limit)fail('text page selector mismatch');}
+    else if(v.kind==='animators'){if(v.layerUid!==x.layerUid||v.frame!==x.frame||x.offset!==v.offset||bytes(x.text)>v.limit)fail('animator chunk selector mismatch');}
     else if(!same(v.target,x.target)||v.kind==='text'&&(x.offset!==v.offset||bytes(x.text)>v.limit))fail('text target selector mismatch');
   }
   var own={admitted:function(op){return op===OP;},requiresRevision:function(){return false;},payload:payload,result:result,correlate:correlate,
-    paths:function(){return {has:function(p){return /^payload\.(?:documentSnapshotId|view\.(?:scope\.layerUid|target\.(?:layerUid|strokeId)))$/.test(p)||/^result\.(?:documentSnapshotId|scope\.layerUid|target\.(?:layerUid|strokeId)|items\.\d+\.target\.(?:layerUid|strokeId)|text|block\.font\.assetId)$/.test(p);}};}};
+    paths:function(){return {has:function(p){return /^payload\.(?:documentSnapshotId|view\.(?:layerUid|scope\.layerUid|target\.(?:layerUid|strokeId)))$/.test(p)||/^result\.(?:documentSnapshotId|layerUid|scope\.layerUid|target\.(?:layerUid|strokeId)|items\.\d+\.target\.(?:layerUid|strokeId)|text|block\.font\.assetId)$/.test(p);}};}};
   function compose(base){if(!base)return Object.freeze(own);return Object.freeze({admitted:function(op){return own.admitted(op)||base.admitted(op);},requiresRevision:function(op){return own.admitted(op)?false:base.requiresRevision(op);},
     payload:function(op,p,e){return own.admitted(op)?payload(op,p):base.payload(op,p,e);},result:function(op,r){return own.admitted(op)?result(op,r):base.result(op,r);},
     correlate:function(q,r){return own.admitted(q.operation)?correlate(q,r):base.correlate(q,r);},paths:function(op){return own.admitted(op)?own.paths(op):base.paths(op);}});}
