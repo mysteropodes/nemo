@@ -1,7 +1,7 @@
 //! Actual bundled MCP native wire client -> subscribed owner -> retained VM.
 //! No installed UI, filesystem SaveAs or common render/export claim.
-use crate::application_mcp::{revision_sync::RevisionControl, ApplicationMcp};
 use super::property_edit_tests::{history, open, receipt, request, round_trip, saved};
+use crate::application_mcp::{revision_sync::RevisionControl, ApplicationMcp};
 use serde_json::{json, Value};
 
 #[tokio::test]
@@ -22,16 +22,27 @@ async fn expression_bake_real_mcp_client_requires_ack_and_preserves_history_and_
     assert_eq!(refused.error.unwrap().code, "unavailable");
     assert_eq!(events, 0);
     assert_eq!(saved(&state, &id), initial);
-    let binding = state.revisions.control(&state.native, RevisionControl::Binding).unwrap();
-    state.revisions.control(&state.native,
-        serde_json::from_value(json!({"action":"subscribe","binding":binding})).unwrap()).unwrap();
+    let binding = state
+        .revisions
+        .control(&state.native, RevisionControl::Binding)
+        .unwrap();
+    state
+        .revisions
+        .control(
+            &state.native,
+            serde_json::from_value(json!({"action":"subscribe","binding":binding})).unwrap(),
+        )
+        .unwrap();
     let (first, events) = round_trip(&state, command.clone(), Some(&binding)).await;
     receipt(&first, 1, true);
     assert_eq!(events, 1);
     let changed = saved(&state, &id);
     let project: Value = serde_json::from_slice(&changed).unwrap();
     let property = &project["drawing"]["propertyHolders"][0]["properties"][0];
-    assert_eq!(property["expression"], json!({"enabled":false,"code":"value + frame"}));
+    assert_eq!(
+        property["expression"],
+        json!({"enabled":false,"code":"value + frame"})
+    );
     let keys = property["track"]["keys"].as_array().unwrap();
     assert_eq!(keys.len(), 2);
     assert_eq!(keys[0]["frame"], 0);
