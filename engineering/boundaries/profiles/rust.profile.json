@@ -733,7 +733,8 @@
         "object_text_font_resources.rs",
         "object_layer_range_snapshot.rs",
         "object_property_target_pages.rs",
-        "object_project_composition_read.rs"
+        "object_project_composition_read.rs",
+        "object_project_palette_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1596,7 +1597,8 @@
         "object_composition_read.rs",
         "object_composition_public.rs",
         "object_composition_public_reads.rs",
-        "object_palette_edit.rs"
+        "object_palette_edit.rs",
+        "object_palette_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
