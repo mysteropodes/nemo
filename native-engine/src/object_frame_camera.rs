@@ -1,8 +1,8 @@
 //! Stored camera/3D inputs joined to the existing numerical kernels at one snapshot.
-use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
 use crate::evaluation::property_camera_eval::{camera_matrix_at_frame, CameraKey};
 use crate::evaluation::property_projection_3d::Pose3D;
 use crate::object_document::PropertyHolderTarget;
+use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
 use crate::revision::ObjectSnapshot;
 
 impl ObjectSnapshot {

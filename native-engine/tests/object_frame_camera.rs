@@ -171,7 +171,9 @@ fn disabled_3d_does_not_evaluate_an_overflowing_dormant_track() {
     let s = snapshot(&o);
     // The input is admitted and finite. Only evaluating its dormant segment
     // overflows; a disabled 3D feature must not take that evaluation path.
-    assert!(crate::object_frame_packet::sample_property_raw(&s, &target(), "positionZ", 2.).is_err());
+    assert!(
+        crate::object_frame_packet::sample_property_raw(&s, &target(), "positionZ", 2.).is_err()
+    );
     assert_eq!(s.sampled_pose_3d(&target(), 2.).unwrap(), None);
 }
 
@@ -183,7 +185,9 @@ fn drawing_edits_undo_redo_and_fresh_reopen_retain_camera_and_3d_state() {
     let matrix = snapshot(&o).sampled_camera_matrix(2.).unwrap();
     let pose = snapshot(&o).sampled_pose_3d(&target(), 2.).unwrap();
     let rename = json!({"command":"object.layer.rename","layerUid":"L0","name":"renamed"});
-    let candidate = o.prepare_layer_rename_json(rename.to_string().as_bytes()).unwrap();
+    let candidate = o
+        .prepare_layer_rename_json(rename.to_string().as_bytes())
+        .unwrap();
     o.commit_layer_lifecycle(candidate).unwrap();
     assert_eq!(o.history_depths(), (1, 0));
     let after = saved(&o);
@@ -198,8 +202,14 @@ fn drawing_edits_undo_redo_and_fresh_reopen_retain_camera_and_3d_state() {
     assert_eq!(saved(&o), after);
     let reopened = NativeObjectHistory::from_project_file("camera-edit-reopen", &after).unwrap();
     assert_eq!(saved(&reopened), after);
-    assert_eq!(snapshot(&reopened).sampled_camera_matrix(2.).unwrap(), matrix);
-    assert_eq!(snapshot(&reopened).sampled_pose_3d(&target(), 2.).unwrap(), pose);
+    assert_eq!(
+        snapshot(&reopened).sampled_camera_matrix(2.).unwrap(),
+        matrix
+    );
+    assert_eq!(
+        snapshot(&reopened).sampled_pose_3d(&target(), 2.).unwrap(),
+        pose
+    );
 }
 
 #[test]
