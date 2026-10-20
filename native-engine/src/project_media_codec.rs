@@ -1,4 +1,6 @@
 //! Strict private project wire; drawing admission always sees original bytes.
+#[cfg(test)]
+use crate::object_document::ProjectMetadata;
 use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 #[cfg(feature = "project_media_codec")]
 use crate::reference_image_asset::{ImageAssetError, ImageAssetLimits};
