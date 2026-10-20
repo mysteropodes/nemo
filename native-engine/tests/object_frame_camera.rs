@@ -203,10 +203,13 @@ fn component_targets_cannot_borrow_an_opposite_root_layer_3d_flag() {
                 .unwrap()
                 .push(json!({"layerUid":uid,"naturalPosition":index,"order":{}}));
         }
-        let o = owner(&value);
+        let admitted =
+            crate::object_codec::decode_storage_project(value["drawing"].to_string().as_bytes())
+                .unwrap();
+        let s = ObjectSnapshot::new("component-context", admitted).unwrap();
         let target = serde_json::from_value(json!({"contextId":context,"layerUid":uid})).unwrap();
         assert_eq!(
-            snapshot(&o).sampled_pose_3d(&target, 0.),
+            s.sampled_pose_3d(&target, 0.),
             Err(crate::object_frame_packet::PropertySampleError::UnsupportedProperty)
         );
     }

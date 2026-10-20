@@ -105,6 +105,10 @@ fn the_actual_stored_rig_pose_scene_route_also_applies_element_motion() {
     use crate::object_frame_packet::{prepare_object_frame, ObjectFrameSelector};
     let mut doc =
         rig_input::row_document(&rig_input::row("arm_rotate_soft_bone_turned_40_degrees"));
+    for record in doc["objects"].as_array_mut().unwrap() {
+        record["family"] = json!("editable-vector-path");
+        record["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1});
+    }
     let id = doc["objects"][0]["target"]["strokeId"].clone();
     doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L1","strokeId":id},
         "properties":[{"property":"position","static":[7,-3]}]}]);

@@ -58,6 +58,29 @@ fn actual_frame_bounds(o: &NativeObjectHistory, frame: u32) -> Vec<[f64; 4]> {
         .collect()
 }
 
+#[cfg(feature = "compositor")]
+fn original_static_fold_bounds(first_offset: f64, second_offset: f64) -> Vec<[f64; 4]> {
+    // Literal equivalent through the ORIGINAL supplied-port path, including
+    // its separate Path#simplify(2.5) refit; do not invent sharp corners.
+    let mut source = document(json!({"property":"position","static":[0,0]}));
+    source.as_object_mut().unwrap().remove("propertyHolders");
+    for (record, offset) in source["objects"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .zip([first_offset, second_offset])
+    {
+        for segment in record["geometry"]["segments"].as_array_mut().unwrap() {
+            segment["point"]["x"] = json!(segment["point"]["x"].as_f64().unwrap() + offset);
+        }
+    }
+    let mut o = owner(&source);
+    let edit=o.prepare_boolean_flatten_with(&payload(),
+        &crate::object_document::object_group_kernels::object_boolean_ops::plan::UnavailableMotion).unwrap();
+    o.commit_boolean_edit(edit).unwrap();
+    actual_frame_bounds(&o, 1)
+}
+
 #[test]
 fn actual_keyed_member_motion_is_baked_then_undo_and_reopen_preserve_it() {
     let mut o = owner(&document(json!({"property":"position","track":{"keys":[
@@ -69,7 +92,10 @@ fn actual_keyed_member_motion_is_baked_then_undo_and_reopen_preserve_it() {
     assert_eq!(o.history_depths(), (1, 0));
     let after = bytes(&o);
     #[cfg(feature = "compositor")]
-    assert_eq!(actual_frame_bounds(&o, 1), vec![[20., 0., 30., 10.]]);
+    assert_eq!(
+        actual_frame_bounds(&o, 1),
+        original_static_fold_bounds(20., 0.)
+    );
     let value: Value = serde_json::from_slice(&after).unwrap();
     assert_eq!(
         value["objects"].as_array().unwrap().len(),
@@ -142,6 +168,8 @@ fn the_animated_style_identity_is_not_applied_twice_and_other_frames_keep_their_
     let before = bytes(&o);
     #[cfg(feature = "compositor")]
     let other_before = actual_frame_bounds(&o, 0);
+    #[cfg(feature = "compositor")]
+    let expected_baked = original_static_fold_bounds(0., -20.);
     let candidate = o.prepare_boolean_flatten_json(&payload()).unwrap();
     o.commit_boolean_edit(candidate).unwrap();
     let after: Value = serde_json::from_slice(&bytes(&o)).unwrap();
@@ -168,10 +196,10 @@ fn the_animated_style_identity_is_not_applied_twice_and_other_frames_keep_their_
     let after_bytes = bytes(&o);
     #[cfg(feature = "compositor")]
     {
-        assert_eq!(actual_frame_bounds(&o, 1), vec![[0., 0., 10., 10.]]);
+        assert_eq!(actual_frame_bounds(&o, 1), expected_baked);
         assert_eq!(actual_frame_bounds(&o, 0), other_before);
         let reopened = owner(&after);
-        assert_eq!(actual_frame_bounds(&reopened, 1), vec![[0., 0., 10., 10.]]);
+        assert_eq!(actual_frame_bounds(&reopened, 1), expected_baked);
         assert_eq!(actual_frame_bounds(&reopened, 0), other_before);
     }
     o.undo(o.content_revision()).unwrap();
@@ -180,7 +208,7 @@ fn the_animated_style_identity_is_not_applied_twice_and_other_frames_keep_their_
     assert_eq!(bytes(&o), after_bytes);
     #[cfg(feature = "compositor")]
     {
-        assert_eq!(actual_frame_bounds(&o, 1), vec![[0., 0., 10., 10.]]);
+        assert_eq!(actual_frame_bounds(&o, 1), expected_baked);
         assert_eq!(actual_frame_bounds(&o, 0), other_before);
     }
 }
@@ -240,9 +268,7 @@ fn nonneutral_opacity_refuses_without_losing_other_frames_or_redo() {
 
 #[test]
 fn asymmetric_cubic_motion_uses_exact_pivot_and_output_space_curve_tolerance() {
-    use crate::object_document::object_group_kernels::object_fill_trace_ops::native::{
-        bounds, ring,
-    };
+    use super::{ElementMotionSource, SnapshotMotion};
     let mut source = document(json!({"property":"position","static":[5,-7]}));
     source["propertyHolders"][0]["properties"]
         .as_array_mut()
@@ -263,11 +289,32 @@ fn asymmetric_cubic_motion_uses_exact_pivot_and_output_space_curve_tolerance() {
         segment["point"] = json!({"x":p[0],"y":p[1]});
     }
     let mut o = owner(&source);
+    let retained = o.acquire_snapshot(o.content_revision()).unwrap();
+    let port = SnapshotMotion {
+        snapshot: &retained,
+        frame: 1,
+    };
+    let polygon = port
+        .materialized_polygons(&retained.document().objects()[0])
+        .unwrap();
+    let points = &polygon[0].exterior;
+    let measured = [
+        points.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min),
+        points.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min),
+        points
+            .iter()
+            .map(|p| p[0])
+            .fold(f64::NEG_INFINITY, f64::max),
+        points
+            .iter()
+            .map(|p| p[1])
+            .fold(f64::NEG_INFINITY, f64::max),
+    ];
+
     let edit = o.prepare_boolean_flatten_json(&payload()).unwrap();
     o.commit_boolean_edit(edit).unwrap();
     let s = o.acquire_snapshot(o.content_revision()).unwrap();
     assert_eq!(s.document().objects().len(), 1);
-    let b = bounds(&ring(&s.document().objects()[0]));
     // The cubic y extremum is -20/sqrt(3); true bounds centre + anchor is
     // [7,8-10/sqrt(3)]. Scale[2.5,100], then90deg, then[5,-7].
     let py = 8. - 10. / 3f64.sqrt();
@@ -277,10 +324,7 @@ fn asymmetric_cubic_motion_uses_exact_pivot_and_output_space_curve_tolerance() {
         12. + 100. * py + 2000. / 3f64.sqrt(),
         py + 0.5,
     ];
-    for (actual, expected) in [b.x, b.y, b.x + b.width, b.y + b.height]
-        .into_iter()
-        .zip(expected)
-    {
+    for (actual, expected) in measured.into_iter().zip(expected) {
         assert!(
             (actual - expected).abs() <= 0.75,
             "{actual} vs {expected}: retained output-space tolerance exceeded"
@@ -335,9 +379,7 @@ fn open_filled_members_preserve_the_straight_closing_chord_with_and_without_moti
         {
             let actual = actual_frame_bounds(&o, 1);
             if motion {
-                for (a, b) in actual[0].iter().zip([20., 0., 30., 10.]) {
-                    assert!((*a - b).abs() < 1e-10);
-                }
+                assert_eq!(actual, original_static_fold_bounds(20., 0.));
             } else {
                 assert_eq!(actual, vec![[0., 0., 10., 10.], [20., 0., 30., 10.]]);
             }
