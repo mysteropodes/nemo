@@ -602,6 +602,17 @@
     "nemo-mcp/src/native_palette_contract_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report"
+    },
+    "nemo-mcp/src/native_guide_contract.rs": {
+      "lines": 94.44,
+      "regions": 95.76,
+      "functions": 100,
+      "note": "T08 Guide: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean f405eb49ebcf483c8f69e8c92e61ce26ec070401. Report SHA256 3dcfa955293ee92c79e96435fdd6ceb51f1614f4d127efdecad1a3371da699ed. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_guide_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T08 Guide: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean f405eb49ebcf483c8f69e8c92e61ce26ec070401. Report SHA256 3dcfa955293ee92c79e96435fdd6ceb51f1614f4d127efdecad1a3371da699ed. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     }
   },
   "nativeObjectContractRegistration": {
