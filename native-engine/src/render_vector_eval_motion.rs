@@ -249,9 +249,9 @@ pub(super) fn apply_layer_position(
     apply_layer_position_with_consumption(snapshot, record, frame, segments, false)
 }
 
-/// The sole post-placement caller already fenced record context/host against
-/// this packet. Reuse only its exact host output's evaluated-key admission;
-/// the layer Position itself is still RAW and must pass its original guard.
+/// Packet-owned seed and post-placement callers already fence record identity,
+/// context and host against this packet. Reuse only its exact host output's
+/// evaluated-key admission; layer Position stays RAW with its original guard.
 pub(super) fn apply_duplicator_layer_position(
     packet: &crate::object_frame_packet::ObjectFramePacket,
     record: &ObjectRecord,

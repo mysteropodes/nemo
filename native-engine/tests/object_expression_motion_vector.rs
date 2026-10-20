@@ -1,7 +1,7 @@
 //! A1's actual editable-vector post-placement regression. ALL runtime UNRUN.
 use super::{fixture, owner, pins};
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
-    evaluate_vector, VectorEvalError,
+    evaluate_record, evaluate_vector, VectorEvalError,
 };
 use crate::object_codec::encode_storage_project;
 use crate::object_expression_runtime::prepare_object_motion_exposure_frame_for_owner;
@@ -54,6 +54,25 @@ fn evaluated_dup_offset_and_raw_position_reach_real_editable_vector_scene_in_ori
         prepare_object_motion_exposure_frame_for_owner(&o, &s, &pins(&s, 2), &mut effects).unwrap();
     assert!(p.has_evaluated_duplicator_motion(0));
     assert!(!p.has_evaluated_duplicator_motion(1));
+    // Scene must compile this exact retained seed before replacing its paint
+    // slot with derived copies. It cannot drop an unsupported source to pass.
+    let seed = p.record_at(0).unwrap();
+    assert_eq!(
+        (
+            p.records().len(),
+            seed.source_object_index(),
+            seed.source_layer_index()
+        ),
+        (1, 1, 0)
+    );
+    assert_eq!(
+        evaluate_record(&p, seed).unwrap().segments[0].point,
+        [27., 17.]
+    );
+    assert_eq!(
+        seed.record().geometry.segments[0].point.x.as_f64().unwrap(),
+        20.
+    );
     // Placement already ran at the requested frame: [20,22,34] at y20.
     // The post-placement RAW layer Position [7,-3] must run exactly once.
     let placed = p.duplicator_outputs()[0]
@@ -119,6 +138,20 @@ fn a_separate_raw_packet_of_matching_uid_and_layer_index_never_inherits_the_owne
     let plain = prepare_object_exposure_frame(&raw, &pins(&raw, 2)).unwrap();
     assert!(!plain.has_evaluated_duplicator_motion(0));
     assert_eq!(starts(&plain), [[27., 17.], [29., 17.], [41., 17.]]);
+    let evaluated_seed = p.record_at(0).unwrap();
+    let raw_seed = plain.record_at(0).unwrap();
+    assert_eq!(
+        evaluate_record(&p, raw_seed).unwrap_err(),
+        VectorEvalError::MissingRecord
+    );
+    assert_eq!(
+        evaluate_record(&plain, evaluated_seed).unwrap_err(),
+        VectorEvalError::MissingRecord
+    );
+    assert_eq!(
+        evaluate_record(&plain, raw_seed).unwrap().segments[0].point,
+        [27., 17.]
+    );
     let ordinary = evaluate_vector(&raw, 1, 2).unwrap();
     assert_eq!(ordinary.segments[0].point, [27., 17.]);
     assert_eq!(raw_owner.history_depths(), (0, 0));

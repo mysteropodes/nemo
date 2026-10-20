@@ -129,8 +129,16 @@ fn all_five_local_fields_and_original_effector_dimensions_are_evaluated_in_produ
     let p =
         prepare_object_motion_exposure_frame_for_owner(&o, &s, &pins(&s, 2), &mut effects).unwrap();
     assert_eq!(x_values(&p), [20., 22., 34.]);
-    for trace in &p.duplicator_outputs()[0].output.placements {
-        assert!((trace.placement.opacity_factor - 0.95).abs() < 1e-12);
+    // Original app.js:1545-1574: Step uses k/(count-1), so offset -5
+    // and strength100 give factors [1, 0.975, 0.95] for clones [0, 1, 2].
+    let placements = &p.duplicator_outputs()[0].output.placements;
+    assert_eq!(placements.len(), 3);
+    assert_eq!(
+        placements.iter().map(|trace| trace.k).collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
+    for (trace, expected) in placements.iter().zip([1., 0.975, 0.95]) {
+        assert!((trace.placement.opacity_factor - expected).abs() < 1e-12);
     }
     let scene = prepare_object_render_scene(&p, &pins(&s, 2)).unwrap();
     assert_eq!(
@@ -168,8 +176,16 @@ fn recursive_reads_use_actual_same_snapshot_property_values_and_expressions() {
     let mut effects = None;
     let p =
         prepare_object_motion_exposure_frame_for_owner(&o, &s, &pins(&s, 2), &mut effects).unwrap();
-    for trace in &p.duplicator_outputs()[0].output.placements {
-        assert!((trace.placement.opacity_factor - 0.95).abs() < 1e-12);
+    // C's live opacity is20*2=40, so -layer('C').opacity/8 is -5.
+    // Original Step weights [0, 0.5, 1] yield [1, 0.975, 0.95].
+    let placements = &p.duplicator_outputs()[0].output.placements;
+    assert_eq!(placements.len(), 3);
+    assert_eq!(
+        placements.iter().map(|trace| trace.k).collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
+    for (trace, expected) in placements.iter().zip([1., 0.975, 0.95]) {
+        assert!((trace.placement.opacity_factor - expected).abs() < 1e-12);
     }
     assert!(effects.is_none());
     assert_eq!(o.history_depths(), (0, 0));
