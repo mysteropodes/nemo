@@ -60,3 +60,36 @@ test('shared SDK retains original settings actions and opaque authored marker na
   const mismatched=client(q=>reply(q,result(q,{index:1,frame:2,time:2/24,name:'other',color:null})));
   await assert.rejects(mismatched.dispatch(read({kind:'markerNamed',name:'data:chapter'})));
 });
+
+
+test('authored HTML registers composition before browser SDK capture; late contract remains refused',async()=>{
+  const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+  const html=fs.readFileSync(path.join(__dirname,'../src/index.html'),'utf8');
+  const order=[...html.matchAll(/<script\b[^>]*\bsrc="(js\/adapters\/[^"\n]+)"[^>]*>/g)]
+    .map(m=>m[1]).filter(p=>['js/adapters/native-composition-contract.js','js/adapters/native-application.js'].includes(p));
+  assert.deepEqual(order,['js/adapters/native-composition-contract.js','js/adapters/native-application.js']);
+  function browser(files){
+    // Retained dependencies are their real modules; the new contract and SDK
+    // execute their browser branches in exactly the selected HTML order.
+    const root={TextEncoder,Buffer},dependencies={
+      NemoNativeObjectVectorContract:'native-object-vector-contract',NemoNativeAudioTrackContract:'native-audio-track-contract',
+      NemoNativeLayerPlayheadCutContract:'native-layer-playhead-cut-contract',NemoNativeProjectPlacementContract:'native-project-placement-contract',
+      NemoNativeTextReadContract:'native-text-read-contract',NemoNativeObjectRigContract:'native-object-rig-contract',
+      NemoNativeObjectComponentContract:'native-object-component-contract',NemoNativeMediaExportContract:'native-media-export-contract',
+      NemoNativeImportContract:'native-import-contract',NemoNativeBitmapBrushResourcesContract:'native-bitmap-brush-resources-contract',
+      NemoNativeObjectEditSeam:'native-object-edit-seam',NemoNativeObjectItemContract:'native-object-item-contract',
+      NemoNativePropertyContract:'native-property-contract',NemoNativeFrameEditContract:'native-frame-edit-contract'};
+    for(const [name,file]of Object.entries(dependencies))root[name]=require('../src/js/adapters/'+file+'.js');
+    root.globalThis=root;const context=vm.createContext(root);
+    for(const file of files)vm.runInContext(fs.readFileSync(path.join(__dirname,'../src',file),'utf8'),context,{filename:file});
+    const local=value=>vm.runInContext('JSON.parse('+JSON.stringify(JSON.stringify(value))+')',context);
+    let calls=0;const sdk=root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ordinary-ui',{dispatch(q){
+      calls++;return local(q.operation===C.EDIT?reply(q,{applied:true,historyEntriesAdded:1}):reply(q,result(q,settings())));}});
+    return {dispatch:q=>sdk.dispatch(local(q)),calls:()=>calls};
+  }
+  const actual=browser(order);assert.equal((await actual.dispatch(read({kind:'settings'}))).result.result.effectiveBpm,120);
+  assert.equal((await actual.dispatch(edit({kind:'setBpm',bpm:132})) ).contentRevision,8);assert.equal(actual.calls(),2);
+  const late=browser([...order].reverse());
+  await assert.rejects(async()=>late.dispatch(read({kind:'settings'})));assert.equal(late.calls(),0,
+    'loading the contract after the captured SDK must reproduce the original refusal');
+});
