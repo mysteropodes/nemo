@@ -6347,6 +6347,40 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.shadow.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectShadowReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.shadow.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectShadowEditPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -7194,6 +7228,9 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectGuideReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectShadowReadResult"
             }
           ]
         },
@@ -11512,6 +11549,298 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectGuideAxisPageValue"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectShadowEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "color"
+          ],
+          "properties": {
+            "kind": {
+              "const": "add"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "Valid Unicode, at most1024 UTF8 bytes, no NUL; runtime enforces the byte bound."
+            },
+            "color": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "Valid Unicode, at most1024 UTF8 bytes, no NUL; runtime enforces the byte bound."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal"
+          ],
+          "properties": {
+            "kind": {
+              "const": "select"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectShadowSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "settings"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "palettePage"
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectShadowEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.shadow.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectShadowEditAction"
+        }
+      }
+    },
+    "ObjectProjectShadowReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectShadowSelector"
+        }
+      }
+    },
+    "ObjectProjectShadowSettingsValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shadowPalettePresent",
+        "shadowColorCount"
+      ],
+      "properties": {
+        "shadowPalettePresent": {
+          "type": "boolean"
+        },
+        "shadowColorCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "shadowActiveId": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^[^\\u0000]*$",
+          "description": "Valid Unicode, at most1024 UTF8 bytes, no NUL; runtime enforces the byte bound."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "shadowPalettePresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "shadowColorCount": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectShadowPalettePageValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "shadowPalettePresent",
+        "shadowColorCount",
+        "cursor",
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "kind": {
+          "const": "shadowPalettePage"
+        },
+        "shadowPalettePresent": {
+          "type": "boolean"
+        },
+        "shadowColorCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "cursor": {
+          "$ref": "#/$defs/Revision"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ordinal",
+              "id",
+              "color"
+            ],
+            "properties": {
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "id": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "Valid Unicode, at most1024 UTF8 bytes, no NUL; runtime enforces the byte bound."
+              },
+              "color": {
+                "type": "string",
+                "maxLength": 1024,
+                "pattern": "^[^\\u0000]*$",
+                "description": "Valid Unicode, at most1024 UTF8 bytes, no NUL; runtime enforces the byte bound."
+              }
+            }
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Revision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "shadowPalettePresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "shadowColorCount": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectShadowReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectProjectShadowSettingsValue"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectShadowPalettePageValue"
             }
           ]
         }

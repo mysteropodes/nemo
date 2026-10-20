@@ -317,6 +317,7 @@ pub fn validate_native_response(
                         | crate::native_contract::composition::EDIT
                         | crate::native_contract::palette::EDIT
                         | crate::native_contract::guide::EDIT
+                        | crate::native_contract::shadow::EDIT
                 ) || crate::native_contract::settings::revision_matches(
                     request.expected_revision,
                     response.content_revision,

@@ -314,6 +314,15 @@ impl ObjectSnapshot {
                 "Native guide metadata is unavailable.",
             );
         }
+        if request.operation == "query.document.object.project.shadow.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_shadow_read(&request);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native Shadow metadata is unavailable.",
+            );
+        }
         if request.operation != "query.document.object" {
             return failure(
                 DispatchErrorCode::InvalidRequest,

@@ -70,7 +70,7 @@ fn complete_transport_schema_reaches_one_clipboard_result_branch_without_copy_cu
         "#/$defs/ObjectFrameBulkMoveResult",
         "#/$defs/ObjectProjectCompositionReadResult",
     ];
-    assert_eq!(branches.len(), retained.len() + 2);
+    assert_eq!(branches.len(), retained.len() + 3);
     for (branch, expected) in branches.iter().zip(retained) {
         assert_eq!(branch, &json!({"$ref":expected}));
     }
@@ -79,8 +79,12 @@ fn complete_transport_schema_reaches_one_clipboard_result_branch_without_copy_cu
         &json!({"$ref":"#/$defs/ObjectProjectPaletteReadResult"})
     );
     assert_eq!(
-        branches.last().unwrap(),
+        &branches[30],
         &json!({"$ref":"#/$defs/ObjectProjectGuideReadResult"})
+    );
+    assert_eq!(
+        &branches[31],
+        &json!({"$ref":"#/$defs/ObjectProjectShadowReadResult"})
     );
     assert!(!branches
         .iter()

@@ -112,7 +112,9 @@
         "src/native_palette_contract.rs",
         "src/native_palette_contract_tests.rs",
         "src/native_guide_contract.rs",
-        "src/native_guide_contract_tests.rs"
+        "src/native_guide_contract_tests.rs",
+        "src/native_shadow_contract.rs",
+        "src/native_shadow_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

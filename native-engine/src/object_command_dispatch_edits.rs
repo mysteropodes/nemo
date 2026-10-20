@@ -13,11 +13,16 @@ pub(super) const OP_PROJECT_SETTINGS: &str = "command.document.object.project.se
 const OP_PROJECT_COMPOSITION: &str = "command.document.object.project.composition.edit";
 const OP_PROJECT_PALETTE: &str = "command.document.object.project.palette.edit";
 const OP_PROJECT_GUIDE: &str = "command.document.object.project.guide.edit";
+const OP_PROJECT_SHADOW: &str = "command.document.object.project.shadow.edit";
 
 pub(super) fn is_project_settings_operation(operation: &str) -> bool {
     matches!(
         operation,
-        OP_PROJECT_SETTINGS | OP_PROJECT_COMPOSITION | OP_PROJECT_PALETTE | OP_PROJECT_GUIDE
+        OP_PROJECT_SETTINGS
+            | OP_PROJECT_COMPOSITION
+            | OP_PROJECT_PALETTE
+            | OP_PROJECT_GUIDE
+            | OP_PROJECT_SHADOW
     )
 }
 
@@ -156,6 +161,7 @@ impl NativeObjectHistory {
             OP_PROJECT_COMPOSITION => self.prepare_composition_delta_json(&payload),
             OP_PROJECT_PALETTE => self.prepare_palette_delta_json(&payload),
             OP_PROJECT_GUIDE => self.prepare_guide_delta_json(&payload),
+            OP_PROJECT_SHADOW => self.prepare_shadow_delta_json(&payload),
             _ => {
                 return Err((
                     DispatchErrorCode::InvalidRequest,

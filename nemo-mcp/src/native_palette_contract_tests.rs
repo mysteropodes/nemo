@@ -196,10 +196,14 @@ fn shipped_schema_and_descriptor_include_palette_without_dropping_prior_result_b
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
-    assert_eq!(branches.len(), 31);
+    assert_eq!(branches.len(), 32);
     assert_eq!(
         branches[30],
         json!({"$ref":"#/$defs/ObjectProjectGuideReadResult"})
+    );
+    assert_eq!(
+        branches[31],
+        json!({"$ref":"#/$defs/ObjectProjectShadowReadResult"})
     );
     assert_eq!(
         branches[27],

@@ -305,7 +305,8 @@
         "object_text_animator_edit.rs",
         "object_project_composition_edit.rs",
         "object_project_palette_edit.rs",
-        "object_project_guide_edit.rs"
+        "object_project_guide_edit.rs",
+        "object_project_shadow_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -748,7 +749,8 @@
         "object_project_composition_read.rs",
         "object_project_palette_read.rs",
         "object_boolean_frame_motion.rs",
-        "object_project_guide_read.rs"
+        "object_project_guide_read.rs",
+        "object_project_shadow_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1618,7 +1620,8 @@
         "object_frame_motion_values.rs",
         "object_frame_camera.rs",
         "object_boolean_frame_motion.rs",
-        "object_guide_public.rs"
+        "object_guide_public.rs",
+        "object_shadow_public.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1760,7 +1763,9 @@
         "src/native_palette_contract.rs",
         "src/native_palette_contract_tests.rs",
         "src/native_guide_contract.rs",
-        "src/native_guide_contract_tests.rs"
+        "src/native_guide_contract_tests.rs",
+        "src/native_shadow_contract.rs",
+        "src/native_shadow_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

@@ -238,6 +238,8 @@ mod composition;
 mod guide_read;
 #[path = "object_project_palette_read.rs"]
 mod palette_read;
+#[path = "object_project_shadow_read.rs"]
+mod shadow_read;
 
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_palette_read.rs"]
