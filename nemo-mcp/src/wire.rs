@@ -312,6 +312,7 @@ pub fn validate_native_response(
                         | crate::native_contract::metadata::OP
                         | crate::native_contract::text_read::OP
                         | crate::native_contract::property_read::OP
+                        | crate::native_contract::composition::READ
                 ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
                     == Some(response.content_revision))
                 && (!matches!(
@@ -320,6 +321,7 @@ pub fn validate_native_response(
                         | crate::native_contract::metadata::OP
                         | crate::native_contract::text_read::OP
                         | crate::native_contract::property_read::OP
+                        | crate::native_contract::composition::READ
                 ) || (response.instance_id == request.instance_id
                     && response.document_id == request.document_id
                     && result.get("instanceId").and_then(serde_json::Value::as_str)
@@ -331,7 +333,7 @@ pub fn validate_native_response(
                         .expected_revision
                         .and_then(|revision| revision.checked_add(1))
                         == Some(response.content_revision))
-                && (request.operation != "command.document.object.project.settings.edit"
+                && (!matches!(request.operation.as_str(), "command.document.object.project.settings.edit" | crate::native_contract::composition::EDIT)
                     || crate::native_contract::settings::revision_matches(
                         request.expected_revision,
                         response.content_revision,

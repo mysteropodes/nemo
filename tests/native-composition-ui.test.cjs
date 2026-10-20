@@ -1,0 +1,150 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const UI=require('../src/js/adapters/native-composition-ui.js');
+const Contract=require('../src/js/adapters/native-composition-contract.js');
+const clone=x=>JSON.parse(JSON.stringify(x));
+function node(tag='div') {
+  const listeners=new Map(),el={tagName:tag.toUpperCase(),children:[],className:'',style:{setProperty(k,v){this[k]=v;}},
+    classList:{toggle(){}},addEventListener(k,f){if(!listeners.has(k))listeners.set(k,[]);listeners.get(k).push(f);},
+    fire(k,e={}){e={button:0,clientX:0,clientY:0,target:el,currentTarget:el,preventDefault(){},stopPropagation(){},...e};
+      for(const fn of listeners.get(k)||[])fn(e);},
+    appendChild(child){child.parent=this;this.children.push(child);return child;},
+    remove(){if(this.parent)this.parent.children=this.parent.children.filter(x=>x!==this);},
+    querySelectorAll(selector){return this.children.filter(x=>selector==='.bpm-line'&&x.className.startsWith('bpm-line'));},
+    closest(){return null;},getBoundingClientRect(){return {left:0};}};
+  return el;
+}
+function fixture() {
+  const elements=Object.fromEntries(['bars-row','frame-hdr','fg-wrap','frame-grid','btn-bpm'].map(id=>[id,node()]));
+  const document=Object.assign(node('document'),{readyState:'loading',getElementById:id=>elements[id]||null,
+    createElement:node,createDocumentFragment:()=>node('fragment'),querySelector:()=>null,
+    querySelectorAll:selector=>selector==='.tl-marker'?elements['bars-row'].children.filter(x=>x.className.startsWith('tl-marker')):[]});
+  const persisted=Object.freeze([{frame:39,name:'legacy'}]),layerMarkers=Object.freeze([{frame:20}]);
+  const state={markers:persisted,layers:[{markers:layerMarkers}],totalFrames:40,currentFrame:3,fps:24};
+  let info={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'s0'},
+    revision=0,ticket=1,pending=0,serial=0,active=true,tail=Promise.resolve(),block=null;
+  let metadata={markers:[{frame:2.5,name:'First',color:''},{frame:8,name:'Second'}]};
+  const calls=[],notices=[],prompts=[],menus=[],jumps=[];
+  const shown=pin=>({...pin,presentation:{...pin,owner:'native',status:'presented'}});
+  let controller;
+  async function dispatch(q) {
+    calls.push(clone(q));Contract.payload(q.operation,q.payload);
+    if(block){const held=block;block=null;held.entered();await held.wait;}
+    const response={apiVersion:2,requestId:q.requestId,instanceId:info.instanceId,documentId:info.documentId,contentRevision:revision,ok:true};
+    if(q.operation===Contract.EDIT) {
+      assert.equal(q.expectedRevision,revision);const a=q.payload.action,before=JSON.stringify(metadata);
+      if(a.kind==='setBpm')for(const k of ['bpm','bpmOffset','bpmShow'])if(Object.hasOwn(a,k))metadata[k]=a[k];
+      if(a.kind==='addMarker'){metadata.markers.push({frame:a.frame,name:a.name,color:a.color});metadata.markers.sort((x,y)=>x.frame-y.frame);}
+      if(a.kind==='updateMarker'){Object.assign(metadata.markers[a.ordinal-1],Object.fromEntries(Object.entries(a).filter(([k])=>!['kind','ordinal'].includes(k))));metadata.markers.sort((x,y)=>x.frame-y.frame);}
+      if(a.kind==='removeMarker')metadata.markers.splice(a.ordinal-1,1);
+      if(a.kind==='clearMarkers')metadata.markers=[];
+      const applied=before!==JSON.stringify(metadata);if(applied)revision++;
+      response.contentRevision=revision;response.result={applied,historyEntriesAdded:Number(applied)};
+    } else {
+      assert.equal(q.payload.atRevision,revision);assert.equal(q.payload.documentSnapshotId,'s'+revision);
+      const s=q.payload.selector;
+      const result=s.kind==='settings'?{markersPresent:true,markerCount:metadata.markers.length,
+        effectiveBpm:metadata.bpm??120,effectiveBpmOffset:metadata.bpmOffset??0,effectiveBpmShow:metadata.bpmShow??false,
+        ...Object.fromEntries(['bpm','bpmOffset','bpmShow'].filter(k=>Object.hasOwn(metadata,k)).map(k=>[k,metadata[k]]))}:
+        {kind:'markerPage',markersPresent:true,markerCount:metadata.markers.length,cursor:s.cursor,
+          items:metadata.markers.slice(s.cursor).map((m,i)=>({ordinal:s.cursor+i+1,...m})),nextCursor:null};
+      response.result={instanceId:info.instanceId,documentId:info.documentId,atRevision:revision,
+        documentSnapshotId:'s'+revision,contextId:'scene-root',result};
+    }
+    return response;
+  }
+  const session={info:()=>info,isActive:()=>active,requestId:()=> 'q'+(++serial),readSubscriptionGeneration:()=>ticket,
+    readPresentedObjectSession:()=>pending===0&&active?shown(info):null,
+    runResourceCommand(action){pending++;const work=tail.then(async()=>{const origin=info;
+      return action({dispatch,readPresentedObjectSession:()=>active&&pending===1&&info===origin?shown(origin):null,
+        async reconcile(r){assert.equal(r,revision);info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};
+          controller.willProject(info);controller.presented(info);return info;}});
+    }).finally(()=>{pending--;controller.presented(info);});tail=work.catch(()=>{});return work;}};
+  const root={document,state,FC:10,__TAURI__:{core:{}},SM:{t:x=>x},
+    NemoNativeObjectProject:{desktop:()=>session},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>active&&pending===0},
+    showToast:x=>notices.push(x),showContextMenu:(x,y,items)=>menus.push(items),prompt:()=>prompts.shift(),
+    pushUndo(){throw new Error('legacy JS history must not run on native desktop');},renderTimeline(){},
+    goToFrame:f=>jumps.push(f),addEventListener(){}};
+  root.window=root;root.globalThis=root;
+  const context=vm.createContext(root);
+  for(const file of ['markers.js','bpm-grid.js'])vm.runInContext(fs.readFileSync(require.resolve('../src/js/'+file),'utf8'),context,{filename:file});
+  controller=UI.install(root);document.fire('DOMContentLoaded');
+  const edits=()=>calls.filter(q=>q.operation===Contract.EDIT);
+  async function settled(){for(let i=0;i<20;i++){await tail;await new Promise(resolve=>setImmediate(resolve));if(!controller.isPending())return;}throw Error('controller did not settle');}
+  return {root,state,elements,document,controller,calls,notices,prompts,menus,jumps,edits,settled,
+    async ready(){await controller.presented();await settled();},
+    marker:()=>elements['bars-row'].children.find(x=>x.className==='tl-marker tl-marker-comp'),
+    unchanged(){assert.strictEqual(state.markers,persisted);assert.strictEqual(state.layers[0].markers,layerMarkers);
+      for(const k of ['bpm','bpmOffset','bpmShow'])assert.equal(Object.hasOwn(state,k),false);},
+    replace(){info={...info,documentId:'replacement',lifecycleGeneration:2};controller.willProject(info);},
+    resubscribe(){ticket++;},
+    hold(){let entered,release;const started=new Promise(r=>entered=r),wait=new Promise(r=>release=r);block={entered,wait};return {started,release};},
+    retire(){active=false;controller.dispose();}};
+}
+
+test('ordinary native consumers publish complete pinned readback without authoring legacy defaults',async()=>{
+  const h=fixture();h.unchanged();assert.equal(h.root.SMMarkers.compMarkers().length,0);
+  await h.ready();assert.equal(h.root.SMMarkers.compMarkers().length,2);assert.equal(h.root.SMBpm.framesPerBeat(),12);
+  const count=h.calls.length;await h.controller.presented();await h.settled();assert.equal(h.calls.length,count,'presentation does not recursively query');
+  assert.equal(UI.install(h.root),h.controller);h.unchanged();
+});
+
+test('ordinary add key and BPM buttons submit native intents and display confirmed readback',async()=>{
+  const h=fixture();await h.ready();
+  h.document.fire('keydown',{key:'*',target:{tagName:'DIV'}});await h.settled();
+  assert.equal(h.edits().length,1);assert.equal(h.edits()[0].payload.action.kind,'addMarker');
+  assert.equal(h.edits()[0].payload.action.frame,3);assert.equal(h.root.SMMarkers.compMarkers().length,3);
+  h.elements['btn-bpm'].fire('click');await h.settled();assert.equal(h.edits().length,2);
+  assert.deepEqual(h.edits()[1].payload.action,{kind:'setBpm',bpmShow:true});
+  h.prompts.push('137.5','4');h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+  assert.deepEqual(h.edits()[2].payload.action,{kind:'setBpm',bpm:137.5,bpmOffset:4,bpmShow:true});
+  assert.equal(h.root.SMBpm.framesPerBeat(),60/137.5*24);h.unchanged();
+});
+
+test('native drag changes only temporary DOM and commits exactly one captured ordinal edit',async()=>{
+  const h=fixture();await h.ready();const marker=h.marker(),before=h.root.SMMarkers.compMarkers();
+  marker.fire('mousedown',{clientX:10});h.document.fire('mousemove',{clientX:40});
+  assert.equal(h.edits().length,0);assert.equal(before[0].frame,2.5);assert.equal(marker.style.left,'55px');h.unchanged();
+  h.document.fire('mouseup');await h.settled();assert.equal(h.edits().length,1);
+  assert.deepEqual(h.edits()[0].payload.action,{kind:'updateMarker',ordinal:1,frame:5.5});
+  assert.equal(h.root.SMMarkers.compMarkers()[0].frame,5.5);h.unchanged();
+});
+
+test('retired marker menu and drag cannot write the same ordinal in a replacement document',async()=>{
+  for(const gesture of ['menu','drag']) {
+    const h=fixture();await h.ready();const marker=h.marker();
+    if(gesture==='menu')marker.fire('contextmenu');else {marker.fire('mousedown');h.document.fire('mousemove',{clientX:30});}
+    h.replace();await h.ready();
+    if(gesture==='menu')h.menus[0].find(x=>x.label==='Supprimer le repère').action();else h.document.fire('mouseup');
+    await h.settled();assert.equal(h.edits().length,0);assert(h.notices.length>0);h.unchanged();
+  }
+});
+
+test('ordinary rename/remove and ruler clear retain native history ownership',async()=>{
+  const h=fixture();await h.ready();h.prompts.push('Renamed');h.marker().fire('dblclick');await h.settled();
+  assert.deepEqual(h.edits()[0].payload.action,{kind:'updateMarker',ordinal:1,name:'Renamed'});
+  h.marker().fire('contextmenu');h.menus[0].find(x=>x.label==='Supprimer le repère').action();await h.settled();
+  assert.deepEqual(h.edits()[1].payload.action,{kind:'removeMarker',ordinal:1});
+  h.elements['bars-row'].fire('contextmenu');h.menus[1].find(x=>x.label==='Supprimer tous les repères').action();await h.settled();
+  assert.deepEqual(h.edits()[2].payload.action,{kind:'clearMarkers'});assert.equal(h.root.SMMarkers.compMarkers().length,0);h.unchanged();
+});
+
+test('unavailable, replaced prompt, and changed subscription never use a legacy writer',async()=>{
+  const h=fixture();h.root.SMMarkers.addCompMarker(2,'missing');h.root.SMBpm.toggle();assert.equal(h.edits().length,0);
+  await h.ready();h.root.prompt=()=>{h.replace();return 'Changed';};h.marker().fire('dblclick');await h.settled();
+  assert.equal(h.edits().length,0);await h.ready();h.resubscribe();h.root.SMBpm.toggle();await h.settled();
+  assert.equal(h.edits().length,0);assert.equal(h.root.SMMarkers.addLayerMarker(0,1,''),null);h.unchanged();
+});
+
+test('pending native edit rejects overlapping ordinary intents and publishes only after reconciliation',async()=>{
+  const h=fixture();await h.ready();const hold=h.hold();h.root.SMBpm.toggle();await hold.started;
+  assert.equal(h.edits().length,1);assert.equal(h.controller.read(),null);h.root.SMMarkers.addCompMarker(7,'while pending');
+  assert.equal(h.edits().length,1);h.unchanged();hold.release();await h.settled();
+  assert.equal(h.controller.read().composition.effectiveBpmShow,true);assert.equal(h.edits().length,1);h.unchanged();
+});
+
+test('retirement during a pinned read prevents publication and ordinary controls remain unavailable',async()=>{
+  const h=fixture(),hold=h.hold();const refresh=h.controller.presented();await hold.started;h.retire();hold.release();
+  assert.equal(await refresh,null);await h.settled();assert.equal(h.controller.read(),null);
+  h.root.SMMarkers.addCompMarker(4,'late');h.root.SMBpm.toggle();assert.equal(h.edits().length,0);h.unchanged();
+});

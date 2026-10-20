@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-composition",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.composition.read",
+    "command.document.object.project.composition.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCompositionReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCompositionEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
+  },
+  "semantics": "Root-scene marker and BPM reads/deltas through the retained native snapshot/history owner. Reads pin revision/snapshot/context; marker pages retain supplied name/color presence and stored order. Original single-marker selectors preserve their existing normalized result semantics. Complete messages stay4096 encoded bytes; marker text stays1024 UTF-8 bytes, marker pages limit1..16 and always progress or refuse. Imported fractions/order/duplicates are not normalized. UI add/drag sort explicitly; no full-array replacement or JS writer. No-op preserves redo. Bare project or nonroot context reports unavailable. Other metadata/UI/installed acceptance remains pending.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned root settings; raw omitted fields stay omitted",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "composition-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.composition.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "composition-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "markersPresent": false,
+            "markerCount": 0,
+            "effectiveBpm": 120,
+            "effectiveBpmOffset": 0,
+            "effectiveBpmShow": false
+          }
+        }
+      }
+    },
+    {
+      "label": "One native tempo revision; ordinary UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "composition-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.composition.edit",
+        "payload": {
+          "command": "object.project.composition.edit",
+          "action": {
+            "kind": "setBpm",
+            "bpm": 132,
+            "bpmShow": false
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "composition-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

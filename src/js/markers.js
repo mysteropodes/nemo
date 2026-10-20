@@ -13,12 +13,24 @@
 // bug (CLAUDE.md §1) simply doesn't apply here — nothing else consumes them.
 (function () {
   var DEFAULT_COLOR = '#e8b64c';
+  function native() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+  function projection() { var c = window.NemoNativeCompositionController; return c && c.read(); }
+  function unavailable() { if (window.showToast) showToast('Native markers are unavailable.'); }
+  function intent(action, origin) {
+    var c = window.NemoNativeCompositionController;
+    if (!c || !origin) { unavailable(); return null; }
+    c.edit(action, origin.info); return true;
+  }
+  function ordinal(m, origin) { return origin && origin.composition.markers.indexOf(m) >= 0 ? m.ordinal : null; }
+
 
   function compMarkers() {
+    if (native()) { var p = projection(); return p ? p.composition.markers : []; }
     if (!state.markers) state.markers = [];
     return state.markers;
   }
   function layerMarkers(ld) {
+    if (native()) return []; // Layer-marker authoring has no admitted native owner yet.
     if (!ld.markers) ld.markers = [];
     return ld.markers;
   }
@@ -29,7 +41,12 @@
   function sortMarkers(list) { list.sort(function (a, b) { return a.frame - b.frame; }); }
 
   // ---- model ----------------------------------------------------------
-  function addCompMarker(frame, name) {
+  function addCompMarker(frame, name, origin) {
+    if (native()) {
+      origin = origin || projection();
+      frame = Math.max(0, Math.min(state.totalFrames - 1, frame == null ? state.currentFrame : frame));
+      return intent({ kind: 'addMarker', frame: frame, name: name || '', color: DEFAULT_COLOR }, origin);
+    }
     var list = compMarkers();
     frame = Math.max(0, Math.min(state.totalFrames - 1, frame == null ? state.currentFrame : frame));
     if (markerAt(list, frame)) return null; // one per frame, like AE
@@ -40,6 +57,7 @@
     return m;
   }
   function addLayerMarker(li, frame, name) {
+    if (native()) { unavailable(); return null; }
     var ld = state.layers[li]; if (!ld) return null;
     var list = layerMarkers(ld);
     frame = Math.max(0, Math.min(state.totalFrames - 1, frame == null ? state.currentFrame : frame));
@@ -50,16 +68,19 @@
     refresh();
     return m;
   }
-  function removeMarker(list, m) {
+  function removeMarker(list, m, origin) {
+    if (native()) { var index = ordinal(m, origin); if (index) intent({ kind: 'removeMarker', ordinal: index }, origin); return; }
     var i = list.indexOf(m);
     if (i < 0) return;
     if (window.pushUndo) pushUndo();
     list.splice(i, 1);
     refresh();
   }
-  function renameMarker(list, m) {
+  function renameMarker(list, m, origin) {
+    if (native() && !ordinal(m, origin)) { unavailable(); return; }
     var v = prompt('Nom du repère', m.name || '');
     if (v === null) return;
+    if (native()) { intent({ kind: 'updateMarker', ordinal: m.ordinal, name: v }, origin); return; }
     if (window.pushUndo) pushUndo();
     m.name = v;
     refresh();
@@ -110,6 +131,7 @@
 
     // Layer markers ride their own row in the grid, so they scroll with it
     // and land exactly on the layer they annotate.
+    if (native()) return;
     state.layers.forEach(function (ld, li) {
       if (!ld.markers || !ld.markers.length) return;
       var row = document.querySelector('#frame-grid .frow[data-layer="' + li + '"]');
@@ -120,6 +142,7 @@
   }
 
   function buildEl(m, list, li) {
+    var origin = native() ? projection() : null;
     var el = document.createElement('div');
     el.className = 'tl-marker' + (li == null ? ' tl-marker-comp' : ' tl-marker-layer');
     el.style.left = (m.frame * FC) + 'px';
@@ -135,17 +158,17 @@
     el.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
       e.stopPropagation(); e.preventDefault();
-      startDrag(m, list, e);
+      startDrag(m, list, e, origin);
     });
-    el.addEventListener('dblclick', function (e) { e.stopPropagation(); e.preventDefault(); renameMarker(list, m); });
+    el.addEventListener('dblclick', function (e) { e.stopPropagation(); e.preventDefault(); renameMarker(list, m, origin); });
     el.addEventListener('contextmenu', function (e) {
       e.preventDefault(); e.stopPropagation();
-      if (!window.showContextMenu) { removeMarker(list, m); return; }
+      if (!window.showContextMenu) { removeMarker(list, m, origin); return; }
       window.showContextMenu(e.clientX, e.clientY, [
-        { label: 'Renommer le repère…', action: function () { renameMarker(list, m); } },
+        { label: 'Renommer le repère…', action: function () { renameMarker(list, m, origin); } },
         { label: 'Aller à ce repère', action: function () { if (window.goToFrame) goToFrame(m.frame); } },
         { sep: true },
-        { label: 'Supprimer le repère', action: function () { removeMarker(list, m); } },
+        { label: 'Supprimer le repère', action: function () { removeMarker(list, m, origin); } },
       ]);
     });
     return el;
@@ -154,7 +177,12 @@
   // Drag to retime a marker. One undo step for the whole drag (taken at
   // mousedown), same convention as the layer bars' own drag.
   var _drag = null;
-  function startDrag(m, list, e) {
+  function startDrag(m, list, e, origin) {
+    if (native()) {
+      if (!ordinal(m, origin)) { unavailable(); return; }
+      _drag = { m: m, startX: e.clientX, orig: m.frame, frame: m.frame, origin: origin, element: e.currentTarget };
+      return;
+    }
     if (window.pushUndo) pushUndo();
     _drag = { m: m, list: list, startX: e.clientX, orig: m.frame };
   }
@@ -162,12 +190,22 @@
     if (!_drag) return;
     var dx = Math.round((e.clientX - _drag.startX) / FC);
     var nf = Math.max(0, Math.min(state.totalFrames - 1, _drag.orig + dx));
+    if (_drag.origin) {
+      _drag.frame = nf;
+      if (_drag.element) _drag.element.style.left = (nf * FC) + 'px';
+      return;
+    }
     if (nf === _drag.m.frame) return;
     _drag.m.frame = nf;
     render();
   });
   document.addEventListener('mouseup', function () {
     if (!_drag) return;
+    if (_drag.origin) {
+      var drag = _drag; _drag = null;
+      if (drag.frame !== drag.orig) intent({ kind: 'updateMarker', ordinal: drag.m.ordinal, frame: drag.frame }, drag.origin);
+      render(); return;
+    }
     sortMarkers(_drag.list);
     _drag = null;
     render();
@@ -193,12 +231,12 @@
         if (e.target.closest('.tl-marker, .wa-handle, .onion-marker')) return; // their own menus
         if (!window.showContextMenu) return;
         e.preventDefault(); e.stopPropagation();
-        var f = frameFromEvent(e);
+        var f = frameFromEvent(e), origin = native() ? projection() : null;
         window.showContextMenu(e.clientX, e.clientY, [
-          { label: 'Ajouter un repère ici (frame ' + (f + 1) + ')', action: function () { addCompMarker(f, ''); } },
+          { label: 'Ajouter un repère ici (frame ' + (f + 1) + ')', action: function () { addCompMarker(f, '', origin); } },
           { label: 'Ajouter un repère nommé…', action: function () {
             var v = prompt('Nom du repère', '');
-            if (v !== null) addCompMarker(f, v);
+            if (v !== null) addCompMarker(f, v, origin);
           } },
           { sep: true },
           { label: 'Repère suivant  (Maj+→)', action: function () { gotoAdjacent(1); } },
@@ -208,6 +246,7 @@
           { label: 'Réduire la composition à la zone de travail', action: function () { if (window.SM && SM.trimToWorkArea) SM.trimToWorkArea(); } },
           { sep: true },
           { label: 'Supprimer tous les repères', disabled: !compMarkers().length, action: function () {
+            if (native()) { intent({ kind: 'clearMarkers' }, origin); return; }
             if (window.pushUndo) pushUndo();
             state.markers = [];
             refresh();

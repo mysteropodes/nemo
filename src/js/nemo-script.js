@@ -529,15 +529,16 @@
       trimToWorkArea: function () { window.SM.trimToWorkArea(); return api.comp; },
 
       // Beat grid. `bpm` alone shows it; 0 hides it.
-      get bpm() { return state.bpmShow ? state.bpm : 0; },
+      get bpm() { if (window.__TAURI__ && window.__TAURI__.core) { var c = window.NemoNativeCompositionController, p = c && c.read(); return p && p.composition.effectiveBpmShow ? p.composition.effectiveBpm : 0; } return state.bpmShow ? state.bpm : 0; },
       set bpm(v) {
+        if (window.__TAURI__ && window.__TAURI__.core) fail('Native BPM edits require the composition application API');
         var n = Number(v) || 0;
         state.bpm = n > 0 ? n : (state.bpm || 120);
         state.bpmShow = n > 0;
         if (window.SMBpm) SMBpm.refresh();
       },
-      get bpmOffset() { return state.bpmOffset || 0; },
-      set bpmOffset(v) { state.bpmOffset = v | 0; if (window.SMBpm) SMBpm.refresh(); },
+      get bpmOffset() { if (window.__TAURI__ && window.__TAURI__.core) { var c = window.NemoNativeCompositionController, p = c && c.read(); return p ? p.composition.effectiveBpmOffset : 0; } return state.bpmOffset || 0; },
+      set bpmOffset(v) { if (window.__TAURI__ && window.__TAURI__.core) fail('Native BPM edits require the composition application API'); state.bpmOffset = v | 0; if (window.SMBpm) SMBpm.refresh(); },
       // Nearest beat to a frame — for snapping keys to the music.
       beat: function (frame) {
         return window.SMBpm ? SMBpm.snapFrame(frame == null ? state.currentFrame : frame | 0) : frame;
@@ -559,15 +560,17 @@
     // ---- nemo.markers — composition markers ----------------------------
     api.markers = {
       list: function () {
-        return (state.markers || []).map(function (m) { return { frame: m.frame, name: m.name || '', color: m.color || null }; });
+        return (window.SMMarkers ? SMMarkers.compMarkers() : []).map(function (m) { return { frame: m.frame, name: m.name || '', color: m.color || null }; });
       },
       add: function (frame, name) {
+        if (window.__TAURI__ && window.__TAURI__.core) fail('Native marker edits require the composition application API');
         if (!window.SMMarkers) fail('repères indisponibles');
         var m = SMMarkers.addCompMarker(frame == null ? state.currentFrame : frame | 0, name || '');
         if (!m) fail('un repère existe déjà sur cette frame');
         return api.markers;
       },
       removeAt: function (frame) {
+        if (window.__TAURI__ && window.__TAURI__.core) fail('Native marker edits require the composition application API');
         var list = state.markers || [];
         for (var i = 0; i < list.length; i++) if (list[i].frame === (frame | 0)) { list.splice(i, 1); break; }
         if (window.SMMarkers) SMMarkers.render();

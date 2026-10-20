@@ -43,6 +43,7 @@ impl NativeObjectHistory {
 #[path = "../tests/object_composition_dispatch.rs"]
 mod composition_delta_tests;
 
-#[cfg(all(test, feature = "project_media_codec"))]
+// The actual Baker History public route is application-scoped.
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_composition_public.rs"]
 mod composition_public_tests;

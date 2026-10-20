@@ -54,8 +54,9 @@
       if(typeof ports.publish==='function'&&ports.publish(projection)!==true)throw fault();
       guard(stamp);cache={stamp:stamp,value:projection};return projection;
     }
-    async function edit(value){
+    async function edit(value,expected){
       var intent=Contract.action(value);invalidate();var stamp=capture(),receipt=null,after=null;
+      if(expected&&!same(expected,stamp.info))throw fault('stale_revision');
       try {
         await stamp.session.runResourceCommand(async function(ctx){
           actionReady(stamp,ctx);var pin=stamp.info;

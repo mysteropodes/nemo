@@ -6245,6 +6245,40 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.composition.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectCompositionReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.composition.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectCompositionEditPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -7083,6 +7117,9 @@
             },
             {
               "$ref": "#/$defs/ObjectFrameBulkMoveResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectCompositionReadResult"
             }
           ]
         },
@@ -9916,6 +9953,459 @@
         }
       ],
       "description": "Authored fillSeed/fillSeeds/fillWalls/fillGapPx provenance in the existing native vector record. Empty arrays and an explicit zero remain distinct from absence."
+    },
+    "ObjectProjectCompositionSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "settings"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "index"
+          ],
+          "properties": {
+            "kind": {
+              "const": "markerAt"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "const": "markerNamed"
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "markerNearest"
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "markerPage"
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4096
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCompositionEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "addMarker"
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+            },
+            "color": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal"
+          ],
+          "properties": {
+            "kind": {
+              "const": "updateMarker"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "frame": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+            },
+            "color": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal"
+          ],
+          "properties": {
+            "kind": {
+              "const": "removeMarker"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "clearMarkers"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setBpm"
+            },
+            "bpm": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "bpmOffset": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            "bpmShow": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCompositionReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectCompositionSelector"
+        }
+      }
+    },
+    "ObjectProjectCompositionEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.composition.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectCompositionEditAction"
+        }
+      }
+    },
+    "ObjectProjectCompositionSettingsValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "markersPresent",
+        "markerCount",
+        "effectiveBpm",
+        "effectiveBpmOffset",
+        "effectiveBpmShow"
+      ],
+      "properties": {
+        "markersPresent": {
+          "type": "boolean"
+        },
+        "markerCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "effectiveBpm": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "effectiveBpmOffset": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "effectiveBpmShow": {
+          "type": "boolean"
+        },
+        "bpm": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "bpmOffset": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "bpmShow": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectProjectCompositionMarkerRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "frame"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^[^\\u0000]*$",
+          "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+        },
+        "color": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^[^\\u0000]*$",
+          "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+        }
+      }
+    },
+    "ObjectProjectCompositionPageValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "markersPresent",
+        "markerCount",
+        "cursor",
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "kind": {
+          "const": "markerPage"
+        },
+        "markersPresent": {
+          "type": "boolean"
+        },
+        "markerCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/ObjectProjectCompositionMarkerRecord"
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4096
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectCompositionMarkerValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "frame",
+        "time",
+        "name",
+        "color"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "time": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^[^\\u0000]*$",
+          "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+        },
+        "color": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^[^\\u0000]*$",
+              "description": "At most1024 UTF-8 bytes; runtime checks the encoded byte count."
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectCompositionReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectProjectCompositionSettingsValue"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectCompositionPageValue"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectCompositionMarkerValue"
+            }
+          ]
+        }
+      }
     }
   }
 }
