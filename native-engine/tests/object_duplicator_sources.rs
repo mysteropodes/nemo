@@ -1,6 +1,6 @@
 //! Real sparse drawing sources, not the duplicator oracle's answer-table port.
 use super::*;
-use crate::object_codec::{decode_project, encode_project};
+use crate::object_codec::{decode_storage_project, encode_storage_project};
 use serde_json::{json, Value};
 
 fn drawing(frame: u32, x: i32) -> Value {
@@ -27,7 +27,7 @@ fn document() -> Value {
 fn snapshot(value: Value) -> ObjectSnapshot {
     ObjectSnapshot::new(
         "real-duplicator-sources",
-        decode_project(value.to_string().as_bytes()).unwrap(),
+        decode_storage_project(value.to_string().as_bytes()).unwrap(),
     )
     .unwrap()
 }
@@ -84,7 +84,7 @@ fn fractional_and_outside_array_frames_are_empty_without_rounding_or_poisoning()
 #[test]
 fn every_returned_copy_is_detached_from_the_retained_snapshot_and_other_frames() {
     let snapshot = snapshot(document());
-    let before = encode_project(snapshot.document()).unwrap();
+    let before = encode_storage_project(snapshot.document()).unwrap();
     let port = SnapshotSources::new(&snapshot, &selector(&snapshot), true).unwrap();
     let mut copies = port.read("L0", 6.).unwrap();
     copies[0].geometry.segments[0].point.x = serde_json::Number::from(999);
@@ -96,7 +96,7 @@ fn every_returned_copy_is_detached_from_the_retained_snapshot_and_other_frames()
         port.read("L0", 0.).unwrap()[0].geometry.segments[0].point.x,
         serde_json::Number::from(10)
     );
-    assert_eq!(encode_project(snapshot.document()).unwrap(), before);
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
 }
 
 #[test]
@@ -185,7 +185,7 @@ fn run(snapshot: &ObjectSnapshot, frame: u32) -> Result<Evaluation, ObjectFrameE
 #[test]
 fn actual_kernel_reads_shifted_stored_drawings_and_preserves_copy_source_identity() {
     let snapshot = snapshot(duplicated_document(1));
-    let before = encode_project(snapshot.document()).unwrap();
+    let before = encode_storage_project(snapshot.document()).unwrap();
     let Evaluation::Copies(copies) = run(&snapshot, 2).unwrap() else {
         panic!("expected real copies")
     };
@@ -214,7 +214,7 @@ fn actual_kernel_reads_shifted_stored_drawings_and_preserves_copy_source_identit
             .collect::<Vec<_>>(),
         [0, 1, 2]
     );
-    assert_eq!(encode_project(snapshot.document()).unwrap(), before);
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
 }
 
 #[test]
