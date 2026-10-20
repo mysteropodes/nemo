@@ -76,7 +76,9 @@
     else {exact(r,['index','frame','time','name','color']);integer(r.index,1,4096);finite(r.frame);finite(r.time);text(r.name);if(r.color!==null)text(r.color);}
   }
   function correlate(request,response){
-    if(response.instanceId!==request.instanceId||response.documentId!==request.documentId)fail();if(!response.ok)return;
+    if(response.instanceId!==request.instanceId)fail();
+    var replaced=!response.ok&&response.error&&response.error.code==='wrong_document';
+    if(response.documentId!==request.documentId&&!replaced)fail();if(!response.ok)return;
     result(request.operation,response.result);
     if(request.operation===EDIT){if(response.contentRevision!==request.expectedRevision+(response.result.applied?1:0))fail();return;}
     var p=request.payload,r=response.result,v=r.result;
@@ -84,7 +86,7 @@
       r.atRevision!==p.atRevision||r.documentSnapshotId!==p.documentSnapshotId||r.contextId!==p.contextId)fail();
     if(p.selector.kind==='settings'){if(!has(v,'effectiveBpm'))fail();}
     else if(p.selector.kind==='markerPage'){if(v.kind!=='markerPage'||v.cursor!==p.selector.cursor||v.items.length>p.selector.limit)fail();}
-    else if(has(v,'kind')||has(v,'markersPresent')||p.selector.kind==='markerAt'&&v.index!==p.selector.index)fail();
+    else if(has(v,'kind')||has(v,'markersPresent')||p.selector.kind==='markerAt'&&v.index!==p.selector.index||p.selector.kind==='markerNamed'&&v.name!==p.selector.name)fail();
   }
   function admitted(op){return op===READ||op===EDIT;}
   function paths(op){if(!admitted(op))return null;return {has:function(path){return /^(?:payload\.action|payload\.selector|result\.result(?:\.items\.\d+)?)\.(?:name|color)$/.test(path);}};}
@@ -98,6 +100,6 @@
       correlate:function(q,r){return pick(q.operation).correlate(q,r);},paths:function(op){return pick(op).paths(op);}});
   }
   var api=Object.freeze({READ:READ,EDIT:EDIT,admitted:admitted,requiresRevision:function(op){return op===EDIT;},action:action,
-    payload:payload,result:result,correlate:correlate,paths:paths,requestByteLimit:function(){return 4096;},responseByteLimit:function(){return 4096;},join:join});
+    payload:payload,result:result,correlate:correlate,paths:paths,requestByteLimit:function(){return 4096;},responseByteLimit:function(){return 4096;},join:join,compose:join});
   return api;
 }));
