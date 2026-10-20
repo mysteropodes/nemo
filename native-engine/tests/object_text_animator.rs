@@ -335,3 +335,29 @@ fn text_animator_unavailable_evaluation_does_not_hide_raw_descriptor_disable_or_
         .0
         .is_empty());
 }
+
+#[test]
+fn text_animator_field_numeric_noops_keep_original_bytes_revision_and_redo() {
+    let mut doc = drawing();
+    doc["layers"][0]["textAnimators"] = serde_json::from_str(r#"[{"id":"long","selector":{"amount":50.0},"props":{"position":[20.0,0.0],"fillColor":[1.0,0.0,0.0,1.0]}}]"#).unwrap();
+    let mut o = owner(&doc);
+    support::run(
+        &mut o,
+        &edit_payload(json!({"kind":"setEnabled","enabled":false})),
+    )
+    .unwrap();
+    o.undo(o.content_revision()).unwrap();
+    let before = support::state(&o);
+    for edit in [
+        json!({"kind":"setSelector","field":"amount","value":50}),
+        json!({"kind":"setProps","field":"position","value":[20,0]}),
+        json!({"kind":"setProps","field":"fillColor","value":[1,0,0,1]}),
+    ] {
+        assert_eq!(
+            support::run(&mut o, &edit_payload(edit)).unwrap(),
+            o.content_revision()
+        );
+        assert_eq!(support::state(&o), before);
+    }
+    assert_eq!(o.history_depths(), (0, 1));
+}

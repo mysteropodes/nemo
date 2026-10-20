@@ -140,36 +140,46 @@ fn track(record: &mut PropertyRecord) -> &mut OrderTrack {
 fn set_key(
     record: &mut PropertyRecord,
     frame: Number,
-    mut values: Vec<Number>,
+    values: Vec<Number>,
     curve: Option<Vec<OrderCurvePoint>>,
 ) {
-    let keys = &mut track(record).keys;
-    let at = frame.as_f64().unwrap();
-    if let Some(key) = keys.iter_mut().find(|key| key.frame.as_f64() == Some(at)) {
-        preserve_values(&key.v, &mut values);
-        key.v = values;
-        if let Some(mut curve) = curve {
-            if let Some(Some(before)) = key.curve_points.value() {
-                preserve_curve(before, &mut curve);
+    track(record).scalar_intent_key(frame, values, curve);
+}
+impl OrderTrack {
+    pub(crate) fn scalar_intent_key(
+        &mut self,
+        frame: Number,
+        mut values: Vec<Number>,
+        curve: Option<Vec<OrderCurvePoint>>,
+    ) {
+        let keys = &mut self.keys;
+        let at = frame.as_f64().unwrap();
+        if let Some(key) = keys.iter_mut().find(|key| key.frame.as_f64() == Some(at)) {
+            preserve_values(&key.v, &mut values);
+            key.v = values;
+            if let Some(mut curve) = curve {
+                if let Some(Some(before)) = key.curve_points.value() {
+                    preserve_curve(before, &mut curve);
+                }
+                key.curve_points = Presence::Present(Some(curve));
             }
-            key.curve_points = Presence::Present(Some(curve));
+        } else {
+            keys.push(OrderKey {
+                frame,
+                v: values,
+                hold: Presence::Missing,
+                lock_to: Presence::Missing,
+                curve_points: Presence::Present(Some(curve.unwrap_or_else(default_curve))),
+                h_in: Presence::Present(vec![0.into(), 0.into()]),
+                h_out: Presence::Present(vec![0.into(), 0.into()]),
+            });
+            keys.sort_by(|a, b| {
+                a.frame
+                    .as_f64()
+                    .unwrap()
+                    .total_cmp(&b.frame.as_f64().unwrap())
+            });
         }
-    } else {
-        keys.push(OrderKey {
-            frame,
-            v: values,
-            hold: Presence::Missing,
-            lock_to: Presence::Missing,
-            curve_points: Presence::Present(Some(curve.unwrap_or_else(default_curve))),
-            h_in: Presence::Present(vec![0.into(), 0.into()]),
-            h_out: Presence::Present(vec![0.into(), 0.into()]),
-        });
-        keys.sort_by(|a, b| {
-            a.frame
-                .as_f64()
-                .unwrap()
-                .total_cmp(&b.frame.as_f64().unwrap())
-        });
     }
 }
 impl ObjectFillOwner {

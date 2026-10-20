@@ -79,6 +79,19 @@ fn values(v: &[Number]) -> Result<Number, E> {
 fn decode(v: Value) -> Result<AnimatorRecord, E> {
     serde_json::from_value(v).map_err(|_| E::InvalidRequest)
 }
+// Match the existing property editor's JavaScript-number no-op rule while
+// retaining missing/null and real structural edits as authored changes.
+fn preserve_numbers(before: &Value, after: &mut Value) {
+    match (before, after) {
+        (Value::Number(a), Value::Number(b)) if a.as_f64() == b.as_f64() => *b = a.clone(),
+        (Value::Array(a), Value::Array(b)) => {
+            for (a, b) in a.iter().zip(b) {
+                preserve_numbers(a, b);
+            }
+        }
+        _ => {}
+    }
+}
 fn set_field(
     record: &AnimatorRecord,
     group: &str,
@@ -130,7 +143,11 @@ fn set_field(
     if remove {
         object.remove(field);
     } else {
-        object.insert(field.into(), value.clone());
+        let mut value = value.clone();
+        if let Some(before) = object.get(field) {
+            preserve_numbers(before, &mut value);
+        }
+        object.insert(field.into(), value);
     }
     decode(out)
 }

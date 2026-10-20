@@ -37,6 +37,7 @@ object_deserialize!(Scope {
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum Fields {
     Animators {
+        #[serde(rename = "layerUid")]
         layer_uid: String,
         frame: f64,
         offset: u32,
