@@ -1,6 +1,5 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-const UI=require('../src/js/adapters/native-composition-ui.js');
 const Contract=require('../src/js/adapters/native-composition-contract.js');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function node(tag='div') {
@@ -28,7 +27,7 @@ function fixture() {
   const shown=pin=>({...pin,presentation:{...pin,owner:'native',status:'presented'}});
   let controller;
   async function dispatch(q) {
-    calls.push(clone(q));Contract.payload(q.operation,q.payload);
+    calls.push(clone(q));root.NemoNativeCompositionContract.payload(q.operation,q.payload);
     if(block){const held=block;block=null;held.entered();await held.wait;}
     const response={apiVersion:2,requestId:q.requestId,instanceId:info.instanceId,documentId:info.documentId,contentRevision:revision,ok:true};
     if(q.operation===Contract.EDIT) {
@@ -51,7 +50,8 @@ function fixture() {
       response.result={instanceId:info.instanceId,documentId:info.documentId,atRevision:revision,
         documentSnapshotId:'s'+revision,contextId:'scene-root',result};
     }
-    return response;
+    // Tauri JSON is deserialized into the consumer browser realm.
+    return vm.runInContext('JSON.parse('+JSON.stringify(JSON.stringify(response))+')',context);
   }
   const session={info:()=>info,isActive:()=>active,requestId:()=> 'q'+(++serial),readSubscriptionGeneration:()=>ticket,
     readPresentedObjectSession:()=>pending===0&&active?shown(info):null,
@@ -67,11 +67,12 @@ function fixture() {
     goToFrame:f=>jumps.push(f),addEventListener(){}};
   root.window=root;root.globalThis=root;
   const context=vm.createContext(root);
-  for(const file of ['markers.js','bpm-grid.js'])vm.runInContext(fs.readFileSync(require.resolve('../src/js/'+file),'utf8'),context,{filename:file});
-  controller=UI.install(root);document.fire('DOMContentLoaded');
+  for(const file of ['adapters/native-composition-contract.js','adapters/native-composition-desktop.js','adapters/native-composition-ui.js','markers.js','bpm-grid.js'])vm.runInContext(fs.readFileSync(require.resolve('../src/js/'+file),'utf8'),context,{filename:file});
+  controller=root.NemoNativeCompositionController;document.fire('DOMContentLoaded');
   const edits=()=>calls.filter(q=>q.operation===Contract.EDIT);
   async function settled(){for(let i=0;i<20;i++){await tail;await new Promise(resolve=>setImmediate(resolve));if(!controller.isPending())return;}throw Error('controller did not settle');}
   return {root,state,elements,document,controller,calls,notices,prompts,menus,jumps,edits,settled,
+    sameInstall:()=>vm.runInContext('NemoNativeCompositionUI.install(globalThis) === NemoNativeCompositionController',context),
     async ready(){await controller.presented();await settled();},
     marker:()=>elements['bars-row'].children.find(x=>x.className==='tl-marker tl-marker-comp'),
     unchanged(){assert.strictEqual(state.markers,persisted);assert.strictEqual(state.layers[0].markers,layerMarkers);
@@ -86,7 +87,7 @@ test('ordinary native consumers publish complete pinned readback without authori
   const h=fixture();h.unchanged();assert.equal(h.root.SMMarkers.compMarkers().length,0);
   await h.ready();assert.equal(h.root.SMMarkers.compMarkers().length,2);assert.equal(h.root.SMBpm.framesPerBeat(),12);
   const count=h.calls.length;await h.controller.presented();await h.settled();assert.equal(h.calls.length,count,'presentation does not recursively query');
-  assert.equal(UI.install(h.root),h.controller);h.unchanged();
+  assert.equal(h.sameInstall(),true);h.unchanged();
 });
 
 test('ordinary add key and BPM buttons submit native intents and display confirmed readback',async()=>{
