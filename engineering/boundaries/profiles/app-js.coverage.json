@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "c98b8ee6f05b6ce15c7fd3b9e6ff565176832239",
-    "sourceRootTree": "e8de70d650fc405896c774487a1fc75562878114",
+    "candidateCommit": "49555a26089ff7ba4c3e16630ba16e9f42ef21fe",
+    "sourceRootTree": "c64f9b2fd5693ffee1af85adff0899773d7a5e14",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "30b7ca71c84dc58130f7049b9c4ac2543417ff98",
-      "lastChangedCommit": "e0ae5adda75e05fd5d5796b5a6bb28d1234a5e31"
+      "gitTree": "975c6a72ee220a0d9e74b4304a8af0dd09caba7f",
+      "lastChangedCommit": "0437d3c19730c8e2e68f58add7305dbc41d1159a"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "12cb204e13c1617ed5eb364d508bea0010a3cab6777382f4770c6654dca82a57"
+      "value": "28aaa05bd9b4e15d23b9a3497fa8883f186ee7d0f1f649426de228d745194139"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "a5e1e4749582ac4565fa9d6c57a64b561f643e76",
-        "sha256": "01cc3d1c3e078785cb8bc60e9a1d64ce39ac639659242a5366c8e1d5c068bab7",
-        "moduleCount": 273,
-        "basedOnCommit": "c98b8ee6f05b6ce15c7fd3b9e6ff565176832239"
+        "gitBlob": "05ba9c33bf349391dfa43505dc1332232ee02d28",
+        "sha256": "27cbbdfec1a3b90dccde757607cbc9d26dc150a973872b6118f23bda7699cd72",
+        "moduleCount": 275,
+        "basedOnCommit": "49555a26089ff7ba4c3e16630ba16e9f42ef21fe"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -139,7 +139,7 @@
     "runtimeLimit": "Source-declared sites, not observed successful execution: gpu-gate.js may stop boot. No browser/Tauri/runtime acceptance is claimed.",
     "noLoadSiteAudit": {
       "scope": "All committed HTML and src JS-family sources at candidateCommit: local script URLs, imports, worker constructors and script injection inspected; Node test consumers are separate evidence.",
-      "paths": 19,
+      "paths": 21,
       "labsRegistry": {
         "path": "src/js/labs/labs-core.js",
         "line": 18
@@ -4182,6 +4182,32 @@
           "path": "src/index.html",
           "line": 2586,
           "scriptOrdinal": 237
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-palette-contract.js",
+      "moduleId": "app.native.palette.contract",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/adapters/native-palette-contract.js",
+          "line": 1,
+          "role": "T08 source-staged pure palette contract/injected-session use case; not installed in HTML/SDK/UI, native feature availability remains unavailable."
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-palette-desktop.js",
+      "moduleId": "app.native.palette.application",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/adapters/native-palette-desktop.js",
+          "line": 1,
+          "role": "T08 source-staged pure palette contract/injected-session use case; not installed in HTML/SDK/UI, native feature availability remains unavailable."
         }
       ]
     }
