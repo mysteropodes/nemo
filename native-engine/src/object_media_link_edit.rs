@@ -25,10 +25,15 @@
 //! `src/js/audio-bridge.js` (`startOffset + Math.round(dx / FC)`) in whole
 //! frames; like the catalog it refuses a result beyond +-(2^53 - 1) instead of
 //! rounding it the way a JS double would.
+//!
+//! T12: [`PlacementEdit::SetTimeRemap`] and [`PlacementEdit::SetInterpMode`]
+//! own a video placement's stored timing; every rebuilt placement keeps it.
 
 use crate::object_document::object_raster_asset_kernels::object_raster_asset_placement::image_element_exists;
+use crate::object_document::placement_offset::VideoTiming;
 use crate::object_document::{
-    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetTarget, FrameScopeKind, ObjectDocument,
+    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetTarget, FrameScopeKind,
+    ObjectDocument, OrderTrack,
 };
 
 /// Most catalog records the project wire admits.
@@ -227,7 +232,7 @@ pub(crate) fn target_accepts(target: &AssetTarget, kind: AssetKind) -> bool {
 }
 
 /// One typed edit of the placement table. Raw fields in; the kernel validates.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum PlacementEdit {
     /// Add a placement. The identical placement again is a no-op.
     Place {
@@ -248,6 +253,18 @@ pub(crate) enum PlacementEdit {
     },
     /// Remove a placement; the catalog records stay.
     Remove { placement_id: String },
+    /// T12: replace a video placement's whole time-remap track (`None` is
+    /// `disableTimeRemap`'s `delete ld.timeRemap`; any key edit sends the new track).
+    SetTimeRemap {
+        placement_id: String,
+        time_remap: Option<OrderTrack>,
+    },
+    /// T12: the footage panel's mode selector (timeline.js), which writes
+    /// `interpMode` and `frameBlend = interpMode !== 'none'` together.
+    SetInterpMode {
+        placement_id: String,
+        interp_mode: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -284,13 +301,39 @@ fn with_offset(
     placement: &AssetPlacement,
     offset_frames: serde_json::Number,
 ) -> Result<AssetPlacement, PlacementEditError> {
+    // The stored timing travels with every rebuilt placement.
     AssetPlacement::new_number(
         placement.id().to_owned(),
         placement.asset_id().clone(),
         placement.target().clone(),
         offset_frames,
     )
+    .and_then(|next| next.with_timing(placement.timing().clone()))
     .map_err(|_| PlacementEditError::Invalid)
+}
+
+/// Replace the timing of the video placement at `at`; `Ok(false)` when it is the same.
+fn replace_timing(
+    inventory: &AssetInventory,
+    placements: &mut [AssetPlacement],
+    at: usize,
+    edit: impl FnOnce(&mut VideoTiming),
+) -> Result<bool, PlacementEditError> {
+    let kind = inventory.get(placements[at].asset_id()).map(|r| r.kind());
+    if kind != Some(AssetKind::Video) {
+        return Err(PlacementEditError::KindMismatch);
+    }
+    let mut timing = placements[at].timing().clone();
+    edit(&mut timing);
+    let next = placements[at]
+        .clone()
+        .with_timing(timing)
+        .map_err(|_| PlacementEditError::Invalid)?;
+    if next == placements[at] {
+        return Ok(false);
+    }
+    placements[at] = next;
+    Ok(true)
 }
 
 /// Replace the offset of the placement at `at`; `Ok(false)` when it is the same.
@@ -377,6 +420,29 @@ pub(crate) fn apply_edit(
             let at = position(&placements, &placement_id)?;
             placements.remove(at);
         }
+        PlacementEdit::SetTimeRemap {
+            placement_id,
+            time_remap,
+        } => {
+            let at = position(&placements, &placement_id)?;
+            let set = |timing: &mut VideoTiming| timing.time_remap = time_remap;
+            if !replace_timing(inventory, &mut placements, at, set)? {
+                return Ok(PlacementOutcome::Unchanged);
+            }
+        }
+        PlacementEdit::SetInterpMode {
+            placement_id,
+            interp_mode,
+        } => {
+            let at = position(&placements, &placement_id)?;
+            let set = |timing: &mut VideoTiming| {
+                timing.frame_blend = Some(interp_mode != "none");
+                timing.interp_mode = Some(interp_mode);
+            };
+            if !replace_timing(inventory, &mut placements, at, set)? {
+                return Ok(PlacementOutcome::Unchanged);
+            }
+        }
     }
     AssetInventory::new(
         inventory.records().to_vec(),
@@ -395,3 +461,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/object_media_link_edit_check.rs"]
 mod check_tests;
+
+#[cfg(test)]
+#[path = "../tests/object_media_link_edit_timing.rs"]
+mod timing_tests;

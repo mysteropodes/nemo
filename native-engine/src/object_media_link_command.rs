@@ -3,7 +3,7 @@
 //! Audio requires its actual persisted record and sealed source; absent owners still refuse.
 use crate::history::NativeObjectHistory;
 use crate::object_document::media_timing::object_media_link_edit::PlacementEdit;
-use crate::object_document::AssetTarget;
+use crate::object_document::{AssetTarget, OrderTrack};
 use crate::request_receipts::DispatchErrorCode;
 use crate::transaction::CompactResult;
 use serde::{Deserialize, Deserializer};
@@ -34,6 +34,28 @@ enum EditIn {
         #[serde(rename = "placementId")]
         placement_id: String,
     },
+    // T12: the whole track (a key edit) or `null` (`disableTimeRemap`); required.
+    #[serde(rename = "setTimeRemap")]
+    SetTimeRemap {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        #[serde(rename = "timeRemap", deserialize_with = "required_or_null")]
+        time_remap: Option<OrderTrack>,
+    },
+    #[serde(rename = "setInterpMode")]
+    SetInterpMode {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        #[serde(rename = "interpMode")]
+        interp_mode: String,
+    },
+}
+
+// A missing member is refused; only an explicit `null` clears the track.
+fn required_or_null<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<OrderTrack>, D::Error> {
+    Option::<OrderTrack>::deserialize(deserializer)
 }
 
 // Same required persisted placement fields; no absent/null offset coercion.
@@ -106,6 +128,20 @@ fn parse_edit(bytes: &[u8]) -> Result<PlacementEdit, DispatchErrorCode> {
             delta_frames,
         },
         EditIn::Remove { placement_id } => PlacementEdit::Remove { placement_id },
+        EditIn::SetTimeRemap {
+            placement_id,
+            time_remap,
+        } => PlacementEdit::SetTimeRemap {
+            placement_id,
+            time_remap,
+        },
+        EditIn::SetInterpMode {
+            placement_id,
+            interp_mode,
+        } => PlacementEdit::SetInterpMode {
+            placement_id,
+            interp_mode,
+        },
     })
 }
 
@@ -136,3 +172,7 @@ impl NativeObjectHistory {
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_media_link_command.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_media_link_command_timing.rs"]
+mod timing_tests;

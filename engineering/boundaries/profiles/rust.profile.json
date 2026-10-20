@@ -1013,6 +1013,8 @@
         "object_media_link_track.rs",
         "object_media_link_track_controls.rs",
         "object_media_link_track_timing.rs",
+        "object_media_link_edit_timing.rs",
+        "object_media_link_command_timing.rs",
         "native_import_svg_explode.rs",
         "native_import_svg_explode_rows.rs",
         "native_import_svg_explode_pins.rs",
