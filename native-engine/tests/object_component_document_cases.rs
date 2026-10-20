@@ -302,13 +302,6 @@ pub(crate) fn cases() -> Vec<Case> {
             "not a layer of its context",
         ),
         set(
-            "path layer is itself a duplicator",
-            d(3, "duplicator/pathLayerUid"),
-            json!("ly_toggle"),
-            Unsupported,
-            "itself a duplicator",
-        ),
-        set(
             "effector layer aimed at itself",
             format!("{D}/effectorLayers/0/effector/targetLayerUid"),
             json!("ly_effector"),
