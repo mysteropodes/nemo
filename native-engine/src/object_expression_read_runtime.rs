@@ -1,11 +1,11 @@
 //! Native read callbacks live only inside one interrupted guest context.
 //! Recursive property reads retain the same snapshot and execution budget.
-use crate::object_expression_runtime::property::{evaluate_shared, reads::SnapshotReads};
 use crate::evaluation::property_expression_runtime::{evaluate_with_fallback, Outcome};
 use crate::object_expression_pin::{
     prepare_retained_property_expression_request, PropertyDependencyEffect,
     PropertyExpressionRequest,
 };
+use crate::object_expression_runtime::property::{evaluate_shared, reads::SnapshotReads};
 use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
 use rquickjs::{function::Args, Ctx, Exception, Function, Object, Value as JsValue};
 use serde_json::{json, Value};
@@ -151,7 +151,10 @@ pub(super) fn call_property<'js>(
     );
     let factory = crate::object_expression_runtime::eval_single_function(ctx, &source)?;
     let scope: Object = factory.call((read, request.frame()))?;
-    let mut args = Args::new(ctx.clone(), crate::object_expression_runtime::property::bridge::READ_NAMES.len() + 3);
+    let mut args = Args::new(
+        ctx.clone(),
+        crate::object_expression_runtime::property::bridge::READ_NAMES.len() + 3,
+    );
     if request.raw().len() == 1 {
         args.push_arg(request.raw()[0])?;
     } else {
