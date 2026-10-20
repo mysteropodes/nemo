@@ -67,6 +67,7 @@ fn complete_transport_schema_reaches_one_clipboard_result_branch_without_copy_cu
         "native-object-item-v1.schema.json#/$defs/ImageImportResult",
         "#/$defs/ObjectFrameRepeatResult",
         "#/$defs/ObjectFrameClipboardCutResult",
+        "#/$defs/ObjectFrameBulkMoveResult",
     ];
     assert_eq!(branches.len(), retained.len() + 1);
     for (branch, expected) in branches.iter().zip(retained) {
@@ -74,7 +75,7 @@ fn complete_transport_schema_reaches_one_clipboard_result_branch_without_copy_cu
     }
     assert_eq!(
         branches.last().unwrap(),
-        &json!({"$ref":"#/$defs/ObjectFrameBulkMoveResult"})
+        &json!({"$ref":"#/$defs/ObjectProjectCompositionReadResult"})
     );
     assert!(!branches
         .iter()
