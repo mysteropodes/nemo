@@ -75,6 +75,29 @@ fn every_other_holder_keeps_the_packet_unavailable() {
         .as_array_mut()
         .expect("properties")
         .push(json!({"property": "position", "static": [1, 2]}));
+    let snap = snapshot(&transform.to_string());
+    let packet = prepare_object_frame(&snap, &selector(&snap, 5))
+        .expect("element Position is consumed by the native packet evaluator");
+    let got = evaluate_record(&packet, packet.records().next().expect("one record"))
+        .expect("actual transformed packet entry");
+    let mut translated = row(&all, "rect-corner-tl-animated@5").clone();
+    for anchor in &mut translated.expected {
+        anchor[0] += 1.;
+        anchor[1] += 2.;
+    }
+    check(&got, &translated).expect("the original oracle translated by literal [1,2]");
+
+    let mut opacity = base.clone();
+    opacity["propertyHolders"][0]["properties"]
+        .as_array_mut()
+        .expect("properties")
+        .push(json!({"property": "opacity", "static": [25]}));
+    let mut live_position = transform.clone();
+    live_position["propertyHolders"][0]["properties"]
+        .as_array_mut()
+        .expect("properties")
+        .last_mut()
+        .expect("added Position")["expression"] = json!({"enabled": true, "code": "[1,2]"});
     let mut live = base.clone();
     live["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled": true, "code": "1"});
@@ -92,7 +115,8 @@ fn every_other_holder_keeps_the_packet_unavailable() {
     record.remove("vector");
     record.insert("family".into(), json!("closed-solid-fill-cubic-path"));
     for (name, value) in [
-        ("transform property", transform),
+        ("unconsumed opacity", opacity),
+        ("enabled Position expression", live_position),
         ("enabled expression", live),
         ("layer holder", layer),
         ("legacy family", legacy),

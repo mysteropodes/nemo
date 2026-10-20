@@ -132,8 +132,16 @@ fn the_holder_predicate_admits_only_what_the_join_consumes() {
         .expect("properties")
         .push(json!({"property": "position", "static": [1, 2]}));
     assert!(
+        consumed(&other),
+        "element position now reaches the actual sampled Motion consumer"
+    );
+    other["propertyHolders"][0]["properties"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"property":"opacity","static":[25]}));
+    assert!(
         !consumed(&other),
-        "a Motion transform property is not consumed here"
+        "unconsumed element opacity remains refused"
     );
 
     let mut foreign = rect.clone();

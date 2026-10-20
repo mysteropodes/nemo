@@ -72,6 +72,7 @@ pub(crate) struct ProjectMetadata {
     bpm: Option<f64>,
     bpm_offset: Option<f64>,
     bpm_show: Option<bool>,
+    camera: crate::object_document::ProjectCameraState,
 }
 impl ProjectMetadata {
     /// The existing constructor API and positive finite storage FPS are preserved.
@@ -97,6 +98,7 @@ impl ProjectMetadata {
             bpm: None,
             bpm_offset: None,
             bpm_show: None,
+            camera: crate::object_document::ProjectCameraState::default(),
         })
     }
     pub(crate) fn with_canvas_dimensions(
@@ -187,6 +189,21 @@ impl ProjectMetadata {
     }
     pub(crate) fn canvas_dimensions(&self) -> (u32, u32) {
         (self.canvas_width, self.canvas_height)
+    }
+    pub(crate) fn with_camera(
+        self,
+        keys: Option<Vec<crate::object_document::ProjectCameraKey>>,
+        layer_on: Option<bool>,
+    ) -> Result<Self, ProjectMetadataError> {
+        let camera = crate::object_document::ProjectCameraState::new(keys, layer_on)
+            .map_err(|_| ProjectMetadataError::InvalidCompositionMetadata)?;
+        Ok(Self { camera, ..self })
+    }
+    pub(crate) fn camera_keys(&self) -> Option<&[crate::object_document::ProjectCameraKey]> {
+        self.camera.keys.as_deref()
+    }
+    pub(crate) fn camera_layer_on(&self) -> Option<bool> {
+        self.camera.layer_on
     }
     pub(crate) fn fps(&self) -> f64 {
         self.fps

@@ -133,7 +133,8 @@
         "object_fill_trace_record.rs",
         "object_text_animator_record.rs",
         "object_text_animator_selector.rs",
-        "object_text_animator_props.rs"
+        "object_text_animator_props.rs",
+        "project_camera_state.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -171,7 +172,8 @@
         "object_audio_track_baseline.rs",
         "project_audio_asset_wire.rs",
         "project_asset_source_wire.rs",
-        "object_property_codec.rs"
+        "object_property_codec.rs",
+        "project_metadata_wire.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -511,7 +513,10 @@
         "object_expression_reads.rs",
         "object_frame_video.rs",
         "property_expression_bake.rs",
-        "object_text_animator_evaluation.rs"
+        "object_text_animator_evaluation.rs",
+        "object_frame_motion_values.rs",
+        "object_frame_camera.rs",
+        "object_boolean_motion_eval.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -739,7 +744,8 @@
         "object_text_read.rs",
         "object_text_font_resources.rs",
         "object_layer_range_snapshot.rs",
-        "object_property_target_pages.rs"
+        "object_property_target_pages.rs",
+        "object_boolean_frame_motion.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1601,7 +1607,10 @@
         "object_fill_trace_native.rs",
         "property_expression_bake.rs",
         "object_expression_bake.rs",
-        "object_text_animator.rs"
+        "object_text_animator.rs",
+        "object_frame_motion_values.rs",
+        "object_frame_camera.rs",
+        "object_boolean_frame_motion.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
