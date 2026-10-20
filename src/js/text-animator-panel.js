@@ -468,7 +468,7 @@
     var add = el('p-textanim-add');
     if (add) {
       add.addEventListener('click', function () {
-        if(window.NemoNativeTextAnimatorDesktop&&NemoNativeTextAnimatorDesktop.isNative(window)){NemoNativeTextAnimatorDesktop.add(window);return;}
+        if(window.NemoNativeTextAnimatorDesktop&&NemoNativeTextAnimatorDesktop.isNative(window))return;
         var nativeSession=window.NemoNativeObjectProject&&NemoNativeObjectProject.desktop(window);if(nativeSession&&nativeSession.blocksLegacy())return;
         var ctx = activeTextLayer();
         if (!ctx || !window.SMMotion || !SMMotion.addTextAnimator) return;

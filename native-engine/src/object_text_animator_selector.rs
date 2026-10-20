@@ -1,8 +1,5 @@
 //! Presence-aware stored selector, resolved by native Motion sampling at evaluation time.
-#[cfg(feature = "evaluation")]
-use crate::object_document::object_text_layout_kernels::text_glyph_selector::{
-    BasedOn, Selector, SelectorType, Units,
-};
+
 use crate::object_document::{object_deserialize, Presence};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
@@ -11,37 +8,37 @@ use serde_json::Number;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SelectorRecord {
     #[serde(skip_serializing_if = "Presence::missing")]
-    selector_type: Presence<String>,
+    pub(crate) selector_type: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    units: Presence<String>,
+    pub(crate) units: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    based_on: Presence<String>,
+    pub(crate) based_on: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    start: Presence<Option<Number>>,
+    pub(crate) start: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    end: Presence<Option<Number>>,
+    pub(crate) end: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    offset: Presence<Option<Number>>,
+    pub(crate) offset: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    shape: Presence<Option<Number>>,
+    pub(crate) shape: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    amount: Presence<Option<Number>>,
+    pub(crate) amount: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    ease_high: Presence<Option<Number>>,
+    pub(crate) ease_high: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    ease_low: Presence<Option<Number>>,
+    pub(crate) ease_low: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    smooth: Presence<Option<Number>>,
+    pub(crate) smooth: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    wiggle_min: Presence<Option<Number>>,
+    pub(crate) wiggle_min: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    wiggle_max: Presence<Option<Number>>,
+    pub(crate) wiggle_max: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    wiggles_per_sec: Presence<Option<Number>>,
+    pub(crate) wiggles_per_sec: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    correlation: Presence<Option<Number>>,
+    pub(crate) correlation: Presence<Option<Number>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    seed: Presence<Option<Number>>,
+    pub(crate) seed: Presence<Option<Number>>,
 }
 object_deserialize!(SelectorRecord {
     #[serde(default)] selector_type: Presence<String>,
@@ -177,55 +174,5 @@ impl SelectorRecord {
             return Err("nonfinite selector");
         }
         Ok(())
-    }
-    #[cfg(feature = "evaluation")]
-    pub(crate) fn resolve(&self) -> Result<Selector, &'static str> {
-        let text = |v: &Presence<String>,
-                    allowed: &[&str],
-                    default: &str|
-         -> Result<String, &'static str> {
-            let s = v.value().map(String::as_str).unwrap_or(default);
-            if allowed.contains(&s) {
-                Ok(s.to_string())
-            } else {
-                Err("invalid selector enum")
-            }
-        };
-        let number = |v: &Presence<Option<Number>>,
-                      default: Option<f64>|
-         -> Result<Option<f64>, &'static str> {
-            match v {
-                Presence::Missing => Ok(default),
-                Presence::Present(None) => Ok(None),
-                Presence::Present(Some(n)) => n
-                    .as_f64()
-                    .filter(|v| v.is_finite())
-                    .map(Some)
-                    .ok_or("nonfinite selector"),
-            }
-        };
-        let mut out = Selector::default_selector();
-        out.selector_type =
-            SelectorType::from_baseline(&text(&self.selector_type, &["range", "wiggly"], "range")?);
-        out.units = Units::from_baseline(&text(&self.units, &["percent", "index"], "percent")?);
-        out.based_on = BasedOn::from_baseline(&text(
-            &self.based_on,
-            &["chars", "words", "lines"],
-            "chars",
-        )?);
-        out.start = number(&self.start, Some(out.start))?.unwrap_or(0.0);
-        out.end = number(&self.end, out.end)?;
-        out.offset = number(&self.offset, Some(out.offset))?.unwrap_or(0.0);
-        out.shape = number(&self.shape, Some(out.shape))?.unwrap_or(0.0);
-        out.amount = number(&self.amount, out.amount)?;
-        out.ease_high = number(&self.ease_high, Some(out.ease_high))?.unwrap_or(0.0);
-        out.ease_low = number(&self.ease_low, Some(out.ease_low))?.unwrap_or(0.0);
-        out.smooth = number(&self.smooth, out.smooth)?;
-        out.wiggle_min = number(&self.wiggle_min, out.wiggle_min)?;
-        out.wiggle_max = number(&self.wiggle_max, out.wiggle_max)?;
-        out.wiggles_per_sec = number(&self.wiggles_per_sec, out.wiggles_per_sec)?;
-        out.correlation = number(&self.correlation, out.correlation)?;
-        out.seed = number(&self.seed, Some(out.seed))?.unwrap_or(0.0);
-        Ok(out)
     }
 }

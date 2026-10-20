@@ -360,3 +360,40 @@ impl ObjectFillOwner {
             .map_err(|_| DispatchErrorCode::Unavailable)
     }
 }
+
+// Text selector holders share the exact existing key mutation/number preservation.
+impl PropertyRecord {
+    pub(crate) fn scalar_intent_keyed(&self) -> bool {
+        keyed(self)
+    }
+    pub(crate) fn scalar_intent_value(
+        &mut self,
+        frame: Number,
+        value: Number,
+        force_key: bool,
+        curve: Option<Vec<OrderCurvePoint>>,
+    ) {
+        let mut values = vec![value];
+        if force_key || keyed(self) {
+            set_key(self, frame, values, curve);
+        } else {
+            if let Some(before) = self.static_value.value() {
+                preserve_values(before, &mut values);
+            }
+            self.static_value = Presence::Present(values);
+        }
+    }
+    pub(crate) fn scalar_intent_remove(&mut self, at: f64) {
+        if let Presence::Present(t) = &mut self.track {
+            t.keys.retain(|k| k.frame.as_f64() != Some(at));
+        }
+    }
+    pub(crate) fn scalar_intent_freeze(&mut self, value: Number) {
+        track(self).keys.clear();
+        let mut values = vec![value];
+        if let Some(before) = self.static_value.value() {
+            preserve_values(before, &mut values);
+        }
+        self.static_value = Presence::Present(values);
+    }
+}

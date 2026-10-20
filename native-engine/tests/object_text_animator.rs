@@ -222,3 +222,122 @@ fn text_animator_nullable_authored_fields_have_native_effective_facts_for_keying
     }
     assert_eq!(serde_json::to_value(&record).unwrap(), raw);
 }
+
+fn edit_payload(edit: Value) -> Value {
+    json!({"command":"object.text.animator.edit","layerUid":"L0","animatorId":"long","edit":edit})
+}
+#[test]
+fn text_animator_compact_edit_keeps_long_tracks_original_curves_and_one_history_revision() {
+    let mut doc = drawing();
+    let keys=(0..512).map(|frame|json!({"frame":frame,"v":[frame%100],"hold":false,"curvePoints":[{"x":0,"y":0},{"x":1,"y":1}]})).collect::<Vec<_>>();
+    let a = json!({"id":"long","selector":{},"props":{"position":[20,0]},"properties":[{"property":"amount","track":{"keys":keys}}]});
+    assert!(a.to_string().len() > 4096);
+    doc["layers"][0]["textAnimators"] = json!([a]);
+    let mut o = owner(&doc);
+    let before = support::bytes(&o);
+    let payload =
+        edit_payload(json!({"kind":"setValue","property":"amount","frame":2,"values":[75]}));
+    assert!(payload.to_string().len() < 256);
+    assert_eq!(support::run(&mut o, &payload).unwrap(), 1);
+    assert_eq!(o.history_depths(), (1, 0));
+    let after = serde_json::to_value(support::head(&o).document()).unwrap();
+    let record = &after["layers"][0]["textAnimators"][0];
+    assert_eq!(
+        record["properties"][0]["track"]["keys"]
+            .as_array()
+            .unwrap()
+            .len(),
+        512
+    );
+    assert_eq!(
+        record["properties"][0]["track"]["keys"][2]["v"],
+        json!([75])
+    );
+    assert_eq!(
+        record["properties"][0]["track"]["keys"][2]["curvePoints"],
+        json!([{"x":0,"y":0},{"x":1,"y":1}])
+    );
+    support::run(
+        &mut o,
+        &edit_payload(json!({"kind":"setEnabled","enabled":false})),
+    )
+    .unwrap();
+    o.undo(o.content_revision()).unwrap();
+    o.undo(o.content_revision()).unwrap();
+    assert_eq!(support::bytes(&o), before);
+}
+#[test]
+fn text_animator_disabled_keyfacts_and_native_stopwatch_use_actual_sample_not_caller_value() {
+    let mut doc = drawing();
+    doc["layers"][0]["textAnimators"] = json!([{"id":"long","enabled":false,"selector":{"amount":null},"props":{},"properties":[{"property":"amount","track":{"keys":[{"frame":0,"v":[0]},{"frame":4,"v":[100]}]}}]}]);
+    let mut o = owner(&doc);
+    let snap = support::head(&o);
+    let r = &snap.document().layers()[0]
+        .text_animators
+        .value()
+        .unwrap()
+        .0[0];
+    assert_eq!(r.selector_facts(2.).unwrap()["amount"], json!(50.0));
+    support::run(
+        &mut o,
+        &edit_payload(json!({"kind":"setAnimated","property":"amount","frame":2,"animated":false})),
+    )
+    .unwrap();
+    let snap = support::head(&o);
+    let r = &snap.document().layers()[0]
+        .text_animators
+        .value()
+        .unwrap()
+        .0[0];
+    assert_eq!(r.selector_facts(0.).unwrap()["amount"], json!(50.0));
+    let before = support::state(&o);
+    assert_eq!(
+        support::run(
+            &mut o,
+            &edit_payload(
+                json!({"kind":"setAnimated","property":"amount","frame":2,"animated":false})
+            )
+        )
+        .unwrap(),
+        o.content_revision()
+    );
+    assert_eq!(support::state(&o), before);
+}
+#[test]
+fn text_animator_unavailable_evaluation_does_not_hide_raw_descriptor_disable_or_remove() {
+    let mut doc = drawing();
+    doc["layers"][0]["textAnimators"] = json!([{"id":"long","selector":{},"props":{},"properties":[{"property":"amount","expression":{"enabled":true,"code":"50"}}]}]);
+    let mut o = owner(&doc);
+    let snap = support::head(&o);
+    let query = json!({"instanceId":snap.instance_id(),"documentId":snap.document_id(),"atRevision":snap.content_revision(),"documentSnapshotId":snap.snapshot_id(),"view":{"kind":"animators","layerUid":"L0","frame":0,"offset":0,"limit":1024}});
+    let chunk = snap.query_text_json(query.to_string().as_bytes()).unwrap();
+    let data: Value = serde_json::from_str(chunk["text"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        data["animators"][0]["properties"][0]["expression"]["code"],
+        "50"
+    );
+    assert_eq!(data["selectors"][0]["available"], false);
+    support::run(
+        &mut o,
+        &edit_payload(json!({"kind":"setEnabled","enabled":false})),
+    )
+    .unwrap();
+    assert!(
+        plan(&support::head(&o), 0)
+            .text_resources()
+            .entries()
+            .count()
+            > 0
+    );
+    support::run(
+        &mut o,
+        &json!({"command":"object.text.animator.remove","layerUid":"L0","animatorId":"long"}),
+    )
+    .unwrap();
+    assert!(support::head(&o).document().layers()[0]
+        .text_animators
+        .value()
+        .unwrap()
+        .0
+        .is_empty());
+}

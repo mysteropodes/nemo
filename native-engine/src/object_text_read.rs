@@ -159,14 +159,13 @@ impl ObjectSnapshot {
                 #[cfg(feature = "evaluation")]
                 let facts = records
                     .iter()
-                    .map(|r| r.selector_facts(frame))
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|_| unavailable())?;
-                #[cfg(not(feature = "evaluation"))]
-                let facts: Vec<Value> = {
-                    let _ = records;
-                    return Err(unavailable());
-                };
+                    .map(|r| match r.selector_facts(frame) {
+                        Ok(value) => json!({"available":true,"value":value}),
+                        Err(reason) => json!({"available":false,"reason":reason}),
+                    })
+                    .collect::<Vec<_>>();
+                #[cfg(not(feature="evaluation"))]
+                let facts=records.iter().map(|_|json!({"available":false,"reason":"native selector evaluation unavailable"})).collect::<Vec<_>>();
                 let text = serde_json::to_string(&json!({"animators":records,"selectors":facts,"hasText":entries.iter().any(|e|e.target.layer_uid()==layer_uid&&e.target.context_id()=="scene-root")}))
                     .map_err(|_| unavailable())?;
                 out["kind"] = json!("animators");

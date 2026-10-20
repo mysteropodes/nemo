@@ -558,6 +558,30 @@
               "$ref": "#/$defs/Opaque"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "layerUid",
+            "animatorId",
+            "edit"
+          ],
+          "properties": {
+            "command": {
+              "const": "object.text.animator.edit"
+            },
+            "layerUid": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "animatorId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "edit": {
+              "$ref": "#/$defs/TextAnimatorEdit"
+            }
+          }
         }
       ]
     },
@@ -630,7 +654,8 @@
             "text.edit",
             "text.delete",
             "text.animator.upsert",
-            "text.animator.remove"
+            "text.animator.remove",
+            "text.animator.edit"
           ]
         },
         "strokeId": {
@@ -1242,6 +1267,422 @@
           }
         }
       }
+    },
+    "TextAnimatorEdit": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "enabled"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setEnabled"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setSelector"
+            },
+            "field": {
+              "const": "selectorType"
+            },
+            "value": {
+              "enum": [
+                "range",
+                "wiggly"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setSelector"
+            },
+            "field": {
+              "const": "units"
+            },
+            "value": {
+              "enum": [
+                "percent",
+                "index"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setSelector"
+            },
+            "field": {
+              "const": "basedOn"
+            },
+            "value": {
+              "enum": [
+                "chars",
+                "words",
+                "lines"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setSelector"
+            },
+            "field": {
+              "enum": [
+                "start",
+                "end",
+                "offset",
+                "shape",
+                "amount",
+                "easeHigh",
+                "easeLow",
+                "smooth",
+                "wiggleMin",
+                "wiggleMax",
+                "wigglesPerSec",
+                "correlation",
+                "seed"
+              ]
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setProps"
+            },
+            "field": {
+              "enum": [
+                "position",
+                "scale"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setProps"
+            },
+            "field": {
+              "enum": [
+                "rotation",
+                "opacity"
+              ]
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setProps"
+            },
+            "field": {
+              "enum": [
+                "fillColor",
+                "strokeColor"
+              ]
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 4,
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  ],
+                  "items": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "property",
+            "frame",
+            "values"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setValue"
+            },
+            "property": {
+              "enum": [
+                "start",
+                "end",
+                "offset",
+                "amount",
+                "easeHigh",
+                "easeLow",
+                "smooth",
+                "wiggleMin",
+                "wiggleMax",
+                "wigglesPerSec",
+                "correlation"
+              ]
+            },
+            "frame": {
+              "type": "number"
+            },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "property",
+            "frame",
+            "values"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setKey"
+            },
+            "property": {
+              "enum": [
+                "start",
+                "end",
+                "offset",
+                "amount",
+                "easeHigh",
+                "easeLow",
+                "smooth",
+                "wiggleMin",
+                "wiggleMax",
+                "wigglesPerSec",
+                "correlation"
+              ]
+            },
+            "frame": {
+              "type": "number"
+            },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "type": "number"
+              }
+            },
+            "curvePoints": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      },
+                      "tx": {
+                        "type": "number"
+                      },
+                      "ty": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "property",
+            "frame"
+          ],
+          "properties": {
+            "kind": {
+              "const": "removeKey"
+            },
+            "property": {
+              "enum": [
+                "start",
+                "end",
+                "offset",
+                "amount",
+                "easeHigh",
+                "easeLow",
+                "smooth",
+                "wiggleMin",
+                "wiggleMax",
+                "wigglesPerSec",
+                "correlation"
+              ]
+            },
+            "frame": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "property",
+            "frame",
+            "animated"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setAnimated"
+            },
+            "property": {
+              "enum": [
+                "start",
+                "end",
+                "offset",
+                "amount",
+                "easeHigh",
+                "easeLow",
+                "smooth",
+                "wiggleMin",
+                "wiggleMax",
+                "wigglesPerSec",
+                "correlation"
+              ]
+            },
+            "frame": {
+              "type": "number"
+            },
+            "animated": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
     }
   },
   "examples": [

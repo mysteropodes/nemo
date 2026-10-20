@@ -11,7 +11,11 @@
   function create(session,context){
     var reader=Read.create(session),command=Command.create(session,'item'),pending=null,busy=false;
     function current(expected){var c=context(),p=session.info();if(!session.isActive()||!c||!c.layerUid||!same(c.pin,p)||expected&&(!same(expected.pin,p)||expected.layerUid!==c.layerUid||expected.frame!==c.frame||expected.selectionKey!==c.selectionKey))throw fault('stale_revision','Text animator intent is stale');return clone(c);}
-    async function load(){var c=current(),value=await reader.readAnimators(c.layerUid,c.frame,c.pin);current(c);var ids=new Set();value.animators.forEach(function(r){Item.animator(r);if(ids.has(r.id))throw fault("uncorrelated","Duplicate native animator identity");ids.add(r.id);});value.selectors.forEach(function(s){Item.animator({id:"native-view",selector:s});});return {context:c,animators:clone(value.animators),selectors:clone(value.selectors),hasText:value.hasText};}
+    async function load(){var c=current(),value=await reader.readAnimators(c.layerUid,c.frame,c.pin);current(c);var ids=new Set();value.animators.forEach(function(r){Item.animator(r);if(ids.has(r.id))throw fault("uncorrelated","Duplicate native animator identity");ids.add(r.id);});value.selectors.forEach(function(s){
+      if(!s||typeof s.available!=='boolean'||Object.keys(s).length!==2)throw fault('uncorrelated','Native selector availability invalid');
+      if(s.available){if(!Object.prototype.hasOwnProperty.call(s,'value'))throw fault('uncorrelated','Native selector facts invalid');Item.animator({id:'native-view',selector:s.value});}
+      else if(typeof s.reason!=='string'||!s.reason.length)throw fault('uncorrelated','Native selector refusal invalid');
+    });return {context:c,animators:clone(value.animators),selectors:clone(value.selectors),hasText:value.hasText};}
     async function write(payload,origin){
       if(busy||pending)throw fault('unavailable','Resolve the previous animator command first');current(origin);busy=true;
       try{return await command.execute(Item.ITEM,function(){current(origin);return clone(payload);});}
@@ -19,6 +23,7 @@
     }
     return Object.freeze({load:load,
       upsert:function(record,origin){Item.animator(record);return write({command:'object.text.animator.upsert',layerUid:origin.layerUid,animator:clone(record)},origin);},
+      edit:function(id,edit,origin){Item.animatorEdit(edit);return write({command:'object.text.animator.edit',layerUid:origin.layerUid,animatorId:id,edit:clone(edit)},origin);},
       remove:function(id,origin){return write({command:'object.text.animator.remove',layerUid:origin.layerUid,animatorId:id},origin);},
       resolve:async function(){if(!pending||busy)throw fault('unavailable','No pending animator receipt');busy=true;try{var receipt=await pending.replay();pending=null;return receipt;}finally{busy=false;}},
       state:function(){return {busy:busy,pending:!!pending};}});

@@ -115,6 +115,62 @@ pub(super) fn record(v: &Value) -> bool {
     true
 }
 
+pub(super) fn edit(v: &Value) -> bool {
+    let kind = v["kind"].as_str().unwrap_or("");
+    if kind == "setEnabled" {
+        return exact(v, &["kind", "enabled"], &[]).is_some() && v["enabled"].is_boolean();
+    }
+    if kind == "setSelector" {
+        return exact(v, &["kind", "field", "value"], &[]).is_some()
+            && v["field"].as_str().is_some_and(|field| {
+                record(&serde_json::json!({"id":"validation","selector":{field:v["value"]}}))
+            });
+    }
+    if kind == "setProps" {
+        return exact(v,&["kind","field","value"],&[]).is_some()&&v["field"].as_str().is_some_and(|field|["position","scale","rotation","opacity","fillColor","strokeColor"].contains(&field)&&((v["value"].is_null()&&matches!(field,"fillColor"|"strokeColor"))||record(&serde_json::json!({"id":"validation","selector":{},"props":{field:v["value"]}}))));
+    }
+    let Some(property) = v["property"].as_str() else {
+        return false;
+    };
+    if !KEYS.contains(&property) || !number(&v["frame"]) {
+        return false;
+    }
+    let extra = match kind {
+        "setValue" | "setKey" => "values",
+        "setAnimated" => "animated",
+        "removeKey" => "",
+        _ => return false,
+    };
+    let mut required = vec!["kind", "property", "frame"];
+    if !extra.is_empty() {
+        required.push(extra);
+    }
+    if exact(
+        v,
+        &required,
+        if kind == "setKey" {
+            &["curvePoints"]
+        } else {
+            &[]
+        },
+    )
+    .is_none()
+    {
+        return false;
+    }
+    if kind == "setAnimated" {
+        return v["animated"].is_boolean();
+    }
+    if kind == "removeKey" {
+        return true;
+    }
+    let mut key = serde_json::json!({"frame":v["frame"],"v":v["values"]});
+    if let Some(curve) = v.get("curvePoints") {
+        key["curvePoints"] = curve.clone();
+    }
+    property_read::key(&key, 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,5 +220,37 @@ mod tests {
         assert!(!crate::native_contract::text_read::result(
             "document", &p, &r
         ));
+    }
+    #[test]
+    fn text_animator_compact_edit_contract_preserves_closed_native_action_shapes() {
+        for action in [
+            json!({"kind":"setEnabled","enabled":false}),
+            json!({"kind":"setProps","field":"scale","value":[0,0]}),
+            json!({"kind":"setSelector","field":"basedOn","value":"words"}),
+            json!({"kind":"setValue","property":"amount","frame":2,"values":[75]}),
+            json!({"kind":"setKey","property":"amount","frame":2,"values":[75],"curvePoints":[{"x":0,"y":0},{"x":1,"y":1}]}),
+            json!({"kind":"setAnimated","property":"amount","frame":2,"animated":false}),
+        ] {
+            assert!(edit(&action), "{action}");
+            let p = json!({"command":"object.text.animator.edit","layerUid":"L0","animatorId":"long","edit":action});
+            assert!(crate::native_contract::item::request(
+                crate::native_contract::item::ITEM,
+                &p
+            ));
+            assert!(crate::native_contract::item::result(
+                crate::native_contract::item::ITEM,
+                &p,
+                &json!({"applied":true,"historyEntriesAdded":1,"operation":"text.animator.edit","strokeId":"long"})
+            ));
+        }
+        for action in [
+            json!({"kind":"setEnabled","enabled":false,"value":1}),
+            json!({"kind":"setProps","field":"position","value":[1]}),
+            json!({"kind":"setValue","property":"shape","frame":0,"values":[2]}),
+            json!({"kind":"setAnimated","property":"amount","frame":0,"animated":true,"values":[900]}),
+            json!({"kind":"setKey","property":"amount","frame":0,"values":[null]}),
+        ] {
+            assert!(!edit(&action));
+        }
     }
 }

@@ -348,3 +348,9 @@ test('element blur keeps an invalid area draft while real window blur cancels it
  const event=area.fire('blur');await f.turn();assert.equal(event.bubbles,false);assert.equal(capturedBlur,1);assert.equal(windowBlur,0);assert.ok(f.binding.core.snapshot().draft);assert.equal(f.owner.log.executed.length,0);
  f.root.fire('blur');await f.turn();assert.equal(windowBlur,1);assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.owner.log.executed.length,0);assert.equal(f.logs.legacy,0);
 });
+test('actual Text inspector mounts late animator capability once and retires its native child',async()=>{
+ const f=await fixture();let mounts=0,refreshes=0,retires=0;
+ f.root.NemoNativeTextAnimatorDesktop={mount(root,container){assert.equal(root,f.root);assert.equal(container,f.get('native-inspector'));mounts++;return {refresh(){refreshes++;},retire(){retires++;}};}};
+ await f.binding.refresh();await f.binding.refresh();assert.equal(mounts,1);assert.ok(refreshes>=1);
+ f.binding.retire();assert.equal(retires,1);
+});

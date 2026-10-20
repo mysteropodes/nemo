@@ -89,16 +89,28 @@
           });}
       });}
   }
+  function animatorEdit(v){
+    if(!plain(v))fail('animator edit invalid');
+    if(v.kind==='setEnabled'){exact(v,['kind','enabled'],[],'animator enabled edit');bool(v.enabled);return;}
+    if(v.kind==='setSelector'){exact(v,['kind','field','value'],[],'selector field edit');animator({id:'validation',selector:{[v.field]:v.value}});return;}
+    if(v.kind==='setProps'){exact(v,['kind','field','value'],[],'animator property edit');oneOf(v.field,['position','scale','rotation','opacity','fillColor','strokeColor']);if(v.value===null&&['fillColor','strokeColor'].includes(v.field))return;animator({id:'validation',selector:{},props:{[v.field]:v.value}});return;}
+    const fields={setValue:['values'],setKey:['values'],removeKey:[],setAnimated:['animated']};
+    if(!Object.prototype.hasOwnProperty.call(fields,v.kind))fail('selector edit kind invalid');
+    exact(v,['kind','property','frame'].concat(fields[v.kind]),v.kind==='setKey'?['curvePoints']:[],'selector key edit');oneOf(v.property,SELECTOR_KEYS);num(v.frame);
+    if(v.kind==='setAnimated'){bool(v.animated);return;}if(v.kind==='removeKey')return;
+    const key={frame:v.frame,v:v.values};if('curvePoints' in v)key.curvePoints=v.curvePoints;
+    animator({id:'validation',selector:{},properties:[{property:v.property,track:{keys:[key]}}]});
+  }
   const SHAPES={
     'object.raster.create':['target','item'],'object.raster.move':['stableTarget','x','y'],'object.raster.resize':['stableTarget','width','height'],
     'object.raster.rotate':['stableTarget','rotation'],'object.raster.opacity':['stableTarget','opacity'],'object.raster.delete':['stableTarget'],
     'object.text.create':['target','block'],'object.text.edit':['stableTarget','patch'],'object.text.delete':['stableTarget'],
-    'object.text.animator.upsert':['layerUid','animator'],'object.text.animator.remove':['layerUid','animatorId'],
+    'object.text.animator.upsert':['layerUid','animator'],'object.text.animator.remove':['layerUid','animatorId'],'object.text.animator.edit':['layerUid','animatorId','edit'],
   };
   function itemPayload(p){
     if(!plain(p)||!Object.prototype.hasOwnProperty.call(SHAPES,p.command))fail('item command invalid');
     exact(p,['command'].concat(SHAPES[p.command]),[],'item command');
-    if('layerUid' in p)opaque(p.layerUid);if('animator' in p)animator(p.animator);if('animatorId' in p)opaque(p.animatorId);
+    if('layerUid' in p)opaque(p.layerUid);if('animator' in p)animator(p.animator);if('animatorId' in p)opaque(p.animatorId);if('edit' in p)animatorEdit(p.edit);
     if('target' in p)target(p.target,true);if('stableTarget' in p)target(p.stableTarget,false);
     if('item' in p)rasterItem(p.item);if('block' in p)textBlock(p.block);if('patch' in p)textPatch(p.patch);
     ['x','y','width','height','rotation','opacity'].forEach(k=>{if(k in p)num(p[k]);});
@@ -132,7 +144,7 @@
     if(op===ATTACH&&plain(v)&&Object.prototype.hasOwnProperty.call(v,'assetId'))return imageResult(v);
     exact(v,op===ITEM?['applied','historyEntriesAdded','operation','strokeId']:['applied','historyEntriesAdded'],[],'result');
     bool(v.applied);if(v.historyEntriesAdded!==(v.applied?1:0))fail('history disposition invalid');
-    if(op===ITEM){oneOf(v.operation,RASTER.concat(TEXT,['text.animator.upsert','text.animator.remove']));opaque(v.strokeId);}
+    if(op===ITEM){oneOf(v.operation,RASTER.concat(TEXT,['text.animator.upsert','text.animator.remove','text.animator.edit']));opaque(v.strokeId);}
   }
   function correlate(q,r){
     if(r.requestId!==q.requestId)fail('response request mismatch');
@@ -174,5 +186,5 @@
       payload:(op,p,e)=>own.admitted(op)?own.payload(op,p):base.payload(op,p,e),result:(op,v)=>own.admitted(op)?own.result(op,v):base.result(op,v),
       correlate:(q,r)=>own.admitted(q.operation)?own.correlate(q,r):base.correlate(q,r),paths:op=>own.admitted(op)?own.paths(op):base.paths(op)});
   }
-  return Object.freeze(Object.assign({compose:compose,ITEM:ITEM,ATTACH:ATTACH,REMOVE:REMOVE,FONTS:FONTS,MEDIA:MEDIA,animator:animator},own));
+  return Object.freeze(Object.assign({compose:compose,ITEM:ITEM,ATTACH:ATTACH,REMOVE:REMOVE,FONTS:FONTS,MEDIA:MEDIA,animator:animator,animatorEdit:animatorEdit},own));
 }));

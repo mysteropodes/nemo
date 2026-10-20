@@ -54,6 +54,8 @@ pub(crate) struct ItemPayload {
     pub(crate) animator:
         Presence<crate::object_document::object_text_layout_kernels::animator::AnimatorRecord>,
     pub(crate) animator_id: Presence<String>,
+    pub(crate) edit:
+        Presence<crate::commands::object_fill_owner::text_commands::animator::edit::AnimatorEdit>,
 }
 object_deserialize!(ItemPayload {
     command: String,
@@ -70,7 +72,8 @@ object_deserialize!(ItemPayload {
     #[serde(default)] opacity: Presence<Number>,
     #[serde(default)] layer_uid: Presence<String>,
     #[serde(default)] animator: Presence<crate::object_document::object_text_layout_kernels::animator::AnimatorRecord>,
-    #[serde(default)] animator_id: Presence<String>
+    #[serde(default)] animator_id: Presence<String>,
+    #[serde(default)] edit: Presence<crate::commands::object_fill_owner::text_commands::animator::edit::AnimatorEdit>
 });
 
 impl ItemPayload {
@@ -92,6 +95,7 @@ impl ItemPayload {
             ("layerUid", !self.layer_uid.missing()),
             ("animator", !self.animator.missing()),
             ("animatorId", !self.animator_id.missing()),
+            ("edit", !self.edit.missing()),
         ];
         for (name, present) in flags {
             if present {
