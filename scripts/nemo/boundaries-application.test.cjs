@@ -239,7 +239,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 127, 128, 129, 130, 131, 175, 227, 229, 255, 256, 257, 258, 261, 262, 263, 264]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 22, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 127, 128, 129, 130, 131, 175, 228, 229, 255, 256, 257, 258, 261, 262, 263, 264]);
   // T08 contract precedes SDK; its model/UI add two tags after Text desktop. All42 identities and adjacency stay fixed.
   assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 230);
   assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 230);
