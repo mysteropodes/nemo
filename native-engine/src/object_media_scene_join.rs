@@ -18,7 +18,8 @@
 //! video placement, a video layer that also carries drawn records (baseline
 //! masks) or path effects are typed refusals: never a blank or partial frame.
 //! A blend pair (the baseline `blend` interpolation of a remapped video) is
-//! mixed exactly like `_blendPixels`; duplicator and 3D projection of a video
+//! mixed exactly like `_blendPixels`, and a `motion` pair by the ported optical
+//! flow ([`motion_flow`], byte-identical to geometry-wasm); duplicator and 3D projection of a video
 //! layer have no native snapshot field yet and are not invented here.
 use crate::evaluation::motion_parent_chain::ImageRect;
 use crate::object_frame_packet::ObjectFramePacket;
@@ -36,13 +37,18 @@ use vello::peniko::{Blob, ImageAlphaType, ImageData, ImageFormat};
 
 /// The decoded frame (or blend pair) a frame gives one video placement:
 /// `frame` is its `media:<asset>:<source>` resource; `blend` names the `to`
-/// frame and its 1/32-step share (`_blendPixels`, native-video-bridge.js).
+/// frame and its 1/32-step share (`_blendPixels`, native-video-bridge.js);
+/// `motion` mixes the pair by optical flow instead (`_mixed`, `motion` mode).
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct VideoFrameDraw {
     pub(crate) placement_id: String,
     pub(crate) frame: String,
     pub(crate) blend: Option<(String, f64)>,
+    pub(crate) motion: bool,
 }
+
+#[path = "object_media_motion_flow.rs"]
+pub(crate) mod motion_flow;
 
 /// `_blendPixels`: `(a * (256 - w) + b * w) >> 8` per byte, `w = round(t * 256)`.
 fn blend_rgba(a: &[u8], b: &[u8], weight: f64) -> Vec<u8> {
@@ -205,8 +211,22 @@ impl MediaDraws {
                     if (second.width, second.height) != (first.width, first.height) {
                         return Err(missing());
                     }
-                    let id = format!("{}+{to}@{weight}", wanted.frame);
-                    (blend_rgba(&first.rgba, &second.rgba, *weight), id)
+                    let mode = if wanted.motion { "~" } else { "@" };
+                    let id = format!("{}+{to}{mode}{weight}", wanted.frame);
+                    let mixed = if wanted.motion {
+                        let (w, h) = (first.width as usize, first.height as usize);
+                        motion_flow::motion_interpolate(
+                            &first.rgba,
+                            &second.rgba,
+                            w,
+                            h,
+                            *weight as f32,
+                        )
+                        .ok_or_else(missing)?
+                    } else {
+                        blend_rgba(&first.rgba, &second.rgba, *weight)
+                    };
+                    (mixed, id)
                 }
             };
             let (width, height, id) = (first.width, first.height, id.as_str());

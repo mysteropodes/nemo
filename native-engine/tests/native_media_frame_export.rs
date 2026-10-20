@@ -302,7 +302,8 @@ fn a_frame_without_its_decoded_video_never_draws_blank() {
             &[VideoFrameDraw {
                 placement_id: "p1".into(),
                 frame: "media:v1:2".into(),
-                blend: None
+                blend: None,
+                motion: false
             }]
         )
         .is_err());

@@ -25,9 +25,8 @@
 //! The placement's stored timing (`timeRemap`, `interpMode`, `frameBlend`) is
 //! the plan's video facts and time-remap sampler: a remapped video selects its
 //! source frame through the track, and a `blend` pair decodes both frames and
-//! mixes them like `_blendPixels`. The `motion` mode (optical-flow
-//! interpolation, geometry-wasm `interp.rs`) has no native port yet and refuses
-//! as unavailable rather than drawing a plain blend. An embedded (non-linked)
+//! mixes them like `_blendPixels`; the `motion` mode mixes the same pair by the
+//! ported optical flow (geometry-wasm `interp.rs`/`track.rs`). An embedded (non-linked)
 //! video has no decodable locator for the desktop decoder and refuses as
 //! unavailable.
 use crate::export_job::native_media_export::native_media_export_job::media_resource_id;
@@ -391,22 +390,16 @@ pub fn begin_native_media_frames<'p, 'd>(
                     placement_id: need.placement_id().to_owned(),
                     frame: media_resource_id(asset, *source),
                     blend: None,
+                    motion: false,
                 },
                 MediaNeed::Blend {
                     from, to, weight, ..
-                } => {
-                    if motion_mode(&facts, need.placement_id()) {
-                        return Err(unavailable(
-                            *frame,
-                            "motion-compensated video interpolation is not native yet",
-                        ));
-                    }
-                    VideoFrameDraw {
-                        placement_id: need.placement_id().to_owned(),
-                        frame: media_resource_id(asset, *from),
-                        blend: Some((media_resource_id(asset, *to), *weight)),
-                    }
-                }
+                } => VideoFrameDraw {
+                    placement_id: need.placement_id().to_owned(),
+                    frame: media_resource_id(asset, *from),
+                    blend: Some((media_resource_id(asset, *to), *weight)),
+                    motion: motion_mode(&facts, need.placement_id()),
+                },
                 MediaNeed::Still { .. } => {
                     return Err(unavailable(*frame, "a still is not a video need"))
                 }

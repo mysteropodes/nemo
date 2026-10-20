@@ -1,8 +1,8 @@
 //! T12 stored video timing through the real codec, history owner, frame
 //! packet, scene and witness: a remapped video draws the track's source frame
 //! (the offset no longer applies), a `blend` pair decodes both neighbours and
-//! mixes them like `_blendPixels`, and `motion` refuses instead of blending.
-use super::tests::{export, known, selector, wire, Fake, BOTH};
+//! mixes them like `_blendPixels`, and `motion` mixes it by the ported flow.
+use super::tests::{export, known, wire, Fake, BOTH};
 use super::*;
 use crate::history::NativeObjectHistory;
 use serde_json::{json, Value};
@@ -129,37 +129,30 @@ fn the_mode_needs_a_remap_and_the_legacy_flag_still_selects_blend() {
 }
 
 #[test]
-fn motion_interpolation_refuses_typed_before_any_decode() {
-    let timing = json!({"timeRemap": track(&[(0, 0.0), (20, 10.0)]), "interpMode": "motion", "frameBlend": true});
+fn motion_mixes_the_same_pair_through_the_ported_optical_flow() {
+    let long: &[(&str, u32, u32, u32)] = &[
+        ("clips/one.mov", 160, 120, 300),
+        ("clips/two.mov", 8, 6, 300),
+    ];
+    let timing = json!({"timeRemap": track(&[(0, 254.0), (20, 264.0)]), "interpMode": "motion", "frameBlend": true});
     let history = timed("v1", timing);
     let snapshot = history.acquire_snapshot(0).unwrap();
-    let mut decoder = Fake::with(BOTH);
-    let mut port = NativeVideoPort::new(&mut decoder);
-    let refused = begin_native_media_frames(
-        &mut port,
-        &snapshot,
-        &selector(&snapshot, 3),
-        &[3],
-        true,
-        &|_| true,
-        0,
+    let mut decoder = Fake::with(long);
+    let (drawn, release) = export(&snapshot, &mut decoder, &[3, 4]);
+    let len = 160 * 120 * 4;
+    let flow = crate::object_render_scene::media_scene::motion_flow::motion_interpolate(
+        &known("clips/one.mov", 255, len),
+        &known("clips/one.mov", 256, len),
+        160,
+        120,
+        0.5,
     )
-    .err()
-    .expect("motion must refuse");
-    assert!(
-        matches!(&refused, NativeMediaRefusal::Unavailable { frame: 3, reason } if reason.contains("motion")),
-        "{refused:?}"
-    );
-    drop(port);
-    assert!(decoder.decoded.is_empty());
-    assert_eq!(
-        decoder.closed.len(),
-        decoder.opened.len(),
-        "the probe session is closed"
-    );
-    // An integral source frame needs no interpolation and draws in motion mode too.
-    let mut decoder = Fake::with(BOTH);
-    let (drawn, release) = export(&snapshot, &mut decoder, &[4]);
-    assert_eq!(drawn[0], known("clips/one.mov", 2, 160 * 120 * 4));
+    .unwrap();
+    assert_eq!(drawn[0], flow);
+    // An integral source frame needs no interpolation in motion mode either.
+    assert_eq!(drawn[1], known("clips/one.mov", 256, len));
+    let frames: Vec<u32> = decoder.decoded.iter().map(|(_, f)| *f).collect();
+    assert_eq!(frames, [255, 256, 256]);
     assert!(release.complete);
+    assert_eq!((release.frames_acquired, release.frames_released), (3, 3));
 }
