@@ -133,18 +133,31 @@ mod wire {
             "propsPanelWidth":null,"propsPanelCollapsed":false,"timelineHeight":null,
             "panelOrder":null,"motionColumns":null});
         for version in [1, 2] {
-            let owner = NativeObjectHistory::from_project_file(
+            let mut owner = NativeObjectHistory::from_project_file(
                 "nullable-panel-order",
                 &input(version, json!({"workspace":captured.clone()})),
             )
             .unwrap();
             assert_eq!(fields(&owner)["workspace"], captured);
+            let before = save(&owner);
+            assert_eq!(owner.history_depths(), (0, 0));
+            let edit = owner.prepare_composition_delta_json(
+                br#"{"command":"object.project.composition.edit","action":{"kind":"setBpm","bpm":132}}"#
+            ).unwrap();
+            owner.commit_project_settings(edit).unwrap();
+            assert_eq!(fields(&owner)["workspace"], captured);
+            assert_eq!(owner.history_depths(), (1, 0));
             let saved = save(&owner);
             let reopened =
                 NativeObjectHistory::from_project_file("nullable-panel-fresh", &saved).unwrap();
             assert_eq!(save(&reopened), saved);
             assert_eq!(fields(&reopened)["workspace"]["panelOrder"], Value::Null);
-            assert_eq!(owner.history_depths(), (0, 0));
+            owner.undo(1).unwrap();
+            assert_eq!(save(&owner), before);
+            assert_eq!(fields(&owner)["workspace"], captured);
+            owner.redo(2).unwrap();
+            assert_eq!(save(&owner), saved);
+            assert_eq!(fields(&owner)["workspace"], captured);
         }
     }
 
