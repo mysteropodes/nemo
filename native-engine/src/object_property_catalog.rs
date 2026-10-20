@@ -37,16 +37,22 @@ pub(super) fn vertex_index(property: &str) -> Option<usize> {
 
 pub(super) fn builtin(property: &str) -> Option<PropertyMetadata> {
     Some(match property {
-        "position" | "anchor" | "dupOffsetPos" => metadata(2, "px", Some(&[0., 0.])),
+        "position" | "anchor" | "dupOffsetPos" | "effOffPosition" => {
+            metadata(2, "px", Some(&[0., 0.]))
+        }
         "scale" => metadata(2, "%", Some(&[100., 100.])),
-        "dupOffsetScale" => metadata(2, "%", Some(&[0., 0.])),
-        "rotation" | "rotationX" | "rotationY" | "dupOffsetRot" | "dupOffsetHue"
-        | "dupOffsetRotX" | "dupOffsetRotY" | "arcStart" => metadata(1, "°", Some(&[0.])),
-        "positionZ" | "dupOffsetPosZ" | "cornerTL" | "cornerTR" | "cornerBR" | "cornerBL"
-        | "starCorner" => metadata(1, "px", Some(&[0.])),
-        "opacity" | "matteOn" | "trimEnd" | "pathInfluence" => metadata(1, "%", Some(&[100.])),
-        "dupOffsetOpacity" | "parentBlend" | "trimStart" | "trimOffset" | "pathPercent"
-        | "arcInner" => metadata(1, "%", Some(&[0.])),
+        "dupOffsetScale" | "effOffScale" => metadata(2, "%", Some(&[0., 0.])),
+        "rotation" | "rotationX" | "rotationY" | "dupOffsetRot" | "dupOffsetHue" | "effAngle"
+        | "effOffRotation" | "effOffRotationX" | "effOffRotationY" | "dupOffsetRotX"
+        | "dupOffsetRotY" | "arcStart" => metadata(1, "°", Some(&[0.])),
+        "positionZ" | "dupOffsetPosZ" | "effOffPositionZ" | "cornerTL" | "cornerTR"
+        | "cornerBR" | "cornerBL" | "starCorner" => metadata(1, "px", Some(&[0.])),
+        "opacity" | "matteOn" | "trimEnd" | "pathInfluence" | "effStrength" => {
+            metadata(1, "%", Some(&[100.]))
+        }
+        "dupOffsetOpacity" | "effOffOpacity" | "parentBlend" | "trimStart" | "trimOffset"
+        | "pathPercent" | "arcInner" => metadata(1, "%", Some(&[0.])),
+        "effRadius" => metadata(1, "px", Some(&[200.])),
         "arcSweep" => metadata(1, "°", Some(&[359.9])),
         "starInner" => metadata(1, "%", Some(&[50.])),
         "volume" => metadata(1, "", Some(&[1.])),

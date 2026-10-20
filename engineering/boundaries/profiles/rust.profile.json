@@ -514,7 +514,8 @@
         "object_text_animator_evaluation.rs",
         "object_frame_motion_values.rs",
         "object_frame_camera.rs",
-        "object_boolean_motion_eval.rs"
+        "object_boolean_motion_eval.rs",
+        "object_duplicator_snapshot.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -1598,7 +1599,8 @@
         "object_text_animator.rs",
         "object_frame_motion_values.rs",
         "object_frame_camera.rs",
-        "object_boolean_frame_motion.rs"
+        "object_boolean_frame_motion.rs",
+        "object_duplicator_snapshot.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
