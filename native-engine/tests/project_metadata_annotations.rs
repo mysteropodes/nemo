@@ -134,11 +134,14 @@ mod wire {
             "panelOrder":null,"motionColumns":null});
         for version in [1, 2] {
             let owner = NativeObjectHistory::from_project_file(
-                "nullable-panel-order", &input(version, json!({"workspace":captured.clone()}))
-            ).unwrap();
+                "nullable-panel-order",
+                &input(version, json!({"workspace":captured.clone()})),
+            )
+            .unwrap();
             assert_eq!(fields(&owner)["workspace"], captured);
             let saved = save(&owner);
-            let reopened = NativeObjectHistory::from_project_file("nullable-panel-fresh", &saved).unwrap();
+            let reopened =
+                NativeObjectHistory::from_project_file("nullable-panel-fresh", &saved).unwrap();
             assert_eq!(save(&reopened), saved);
             assert_eq!(fields(&reopened)["workspace"]["panelOrder"], Value::Null);
             assert_eq!(owner.history_depths(), (0, 0));
