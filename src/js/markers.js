@@ -23,7 +23,6 @@
   }
   function ordinal(m, origin) { return origin && origin.composition.markers.indexOf(m) >= 0 ? m.ordinal : null; }
 
-
   function compMarkers() {
     if (native()) { var p = projection(); return p ? p.composition.markers : []; }
     if (!state.markers) state.markers = [];
@@ -43,7 +42,7 @@
   // ---- model ----------------------------------------------------------
   function addCompMarker(frame, name, origin) {
     if (native()) {
-      origin = origin || projection();
+      origin = arguments.length > 2 ? origin : projection();
       frame = Math.max(0, Math.min(state.totalFrames - 1, frame == null ? state.currentFrame : frame));
       return intent({ kind: 'addMarker', frame: frame, name: name || '', color: DEFAULT_COLOR }, origin);
     }

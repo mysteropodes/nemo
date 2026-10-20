@@ -129,7 +129,11 @@
         "object_fill_native_raster.rs",
         "object_fill_regenerate.rs",
         "object_fill_trace_plan.rs",
-        "object_fill_trace_record.rs"
+        "object_fill_trace_record.rs",
+        "project_metadata_fields.rs",
+        "project_metadata_wire.rs",
+        "project_metadata_annotations.rs",
+        "project_metadata_presets.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -292,7 +296,8 @@
         "object_layer_playhead_cut_owner.rs",
         "object_audio_track_edit_owner.rs",
         "object_fill_trace_owner.rs",
-        "object_property_bake_edit.rs"
+        "object_property_bake_edit.rs",
+        "object_project_composition_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -726,7 +731,8 @@
         "object_text_read.rs",
         "object_text_font_resources.rs",
         "object_layer_range_snapshot.rs",
-        "object_property_target_pages.rs"
+        "object_property_target_pages.rs",
+        "object_project_composition_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1581,7 +1587,14 @@
         "object_fill_trace_history.rs",
         "object_fill_trace_native.rs",
         "property_expression_bake.rs",
-        "object_expression_bake.rs"
+        "object_expression_bake.rs",
+        "project_metadata_fields.rs",
+        "project_metadata_annotations.rs",
+        "project_metadata_presets.rs",
+        "object_composition_dispatch.rs",
+        "object_composition_read.rs",
+        "object_composition_public.rs",
+        "object_composition_public_reads.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1969,6 +1982,7 @@
         "native_text_read_dispatch_tests.rs",
         "native_property_edit_dispatch_tests.rs",
         "native_property_bake_dispatch_tests.rs",
+        "native_composition_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
         "native_asset_remove_dispatch_tests.rs",

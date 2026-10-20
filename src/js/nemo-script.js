@@ -26,6 +26,11 @@
   var _log = [];
   function note(w) { _log.push(w); }
   function fail(msg) { throw new Error('nemo: ' + msg); }
+  function compositionRead() {
+    var c = window.NemoNativeCompositionController, p = c && c.read();
+    if (!p) fail('Native composition is unavailable');
+    return p.composition;
+  }
 
   // ---- helpers over the app's own state ----
   function layerAt(i) {
@@ -529,7 +534,7 @@
       trimToWorkArea: function () { window.SM.trimToWorkArea(); return api.comp; },
 
       // Beat grid. `bpm` alone shows it; 0 hides it.
-      get bpm() { if (window.__TAURI__ && window.__TAURI__.core) { var c = window.NemoNativeCompositionController, p = c && c.read(); return p && p.composition.effectiveBpmShow ? p.composition.effectiveBpm : 0; } return state.bpmShow ? state.bpm : 0; },
+      get bpm() { if (window.__TAURI__ && window.__TAURI__.core) { var c = compositionRead(); return c.effectiveBpmShow ? c.effectiveBpm : 0; } return state.bpmShow ? state.bpm : 0; },
       set bpm(v) {
         if (window.__TAURI__ && window.__TAURI__.core) fail('Native BPM edits require the composition application API');
         var n = Number(v) || 0;
@@ -537,7 +542,7 @@
         state.bpmShow = n > 0;
         if (window.SMBpm) SMBpm.refresh();
       },
-      get bpmOffset() { if (window.__TAURI__ && window.__TAURI__.core) { var c = window.NemoNativeCompositionController, p = c && c.read(); return p ? p.composition.effectiveBpmOffset : 0; } return state.bpmOffset || 0; },
+      get bpmOffset() { if (window.__TAURI__ && window.__TAURI__.core) { return compositionRead().effectiveBpmOffset; } return state.bpmOffset || 0; },
       set bpmOffset(v) { if (window.__TAURI__ && window.__TAURI__.core) fail('Native BPM edits require the composition application API'); state.bpmOffset = v | 0; if (window.SMBpm) SMBpm.refresh(); },
       // Nearest beat to a frame — for snapping keys to the music.
       beat: function (frame) {
@@ -560,7 +565,7 @@
     // ---- nemo.markers — composition markers ----------------------------
     api.markers = {
       list: function () {
-        return (window.SMMarkers ? SMMarkers.compMarkers() : []).map(function (m) { return { frame: m.frame, name: m.name || '', color: m.color || null }; });
+        return (window.__TAURI__ && window.__TAURI__.core ? compositionRead().markers : state.markers || []).map(function (m) { return { frame: m.frame, name: m.name || '', color: m.color || null }; });
       },
       add: function (frame, name) {
         if (window.__TAURI__ && window.__TAURI__.core) fail('Native marker edits require the composition application API');

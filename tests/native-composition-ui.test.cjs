@@ -148,3 +148,25 @@ test('retirement during a pinned read prevents publication and ordinary controls
   assert.equal(await refresh,null);await h.settled();assert.equal(h.controller.read(),null);
   h.root.SMMarkers.addCompMarker(4,'late');h.root.SMBpm.toggle();assert.equal(h.edits().length,0);h.unchanged();
 });
+
+// Exercise the retained scripting entry itself, without constructing a parallel API.
+test('legacy scripting reads native projection and refuses synchronous metadata writes',async()=>{
+  const h=fixture();await h.ready();
+  h.root.NemoNativeLayerPlayheadCutUI={scripting:()=>()=>{}};
+  vm.runInContext(fs.readFileSync(require.resolve('../src/js/nemo-script.js'),'utf8'),vm.createContext(h.root));
+  const api=h.root.SMScript.api();
+  assert.equal(api.comp.bpm,0);assert.equal(api.comp.bpmOffset,0);assert.equal(api.markers.list().length,2);
+  assert.throws(()=>{api.comp.bpm=140;},/composition application API/);
+  assert.throws(()=>{api.comp.bpmOffset=12;},/composition application API/);
+  assert.throws(()=>api.markers.add(3,'script'),/composition application API/);
+  assert.throws(()=>api.markers.removeAt(2.5),/composition application API/);
+  h.unchanged();assert.equal(h.edits().length,0);h.retire();
+  assert.throws(()=>api.markers.list(),/composition is unavailable/);
+  assert.throws(()=>api.comp.bpm,/composition is unavailable/);
+});
+
+test('a ruler menu opened before native readiness never acquires a later document',async()=>{
+  const h=fixture();h.elements['bars-row'].fire('contextmenu');
+  const action=h.menus[0].find(x=>x.label.startsWith('Ajouter un repère ici'));
+  await h.ready();action.action();await h.settled();assert.equal(h.edits().length,0);h.unchanged();
+});

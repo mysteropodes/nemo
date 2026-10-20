@@ -105,7 +105,9 @@
         "src/native_audio_track_contract_tests.rs",
         "src/native_audio_track_wire_tests.rs",
         "src/native_fill_trace_contract_tests.rs",
-        "src/native_fill_trace_wire.rs"
+        "src/native_fill_trace_wire.rs",
+        "src/native_composition_contract.rs",
+        "src/native_composition_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
