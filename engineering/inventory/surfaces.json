@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f3cfc3be4fecea571a1d669f9f84f7b5192a90a4",
-  "describe": "v0.7.0-alpha.4-2574-gf3cfc3be"
+  "head": "c8a7ec57f9ed03a488572a8bc8be38dd9c0ae36e",
+  "describe": "v0.7.0-alpha.4-2595-gc8a7ec57"
  },
- "inputsDigest": "68c2f79eb8fc01cd3647005798f73d55f9770070cf02311c58ef0c7d7f427613",
+ "inputsDigest": "e112e1255a1a8c4313d60737fa4f8ed043dc5b7d957e981ab67f7892797dea0d",
  "states": [
   "inventoried",
   "characterized",
@@ -57,7 +57,7 @@
    "animation": 445,
    "history": 357,
    "selection": 381,
-   "render": 481,
+   "render": 482,
    "persist": 412
   }
  },
@@ -326,7 +326,7 @@
   },
   "SMShadowBrush": {
    "file": "src/js/shadow-brush-bridge.js",
-   "line": 151,
+   "line": 183,
    "members": 0
   },
   "SMStoryboard": {
@@ -3428,7 +3428,8 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 1
+    "native": 1,
+    "render": 2
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -3440,7 +3441,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 111,
+    "functionsVisited": 156,
     "via": "chain",
     "references": []
    },
@@ -5398,7 +5399,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:10257",
-     "src/js/tools.js:7617 onMouseDown()",
+     "src/js/tools.js:7560 onMouseDown()",
      "src/js/timeline.js:3859 updateFsSelPanel()",
      "src/js/timeline.js:6313 paintFillSwatches()",
      "src/js/viewtools-bridge.js:121 setColorUI()"
@@ -5449,8 +5450,8 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:10265",
-     "src/js/tools.js:7614 onMouseDown()",
-     "src/js/tools.js:7616 onMouseDown()",
+     "src/js/tools.js:7557 onMouseDown()",
+     "src/js/tools.js:7559 onMouseDown()",
      "src/js/timeline.js:3871 updateFsSelPanel()",
      "src/js/timeline.js:6303 paintStrokeSwatches()",
      "src/js/viewtools-bridge.js:117 setColorUI()"
@@ -9108,7 +9109,7 @@
     "container": "assets-view-media",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 62,
+    "functionsVisited": 63,
     "via": "variable input",
     "references": []
    },
@@ -10594,7 +10595,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:667 _syncFillEnabledUI()",
-     "src/js/tools.js:7617 onMouseDown()",
+     "src/js/tools.js:7560 onMouseDown()",
      "src/js/viewtools-bridge.js:124 setColorUI()"
     ]
    },
@@ -12516,8 +12517,11 @@
     "functionsVisited": 1,
     "via": "chain",
     "references": [
-     "src/js/shadow-brush-bridge.js:67 arm()",
-     "src/js/shadow-brush-bridge.js:71 disarm()"
+     "src/js/adapters/native-shadow-ui.js:27 disarm()",
+     "src/js/adapters/native-shadow-ui.js:67 edit()",
+     "src/js/adapters/native-shadow-ui.js:88 install()",
+     "src/js/shadow-brush-bridge.js:84 arm()",
+     "src/js/shadow-brush-bridge.js:88 disarm()"
     ]
    },
    "fixtures": [
@@ -13244,7 +13248,7 @@
      "src/js/timeline.js:728 setBrushPreset()",
      "src/js/timeline.js:3623 _restoreDrawingDefaults()",
      "src/js/timeline.js:3777 updateSelPropsPanel()",
-     "src/js/tools.js:7619 onMouseDown()",
+     "src/js/tools.js:7562 onMouseDown()",
      "src/js/viewtools-bridge.js:167 pick()",
      "src/js/viewtools-bridge.js:170 pick()"
     ]
@@ -14239,7 +14243,7 @@
      "src/js/timeline.js:664 _syncFillEnabledUI()",
      "src/js/timeline.js:3858 updateFsSelPanel()",
      "src/js/timeline.js:6312 paintFillSwatches()",
-     "src/js/tools.js:7617 onMouseDown()",
+     "src/js/tools.js:7560 onMouseDown()",
      "src/js/viewtools-bridge.js:122 setColorUI()"
     ]
    },
@@ -14287,7 +14291,7 @@
     "functionsVisited": 77,
     "via": "chain",
     "references": [
-     "src/js/tools.js:7617 onMouseDown()",
+     "src/js/tools.js:7560 onMouseDown()",
      "src/js/timeline.js:3859 updateFsSelPanel()",
      "src/js/timeline.js:6313 paintFillSwatches()",
      "src/js/viewtools-bridge.js:121 setColorUI()"
@@ -14333,8 +14337,8 @@
     "references": [
      "src/js/timeline.js:3870 updateFsSelPanel()",
      "src/js/timeline.js:6302 paintStrokeSwatches()",
-     "src/js/tools.js:7614 onMouseDown()",
-     "src/js/tools.js:7616 onMouseDown()",
+     "src/js/tools.js:7557 onMouseDown()",
+     "src/js/tools.js:7559 onMouseDown()",
      "src/js/viewtools-bridge.js:118 setColorUI()"
     ]
    },
@@ -14382,8 +14386,8 @@
     "functionsVisited": 88,
     "via": "chain",
     "references": [
-     "src/js/tools.js:7614 onMouseDown()",
-     "src/js/tools.js:7616 onMouseDown()",
+     "src/js/tools.js:7557 onMouseDown()",
+     "src/js/tools.js:7559 onMouseDown()",
      "src/js/timeline.js:3871 updateFsSelPanel()",
      "src/js/timeline.js:6303 paintStrokeSwatches()",
      "src/js/viewtools-bridge.js:117 setColorUI()"
@@ -30694,7 +30698,7 @@
    "source": "src/js/timeline.js:6474",
    "meta": {
     "i18n": null,
-    "functionsVisited": 149
+    "functionsVisited": 150
    },
    "fixtures": [
     "keyed-props",
