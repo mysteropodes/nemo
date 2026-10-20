@@ -1,6 +1,9 @@
 //! Immutable supplied project settings, not a document owner, wire codec or UI command.
 //! Supplied settings share the existing project revision owner.
 
+#[path = "project_metadata_fields.rs"]
+mod visual;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectMetadataError {
     InvalidCanvas,
@@ -8,6 +11,7 @@ pub(crate) enum ProjectMetadataError {
     InvalidCanvasBackground,
     InvalidWorkArea,
     InvalidCompositionMetadata,
+    InvalidVisualMetadata,
 }
 
 /// Exact accepted spelling plus straight sRGB RGBA8, including the source alpha.
@@ -72,6 +76,7 @@ pub(crate) struct ProjectMetadata {
     bpm: Option<f64>,
     bpm_offset: Option<f64>,
     bpm_show: Option<bool>,
+    visual: visual::VisualMetadata,
 }
 impl ProjectMetadata {
     /// The existing constructor API and positive finite storage FPS are preserved.
@@ -97,6 +102,7 @@ impl ProjectMetadata {
             bpm: None,
             bpm_offset: None,
             bpm_show: None,
+            visual: visual::VisualMetadata::default(),
         })
     }
     pub(crate) fn with_canvas_dimensions(
