@@ -202,11 +202,13 @@ pub(super) fn prepare(
 
 /// One route for ordinary UI and bundled MCP; the existing dispatcher keeps
 /// raw-envelope admission, requestId replay, cancel/stale checks and one commit.
-pub fn dispatch_object_command(
-    owner: &mut NativeObjectHistory,
-    request: &OpacityRequest,
-) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
-    owner.try_dispatch_object_command_with_bake(request, prepare)
+impl NativeObjectHistory {
+    pub fn dispatch_object_command(
+        &mut self,
+        request: &OpacityRequest,
+    ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
+        self.try_dispatch_object_command_with_bake(request, prepare)
+    }
 }
 
 #[cfg(test)]

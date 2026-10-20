@@ -2,7 +2,7 @@
 use crate::history::NativeObjectHistory;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_document::{ProjectEnvelope, ProjectMetadata};
-use crate::object_expression_bake::{dispatch_object_command, prepare};
+use crate::object_expression_bake::prepare;
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest};
 use serde_json::{json, Value};
 
@@ -49,7 +49,7 @@ fn request(owner: &NativeObjectHistory, id: &str, payload: Value) -> OpacityRequ
     .unwrap()
 }
 fn dispatch(owner: &mut NativeObjectHistory, request: &OpacityRequest) -> Value {
-    serde_json::to_value(dispatch_object_command(owner, request).unwrap().unwrap()).unwrap()
+    serde_json::to_value(owner.dispatch_object_command(request).unwrap().unwrap()).unwrap()
 }
 
 #[test]

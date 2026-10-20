@@ -1,5 +1,3 @@
-pub use crate::object_expression_bake::dispatch_object_command;
-
 use crate::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::export_job::{
     ExportBegin, ExportCompositor, ExportFrameInput, ExportJobError, ExportJobErrorKind,
