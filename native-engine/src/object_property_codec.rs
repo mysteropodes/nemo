@@ -1,5 +1,5 @@
 //! Codec error adaptation for the existing property-holder admission.
-use super::{
+use crate::object_codec::{
     ImageMeshStore, ObjectCodecError, ObjectCodecErrorKind, ObjectLayer, ObjectRecord, Presence,
     PropertyHolder,
 };

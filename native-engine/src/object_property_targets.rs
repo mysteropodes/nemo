@@ -90,7 +90,7 @@ impl PropertyHolder {
         )
     }
     pub(crate) fn vertex_index(property: &str) -> Option<usize> {
-        super::catalog::vertex_index(property)
+        crate::object_document::properties::catalog::vertex_index(property)
     }
     pub(crate) fn bound_mesh<'a>(
         document: &'a ObjectDocument,
@@ -129,12 +129,12 @@ impl PropertyHolder {
         &self,
         document: &ObjectDocument,
         property: &str,
-    ) -> Option<super::PropertyMetadata> {
+    ) -> Option<crate::object_document::PropertyMetadata> {
         if Self::target_ambiguous(document, self.target()) {
             return None;
         }
         let mut metadata = self.metadata(property)?;
-        if let Some(index) = super::catalog::vertex_index(property) {
+        if let Some(index) = crate::object_document::properties::catalog::vertex_index(property) {
             let count = Self::vertex_count(document, self.target())?;
             if index >= count && !self.properties().iter().any(|r| r.property() == property) {
                 return None;

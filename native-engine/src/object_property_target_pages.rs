@@ -1,5 +1,9 @@
 //! Bounded metadata pages over actual path, item and stable mesh holder identities.
-use super::*;
+use crate::object_codec::FrameScopeKind;
+use crate::object_snapshot::property_metadata_read::{invalid, metadata_context_parts};
+use crate::request_receipts::DispatchErrorCode;
+use crate::revision::ObjectSnapshot;
+use serde_json::{json, Value};
 use std::collections::HashSet;
 impl ObjectSnapshot {
     pub(super) fn metadata_target_page(

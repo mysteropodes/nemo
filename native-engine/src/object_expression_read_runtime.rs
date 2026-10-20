@@ -1,6 +1,6 @@
 //! Native read callbacks live only inside one interrupted guest context.
 //! Recursive property reads retain the same snapshot and execution budget.
-use super::{evaluate_shared, reads::SnapshotReads};
+use crate::object_expression_runtime::property::{evaluate_shared, reads::SnapshotReads};
 use crate::evaluation::property_expression_runtime::{evaluate_with_fallback, Outcome};
 use crate::object_expression_pin::{
     prepare_retained_property_expression_request, PropertyDependencyEffect,
@@ -146,12 +146,12 @@ pub(super) fn call_property<'js>(
 ) -> rquickjs::Result<JsValue<'js>> {
     let source = format!(
         "function(__read,frame){{{}\nreturn{{{}}};}}",
-        super::bridge::PRELUDE,
-        super::bridge::READ_NAMES.join(",")
+        crate::object_expression_runtime::property::bridge::PRELUDE,
+        crate::object_expression_runtime::property::bridge::READ_NAMES.join(",")
     );
     let factory = crate::object_expression_runtime::eval_single_function(ctx, &source)?;
     let scope: Object = factory.call((read, request.frame()))?;
-    let mut args = Args::new(ctx.clone(), super::bridge::READ_NAMES.len() + 3);
+    let mut args = Args::new(ctx.clone(), crate::object_expression_runtime::property::bridge::READ_NAMES.len() + 3);
     if request.raw().len() == 1 {
         args.push_arg(request.raw()[0])?;
     } else {
@@ -161,7 +161,7 @@ pub(super) fn call_property<'js>(
     if let Some(time) = time {
         args.push_arg(time)?;
     }
-    for name in super::bridge::READ_NAMES {
+    for name in crate::object_expression_runtime::property::bridge::READ_NAMES {
         args.push_arg(scope.get::<_, JsValue>(*name)?)?;
     }
     function.call_arg(args)
