@@ -72,7 +72,9 @@ fn one_palette() -> Value {
 fn public_create_replays_one_commit_and_retains_old_snapshot_and_unrelated_fields() {
     let extra = json!({"workspace":{"panelOrder":null},"guides":{"h":[-0.25]},
         "comments":[{"text":"Keep","authorName":"Writer"}],"bpm":137.5,
-        "customBrushPresets":{"brush":{"label":"Preset","nibSize":0.5}}});
+        "customBrushPresets":{"brush":{"label":"Preset","nibSize":0.5}},
+        "cameraKeys":[{"frame":0,"x":12,"y":24,"w":64,"rot":0,"hIn":[0,0]}],
+        "cameraLayerOn":false});
     let mut o = owner(extra.clone());
     let old = pin(&o);
     let before = saved(&o);

@@ -1,7 +1,8 @@
 //! Strict project metadata DTO shared by both native envelope versions.
 use crate::object_codec::project::ProjectWireError;
 use crate::object_document::{
-    Presence, ProjectCommentRecord, ProjectMetadata, ProjectPresetCatalog, ProjectWorkspaceRecord,
+    Presence, ProjectCameraKey, ProjectCommentRecord, ProjectMetadata, ProjectPresetCatalog,
+    ProjectWorkspaceRecord,
 };
 use serde::{Deserialize, Serialize};
 
@@ -105,6 +106,10 @@ pub(super) struct Metadata {
     comments: Presence<Vec<ProjectCommentRecord>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     custom_brush_presets: Presence<ProjectPresetCatalog>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    camera_keys: Presence<Vec<ProjectCameraKey>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    camera_layer_on: Presence<bool>,
 }
 // Derived decoding alone admits positional arrays; reuse the drawing's
 // object-only visitor with strict duplicate/unknown/required-member checks.
@@ -130,7 +135,9 @@ crate::object_document::object_deserialize!(Metadata {
     #[serde(default,rename="perspectiveVPs")] perspective_vps:Presence<Option<Vec<VanishingPoint>>>,
     #[serde(default)] workspace:Presence<ProjectWorkspaceRecord>,
     #[serde(default)] comments:Presence<Vec<ProjectCommentRecord>>,
-    #[serde(default)] custom_brush_presets:Presence<ProjectPresetCatalog>
+    #[serde(default)] custom_brush_presets:Presence<ProjectPresetCatalog>,
+    #[serde(default)] camera_keys: Presence<Vec<ProjectCameraKey>>,
+    #[serde(default)] camera_layer_on: Presence<bool>
 });
 
 impl Metadata {
@@ -207,6 +214,12 @@ impl Metadata {
             })
             .and_then(|value| {
                 value.with_custom_brush_presets(self.custom_brush_presets.value().cloned())
+            })
+            .and_then(|value| {
+                value.with_camera(
+                    self.camera_keys.value().cloned(),
+                    self.camera_layer_on.value().copied(),
+                )
             })
             .map_err(|_| ProjectWireError::Invalid)
     }
@@ -298,6 +311,14 @@ impl Metadata {
                         .collect()
                 })
             })),
+            camera_keys: value
+                .camera_keys()
+                .map(|keys| Presence::Present(keys.to_vec()))
+                .unwrap_or(Presence::Missing),
+            camera_layer_on: value
+                .camera_layer_on()
+                .map(Presence::Present)
+                .unwrap_or(Presence::Missing),
         }
     }
 }

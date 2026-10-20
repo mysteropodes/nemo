@@ -13,6 +13,10 @@ mod asset_wire;
 #[cfg(feature = "project_media_codec")]
 pub(crate) use asset_wire::{prepare_project_wire, DecodedProjectWire, PreparedProjectWire};
 
+#[path = "project_metadata_wire.rs"]
+mod metadata;
+use metadata::Metadata;
+
 const FORMAT: &str = "nemo.native-project-document";
 const MAX_ENVELOPE: usize = 32 * 1024 * 1024;
 const MAX_DRAWING: usize = 8 * 1024 * 1024;
@@ -118,10 +122,6 @@ struct Input<'a> {
     #[serde(borrow)]
     assets: &'a RawValue,
 }
-
-#[path = "project_metadata_wire.rs"]
-mod metadata_wire;
-use metadata_wire::Metadata;
 
 pub(crate) fn decode_project(
     bytes: &[u8],

@@ -30,6 +30,9 @@ use crate::request_receipts::DispatchErrorCode;
 
 #[path = "object_fill_trace_owner.rs"]
 mod fill_trace;
+#[cfg(feature = "evaluation")]
+#[path = "object_boolean_frame_motion.rs"]
+mod frame_motion;
 #[path = "object_boolean_ops_payload.rs"]
 mod wire;
 use wire::{
@@ -184,6 +187,17 @@ fn scope_of(layer_uid: String, context_id: String, frame: u32) -> Scope {
     }
 }
 
+fn flatten_payload(bytes: &[u8]) -> Result<FlattenPayload, DispatchErrorCode> {
+    let payload: FlattenPayload = parse(bytes)?;
+    if payload.command != "object.boolean.flatten"
+        || !target_ok(&payload.layer_uid, &payload.context_id)
+        || !text_ok(&payload.group_id)
+    {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    Ok(payload)
+}
+
 impl ObjectFillOwner {
     pub(crate) fn prepare_boolean_op_json(
         &self,
@@ -236,12 +250,27 @@ impl ObjectFillOwner {
         )
     }
 
-    /// Flatten with the production Motion port: a member animated by element Motion is
-    /// refused as unavailable until the evaluator is connected.
+    /// Flatten samples element Motion from the exact snapshot sealed by the edit.
     pub(crate) fn prepare_boolean_flatten_json(
         &self,
         bytes: &[u8],
     ) -> Result<PreparedBooleanEdit, DispatchErrorCode> {
+        #[cfg(feature = "evaluation")]
+        {
+            let payload = flatten_payload(bytes)?;
+            let origin = self.current_snapshot();
+            let motion = frame_motion::from_snapshot(&origin, payload.frame);
+            return PreparedBooleanEdit::seal(
+                origin.clone(),
+                BooleanEditKind::Flatten,
+                &scope_of(payload.layer_uid, payload.context_id, payload.frame),
+                &BooleanRequest::Flatten {
+                    group: payload.group_id,
+                },
+                &motion,
+            );
+        }
+        #[cfg(not(feature = "evaluation"))]
         self.prepare_boolean_flatten_with(bytes, &UnavailableMotion)
     }
 
@@ -251,13 +280,7 @@ impl ObjectFillOwner {
         bytes: &[u8],
         motion: &dyn ElementMotionSource,
     ) -> Result<PreparedBooleanEdit, DispatchErrorCode> {
-        let payload: FlattenPayload = parse(bytes)?;
-        if payload.command != "object.boolean.flatten"
-            || !target_ok(&payload.layer_uid, &payload.context_id)
-            || !text_ok(&payload.group_id)
-        {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
+        let payload = flatten_payload(bytes)?;
         let origin = self.current_snapshot();
         PreparedBooleanEdit::seal(
             origin,

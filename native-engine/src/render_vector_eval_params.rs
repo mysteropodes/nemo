@@ -190,12 +190,17 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
         if record.family != VECTOR_FAMILY {
             return false;
         }
-        let Ok(Some(shape)) = shape_of(record) else {
-            return false;
+        let keys = match shape_of(record) {
+            Ok(Some(shape)) => keys_of(shape.kind()),
+            Ok(None) => &[],
+            Err(_) => return false,
         };
-        let keys = keys_of(shape.kind());
         let consumed = holder.properties().iter().all(|property| {
-            keys.iter().any(|key| *key == property.property())
+            (keys.iter().any(|key| *key == property.property())
+                || matches!(
+                    property.property(),
+                    "position" | "anchor" | "rotation" | "scale"
+                ))
                 && !property.expression.value().is_some_and(|code| code.enabled)
         });
         if !consumed {

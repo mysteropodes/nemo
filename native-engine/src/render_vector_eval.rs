@@ -336,7 +336,7 @@ fn evaluate_stored_rest(
     Ok(EvaluatedVector {
         source_object_index: object_index,
         closed: after_effects.closed,
-        segments,
+        segments: motion::apply_element_motion(snapshot, stored.record, frame, segments)?,
     })
 }
 
@@ -420,6 +420,7 @@ pub(crate) fn evaluate_record_with_pose(
             handle_out: segment.handle_out,
         })
         .collect();
+    let segments = motion::apply_element_motion(snapshot, stored.record, packet.frame(), segments)?;
     Ok(EvaluatedVector {
         source_object_index: source.source_object_index(),
         closed: pose.closed,
