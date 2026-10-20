@@ -304,7 +304,8 @@
         "object_text_animator_commands.rs",
         "object_text_animator_edit.rs",
         "object_project_composition_edit.rs",
-        "object_project_palette_edit.rs"
+        "object_project_palette_edit.rs",
+        "object_project_guide_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -746,7 +747,8 @@
         "object_property_target_pages.rs",
         "object_project_composition_read.rs",
         "object_project_palette_read.rs",
-        "object_boolean_frame_motion.rs"
+        "object_boolean_frame_motion.rs",
+        "object_project_guide_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1615,7 +1617,8 @@
         "object_palette_public.rs",
         "object_frame_motion_values.rs",
         "object_frame_camera.rs",
-        "object_boolean_frame_motion.rs"
+        "object_boolean_frame_motion.rs",
+        "object_guide_public.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -8,15 +8,16 @@ use crate::history::NativeObjectHistory;
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest};
 use crate::transaction::{CompactResult, RetainedDisposition};
 
-// These three field-specific namespaces share preparation/commit, not action shapes.
+// These field-specific namespaces share preparation/commit, not action shapes.
 pub(super) const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
 const OP_PROJECT_COMPOSITION: &str = "command.document.object.project.composition.edit";
 const OP_PROJECT_PALETTE: &str = "command.document.object.project.palette.edit";
+const OP_PROJECT_GUIDE: &str = "command.document.object.project.guide.edit";
 
 pub(super) fn is_project_settings_operation(operation: &str) -> bool {
     matches!(
         operation,
-        OP_PROJECT_SETTINGS | OP_PROJECT_COMPOSITION | OP_PROJECT_PALETTE
+        OP_PROJECT_SETTINGS | OP_PROJECT_COMPOSITION | OP_PROJECT_PALETTE | OP_PROJECT_GUIDE
     )
 }
 
@@ -154,6 +155,7 @@ impl NativeObjectHistory {
             OP_PROJECT_SETTINGS => self.prepare_project_settings_json(&payload),
             OP_PROJECT_COMPOSITION => self.prepare_composition_delta_json(&payload),
             OP_PROJECT_PALETTE => self.prepare_palette_delta_json(&payload),
+            OP_PROJECT_GUIDE => self.prepare_guide_delta_json(&payload),
             _ => {
                 return Err((
                     DispatchErrorCode::InvalidRequest,

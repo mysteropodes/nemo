@@ -305,6 +305,15 @@ impl ObjectSnapshot {
                 "Native palette metadata is unavailable.",
             );
         }
+        if request.operation == "query.document.object.project.guide.read" {
+            #[cfg(all(feature = "history", feature = "project_media_codec"))]
+            return self.dispatch_guide_read(&request);
+            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native guide metadata is unavailable.",
+            );
+        }
         if request.operation != "query.document.object" {
             return failure(
                 DispatchErrorCode::InvalidRequest,

@@ -10,6 +10,8 @@ use serde_json::Number;
 mod composition_delta;
 #[path = "object_project_palette_edit.rs"]
 mod palette_delta;
+#[path = "object_project_guide_edit.rs"]
+mod guide_delta;
 
 #[derive(Debug)]
 struct CompositionMarkerInput {
