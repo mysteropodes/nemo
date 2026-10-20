@@ -166,3 +166,22 @@ test('ordinary native Motion bake uses the existing exact pinned public intent a
  await retired.fire('click');assert.equal(writes.length,1,'retired owner cannot reuse the old native intent');
  h.retire();
 });
+
+test('real Order inspector exposes its bake and reads without granting unavailable generic value or key writes',async()=>{
+ const Panel=require('../src/js/adapters/native-motion-property-panel.js'),doc=document(),container=doc.createElement('div');doc.body.appendChild(container);
+ const pin={instanceId:'order-instance',documentId:'order-document',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'order-snapshot'},target={contextId:'scene-root',layerUid:'L0'};
+ const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
+ const row=clone(fixture.propertyPageOracle.find(r=>r.property==='opacity'));row.property='order';row.authored={availability:'available',keyCount:2,hasStaticOverride:true,expressionEnabled:true};
+ const categories=clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories),writes=[];
+ const panel=Panel.create(container,{document:doc,readContext:context,readSelection:()=>target,readSelections:()=>[target],readContextId:()=>target.contextId,
+  async query(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.kind==='targets'?null:q.view.target,items:q.view.kind==='targets'?[{kind:'context',contextId:target.contextId},{kind:'layer',target}]:[clone(row)],nextOffset:null,unavailableCategories:categories};},
+  async readProperty(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.target,property:'order',dimension:1,...q.view.kind==='rawSample'?{frame:q.view.frame,value:[20]}:{trackPresent:true,items:[{frame:0,v:[17]},{frame:15,v:[32]}],nextOffset:null}};},
+  async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},editPropertyTrack(){throw Error('Order generic track writer must remain unavailable');}});
+ assert.equal(await panel.refresh(true),true);await tick();await tick();
+ const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.type==='number');assert.ok(numeric.length);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
+ const bake=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Bake expression');assert.ok(bake);await bake.fire('click');
+ assert.equal(writes.length,1);assert.equal(writes[0].property,'order');assert.deepEqual(writes[0].action,{kind:'bake'});
+ await tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');await tick();
+ const checks=tree(container).filter(n=>n.type==='checkbox');assert.equal(checks.length,2);assert.ok(checks.every(n=>n.disabled));
+ assert.equal(panel.readKeyTimeline().selectFrames([0]),false);assert.equal(writes.length,1);panel.dispose();
+});
