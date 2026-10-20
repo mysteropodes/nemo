@@ -26,15 +26,14 @@
 //! frames; like the catalog it refuses a result beyond +-(2^53 - 1) instead of
 //! rounding it the way a JS double would.
 //!
-//! T12: the bounded remap intents (enable, disable, remove key) and
+//! T12: [`PlacementEdit::TimeRemap`] (enable, disable, remove or set a key) and
 //! [`PlacementEdit::SetInterpMode`] own a video placement's stored timing,
 //! each within the 4 KiB request budget; every rebuilt placement keeps it.
 
 use crate::object_document::object_raster_asset_kernels::object_raster_asset_placement::image_element_exists;
-use crate::object_document::placement_offset::VideoTiming;
+use crate::object_document::placement_offset::{RemapIntent, RemapRefusal, VideoTiming};
 use crate::object_document::{
-    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetTarget, FrameScopeKind,
-    ObjectDocument, OrderTrack,
+    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetTarget, FrameScopeKind, ObjectDocument,
 };
 
 /// Most catalog records the project wire admits.
@@ -254,20 +253,10 @@ pub(crate) enum PlacementEdit {
     },
     /// Remove a placement; the catalog records stay.
     Remove { placement_id: String },
-    /// T12 `enableTimeRemap` (motion.js): keys `{in, v:[0]}` and
-    /// `{max(in + 1, out), v:[last]}`, linear; refused when one exists.
-    EnableTimeRemap {
+    /// T12: one bounded `timeRemap` intent (enable/disable/remove or set a key).
+    TimeRemap {
         placement_id: String,
-        in_frame: serde_json::Number,
-        out_frame: serde_json::Number,
-        last_source_frame: serde_json::Number,
-    },
-    /// T12 `disableTimeRemap`: `delete ld.timeRemap`.
-    DisableTimeRemap { placement_id: String },
-    /// T12: remove the remap key at `frame` (the property `removeKey` rule).
-    RemoveTimeRemapKey {
-        placement_id: String,
-        frame: serde_json::Number,
+        intent: RemapIntent,
     },
     /// T12: the footage panel's mode selector (timeline.js), which writes
     /// `interpMode` and `frameBlend = interpMode !== 'none'` together.
@@ -430,39 +419,16 @@ pub(crate) fn apply_edit(
             let at = position(&placements, &placement_id)?;
             placements.remove(at);
         }
-        PlacementEdit::EnableTimeRemap {
+        PlacementEdit::TimeRemap {
             placement_id,
-            in_frame,
-            out_frame,
-            last_source_frame,
+            intent,
         } => {
             let at = position(&placements, &placement_id)?;
-            let track = VideoTiming::enabled_track(&in_frame, &out_frame, &last_source_frame)
-                .ok_or(PlacementEditError::Invalid)?;
-            let set = |timing: &mut VideoTiming| match timing.time_remap {
-                Some(_) => Err(PlacementEditError::Conflict),
-                None => Ok(timing.time_remap = Some(track)),
-            };
-            replace_timing(inventory, &mut placements, at, set)?;
-        }
-        PlacementEdit::DisableTimeRemap { placement_id } => {
-            let at = position(&placements, &placement_id)?;
-            let set = |timing: &mut VideoTiming| Ok(timing.time_remap = None);
-            if !replace_timing(inventory, &mut placements, at, set)? {
-                return Ok(PlacementOutcome::Unchanged);
-            }
-        }
-        PlacementEdit::RemoveTimeRemapKey {
-            placement_id,
-            frame,
-        } => {
-            let at = position(&placements, &placement_id)?;
-            let frame = frame.as_f64().filter(|f| f.is_finite());
             let set = |timing: &mut VideoTiming| {
-                let (Some(track), Some(at)) = (timing.time_remap.as_mut(), frame) else {
-                    return Err(PlacementEditError::Invalid);
-                };
-                Ok(track.keys.retain(|key| key.frame.as_f64() != Some(at)))
+                timing.apply_remap(intent).map_err(|refusal| match refusal {
+                    RemapRefusal::Invalid => PlacementEditError::Invalid,
+                    RemapRefusal::Conflict => PlacementEditError::Conflict,
+                })
             };
             if !replace_timing(inventory, &mut placements, at, set)? {
                 return Ok(PlacementOutcome::Unchanged);

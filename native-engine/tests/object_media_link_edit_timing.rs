@@ -3,7 +3,7 @@
 //! any other asset kind.
 use super::tests::{catalog, document, track};
 use super::*;
-use crate::object_document::placement_offset::VideoTiming;
+use crate::object_document::placement_offset::{RemapIntent, VideoTiming};
 
 fn changed(inventory: &AssetInventory, edit: PlacementEdit) -> AssetInventory {
     match apply_edit(inventory, &document(), edit).unwrap() {
@@ -14,24 +14,33 @@ fn changed(inventory: &AssetInventory, edit: PlacementEdit) -> AssetInventory {
 fn timing(inventory: &AssetInventory) -> VideoTiming {
     inventory.placements()[0].timing().clone()
 }
-fn enable(in_frame: i64, out_frame: i64, last: i64) -> PlacementEdit {
-    PlacementEdit::EnableTimeRemap {
+fn remap(intent: RemapIntent) -> PlacementEdit {
+    PlacementEdit::TimeRemap {
         placement_id: "p1".into(),
+        intent,
+    }
+}
+fn enable(in_frame: i64, out_frame: i64, last: i64) -> PlacementEdit {
+    remap(RemapIntent::Enable {
         in_frame: in_frame.into(),
         out_frame: out_frame.into(),
         last_source_frame: last.into(),
-    }
+    })
 }
 fn disable() -> PlacementEdit {
-    PlacementEdit::DisableTimeRemap {
-        placement_id: "p1".into(),
-    }
+    remap(RemapIntent::Disable)
 }
 fn remove_key(frame: i64) -> PlacementEdit {
-    PlacementEdit::RemoveTimeRemapKey {
-        placement_id: "p1".into(),
+    remap(RemapIntent::RemoveKey {
         frame: frame.into(),
-    }
+    })
+}
+fn set_key(frame: f64, value: f64, curve: Option<serde_json::Value>) -> PlacementEdit {
+    remap(RemapIntent::SetKey {
+        frame: serde_json::Number::from_f64(frame).unwrap(),
+        value: serde_json::Number::from_f64(value).unwrap(),
+        curve: curve.map(|c| serde_json::from_value(c).unwrap()),
+    })
 }
 fn set_mode(mode: &str) -> PlacementEdit {
     PlacementEdit::SetInterpMode {
@@ -156,6 +165,7 @@ fn timing_on_a_non_video_placement_or_an_unknown_one_is_refused() {
         set_mode("blend"),
         disable(),
         remove_key(0),
+        set_key(0.0, 1.0, None),
     ] {
         assert_eq!(
             apply_edit(&audio, &document(), edit),
@@ -170,14 +180,51 @@ fn timing_on_a_non_video_placement_or_an_unknown_one_is_refused() {
         apply_edit(&catalog(), &document(), unknown),
         Err(PlacementEditError::UnknownPlacement)
     );
-    let nan = PlacementEdit::EnableTimeRemap {
-        placement_id: "p1".into(),
+    let nan = remap(RemapIntent::Enable {
         in_frame: 0.into(),
         out_frame: serde_json::Number::from_f64(1e300).unwrap(),
         last_source_frame: (-3).into(),
-    };
+    });
     // Finite numbers are admitted as the caller computed them; a remap value
     // below zero is the baseline's `Math.max(0, ...)` floor.
     let floored = timing(&changed(&catalog(), nan)).time_remap.unwrap();
     assert_eq!(floored.keys[1].v[0].as_f64(), Some(0.0));
+}
+
+#[test]
+fn set_key_uses_the_shared_property_key_kernel() {
+    let on = changed(&catalog(), enable(0, 10, 19));
+    // Without a remap there is no row to key: refused, nothing written.
+    assert_eq!(
+        apply_edit(&catalog(), &document(), set_key(5.0, 3.0, None)),
+        Err(PlacementEditError::Invalid)
+    );
+    // A new key gets the kernel's default curve and zero handles, sorted in.
+    let added = changed(&on, set_key(5.0, 3.0, None));
+    let keys = &timing(&added).time_remap.unwrap().keys;
+    assert_eq!(
+        keys.iter()
+            .map(|k| k.frame.as_f64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![0.0, 5.0, 10.0]
+    );
+    let saved = serde_json::to_value(&keys[1]).unwrap();
+    assert_eq!(saved["v"], serde_json::json!([3.0]));
+    assert_eq!(saved["hIn"], serde_json::json!([0, 0]));
+    assert_eq!(saved["hOut"], serde_json::json!([0, 0]));
+    assert!(saved["curvePoints"].is_array());
+    assert_eq!(timing(&added).remap_value(5.0), Some(3.0));
+    // Re-keying an existing frame replaces its value and keeps its handles;
+    // a curve, when given, replaces the stored one.
+    let hold = serde_json::json!([{"x":0,"y":0},{"x":1,"y":0}]);
+    let moved = changed(&added, set_key(10.0, 7.0, Some(hold.clone())));
+    let last = serde_json::to_value(&timing(&moved).time_remap.unwrap().keys[2]).unwrap();
+    assert_eq!(last["v"], serde_json::json!([7.0]));
+    assert_eq!(last["curvePoints"], hold);
+    assert_eq!(last["hIn"], serde_json::json!([0, 0]));
+    // The same value again is a no-op with the stored spelling kept.
+    assert_eq!(
+        apply_edit(&added, &document(), set_key(5.0, 3.0, None)),
+        Ok(PlacementOutcome::Unchanged)
+    );
 }

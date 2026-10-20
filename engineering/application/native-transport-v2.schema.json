@@ -1399,6 +1399,58 @@
           "required": [
             "kind",
             "placementId",
+            "frame",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "setTimeRemapKey"
+            },
+            "placementId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^(?![\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$)[^\\u0000]+$"
+            },
+            "frame": {
+              "type": "number"
+            },
+            "value": {
+              "type": "number"
+            },
+            "curvePoints": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "tx": {
+                    "type": "number"
+                  },
+                  "ty": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "placementId",
             "interpMode"
           ],
           "properties": {

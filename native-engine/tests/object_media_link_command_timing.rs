@@ -51,6 +51,12 @@ fn timing_edits_persist_and_undo_redo_one_transaction_each() {
         dispatch(&mut o, "m1", mode("blend"))["result"]["applied"],
         true
     );
+    let key = json!({"kind":"setTimeRemapKey","placementId":"p1","frame":10,"value":12,
+        "curvePoints":[{"x":0,"y":0},{"x":1,"y":1}]});
+    assert_eq!(dispatch(&mut o, "s1", key)["result"]["applied"], true);
+    assert_eq!(placement(&o)["timeRemap"]["keys"][1]["v"], json!([12]));
+    o.undo(o.content_revision()).unwrap();
+    assert_eq!(placement(&o)["timeRemap"]["keys"][1]["v"], json!([19]));
     let remove = json!({"kind":"removeTimeRemapKey","placementId":"p1","frame":10});
     assert_eq!(dispatch(&mut o, "k1", remove)["result"]["applied"], true);
     let timed = placement(&o);
@@ -118,6 +124,14 @@ fn malformed_payloads_and_non_video_placements_leave_everything_untouched() {
         (
             "no-remap",
             json!({"kind":"removeTimeRemapKey","placementId":"p1","frame":0}),
+        ),
+        (
+            "key-string",
+            json!({"kind":"setTimeRemapKey","placementId":"p1","frame":0,"value":"1"}),
+        ),
+        (
+            "key-curve",
+            json!({"kind":"setTimeRemapKey","placementId":"p1","frame":0,"value":1,"curvePoints":[{"x":0}]}),
         ),
         (
             "disable-extra",

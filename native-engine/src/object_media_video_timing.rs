@@ -14,7 +14,7 @@
 //! catalog's check (`object_media_link_track::validate`, the edit owner).
 use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::object_document::object_component_record_kernels::object_component_records::validate_remap;
-use crate::object_document::{OrderKey, OrderTrack};
+use crate::object_document::{OrderCurvePoint, OrderKey, OrderTrack};
 use serde_json::Number;
 
 /// The longest authored `interpMode` kept (the baseline values are four to six bytes).
@@ -87,10 +87,78 @@ impl VideoTiming {
         serde_json::from_value(serde_json::json!({ "keys": keys })).ok()
     }
 
+    /// Apply one bounded remap intent; `with_timing` admits the result.
+    pub(crate) fn apply_remap(&mut self, intent: RemapIntent) -> Result<(), RemapRefusal> {
+        let finite = |n: &Number| n.as_f64().filter(|v| v.is_finite());
+        match intent {
+            RemapIntent::Enable {
+                in_frame,
+                out_frame,
+                last_source_frame,
+            } => {
+                if self.time_remap.is_some() {
+                    return Err(RemapRefusal::Conflict);
+                }
+                let track = Self::enabled_track(&in_frame, &out_frame, &last_source_frame);
+                self.time_remap = Some(track.ok_or(RemapRefusal::Invalid)?);
+            }
+            RemapIntent::Disable => self.time_remap = None,
+            RemapIntent::RemoveKey { frame } => {
+                let (Some(track), Some(at)) = (self.time_remap.as_mut(), finite(&frame)) else {
+                    return Err(RemapRefusal::Invalid);
+                };
+                track.keys.retain(|key| key.frame.as_f64() != Some(at));
+            }
+            // The shared property key kernel: an existing key keeps its spelling
+            // and handles, a new one gets the default curve and zero handles.
+            RemapIntent::SetKey {
+                frame,
+                value,
+                curve,
+            } => {
+                let track = self.time_remap.as_mut().ok_or(RemapRefusal::Invalid)?;
+                if finite(&frame).is_none() || finite(&value).is_none() {
+                    return Err(RemapRefusal::Invalid);
+                }
+                track.scalar_intent_key(frame, vec![value], curve);
+            }
+        }
+        Ok(())
+    }
+
     /// Whether the time-remap sampler is consulted (`ld.timeRemap` present).
     pub(crate) fn has_time_remap(&self) -> bool {
         self.time_remap.is_some()
     }
+}
+
+/// The bounded `timeRemap` edits of the baseline UI (motion.js), each one
+/// request under the 4 KiB command budget; no whole-track write exists.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum RemapIntent {
+    /// `enableTimeRemap`: the two linear keys; refused when a remap exists.
+    Enable {
+        in_frame: Number,
+        out_frame: Number,
+        last_source_frame: Number,
+    },
+    /// `disableTimeRemap`: `delete ld.timeRemap`.
+    Disable,
+    /// Remove the keys at `frame` (the property `removeKey` rule).
+    RemoveKey { frame: Number },
+    /// Set the key at `frame` to `value` source frames, optionally its curve.
+    SetKey {
+        frame: Number,
+        value: Number,
+        curve: Option<Vec<OrderCurvePoint>>,
+    },
+}
+
+/// Why a remap intent was refused before admission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RemapRefusal {
+    Invalid,
+    Conflict,
 }
 
 fn frame(key: &OrderKey) -> Option<f64> {

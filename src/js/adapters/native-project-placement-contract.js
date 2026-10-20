@@ -23,6 +23,7 @@
   // T12 video timing: bounded remap intents (baseline enable/disable/remove key) and the footage mode selector; the native owner admits the values.
   const finite=n=>typeof n==='number'&&Number.isFinite(n);
   const frames=(v,names)=>{for(const n of names)if(!finite(v[n]))fail('invalid time remap frame');};
+  function curvePoints(c){if(!Array.isArray(c)||!c.every(p=>{exact(p,['x','y'],['tx','ty']);return ['x','y','tx','ty'].every(k=>!has(p,k)||finite(p[k]));}))fail('invalid time remap curve');}
   function interpMode(m){if(typeof m!=='string'||!m||bytes(m)>32||m.includes('\0'))fail('invalid interpolation mode');}
   function payload(op,v){
     if(op!==OP)fail('placement operation is not declared');
@@ -35,6 +36,7 @@
     else if(v&&v.kind==='enableTimeRemap'){exact(v,['kind','placementId','inFrame','outFrame','lastSourceFrame']);sourceId(v.placementId);frames(v,['inFrame','outFrame','lastSourceFrame']);}
     else if(v&&v.kind==='removeTimeRemapKey'){exact(v,['kind','placementId','frame']);sourceId(v.placementId);frames(v,['frame']);}
     else if(v&&v.kind==='disableTimeRemap'){exact(v,['kind','placementId']);sourceId(v.placementId);}
+    else if(v&&v.kind==='setTimeRemapKey'){exact(v,['kind','placementId','frame','value'],['curvePoints']);sourceId(v.placementId);frames(v,['frame','value']);if(has(v,'curvePoints'))curvePoints(v.curvePoints);}
     else if(v&&v.kind==='setInterpMode'){exact(v,['kind','placementId','interpMode']);sourceId(v.placementId);interpMode(v.interpMode);}
     else fail('invalid placement edit');
   }

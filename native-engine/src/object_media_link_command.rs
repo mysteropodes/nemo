@@ -3,7 +3,8 @@
 //! Audio requires its actual persisted record and sealed source; absent owners still refuse.
 use crate::history::NativeObjectHistory;
 use crate::object_document::media_timing::object_media_link_edit::PlacementEdit;
-use crate::object_document::AssetTarget;
+use crate::object_document::placement_offset::RemapIntent;
+use crate::object_document::{AssetTarget, OrderCurvePoint};
 use crate::request_receipts::DispatchErrorCode;
 use crate::transaction::CompactResult;
 use serde::{Deserialize, Deserializer};
@@ -57,6 +58,15 @@ enum EditIn {
         placement_id: String,
         frame: serde_json::Number,
     },
+    #[serde(rename = "setTimeRemapKey")]
+    SetTimeRemapKey {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        frame: serde_json::Number,
+        value: serde_json::Number,
+        #[serde(rename = "curvePoints", default)]
+        curve: Option<Vec<OrderCurvePoint>>,
+    },
     #[serde(rename = "setInterpMode")]
     SetInterpMode {
         #[serde(rename = "placementId")]
@@ -100,6 +110,13 @@ fn present_id<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Strin
     String::deserialize(deserializer).map(Some)
 }
 
+fn remap(placement_id: String, intent: RemapIntent) -> PlacementEdit {
+    PlacementEdit::TimeRemap {
+        placement_id,
+        intent,
+    }
+}
+
 fn parse_edit(bytes: &[u8]) -> Result<PlacementEdit, DispatchErrorCode> {
     let input: EditIn =
         serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -141,22 +158,32 @@ fn parse_edit(bytes: &[u8]) -> Result<PlacementEdit, DispatchErrorCode> {
             in_frame,
             out_frame,
             last_source_frame,
-        } => PlacementEdit::EnableTimeRemap {
+        } => remap(
             placement_id,
-            in_frame,
-            out_frame,
-            last_source_frame,
-        },
-        EditIn::DisableTimeRemap { placement_id } => {
-            PlacementEdit::DisableTimeRemap { placement_id }
-        }
+            RemapIntent::Enable {
+                in_frame,
+                out_frame,
+                last_source_frame,
+            },
+        ),
+        EditIn::DisableTimeRemap { placement_id } => remap(placement_id, RemapIntent::Disable),
         EditIn::RemoveTimeRemapKey {
             placement_id,
             frame,
-        } => PlacementEdit::RemoveTimeRemapKey {
+        } => remap(placement_id, RemapIntent::RemoveKey { frame }),
+        EditIn::SetTimeRemapKey {
             placement_id,
             frame,
-        },
+            value,
+            curve,
+        } => remap(
+            placement_id,
+            RemapIntent::SetKey {
+                frame,
+                value,
+                curve,
+            },
+        ),
         EditIn::SetInterpMode {
             placement_id,
             interp_mode,
