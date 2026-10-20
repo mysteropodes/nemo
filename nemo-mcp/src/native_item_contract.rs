@@ -29,7 +29,10 @@ const MEDIA: [&str; 7] = [
     "image/svg+xml",
     "image/avif",
 ];
-const RESULT_OPERATIONS: [&str; 9] = [
+#[path = "native_text_animator_contract.rs"]
+mod animator;
+
+const RESULT_OPERATIONS: [&str; 12] = [
     "raster.create",
     "raster.move",
     "raster.resize",
@@ -39,6 +42,9 @@ const RESULT_OPERATIONS: [&str; 9] = [
     "text.create",
     "text.edit",
     "text.delete",
+    "text.animator.upsert",
+    "text.animator.remove",
+    "text.animator.edit",
 ];
 
 pub(crate) fn owns(operation: &str) -> bool {
@@ -193,6 +199,22 @@ fn item_request(payload: &Value) -> bool {
             && extra.iter().all(|key| payload[*key].is_number())
     };
     match command {
+        "object.text.animator.edit" => {
+            exact(payload, &["command", "layerUid", "animatorId", "edit"], &[]).is_some()
+                && opaque(&payload["layerUid"])
+                && opaque(&payload["animatorId"])
+                && animator::edit(&payload["edit"])
+        }
+        "object.text.animator.upsert" => {
+            exact(payload, &["command", "layerUid", "animator"], &[]).is_some()
+                && opaque(&payload["layerUid"])
+                && animator::record(&payload["animator"])
+        }
+        "object.text.animator.remove" => {
+            exact(payload, &["command", "layerUid", "animatorId"], &[]).is_some()
+                && opaque(&payload["layerUid"])
+                && opaque(&payload["animatorId"])
+        }
         "object.raster.create" => {
             exact(payload, &["command", "target", "item"], &[]).is_some()
                 && target(&payload["target"], true)
@@ -354,7 +376,13 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
             } else {
                 stroke.starts_with("native-text:")
             };
-            let stroke_matches = if ran.ends_with(".create") {
+            let stroke_matches = if ran.starts_with("text.animator.") {
+                if ran.ends_with("upsert") {
+                    payload["animator"]["id"].as_str() == Some(stroke)
+                } else {
+                    payload["animatorId"].as_str() == Some(stroke)
+                }
+            } else if ran.ends_with(".create") {
                 allocated
             } else {
                 payload["stableTarget"]["strokeId"].as_str() == Some(stroke)

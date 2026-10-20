@@ -44,6 +44,9 @@ use crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::{
 };
 use std::collections::BTreeSet;
 
+#[path = "object_scene_producer_text_animator.rs"]
+pub(crate) mod animator;
+
 pub(crate) const PRODUCER: &str = "text-block";
 
 pub(crate) const REASON_NO_FONT_PROVIDER: &str =
@@ -82,6 +85,7 @@ pub(crate) enum TextProducerError {
     Layout(TextLayoutError),
     Scene(TextSceneError),
     Color,
+    Animator,
 }
 
 impl TextProducerError {
@@ -91,6 +95,7 @@ impl TextProducerError {
             TextProducerError::Layout(error) => format!("text layout refused: {error:?}"),
             TextProducerError::Scene(error) => error.reason().to_owned(),
             TextProducerError::Color => REASON_COLOR.to_owned(),
+            TextProducerError::Animator => "native Text animator evaluation unavailable".into(),
         }
     }
 }
@@ -103,6 +108,8 @@ pub(crate) struct TextSceneItem {
     fills: Vec<[u8; 4]>,
     color: String,
     font_resource: String,
+    units: Vec<crate::evaluation::object_text_layout_kernels::text_glyph_selector::UnitIndices>,
+    pulls: Vec<Option<crate::evaluation::property_text_animator::ColorPull>>,
 }
 
 impl TextSceneItem {
@@ -157,6 +164,13 @@ pub(super) fn prepare_block(
         admission: target.admission,
     };
     let scene = prepare_text_glyph_scene(&input).map_err(TextProducerError::Scene)?;
+    let glyph_units=layout.lines.iter().flat_map(|l|&l.glyphs).map(crate::evaluation::object_text_layout_kernels::text_glyph_selector::UnitIndices::of_glyph).collect::<Vec<_>>();
+    let units=scene.contours().iter().map(|c|match c.role {
+        crate::object_render_scene::text_glyph_scene_kernels::text_glyph_scene::SceneRole::Glyph {ordinal,..} => {
+            *glyph_units.get(ordinal).expect("scene glyph belongs to layout")
+        }
+        _=>Default::default(),
+    }).collect();
     let color = target.record.color();
     let fills = scene
         .contours()
@@ -164,6 +178,8 @@ pub(super) fn prepare_block(
         .map(|contour| fill_rgba(color, contour.opacity))
         .collect::<Result<Vec<[u8; 4]>, TextProducerError>>()?;
     Ok(TextSceneItem {
+        pulls: vec![None; scene.contours().len()],
+        units,
         scene,
         fills,
         color: color.to_owned(),

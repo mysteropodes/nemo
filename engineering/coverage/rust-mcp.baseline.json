@@ -576,6 +576,12 @@
       "regions": 98.03,
       "functions": 100,
       "note": "Measured clean e4641008889c016b1d3730d5afe1432cf5bbba36, MCP tree fd9d53246ddab873f79c526b5806c5747b7f14ea; standard cargo-llvm-cov 0.9.1 JSON 11f8c1c11e1748030bf0c347cb0c089812bb095e0628bfc6fc10d17908d15746, actual full unfiltered suites 387 tests/0 failed across 20 binaries, booking https://github.com/mysteropodes/nemo/issues/1062#issuecomment-6278970723. Only measured missing entries are added; every pre-existing per-file/aggregate floor, exclusion, tool and original recorded provenance is retained. Existing pure buildBaseline derives these floors/noRegions/reason. Registration is not installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_text_animator_contract.rs": {
+      "lines": 87.13,
+      "regions": 88.65,
+      "functions": 86.36,
+      "note": "Measured clean 8d1f78fd8aa3c998147fc336fd3e4af205035f6a, MCP tree f153c81dd50c22486b57e22b8a2c627db02ba3b7; cargo-llvm-cov 0.9.1 JSON f65c48e230ffcacebd837715bc92e937581ea079ac35ad36e8c9ec07625227a8. Existing pure buildBaseline derives only this missing file's observed floors. Every pre-existing file and aggregate floor, exclusion, tool and recorded provenance remains unchanged. Measurement and contract tests do not establish installed or native-host acceptance."
     }
   },
   "nativeObjectContractRegistration": {

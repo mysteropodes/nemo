@@ -31,6 +31,9 @@ const COMMANDS = [
   ['text.create', { command: 'object.text.create', target: created(), block: block() }, 'native-text:8:0'],
   ['text.edit', { command: 'object.text.edit', stableTarget: stable(), patch: { fixedWidth: null, text: 'data:text kept opaque' } }, 'native-raster:3:0'],
   ['text.delete', { command: 'object.text.delete', stableTarget: stable() }, 'native-raster:3:0'],
+  ['text.animator.upsert', { command: 'object.text.animator.upsert', layerUid: 'layer', animator: {id: 'ta', selector: {}} }, 'ta'],
+  ['text.animator.remove', { command: 'object.text.animator.remove', layerUid: 'layer', animatorId: 'ta' }, 'ta'],
+  ['text.animator.edit', { command: 'object.text.animator.edit', layerUid: 'layer', animatorId: 'ta', edit: {kind: 'setEnabled', enabled: false} }, 'ta'],
 ];
 const ATTACH_PAYLOAD = () => ({ documentSnapshotId: 'snapshot-8', name: 'photo', mediaType: 'image/png', source: { kind: 'file', path: '/Users/a/Pictures/photo.png' } });
 const REMOVE_PAYLOAD = () => ({ documentSnapshotId: 'snapshot-8', assetId: 'asset-project-asset-1' });

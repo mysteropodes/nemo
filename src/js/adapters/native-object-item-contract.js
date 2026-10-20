@@ -62,14 +62,55 @@
     const members=['text','font','size','color','align'].concat(TEXT_OPTIONAL);
     if(!plain(v)||!Object.keys(v).length||!Object.keys(v).every(k=>members.includes(k)))fail('text patch invalid');textBody(v,false);
   }
+  const SELECTOR_KEYS=['start','end','offset','amount','easeHigh','easeLow','smooth','wiggleMin','wiggleMax','wigglesPerSec','correlation'];
+  function animator(v){
+    exact(v,['id','selector'],['enabled','props','properties'],'text animator');opaque(v.id);
+    if('enabled' in v)bool(v.enabled);
+    exact(v.selector,[],SELECTOR_KEYS.concat(['selectorType','units','basedOn','shape','seed']),'animator selector');
+    Object.keys(v.selector).forEach(k=>{var n=v.selector[k];
+      if(k==='selectorType')oneOf(n,['range','wiggly']);else if(k==='units')oneOf(n,['percent','index']);else if(k==='basedOn')oneOf(n,['chars','words','lines']);else if(n!==null)num(n);
+    });
+    if('props' in v){exact(v.props,[],['position','scale','rotation','opacity','fillColor','strokeColor'],'animator properties');
+      Object.keys(v.props).forEach(k=>{var n=v.props[k];if(k==='rotation'||k==='opacity'){if(n!==null)num(n);return;}
+        if(!Array.isArray(n)||(['position','scale'].includes(k)?n.length!==2:![3,4].includes(n.length)))fail('animator vector invalid');
+        n.forEach((x,i)=>{if(x===null){if(['fillColor','strokeColor'].includes(k)&&i<3)fail('animator color invalid');}else num(x);});});
+    }
+    if('properties' in v){if(!Array.isArray(v.properties)||v.properties.length>11)fail('selector tracks invalid');var names=new Set();
+      v.properties.forEach(p=>{exact(p,['property'],['static','track','expression'],'selector property');oneOf(p.property,SELECTOR_KEYS);if(names.has(p.property))fail('duplicate selector property');names.add(p.property);
+        if('static' in p){if(!Array.isArray(p.static)||p.static.length!==1)fail('selector static invalid');num(p.static[0]);}
+        if('expression' in p){exact(p.expression,['enabled','code'],[],'selector expression');bool(p.expression.enabled);if(typeof p.expression.code!=='string'||bytes(p.expression.code)>4096)fail('selector expression invalid');}
+        if('track' in p){exact(p.track,['keys'],[],'selector track');if(!Array.isArray(p.track.keys))fail('selector keys invalid');var previous=-Infinity;
+          p.track.keys.forEach(k=>{exact(k,['frame','v'],['hold','lockTo','curvePoints','hIn','hOut'],'selector key');num(k.frame);if(k.frame<=previous)fail('selector keys unordered');previous=k.frame;
+            if(!Array.isArray(k.v)||k.v.length!==1)fail('selector key vector invalid');num(k.v[0]);if('hold' in k)bool(k.hold);if('lockTo' in k&&k.lockTo!==null)oneOf(k.lockTo,['in','out','layer']);
+            ['hIn','hOut'].forEach(n=>{if(n in k){if(!Array.isArray(k[n])||k[n].length!==2)fail('selector handle invalid');k[n].forEach(num);}});
+            if('curvePoints' in k&&k.curvePoints!==null){if(!Array.isArray(k.curvePoints))fail('selector curve invalid');var x=-Infinity;
+              k.curvePoints.forEach(c=>{exact(c,['x','y'],['tx','ty'],'selector curve point');Object.values(c).forEach(num);if(c.x<=x)fail('selector curve unordered');x=c.x;});
+              if(k.curvePoints.length>=2&&(k.curvePoints[0].x!==0||x!==1))fail('selector curve endpoints invalid');}
+          });}
+      });}
+  }
+  function animatorEdit(v){
+    if(!plain(v))fail('animator edit invalid');
+    if(v.kind==='setEnabled'){exact(v,['kind','enabled'],[],'animator enabled edit');bool(v.enabled);return;}
+    if(v.kind==='setSelector'){exact(v,['kind','field','value'],[],'selector field edit');animator({id:'validation',selector:{[v.field]:v.value}});return;}
+    if(v.kind==='setProps'){exact(v,['kind','field','value'],[],'animator property edit');oneOf(v.field,['position','scale','rotation','opacity','fillColor','strokeColor']);if(v.value===null&&['fillColor','strokeColor'].includes(v.field))return;animator({id:'validation',selector:{},props:{[v.field]:v.value}});return;}
+    const fields={setValue:['values'],setKey:['values'],removeKey:[],setAnimated:['animated']};
+    if(!Object.prototype.hasOwnProperty.call(fields,v.kind))fail('selector edit kind invalid');
+    exact(v,['kind','property','frame'].concat(fields[v.kind]),v.kind==='setKey'?['curvePoints']:[],'selector key edit');oneOf(v.property,SELECTOR_KEYS);num(v.frame);
+    if(v.kind==='setAnimated'){bool(v.animated);return;}if(v.kind==='removeKey')return;
+    const key={frame:v.frame,v:v.values};if('curvePoints' in v)key.curvePoints=v.curvePoints;
+    animator({id:'validation',selector:{},properties:[{property:v.property,track:{keys:[key]}}]});
+  }
   const SHAPES={
     'object.raster.create':['target','item'],'object.raster.move':['stableTarget','x','y'],'object.raster.resize':['stableTarget','width','height'],
     'object.raster.rotate':['stableTarget','rotation'],'object.raster.opacity':['stableTarget','opacity'],'object.raster.delete':['stableTarget'],
     'object.text.create':['target','block'],'object.text.edit':['stableTarget','patch'],'object.text.delete':['stableTarget'],
+    'object.text.animator.upsert':['layerUid','animator'],'object.text.animator.remove':['layerUid','animatorId'],'object.text.animator.edit':['layerUid','animatorId','edit'],
   };
   function itemPayload(p){
     if(!plain(p)||!Object.prototype.hasOwnProperty.call(SHAPES,p.command))fail('item command invalid');
     exact(p,['command'].concat(SHAPES[p.command]),[],'item command');
+    if('layerUid' in p)opaque(p.layerUid);if('animator' in p)animator(p.animator);if('animatorId' in p)opaque(p.animatorId);if('edit' in p)animatorEdit(p.edit);
     if('target' in p)target(p.target,true);if('stableTarget' in p)target(p.stableTarget,false);
     if('item' in p)rasterItem(p.item);if('block' in p)textBlock(p.block);if('patch' in p)textPatch(p.patch);
     ['x','y','width','height','rotation','opacity'].forEach(k=>{if(k in p)num(p[k]);});
@@ -103,7 +144,7 @@
     if(op===ATTACH&&plain(v)&&Object.prototype.hasOwnProperty.call(v,'assetId'))return imageResult(v);
     exact(v,op===ITEM?['applied','historyEntriesAdded','operation','strokeId']:['applied','historyEntriesAdded'],[],'result');
     bool(v.applied);if(v.historyEntriesAdded!==(v.applied?1:0))fail('history disposition invalid');
-    if(op===ITEM){oneOf(v.operation,RASTER.concat(TEXT));opaque(v.strokeId);}
+    if(op===ITEM){oneOf(v.operation,RASTER.concat(TEXT,['text.animator.upsert','text.animator.remove','text.animator.edit']));opaque(v.strokeId);}
   }
   function correlate(q,r){
     if(r.requestId!==q.requestId)fail('response request mismatch');
@@ -126,13 +167,14 @@
     }
     if(q.operation!==ITEM)return;
     const p=q.payload,created=p.command.endsWith('.create');
+    if(p.command.startsWith('object.text.animator.')){if(r.result.operation!==p.command.slice(7)||r.result.strokeId!==(p.animator?p.animator.id:p.animatorId))fail('animator receipt mismatch');return;}
     if(r.result.operation!==p.command.slice('object.'.length))fail('item receipt operation mismatch');
     const prefix=p.command.startsWith('object.raster.')?'native-raster:':'native-text:';
     // A created item reports the id the owner allocated; every other edit reports the stable target it named.
     if(created?!r.result.strokeId.startsWith(prefix):r.result.strokeId!==p.stableTarget.strokeId)fail('item receipt stroke mismatch');
   }
   function paths(op){
-    if(op===ITEM)return new Set(['payload.target.layerUid','payload.stableTarget.layerUid','payload.target.strokeId','payload.stableTarget.strokeId','payload.item.assetId',
+    if(op===ITEM)return new Set(['payload.layerUid','payload.animatorId','payload.animator.id','payload.target.layerUid','payload.stableTarget.layerUid','payload.target.strokeId','payload.stableTarget.strokeId','payload.item.assetId',
       'payload.item.brushGroupId','payload.item.meshId','payload.block.text','payload.block.font.assetId','payload.patch.text','payload.patch.font.assetId','result.strokeId']);
     return op===ATTACH?new Set(['payload.name','payload.source.path','payload.placement.layerUid','result.assetId','result.target.layerUid','result.target.strokeId']):new Set(['payload.assetId']);
   }
@@ -144,5 +186,5 @@
       payload:(op,p,e)=>own.admitted(op)?own.payload(op,p):base.payload(op,p,e),result:(op,v)=>own.admitted(op)?own.result(op,v):base.result(op,v),
       correlate:(q,r)=>own.admitted(q.operation)?own.correlate(q,r):base.correlate(q,r),paths:op=>own.admitted(op)?own.paths(op):base.paths(op)});
   }
-  return Object.freeze(Object.assign({compose:compose,ITEM:ITEM,ATTACH:ATTACH,REMOVE:REMOVE,FONTS:FONTS,MEDIA:MEDIA},own));
+  return Object.freeze(Object.assign({compose:compose,ITEM:ITEM,ATTACH:ATTACH,REMOVE:REMOVE,FONTS:FONTS,MEDIA:MEDIA,animator:animator,animatorEdit:animatorEdit},own));
 }));

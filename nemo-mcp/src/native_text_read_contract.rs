@@ -36,6 +36,15 @@ pub(super) fn request(v: &Value) -> bool {
     }
     let x = &v["view"];
     match x["kind"].as_str() {
+        Some("animators") => {
+            exact(x, &["kind", "layerUid", "frame", "offset", "limit"], &[]).is_some()
+                && opaque(&x["layerUid"])
+                && x["frame"]
+                    .as_f64()
+                    .is_some_and(|n| n.is_finite() && n >= 0.)
+                && uint(&x["offset"], u32::MAX as u64).is_some()
+                && uint(&x["limit"], 1024).is_some_and(|n| n >= 1)
+        }
         Some("targets") => {
             exact(x, &["kind", "scope", "offset", "limit"], &[]).is_some()
                 && scope(&x["scope"])
@@ -199,33 +208,43 @@ pub(super) fn result(document: &str, p: &Value, r: &Value) -> bool {
                 &json!({"command":"object.text.create","target":created,"block":block}),
             )
         }
-        Some("text") => {
-            if exact(
-                r,
-                &[
-                    "instanceId",
-                    "documentId",
-                    "atRevision",
-                    "documentSnapshotId",
-                    "kind",
-                    "target",
-                    "textBytes",
-                    "offset",
-                    "text",
-                    "nextOffset",
-                ],
-                &[],
-            )
-            .is_none()
-                || r["target"] != v["target"]
+        Some("text" | "animators") => {
+            let animator = r["kind"] == "animators";
+            let mut required = vec![
+                "instanceId",
+                "documentId",
+                "atRevision",
+                "documentSnapshotId",
+                "kind",
+                "textBytes",
+                "offset",
+                "text",
+                "nextOffset",
+            ];
+            required.push(if animator { "layerUid" } else { "target" });
+            if animator {
+                required.push("frame");
+            }
+            if exact(r, &required, &[]).is_none()
+                || if animator {
+                    r["layerUid"] != v["layerUid"] || r["frame"].as_f64() != v["frame"].as_f64()
+                } else {
+                    r["target"] != v["target"]
+                }
                 || r["offset"] != v["offset"]
             {
                 return false;
             }
             let (Some(text), Some(total), Some(offset), Some(limit)) = (
                 r["text"].as_str(),
-                uint(&r["textBytes"], 196608),
-                uint(&r["offset"], 196608),
+                uint(
+                    &r["textBytes"],
+                    if animator { u32::MAX as u64 } else { 196608 },
+                ),
+                uint(
+                    &r["offset"],
+                    if animator { u32::MAX as u64 } else { 196608 },
+                ),
                 v["limit"].as_u64(),
             ) else {
                 return false;
