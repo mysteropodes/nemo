@@ -263,5 +263,5 @@ test('actual HTML loads the palette protocol before SDK capture and the model be
       documentSnapshotId:'s0',contextId:'scene-root',selector:{kind:'settings'}}})`, context);
   }
   assert.doesNotThrow(load(actual));
-  assert.throws(load([wanted[1], wanted[0], wanted[2], wanted[3]]), /unsupported native operation/);
+  assert.throws(load([wanted[1], wanted[0], wanted[2], wanted[3]]), /^TypeError: operation is not admitted$/);
 });
