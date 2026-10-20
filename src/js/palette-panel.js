@@ -19,7 +19,7 @@
     var grid = document.getElementById('palette-grid'), tabs = document.getElementById('palette-tabs');
     if (grid) { grid.textContent = 'Palette editing is unavailable.'; grid.setAttribute('role', 'status'); }
     if (tabs) tabs.textContent = '';
-    ['btn-palette-new', 'btn-palette-add-fill', 'btn-palette-add-stroke', 'btn-palette-replace'].forEach(function (id) {
+    ['btn-palette-new', 'btn-palette-add-fill', 'btn-palette-add-stroke', 'btn-palette-replace', 'btn-palette-swap'].forEach(function (id) {
       var button = document.getElementById(id); if (button) button.disabled = true;
     });
   }
@@ -189,6 +189,7 @@
       btn.title = hex;
       wireDrag(btn, idx);
       btn.addEventListener('click', function (e) {
+        if (paletteNativeBlocked(true)) return;
         if (replaceArmed) {
           if (replaceSource === null) { replaceSource = hex; render(); return; }
           var res = replaceColor(replaceSource, hex);
@@ -203,11 +204,12 @@
       });
       btn.addEventListener('contextmenu', function (e) {
         e.preventDefault();
+        if (paletteNativeBlocked(true)) return;
         window.showContextMenu(e.clientX, e.clientY, [
-          { label: 'Utiliser comme Fill', action: function () { window.SM.setFillColor(hex); if (!state.fillEnabled) window.SM.setFillEnabled(true); } },
-          { label: 'Utiliser comme Stroke', action: function () { window.SM.setStrokeColor(hex); } },
+          { label: 'Utiliser comme Fill', action: function () { if (paletteNativeBlocked(true)) return; window.SM.setFillColor(hex); if (!state.fillEnabled) window.SM.setFillEnabled(true); } },
+          { label: 'Utiliser comme Stroke', action: function () { if (paletteNativeBlocked(true)) return; window.SM.setStrokeColor(hex); } },
           { sep: true },
-          { label: 'Remplacer dans le calque…', action: function () { replaceArmed = true; replaceSource = hex; render(); showToast(SM.t('hsClickTargetColor')); } },
+          { label: 'Remplacer dans le calque…', action: function () { if (paletteNativeBlocked(true)) return; replaceArmed = true; replaceSource = hex; render(); showToast(SM.t('hsClickTargetColor')); } },
           { sep: true },
           { label: 'Retirer de la palette', action: function () { removeColor(idx); } },
         ]);
@@ -243,6 +245,7 @@
       tab.addEventListener('dblclick', function () { renamePalette(idx); });
       tab.addEventListener('contextmenu', function (e) {
         e.preventDefault();
+        if (paletteNativeBlocked(true)) return;
         window.showContextMenu(e.clientX, e.clientY, [
           { label: 'Renommer…', action: function () { renamePalette(idx); } },
           { label: 'Dupliquer', action: function () { duplicatePalette(idx); } },
@@ -296,6 +299,7 @@
     if (newBtn) newBtn.addEventListener('click', newPalette);
     var swapBtn = document.getElementById('btn-palette-swap');
     if (swapBtn) swapBtn.addEventListener('click', function () {
+      if (paletteNativeBlocked(true)) return;
       var f = currentHex('fill'), s = currentHex('stroke');
       window.SM.setFillColor(s); window.SM.setStrokeColor(f);
     });
