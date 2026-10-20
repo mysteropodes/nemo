@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "49555a26089ff7ba4c3e16630ba16e9f42ef21fe",
-  "describe": "v0.7.0-alpha.4-2560-g49555a26"
+  "head": "567208845afb53ec4e4cea3789866cc3b39ac73d",
+  "describe": "v0.7.0-alpha.4-2565-g56720884"
  },
- "inputsDigest": "584c80c8919e29f88508029d2eb57ed644e8bddbe2429f7877af6a398d33613e",
+ "inputsDigest": "5db762cd6fd833636a6a62c1a3accde04edefa1990d4791aac755a3c96529200",
  "states": [
   "inventoried",
   "characterized",
@@ -26,22 +26,22 @@
   "native"
  ],
  "counts": {
-  "total": 907,
+  "total": 911,
   "byKind": {
    "dom": 484,
    "labs": 36,
-   "menu": 261,
+   "menu": 265,
    "sdk": 76,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 878,
+   "inventoried": 882,
    "unmapped": 28,
    "unavailable-with-reason": 1
   },
   "byArea": {
    "project-lifecycle-integrations": 124,
-   "drawing-selection": 262,
+   "drawing-selection": 266,
    "media-import-export": 52,
    "timeline-layers-frames": 175,
    "animation-rigs-expressions": 160,
@@ -52,13 +52,13 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 260,
+   "native": 261,
    "export": 5,
    "animation": 445,
    "history": 357,
    "selection": 381,
    "render": 481,
-   "persist": 411
+   "persist": 412
   }
  },
  "fixturesByArea": {
@@ -2013,7 +2013,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 93,
+    "functionsVisited": 95,
     "via": "chain",
     "references": []
    },
@@ -3574,7 +3574,7 @@
    "capability": "Add the current Fill color to the palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:296 init()"
+    "src/js/palette-panel.js:308 init()"
    ],
    "events": [
     "click"
@@ -3598,6 +3598,7 @@
     "functionsVisited": 2,
     "via": "variable addFillBtn",
     "references": [
+     "src/js/adapters/native-palette-ui.js:148 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3615,7 +3616,7 @@
    "capability": "Add the current Stroke color to the palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:297 init()"
+    "src/js/palette-panel.js:309 init()"
    ],
    "events": [
     "click"
@@ -3639,6 +3640,7 @@
     "functionsVisited": 2,
     "via": "variable addStrokeBtn",
     "references": [
+     "src/js/adapters/native-palette-ui.js:148 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3656,7 +3658,7 @@
    "capability": "Create a new palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:299 init()"
+    "src/js/palette-panel.js:311 init()"
    ],
    "events": [
     "click"
@@ -3666,8 +3668,11 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 2,
+    "persist": 2
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1202",
@@ -3677,9 +3682,10 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 48,
+    "functionsVisited": 83,
     "via": "variable newBtn",
     "references": [
+     "src/js/adapters/native-palette-ui.js:148 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3697,7 +3703,7 @@
    "capability": "Replace a color in the active layer: click the source, then the target",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:307 init()"
+    "src/js/palette-panel.js:319 init()"
    ],
    "events": [
     "click"
@@ -3721,7 +3727,8 @@
     "functionsVisited": 30,
     "via": "variable replaceBtn",
     "references": [
-     "src/js/palette-panel.js:221 render()",
+     "src/js/palette-panel.js:229 render()",
+     "src/js/adapters/native-palette-ui.js:151 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3739,7 +3746,7 @@
    "capability": "Swap Fill ↔ Stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:301 init()"
+    "src/js/palette-panel.js:313 init()"
    ],
    "events": [
     "click"
@@ -3769,6 +3776,7 @@
     "functionsVisited": 83,
     "via": "variable swapBtn",
     "references": [
+     "src/js/adapters/native-palette-ui.js:151 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -14114,7 +14122,7 @@
    "capability": "Scope of the colour replace",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:311 init()"
+    "src/js/palette-panel.js:323 init()"
    ],
    "events": [
     "change"
@@ -14138,7 +14146,8 @@
     "functionsVisited": 43,
     "via": "variable scopeSel",
     "references": [
-     "src/js/palette-panel.js:219 render()"
+     "src/js/palette-panel.js:227 render()",
+     "src/js/adapters/native-palette-ui.js:151 render()"
     ]
    },
    "fixtures": [
@@ -22241,6 +22250,138 @@
    "fixtures": []
   },
   {
+   "id": "menu:adapters/native-palette-ui.js:106",
+   "kind": "menu",
+   "surface": "dynamic menu (tabs)",
+   "capability": "Renommer…",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/adapters/native-palette-ui.js:106 tabs()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-palette-ui.js:106",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 27
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:adapters/native-palette-ui.js:107",
+   "kind": "menu",
+   "surface": "dynamic menu (tabs)",
+   "capability": "Dupliquer",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/adapters/native-palette-ui.js:107 tabs()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-palette-ui.js:107",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 23
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:adapters/native-palette-ui.js:109",
+   "kind": "menu",
+   "surface": "dynamic menu (tabs)",
+   "capability": "Supprimer",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/adapters/native-palette-ui.js:109 tabs()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-palette-ui.js:109",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 1
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:adapters/native-palette-ui.js:124",
+   "kind": "menu",
+   "surface": "dynamic menu (colors)",
+   "capability": "Retirer de la palette",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/adapters/native-palette-ui.js:124 colors()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-palette-ui.js:124",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 53
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
    "id": "menu:effects-panel.js:385",
    "kind": "menu",
    "surface": "dynamic menu (openCustom)",
@@ -22985,7 +23126,7 @@
    "source": "src/js/labs/command-palette.js:34",
    "meta": {
     "i18n": "labsCmdDuplicateLayer",
-    "functionsVisited": 93
+    "functionsVisited": 95
    },
    "fixtures": []
   },
@@ -27162,13 +27303,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:209",
+   "id": "menu:palette-panel.js:217",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Utiliser comme Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:209 render()"
+    "src/js/palette-panel.js:217 render()"
    ],
    "events": [
     "click"
@@ -27188,7 +27329,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:209",
+   "source": "src/js/palette-panel.js:217",
    "meta": {
     "i18n": null,
     "functionsVisited": 76
@@ -27201,13 +27342,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:210",
+   "id": "menu:palette-panel.js:218",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Utiliser comme Stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:210 render()"
+    "src/js/palette-panel.js:218 render()"
    ],
    "events": [
     "click"
@@ -27227,7 +27368,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:210",
+   "source": "src/js/palette-panel.js:218",
    "meta": {
     "i18n": null,
     "functionsVisited": 57
@@ -27240,13 +27381,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:212",
+   "id": "menu:palette-panel.js:220",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Remplacer dans le calque…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:212 render()"
+    "src/js/palette-panel.js:220 render()"
    ],
    "events": [
     "click"
@@ -27260,7 +27401,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:212",
+   "source": "src/js/palette-panel.js:220",
    "meta": {
     "i18n": null,
     "functionsVisited": 49
@@ -27273,13 +27414,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:214",
+   "id": "menu:palette-panel.js:222",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Retirer de la palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:214 render()"
+    "src/js/palette-panel.js:222 render()"
    ],
    "events": [
     "click"
@@ -27293,7 +27434,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:214",
+   "source": "src/js/palette-panel.js:222",
    "meta": {
     "i18n": null,
     "functionsVisited": 25
@@ -27306,13 +27447,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:250",
+   "id": "menu:palette-panel.js:258",
    "kind": "menu",
    "surface": "dynamic menu (renderTabs)",
    "capability": "Renommer…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:250 renderTabs()"
+    "src/js/palette-panel.js:258 renderTabs()"
    ],
    "events": [
     "click"
@@ -27326,7 +27467,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:250",
+   "source": "src/js/palette-panel.js:258",
    "meta": {
     "i18n": null,
     "functionsVisited": 25
@@ -27339,13 +27480,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:251",
+   "id": "menu:palette-panel.js:259",
    "kind": "menu",
    "surface": "dynamic menu (renderTabs)",
    "capability": "Dupliquer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:251 renderTabs()"
+    "src/js/palette-panel.js:259 renderTabs()"
    ],
    "events": [
     "click"
@@ -27359,7 +27500,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:251",
+   "source": "src/js/palette-panel.js:259",
    "meta": {
     "i18n": null,
     "functionsVisited": 30
@@ -27372,13 +27513,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:253",
+   "id": "menu:palette-panel.js:261",
    "kind": "menu",
    "surface": "dynamic menu (renderTabs)",
    "capability": "Supprimer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:253 renderTabs()"
+    "src/js/palette-panel.js:261 renderTabs()"
    ],
    "events": [
     "click"
@@ -27392,7 +27533,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:253",
+   "source": "src/js/palette-panel.js:261",
    "meta": {
     "i18n": null,
     "functionsVisited": 31
@@ -30965,7 +31106,7 @@
    "source": "src/js/timeline.js:6787",
    "meta": {
     "i18n": "ctxDuplicateLayer",
-    "functionsVisited": 93
+    "functionsVisited": 95
    },
    "fixtures": [
     "keyed-props",
@@ -32534,7 +32675,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 406
+    "functionsVisited": 425
    },
    "fixtures": [
     "media",
@@ -32818,7 +32959,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:261",
    "meta": {
-    "functionsVisited": 140
+    "functionsVisited": 142
    },
    "fixtures": [
     "media",
