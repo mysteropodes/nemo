@@ -10,6 +10,10 @@ use crate::revision::DocumentSnapshot;
 use serde_json::Number;
 use std::fmt::{Display, Formatter};
 
+#[path = "property_expression_bake.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_expression_bake;
+
 #[path = "object_expression_reads.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_expression_snapshot_reads;

@@ -42,22 +42,22 @@
     }
     function makeKeyEditor(){
       if(!Keys||typeof Keys.create!=='function'||typeof ports.readProperty!=='function')return null;
-      var entry={id:null,editor:null};
+      var entry={id:null,property:null,editor:null};
       entry.editor=Keys.create(section,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,
         keyTimelineChanged:keyNotice,acceptKeySelection:function(frames){return acceptKeySelection(entry,frames);},
-        get editPropertyTrack(){return ports.editPropertyTrack;},refresh:function(){return refresh(true);}});
+        get editPropertyTrack(){return entry.property==='order'?null:ports.editPropertyTrack;},refresh:function(){return refresh(true);}});
       keyEditors.push(entry);return entry;
     }
     var initial=makeKeyEditor();if(initial)keyEditor=initial.editor;
     function clearKeys(){
       suppressKeyNotice=true;
-      try{keyEditors.forEach(function(entry,index){if(index===0){entry.editor.clear();entry.id=null;}else entry.editor.dispose();});keyEditors=keyEditors.slice(0,1);keyEditor=keyEditors.length?keyEditors[0].editor:null;}
+      try{keyEditors.forEach(function(entry,index){if(index===0){entry.editor.clear();entry.id=null;entry.property=null;}else entry.editor.dispose();});keyEditors=keyEditors.slice(0,1);keyEditor=keyEditors.length?keyEditors[0].editor:null;}
       finally{suppressKeyNotice=false;keyNotice('reset');}
     }
     function openKeys(target,property){
       var id=JSON.stringify([key(target),property]),entry=keyEditors.find(function(item){return item.id===id;});
       if(!entry)entry=keyEditors.find(function(item){return item.id===null;})||makeKeyEditor();
-      if(!entry)return false;entry.id=id;keyEditor=entry.editor;return entry.editor.open(target,property);
+      if(!entry)return false;entry.id=id;entry.property=property;keyEditor=entry.editor;return entry.editor.open(target,property);
     }
     function readKeyTimelines(){
       if(retired||!validAccepted())return null;
@@ -191,6 +191,19 @@
             };
             keysButton.addEventListener('click',onOpenKeys);nextBindings.push([keysButton,onOpenKeys]);line.appendChild(keysButton);
           }
+          if(f.availability==='available'&&f.expressionEnabled&&typeof ports.editProperty==='function'){
+            var bakeButton=make('button','Bake expression'),bakeToken=accepted.token,bakeTicket=serial,bakeSignature=accepted.selection.signature;
+            bakeButton.type='button';bakeButton.setAttribute('aria-label','Bake expression for '+entry.label);
+            var onBake=async function(){
+              function isCurrent(){return current(bakeToken,bakeTicket,bakeSignature)&&bakeButton.parentNode===line;}
+              if(!isCurrent()||bakeButton.disabled)return;
+              bakeButton.disabled=true;
+              try{await ports.editProperty({command:'object.property.edit',target:group.target,property:row.property,action:{kind:'bake'}},bakeToken.pin,isCurrent);}
+              catch(_){if(isCurrent())notify('Expression could not be baked.');}
+              finally{if(isCurrent())bakeButton.disabled=false;}
+            };
+            bakeButton.addEventListener('click',onBake);nextBindings.push([bakeButton,onBake]);line.appendChild(bakeButton);
+          }
           if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:line,target:group.target,row:row});
           fragment.appendChild(line);shown++;});
       });
@@ -198,7 +211,7 @@
       if(appendRevealLimits(fragment))unknown=true;
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);
-      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,get editProperty(){return ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
+      nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
       notify(collapsed?'Properties collapsed.':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':shown?(keyEditor?'Select Keys to inspect native animation.':'Properties are read-only.'):accepted.groups.length?'No matching properties.':'Select a native target to view properties.');return true;
     }
     function paint(){try{return paintRows();}catch(_){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}}

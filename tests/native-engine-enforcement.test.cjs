@@ -359,6 +359,7 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(members.object_expression_pin, ['history', 'evaluation']);
   assert.deepEqual(members['test-object_expression_pin'], ['object_expression_pin']);
   assert.deepEqual(members.object_expression_runtime, ['object_expression_pin', 'dep:rquickjs']);
+  assert.deepEqual(members.application, ['history', 'export_job', 'object_expression_runtime']);
   assert.deepEqual(members['test-object_expression_runtime'], ['object_expression_runtime']);
   assert.match(cargoText, /^rquickjs = \{ version = "=0\.14\.0", default-features = false, features = \["std"\], optional = true \}$/m);
   const reaches = (feature, target, graph = members, seen = new Set()) => {
@@ -389,12 +390,12 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.match(fontText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/font_asset_admission\.rs"\]\s*mod tests;/);
   for (const feature of cargo.features.filter((name) => name !== 'object_expression_pin')) {
     assert.equal(reaches(feature, 'object_expression_pin'),
-      ['test-object_expression_pin', 'object_expression_runtime', 'test-object_expression_runtime'].includes(feature),
+      ['test-object_expression_pin', 'object_expression_runtime', 'test-object_expression_runtime', 'application', 'test-application'].includes(feature),
       `${feature} must not activate the private expression-pin selector`);
   }
   for (const feature of cargo.features.filter((name) => name !== 'object_expression_runtime')) {
-    assert.equal(reaches(feature, 'object_expression_runtime'), feature === 'test-object_expression_runtime',
-      `${feature} must not activate the private expression-runtime selector`);
+    assert.equal(reaches(feature, 'object_expression_runtime'), ['test-object_expression_runtime', 'application', 'test-application'].includes(feature),
+      `${feature} must not activate the expression runtime outside its admitted application bake route`);
   }
   assert.equal(reaches('codec', 'reference_image_asset', { ...members,
     codec: [...members.codec, 'reference_image_asset'] }), true, 'feature-isolation mutant must be detected');

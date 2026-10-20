@@ -91,6 +91,19 @@ impl NativeObjectHistory {
         &mut self,
         request: &OpacityRequest,
     ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
+        self.try_dispatch_object_command_with_bake(request, |_, _| {
+            Err(DispatchErrorCode::Unavailable)
+        })
+    }
+
+    pub(crate) fn try_dispatch_object_command_with_bake(
+        &mut self,
+        request: &OpacityRequest,
+        bake: impl FnOnce(
+            &Self,
+            &[u8],
+        ) -> Result<crate::commands::PreparedPropertyEdit, DispatchErrorCode>,
+    ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
         if !Self::layer_lifecycle_operation(&request.operation)
             && !Self::group_operation(&request.operation)
             && !Self::component_setup_operation(&request.operation)
@@ -378,7 +391,13 @@ impl NativeObjectHistory {
             ) {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-                self.dispatch_property_edit_command(request, &payload)
+                if request.operation == OP_PROPERTY_EDIT
+                    && request.payload["action"]["kind"] == "bake"
+                {
+                    self.dispatch_property_bake_command(&payload, bake)
+                } else {
+                    self.dispatch_property_edit_command(request, &payload)
+                }
             } else if request.operation == OP_OBJECT_FILL {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;

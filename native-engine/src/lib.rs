@@ -27,6 +27,9 @@ engine_modules! {
 #[cfg(feature = "reference_image_asset")]
 pub(crate) mod reference_image_asset;
 
+#[cfg(feature = "application")]
+pub(crate) mod object_expression_bake;
+
 #[cfg(feature = "object_expression_pin")]
 pub(crate) mod object_expression_pin;
 #[cfg(feature = "object_expression_runtime")]

@@ -164,6 +164,11 @@
   // across pixels/degrees/percent without per-property-type tuning).
   function bakeExpressionToKeyframes(holder, prop, frameStart, frameEnd, toleranceFrac) {
     if (!window.SMMotion || !holder || !prop) return null;
+    // The retained browser implementation must never write a native document.
+    try {
+      var admission = window.NemoNativeOpacityLegacyAdmission;
+      if (admission !== undefined && (!admission || typeof admission.allow !== 'function' || admission.allow('motion-expression-bake') !== true)) return null;
+    } catch (_) { return null; }
     var SM = window.SMMotion;
     var ex = holder.expressions && holder.expressions[prop];
     if (!ex || !ex.enabled || !ex.code) return null;

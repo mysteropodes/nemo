@@ -37,7 +37,7 @@
         if (v.kind==='targets') {exact(x,x.kind==='context'?['kind','contextId']:['kind','target'],[],'metadata target entry'); if(x.kind==='context') objectUid(x.contextId); else {if(!['layer','element'].includes(x.kind)) throw new TypeError('unknown target kind'); exact(x.target,['contextId','layerUid'],x.kind==='element'?['strokeId']:[],'target'); if((x.kind==='element')!==has(x.target,'strokeId')) throw new TypeError('target kind mismatch'); Object.values(x.target).forEach(objectUid);} continue;}
         exact(x,['property','dimension','unit','defaultValue','animatable','controlType','controlName','authored','availability'],[],'metadata descriptor'); objectUid(x.property);
         if (!Number.isInteger(x.dimension)||x.dimension<1||x.dimension>4||typeof x.unit!=='string'||typeof x.animatable!=='boolean'||!['controlType','controlName'].every(k=>x[k]===null||typeof x[k]==='string')||!(x.defaultValue===null||Array.isArray(x.defaultValue)&&x.defaultValue.length===x.dimension&&x.defaultValue.every(Number.isFinite))) throw new TypeError('invalid descriptor scalars');
-        const a=x.authored; if(a&&a.availability==='available'){exact(a,['availability','keyCount','hasStaticOverride','expressionEnabled'],[],'authored facts');frame(a.keyCount);if(['order','timeRemap'].includes(x.property)||typeof a.hasStaticOverride!=='boolean'||typeof a.expressionEnabled!=='boolean')throw new TypeError('invalid authored facts');}
+        const a=x.authored; if(a&&a.availability==='available'){exact(a,['availability','keyCount','hasStaticOverride','expressionEnabled'],[],'authored facts');frame(a.keyCount);if(x.property==='timeRemap'||typeof a.hasStaticOverride!=='boolean'||typeof a.expressionEnabled!=='boolean')throw new TypeError('invalid authored facts');}
         else {exact(a,['availability','reason'],[],'authored unavailable');if(a.availability!=='unavailable'||a.reason!=='separate-property-owner'||!['order','timeRemap'].includes(x.property))throw new TypeError('unowned authored facts');}
         exact(x.availability,['metadata','applicability','propertyWrite','reason'],[],'metadata availability'); const stored=v.kind==='storedProperty'; if(x.availability.metadata!=='available'||x.availability.propertyWrite!=='unavailable'||x.availability.applicability!==(stored?'unavailable':'available')||x.availability.reason!==(stored?'stored-metadata-does-not-prove-applicability':'read-only-description-not-command-availability'))throw new TypeError('metadata grants a consumer');
       }
@@ -61,11 +61,11 @@
       Object.values(value.target).forEach(objectUid); objectUid(value.property);
       const action = value.action;
       if (!plain(action)) throw new TypeError('property action must be an object');
-      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated']};
+      const fields = {setValue:['values'], setKey:['values'], removeKey:[], setAnimated:['animated'], bake:[]};
       if (typeof action.kind !== 'string' || !has(fields, action.kind)) throw new TypeError('unsupported property edit action');
-      exact(action, ['kind', 'frame', ...fields[action.kind]], [], 'property action');
+      exact(action, ['kind', ...(action.kind === 'bake' ? [] : ['frame']), ...fields[action.kind]], [], 'property action');
       // Native frames are finite numbers, including negative and fractional values.
-      if (!Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
+      if (action.kind !== 'bake' && !Number.isFinite(action.frame)) throw new TypeError('invalid property frame');
       if (has(action, 'values')) {
         const values = action.values;
         if (!Array.isArray(values) || values.length < 1 || values.length > 4 ||

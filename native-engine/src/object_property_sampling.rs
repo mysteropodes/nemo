@@ -121,7 +121,15 @@ pub fn sample_property_raw(
     if !target_exists(document, target) {
         return Err(PropertySampleError::MissingTarget);
     }
-    if matches!(property, "order" | "timeRemap") {
+    if property == "order" {
+        let order = document
+            .property_order(target)
+            .ok_or(PropertySampleError::Unavailable)?;
+        return crate::object_frame_packet::order::numeric_at(order, at)
+            .map(|v| vec![v])
+            .map_err(|_| PropertySampleError::Unavailable);
+    }
+    if property == "timeRemap" {
         return Err(PropertySampleError::UnsupportedProperty);
     }
     let empty = PropertyHolder {

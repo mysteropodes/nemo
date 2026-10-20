@@ -16,6 +16,7 @@ fn values(value: &Value) -> bool {
 }
 fn action(value: &Value) -> bool {
     match value.get("kind").and_then(Value::as_str) {
+        Some("bake") => exact(value, &["kind"], &[]).is_some(),
         Some("setValue" | "setKey") => exact(value, &["kind", "frame", "values"], &[])
             .is_some_and(|a| finite(a.get("frame")) && values(&a["values"])),
         Some("removeKey") => {
