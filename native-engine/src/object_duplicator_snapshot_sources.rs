@@ -6,7 +6,7 @@ use crate::evaluation::object_component_kernels::object_duplicator_evaluate::{
     evaluate_duplicator, Evaluation, LayerSources, Ports, Request,
 };
 use crate::evaluation::object_component_kernels::object_effector_layers::MotionPort;
-use crate::object_document::{FrameScopeKind, ObjectLayer, ObjectRecord};
+use crate::object_document::{FrameScopeKind, ObjectLayer, ObjectRecord, RangeEvaluator};
 use crate::revision::ObjectSnapshot;
 use std::cell::Cell;
 
@@ -81,7 +81,20 @@ impl<'a> SnapshotSources<'a> {
             })
         {
             // getEffectiveStrokes returns before its drawing lookup for these
-            // non-content roles, including a layer with no timing provider.
+            // non-content roles, but AFTER its shared range gate. Preserve
+            // unavailable linked offsets, without requiring drawing timing
+            // when this zero-content layer has no range gate at all.
+            let ranges = RangeEvaluator::new(self.snapshot, &self.context_id, selector.frame)
+                .map_err(|_| ObjectFrameError::Unavailable)?;
+            if self.scope_kind == FrameScopeKind::Authored
+                && ranges
+                    .gates(uid)
+                    .map_err(|_| ObjectFrameError::Unavailable)?
+            {
+                ranges
+                    .resolve(uid, true)
+                    .map_err(|_| ObjectFrameError::Unavailable)?;
+            }
             return Ok(Vec::new());
         }
         // These families need their real item/component consumer. An empty

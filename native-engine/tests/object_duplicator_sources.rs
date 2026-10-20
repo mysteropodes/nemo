@@ -246,6 +246,7 @@ fn real_blank_temporal_source_keeps_original_fallback_but_missing_provider_does_
 #[test]
 fn effect_layers_have_no_source_drawing_even_when_no_timing_provider_exists() {
     let mut value = document();
+    value["objects"] = json!([]);
     value["layers"][0]["isEffectLayer"] = json!(true);
     value["layers"][0].as_object_mut().unwrap().remove("timing");
     let snapshot = snapshot(value);
@@ -258,12 +259,31 @@ fn effect_layers_have_no_source_drawing_even_when_no_timing_provider_exists() {
 #[test]
 fn stored_effector_role_is_not_treated_as_hidden_pool_drawing_content() {
     let mut value = duplicated_document(0);
+    value["componentTables"]["duplicators"]["duplicators"] = json!([]);
     value["componentTables"]["duplicators"]["effectorLayers"] = json!([
-        {"contextId":"scene-root","layerUid":"L0","effector":{"targetLayerUid":"L0"}}]);
+        {"contextId":"scene-root","layerUid":"L0","effector":{"targetLayerUid":"removed-host"}}]);
     value["layers"][0].as_object_mut().unwrap().remove("timing");
     let snapshot = snapshot(value);
     let port = SnapshotSources::new(&snapshot, &selector(&snapshot), true).unwrap();
     assert!(port.has_layer("L0"));
     assert!(port.strokes_at("L0", 2.).is_empty());
     assert_eq!(port.failure.get(), None);
+}
+
+#[test]
+fn a_zero_content_role_does_not_hide_its_unavailable_linked_range_provider() {
+    let mut value = document();
+    value["objects"] = json!([]);
+    value["layers"][0]["isEffectLayer"] = json!(true);
+    value["layers"][0].as_object_mut().unwrap().remove("timing");
+    value["layers"][0]["range"] = json!({"timeLink":{"uid":"L1","mode":"in","srcAnchor":"in"}});
+    value["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"L1","range":{"inPoint":0,"outPoint":7}}));
+    value["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
+        "properties":[{"property":"timeLinkInOffset","expression":{"enabled":true,"code":"0"}}]}]);
+    let snapshot = snapshot(value);
+    let port = SnapshotSources::new(&snapshot, &selector(&snapshot), true).unwrap();
+    assert_eq!(port.read("L0", 2.), Err(ObjectFrameError::Unavailable));
 }
