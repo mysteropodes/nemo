@@ -171,7 +171,8 @@
         "object_audio_track_baseline.rs",
         "project_audio_asset_wire.rs",
         "project_asset_source_wire.rs",
-        "object_property_codec.rs"
+        "object_property_codec.rs",
+        "project_metadata_wire.rs"
       ],
       "publicApi": [
         "codec.rs",
