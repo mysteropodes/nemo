@@ -247,3 +247,21 @@ test('palette UI installation leaves browser palette DOM and button state unchan
   assert.equal(elements['palette-tabs'].textContent, 'browser tabs'); assert.equal(elements['btn-palette-new'].disabled, false);
   assert.strictEqual(UI.install(root), controller);
 });
+
+test('actual HTML loads the palette protocol before SDK capture and the model before ordinary UI', () => {
+  const wanted = ['native-palette-contract.js', 'native-application.js', 'native-palette-desktop.js', 'native-palette-ui.js'];
+  const html = fs.readFileSync(require.resolve('../src/index.html'), 'utf8');
+  const actual = [...html.matchAll(/<script\b[^>]*\bsrc="js\/adapters\/([^"\n]+)"[^>]*>/g)]
+    .map(match => match[1]).filter(file => wanted.includes(file));
+  assert.deepEqual(actual, wanted);
+  function load(files) {
+    const root = { document: { getElementById: () => null }, addEventListener() {} };
+    root.globalThis = root; const context = vm.createContext(root);
+    for (const file of files) vm.runInContext(fs.readFileSync(require.resolve('../src/js/adapters/' + file), 'utf8'), context);
+    return () => vm.runInContext(`NemoNativeApplicationAdapter.validateRequest({apiVersion:2,requestId:'html-palette',
+      instanceId:'i',documentId:'d',operation:'query.document.object.project.palette.read',payload:{atRevision:0,
+      documentSnapshotId:'s0',contextId:'scene-root',selector:{kind:'settings'}}})`, context);
+  }
+  assert.doesNotThrow(load(actual));
+  assert.throws(load([wanted[1], wanted[0], wanted[2], wanted[3]]), /unsupported native operation/);
+});
