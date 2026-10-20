@@ -178,10 +178,11 @@ test('real Order inspector exposes its bake and reads without granting unavailab
   async readProperty(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.target,property:'order',dimension:1,...q.view.kind==='rawSample'?{frame:q.view.frame,value:[20]}:{trackPresent:true,items:[{frame:0,v:[17]},{frame:15,v:[32]}],nextOffset:null}};},
   async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},editPropertyTrack(){throw Error('Order generic track writer must remain unavailable');}});
  assert.equal(await panel.refresh(true),true);await tick();await tick();
- const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.type==='number');assert.ok(numeric.length);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
+ const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.className==='motion-val');assert.equal(numeric.length,1);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
  const bake=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Bake expression');assert.ok(bake);await bake.fire('click');
  assert.equal(writes.length,1);assert.equal(writes[0].property,'order');assert.deepEqual(writes[0].action,{kind:'bake'});
  await tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');await tick();
  const checks=tree(container).filter(n=>n.type==='checkbox');assert.equal(checks.length,2);assert.ok(checks.every(n=>n.disabled));
+ const keyPanel=tree(container).find(n=>n.className==='native-motion-property-keys');assert.ok(tree(keyPanel).filter(n=>n.tagName==='INPUT').every(n=>n.disabled));
  assert.equal(panel.readKeyTimeline().selectFrames([0]),false);assert.equal(writes.length,1);panel.dispose();
 });
