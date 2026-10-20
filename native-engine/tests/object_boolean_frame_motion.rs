@@ -204,11 +204,20 @@ fn open_filled_members_preserve_the_straight_closing_chord_with_and_without_moti
             record["vector"]=json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1});
             // These handles do not belong to an open path; using a closing
             // Bezier would introduce a huge bulge and a wrong rotation pivot.
-            record["geometry"]["segments"][0]["handleIn"]=json!({"x":1000,"y":1000});
-            record["geometry"]["segments"][3]["handleOut"]=json!({"x":1000,"y":1000});
+            if motion {
+                record["geometry"]["segments"][0]["handleIn"]=json!({"x":1000,"y":1000});
+                record["geometry"]["segments"][3]["handleOut"]=json!({"x":1000,"y":1000});
+            }
         }
         let mut o=owner(&source); let before=bytes(&o);
         let edit=o.prepare_boolean_flatten_json(&payload()).unwrap(); o.commit_boolean_edit(edit).unwrap();
+        if !motion {
+            let mut legacy=owner(&source);
+            let edit=legacy.prepare_boolean_flatten_with(&payload(),
+                &crate::object_document::object_group_kernels::object_boolean_ops::plan::UnavailableMotion).unwrap();
+            legacy.commit_boolean_edit(edit).unwrap();
+            assert_eq!(bytes(&o),bytes(&legacy),"previous open straight-fill output is byte-identical");
+        }
         let after:Value=serde_json::from_slice(&bytes(&o)).unwrap();
         assert_eq!(after["objects"].as_array().unwrap().len(),if motion{1}else{2});
         #[cfg(feature="compositor")]
