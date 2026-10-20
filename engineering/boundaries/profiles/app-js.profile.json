@@ -3258,7 +3258,7 @@
     },
     {
       "id": "app.native.composition.contract.adapter",
-      "layer": "adapters",
+      "layer": "domain",
       "dir": "src/js/adapters",
       "files": [
         "native-composition-contract.js"
@@ -3266,11 +3266,11 @@
       "publicApi": [
         "native-composition-contract.js"
       ],
-      "sizeProfile": "Platform/engine adapter"
+      "sizeProfile": "Domain/application"
     },
     {
       "id": "app.native.composition.desktop.adapter",
-      "layer": "adapters",
+      "layer": "application",
       "dir": "src/js/adapters",
       "files": [
         "native-composition-desktop.js"
@@ -3278,7 +3278,7 @@
       "publicApi": [
         "native-composition-desktop.js"
       ],
-      "sizeProfile": "Platform/engine adapter"
+      "sizeProfile": "Domain/application"
     },
     {
       "id": "app.native.composition.ui.adapter",
