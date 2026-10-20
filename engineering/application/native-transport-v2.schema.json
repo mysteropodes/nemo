@@ -7412,6 +7412,33 @@
                   "maximum": 8
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "property",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "expressionContext"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectPropertyReadTarget"
+                },
+                "property": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "frame": {
+                  "type": "number",
+                  "minimum": -1.7976931348623157e+308,
+                  "maximum": 1.7976931348623157e+308
+                }
+              }
             }
           ]
         }
@@ -7849,6 +7876,273 @@
                     "maxItems": 0
                   },
                   "nextOffset": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "property",
+            "dimension",
+            "frame",
+            "self",
+            "comp",
+            "keyCount",
+            "compUnavailable"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "expressionContext"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dimension": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "frame": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "self": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "index",
+                    "isShape",
+                    "hasParent",
+                    "property",
+                    "parent"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "isShape": {
+                      "type": "boolean"
+                    },
+                    "hasParent": {
+                      "type": "boolean"
+                    },
+                    "property": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "parent": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "name",
+                            "index"
+                          ],
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 4294967295
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "comp": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "width",
+                    "height",
+                    "fps",
+                    "frames",
+                    "layers",
+                    "name",
+                    "frameDuration",
+                    "duration",
+                    "numLayers"
+                  ],
+                  "properties": {
+                    "width": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4294967295
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4294967295
+                    },
+                    "frames": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "layers": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "numLayers": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4294967295
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "fps": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "frameDuration": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "duration": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                }
+              ]
+            },
+            "keyCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65536
+            },
+            "compUnavailable": {
+              "enum": [
+                null,
+                "projectMetadata"
+              ]
+            },
+            "mesh": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "meshId",
+                "vertexIndex",
+                "vertexCount",
+                "outlineVertexCount",
+                "vertexUV",
+                "isOutlineVertex"
+              ],
+              "properties": {
+                "meshId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "vertexIndex": {
+                  "type": "integer",
+                  "minimum": -1,
+                  "maximum": 4294967295
+                },
+                "vertexCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "outlineVertexCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "vertexUV": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number",
+                    "minimum": -1.7976931348623157e+308,
+                    "maximum": 1.7976931348623157e+308
+                  }
+                },
+                "isOutlineVertex": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "comp": {
+                    "type": "null"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "compUnavailable": {
+                    "const": "projectMetadata"
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "compUnavailable": {
                     "type": "null"
                   }
                 }

@@ -16,7 +16,7 @@ fn expression(code: &str, enabled: bool) -> Value {
     json!({"enabled": enabled, "code": code})
 }
 
-fn owner(property: &str, code: &str, enabled: bool) -> NativeObjectHistory {
+pub(super) fn owner(property: &str, code: &str, enabled: bool) -> NativeObjectHistory {
     let mut properties = vec![
         json!({"property":"position","static":[3,4]}),
         json!({"property":"opacity","static":[50]}),

@@ -26,6 +26,9 @@ use crate::object_document::{
     ImageMeshStore, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
 };
 pub(crate) use crate::object_document::{ObjectLayer, Presence, PropertyHolder};
+#[path = "object_property_codec.rs"]
+mod property_codec;
+pub(crate) use property_codec::validate_property_holders;
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -288,6 +291,8 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.objects,
         None,
         None,
+        document.items.value(),
+        document.image_meshes.value(),
     )?;
     validate_image_meshes(&document.image_meshes)?;
     object_raster_asset_codec::validate_items(document)
@@ -316,31 +321,6 @@ pub(crate) fn validate_layer_organization(
 ) -> Result<(), ObjectCodecError> {
     crate::object_document::validate_layer_organization(layers, folders)
         .map_err(|message| ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message))
-}
-
-pub(crate) fn validate_property_holders(
-    holders: &Presence<Vec<PropertyHolder>>,
-    layers: &[ObjectLayer],
-    records: &[ObjectRecord],
-    plan: Option<&crate::object_document::OrderPlan>,
-    tables: Option<&crate::object_document::ComponentTables>,
-) -> Result<(), ObjectCodecError> {
-    use crate::object_document::PropertyAdmissionError;
-    crate::object_document::validate_property_holders(holders, layers, records, plan, tables)
-        .map_err(|error| {
-            let (kind, message) = match error {
-                PropertyAdmissionError::Invalid(message) => {
-                    (ObjectCodecErrorKind::Invalid, message)
-                }
-                PropertyAdmissionError::Unsupported(message) => {
-                    (ObjectCodecErrorKind::Unsupported, message)
-                }
-                PropertyAdmissionError::DuplicateId(message) => {
-                    (ObjectCodecErrorKind::DuplicateId, message)
-                }
-            };
-            ObjectCodecError::new(kind, message)
-        })
 }
 
 /// Legacy and component-symbol content retain their original parent refusal.

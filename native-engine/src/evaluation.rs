@@ -10,6 +10,10 @@ use crate::revision::DocumentSnapshot;
 use serde_json::Number;
 use std::fmt::{Display, Formatter};
 
+#[path = "object_expression_reads.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_expression_snapshot_reads;
+
 // D16-K1: supplied immutable lookup records; no guest or owner binding yet.
 #[path = "property_expression_lookup.rs"]
 #[allow(dead_code)]

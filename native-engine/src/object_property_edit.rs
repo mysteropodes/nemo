@@ -211,16 +211,18 @@ impl ObjectFillOwner {
                 properties: vec![],
             });
         // Validate even a no-op selector; absent targets cannot invent a holder.
-        crate::object_document::validate_property_holders(
+        PropertyHolder::validate_with_items(
             &Presence::Present(vec![holder.clone()]),
             &document.layers,
             &document.objects,
             document.composition_order.value(),
             document.component_tables(),
+            document.items.value(),
+            document.image_meshes.value(),
         )
         .map_err(|_| DispatchErrorCode::NotFound)?;
         let metadata = holder
-            .metadata(&payload.property)
+            .metadata_in_document(&document, &payload.property)
             .ok_or(DispatchErrorCode::Unavailable)?;
         let record_index = holder
             .properties
