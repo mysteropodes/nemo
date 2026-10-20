@@ -25,12 +25,12 @@ pub(crate) mod text_read;
 
 #[path = "native_audio_track_contract.rs"]
 pub(crate) mod audio_track;
+#[path = "native_composition_contract.rs"]
+pub(crate) mod composition;
 #[path = "native_project_placement_contract.rs"]
 pub(crate) mod placement;
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
-#[path = "native_composition_contract.rs"]
-pub(crate) mod composition;
 
 #[path = "native_diagnostics_contract.rs"]
 mod diagnostics;

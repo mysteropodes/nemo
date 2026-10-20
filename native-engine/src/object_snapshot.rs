@@ -291,7 +291,10 @@ impl ObjectSnapshot {
             #[cfg(all(feature = "history", feature = "project_media_codec"))]
             return self.dispatch_composition_read(&request);
             #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
-            return failure(DispatchErrorCode::Unavailable, "Native composition metadata is unavailable.");
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Native composition metadata is unavailable.",
+            );
         }
         if request.operation != "query.document.object" {
             return failure(

@@ -305,40 +305,21 @@ pub fn validate_native_response(
                         .get("verifiedContentRevision")
                         .and_then(serde_json::Value::as_u64)
                         == Some(response.content_revision))
-                && (!matches!(
-                    request.operation.as_str(),
-                    "query.document.object"
-                        | "query.document.object.layer.timing"
-                        | crate::native_contract::metadata::OP
-                        | crate::native_contract::text_read::OP
-                        | crate::native_contract::property_read::OP
-                        | crate::native_contract::composition::READ
-                ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
-                    == Some(response.content_revision))
-                && (!matches!(
-                    request.operation.as_str(),
-                    "query.document.object.layer.timing"
-                        | crate::native_contract::metadata::OP
-                        | crate::native_contract::text_read::OP
-                        | crate::native_contract::property_read::OP
-                        | crate::native_contract::composition::READ
-                ) || (response.instance_id == request.instance_id
-                    && response.document_id == request.document_id
-                    && result.get("instanceId").and_then(serde_json::Value::as_str)
-                        == Some(response.instance_id.as_str())
-                    && result.get("documentId").and_then(serde_json::Value::as_str)
-                        == Some(response.document_id.as_str())))
+                && response_owner::pinned_read_correlated(request, response, result)
                 && (request.operation != "command.document.object.layer.create"
                     || request
                         .expected_revision
                         .and_then(|revision| revision.checked_add(1))
                         == Some(response.content_revision))
-                && (!matches!(request.operation.as_str(), "command.document.object.project.settings.edit" | crate::native_contract::composition::EDIT)
-                    || crate::native_contract::settings::revision_matches(
-                        request.expected_revision,
-                        response.content_revision,
-                        result,
-                    ))
+                && (!matches!(
+                    request.operation.as_str(),
+                    "command.document.object.project.settings.edit"
+                        | crate::native_contract::composition::EDIT
+                ) || crate::native_contract::settings::revision_matches(
+                    request.expected_revision,
+                    response.content_revision,
+                    result,
+                ))
                 && (!policy_command
                     || crate::native_contract::layer_policy::revision_matches(
                         request.expected_revision,
