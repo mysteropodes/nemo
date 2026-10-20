@@ -406,7 +406,9 @@ impl ObjectSnapshot {
             }
             ViewFields::StoredProperty { target, property } => {
                 let holder = self.metadata_holder(&target)?;
-                if !holder.properties.iter().any(|p| p.property == property) {
+                if !holder.properties.iter().any(|p| p.property == property)
+                    && !(property == "order" && self.document().property_order(&target).is_some())
+                {
                     return Err(DispatchErrorCode::NotFound);
                 }
                 let item = descriptor(self.document(), &holder, &property, false)?;

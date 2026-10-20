@@ -247,6 +247,14 @@ fn order_payload(element: bool) -> Value {
     }
     p
 }
+fn order_stored(
+    pin: &crate::revision::ObjectSnapshot,
+    target: Value,
+) -> Result<Value, DispatchErrorCode> {
+    pin.query_property_metadata_json(json!({"instanceId":pin.instance_id(),
+        "documentId":pin.document_id(),"atRevision":pin.content_revision(),"documentSnapshotId":pin.snapshot_id(),
+        "view":{"kind":"storedProperty","target":target,"property":"order"}}).to_string().as_bytes())
+}
 #[test]
 fn layer_and_element_order_bake_real_stored_provider_one_history_and_reopen() {
     for element in [false, true] {
@@ -256,6 +264,11 @@ fn layer_and_element_order_bake_real_stored_provider_one_history_and_reopen() {
         let target = serde_json::from_value(p["target"].clone()).unwrap();
         let req = request(&owner, "order-bake", p);
         let pin = owner.acquire_snapshot(0).unwrap();
+        assert_eq!(
+            order_stored(&pin, serde_json::to_value(&target).unwrap()).unwrap()["items"][0]
+                ["authored"]["expressionEnabled"],
+            true
+        );
         let page = pin
             .query_property_metadata_json(
                 json!({"instanceId":pin.instance_id(),
@@ -273,6 +286,11 @@ fn layer_and_element_order_bake_real_stored_provider_one_history_and_reopen() {
         let after = drawing(&owner);
         let pin = owner.acquire_snapshot(1).unwrap();
         let order = pin.document().property_order(&target).unwrap();
+        assert_eq!(
+            order_stored(&pin, serde_json::to_value(&target).unwrap()).unwrap()["items"][0]
+                ["authored"]["expressionEnabled"],
+            false
+        );
         assert_eq!(order.expression.value().unwrap().enabled, false);
         assert_eq!(order.track.value().unwrap().keys.len(), 2);
         for frame in [0., 0.5, 6., 12., 24.] {
@@ -328,5 +346,40 @@ fn order_constant_and_actual_vm_errors_never_publish_partial_state() {
                 assert_eq!(owner.content_revision(), 0);
             }
         }
+    }
+}
+
+#[test]
+fn missing_or_ambiguous_real_order_target_refuses_metadata_and_bake_without_change() {
+    for ambiguous in [false, true] {
+        let mut document = drawing(&order_owner("frame", true));
+        if ambiguous {
+            let mut object = document["objects"][0].clone();
+            object["target"]["frameScope"]["frame"] = json!(8);
+            document["objects"].as_array_mut().unwrap().push(object);
+            let mut scope = document["compositionOrder"]["contexts"][0]["scopes"][0].clone();
+            scope["frameScope"]["frame"] = json!(8);
+            document["compositionOrder"]["contexts"][0]["scopes"]
+                .as_array_mut()
+                .unwrap()
+                .push(scope);
+        }
+        let drawing_doc = decode_storage_project(document.to_string().as_bytes()).unwrap();
+        let mut owner = NativeObjectHistory::from_admitted_project(
+            "refuse-order",
+            ProjectEnvelope::no_media(ProjectMetadata::new(320, 180, 24.).unwrap(), drawing_doc),
+        )
+        .unwrap();
+        let mut p = order_payload(true);
+        if !ambiguous {
+            p["target"]["strokeId"] = json!("missing");
+        }
+        let before = drawing(&owner);
+        let pin = owner.acquire_snapshot(0).unwrap();
+        assert!(order_stored(&pin, p["target"].clone()).is_err());
+        let req = request(&owner, "refused-order", p);
+        assert_eq!(dispatch(&mut owner, &req)["ok"], false);
+        assert_eq!(drawing(&owner), before);
+        assert_eq!(owner.content_revision(), 0);
     }
 }

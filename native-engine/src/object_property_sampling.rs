@@ -125,7 +125,7 @@ pub fn sample_property_raw(
         let order = document
             .property_order(target)
             .ok_or(PropertySampleError::Unavailable)?;
-        return super::order::numeric_at(order, at)
+        return crate::object_frame_packet::order::numeric_at(order, at)
             .map(|v| vec![v])
             .map_err(|_| PropertySampleError::Unavailable);
     }
