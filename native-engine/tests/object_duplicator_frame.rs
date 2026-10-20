@@ -487,15 +487,16 @@ fn retained_random_is_pinned_across_reconstruction_seed_changes_and_count_growth
 }
 
 #[test]
-fn retained_path_layer_that_is_a_duplicator_preserves_the_existing_admission_refusal() {
-    // This exact current codec guard prevents reaching the pure evaluator's
-    // original BrokenPath fallback through a retained production document.
-    // Preserve its old test and report the original fallback criterion OPEN.
-    let value = retained_mode_document("chain");
-    let error = decode_storage_project(value.to_string().as_bytes()).unwrap_err();
-    assert_eq!(
-        error.kind(),
-        crate::object_codec::ObjectCodecErrorKind::Unsupported
-    );
-    assert_eq!(error.message(), "the path layer is itself a duplicator");
+fn retained_path_layer_that_is_a_duplicator_keeps_the_original_no_chain_fallback() {
+    let admitted = snapshot(retained_mode_document("chain"));
+    let before = encode_storage_project(admitted.document()).unwrap();
+    let snapshot = snapshot(serde_json::from_slice(&before).unwrap());
+    let packet = prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 2)).unwrap();
+    assert!(packet.duplicator_outputs().is_empty()); // Original oracle: out same.
+    let records = packet.records().collect::<Vec<_>>();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].record(), &snapshot.document().objects()[1]);
+    assert_eq!(snapshot.document().objects().len(), 4);
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+    assert_eq!(snapshot.content_revision(), 0);
 }

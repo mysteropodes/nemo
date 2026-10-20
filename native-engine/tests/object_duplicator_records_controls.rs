@@ -166,16 +166,16 @@ fn inline_effector_rules() {
 }
 
 #[test]
-fn a_path_layer_may_not_chain_and_must_exist_in_path_mode() {
+fn a_path_reference_keeps_the_original_other_duplicator_fallback_but_refuses_self_and_missing() {
     let path = |uid: Value| dup("ly_pathdup", "pathLayerUid", uid);
     assert_eq!(
         run(path(json!("ly_pathdup"))),
         Err(Chained("a duplicator cannot path along itself"))
     );
-    assert_eq!(
-        run(path(json!("ly_toggle"))),
-        Err(Chained("the path layer is itself a duplicator"))
-    );
+    // Correct the former Chained pin against baseline app.js:1470,1703:
+    // the path is unusable, but the document remains representable and the
+    // evaluator returns the original seed without reading another duplicator.
+    assert_eq!(run(path(json!("ly_toggle"))), Ok(()));
     assert_eq!(
         run(path(json!("ly_ghost"))),
         Err(Unresolved("the path layer names no layer"))
@@ -200,6 +200,23 @@ fn a_path_layer_may_not_chain_and_must_exist_in_path_mode() {
     );
     assert_eq!(run(stale("grid")), Ok(()));
     assert_eq!(run(stale("radial")), Ok(()));
+}
+
+#[test]
+fn a_path_reference_must_resolve_in_its_hosts_context() {
+    let mut value = set_value();
+    dup("ly_pathdup", "pathLayerUid", json!("ly_pool_a"))(&mut value);
+    let set: DuplicatorSet = serde_json::from_value(value).unwrap();
+    let mut refs = layers();
+    refs.retain(|layer| layer.layer_uid != "ly_pool_a");
+    refs.push(LayerRef {
+        context_id: "sym_comp",
+        layer_uid: "ly_pool_a",
+    });
+    assert_eq!(
+        set.validate(&refs),
+        Err(Unresolved("the path layer names no layer"))
+    );
 }
 
 #[test]
