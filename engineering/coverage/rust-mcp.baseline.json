@@ -582,6 +582,17 @@
       "regions": 88.65,
       "functions": 86.36,
       "note": "Measured clean 8d1f78fd8aa3c998147fc336fd3e4af205035f6a, MCP tree f153c81dd50c22486b57e22b8a2c627db02ba3b7; cargo-llvm-cov 0.9.1 JSON f65c48e230ffcacebd837715bc92e937581ea079ac35ad36e8c9ec07625227a8. Existing pure buildBaseline derives only this missing file's observed floors. Every pre-existing file and aggregate floor, exclusion, tool and recorded provenance remains unchanged. Measurement and contract tests do not establish installed or native-host acceptance."
+    },
+    "nemo-mcp/src/native_composition_contract.rs": {
+      "lines": 96.11,
+      "regions": 94.87,
+      "functions": 100,
+      "note": "T08: observed from the original cargo-llvm-cov report at e40199208345e2959d5f69e174f598e055354675; all prior file and aggregate floors retained."
+    },
+    "nemo-mcp/src/native_composition_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T08: observed from the original cargo-llvm-cov report at e40199208345e2959d5f69e174f598e055354675; all prior file and aggregate floors retained."
     }
   },
   "nativeObjectContractRegistration": {

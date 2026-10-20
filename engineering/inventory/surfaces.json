@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "10c64992754660c703944145f7b04db92003daf7",
-  "describe": "v0.7.0-alpha.4-2492-g10c64992"
+  "head": "e40199208345e2959d5f69e174f598e055354675",
+  "describe": "v0.7.0-alpha.4-2525-ge4019920"
  },
- "inputsDigest": "7e467dd3c3014dd621998480f76172b0cbac8e7e945d8d8a80cc97778c045c4a",
+ "inputsDigest": "6d84a2bfe610d8427b485f47fe90b808c95500319a9615cdb8f91620c7e11998",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 272,
+   "native": 275,
    "export": 5,
    "animation": 457,
    "history": 357,
@@ -126,7 +126,7 @@
   },
   "SMBpm": {
    "file": "src/js/bpm-grid.js",
-   "line": 100,
+   "line": 115,
    "members": 0
   },
   "SMCamera": {
@@ -221,7 +221,7 @@
   },
   "SMMarkers": {
    "file": "src/js/markers.js",
-   "line": 245,
+   "line": 283,
    "members": 0
   },
   "SMMediaLibrary": {
@@ -256,7 +256,7 @@
   },
   "SMScript": {
    "file": "src/js/nemo-script.js",
-   "line": 694,
+   "line": 702,
    "members": 0
   },
   "SMPathFx": {
@@ -463,7 +463,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 110,
+    "functionsVisited": 113,
     "via": "variable btn",
     "references": []
    },
@@ -966,8 +966,8 @@
    "capability": "Grille BPM — clic : afficher/masquer · clic droit : régler le tempo",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/bpm-grid.js:93 init()",
-    "src/js/bpm-grid.js:94 init()"
+    "src/js/bpm-grid.js:108 init()",
+    "src/js/bpm-grid.js:109 init()"
    ],
    "events": [
     "click",
@@ -989,10 +989,10 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 39,
+    "functionsVisited": 54,
     "via": "variable b",
     "references": [
-     "src/js/bpm-grid.js:86 refresh()"
+     "src/js/bpm-grid.js:101 refresh()"
     ]
    },
    "fixtures": [
@@ -1134,7 +1134,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 589,
+    "functionsVisited": 591,
     "via": "variable btn",
     "references": [
      "src/js/motion.js:7283 action()"
@@ -1875,7 +1875,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 198,
+    "functionsVisited": 204,
     "via": "chain",
     "references": []
    },
@@ -2492,7 +2492,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 131,
+    "functionsVisited": 129,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9085 action()"
@@ -2586,7 +2586,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 226,
+    "functionsVisited": 229,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9087 action()"
@@ -2669,7 +2669,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 283,
+    "functionsVisited": 285,
     "via": "chain",
     "references": [
      "src/js/images.js:705",
@@ -2751,7 +2751,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 87,
+    "functionsVisited": 32,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9136 action()"
@@ -2841,7 +2841,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 504,
+    "functionsVisited": 505,
     "via": "variable btn",
     "references": []
    },
@@ -3015,7 +3015,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 62,
+    "functionsVisited": 63,
     "via": "variable bClean",
     "references": [
      "src/js/media-library.js:691 render()"
@@ -3103,7 +3103,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 103,
+    "functionsVisited": 105,
     "via": "variable bVid",
     "references": []
    },
@@ -3275,7 +3275,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 59,
     "via": "chain",
     "references": []
    },
@@ -3316,7 +3316,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 83,
+    "functionsVisited": 84,
     "via": "chain",
     "references": []
    },
@@ -3440,7 +3440,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 121,
+    "functionsVisited": 122,
     "via": "chain",
     "references": []
    },
@@ -3574,7 +3574,7 @@
    "capability": "Add the current Fill color to the palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:265 init()"
+    "src/js/palette-panel.js:296 init()"
    ],
    "events": [
     "click"
@@ -3597,7 +3597,9 @@
     "hiddenAtLoad": false,
     "functionsVisited": 2,
     "via": "variable addFillBtn",
-    "references": []
+    "references": [
+     "src/js/palette-panel.js:22 paletteNativeUnavailable()"
+    ]
    },
    "fixtures": [
     "static-props",
@@ -3613,7 +3615,7 @@
    "capability": "Add the current Stroke color to the palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:266 init()"
+    "src/js/palette-panel.js:297 init()"
    ],
    "events": [
     "click"
@@ -3636,7 +3638,9 @@
     "hiddenAtLoad": false,
     "functionsVisited": 2,
     "via": "variable addStrokeBtn",
-    "references": []
+    "references": [
+     "src/js/palette-panel.js:22 paletteNativeUnavailable()"
+    ]
    },
    "fixtures": [
     "static-props",
@@ -3652,7 +3656,7 @@
    "capability": "Create a new palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:268 init()"
+    "src/js/palette-panel.js:299 init()"
    ],
    "events": [
     "click"
@@ -3673,9 +3677,11 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 59,
+    "functionsVisited": 60,
     "via": "variable newBtn",
-    "references": []
+    "references": [
+     "src/js/palette-panel.js:22 paletteNativeUnavailable()"
+    ]
    },
    "fixtures": [
     "static-props",
@@ -3691,7 +3697,7 @@
    "capability": "Replace a color in the active layer: click the source, then the target",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:275 init()"
+    "src/js/palette-panel.js:307 init()"
    ],
    "events": [
     "click"
@@ -3715,7 +3721,8 @@
     "functionsVisited": 30,
     "via": "variable replaceBtn",
     "references": [
-     "src/js/palette-panel.js:195 render()"
+     "src/js/palette-panel.js:221 render()",
+     "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
    "fixtures": [
@@ -3732,7 +3739,7 @@
    "capability": "Swap Fill ↔ Stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:270 init()"
+    "src/js/palette-panel.js:301 init()"
    ],
    "events": [
     "click"
@@ -3761,7 +3768,9 @@
     "hiddenAtLoad": false,
     "functionsVisited": 83,
     "via": "variable swapBtn",
-    "references": []
+    "references": [
+     "src/js/palette-panel.js:22 paletteNativeUnavailable()"
+    ]
    },
    "fixtures": [
     "static-props",
@@ -4069,7 +4078,7 @@
     "container": "ref-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 51,
+    "functionsVisited": 50,
     "via": "variable rm",
     "references": [
      "src/js/reference-bridge.js:359 syncUI()"
@@ -5027,7 +5036,7 @@
     "container": "p-toolpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 81,
+    "functionsVisited": 82,
     "via": "variable saveBtn",
     "references": []
    },
@@ -5200,7 +5209,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 91,
+    "functionsVisited": 93,
     "via": "chain",
     "references": []
    },
@@ -7378,7 +7387,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 115,
+    "functionsVisited": 117,
     "via": "variable runBtn",
     "references": []
    },
@@ -7829,7 +7838,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 73,
+    "functionsVisited": 72,
     "via": "chain",
     "references": [
      "src/js/project.js:214 openDialog()"
@@ -9091,7 +9100,7 @@
     "container": "assets-view-media",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 73,
+    "functionsVisited": 74,
     "via": "variable input",
     "references": []
    },
@@ -9206,7 +9215,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 77,
+    "functionsVisited": 72,
     "via": "chain",
     "references": []
    },
@@ -9582,7 +9591,7 @@
     "container": "effects-stack-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 72,
     "via": "variable addBtn",
     "references": [
      "src/js/tutorial.js:1310 check()"
@@ -9765,7 +9774,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 90,
+    "functionsVisited": 93,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3338 updatePropsContext()"
@@ -9850,7 +9859,7 @@
     "container": "p-brushpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 64,
+    "functionsVisited": 67,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:476 setTool()"
@@ -9937,7 +9946,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 25,
+    "functionsVisited": 28,
     "via": "chain",
     "references": [
      "src/js/adapters/native-object-ui.js:302 renderNativeObjectUiMetadata()"
@@ -9982,7 +9991,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 29,
+    "functionsVisited": 31,
     "via": "chain",
     "references": [
      "src/js/timeline.js:10385"
@@ -10217,7 +10226,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 66,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2900 updateCornersPanel()",
@@ -10306,7 +10315,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 29,
+    "functionsVisited": 31,
     "via": "chain",
     "references": [
      "src/js/timeline.js:10393"
@@ -10526,7 +10535,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 114,
+    "functionsVisited": 116,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6314 paintFillSwatches()"
@@ -10942,7 +10951,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 216,
+    "functionsVisited": 222,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
@@ -11089,7 +11098,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 216,
+    "functionsVisited": 222,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
@@ -11351,7 +11360,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 90,
+    "functionsVisited": 93,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3344 updatePropsContext()",
@@ -12328,7 +12337,7 @@
     "container": "ref-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 67,
+    "functionsVisited": 65,
     "via": "variable off",
     "references": [
      "src/js/reference-bridge.js:358 syncUI()"
@@ -12371,7 +12380,7 @@
     "container": "ref-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 79,
+    "functionsVisited": 76,
     "via": "variable on",
     "references": [
      "src/js/reference-bridge.js:356 syncUI()"
@@ -12415,7 +12424,7 @@
     "container": "ref-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 38,
     "via": "variable op",
     "references": [
      "src/js/reference-bridge.js:357 syncUI()"
@@ -12903,7 +12912,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 126,
+    "functionsVisited": 128,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6304 paintStrokeSwatches()"
@@ -13312,7 +13321,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 56,
+    "functionsVisited": 57,
     "via": "helper el()",
     "references": [
      "src/js/adapters/native-text-animator-desktop.js:43 draw()",
@@ -13492,7 +13501,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:569 renderWidgetPanel()"
@@ -13542,7 +13551,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:569 renderWidgetPanel()"
@@ -13637,7 +13646,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:573 renderWidgetPanel()"
@@ -13687,7 +13696,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:573 renderWidgetPanel()"
@@ -13737,7 +13746,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:573 renderWidgetPanel()"
@@ -13832,7 +13841,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:583 renderWidgetPanel()"
@@ -13882,7 +13891,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:583 renderWidgetPanel()"
@@ -13932,7 +13941,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 181,
+    "functionsVisited": 185,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:583 renderWidgetPanel()"
@@ -14105,7 +14114,7 @@
    "capability": "Scope of the colour replace",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:279 init()"
+    "src/js/palette-panel.js:311 init()"
    ],
    "events": [
     "change"
@@ -14126,10 +14135,10 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 54,
+    "functionsVisited": 55,
     "via": "variable scopeSel",
     "references": [
-     "src/js/palette-panel.js:193 render()"
+     "src/js/palette-panel.js:219 render()"
     ]
    },
    "fixtures": [
@@ -14310,7 +14319,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 68,
+    "functionsVisited": 71,
     "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
      "src/js/timeline.js:3870 updateFsSelPanel()",
@@ -14600,7 +14609,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 25,
+    "functionsVisited": 27,
     "via": "chain",
     "references": []
    },
@@ -15416,7 +15425,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 46,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3836 updateSelPropsPanel()",
@@ -15462,7 +15471,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 46,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3837 updateSelPropsPanel()"
@@ -15507,7 +15516,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 46,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3835 updateSelPropsPanel()",
@@ -15553,7 +15562,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 46,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3833 updateSelPropsPanel()"
@@ -15598,7 +15607,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 46,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3834 updateSelPropsPanel()"
@@ -16412,7 +16421,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 25,
+    "functionsVisited": 27,
     "via": "chain",
     "references": []
    },
@@ -18816,7 +18825,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -18855,7 +18864,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -18894,7 +18903,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -18933,7 +18942,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -18972,7 +18981,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -19011,7 +19020,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -19050,7 +19059,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -19089,7 +19098,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "callback tab",
     "references": []
    },
@@ -19128,7 +19137,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 71,
+    "functionsVisited": 70,
     "via": "callback btn",
     "references": []
    },
@@ -19170,7 +19179,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 71,
+    "functionsVisited": 70,
     "via": "callback btn",
     "references": []
    },
@@ -19212,7 +19221,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 71,
+    "functionsVisited": 70,
     "via": "callback btn",
     "references": []
    },
@@ -19254,7 +19263,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 71,
+    "functionsVisited": 70,
     "via": "callback btn",
     "references": []
    },
@@ -23177,7 +23186,7 @@
    "source": "src/js/layer-inout.js:1555",
    "meta": {
     "i18n": null,
-    "functionsVisited": 384
+    "functionsVisited": 386
    },
    "fixtures": [
     "static-props",
@@ -23487,13 +23496,13 @@
    ]
   },
   {
-   "id": "menu:markers.js:145",
+   "id": "menu:markers.js:167",
    "kind": "menu",
    "surface": "dynamic menu (buildEl)",
    "capability": "Renommer le repère…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/markers.js:145 buildEl()"
+    "src/js/markers.js:167 buildEl()"
    ],
    "events": [
     "click"
@@ -23509,10 +23518,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:145",
+   "source": "src/js/markers.js:167",
    "meta": {
     "i18n": null,
-    "functionsVisited": 7
+    "functionsVisited": 13
    },
    "fixtures": [
     "static-props",
@@ -23524,13 +23533,13 @@
    ]
   },
   {
-   "id": "menu:markers.js:146",
+   "id": "menu:markers.js:168",
    "kind": "menu",
    "surface": "dynamic menu (buildEl)",
    "capability": "Aller à ce repère",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/markers.js:146 buildEl()"
+    "src/js/markers.js:168 buildEl()"
    ],
    "events": [
     "click"
@@ -23550,7 +23559,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:146",
+   "source": "src/js/markers.js:168",
    "meta": {
     "i18n": null,
     "functionsVisited": 125
@@ -23565,13 +23574,13 @@
    ]
   },
   {
-   "id": "menu:markers.js:148",
+   "id": "menu:markers.js:170",
    "kind": "menu",
    "surface": "dynamic menu (buildEl)",
    "capability": "Supprimer le repère",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/markers.js:148 buildEl()"
+    "src/js/markers.js:170 buildEl()"
    ],
    "events": [
     "click"
@@ -23587,44 +23596,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:148",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 8
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:markers.js:198",
-   "kind": "menu",
-   "surface": "dynamic menu (initRulerMenu)",
-   "capability": "Ajouter un repère ici (frame ",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/markers.js:198 initRulerMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 2
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:198",
+   "source": "src/js/markers.js:170",
    "meta": {
     "i18n": null,
     "functionsVisited": 12
@@ -23639,13 +23611,13 @@
    ]
   },
   {
-   "id": "menu:markers.js:199",
+   "id": "menu:markers.js:235",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
-   "capability": "Ajouter un repère nommé…",
+   "capability": "Ajouter un repère ici (frame ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/markers.js:199 initRulerMenu()"
+    "src/js/markers.js:235 initRulerMenu()"
    ],
    "events": [
     "click"
@@ -23661,10 +23633,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:199",
+   "source": "src/js/markers.js:235",
    "meta": {
     "i18n": null,
-    "functionsVisited": 13
+    "functionsVisited": 17
    },
    "fixtures": [
     "static-props",
@@ -23676,13 +23648,13 @@
    ]
   },
   {
-   "id": "menu:markers.js:204",
+   "id": "menu:markers.js:236",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
-   "capability": "Repère suivant  (Maj+→)",
+   "capability": "Ajouter un repère nommé…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/markers.js:204 initRulerMenu()"
+    "src/js/markers.js:236 initRulerMenu()"
    ],
    "events": [
     "click"
@@ -23693,92 +23665,12 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "animation": 2,
-    "render": 2,
-    "persist": 3,
-    "selection": 3,
-    "native": 3
+    "history": 2
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:204",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 45
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:markers.js:205",
-   "kind": "menu",
-   "surface": "dynamic menu (initRulerMenu)",
-   "capability": "Repère précédent  (Maj+←)",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/markers.js:205 initRulerMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 2,
-    "render": 2,
-    "persist": 3,
-    "selection": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:205",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 45
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:markers.js:207",
-   "kind": "menu",
-   "surface": "dynamic menu (initRulerMenu)",
-   "capability": "Grille BPM…",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/markers.js:207 initRulerMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:207",
+   "source": "src/js/markers.js:236",
    "meta": {
     "i18n": null,
     "functionsVisited": 18
@@ -23793,13 +23685,95 @@
    ]
   },
   {
-   "id": "menu:markers.js:208",
+   "id": "menu:markers.js:241",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
-   "capability": "Réduire la composition à la zone de travail",
+   "capability": "Repère suivant  (Maj+→)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/markers.js:208 initRulerMenu()"
+    "src/js/markers.js:241 initRulerMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 2,
+    "render": 2,
+    "persist": 3,
+    "selection": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/markers.js:241",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 46
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:markers.js:242",
+   "kind": "menu",
+   "surface": "dynamic menu (initRulerMenu)",
+   "capability": "Repère précédent  (Maj+←)",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/markers.js:242 initRulerMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 2,
+    "render": 2,
+    "persist": 3,
+    "selection": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/markers.js:242",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 46
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:markers.js:244",
+   "kind": "menu",
+   "surface": "dynamic menu (initRulerMenu)",
+   "capability": "Grille BPM…",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/markers.js:244 initRulerMenu()"
    ],
    "events": [
     "click"
@@ -23813,7 +23787,42 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:208",
+   "source": "src/js/markers.js:244",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 35
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:markers.js:245",
+   "kind": "menu",
+   "surface": "dynamic menu (initRulerMenu)",
+   "capability": "Réduire la composition à la zone de travail",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/markers.js:245 initRulerMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/markers.js:245",
    "meta": {
     "i18n": null,
     "functionsVisited": 1
@@ -23828,13 +23837,13 @@
    ]
   },
   {
-   "id": "menu:markers.js:210",
+   "id": "menu:markers.js:247",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
    "capability": "Supprimer tous les repères",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/markers.js:210 initRulerMenu()"
+    "src/js/markers.js:247 initRulerMenu()"
    ],
    "events": [
     "click"
@@ -23851,10 +23860,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/markers.js:210",
+   "source": "src/js/markers.js:247",
    "meta": {
     "i18n": null,
-    "functionsVisited": 17
+    "functionsVisited": 37
    },
    "fixtures": [
     "static-props",
@@ -24170,10 +24179,10 @@
    "consumers": {
     "history": 1,
     "render": 1,
+    "native": 2,
     "animation": 2,
     "persist": 3,
-    "selection": 3,
-    "native": 3
+    "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -24181,7 +24190,7 @@
    "source": "src/js/motion.js:10523",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 512
+    "functionsVisited": 515
    },
    "fixtures": [
     "static-props",
@@ -24265,7 +24274,7 @@
    "source": "src/js/motion.js:10958",
    "meta": {
     "i18n": "ctxAddKeyHere",
-    "functionsVisited": 514
+    "functionsVisited": 516
    },
    "fixtures": [
     "static-props",
@@ -24583,7 +24592,7 @@
    "source": "src/js/motion.js:10993",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
-    "functionsVisited": 526
+    "functionsVisited": 528
    },
    "fixtures": [
     "static-props",
@@ -24855,7 +24864,7 @@
    "source": "src/js/motion.js:11021",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 384
+    "functionsVisited": 386
    },
    "fixtures": [
     "static-props",
@@ -25526,7 +25535,7 @@
    "source": "src/js/motion.js:7308",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 384
+    "functionsVisited": 386
    },
    "fixtures": [
     "static-props",
@@ -25683,7 +25692,7 @@
    "source": "src/js/motion.js:7334",
    "meta": {
     "i18n": "ctxAddMarkerOnLayer",
-    "functionsVisited": 12
+    "functionsVisited": 14
    },
    "fixtures": [
     "static-props",
@@ -26228,7 +26237,7 @@
    "source": "src/js/motion.js:8258",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 509
+    "functionsVisited": 511
    },
    "fixtures": [
     "static-props",
@@ -26270,7 +26279,7 @@
    "source": "src/js/motion.js:8335",
    "meta": {
     "i18n": "ctxUnlinkTime",
-    "functionsVisited": 539
+    "functionsVisited": 541
    },
    "fixtures": [
     "static-props",
@@ -27053,7 +27062,7 @@
    "source": "src/js/motion.js:9822",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 528
+    "functionsVisited": 530
    },
    "fixtures": [
     "static-props",
@@ -27095,7 +27104,7 @@
    "source": "src/js/motion.js:9865",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 435
+    "functionsVisited": 437
    },
    "fixtures": [
     "static-props",
@@ -27177,7 +27186,7 @@
    "source": "src/js/motion.js:9867",
    "meta": {
     "i18n": "elementsDelete",
-    "functionsVisited": 582
+    "functionsVisited": 584
    },
    "fixtures": [
     "static-props",
@@ -27189,13 +27198,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:183",
+   "id": "menu:palette-panel.js:209",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Utiliser comme Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:183 render()"
+    "src/js/palette-panel.js:209 render()"
    ],
    "events": [
     "click"
@@ -27215,7 +27224,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:183",
+   "source": "src/js/palette-panel.js:209",
    "meta": {
     "i18n": null,
     "functionsVisited": 76
@@ -27228,13 +27237,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:184",
+   "id": "menu:palette-panel.js:210",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Utiliser comme Stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:184 render()"
+    "src/js/palette-panel.js:210 render()"
    ],
    "events": [
     "click"
@@ -27254,7 +27263,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:184",
+   "source": "src/js/palette-panel.js:210",
    "meta": {
     "i18n": null,
     "functionsVisited": 57
@@ -27267,13 +27276,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:186",
+   "id": "menu:palette-panel.js:212",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Remplacer dans le calque…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:186 render()"
+    "src/js/palette-panel.js:212 render()"
    ],
    "events": [
     "click"
@@ -27287,10 +27296,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:186",
+   "source": "src/js/palette-panel.js:212",
    "meta": {
     "i18n": null,
-    "functionsVisited": 60
+    "functionsVisited": 61
    },
    "fixtures": [
     "static-props",
@@ -27300,13 +27309,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:188",
+   "id": "menu:palette-panel.js:214",
    "kind": "menu",
    "surface": "dynamic menu (render)",
    "capability": "Retirer de la palette",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:188 render()"
+    "src/js/palette-panel.js:214 render()"
    ],
    "events": [
     "click"
@@ -27320,7 +27329,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:188",
+   "source": "src/js/palette-panel.js:214",
    "meta": {
     "i18n": null,
     "functionsVisited": 25
@@ -27333,13 +27342,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:223",
+   "id": "menu:palette-panel.js:250",
    "kind": "menu",
    "surface": "dynamic menu (renderTabs)",
    "capability": "Renommer…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:223 renderTabs()"
+    "src/js/palette-panel.js:250 renderTabs()"
    ],
    "events": [
     "click"
@@ -27353,7 +27362,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:223",
+   "source": "src/js/palette-panel.js:250",
    "meta": {
     "i18n": null,
     "functionsVisited": 25
@@ -27366,13 +27375,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:224",
+   "id": "menu:palette-panel.js:251",
    "kind": "menu",
    "surface": "dynamic menu (renderTabs)",
    "capability": "Dupliquer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:224 renderTabs()"
+    "src/js/palette-panel.js:251 renderTabs()"
    ],
    "events": [
     "click"
@@ -27386,7 +27395,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:224",
+   "source": "src/js/palette-panel.js:251",
    "meta": {
     "i18n": null,
     "functionsVisited": 30
@@ -27399,13 +27408,13 @@
    ]
   },
   {
-   "id": "menu:palette-panel.js:226",
+   "id": "menu:palette-panel.js:253",
    "kind": "menu",
    "surface": "dynamic menu (renderTabs)",
    "capability": "Supprimer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/palette-panel.js:226 renderTabs()"
+    "src/js/palette-panel.js:253 renderTabs()"
    ],
    "events": [
     "click"
@@ -27419,7 +27428,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/palette-panel.js:226",
+   "source": "src/js/palette-panel.js:253",
    "meta": {
     "i18n": null,
     "functionsVisited": 31
@@ -28753,7 +28762,7 @@
    "source": "src/js/storyboard.js:1213",
    "meta": {
     "i18n": null,
-    "functionsVisited": 63
+    "functionsVisited": 64
    },
    "fixtures": [
     "components"
@@ -28783,7 +28792,7 @@
    "source": "src/js/storyboard.js:1214",
    "meta": {
     "i18n": null,
-    "functionsVisited": 64
+    "functionsVisited": 65
    },
    "fixtures": [
     "components"
@@ -28912,7 +28921,7 @@
    "source": "src/js/storyboard.js:974",
    "meta": {
     "i18n": null,
-    "functionsVisited": 118
+    "functionsVisited": 119
    },
    "fixtures": [
     "components"
@@ -28945,7 +28954,7 @@
    "source": "src/js/storyboard.js:975",
    "meta": {
     "i18n": null,
-    "functionsVisited": 121
+    "functionsVisited": 122
    },
    "fixtures": [
     "components"
@@ -28975,7 +28984,7 @@
    "source": "src/js/storyboard.js:979",
    "meta": {
     "i18n": null,
-    "functionsVisited": 57
+    "functionsVisited": 58
    },
    "fixtures": [
     "components"
@@ -29042,7 +29051,7 @@
    "source": "src/js/storyboard.js:988",
    "meta": {
     "i18n": null,
-    "functionsVisited": 63
+    "functionsVisited": 64
    },
    "fixtures": [
     "components"
@@ -29072,7 +29081,7 @@
    "source": "src/js/storyboard.js:990",
    "meta": {
     "i18n": null,
-    "functionsVisited": 64
+    "functionsVisited": 65
    },
    "fixtures": [
     "components"
@@ -30040,7 +30049,7 @@
    "source": "src/js/timeline.js:5577",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 528
+    "functionsVisited": 530
    },
    "fixtures": [
     "keyed-props",
@@ -30079,7 +30088,7 @@
    "source": "src/js/timeline.js:5606",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 435
+    "functionsVisited": 437
    },
    "fixtures": [
     "keyed-props",
@@ -30155,7 +30164,7 @@
    "source": "src/js/timeline.js:5608",
    "meta": {
     "i18n": "fxDelete",
-    "functionsVisited": 582
+    "functionsVisited": 584
    },
    "fixtures": [
     "keyed-props",
@@ -31336,7 +31345,7 @@
    "source": "src/js/timeline.js:6803",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
-    "functionsVisited": 381
+    "functionsVisited": 383
    },
    "fixtures": [
     "keyed-props",
@@ -31561,7 +31570,7 @@
    "source": "src/js/timeline.js:6811",
    "meta": {
     "i18n": "ctxUnlinkFromLFSGroup",
-    "functionsVisited": 382
+    "functionsVisited": 384
    },
    "fixtures": [
     "keyed-props",
@@ -31943,7 +31952,7 @@
    "source": "src/js/timeline.js:6848",
    "meta": {
     "i18n": "ctxMatteSource",
-    "functionsVisited": 381
+    "functionsVisited": 383
    },
    "fixtures": [
     "keyed-props",
@@ -32042,7 +32051,7 @@
    "capability": "activeLayer",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:432 activeLayer"
+    "src/js/nemo-script.js:437 activeLayer"
    ],
    "events": [],
    "exposure": [
@@ -32054,7 +32063,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:432",
+   "source": "src/js/nemo-script.js:437",
    "meta": {
     "functionsVisited": 1
    },
@@ -32070,7 +32079,7 @@
    "capability": "addLayer",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:433 addLayer"
+    "src/js/nemo-script.js:438 addLayer"
    ],
    "events": [],
    "exposure": [
@@ -32089,9 +32098,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:433",
+   "source": "src/js/nemo-script.js:438",
    "meta": {
-    "functionsVisited": 344
+    "functionsVisited": 346
    },
    "fixtures": [
     "media",
@@ -32105,7 +32114,7 @@
    "capability": "addPivot",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:442 addPivot"
+    "src/js/nemo-script.js:447 addPivot"
    ],
    "events": [],
    "exposure": [
@@ -32124,9 +32133,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:442",
+   "source": "src/js/nemo-script.js:447",
    "meta": {
-    "functionsVisited": 374
+    "functionsVisited": 376
    },
    "fixtures": [
     "media",
@@ -32140,7 +32149,7 @@
    "capability": "camera.keys",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:616 camera.keys"
+    "src/js/nemo-script.js:624 camera.keys"
    ],
    "events": [],
    "exposure": [
@@ -32154,7 +32163,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:616",
+   "source": "src/js/nemo-script.js:624",
    "meta": {
     "functionsVisited": 1
    },
@@ -32170,7 +32179,7 @@
    "capability": "comp.beat",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:542 comp.beat"
+    "src/js/nemo-script.js:548 comp.beat"
    ],
    "events": [],
    "exposure": [
@@ -32182,9 +32191,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:542",
+   "source": "src/js/nemo-script.js:548",
    "meta": {
-    "functionsVisited": 6
+    "functionsVisited": 7
    },
    "fixtures": [
     "media",
@@ -32198,7 +32207,7 @@
    "capability": "comp.beats",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:545 comp.beats"
+    "src/js/nemo-script.js:551 comp.beats"
    ],
    "events": [],
    "exposure": [
@@ -32210,9 +32219,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:545",
+   "source": "src/js/nemo-script.js:551",
    "meta": {
-    "functionsVisited": 7
+    "functionsVisited": 8
    },
    "fixtures": [
     "media",
@@ -32226,7 +32235,7 @@
    "capability": "comp.setWorkArea",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:522 comp.setWorkArea"
+    "src/js/nemo-script.js:527 comp.setWorkArea"
    ],
    "events": [],
    "exposure": [
@@ -32238,7 +32247,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:522",
+   "source": "src/js/nemo-script.js:527",
    "meta": {
     "functionsVisited": 2
    },
@@ -32254,7 +32263,7 @@
    "capability": "comp.trimToWorkArea",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:529 comp.trimToWorkArea"
+    "src/js/nemo-script.js:534 comp.trimToWorkArea"
    ],
    "events": [],
    "exposure": [
@@ -32266,7 +32275,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:529",
+   "source": "src/js/nemo-script.js:534",
    "meta": {
     "functionsVisited": 1
    },
@@ -32282,7 +32291,7 @@
    "capability": "enabled (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:202 Effect.enabled"
+    "src/js/nemo-script.js:207 Effect.enabled"
    ],
    "events": [],
    "exposure": [
@@ -32294,7 +32303,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:202",
+   "source": "src/js/nemo-script.js:207",
    "meta": {
     "functionsVisited": 2
    },
@@ -32310,7 +32319,7 @@
    "capability": "Effect.get",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:209 Effect.get"
+    "src/js/nemo-script.js:214 Effect.get"
    ],
    "events": [],
    "exposure": [
@@ -32322,7 +32331,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:209",
+   "source": "src/js/nemo-script.js:214",
    "meta": {
     "functionsVisited": 2
    },
@@ -32338,7 +32347,7 @@
    "capability": "Effect.key",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:218 Effect.key"
+    "src/js/nemo-script.js:223 Effect.key"
    ],
    "events": [],
    "exposure": [
@@ -32350,9 +32359,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:218",
+   "source": "src/js/nemo-script.js:223",
    "meta": {
-    "functionsVisited": 54
+    "functionsVisited": 56
    },
    "fixtures": [
     "media",
@@ -32366,7 +32375,7 @@
    "capability": "Effect.keys",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:226 Effect.keys"
+    "src/js/nemo-script.js:231 Effect.keys"
    ],
    "events": [],
    "exposure": [
@@ -32378,7 +32387,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:226",
+   "source": "src/js/nemo-script.js:231",
    "meta": {
     "functionsVisited": 2
    },
@@ -32394,7 +32403,7 @@
    "capability": "Effect.params",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:206 Effect.params"
+    "src/js/nemo-script.js:211 Effect.params"
    ],
    "events": [],
    "exposure": [
@@ -32406,7 +32415,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:206",
+   "source": "src/js/nemo-script.js:211",
    "meta": {
     "functionsVisited": 5
    },
@@ -32422,7 +32431,7 @@
    "capability": "Effect.remove",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:230 Effect.remove"
+    "src/js/nemo-script.js:235 Effect.remove"
    ],
    "events": [],
    "exposure": [
@@ -32434,7 +32443,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:230",
+   "source": "src/js/nemo-script.js:235",
    "meta": {
     "functionsVisited": 2
    },
@@ -32450,7 +32459,7 @@
    "capability": "Effect.set",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:213 Effect.set"
+    "src/js/nemo-script.js:218 Effect.set"
    ],
    "events": [],
    "exposure": [
@@ -32462,7 +32471,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:213",
+   "source": "src/js/nemo-script.js:218",
    "meta": {
     "functionsVisited": 3
    },
@@ -32478,7 +32487,7 @@
    "capability": "type (get property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:201 Effect.type"
+    "src/js/nemo-script.js:206 Effect.type"
    ],
    "events": [],
    "exposure": [
@@ -32490,7 +32499,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:201",
+   "source": "src/js/nemo-script.js:206",
    "meta": {
     "functionsVisited": 1
    },
@@ -32506,7 +32515,7 @@
    "capability": "goToFrame",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:451 goToFrame"
+    "src/js/nemo-script.js:456 goToFrame"
    ],
    "events": [],
    "exposure": [
@@ -32524,7 +32533,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:451",
+   "source": "src/js/nemo-script.js:456",
    "meta": {
     "functionsVisited": 125
    },
@@ -32540,7 +32549,7 @@
    "capability": "help",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:468 help"
+    "src/js/nemo-script.js:473 help"
    ],
    "events": [],
    "exposure": [
@@ -32554,14 +32563,14 @@
     "render": 2,
     "selection": 2,
     "persist": 2,
-    "native": 3
+    "native": 2
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:468",
+   "source": "src/js/nemo-script.js:473",
    "meta": {
-    "functionsVisited": 433
+    "functionsVisited": 432
    },
    "fixtures": [
     "media",
@@ -32575,7 +32584,7 @@
    "capability": "isKeyframe",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:452 isKeyframe"
+    "src/js/nemo-script.js:457 isKeyframe"
    ],
    "events": [],
    "exposure": [
@@ -32587,7 +32596,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:452",
+   "source": "src/js/nemo-script.js:457",
    "meta": {
     "functionsVisited": 3
    },
@@ -32603,7 +32612,7 @@
    "capability": "layer",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:390 layer"
+    "src/js/nemo-script.js:395 layer"
    ],
    "events": [],
    "exposure": [
@@ -32615,7 +32624,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:390",
+   "source": "src/js/nemo-script.js:395",
    "meta": {
     "functionsVisited": 1
    },
@@ -32631,7 +32640,7 @@
    "capability": "Layer.addEffect",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:239 Layer.addEffect"
+    "src/js/nemo-script.js:244 Layer.addEffect"
    ],
    "events": [],
    "exposure": [
@@ -32648,9 +32657,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:239",
+   "source": "src/js/nemo-script.js:244",
    "meta": {
-    "functionsVisited": 119
+    "functionsVisited": 121
    },
    "fixtures": [
     "media",
@@ -32664,7 +32673,7 @@
    "capability": "Layer.addMarker",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:377 Layer.addMarker"
+    "src/js/nemo-script.js:382 Layer.addMarker"
    ],
    "events": [],
    "exposure": [
@@ -32678,9 +32687,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:377",
+   "source": "src/js/nemo-script.js:382",
    "meta": {
-    "functionsVisited": 15
+    "functionsVisited": 17
    },
    "fixtures": [
     "media",
@@ -32694,7 +32703,7 @@
    "capability": "blendMode (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:290 Layer.blendMode"
+    "src/js/nemo-script.js:295 Layer.blendMode"
    ],
    "events": [],
    "exposure": [
@@ -32711,7 +32720,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:290",
+   "source": "src/js/nemo-script.js:295",
    "meta": {
     "functionsVisited": 182
    },
@@ -32727,7 +32736,7 @@
    "capability": "Layer.clearKeys",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:175 Layer.clearKeys"
+    "src/js/nemo-script.js:180 Layer.clearKeys"
    ],
    "events": [],
    "exposure": [
@@ -32739,9 +32748,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:175",
+   "source": "src/js/nemo-script.js:180",
    "meta": {
-    "functionsVisited": 14
+    "functionsVisited": 16
    },
    "fixtures": [
     "media",
@@ -32755,7 +32764,7 @@
    "capability": "color (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:286 Layer.color"
+    "src/js/nemo-script.js:291 Layer.color"
    ],
    "events": [],
    "exposure": [
@@ -32774,9 +32783,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:286",
+   "source": "src/js/nemo-script.js:291",
    "meta": {
-    "functionsVisited": 345
+    "functionsVisited": 347
    },
    "fixtures": [
     "media",
@@ -32790,7 +32799,7 @@
    "capability": "Layer.disableTimeRemap",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:349 Layer.disableTimeRemap"
+    "src/js/nemo-script.js:354 Layer.disableTimeRemap"
    ],
    "events": [],
    "exposure": [
@@ -32808,7 +32817,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:349",
+   "source": "src/js/nemo-script.js:354",
    "meta": {
     "functionsVisited": 143
    },
@@ -32824,7 +32833,7 @@
    "capability": "Layer.duplicate",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:261 Layer.duplicate"
+    "src/js/nemo-script.js:266 Layer.duplicate"
    ],
    "events": [],
    "exposure": [
@@ -32843,7 +32852,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:261",
+   "source": "src/js/nemo-script.js:266",
    "meta": {
     "functionsVisited": 140
    },
@@ -32859,7 +32868,7 @@
    "capability": "Layer.effects",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:235 Layer.effects"
+    "src/js/nemo-script.js:240 Layer.effects"
    ],
    "events": [],
    "exposure": [
@@ -32871,7 +32880,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:235",
+   "source": "src/js/nemo-script.js:240",
    "meta": {
     "functionsVisited": 3
    },
@@ -32887,7 +32896,7 @@
    "capability": "Layer.enableTimeRemap",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:343 Layer.enableTimeRemap"
+    "src/js/nemo-script.js:348 Layer.enableTimeRemap"
    ],
    "events": [],
    "exposure": [
@@ -32905,7 +32914,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:343",
+   "source": "src/js/nemo-script.js:348",
    "meta": {
     "functionsVisited": 155
    },
@@ -32921,7 +32930,7 @@
    "capability": "Layer.expression",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:357 Layer.expression"
+    "src/js/nemo-script.js:362 Layer.expression"
    ],
    "events": [],
    "exposure": [
@@ -32933,9 +32942,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:357",
+   "source": "src/js/nemo-script.js:362",
    "meta": {
-    "functionsVisited": 14
+    "functionsVisited": 16
    },
    "fixtures": [
     "media",
@@ -32949,7 +32958,7 @@
    "capability": "Layer.get",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:121 Layer.get"
+    "src/js/nemo-script.js:126 Layer.get"
    ],
    "events": [],
    "exposure": [
@@ -32963,9 +32972,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:121",
+   "source": "src/js/nemo-script.js:126",
    "meta": {
-    "functionsVisited": 27
+    "functionsVisited": 29
    },
    "fixtures": [
     "media",
@@ -32979,7 +32988,7 @@
    "capability": "Layer.hold",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:163 Layer.hold"
+    "src/js/nemo-script.js:168 Layer.hold"
    ],
    "events": [],
    "exposure": [
@@ -32991,9 +33000,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:163",
+   "source": "src/js/nemo-script.js:168",
    "meta": {
-    "functionsVisited": 37
+    "functionsVisited": 39
    },
    "fixtures": [
     "media",
@@ -33007,7 +33016,7 @@
    "capability": "inFrame (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:110 Layer.inFrame"
+    "src/js/nemo-script.js:115 Layer.inFrame"
    ],
    "events": [],
    "exposure": [
@@ -33024,7 +33033,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:110",
+   "source": "src/js/nemo-script.js:115",
    "meta": {
     "functionsVisited": 62
    },
@@ -33040,7 +33049,7 @@
    "capability": "Layer.key",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:146 Layer.key"
+    "src/js/nemo-script.js:151 Layer.key"
    ],
    "events": [],
    "exposure": [
@@ -33052,9 +33061,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:146",
+   "source": "src/js/nemo-script.js:151",
    "meta": {
-    "functionsVisited": 68
+    "functionsVisited": 70
    },
    "fixtures": [
     "media",
@@ -33068,7 +33077,7 @@
    "capability": "keyLock (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:299 Layer.keyLock"
+    "src/js/nemo-script.js:304 Layer.keyLock"
    ],
    "events": [],
    "exposure": [
@@ -33084,7 +33093,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:299",
+   "source": "src/js/nemo-script.js:304",
    "meta": {
     "functionsVisited": 125
    },
@@ -33100,7 +33109,7 @@
    "capability": "Layer.keys",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:170 Layer.keys"
+    "src/js/nemo-script.js:175 Layer.keys"
    ],
    "events": [],
    "exposure": [
@@ -33112,9 +33121,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:170",
+   "source": "src/js/nemo-script.js:175",
    "meta": {
-    "functionsVisited": 16
+    "functionsVisited": 18
    },
    "fixtures": [
     "media",
@@ -33128,7 +33137,7 @@
    "capability": "Layer.linkTime",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:325 Layer.linkTime"
+    "src/js/nemo-script.js:330 Layer.linkTime"
    ],
    "events": [],
    "exposure": [
@@ -33145,7 +33154,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:325",
+   "source": "src/js/nemo-script.js:330",
    "meta": {
     "functionsVisited": 96
    },
@@ -33161,7 +33170,7 @@
    "capability": "locked (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:60 Layer.locked"
+    "src/js/nemo-script.js:65 Layer.locked"
    ],
    "events": [],
    "exposure": [
@@ -33180,9 +33189,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:60",
+   "source": "src/js/nemo-script.js:65",
    "meta": {
-    "functionsVisited": 345
+    "functionsVisited": 347
    },
    "fixtures": [
     "media",
@@ -33196,7 +33205,7 @@
    "capability": "Layer.markers",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:374 Layer.markers"
+    "src/js/nemo-script.js:379 Layer.markers"
    ],
    "events": [],
    "exposure": [
@@ -33208,7 +33217,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:374",
+   "source": "src/js/nemo-script.js:379",
    "meta": {
     "functionsVisited": 2
    },
@@ -33224,7 +33233,7 @@
    "capability": "matte (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:294 Layer.matte"
+    "src/js/nemo-script.js:299 Layer.matte"
    ],
    "events": [],
    "exposure": [
@@ -33241,7 +33250,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:294",
+   "source": "src/js/nemo-script.js:299",
    "meta": {
     "functionsVisited": 182
    },
@@ -33257,7 +33266,7 @@
    "capability": "Layer.mergeWith",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:393 Layer.mergeWith"
+    "src/js/nemo-script.js:398 Layer.mergeWith"
    ],
    "events": [],
    "exposure": [
@@ -33276,9 +33285,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:393",
+   "source": "src/js/nemo-script.js:398",
    "meta": {
-    "functionsVisited": 175
+    "functionsVisited": 179
    },
    "fixtures": [
     "media",
@@ -33292,7 +33301,7 @@
    "capability": "motionBlur (get/set property, via switchProp)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:284 Layer.motionBlur"
+    "src/js/nemo-script.js:289 Layer.motionBlur"
    ],
    "events": [],
    "exposure": [
@@ -33308,7 +33317,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:284",
+   "source": "src/js/nemo-script.js:289",
    "meta": {
     "functionsVisited": 150
    },
@@ -33324,7 +33333,7 @@
    "capability": "name (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:52 Layer.name"
+    "src/js/nemo-script.js:57 Layer.name"
    ],
    "events": [],
    "exposure": [
@@ -33343,9 +33352,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:52",
+   "source": "src/js/nemo-script.js:57",
    "meta": {
-    "functionsVisited": 345
+    "functionsVisited": 347
    },
    "fixtures": [
     "media",
@@ -33359,7 +33368,7 @@
    "capability": "outFrame (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:114 Layer.outFrame"
+    "src/js/nemo-script.js:119 Layer.outFrame"
    ],
    "events": [],
    "exposure": [
@@ -33376,7 +33385,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:114",
+   "source": "src/js/nemo-script.js:119",
    "meta": {
     "functionsVisited": 62
    },
@@ -33392,7 +33401,7 @@
    "capability": "parent (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:64 Layer.parent"
+    "src/js/nemo-script.js:69 Layer.parent"
    ],
    "events": [],
    "exposure": [
@@ -33411,9 +33420,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:64",
+   "source": "src/js/nemo-script.js:69",
    "meta": {
-    "functionsVisited": 362
+    "functionsVisited": 364
    },
    "fixtures": [
     "media",
@@ -33427,7 +33436,7 @@
    "capability": "Layer.remove",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:260 Layer.remove"
+    "src/js/nemo-script.js:265 Layer.remove"
    ],
    "events": [],
    "exposure": [
@@ -33446,7 +33455,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:260",
+   "source": "src/js/nemo-script.js:265",
    "meta": {
     "functionsVisited": 230
    },
@@ -33462,7 +33471,7 @@
    "capability": "Layer.select",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:259 Layer.select"
+    "src/js/nemo-script.js:264 Layer.select"
    ],
    "events": [],
    "exposure": [
@@ -33479,7 +33488,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:259",
+   "source": "src/js/nemo-script.js:264",
    "meta": {
     "functionsVisited": 92
    },
@@ -33495,7 +33504,7 @@
    "capability": "Layer.set",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:130 Layer.set"
+    "src/js/nemo-script.js:135 Layer.set"
    ],
    "events": [],
    "exposure": [
@@ -33507,9 +33516,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:130",
+   "source": "src/js/nemo-script.js:135",
    "meta": {
-    "functionsVisited": 18
+    "functionsVisited": 20
    },
    "fixtures": [
     "media",
@@ -33523,7 +33532,7 @@
    "capability": "Layer.setExpression",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:362 Layer.setExpression"
+    "src/js/nemo-script.js:367 Layer.setExpression"
    ],
    "events": [],
    "exposure": [
@@ -33535,9 +33544,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:362",
+   "source": "src/js/nemo-script.js:367",
    "meta": {
-    "functionsVisited": 17
+    "functionsVisited": 19
    },
    "fixtures": [
     "media",
@@ -33551,7 +33560,7 @@
    "capability": "shy (get/set property, via switchProp)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:283 Layer.shy"
+    "src/js/nemo-script.js:288 Layer.shy"
    ],
    "events": [],
    "exposure": [
@@ -33567,7 +33576,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:283",
+   "source": "src/js/nemo-script.js:288",
    "meta": {
     "functionsVisited": 141
    },
@@ -33583,7 +33592,7 @@
    "capability": "solo (get/set property, via switchProp)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:282 Layer.solo"
+    "src/js/nemo-script.js:287 Layer.solo"
    ],
    "events": [],
    "exposure": [
@@ -33600,7 +33609,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:282",
+   "source": "src/js/nemo-script.js:287",
    "meta": {
     "functionsVisited": 51
    },
@@ -33616,7 +33625,7 @@
    "capability": "Layer.strokeProfile",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:400 Layer.strokeProfile"
+    "src/js/nemo-script.js:405 Layer.strokeProfile"
    ],
    "events": [],
    "exposure": [
@@ -33635,7 +33644,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:400",
+   "source": "src/js/nemo-script.js:405",
    "meta": {
     "functionsVisited": 124
    },
@@ -33651,7 +33660,7 @@
    "capability": "Layer.strokes",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:183 Layer.strokes"
+    "src/js/nemo-script.js:188 Layer.strokes"
    ],
    "events": [],
    "exposure": [
@@ -33663,7 +33672,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:183",
+   "source": "src/js/nemo-script.js:188",
    "meta": {
     "functionsVisited": 2
    },
@@ -33679,7 +33688,7 @@
    "capability": "timeLink (get property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:310 Layer.timeLink"
+    "src/js/nemo-script.js:315 Layer.timeLink"
    ],
    "events": [],
    "exposure": [
@@ -33693,7 +33702,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:310",
+   "source": "src/js/nemo-script.js:315",
    "meta": {
     "functionsVisited": 10
    },
@@ -33709,7 +33718,7 @@
    "capability": "Layer.unlinkTime",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:340 Layer.unlinkTime"
+    "src/js/nemo-script.js:345 Layer.unlinkTime"
    ],
    "events": [],
    "exposure": [
@@ -33721,7 +33730,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:340",
+   "source": "src/js/nemo-script.js:345",
    "meta": {
     "functionsVisited": 1
    },
@@ -33737,7 +33746,7 @@
    "capability": "visible (get/set property)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:56 Layer.visible"
+    "src/js/nemo-script.js:61 Layer.visible"
    ],
    "events": [],
    "exposure": [
@@ -33756,9 +33765,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:56",
+   "source": "src/js/nemo-script.js:61",
    "meta": {
-    "functionsVisited": 345
+    "functionsVisited": 347
    },
    "fixtures": [
     "media",
@@ -33772,7 +33781,7 @@
    "capability": "layer",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:422 layer"
+    "src/js/nemo-script.js:427 layer"
    ],
    "events": [],
    "exposure": [
@@ -33784,7 +33793,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:422",
+   "source": "src/js/nemo-script.js:427",
    "meta": {
     "functionsVisited": 5
    },
@@ -33800,7 +33809,7 @@
    "capability": "layers",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:387 layers"
+    "src/js/nemo-script.js:392 layers"
    ],
    "events": [],
    "exposure": [
@@ -33812,7 +33821,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:387",
+   "source": "src/js/nemo-script.js:392",
    "meta": {
     "functionsVisited": 0
    },
@@ -33828,7 +33837,7 @@
    "capability": "layers",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:431 layers"
+    "src/js/nemo-script.js:436 layers"
    ],
    "events": [],
    "exposure": [
@@ -33840,7 +33849,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:431",
+   "source": "src/js/nemo-script.js:436",
    "meta": {
     "functionsVisited": 2
    },
@@ -33856,7 +33865,7 @@
    "capability": "log",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:464 log"
+    "src/js/nemo-script.js:469 log"
    ],
    "events": [],
    "exposure": [
@@ -33868,7 +33877,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:464",
+   "source": "src/js/nemo-script.js:469",
    "meta": {
     "functionsVisited": 1
    },
@@ -33884,7 +33893,7 @@
    "capability": "markers.add",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:564 markers.add"
+    "src/js/nemo-script.js:570 markers.add"
    ],
    "events": [],
    "exposure": [
@@ -33893,14 +33902,15 @@
    "mcp": "none (R14)",
    "sdk": "SMScript",
    "consumers": {
+    "native": 1,
     "history": 2
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:564",
+   "source": "src/js/nemo-script.js:570",
    "meta": {
-    "functionsVisited": 15
+    "functionsVisited": 20
    },
    "fixtures": [
     "media",
@@ -33914,7 +33924,7 @@
    "capability": "markers.list",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:561 markers.list"
+    "src/js/nemo-script.js:567 markers.list"
    ],
    "events": [],
    "exposure": [
@@ -33922,13 +33932,15 @@
    ],
    "mcp": "none (R14)",
    "sdk": "SMScript",
-   "consumers": {},
+   "consumers": {
+    "native": 1
+   },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:561",
+   "source": "src/js/nemo-script.js:567",
    "meta": {
-    "functionsVisited": 1
+    "functionsVisited": 9
    },
    "fixtures": [
     "media",
@@ -33942,7 +33954,7 @@
    "capability": "markers.next",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:576 markers.next"
+    "src/js/nemo-script.js:584 markers.next"
    ],
    "events": [],
    "exposure": [
@@ -33960,9 +33972,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:576",
+   "source": "src/js/nemo-script.js:584",
    "meta": {
-    "functionsVisited": 45
+    "functionsVisited": 46
    },
    "fixtures": [
     "media",
@@ -33976,7 +33988,7 @@
    "capability": "markers.prev",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:577 markers.prev"
+    "src/js/nemo-script.js:585 markers.prev"
    ],
    "events": [],
    "exposure": [
@@ -33994,9 +34006,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:577",
+   "source": "src/js/nemo-script.js:585",
    "meta": {
-    "functionsVisited": 45
+    "functionsVisited": 46
    },
    "fixtures": [
     "media",
@@ -34010,7 +34022,7 @@
    "capability": "markers.removeAt",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:570 markers.removeAt"
+    "src/js/nemo-script.js:577 markers.removeAt"
    ],
    "events": [],
    "exposure": [
@@ -34018,13 +34030,15 @@
    ],
    "mcp": "none (R14)",
    "sdk": "SMScript",
-   "consumers": {},
+   "consumers": {
+    "native": 1
+   },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:570",
+   "source": "src/js/nemo-script.js:577",
    "meta": {
-    "functionsVisited": 53
+    "functionsVisited": 57
    },
    "fixtures": [
     "media",
@@ -34038,7 +34052,7 @@
    "capability": "nativeBlocked",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:386 nativeBlocked"
+    "src/js/nemo-script.js:391 nativeBlocked"
    ],
    "events": [],
    "exposure": [
@@ -34052,7 +34066,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:386",
+   "source": "src/js/nemo-script.js:391",
    "meta": {
     "functionsVisited": 26
    },
@@ -34068,7 +34082,7 @@
    "capability": "selection.clear",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:603 selection.clear"
+    "src/js/nemo-script.js:611 selection.clear"
    ],
    "events": [],
    "exposure": [
@@ -34087,9 +34101,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:603",
+   "source": "src/js/nemo-script.js:611",
    "meta": {
-    "functionsVisited": 344
+    "functionsVisited": 346
    },
    "fixtures": [
     "media",
@@ -34103,7 +34117,7 @@
    "capability": "selection.layers",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:586 selection.layers"
+    "src/js/nemo-script.js:594 selection.layers"
    ],
    "events": [],
    "exposure": [
@@ -34115,7 +34129,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:586",
+   "source": "src/js/nemo-script.js:594",
    "meta": {
     "functionsVisited": 25
    },
@@ -34131,7 +34145,7 @@
    "capability": "selection.setLayers",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:590 selection.setLayers"
+    "src/js/nemo-script.js:598 selection.setLayers"
    ],
    "events": [],
    "exposure": [
@@ -34150,9 +34164,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:590",
+   "source": "src/js/nemo-script.js:598",
    "meta": {
-    "functionsVisited": 426
+    "functionsVisited": 428
    },
    "fixtures": [
     "media",
@@ -34166,7 +34180,7 @@
    "capability": "selection.strokes",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:597 selection.strokes"
+    "src/js/nemo-script.js:605 selection.strokes"
    ],
    "events": [],
    "exposure": [
@@ -34180,7 +34194,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:597",
+   "source": "src/js/nemo-script.js:605",
    "meta": {
     "functionsVisited": 1
    },
@@ -34196,7 +34210,7 @@
    "capability": "split",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:389 split"
+    "src/js/nemo-script.js:394 split"
    ],
    "events": [],
    "exposure": [
@@ -34215,7 +34229,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:389",
+   "source": "src/js/nemo-script.js:394",
    "meta": {
     "functionsVisited": 201
    },
@@ -34231,7 +34245,7 @@
    "capability": "toast",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:459 toast"
+    "src/js/nemo-script.js:464 toast"
    ],
    "events": [],
    "exposure": [
@@ -34243,7 +34257,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:459",
+   "source": "src/js/nemo-script.js:464",
    "meta": {
     "functionsVisited": 26
    },
@@ -34259,7 +34273,7 @@
    "capability": "undoGroup",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/nemo-script.js:460 undoGroup"
+    "src/js/nemo-script.js:465 undoGroup"
    ],
    "events": [],
    "exposure": [
@@ -34274,7 +34288,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R14: expose through the MCP adapter with the same handler",
-   "source": "src/js/nemo-script.js:460",
+   "source": "src/js/nemo-script.js:465",
    "meta": {
     "functionsVisited": 13
    },
