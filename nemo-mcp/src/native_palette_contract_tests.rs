@@ -53,7 +53,7 @@ fn all_eight_palette_actions_are_bounded_field_intents_with_a_separate_closed_na
             json!({"command":"object.project.palette.edit","action":action}),
         );
         assert!(q.validate_input().is_ok(), "{}", q.payload);
-        assert_eq!(q.validate().unwrap_err().code(), "unavailable");
+        assert!(q.validate().is_ok());
     }
     for action in [
         json!({"kind":"replacePalettes","palettes":[]}),
@@ -86,7 +86,7 @@ fn all_eight_palette_actions_are_bounded_field_intents_with_a_separate_closed_na
 fn settings_keep_absence_fractional_negative_and_upper_bound_selection_semantics() {
     let q = query(json!({"kind":"settings"}));
     assert!(q.validate_input().is_ok());
-    assert_eq!(q.validate().unwrap_err().code(), "unavailable");
+    assert!(q.validate().is_ok());
     for body in [
         settings_value(),
         json!({"palettesPresent":false,"paletteCount":0,"activePaletteIdx":0.5,"effectiveActivePaletteIdx":0.5}),
@@ -229,7 +229,7 @@ fn shipped_schema_and_descriptor_include_palette_without_dropping_prior_result_b
         .unwrap();
     let catalog = crate::capabilities::native_catalog();
     let descriptor = catalog.capability_for_operation(READ).unwrap();
-    assert_eq!(descriptor["availability"]["state"], "unavailable");
+    assert_eq!(descriptor["availability"]["state"], "available");
     for example in descriptor["examples"].as_array().unwrap() {
         assert!(validator.is_valid(&example["request"]));
         assert!(validator.is_valid(&example["response"]));
