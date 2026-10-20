@@ -337,6 +337,14 @@ fn emit_frame(
     // Refuse an unsupported component paint before counting/writing ANY header,
     // matching the existing all-or-nothing mixed raster policy.
     for entry in ordered_entries(plan) {
+        if let PaintEntry::Duplicator(copy) = entry {
+            if copy.svg_contour.is_none() || copy.svg_rgba.is_none() {
+                return Err(SvgExportError::Unsupported {
+                    source_object_index: copy.source_index,
+                    reason: "duplicator style has no admitted SVG representation",
+                });
+            }
+        }
         if let PaintEntry::Component(component) = entry {
             if component.contour.is_none() || component.svg_rgba.is_none() {
                 return Err(SvgExportError::UnsupportedComponent {
@@ -376,6 +384,19 @@ fn emit_frame(
                 };
                 let contour = component.contour.as_ref().ok_or(refusal)?;
                 let rgba = component.svg_rgba.ok_or(refusal)?;
+                if count > 0 {
+                    sink.put("\n")?;
+                }
+                emit_contour_with_error(sink, contour, rgba, refusal)?;
+                count += 1;
+            }
+            PaintEntry::Duplicator(copy) => {
+                let refusal = SvgExportError::Unsupported {
+                    source_object_index: copy.source_index,
+                    reason: "duplicator style has no admitted SVG representation",
+                };
+                let contour = copy.svg_contour.as_ref().ok_or(refusal)?;
+                let rgba = copy.svg_rgba.ok_or(refusal)?;
                 if count > 0 {
                     sink.put("\n")?;
                 }

@@ -14,14 +14,19 @@ pub(crate) enum PaintIndex {
     Raster(usize),
     Text(usize),
     Component(usize),
+    Duplicator(usize),
 }
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
     Raster(usize),
     Text(&'a crate::object_render_scene::text_scene::TextSource),
     Component(&'a crate::object_render_scene::component_scene::ComponentPaint),
+    Duplicator(&'a crate::object_render_scene::duplicator_scene::DuplicatorPaint),
 }
 impl ObjectPaintPlan {
+    pub(crate) fn has_duplicators(&self) -> bool {
+        !self.scene.packet().duplicator_outputs().is_empty()
+    }
     pub(crate) fn has_components(&self) -> bool {
         !self.scene.components.paints.is_empty()
     }
@@ -64,6 +69,9 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
         PaintIndex::Text(index) => PaintEntry::Text(&plan.scene.texts.entries[*index]),
         PaintIndex::Component(index) => {
             PaintEntry::Component(&plan.scene.components.paints[*index])
+        }
+        PaintIndex::Duplicator(index) => {
+            PaintEntry::Duplicator(&plan.scene.duplicators.paints[*index])
         }
     })
 }

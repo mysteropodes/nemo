@@ -10,6 +10,10 @@ use std::collections::HashMap;
 
 #[path = "object_frame_context.rs"]
 mod context;
+#[path = "object_duplicator_snapshot_sources.rs"]
+pub(crate) mod duplicator_sources;
+#[path = "object_duplicator_frame.rs"]
+pub(crate) mod duplicators;
 #[path = "object_frame_sources.rs"]
 mod sources;
 use context::FrameContext;
@@ -194,6 +198,7 @@ pub struct ObjectFramePacket {
     records: Vec<ObjectFrameIndices>,
     raster_records: Vec<ObjectFrameRasterIndex>,
     text_records: Vec<text::TextIndex>,
+    duplicators: Vec<duplicators::LayerCopies>,
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
 }
@@ -478,7 +483,8 @@ where
         }
     }
     let text_records = text::select(snapshot, selector, context_layers, &source_frames)?;
-    Ok(ObjectFramePacket {
+    let mut packet = ObjectFramePacket {
+        duplicators: Vec::new(),
         text_records,
         raster_records,
         snapshot: snapshot.clone(),
@@ -489,7 +495,9 @@ where
         records,
         source_frames,
         numeric_order,
-    })
+    };
+    packet.duplicators = duplicators::prepare(&packet, exposure)?;
+    Ok(packet)
 }
 
 #[cfg(all(test, feature = "codec"))]

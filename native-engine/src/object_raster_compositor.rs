@@ -45,6 +45,11 @@ impl Compositor {
                         .prepared
                         .draw(&mut self.scene, Affine::IDENTITY, &source.path)
                 }
+                PaintEntry::Duplicator(source) => {
+                    source
+                        .prepared
+                        .draw(&mut self.scene, Affine::IDENTITY, &source.path)
+                }
                 PaintEntry::Raster(index) => {
                     #[cfg(all(feature = "application", feature = "project_media_codec"))]
                     {
