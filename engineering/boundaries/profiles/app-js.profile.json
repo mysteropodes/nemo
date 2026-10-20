@@ -3327,6 +3327,42 @@
       "publicApi": [
         "native-palette-ui.js"
       ]
+    },
+    {
+      "id": "app.native.guide.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-guide-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-guide-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-guide-ui.js"
+      ]
     }
   ],
   "layerRules": {

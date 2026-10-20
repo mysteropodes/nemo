@@ -6313,6 +6313,40 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.guide.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectGuideReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.guide.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectGuideEditPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -7157,6 +7191,9 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectPaletteReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectGuideReadResult"
             }
           ]
         },
@@ -11068,6 +11105,413 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectPaletteColorPageValue"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectGuideEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "axis",
+            "position"
+          ],
+          "properties": {
+            "kind": {
+              "const": "add"
+            },
+            "axis": {
+              "type": "string",
+              "enum": [
+                "h",
+                "v"
+              ]
+            },
+            "position": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "axis",
+            "ordinal",
+            "position"
+          ],
+          "properties": {
+            "kind": {
+              "const": "move"
+            },
+            "axis": {
+              "type": "string",
+              "enum": [
+                "h",
+                "v"
+              ]
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "position": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "axis",
+            "ordinal"
+          ],
+          "properties": {
+            "kind": {
+              "const": "remove"
+            },
+            "axis": {
+              "type": "string",
+              "enum": [
+                "h",
+                "v"
+              ]
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectGuideSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "settings"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "axis",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "axisPage"
+            },
+            "axis": {
+              "type": "string",
+              "enum": [
+                "h",
+                "v"
+              ]
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectGuideEditPayload": {
+      "type": "object",
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.guide.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectGuideEditAction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ObjectProjectGuideReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectGuideSelector"
+        }
+      }
+    },
+    "ObjectProjectGuideSettingsValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "guidesPresent",
+        "hPresent",
+        "vPresent",
+        "hCount",
+        "vCount"
+      ],
+      "properties": {
+        "guidesPresent": {
+          "type": "boolean"
+        },
+        "hPresent": {
+          "type": "boolean"
+        },
+        "vPresent": {
+          "type": "boolean"
+        },
+        "hCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "vCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "guidesPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "hPresent": {
+                "const": false
+              },
+              "vPresent": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "hPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "hCount": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "vPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "vCount": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectGuideAxisPageValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "axis",
+        "guidesPresent",
+        "axisPresent",
+        "guideCount",
+        "cursor",
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "kind": {
+          "const": "guideAxisPage"
+        },
+        "axis": {
+          "type": "string",
+          "enum": [
+            "h",
+            "v"
+          ]
+        },
+        "guidesPresent": {
+          "type": "boolean"
+        },
+        "axisPresent": {
+          "type": "boolean"
+        },
+        "guideCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ordinal",
+              "position"
+            ],
+            "properties": {
+              "ordinal": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "position": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "guidesPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "axisPresent": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "axisPresent": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "guideCount": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectGuideReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectProjectGuideSettingsValue"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectGuideAxisPageValue"
             }
           ]
         }
