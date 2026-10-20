@@ -34,5 +34,45 @@
     if(typeof root.addEventListener==='function')root.addEventListener('pagehide',controller.dispose,{once:true});
     return controller;
   }
-  return Object.freeze({install:install});
+  // The synchronous scripting facade reads the same projection as ordinary UI.
+  // Its browser functions remain the originals; native writes require the async API.
+  function scripting(root,api,fail) {
+    function native(){return !!(root.__TAURI__&&root.__TAURI__.core);}
+    function composition(){
+      var controller=root.NemoNativeCompositionController;
+      var projection=controller&&controller.read();
+      if(!projection)fail('Native composition is unavailable');
+      return projection.composition;
+    }
+    function refuse(field){
+      if(native())fail('Native '+field+' edits require the composition application API');
+    }
+    var bpm=Object.getOwnPropertyDescriptor(api.comp,'bpm');
+    var offset=Object.getOwnPropertyDescriptor(api.comp,'bpmOffset');
+    Object.defineProperties(api.comp,{
+      bpm:{enumerable:bpm.enumerable,configurable:bpm.configurable,
+        get:function(){
+          if(!native())return bpm.get.call(api.comp);
+          var current=composition();
+          return current.effectiveBpmShow?current.effectiveBpm:0;
+        },
+        set:function(value){refuse('BPM');bpm.set.call(api.comp,value);}},
+      bpmOffset:{enumerable:offset.enumerable,configurable:offset.configurable,
+        get:function(){return native()?composition().effectiveBpmOffset:offset.get.call(api.comp);},
+        set:function(value){refuse('BPM');offset.set.call(api.comp,value);}}
+    });
+    var markers=api.markers;
+    api.markers=Object.assign({},markers,{
+      list:function(){
+        if(!native())return markers.list.call(markers);
+        return composition().markers.map(function(marker){
+          return {frame:marker.frame,name:marker.name||'',color:marker.color||null};
+        });
+      },
+      add:function(){refuse('marker');return markers.add.apply(markers,arguments);},
+      removeAt:function(){refuse('marker');return markers.removeAt.apply(markers,arguments);}
+    });
+    return api;
+  }
+  return Object.freeze({install:install,scripting:scripting});
 }));

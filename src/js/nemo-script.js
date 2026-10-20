@@ -26,11 +26,6 @@
   var _log = [];
   function note(w) { _log.push(w); }
   function fail(msg) { throw new Error('nemo: ' + msg); }
-  function compositionRead() {
-    var c = window.NemoNativeCompositionController, p = c && c.read();
-    if (!p) fail('Native composition is unavailable');
-    return p.composition;
-  }
 
   // ---- helpers over the app's own state ----
   function layerAt(i) {
@@ -534,16 +529,15 @@
       trimToWorkArea: function () { window.SM.trimToWorkArea(); return api.comp; },
 
       // Beat grid. `bpm` alone shows it; 0 hides it.
-      get bpm() { if (window.__TAURI__ && window.__TAURI__.core) { var c = compositionRead(); return c.effectiveBpmShow ? c.effectiveBpm : 0; } return state.bpmShow ? state.bpm : 0; },
+      get bpm() { return state.bpmShow ? state.bpm : 0; },
       set bpm(v) {
-        if (window.__TAURI__ && window.__TAURI__.core) fail('Native BPM edits require the composition application API');
         var n = Number(v) || 0;
         state.bpm = n > 0 ? n : (state.bpm || 120);
         state.bpmShow = n > 0;
         if (window.SMBpm) SMBpm.refresh();
       },
-      get bpmOffset() { if (window.__TAURI__ && window.__TAURI__.core) { return compositionRead().effectiveBpmOffset; } return state.bpmOffset || 0; },
-      set bpmOffset(v) { if (window.__TAURI__ && window.__TAURI__.core) fail('Native BPM edits require the composition application API'); state.bpmOffset = v | 0; if (window.SMBpm) SMBpm.refresh(); },
+      get bpmOffset() { return state.bpmOffset || 0; },
+      set bpmOffset(v) { state.bpmOffset = v | 0; if (window.SMBpm) SMBpm.refresh(); },
       // Nearest beat to a frame — for snapping keys to the music.
       beat: function (frame) {
         return window.SMBpm ? SMBpm.snapFrame(frame == null ? state.currentFrame : frame | 0) : frame;
@@ -565,17 +559,15 @@
     // ---- nemo.markers — composition markers ----------------------------
     api.markers = {
       list: function () {
-        return (window.__TAURI__ && window.__TAURI__.core ? compositionRead().markers : state.markers || []).map(function (m) { return { frame: m.frame, name: m.name || '', color: m.color || null }; });
+        return (state.markers || []).map(function (m) { return { frame: m.frame, name: m.name || '', color: m.color || null }; });
       },
       add: function (frame, name) {
-        if (window.__TAURI__ && window.__TAURI__.core) fail('Native marker edits require the composition application API');
         if (!window.SMMarkers) fail('repères indisponibles');
         var m = SMMarkers.addCompMarker(frame == null ? state.currentFrame : frame | 0, name || '');
         if (!m) fail('un repère existe déjà sur cette frame');
         return api.markers;
       },
       removeAt: function (frame) {
-        if (window.__TAURI__ && window.__TAURI__.core) fail('Native marker edits require the composition application API');
         var list = state.markers || [];
         for (var i = 0; i < list.length; i++) if (list[i].frame === (frame | 0)) { list.splice(i, 1); break; }
         if (window.SMMarkers) SMMarkers.render();
@@ -627,7 +619,7 @@
       get enabled() { return !!state.cameraLayerOn; }
     };
 
-    return api;
+    return window.NemoNativeCompositionUI.scripting(window, api, fail);
   }
 
   // ---- runner ----

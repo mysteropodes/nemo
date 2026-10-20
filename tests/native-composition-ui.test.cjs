@@ -186,3 +186,25 @@ test('fresh readback after same-pin subscription replacement cannot revive old m
     await h.settled();assert.equal(h.edits().length,0);assert(h.notices.length>0);h.unchanged();
   }
 });
+
+
+test('a retained browser scripting facade switches to native projection and refuses legacy writers at admission',async()=>{
+  const h=fixture();await h.ready();
+  const native=h.root.__TAURI__;delete h.root.__TAURI__;
+  h.root.NemoNativeLayerPlayheadCutUI={scripting:()=>()=>{}};
+  h.root.SMBpm.refresh=()=>{};
+  vm.runInContext(fs.readFileSync(require.resolve('../src/js/nemo-script.js'),'utf8'),vm.createContext(h.root));
+  const api=h.root.SMScript.api();
+  api.comp.bpm=93;api.comp.bpmOffset=7;
+  assert.equal(api.comp.bpm,93);assert.equal(api.comp.bpmOffset,7);
+  assert.equal(api.markers.list()[0].name,'legacy');
+  h.root.__TAURI__=native;
+  assert.equal(api.comp.bpm,0);assert.equal(api.comp.bpmOffset,0);
+  assert.equal(api.markers.list()[0].name,'First');
+  assert.throws(()=>{api.comp.bpm=140;},/composition application API/);
+  assert.throws(()=>{api.comp.bpmOffset=12;},/composition application API/);
+  assert.throws(()=>api.markers.add(3,'retained'),/composition application API/);
+  assert.throws(()=>api.markers.removeAt(39),/composition application API/);
+  assert.equal(h.state.bpm,93);assert.equal(h.state.bpmOffset,7);
+  assert.equal(h.state.markers[0].name,'legacy');assert.equal(h.edits().length,0);
+});
