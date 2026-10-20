@@ -126,6 +126,26 @@ mod wire {
     }
 
     #[test]
+    fn original_capture_without_props_panel_preserves_null_panel_order() {
+        // src/js/ui.js::_secOrderNow returns null when #props-panel is absent.
+        // SMWorkspace.capture includes that value; exportJSON saves the workspace.
+        let captured = json!({"layerPanelWidth":null,"toolsPanelWidth":null,
+            "propsPanelWidth":null,"propsPanelCollapsed":false,"timelineHeight":null,
+            "panelOrder":null,"motionColumns":null});
+        for version in [1, 2] {
+            let owner = NativeObjectHistory::from_project_file(
+                "nullable-panel-order", &input(version, json!({"workspace":captured.clone()}))
+            ).unwrap();
+            assert_eq!(fields(&owner)["workspace"], captured);
+            let saved = save(&owner);
+            let reopened = NativeObjectHistory::from_project_file("nullable-panel-fresh", &saved).unwrap();
+            assert_eq!(save(&reopened), saved);
+            assert_eq!(fields(&reopened)["workspace"]["panelOrder"], Value::Null);
+            assert_eq!(owner.history_depths(), (0, 0));
+        }
+    }
+
+    #[test]
     fn absent_and_explicit_empty_annotations_are_distinct_and_never_authored_by_reads() {
         for expected in [
             json!({}),
@@ -152,7 +172,7 @@ mod wire {
         for value in [
             json!({"workspace":[]}),
             json!({"workspace":{"propsPanelCollapsed":null}}),
-            json!({"workspace":{"panelOrder":null}}),
+            json!({"workspace":{"panelOrder":false}}),
             json!({"workspace":{"unknown":true}}),
             json!({"comments":null}),
             json!({"comments":[[]]}),

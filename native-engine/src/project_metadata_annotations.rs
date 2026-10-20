@@ -19,7 +19,7 @@ pub(crate) struct ProjectWorkspaceRecord {
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) timeline_height: Presence<Option<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) panel_order: Presence<Vec<String>>,
+    pub(crate) panel_order: Presence<Option<Vec<String>>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) motion_columns: Presence<Option<String>>,
 }
@@ -29,7 +29,7 @@ object_deserialize!(ProjectWorkspaceRecord {
     #[serde(default)] props_panel_width:Presence<Option<String>>,
     #[serde(default)] props_panel_collapsed:Presence<bool>,
     #[serde(default)] timeline_height:Presence<Option<String>>,
-    #[serde(default)] panel_order:Presence<Vec<String>>,
+    #[serde(default)] panel_order:Presence<Option<Vec<String>>>,
     #[serde(default)] motion_columns:Presence<Option<String>>
 });
 
