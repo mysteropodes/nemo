@@ -11581,6 +11581,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // expr-bake.js does the actual RDP reduction + writes the keys; this is
   // just the toast/refresh wiring, same split as setExpressionCode above.
   function bakeExpressionOnRow(holder, prop) {
+    if (!n20AllowLegacyWrite('motion-expression-bake')) return;
     if (!window.SMExprBake) return;
     var result = SMExprBake.bakeExpressionToKeyframes(holder, prop, 0, state.totalFrames - 1);
     if (!result) return;

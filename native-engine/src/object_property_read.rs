@@ -134,7 +134,7 @@ impl ObjectSnapshot {
         {
             return Err(InvalidRequest);
         }
-        if matches!(property.as_str(), "order" | "timeRemap") {
+        if property == "timeRemap" {
             return Err(Unavailable);
         }
         let holder = self.metadata_holder(target)?;
@@ -188,11 +188,19 @@ impl ObjectSnapshot {
                 if *limit == 0 || *limit > 8 {
                     return Err(InvalidRequest);
                 }
-                let track = holder
-                    .properties()
-                    .iter()
-                    .find(|r| r.property() == property)
-                    .and_then(|r| r.track.value());
+                let track = if property == "order" {
+                    self.document()
+                        .property_order(target)
+                        .ok_or(Unavailable)?
+                        .track
+                        .value()
+                } else {
+                    holder
+                        .properties()
+                        .iter()
+                        .find(|r| r.property() == property)
+                        .and_then(|r| r.track.value())
+                };
                 let keys = track.map_or(&[][..], |t| t.keys.as_slice());
                 let start = *offset as usize;
                 if start > keys.len() {

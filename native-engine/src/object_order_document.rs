@@ -5,6 +5,8 @@ use crate::object_document::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
+#[path = "object_property_order.rs"]
+mod property_order;
 
 /// Missing differs from present null. T chooses where null is actually allowed.
 #[derive(Debug, Clone, PartialEq)]

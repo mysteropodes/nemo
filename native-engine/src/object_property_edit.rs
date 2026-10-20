@@ -9,6 +9,8 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_property_bake_edit.rs"]
+mod bake_edit;
 #[path = "object_property_curve_edits.rs"]
 mod curves;
 #[path = "object_property_track_edit.rs"]

@@ -169,7 +169,12 @@ fn metadata_properties_and_stored_reads_preserve_authorship_and_applicability() 
         let mut separate = response.clone();
         let item = &mut separate.result.as_mut().unwrap()["items"][0];
         item["property"] = json!(property);
-        assert!(validate_native_response(&separate, &request).is_err());
+        // T17 now supplies real native Order authored facts. Time remap still
+        // has no admitted property provider; its original refusal is retained.
+        assert_eq!(
+            validate_native_response(&separate, &request).is_ok(),
+            property == "order"
+        );
         separate.result.as_mut().unwrap()["items"][0]["authored"] =
             json!({"availability":"unavailable","reason":"separate-property-owner"});
         assert!(validate_native_response(&separate, &request).is_ok());

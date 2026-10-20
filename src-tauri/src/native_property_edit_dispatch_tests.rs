@@ -13,7 +13,7 @@ fn install(state: &ApplicationMcp) -> String {
         "property":"opacity","static":[17]}]}]}});
     open(state, document.to_string())
 }
-fn open(state: &ApplicationMcp, document: String) -> String {
+pub(super) fn open(state: &ApplicationMcp, document: String) -> String {
     let receipt = bootstrap_raw(
         state,
         &json!({"apiVersion":2,"requestId":"property-edit-install",
@@ -26,7 +26,7 @@ fn open(state: &ApplicationMcp, document: String) -> String {
         .unwrap()
         .into()
 }
-fn request(
+pub(super) fn request(
     state: &ApplicationMcp,
     id: &str,
     rid: &str,
@@ -50,7 +50,7 @@ fn property(state: &ApplicationMcp, id: &str) -> Value {
     let document: Value = serde_json::from_slice(&saved(state, id)).unwrap();
     document["drawing"]["propertyHolders"][0]["properties"][0].clone()
 }
-fn saved(state: &ApplicationMcp, id: &str) -> Vec<u8> {
+pub(super) fn saved(state: &ApplicationMcp, id: &str) -> Vec<u8> {
     let info = state.native_project_info(id).unwrap();
     state
         .native_project_file_snapshot(
@@ -67,7 +67,7 @@ fn dispatch(
 ) -> NativeApplicationResponse {
     state.dispatch_native(request).unwrap()
 }
-fn history(
+pub(super) fn history(
     state: &ApplicationMcp,
     id: &str,
     rid: &str,
@@ -85,7 +85,7 @@ fn history(
     )
     .unwrap()
 }
-fn receipt(response: &NativeApplicationResponse, revision: u64, applied: bool) {
+pub(super) fn receipt(response: &NativeApplicationResponse, revision: u64, applied: bool) {
     assert!(response.ok, "{response:?}");
     assert_eq!(response.content_revision, revision);
     assert_eq!(
@@ -350,7 +350,7 @@ fn property_edit_public_refusals_are_atomic_and_do_not_block_a_later_valid_comma
     assert_eq!(saved(&state, &id), source);
 }
 /// Drives the actual external host route and its retained ACK receiver over TCP.
-async fn round_trip(
+pub(super) async fn round_trip(
     state: &ApplicationMcp,
     original: NativeApplicationRequest,
     binding: Option<&Value>,

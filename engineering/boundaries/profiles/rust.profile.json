@@ -22,6 +22,7 @@
         "object_record.rs",
         "project_media_envelope.rs",
         "object_order_document.rs",
+        "object_property_order.rs",
         "object_layer_timing.rs",
         "object_layer_range_evaluate.rs",
         "object_media_timing_core.rs",
@@ -290,7 +291,8 @@
         "object_layer_playhead_cut.rs",
         "object_layer_playhead_cut_owner.rs",
         "object_audio_track_edit_owner.rs",
-        "object_fill_trace_owner.rs"
+        "object_fill_trace_owner.rs",
+        "object_property_bake_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -500,7 +502,8 @@
         "property_expression_lookup.rs",
         "object_frame_context.rs",
         "object_audio_track_sampling.rs",
-        "object_expression_reads.rs"
+        "object_expression_reads.rs",
+        "property_expression_bake.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -691,7 +694,8 @@
         "object_expression_property.rs",
         "object_expression_read_bridge.rs",
         "object_expression_read_runtime.rs",
-        "object_expression_harden.rs"
+        "object_expression_harden.rs",
+        "object_expression_bake.rs"
       ],
       "publicApi": [
         "application.rs"
@@ -1575,7 +1579,9 @@
         "object_expression_reads.rs",
         "object_property_holder_targets.rs",
         "object_fill_trace_history.rs",
-        "object_fill_trace_native.rs"
+        "object_fill_trace_native.rs",
+        "property_expression_bake.rs",
+        "object_expression_bake.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1962,6 +1968,7 @@
         "native_property_read_dispatch_tests.rs",
         "native_text_read_dispatch_tests.rs",
         "native_property_edit_dispatch_tests.rs",
+        "native_property_bake_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
         "native_asset_remove_dispatch_tests.rs",

@@ -108,9 +108,17 @@ fn descriptor(
         .find(|control| control.key == property)
         .map(|control| control.name.as_str());
     fields.insert("controlName".into(), json!(control_name));
-    // Order and time remap have separate owners: absent generic storage is
-    // not evidence that those authored tracks or overrides are absent.
-    let authored = if matches!(property, "order" | "timeRemap") {
+    // Native Order has separate storage; inspect that real slot, never infer
+    // absence from an empty generic holder. Time remap remains separately owned.
+    let authored = if property == "order" && document.property_order(holder.target()).is_some() {
+        let order = document
+            .property_order(holder.target())
+            .ok_or_else(unavailable)?;
+        json!({"availability":"available",
+            "keyCount":order.track.value().map_or(0, |t| t.keys.len()),
+            "hasStaticOverride":order.static_value.value().is_some(),
+            "expressionEnabled":order.expression.value().is_some_and(|e| e.enabled)})
+    } else if matches!(property, "order" | "timeRemap") {
         json!({"availability":"unavailable","reason":"separate-property-owner"})
     } else {
         let record = holder
@@ -398,7 +406,9 @@ impl ObjectSnapshot {
             }
             ViewFields::StoredProperty { target, property } => {
                 let holder = self.metadata_holder(&target)?;
-                if !holder.properties.iter().any(|p| p.property == property) {
+                if !holder.properties.iter().any(|p| p.property == property)
+                    && !(property == "order" && self.document().property_order(&target).is_some())
+                {
                     return Err(DispatchErrorCode::NotFound);
                 }
                 let item = descriptor(self.document(), &holder, &property, false)?;

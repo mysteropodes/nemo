@@ -40,11 +40,16 @@ test('D36 declaration keeps mutation admission separate from read-only metadata 
   assert.deepEqual(payload.properties.target.required, ['contextId', 'layerUid']);
   assert.equal(payload.properties.target.additionalProperties, false);
   assert.deepEqual(payload.properties.action.oneOf.map(v => v.properties.kind.const),
-    ['setValue', 'setKey', 'removeKey', 'setAnimated']);
+    ['setValue', 'setKey', 'removeKey', 'setAnimated', 'bake']);
   for (const action of payload.properties.action.oneOf) {
     assert.equal(action.additionalProperties, false);
-    assert.equal(action.properties.frame.type, 'number');
-    assert.equal(action.properties.frame.minimum, undefined);
+    if (action.properties.kind.const === 'bake') {
+      assert.deepEqual(action.required, ['kind']);
+      assert.deepEqual(Object.keys(action.properties), ['kind']);
+    } else {
+      assert.equal(action.properties.frame.type, 'number');
+      assert.equal(action.properties.frame.minimum, undefined);
+    }
     assert.equal(action.properties.curvePoints, undefined);
     if (action.properties.values) {
       assert.equal(action.properties.values.minItems, 1);
@@ -194,4 +199,16 @@ test('browser classic-script SDK exposes editProperty through the same cohesive 
     return api.editProperty(JSON.parse(requestJson));
   })()`, context);
   assert.equal(r.result.applied, true); assert.equal(r.contentRevision, 8);
+});
+
+
+test('native bake sends only the strict intent through the existing public edit operation', async () => {
+  const q=request({kind:'bake'});let count=0;
+  const app=adapter(async sent=>{count++;assert.deepEqual(sent,q);return reply(sent);});
+  assert.equal((await app.dispatch(q)).ok,true);assert.equal(count,1);
+  for(const action of [{kind:'bake',frame:0},{kind:'bake',values:[1,2]},
+    {kind:'bake',samples:[[1,2]]},{kind:'bake',tolerance:100},['bake']]) {
+    assert.throws(()=>SDK.validateRequest(request(action)));
+  }
+  assert.equal(count,1);
 });

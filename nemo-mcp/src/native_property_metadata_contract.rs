@@ -128,7 +128,7 @@ fn descriptor(v: &Value, stored: bool) -> bool {
                 && uint(a.get("keyCount")).is_some()
                 && a["hasStaticOverride"].is_boolean()
                 && a["expressionEnabled"].is_boolean()
-                && !matches!(v["property"].as_str(), Some("order" | "timeRemap"))
+                && v["property"] != "timeRemap"
         }
         Some("unavailable") => {
             exact(a, &["availability", "reason"], &[]).is_some()
