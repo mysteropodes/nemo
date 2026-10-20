@@ -111,11 +111,56 @@ fn actual_svg_serializes_each_temporal_copy_without_the_original_seed_or_persist
         .skip(1)
         .map(|path| path.split(" C").next().unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(starts, ["20,0", "20,0", "30,0"]);
+    assert_eq!(starts, ["20,20", "20,20", "30,20"]);
     assert_eq!(frame.path_count, 3);
     assert_eq!(frame.pins.document_snapshot_id, snapshot.snapshot_id());
     assert_eq!(frame.pins.content_revision, snapshot.content_revision());
     assert_eq!(frame.pins.frame, 2);
     assert_eq!(plan.packet().records().len(), 1);
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+}
+
+#[test]
+fn enabled_effects_only_on_hidden_or_shifted_sources_refuse_without_poisoning_disabled_stacks() {
+    for hidden_pool in [false, true] {
+        for enabled in [false, true] {
+            let mut value = if hidden_pool {
+                empty_host_pool()
+            } else {
+                fixture(1)
+            };
+            for record in value["objects"].as_array_mut().unwrap() {
+                if hidden_pool || record["target"]["frameScope"]["frame"] == 0 {
+                    record["effects"] = json!([{"type":"blur","enabled":enabled,"p1":3}]);
+                }
+            }
+            let snapshot = snapshot(value);
+            let pin = selector(&snapshot, 2);
+            let packet = prepare_object_exposure_frame(&snapshot, &pin).unwrap();
+            // Prove the old selected-original contour guard cannot cover this case.
+            assert!(packet
+                .records()
+                .all(|record| !record.record().has_enabled_effects()));
+            let result = prepare_object_render_scene(&packet, &pin);
+            if enabled {
+                assert!(
+                    matches!(
+                        result,
+                        Err(
+                            crate::object_render_scene::ObjectSceneError::UnsupportedGeometry {
+                                reason:
+                                    "per-element effect evaluation awaits its native scene consumer",
+                                ..
+                            }
+                        )
+                    ),
+                    "hidden_pool={hidden_pool}: {result:?}"
+                );
+            } else {
+                let scene = result.unwrap();
+                let plan = prepare_object_paint_plan(&scene, &pin).unwrap();
+                assert_eq!(ordered_entries(&plan).count(), 3);
+            }
+        }
+    }
 }

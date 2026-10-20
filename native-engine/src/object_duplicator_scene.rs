@@ -43,6 +43,17 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                 source_object_index: layer.source_indices[copy_index],
                 reason,
             };
+            let source = packet
+                .snapshot()
+                .document()
+                .objects()
+                .get(layer.source_indices[copy_index])
+                .ok_or_else(|| invalid("duplicator original source is unavailable"))?;
+            if source.has_enabled_effects() || copy.record.has_enabled_effects() {
+                return Err(invalid(
+                    "per-element effect evaluation awaits its native scene consumer",
+                ));
+            }
             if copy.dup_3d.is_some() {
                 return Err(invalid("duplicator 3D awaits its native projection join"));
             }

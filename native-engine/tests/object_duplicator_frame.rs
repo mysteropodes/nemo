@@ -139,3 +139,51 @@ fn a_hidden_pool_does_not_bypass_its_hosts_admitted_visible_time_window() {
     assert!(frame.duplicator_outputs().is_empty());
     assert_eq!(frame.records().len(), 0);
 }
+
+#[test]
+fn real_effector_layers_sample_stored_offsets_and_hiding_disables_their_contribution() {
+    let mut value = fixture(1);
+    value["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"E0","timing":{
+        "format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}));
+    value["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"E0","naturalPosition":1,"order":{}}));
+    value["componentTables"]["duplicators"]["effectorLayers"] = json!([{
+        "contextId":"scene-root","layerUid":"E0",
+        "effector":{"targetLayerUid":"L0","falloff":"step"}}]);
+    value["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"E0"},
+        "properties":[{"property":"effOffPosition","track":{"keys":[
+            {"frame":0,"v":[0,0],"curvePoints":[]},{"frame":4,"v":[8,-4]}]}}]}]);
+    for visible in [true, false] {
+        value["layers"][1]["visible"] = json!(visible);
+        let snapshot = snapshot(value.clone());
+        let before = encode_storage_project(snapshot.document()).unwrap();
+        let frame = prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 2)).unwrap();
+        let copies = &frame.duplicator_outputs()[0];
+        let starts = copies
+            .output
+            .copies
+            .iter()
+            .map(|copy| {
+                let p = &copy.record.geometry.segments[0].point;
+                [p.x.as_f64().unwrap(), p.y.as_f64().unwrap()]
+            })
+            .collect::<Vec<_>>();
+        // effector-layer.js step weights0,1/2,1; at frame2 stored offset is[4,-2].
+        let expected = if visible {
+            [[20., 20.], [22., 19.], [34., 18.]]
+        } else {
+            [[20., 20.], [20., 20.], [30., 20.]]
+        };
+        assert_eq!(starts, expected);
+        assert_eq!(copies.source_indices, [1, 0, 0]);
+        assert_eq!(frame.records().len(), 1);
+        assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+        assert_eq!(snapshot.content_revision(), 0);
+    }
+}
