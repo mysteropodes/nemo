@@ -70,7 +70,10 @@ impl ObjectSnapshot {
         match &query.selector {
             CompositionSelector::MarkerAt { index: 0 } => return Err(InvalidRequest),
             CompositionSelector::MarkerPage { cursor, limit }
-                if *cursor > 4096 || !(1..=16).contains(limit) => return Err(InvalidRequest),
+                if *cursor > 4096 || !(1..=16).contains(limit) =>
+            {
+                return Err(InvalidRequest)
+            }
             CompositionSelector::MarkerNamed { name }
                 if name.len() > 1024 || name.contains('\0') =>
             {
@@ -106,20 +109,33 @@ impl ObjectSnapshot {
             }
             CompositionSelector::MarkerPage { cursor, limit } => {
                 let values = markers.unwrap_or_default();
-                if cursor > values.len() { return Err(InvalidRequest); }
+                if cursor > values.len() {
+                    return Err(InvalidRequest);
+                }
                 let mut page = json!({"kind":"markerPage", "markersPresent":markers.is_some(),
                     "markerCount":values.len(), "cursor":cursor, "items":[], "nextCursor":null});
                 let mut items = Vec::new();
-                for (at, (frame, name, color)) in values.iter().enumerate().skip(cursor).take(limit) {
+                for (at, (frame, name, color)) in values.iter().enumerate().skip(cursor).take(limit)
+                {
                     let mut item = json!({"ordinal":at + 1, "frame":frame});
-                    if let Some(name) = name { item["name"] = name.clone().into(); }
-                    if let Some(color) = color { item["color"] = color.clone().into(); }
+                    if let Some(name) = name {
+                        item["name"] = name.clone().into();
+                    }
+                    if let Some(color) = color {
+                        item["color"] = color.clone().into();
+                    }
                     items.push(item);
                     page["items"] = json!(items);
-                    page["nextCursor"] = if at + 1 < values.len() { json!(at + 1) } else { Value::Null };
+                    page["nextCursor"] = if at + 1 < values.len() {
+                        json!(at + 1)
+                    } else {
+                        Value::Null
+                    };
                     if encoded_len(&self.composition_response(page.clone()))? > budget {
                         items.pop();
-                        if items.is_empty() { return Err(Unavailable); }
+                        if items.is_empty() {
+                            return Err(Unavailable);
+                        }
                         page["items"] = json!(items);
                         page["nextCursor"] = json!(at);
                         break;
@@ -154,7 +170,9 @@ impl ObjectSnapshot {
                         }
                         best
                     }
-                    CompositionSelector::Settings {} | CompositionSelector::MarkerPage { .. } => unreachable!(),
+                    CompositionSelector::Settings {} | CompositionSelector::MarkerPage { .. } => {
+                        unreachable!()
+                    }
                 };
                 let (frame, name, color) = &values[index];
                 let time = frame / metadata.fps();
@@ -167,7 +185,9 @@ impl ObjectSnapshot {
             }
         };
         let response = self.composition_response(result);
-        if encoded_len(&response)? > budget { return Err(Unavailable); }
+        if encoded_len(&response)? > budget {
+            return Err(Unavailable);
+        }
         Ok(response)
     }
     fn composition_response(&self, result: Value) -> Value {
@@ -183,9 +203,16 @@ impl ObjectSnapshot {
     ) -> Result<ResponseEnvelope, DispatchErrorCode> {
         use DispatchErrorCode::{Internal, InvalidRequest, Unavailable};
         let fields = ["atRevision", "documentSnapshotId", "contextId", "selector"];
-        if request.payload.as_object().is_none_or(|p|
-            p.len() != fields.len() || fields.iter().any(|k| !p.contains_key(*k))) {
-            return Ok(self.read_failure(request, InvalidRequest, "Invalid composition read payload."));
+        if request
+            .payload
+            .as_object()
+            .is_none_or(|p| p.len() != fields.len() || fields.iter().any(|k| !p.contains_key(*k)))
+        {
+            return Ok(self.read_failure(
+                request,
+                InvalidRequest,
+                "Invalid composition read payload.",
+            ));
         }
         let query = json!({"command":"object.project.composition.read",
             "instanceId":request.instance_id, "documentId":request.document_id,
@@ -193,25 +220,45 @@ impl ObjectSnapshot {
             "documentSnapshotId":request.payload["documentSnapshotId"],
             "contextId":request.payload["contextId"], "selector":request.payload["selector"]});
         let mut response = ResponseEnvelope {
-            api_version:request.api_version, request_id:request.request_id.clone(),
-            instance_id:self.instance_id().into(), document_id:self.document_id().into(),
-            content_revision:self.content_revision(), ok:true, result:Some(Value::Null), error:None,
+            api_version: request.api_version,
+            request_id: request.request_id.clone(),
+            instance_id: self.instance_id().into(),
+            document_id: self.document_id().into(),
+            content_revision: self.content_revision(),
+            ok: true,
+            result: Some(Value::Null),
+            error: None,
         };
         // Charge the actual complete envelope, including escaped correlation IDs.
         let overhead = serde_json::to_vec(&response).map_err(|_| Internal)?.len() - 4;
         let budget = 4096usize.checked_sub(overhead).ok_or(Unavailable)?;
-        match self.composition_read_with_budget(&serde_json::to_vec(&query).map_err(|_| InvalidRequest)?, budget) {
+        match self.composition_read_with_budget(
+            &serde_json::to_vec(&query).map_err(|_| InvalidRequest)?,
+            budget,
+        ) {
             Ok(value) => response.result = Some(value),
-            Err(code) => return Ok(self.read_failure(request, code, "Pinned composition read is invalid or unavailable.")),
+            Err(code) => {
+                return Ok(self.read_failure(
+                    request,
+                    code,
+                    "Pinned composition read is invalid or unavailable.",
+                ))
+            }
         }
         if serde_json::to_vec(&response).map_err(|_| Internal)?.len() > 4096 {
-            return Ok(self.read_failure(request, Unavailable, "Complete composition read exceeds 4096 bytes."));
+            return Ok(self.read_failure(
+                request,
+                Unavailable,
+                "Complete composition read exceeds 4096 bytes.",
+            ));
         }
         Ok(response)
     }
 }
 fn encoded_len(value: &Value) -> Result<usize, DispatchErrorCode> {
-    serde_json::to_vec(value).map(|bytes| bytes.len()).map_err(|_| DispatchErrorCode::Unavailable)
+    serde_json::to_vec(value)
+        .map(|bytes| bytes.len())
+        .map_err(|_| DispatchErrorCode::Unavailable)
 }
 #[cfg(test)]
 #[path = "../tests/object_composition_read.rs"]

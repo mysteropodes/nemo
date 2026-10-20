@@ -193,12 +193,15 @@ impl ProjectMetadata {
         bpm_offset: Option<f64>,
         bpm_show: Option<bool>,
     ) -> Result<Self, ProjectMetadataError> {
-        if bpm.is_some_and(|v| !v.is_finite())
-            || bpm_offset.is_some_and(|v| !v.is_finite())
-        {
+        if bpm.is_some_and(|v| !v.is_finite()) || bpm_offset.is_some_and(|v| !v.is_finite()) {
             return Err(ProjectMetadataError::InvalidCompositionMetadata);
         }
-        Ok(Self { bpm, bpm_offset, bpm_show, ..self })
+        Ok(Self {
+            bpm,
+            bpm_offset,
+            bpm_show,
+            ..self
+        })
     }
     pub(crate) fn canvas_dimensions(&self) -> (u32, u32) {
         (self.canvas_width, self.canvas_height)
