@@ -513,7 +513,8 @@
         "property_expression_bake.rs",
         "object_text_animator_evaluation.rs",
         "object_frame_motion_values.rs",
-        "object_frame_camera.rs"
+        "object_frame_camera.rs",
+        "object_boolean_motion_eval.rs"
       ],
       "publicApi": [
         "evaluation.rs",

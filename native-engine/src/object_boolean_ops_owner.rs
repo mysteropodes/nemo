@@ -259,10 +259,7 @@ impl ObjectFillOwner {
         {
             let payload = flatten_payload(bytes)?;
             let origin = self.current_snapshot();
-            let motion = frame_motion::SnapshotMotion {
-                snapshot: &origin,
-                frame: payload.frame,
-            };
+            let motion = frame_motion::from_snapshot(&origin, payload.frame);
             return PreparedBooleanEdit::seal(
                 origin.clone(),
                 BooleanEditKind::Flatten,
