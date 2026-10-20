@@ -2,7 +2,10 @@
 //! once by the desktop shell (this seam may not depend on the shell's media
 //! module). Without an installed decoder a drawn video is a typed refusal when
 //! its session opens; frames without video never need one.
-use native_engine::native_media_frame_export::{NativeVideoDecoder, NativeVideoInfo};
+use native_engine::native_media_frame_export::{
+    with_placement_source_frame_count, NativeVideoDecoder, NativeVideoInfo,
+};
+use native_engine::{commands::ResponseEnvelope, object_snapshot::ObjectSnapshot};
 use std::sync::OnceLock;
 
 static FACTORY: OnceLock<fn() -> Box<dyn NativeVideoDecoder>> = OnceLock::new();
@@ -32,6 +35,22 @@ impl NativeVideoDecoder for Uninstalled {
     fn close(&mut self, session: u64) -> Result<(), String> {
         Err(format!("video session {session} is not open"))
     }
+}
+
+/// The placement read's `sourceFrameCount`, from a session opened on the read's
+/// own snapshot and asset and closed once (2232/6287401377); other reads pass.
+pub(super) fn with_source_frame_count(
+    response: ResponseEnvelope,
+    snapshot: &ObjectSnapshot,
+) -> ResponseEnvelope {
+    if response
+        .result()
+        .is_none_or(|result| result["kind"] != "layerPlacement")
+    {
+        return response;
+    }
+    let mut decoder = video_decoder();
+    with_placement_source_frame_count(response, snapshot, decoder.as_mut(), &linked_file_readable)
 }
 
 /// Whether a linked desktop video path can be read now (the MissingLink probe).

@@ -24,13 +24,13 @@
       objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
       if(value.contextId!=='scene-root')throw new TypeError('invalid placement context');
       const p=value.placement;if(p===null)return;
-      exact(p,['placementId','assetId','assetKind','offsetFrames','timeRemap','interpMode','frameBlend'],[],'video placement');
+      exact(p,['placementId','assetId','assetKind','offsetFrames','timeRemap','interpMode','frameBlend','sourceFrameCount'],[],'video placement');
       objectUid(p.placementId);objectUid(p.assetId);
       const r=p.timeRemap;if(r!==null)exact(r,['keyCount','keyAtFrame'],[],'time remap facts');
       if(p.assetKind!=='video'||!Number.isFinite(p.offsetFrames)||
          r!==null&&(!Number.isSafeInteger(r.keyCount)||r.keyCount<0||typeof r.keyAtFrame!=='boolean')||
          p.interpMode!==null&&(typeof p.interpMode!=='string'||!p.interpMode||p.interpMode.length>32)||
-         p.frameBlend!==null&&typeof p.frameBlend!=='boolean')throw new TypeError('invalid video placement facts');
+         p.frameBlend!==null&&typeof p.frameBlend!=='boolean'||p.sourceFrameCount!==null&&(!Number.isSafeInteger(p.sourceFrameCount)||p.sourceFrameCount<1||p.sourceFrameCount>4294967295))throw new TypeError('invalid video placement facts');
     }
     function metadataPayload(p) {
       exact(p, ['atRevision', 'documentSnapshotId', 'view'], [], 'metadata selector'); revision(p.atRevision, 'atRevision'); objectUid(p.documentSnapshotId);

@@ -433,6 +433,7 @@
           "native_media_frame_export::NativeVideoPort",
           "native_media_frame_export::begin_native_media_frames",
           "native_media_frame_export::declared_scene_resources",
+          "native_media_frame_export::with_placement_source_frame_count",
           "object_document::ObjectDocument",
           "object_frame_packet::ObjectFrameSelector",
           "object_frame_packet::prepare_object_exposure_frame",

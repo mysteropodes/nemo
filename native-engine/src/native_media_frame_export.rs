@@ -53,6 +53,7 @@ use crate::object_frame_packet::{
     prepare_object_exposure_frame, prepare_object_frame, ObjectFrameSelector,
 };
 use crate::object_render_scene::ObjectCompositionWitness;
+use crate::request_receipts::ResponseEnvelope;
 use crate::revision::ObjectSnapshot;
 use std::collections::BTreeMap;
 use video_facts::{motion_mode, Facts, Remap};
@@ -453,6 +454,61 @@ impl NativeMediaFrames<'_, '_> {
     pub fn finish(&mut self) -> NativeMediaRelease {
         self.gate.finish().into()
     }
+}
+
+/// The object read bound the placement view is held to (object_snapshot.rs).
+const MAX_MESSAGE_BYTES: usize = 4096;
+
+/// T12 desktop placement read: fills `placement.sourceFrameCount` (the decoder's
+/// own count) from a session on the placement's asset in `snapshot`, the snapshot
+/// the read answered for, opened for this read and closed exactly once. Anything
+/// else (foreign snapshot, unreadable or non-video asset, failed session, zero
+/// count, oversized result) leaves the count `null`.
+pub fn with_placement_source_frame_count(
+    mut response: ResponseEnvelope,
+    snapshot: &ObjectSnapshot,
+    decoder: &mut dyn NativeVideoDecoder,
+    readable: &dyn Fn(&str) -> bool,
+) -> ResponseEnvelope {
+    let Some(result) = response.result.as_mut().filter(|r| {
+        r["kind"] == "layerPlacement" && r["documentSnapshotId"] == snapshot.snapshot_id()
+    }) else {
+        return response;
+    };
+    let Some(asset_id) = result["placement"]["assetId"].as_str() else {
+        return response;
+    };
+    if let Some(count) = source_frame_count(decoder, snapshot, asset_id, readable) {
+        let mut filled = result.clone();
+        filled["placement"]["sourceFrameCount"] = count.into();
+        if serde_json::to_vec(&filled).is_ok_and(|bytes| bytes.len() <= MAX_MESSAGE_BYTES) {
+            *result = filled;
+        }
+    }
+    response
+}
+
+fn source_frame_count(
+    decoder: &mut dyn NativeVideoDecoder,
+    snapshot: &ObjectSnapshot,
+    asset_id: &str,
+    readable: &dyn Fn(&str) -> bool,
+) -> Option<u32> {
+    let inventory = snapshot.project()?.asset_inventory()?;
+    let record = inventory
+        .records()
+        .iter()
+        .find(|record| record.id().as_str() == asset_id)?;
+    if record.kind() != AssetKind::Video {
+        return None;
+    }
+    let path = link_ref_of(record, LocatorNamespace::DesktopPath)?.linked_path?;
+    if !readable(path) {
+        return None;
+    }
+    let info = decoder.open(path).ok()?;
+    let closed = decoder.close(info.session).is_ok();
+    (closed && info.frame_count > 0).then_some(info.frame_count)
 }
 
 /// The (id, version) pairs a scheduler key must declare for `witness`: exactly

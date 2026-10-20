@@ -10,7 +10,8 @@ fn output(placement: Value) -> Value {
 }
 fn video() -> Value {
     json!({"placementId":"p1","assetId":"v1","assetKind":"video","offsetFrames":5,
-        "timeRemap":{"keyCount":2,"keyAtFrame":false},"interpMode":"blend","frameBlend":true})
+        "timeRemap":{"keyCount":2,"keyAtFrame":false},"interpMode":"blend","frameBlend":true,
+        "sourceFrameCount":48})
 }
 #[test]
 fn placement_selector_is_exact_and_routed_by_the_timing_contract() {
@@ -36,7 +37,7 @@ fn placement_selector_is_exact_and_routed_by_the_timing_contract() {
 fn result_facts_are_bounded_and_belong_to_the_requested_snapshot() {
     let q = query();
     let mut plain = video();
-    for k in ["timeRemap", "interpMode", "frameBlend"] {
+    for k in ["timeRemap", "interpMode", "frameBlend", "sourceFrameCount"] {
         plain[k] = Value::Null;
     }
     assert!(result("document", &q, &output(plain)));
@@ -45,6 +46,9 @@ fn result_facts_are_bounded_and_belong_to_the_requested_snapshot() {
         ("offsetFrames", json!("5")),
         ("interpMode", json!("")),
         ("frameBlend", json!(1)),
+        ("sourceFrameCount", json!(0)),
+        ("sourceFrameCount", json!(1.5)),
+        ("sourceFrameCount", json!(4_294_967_296_u64)),
         ("timeRemap", json!({"keyCount":2})),
         ("timeRemap", json!({"keyCount":-1,"keyAtFrame":true})),
         (

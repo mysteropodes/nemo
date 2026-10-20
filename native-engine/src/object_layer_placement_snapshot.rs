@@ -84,7 +84,9 @@ impl ObjectSnapshot {
             });
             json!({"placementId":placement.id(),"assetId":placement.asset_id().as_str(),
                 "assetKind":"video","offsetFrames":placement.offset_frames(),
-                "timeRemap":remap,"interpMode":timing.interp_mode,"frameBlend":timing.frame_blend})
+                "timeRemap":remap,"interpMode":timing.interp_mode,"frameBlend":timing.frame_blend,
+                // The decoder's count: only the desktop host's bound session can fill it.
+                "sourceFrameCount":null})
         });
         let value = json!({"kind":"layerPlacement","instanceId":self.instance_id(),
             "documentId":self.document_id(),"atRevision":self.content_revision(),

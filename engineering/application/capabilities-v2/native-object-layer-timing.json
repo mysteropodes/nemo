@@ -175,11 +175,12 @@
               "keyAtFrame": true
             },
             "interpMode": "blend",
-            "frameBlend": true
+            "frameBlend": true,
+            "sourceFrameCount": null
           }
         }
       }
     }
   ],
-  "semantics": " Optional strict view:range reads the same immutable D27 raw/clamped layer ranges and custom/link booleans, including layers without drawing timing. Original five-field cell selector and eleven-field timing result remain exact separate branches. Range projection is read-only; unsupported contexts/providers and complete4096 limits remain explicit refusal; source examples are not desktop acceptance. T12 view \"placement\" returns the layer's video drawing placement (id, asset, offset, remap key count and key-at-frame, interpMode, frameBlend) or null; remap keys are counted, never listed; any other view is refused."
+  "semantics": " Optional strict view:range reads the same immutable D27 raw/clamped layer ranges and custom/link booleans, including layers without drawing timing. Original five-field cell selector and eleven-field timing result remain exact separate branches. Range projection is read-only; unsupported contexts/providers and complete4096 limits remain explicit refusal; source examples are not desktop acceptance. T12 view \"placement\" returns the layer's video drawing placement (id, asset, offset, remap key count and key-at-frame, interpMode, frameBlend, and sourceFrameCount, the source frame count the desktop host fills from its decode session bound to the same placement and snapshot, or null) or null; remap keys are counted, never listed; any other view is refused."
 }

@@ -302,9 +302,12 @@ impl NativeDispatch for NativeObjectHost {
             .history
             .acquire_snapshot(self.content_revision())
             .ok_or("native object snapshot is unavailable")?;
-        snapshot
+        let response = snapshot
             .dispatch(request)
-            .map_err(|_| "native object read correlation is invalid".into())
+            .map_err(|_| "native object read correlation is invalid".to_string())?;
+        Ok(crate::native_dispatch::video::with_source_frame_count(
+            response, &snapshot,
+        ))
     }
     fn replace_document(&mut self, _: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
         Err("native object host replacement is unavailable".into())

@@ -2809,7 +2809,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     if (prop === 'timeRemap') {
       var tli = state.layers.indexOf(ld);
       if (tli < 0) return;
-      ld.timeRemap ? disableTimeRemap(tli) : enableTimeRemap(tli);
+      window.SM.toggleTimeRemap(tli);
       return;
     }
     if (isAnimated(ld, prop)) {
@@ -7340,8 +7340,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
           // calques composants') — leaving the row always clickable lets
           // that existing message do the explaining instead of a silent
           // grey row.
-          { label: ld.timeRemap ? SM.t('ctxDisableTimeRemap') : SM.t('ctxEnableTimeRemap'),
-            action: function () { ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li); } },
+          { label: window.SM.isTimeRemapped(li) ? SM.t('ctxDisableTimeRemap') : SM.t('ctxEnableTimeRemap'),
+            action: function () { window.SM.toggleTimeRemap(li); } },
           { label: SM.t('ctxMergeSelectedLayers'), disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
           { label: SM.t('ctxObjectDuplicatorEllipsis'), disabled: !multi, action: function () { window.SM.convertSelectionToObjectDuplicator(_layerSel.slice()); } },
           { sep: true },
@@ -12412,6 +12412,13 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     if (window.showToast) showToast(SM.t('toastTimeRemapEnabledFromSuffix') + last);
     return true;
   }
+  // Late-bound entries: under the native owner native-time-remap-ui.js replaces
+  // both, reading the layer's video placement and editing it natively.
+  window.SM.toggleTimeRemap = function (li) {
+    var ld = state.layers[li];
+    return ld && ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li);
+  };
+  window.SM.isTimeRemapped = function (li) { var ld = state.layers[li]; return !!(ld && ld.timeRemap); };
   function disableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld || !ld.timeRemap) return false;

@@ -43,7 +43,7 @@ fn a_video_layer_reports_its_placement_and_remap_facts_without_the_keys() {
             "atRevision":0,"documentSnapshotId":s.snapshot_id(),"contextId":"scene-root",
             "layerUid":"L","frame":24,"placement":{"placementId":"p1","assetId":"v1",
             "assetKind":"video","offsetFrames":5,"timeRemap":{"keyCount":2,"keyAtFrame":true},
-            "interpMode":"blend","frameBlend":true}})
+            "interpMode":"blend","frameBlend":true,"sourceFrameCount":null}})
     );
     let between = read(&s, &query(&s, "L", 3)).unwrap();
     assert_eq!(between["placement"]["timeRemap"]["keyAtFrame"], false);
@@ -56,6 +56,7 @@ fn absent_timing_and_layers_without_video_stay_distinct() {
     assert_eq!(plain["timeRemap"], Value::Null);
     assert_eq!(plain["interpMode"], Value::Null);
     assert_eq!(plain["frameBlend"], Value::Null);
+    assert_eq!(plain["sourceFrameCount"], Value::Null);
     assert_eq!(
         read(&s, &query(&s, "M", 0)).unwrap()["placement"],
         Value::Null

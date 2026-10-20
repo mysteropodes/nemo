@@ -366,3 +366,58 @@ fn a_decode_failure_mid_range_is_typed_and_still_closes_the_session_once() {
     }
     assert_eq!(decoder.closed.len(), 1);
 }
+
+#[test]
+fn the_desktop_placement_read_counts_source_frames_from_one_bound_session() {
+    let history = owner("v2", 0, true);
+    let snapshot = history.acquire_snapshot(0).unwrap();
+    let read = |layer: &str| {
+        let query = json!({"atRevision":0,"documentSnapshotId":snapshot.snapshot_id(),
+            "contextId":"scene-root","layerUid":layer,"frame":0,"view":"placement"});
+        snapshot
+            .query_layer_placement_json(query.to_string().as_bytes())
+            .unwrap()
+    };
+    let envelope = |result: Value| ResponseEnvelope {
+        api_version: 2,
+        request_id: "placement".into(),
+        instance_id: snapshot.instance_id().into(),
+        document_id: snapshot.document_id().into(),
+        content_revision: 0,
+        ok: true,
+        result: Some(result),
+        error: None,
+    };
+    let count = |response: &ResponseEnvelope| {
+        response.result().unwrap()["placement"]["sourceFrameCount"].clone()
+    };
+    let mut decoder = Fake::with(BOTH);
+    let filled =
+        with_placement_source_frame_count(envelope(read("V")), &snapshot, &mut decoder, &|_| true);
+    assert_eq!(count(&filled), json!(12));
+    assert_eq!(decoder.opened, ["clips/two.mov"]);
+    assert_eq!(decoder.closed, [1]);
+    assert!(decoder.decoded.is_empty());
+
+    // An unreadable link, a foreign snapshot and a layer without video open nothing.
+    let mut decoder = Fake::with(BOTH);
+    let unreadable =
+        with_placement_source_frame_count(envelope(read("V")), &snapshot, &mut decoder, &|_| false);
+    assert_eq!(count(&unreadable), Value::Null);
+    let mut foreign = read("V");
+    foreign["documentSnapshotId"] = json!("another-snapshot");
+    let foreign =
+        with_placement_source_frame_count(envelope(foreign), &snapshot, &mut decoder, &|_| true);
+    assert_eq!(count(&foreign), Value::Null);
+    let drawing =
+        with_placement_source_frame_count(envelope(read("D")), &snapshot, &mut decoder, &|_| true);
+    assert_eq!(drawing.result().unwrap()["placement"], Value::Null);
+    assert!(decoder.opened.is_empty());
+
+    // A zero count is unknown, and its session is still closed once.
+    let mut empty = Fake::with(&[("clips/two.mov", 8, 6, 0)]);
+    let unknown =
+        with_placement_source_frame_count(envelope(read("V")), &snapshot, &mut empty, &|_| true);
+    assert_eq!(count(&unknown), Value::Null);
+    assert_eq!(empty.closed, [1]);
+}

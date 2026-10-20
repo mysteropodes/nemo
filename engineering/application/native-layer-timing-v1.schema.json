@@ -428,7 +428,8 @@
                 "offsetFrames",
                 "timeRemap",
                 "interpMode",
-                "frameBlend"
+                "frameBlend",
+                "sourceFrameCount"
               ],
               "properties": {
                 "placementId": {
@@ -485,6 +486,19 @@
                   "type": [
                     "boolean",
                     "null"
+                  ]
+                },
+                "sourceFrameCount": {
+                  "description": "T12: the source frame count of the desktop host's decode session bound to this placement and snapshot, as the decoder defines it; null when no session is bound or the count is unknown.",
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4294967295
+                    }
                   ]
                 }
               }

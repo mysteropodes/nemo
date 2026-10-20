@@ -35,6 +35,7 @@ fn placement(value: &Value) -> bool {
                 "timeRemap",
                 "interpMode",
                 "frameBlend",
+                "sourceFrameCount",
             ],
             &[],
         )
@@ -45,6 +46,10 @@ fn placement(value: &Value) -> bool {
                 && p["offsetFrames"].as_f64().is_some_and(f64::is_finite)
                 && (p["interpMode"].is_null() || nonempty(&p["interpMode"]))
                 && (p["frameBlend"].is_null() || p["frameBlend"].is_boolean())
+                && (p["sourceFrameCount"].is_null()
+                    || p["sourceFrameCount"]
+                        .as_u64()
+                        .is_some_and(|n| (1..=u64::from(u32::MAX)).contains(&n)))
                 && (p["timeRemap"].is_null()
                     || exact(&p["timeRemap"], &["keyCount", "keyAtFrame"], &[])
                         .is_some_and(|r| r["keyCount"].is_u64() && r["keyAtFrame"].is_boolean()))
