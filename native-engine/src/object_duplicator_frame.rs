@@ -364,11 +364,11 @@ pub(crate) fn prepare_with_motion(
     selector: &ObjectFrameSelector<'_>,
     motion: &dyn MotionPort,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    super::prepare_frame_with_order(
+    crate::object_frame_packet::prepare_frame_with_order(
         snapshot,
         selector,
         true,
-        super::order::prepare_context,
+        crate::object_frame_packet::order::prepare_context,
         Some(motion),
     )
 }

@@ -395,7 +395,8 @@
           "object_snapshot::ObjectSnapshot",
           "render_scene::ScheduledFrameIdentity",
           "resource_leases::WorkId",
-          "scheduler::OutputSpec"
+          "scheduler::OutputSpec",
+          "object_codec::encode_storage_project"
         ],
         "rust.desktop.native.dispatch": [
           "application::ApplicationReleaseReceipt",
@@ -444,7 +445,9 @@
           "scheduler::ObjectSchedulePins",
           "scheduler::ObjectScheduleScope",
           "scheduler::OutputSpec",
-          "scheduler::ScheduledFrame"
+          "scheduler::ScheduledFrame",
+          "application::prepare_object_motion_exposure_frame_for_owner",
+          "application::ObjectMotionFrameFailure"
         ]
       },
       "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."

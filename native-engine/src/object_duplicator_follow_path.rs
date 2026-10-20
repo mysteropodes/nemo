@@ -1,9 +1,12 @@
 //! Snapshot caller for the original layerMotionAt FollowPath contribution.
 //! D30 owns path sampling, target-transform and additive placement arithmetic.
 //! The effector's own parents are not inputs; unsupported guide parents refuse.
-use super::{MotionPort, SnapshotMotion, Unavailable};
 use crate::evaluation::motion_parent_chain::MotionMat;
 use crate::evaluation::object_component_kernels::object_context_resolver::ContextSource;
+use crate::evaluation::object_component_kernels::object_duplicator_evaluate::snapshot::SnapshotMotion;
+use crate::evaluation::object_component_kernels::object_effector_layers::{
+    MotionPort, Unavailable,
+};
 use crate::evaluation::property_follow_path_sample::{follow_path_geometry, SegmentIn, StrokeIn};
 use crate::evaluation::property_transform_eval::{
     apply_follow_path, follow_path_offset, follow_path_sample,

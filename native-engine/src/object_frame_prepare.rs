@@ -1,5 +1,5 @@
 //! Shared immutable frame construction; caller supplies only its proven Motion port.
-use super::{
+use crate::object_frame_packet::{
     duplicators, holders_fully_consumed, sources, text, FrameContext, NumericOrderPlan,
     ObjectFrameError, ObjectFrameIndices, ObjectFramePacket, ObjectFrameRasterIndex,
     ObjectFrameSelector,

@@ -1,8 +1,6 @@
 //! Original owner-held Motion -> duplicator frame; all guest values retire first.
 //! Non-clean outcomes remain at the actual host and refuse publication. C02's
 //! diagnostic/timeout-disable committer is still required; a getter never edits history.
-use super::property::evaluate_property_for_owner_with_effects;
-use super::{ExpressionLimits, ExpressionRefusal};
 use crate::evaluation::motion_parent_chain::motion_mat_from_values;
 use crate::evaluation::object_component_kernels::duplicator_placement_modes::JsNumber;
 use crate::evaluation::object_component_kernels::object_duplicator_evaluate::snapshot::SnapshotMotion;
@@ -15,6 +13,8 @@ use crate::object_document::{Presence, PropertyHolderTarget};
 use crate::object_expression_pin::{
     verify_owner_snapshot, PropertyDependencyEffect, PropertyEvaluation,
 };
+use crate::object_expression_runtime::property::evaluate_property_for_owner_with_effects;
+use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
 use crate::object_frame_packet::{ObjectFrameError, ObjectFramePacket, ObjectFrameSelector};
 use crate::revision::ObjectSnapshot;
 use std::cell::RefCell;

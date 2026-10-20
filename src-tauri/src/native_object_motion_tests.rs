@@ -1,6 +1,8 @@
 //! Actual owner-held CPU preview and SVG export hooks. No GPU. ALL UNRUN.
-use super::*;
-use crate::native_dispatch::NativeDispatch;
+use crate::native_dispatch::object_host::preview::tests::{
+    host as base_host, output, selector, snapshot,
+};
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{
     export_job::{ExportArtifact, JobStatus, StagedArtifactPort},
     object_codec::encode_storage_project,
@@ -8,8 +10,8 @@ use native_engine::{
 use serde_json::{json, Value};
 
 fn host(code: &str) -> NativeObjectHost {
-    let base = super::tests::host();
-    let snapshot = super::tests::snapshot(&base);
+    let base = base_host();
+    let snapshot = snapshot(&base);
     let mut document = serde_json::to_value(snapshot.document()).unwrap();
     document["componentTables"] = json!({"duplicators":{"format":"nemo.native-duplicator-set",
         "formatVersion":1,"duplicators":[{"contextId":"scene-root","layerUid":"L0",
@@ -61,11 +63,11 @@ impl StagedArtifactPort for MemoryPort {
 #[test]
 fn actual_preview_preparation_paints_expression_values_without_touching_history() {
     let mut owner = host("[frame,0]");
-    let snapshot = super::tests::snapshot(&owner);
-    let selector = super::tests::selector(&snapshot, 1);
+    let snapshot = snapshot(&owner);
+    let selector = selector(&snapshot, 1);
     let before = encode_storage_project(snapshot.document()).unwrap();
     owner
-        .with_prepared_object_preview(&selector, super::tests::output(), |h| {
+        .with_prepared_object_preview(&selector, output(), |h| {
             let plan = &h.preview.prepared.as_ref().unwrap().plan;
             assert_eq!(plan.packet().frame(), 1);
             assert_eq!(plan.packet().records().len(), 1); // Only authored provenance.
@@ -85,8 +87,8 @@ fn actual_preview_preparation_paints_expression_values_without_touching_history(
 #[test]
 fn actual_svg_export_uses_the_same_evaluated_frame_and_existing_job_lifecycle() {
     let mut owner = host("[frame,0]");
-    let snapshot = super::tests::snapshot(&owner);
-    let selector = super::tests::selector(&snapshot, 1);
+    let snapshot = snapshot(&owner);
+    let selector = selector(&snapshot, 1);
     let mut port = MemoryPort::default();
     let result = owner
         .export_pinned_object_svg_frames(
@@ -94,7 +96,7 @@ fn actual_svg_export_uses_the_same_evaluated_frame_and_existing_job_lifecycle() 
             &[1],
             "motion-svg".into(),
             "output".into(),
-            super::tests::output(),
+            output(),
             1024 * 1024,
             &mut port,
         )
@@ -117,11 +119,11 @@ fn actual_svg_export_uses_the_same_evaluated_frame_and_existing_job_lifecycle() 
 #[test]
 fn actual_timeout_is_retained_at_owner_and_prevents_both_preview_and_export_publication() {
     let mut owner = host("while(true){}");
-    let snapshot = super::tests::snapshot(&owner);
-    let selector = super::tests::selector(&snapshot, 1);
+    let snapshot = snapshot(&owner);
+    let selector = selector(&snapshot, 1);
     let before = encode_storage_project(snapshot.document()).unwrap();
     let error = owner
-        .with_prepared_object_preview::<()>(&selector, super::tests::output(), |_| {
+        .with_prepared_object_preview::<()>(&selector, output(), |_| {
             panic!("a non-clean frame must never reach the real preview operation")
         })
         .unwrap_err();
@@ -135,7 +137,7 @@ fn actual_timeout_is_retained_at_owner_and_prevents_both_preview_and_export_publ
             &[1],
             "motion-failed-svg".into(),
             "output".into(),
-            super::tests::output(),
+            output(),
             1024 * 1024,
             &mut port
         )
@@ -160,12 +162,12 @@ fn actual_timeout_is_retained_at_owner_and_prevents_both_preview_and_export_publ
 #[test]
 fn dropping_the_actual_cpu_preparation_on_a_caller_error_keeps_the_owner_clean() {
     let mut owner = host("[frame,0]");
-    let snapshot = super::tests::snapshot(&owner);
-    let selector = super::tests::selector(&snapshot, 1);
+    let snapshot = snapshot(&owner);
+    let selector = selector(&snapshot, 1);
     let before = encode_storage_project(snapshot.document()).unwrap();
     assert_eq!(
         owner
-            .with_prepared_object_preview::<()>(&selector, super::tests::output(), |_| {
+            .with_prepared_object_preview::<()>(&selector, output(), |_| {
                 Err("caller stopped before surface acquisition".into())
             })
             .unwrap_err(),
@@ -174,7 +176,7 @@ fn dropping_the_actual_cpu_preparation_on_a_caller_error_keeps_the_owner_clean()
     assert!(owner.preview.prepared.is_none());
     assert!(owner.preview.motion_failure.is_none());
     owner
-        .with_prepared_object_preview(&selector, super::tests::output(), |_| Ok(()))
+        .with_prepared_object_preview(&selector, output(), |_| Ok(()))
         .unwrap();
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
     assert_eq!(owner.history.history_depths(), (0, 0));
@@ -183,15 +185,15 @@ fn dropping_the_actual_cpu_preparation_on_a_caller_error_keeps_the_owner_clean()
 #[test]
 fn pending_original_effects_follow_the_real_retained_document_across_tab_activation() {
     let mut owner = host("while(true){}");
-    let origin = super::tests::snapshot(&owner);
-    let selector = super::tests::selector(&origin, 1);
+    let origin = snapshot(&owner);
+    let selector = selector(&origin, 1);
     assert!(owner
-        .with_prepared_object_preview::<()>(&selector, super::tests::output(), |_| Ok(()))
+        .with_prepared_object_preview::<()>(&selector, output(), |_| Ok(()))
         .is_err());
     let receipt = owner.preview.motion_failure.as_ref().unwrap().to_string();
     let incoming =
         NativeObjectHost::new_blank_project("motion-incoming".into(), 64, 64, 24.).unwrap();
-    let incoming_snapshot = super::tests::snapshot(&incoming);
+    let incoming_snapshot = snapshot(&incoming);
     let bytes = incoming
         .history
         .serialize_project_file(0, incoming_snapshot.snapshot_id())
@@ -220,7 +222,7 @@ fn pending_original_effects_follow_the_real_retained_document_across_tab_activat
         owner.preview.motion_failure.is_none(),
         "the incoming document has no effects"
     );
-    let current = super::tests::snapshot(&owner);
+    let current = snapshot(&owner);
     let token = owner.retained_project_token().unwrap().to_owned();
     let back = owner
         .prepare_retained_activation(
@@ -237,9 +239,6 @@ fn pending_original_effects_follow_the_real_retained_document_across_tab_activat
         owner.preview.motion_failure.as_ref().unwrap().to_string(),
         receipt
     );
-    assert_eq!(
-        super::tests::snapshot(&owner).snapshot_id(),
-        origin.snapshot_id()
-    );
+    assert_eq!(snapshot(&owner).snapshot_id(), origin.snapshot_id());
     assert_eq!(owner.history.history_depths(), (0, 0));
 }
