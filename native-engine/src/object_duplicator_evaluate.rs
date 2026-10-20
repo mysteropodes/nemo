@@ -46,6 +46,9 @@ pub(crate) use crate::evaluation::object_component_kernels::object_duplicator_ev
     UnchangedReason,
 };
 
+#[path = "object_duplicator_snapshot.rs"]
+pub(crate) mod snapshot;
+
 /// Evaluate one duplicator layer at one frame.
 pub(crate) fn evaluate_duplicator(
     req: &Request<'_>,
