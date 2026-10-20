@@ -14,7 +14,10 @@ const OP_PROJECT_COMPOSITION: &str = "command.document.object.project.compositio
 const OP_PROJECT_PALETTE: &str = "command.document.object.project.palette.edit";
 
 pub(super) fn is_project_settings_operation(operation: &str) -> bool {
-    matches!(operation, OP_PROJECT_SETTINGS | OP_PROJECT_COMPOSITION | OP_PROJECT_PALETTE)
+    matches!(
+        operation,
+        OP_PROJECT_SETTINGS | OP_PROJECT_COMPOSITION | OP_PROJECT_PALETTE
+    )
 }
 
 impl NativeObjectHistory {
@@ -141,15 +144,22 @@ impl NativeObjectHistory {
         &mut self,
         request: &OpacityRequest,
     ) -> Result<CompactResult, (DispatchErrorCode, &'static str)> {
-        let payload = serde_json::to_vec(&request.payload).map_err(|_| (
-            DispatchErrorCode::InvalidRequest,
-            "Project settings payload cannot be encoded.",
-        ))?;
+        let payload = serde_json::to_vec(&request.payload).map_err(|_| {
+            (
+                DispatchErrorCode::InvalidRequest,
+                "Project settings payload cannot be encoded.",
+            )
+        })?;
         let prepared = match request.operation.as_str() {
             OP_PROJECT_SETTINGS => self.prepare_project_settings_json(&payload),
             OP_PROJECT_COMPOSITION => self.prepare_composition_delta_json(&payload),
             OP_PROJECT_PALETTE => self.prepare_palette_delta_json(&payload),
-            _ => return Err((DispatchErrorCode::InvalidRequest, "Unsupported project metadata edit.")),
+            _ => {
+                return Err((
+                    DispatchErrorCode::InvalidRequest,
+                    "Unsupported project metadata edit.",
+                ))
+            }
         };
         match prepared {
             Ok(candidate) => {

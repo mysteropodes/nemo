@@ -13,8 +13,10 @@ pub(super) fn correlated(
     let correlated_operation = request.operation == crate::native_contract::text_read::OP
         || matches!(
             request.operation.as_str(),
-            crate::native_contract::composition::READ | crate::native_contract::composition::EDIT
-                | crate::native_contract::palette::READ | crate::native_contract::palette::EDIT
+            crate::native_contract::composition::READ
+                | crate::native_contract::composition::EDIT
+                | crate::native_contract::palette::READ
+                | crate::native_contract::palette::EDIT
         )
         || request.operation == crate::native_contract::metadata::OP
         || request.operation == crate::native_contract::placement::OP
