@@ -7,6 +7,7 @@ use crate::object_document::{
 };
 use crate::object_expression_runtime::{evaluate_property_for_owner, ExpressionLimits};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
+use serde::Deserialize;
 use serde_json::Number;
 
 // A bake owns bounded temporary samples/fits as well as each retired VM.

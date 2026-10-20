@@ -157,11 +157,12 @@ test('ordinary native Motion bake uses the existing exact pinned public intent a
    expectedRevision:pin.contentRevision,operation:'command.document.object.property.edit',payload});
  };
  h.paint();await h.settle();const button=h.button('Bake expression');assert.ok(button);
+ h.root.state.currentFrame++; // Whole-composition bake uses frame-independent metadata.
  await button.fire('click');assert.equal(writes.length,1);
  assert.deepEqual(writes[0].payload.action,{kind:'bake'});
  assert.equal(writes[0].payload.command,'object.property.edit');
  assert.equal(typeof writes[0].expectedRevision,'number');
- const retired=h.button('Bake expression');assert.ok(retired);h.root.state.currentFrame++;
- await retired.fire('click');assert.equal(writes.length,1,'changed frame cannot reuse the old native intent');
+ const retired=h.button('Bake expression');assert.ok(retired);h.replace();
+ await retired.fire('click');assert.equal(writes.length,1,'retired owner cannot reuse the old native intent');
  h.retire();
 });
