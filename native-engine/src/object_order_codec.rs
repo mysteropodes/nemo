@@ -301,6 +301,8 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.objects,
         Some(&document.composition_order),
         document.component_tables.value(),
+        document.items.value(),
+        document.image_meshes.value(),
     )?;
     validate_image_meshes(&document.image_meshes)?;
     validate_component_tables(&document.component_tables, &document.layers)
@@ -342,6 +344,8 @@ pub(crate) fn validate_storage_order(
         &document.objects,
         Some(plan),
         document.component_tables.value(),
+        document.items.value(),
+        document.image_meshes.value(),
     )?;
     validate_image_meshes(&document.image_meshes)
 }

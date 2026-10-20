@@ -27,6 +27,14 @@ fn metadata(dimension: usize, unit: &'static str, default: Option<&[f64]>) -> Pr
 
 /// Frozen motion.js PROP_DIM/UNIT/DEFAULT plus its opt-in paint consumers.
 /// A missing paint default means inherit the actual source paint, not zero.
+pub(super) fn vertex_index(property: &str) -> Option<usize> {
+    let digits = property.strip_prefix("vtx")?;
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse::<usize>().ok()
+}
+
 pub(super) fn builtin(property: &str) -> Option<PropertyMetadata> {
     Some(match property {
         "position" | "anchor" | "dupOffsetPos" => metadata(2, "px", Some(&[0., 0.])),
@@ -52,6 +60,7 @@ pub(super) fn builtin(property: &str) -> Option<PropertyMetadata> {
         "fillColor" | "strokeColor" => metadata(4, "", None),
         "strokeWidth" => metadata(1, "px", None),
         "brushSize" => metadata(1, "%", None),
+        _ if vertex_index(property).is_some() => metadata(2, "px", Some(&[0., 0.])),
         _ => return None,
     })
 }

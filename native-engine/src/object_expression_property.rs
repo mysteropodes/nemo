@@ -6,11 +6,11 @@
 //! interrupted runtime into E1's `GuestValue`, and E1's fallback decides the
 //! published value. Same fresh Runtime, limits and retirement as Order.
 //!
-//! Named gaps: builtins beyond `value`/`frame` (`time`, `self`, `comp`, the
-//! helpers), cross-layer re-entry and `_depthTripped` retention, the compile
-//! cache, V8's message/line text (QuickJS words its own), and dimensions
-//! Motion registers at runtime for effector/exposed properties, which D11
-//! refuses as unsupported.
+//! T09 binds stored self/layer/control/key/comp reads through the same native
+//! snapshot, including dependency diagnostics and the shared recursion budget.
+//! Timing is supplied only by real project metadata. Other expression helpers,
+//! compile caching, V8 message/line parity and dynamic effector/exposed dimensions
+//! remain separate named consumers; a provider increment does not accept them.
 #[cfg(all(test, feature = "test-object_expression_runtime"))]
 #[path = "../tests/object_expression_property.rs"]
 mod tests;
@@ -22,19 +22,62 @@ use crate::object_expression_pin::{
     prepare_property_expression_request, PropertyEvaluation, PropertyExpressionRequest,
 };
 use crate::object_expression_runtime::{
-    compile, in_runtime, with_context, ExpressionLimits, ExpressionRefusal,
+    eval_single_function, in_runtime, with_context_budget, ExpressionLimits, ExpressionRefusal,
+    Fail,
 };
 use crate::revision::ObjectSnapshot;
 use rquickjs::{Function, Runtime, Value};
+use std::sync::{atomic::AtomicUsize, Arc};
+
+#[path = "object_expression_read_bridge.rs"]
+mod bridge;
+#[path = "object_expression_read_runtime.rs"]
+mod read_runtime;
+use crate::evaluation::property_expression_snapshot_reads as reads;
+use read_runtime::ReadState;
+
+#[cfg(all(test, feature = "test-object_expression_runtime"))]
+#[path = "../tests/object_expression_reads.rs"]
+mod read_tests;
 
 /// The typed twin: an E1 outcome made only of Rust data.
 pub(crate) struct PropertyCandidate {
     outcome: Result<Outcome, ExpressionRefusal>,
+    dependencies: Vec<crate::object_expression_pin::PropertyDependencyEffect>,
 }
 
 impl PropertyCandidate {
-    pub(crate) fn into_outcome(self) -> Result<Outcome, ExpressionRefusal> {
-        self.outcome
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        Result<Outcome, ExpressionRefusal>,
+        Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+    ) {
+        (self.outcome, self.dependencies)
+    }
+}
+
+fn compile_property<'js>(
+    ctx: &rquickjs::Ctx<'js>,
+    code: &str,
+    fail: &Fail,
+    has_time: bool,
+) -> Result<Function<'js>, (ExpressionRefusal, String)> {
+    let time = if has_time { ",time" } else { "" };
+    let prefix = format!(
+        "function(value,frame{time},{}){{'use strict';",
+        bridge::READ_NAMES.join(",")
+    );
+    let expression = format!("{prefix}\nreturn ({code}\n);}}");
+    match eval_single_function(ctx, &expression) {
+        Ok(f) => Ok(f),
+        Err(error) => match fail.of(ctx, error) {
+            (ExpressionRefusal::Syntax, _) => {
+                eval_single_function(ctx, &format!("{prefix}\n{code}\n}}"))
+                    .map_err(|e| fail.of(ctx, e))
+            }
+            other => Err(other),
+        },
     }
 }
 
@@ -90,9 +133,20 @@ fn evaluate_property_in_context(
     rt: &Runtime,
     request: &PropertyExpressionRequest,
     limits: ExpressionLimits,
+    state: ReadState,
 ) -> Result<Outcome, ExpressionRefusal> {
-    with_context(rt, limits, |ctx, fail| {
-        let function = match compile(ctx, request.code(), fail) {
+    with_context_budget(rt, limits, Arc::clone(&state.polls), |ctx, fail| {
+        let time = reads::SnapshotReads::bind(
+            request.snapshot(),
+            request.target(),
+            request.property(),
+            request.frame(),
+        )
+        .comp()
+        .ok()
+        .and_then(|c| c["fps"].as_f64())
+        .map(|fps| request.frame() / fps);
+        let function = match compile_property(ctx, request.code(), fail, time.is_some()) {
             Ok(function) => function,
             Err((ExpressionRefusal::Interrupted, _)) => return Ok(Outcome::Timeout),
             Err((_, message)) => {
@@ -105,17 +159,13 @@ fn evaluate_property_in_context(
         if request.depth() >= EXPR_MAX_DEPTH {
             return Ok(Outcome::TooDeep);
         }
-        let raw = request.raw();
         let dim = match request.dim() {
             Dim::Known(n) => n as i64,
             Dim::Vertex => 2,
             Dim::Undefined => -1,
         };
-        let called: rquickjs::Result<Value> = if raw.len() == 1 {
-            function.call((raw[0], request.frame()))
-        } else {
-            function.call((raw.to_vec(), request.frame()))
-        };
+        let read = read_runtime::bind(ctx, request, limits, state.clone())?;
+        let called = read_runtime::call_property(ctx, &function, request, read, time);
         let read = called.and_then(|value| {
             let reader: Function = ctx.eval(READ_TYPED)?;
             reader.call::<_, Vec<Value>>((value, dim))
@@ -132,10 +182,26 @@ pub(crate) fn evaluate_property_detached(
     request: &PropertyExpressionRequest,
     limits: ExpressionLimits,
 ) -> Result<PropertyCandidate, ExpressionRefusal> {
+    let state = ReadState::new(Arc::new(AtomicUsize::new(0)));
+    let outcome = evaluate_shared(request, limits, state.clone())?;
+    Ok(PropertyCandidate {
+        outcome,
+        dependencies: state.effects(),
+    })
+}
+
+fn evaluate_shared(
+    request: &PropertyExpressionRequest,
+    limits: ExpressionLimits,
+    state: ReadState,
+) -> Result<Result<Outcome, ExpressionRefusal>, ExpressionRefusal> {
     let outcome = in_runtime(request.code(), limits, |rt| {
-        evaluate_property_in_context(rt, request, limits)
+        evaluate_property_in_context(rt, request, limits, state.clone())
     })?;
-    Ok(PropertyCandidate { outcome })
+    Ok(match state.refusal() {
+        Some(e) => Err(e),
+        None => outcome,
+    })
 }
 
 /// The typed property entry point: finalization rechecks the real owner.
