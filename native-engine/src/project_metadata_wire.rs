@@ -1,7 +1,7 @@
 //! Strict project metadata DTO shared by native project envelope versions.
 use super::ProjectWireError;
-use crate::object_document::{Presence,ProjectMetadata,ProjectCameraKey};
-use serde::{Deserialize,Serialize};
+use crate::object_document::{Presence, ProjectCameraKey, ProjectMetadata};
+use serde::{Deserialize, Serialize};
 
 // Separate composition DTO retains fractional frames; layer MarkerRecord is i64.
 #[derive(Serialize)]
@@ -81,7 +81,12 @@ impl Metadata {
                     self.bpm_show.value().copied(),
                 )
             })
-            .and_then(|value| value.with_camera(self.camera_keys.value().cloned(), self.camera_layer_on.value().copied()))
+            .and_then(|value| {
+                value.with_camera(
+                    self.camera_keys.value().cloned(),
+                    self.camera_layer_on.value().copied(),
+                )
+            })
             .map_err(|_| ProjectWireError::Invalid)
     }
     pub(super) fn from_metadata(value: &ProjectMetadata) -> Self {
@@ -124,9 +129,14 @@ impl Metadata {
                 .map(Presence::Present)
                 .unwrap_or(Presence::Missing),
             bpm_show: bpm_show.map(Presence::Present).unwrap_or(Presence::Missing),
-            camera_keys: value.camera_keys().map(|keys| Presence::Present(keys.to_vec())).unwrap_or(Presence::Missing),
-            camera_layer_on: value.camera_layer_on().map(Presence::Present).unwrap_or(Presence::Missing),
+            camera_keys: value
+                .camera_keys()
+                .map(|keys| Presence::Present(keys.to_vec()))
+                .unwrap_or(Presence::Missing),
+            camera_layer_on: value
+                .camera_layer_on()
+                .map(Presence::Present)
+                .unwrap_or(Presence::Missing),
         }
     }
 }
-

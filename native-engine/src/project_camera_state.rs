@@ -28,7 +28,8 @@ crate::object_document::object_deserialize!(ProjectCameraKey {
 });
 impl ProjectCameraKey {
     fn valid(&self) -> bool {
-        [self.frame,self.x,self.y,self.w].into_iter()
+        [self.frame, self.x, self.y, self.w]
+            .into_iter()
             .chain(self.rot.value().copied())
             .chain(self.h_out.value().into_iter().flatten().copied())
             .chain(self.h_in.value().into_iter().flatten().copied())
@@ -45,10 +46,19 @@ pub(crate) struct ProjectCameraState {
     pub(crate) layer_on: Option<bool>,
 }
 impl ProjectCameraState {
-    pub(crate) fn new(keys: Option<Vec<ProjectCameraKey>>, layer_on: Option<bool>) -> Result<Self, ()> {
-        if keys.as_ref().is_some_and(|keys| keys.iter().any(|key| !key.valid())) {
+    pub(crate) fn new(
+        keys: Option<Vec<ProjectCameraKey>>,
+        layer_on: Option<bool>,
+    ) -> Result<Self, ()> {
+        if keys
+            .as_ref()
+            .is_some_and(|keys| keys.iter().any(|key| !key.valid()))
+        {
             return Err(());
         }
-        Ok(Self { keys:keys.map(Arc::from), layer_on })
+        Ok(Self {
+            keys: keys.map(Arc::from),
+            layer_on,
+        })
     }
 }

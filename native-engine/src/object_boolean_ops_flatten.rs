@@ -21,7 +21,7 @@ use crate::object_document::object_group_kernels::object_group_combine_plan::{
 };
 use crate::object_document::object_group_kernels::object_group_record::layer_stroke_ids;
 use crate::object_document::ObjectDocument;
-use crate::object_document::{Presence,FrameScopeKind};
+use crate::object_document::{FrameScopeKind, Presence};
 
 /// Precomputed (Motion-baked) operand polygons by group item.
 struct Members {
@@ -96,10 +96,14 @@ pub(super) fn plan_flatten_group(
             find_record(document, scope, &id).ok_or_else(|| PlanError::MemberAbsent(id.clone()))?;
         let record = &document.objects[at];
         let mut polygons = if motion.consumes_authored_motion() {
-            let polygons=motion.materialized_polygons(record).map_err(|_|PlanError::MotionUnavailable(id.clone()))?;
+            let polygons = motion
+                .materialized_polygons(record)
+                .map_err(|_| PlanError::MotionUnavailable(id.clone()))?;
             admit_polygons(&polygons).map_err(PlanError::Topology)?;
             polygons
-        } else { filled_polygons(record)? };
+        } else {
+            filled_polygons(record)?
+        };
         if !motion.consumes_authored_motion() && element_holder(document, &record.target) {
             let mat = motion
                 .element_mat(&record.target)
@@ -137,24 +141,34 @@ pub(super) fn plan_flatten_group(
         .count();
     let leaves = groups.collect_group_stroke_ids(group);
     let mut detached = detach(document.clone(), scope, &leaves)?;
-    let first_id = if motion.consumes_authored_motion() && element_holder(document,&style_record.target) {
-        // Never reuse a still-animated identity for an already-baked result.
-        // finish() mints its remaining n-1 IDs from the start of this same
-        // sequence; selecting the nth one here keeps all IDs disjoint.
-        fresh_ids(document,revision,islands.len()).and_then(|mut ids|ids.pop()).ok_or(PlanError::IdUnavailable)?
-    } else { style_id.clone() };
+    let first_id =
+        if motion.consumes_authored_motion() && element_holder(document, &style_record.target) {
+            // Never reuse a still-animated identity for an already-baked result.
+            // finish() mints its remaining n-1 IDs from the start of this same
+            // sequence; selecting the nth one here keeps all IDs disjoint.
+            fresh_ids(document, revision, islands.len())
+                .and_then(|mut ids| ids.pop())
+                .ok_or(PlanError::IdUnavailable)?
+        } else {
+            style_id.clone()
+        };
     if motion.consumes_authored_motion() {
-        if let Presence::Present(holders)=&mut detached.property_holders {
+        if let Presence::Present(holders) = &mut detached.property_holders {
             holders.retain(|holder| {
-                let target=holder.target();
-                let consumed=target.context_id()==scope.context_id && target.layer_uid()==scope.layer_uid
-                    && target.stroke_id().is_some_and(|id|member_ids.iter().any(|member|member==id));
-                !consumed || document.objects().iter().any(|record| {
-                    record.target.context_id==target.context_id() && record.target.layer_uid==target.layer_uid()
-                        && Some(record.target.stroke_id.as_str())==target.stroke_id()
-                        && record.target.frame_scope.kind==FrameScopeKind::Authored
-                        && !scope.owns(&record.target)
-                })
+                let target = holder.target();
+                let consumed = target.context_id() == scope.context_id
+                    && target.layer_uid() == scope.layer_uid
+                    && target
+                        .stroke_id()
+                        .is_some_and(|id| member_ids.iter().any(|member| member == id));
+                !consumed
+                    || document.objects().iter().any(|record| {
+                        record.target.context_id == target.context_id()
+                            && record.target.layer_uid == target.layer_uid()
+                            && Some(record.target.stroke_id.as_str()) == target.stroke_id()
+                            && record.target.frame_scope.kind == FrameScopeKind::Authored
+                            && !scope.owns(&record.target)
+                    })
             });
         }
     }

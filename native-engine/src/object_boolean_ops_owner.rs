@@ -30,11 +30,11 @@ use crate::request_receipts::DispatchErrorCode;
 
 #[path = "object_fill_trace_owner.rs"]
 mod fill_trace;
-#[path = "object_boolean_ops_payload.rs"]
-mod wire;
 #[cfg(feature = "evaluation")]
 #[path = "object_boolean_frame_motion.rs"]
 mod frame_motion;
+#[path = "object_boolean_ops_payload.rs"]
+mod wire;
 use wire::{
     footprint_ok, parse, strokes_ok, target_ok, text_ok, ErasePayload, FlattenPayload, OpPayload,
 };
@@ -259,11 +259,18 @@ impl ObjectFillOwner {
         {
             let payload = flatten_payload(bytes)?;
             let origin = self.current_snapshot();
-            let motion = frame_motion::SnapshotMotion { snapshot: &origin, frame: payload.frame };
+            let motion = frame_motion::SnapshotMotion {
+                snapshot: &origin,
+                frame: payload.frame,
+            };
             return PreparedBooleanEdit::seal(
-                origin.clone(), BooleanEditKind::Flatten,
+                origin.clone(),
+                BooleanEditKind::Flatten,
                 &scope_of(payload.layer_uid, payload.context_id, payload.frame),
-                &BooleanRequest::Flatten { group: payload.group_id }, &motion,
+                &BooleanRequest::Flatten {
+                    group: payload.group_id,
+                },
+                &motion,
             );
         }
         #[cfg(not(feature = "evaluation"))]

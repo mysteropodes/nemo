@@ -199,17 +199,25 @@ fn flatten_consumes_the_current_element_motion_of_a_member() {
         Some(DispatchErrorCode::Unavailable)
     );
     #[cfg(not(feature = "evaluation"))]
-    assert_eq!(prepare(&owner, "flatten", &flatten("L0", 0, "g")).err(),Some(DispatchErrorCode::Unavailable));
+    assert_eq!(
+        prepare(&owner, "flatten", &flatten("L0", 0, "g")).err(),
+        Some(DispatchErrorCode::Unavailable)
+    );
     #[cfg(feature = "evaluation")]
     {
         // The connected production provider must meet the SAME literal +100
         // geometry oracle that the injected Shift port established below.
-        let mut native=owner_of(&doc);
-        let candidate=native.prepare_boolean_flatten_json(flatten("L0",0,"g").to_string().as_bytes()).unwrap();
+        let mut native = owner_of(&doc);
+        let candidate = native
+            .prepare_boolean_flatten_json(flatten("L0", 0, "g").to_string().as_bytes())
+            .unwrap();
         native.commit_boolean_edit(candidate).unwrap();
-        let records=frame_records(&state(&native),"L0",0);
-        assert_eq!(cycle(&ring_points(&records[2])),cycle_of(&square(200.,0.,10.)));
-        assert_eq!(native.history_depths(),(1,0));
+        let records = frame_records(&state(&native), "L0", 0);
+        assert_eq!(
+            cycle(&ring_points(&records[2])),
+            cycle_of(&square(200., 0., 10.))
+        );
+        assert_eq!(native.history_depths(), (1, 0));
     }
     let mut owner = owner_of(&doc);
     let candidate = owner

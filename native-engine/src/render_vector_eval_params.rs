@@ -197,7 +197,10 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
         };
         let consumed = holder.properties().iter().all(|property| {
             (keys.iter().any(|key| *key == property.property())
-                || matches!(property.property(), "position" | "anchor" | "rotation" | "scale"))
+                || matches!(
+                    property.property(),
+                    "position" | "anchor" | "rotation" | "scale"
+                ))
                 && !property.expression.value().is_some_and(|code| code.enabled)
         });
         if !consumed {

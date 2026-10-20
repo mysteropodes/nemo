@@ -99,10 +99,15 @@ pub(crate) trait ElementMotionSource {
     fn element_mat(&self, target: &ObjectTarget) -> Result<Option<ElementMat>, MotionUnavailable>;
     /// Only the real pinned provider may materialize and detach consumed Motion.
     /// Supplied legacy/test ports retain the original orphan-refusal contract.
-    fn consumes_authored_motion(&self) -> bool { false }
+    fn consumes_authored_motion(&self) -> bool {
+        false
+    }
     /// A snapshot-bound consumer transforms the original cubic before output-
     /// space approximation. Legacy supplied ports keep the original polygon API.
-    fn materialized_polygons(&self, _record:&ObjectRecord) -> Result<MultiPolygon,MotionUnavailable> {
+    fn materialized_polygons(
+        &self,
+        _record: &ObjectRecord,
+    ) -> Result<MultiPolygon, MotionUnavailable> {
         Err(MotionUnavailable)
     }
 }

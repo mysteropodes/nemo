@@ -8,11 +8,11 @@ use crate::revision::ObjectSnapshot;
 pub(crate) const MOTION_2D_KEYS: [&str; 5] = ["position", "anchor", "rotation", "scale", "opacity"];
 
 pub(crate) struct MotionValues {
-    pub(crate) position:[f64;2],
-    pub(crate) anchor:[f64;2],
-    pub(crate) rotation:f64,
-    pub(crate) scale:[f64;2],
-    pub(crate) opacity:f64,
+    pub(crate) position: [f64; 2],
+    pub(crate) anchor: [f64; 2],
+    pub(crate) rotation: f64,
+    pub(crate) scale: [f64; 2],
+    pub(crate) opacity: f64,
 }
 
 impl ObjectSnapshot {
@@ -50,13 +50,22 @@ impl ObjectSnapshot {
             }
         };
         Ok(MotionValues {
-            position:pair("position")?, anchor:pair("anchor")?, rotation:scalar("rotation")?,
-            scale:pair("scale")?, opacity:scalar("opacity")?,
+            position: pair("position")?,
+            anchor: pair("anchor")?,
+            rotation: scalar("rotation")?,
+            scale: pair("scale")?,
+            opacity: scalar("opacity")?,
         })
     }
-    pub(crate) fn sampled_motion_2d(&self, target:&PropertyHolderTarget, frame:f64) -> Result<Option<MotionMat>,PropertySampleError> {
-        let v = self.sampled_motion_values(target,frame)?;
-        Ok(motion_mat_from_values(v.position,v.anchor,v.rotation,v.scale,v.opacity))
+    pub(crate) fn sampled_motion_2d(
+        &self,
+        target: &PropertyHolderTarget,
+        frame: f64,
+    ) -> Result<Option<MotionMat>, PropertySampleError> {
+        let v = self.sampled_motion_values(target, frame)?;
+        Ok(motion_mat_from_values(
+            v.position, v.anchor, v.rotation, v.scale, v.opacity,
+        ))
     }
 }
 
