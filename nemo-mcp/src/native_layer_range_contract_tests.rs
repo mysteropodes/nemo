@@ -94,7 +94,7 @@ fn full_range_schema_examples_and_original_cell_examples_remain_shipped_and_disj
         "../../engineering/application/capabilities-v2/native-object-layer-timing.json"
     ))
     .unwrap();
-    assert_eq!(descriptor["examples"].as_array().unwrap().len(), 2);
+    assert_eq!(descriptor["examples"].as_array().unwrap().len(), 3);
     assert!(super::super::timing_result(
         "document-A",
         &descriptor["examples"][0]["request"]["payload"],
@@ -104,5 +104,10 @@ fn full_range_schema_examples_and_original_cell_examples_remain_shipped_and_disj
         "document-A",
         &descriptor["examples"][1]["request"]["payload"],
         &descriptor["examples"][1]["response"]["result"]
+    ));
+    assert!(super::super::timing_result(
+        "document-A",
+        &descriptor["examples"][2]["request"]["payload"],
+        &descriptor["examples"][2]["response"]["result"]
     ));
 }
