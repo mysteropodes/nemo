@@ -242,3 +242,28 @@ fn real_blank_temporal_source_keeps_original_fallback_but_missing_provider_does_
         Err(ObjectFrameError::Unavailable)
     );
 }
+
+#[test]
+fn effect_layers_have_no_source_drawing_even_when_no_timing_provider_exists() {
+    let mut value = document();
+    value["layers"][0]["isEffectLayer"] = json!(true);
+    value["layers"][0].as_object_mut().unwrap().remove("timing");
+    let snapshot = snapshot(value);
+    let port = SnapshotSources::new(&snapshot, &selector(&snapshot), true).unwrap();
+    assert!(port.has_layer("L0"));
+    assert!(port.read("L0", 2.).unwrap().is_empty());
+    assert_eq!(port.failure.get(), None);
+}
+
+#[test]
+fn stored_effector_role_is_not_treated_as_hidden_pool_drawing_content() {
+    let mut value = duplicated_document(0);
+    value["componentTables"]["duplicators"]["effectorLayers"] = json!([
+        {"contextId":"scene-root","layerUid":"L0","effector":{"targetLayerUid":"L0"}}]);
+    value["layers"][0].as_object_mut().unwrap().remove("timing");
+    let snapshot = snapshot(value);
+    let port = SnapshotSources::new(&snapshot, &selector(&snapshot), true).unwrap();
+    assert!(port.has_layer("L0"));
+    assert!(port.strokes_at("L0", 2.).is_empty());
+    assert_eq!(port.failure.get(), None);
+}

@@ -72,6 +72,18 @@ impl<'a> SnapshotSources<'a> {
             }
         }
         let document = self.snapshot.document();
+        if layer.widget.value().is_some()
+            || layer.is_effect_layer.value() == Some(&true)
+            || document.duplicator_set().is_some_and(|set| {
+                set.effector_layers.iter().any(|effector| {
+                    effector.context_id == self.context_id && effector.layer_uid == uid
+                })
+            })
+        {
+            // getEffectiveStrokes returns before its drawing lookup for these
+            // non-content roles, including a layer with no timing provider.
+            return Ok(Vec::new());
+        }
         // These families need their real item/component consumer. An empty
         // vector response would hide their content behind the kernel's blank
         // temporal fallback, so preserve an explicit unavailable disposition.
