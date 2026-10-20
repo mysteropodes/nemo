@@ -112,7 +112,9 @@ pub(super) fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFr
     numeric_at(order, f64::from(frame))
 }
 pub(super) fn numeric_at(order: &AuthoredOrder, frame: f64) -> Result<f64, ObjectFrameError> {
-    if !frame.is_finite() { return Err(ObjectFrameError::FrameOutOfRange); }
+    if !frame.is_finite() {
+        return Err(ObjectFrameError::FrameOutOfRange);
+    }
     let Some(track) = order.track.value().filter(|t| !t.keys.is_empty()) else {
         return order
             .static_value

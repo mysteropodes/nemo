@@ -189,12 +189,18 @@ impl ObjectSnapshot {
                     return Err(InvalidRequest);
                 }
                 let track = if property == "order" {
-                    self.document().property_order(target).ok_or(Unavailable)?.track.value()
-                } else { holder
-                    .properties()
-                    .iter()
-                    .find(|r| r.property() == property)
-                    .and_then(|r| r.track.value()) };
+                    self.document()
+                        .property_order(target)
+                        .ok_or(Unavailable)?
+                        .track
+                        .value()
+                } else {
+                    holder
+                        .properties()
+                        .iter()
+                        .find(|r| r.property() == property)
+                        .and_then(|r| r.track.value())
+                };
                 let keys = track.map_or(&[][..], |t| t.keys.as_slice());
                 let start = *offset as usize;
                 if start > keys.len() {

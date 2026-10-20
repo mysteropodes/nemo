@@ -233,73 +233,99 @@ fn order_owner(code: &str, element: bool) -> NativeObjectHistory {
                     {"layerUid":"L0","strokeId":"s0","naturalPosition":0,"order":if element { order } else { json!({}) }}]}]}],
             "migration":"explicit-plan-required","referencePolicy":"unresolved"}
     }).to_string().as_bytes()).unwrap();
-    NativeObjectHistory::from_admitted_project("order-bake", ProjectEnvelope::no_media(
-        ProjectMetadata::new(320,180,24.0).unwrap(), document)).unwrap()
+    NativeObjectHistory::from_admitted_project(
+        "order-bake",
+        ProjectEnvelope::no_media(ProjectMetadata::new(320, 180, 24.0).unwrap(), document),
+    )
+    .unwrap()
 }
 fn order_payload(element: bool) -> Value {
     let mut p = payload();
     p["property"] = json!("order");
-    if element { p["target"]["strokeId"] = json!("s0"); }
+    if element {
+        p["target"]["strokeId"] = json!("s0");
+    }
     p
 }
 #[test]
 fn layer_and_element_order_bake_real_stored_provider_one_history_and_reopen() {
-    for element in [false,true] {
+    for element in [false, true] {
         let mut owner = order_owner("value + frame / 2 + comp.fps", element);
         let before = drawing(&owner);
         let p = order_payload(element);
         let target = serde_json::from_value(p["target"].clone()).unwrap();
-        let req = request(&owner,"order-bake",p);
+        let req = request(&owner, "order-bake", p);
         let pin = owner.acquire_snapshot(0).unwrap();
-        let page = pin.query_property_metadata_json(json!({"instanceId":pin.instance_id(),
+        let page = pin
+            .query_property_metadata_json(
+                json!({"instanceId":pin.instance_id(),
             "documentId":pin.document_id(),"atRevision":0,"documentSnapshotId":pin.snapshot_id(),
-            "view":{"kind":"properties","target":target,"offset":5,"limit":1}}).to_string().as_bytes()).unwrap();
-        assert_eq!(page["items"][0]["property"],"order");
-        assert_eq!(page["items"][0]["authored"]["expressionEnabled"],true);
-        let result = dispatch(&mut owner,&req);
-        assert_eq!(result["ok"],true,"{result}");
-        assert_eq!(result["result"]["historyEntriesAdded"],1);
+            "view":{"kind":"properties","target":target,"offset":5,"limit":1}})
+                .to_string()
+                .as_bytes(),
+            )
+            .unwrap();
+        assert_eq!(page["items"][0]["property"], "order");
+        assert_eq!(page["items"][0]["authored"]["expressionEnabled"], true);
+        let result = dispatch(&mut owner, &req);
+        assert_eq!(result["ok"], true, "{result}");
+        assert_eq!(result["result"]["historyEntriesAdded"], 1);
         let after = drawing(&owner);
         let pin = owner.acquire_snapshot(1).unwrap();
         let order = pin.document().property_order(&target).unwrap();
-        assert_eq!(order.expression.value().unwrap().enabled,false);
-        assert_eq!(order.track.value().unwrap().keys.len(),2);
-        for frame in [0.,0.5,6.,12.,24.] {
-            assert_eq!(pin.sample_property_raw(&target,"order",frame).unwrap(),vec![26.+frame/2.]);
+        assert_eq!(order.expression.value().unwrap().enabled, false);
+        assert_eq!(order.track.value().unwrap().keys.len(), 2);
+        for frame in [0., 0.5, 6., 12., 24.] {
+            assert_eq!(
+                pin.sample_property_raw(&target, "order", frame).unwrap(),
+                vec![26. + frame / 2.]
+            );
         }
-        let keys = pin.query_property_read_json(json!({"instanceId":pin.instance_id(),
+        let keys = pin
+            .query_property_read_json(
+                json!({"instanceId":pin.instance_id(),
             "documentId":pin.document_id(),"atRevision":1,"documentSnapshotId":pin.snapshot_id(),
             "view":{"kind":"authoredKeys","target":target,"property":"order","offset":0,"limit":8}})
-            .to_string().as_bytes()).unwrap();
-        assert_eq!(keys["items"].as_array().unwrap().len(),2);
-        let encoded = owner.serialize_project_file(pin.content_revision(),pin.snapshot_id()).unwrap();
-        let reopened = NativeObjectHistory::from_project_file("order-reopened",&encoded).unwrap();
-        assert_eq!(drawing(&reopened),after);
-        owner.undo(owner.content_revision()).unwrap(); assert_eq!(drawing(&owner),before);
-        owner.redo(owner.content_revision()).unwrap(); assert_eq!(drawing(&owner),after);
+                .to_string()
+                .as_bytes(),
+            )
+            .unwrap();
+        assert_eq!(keys["items"].as_array().unwrap().len(), 2);
+        let encoded = owner
+            .serialize_project_file(pin.content_revision(), pin.snapshot_id())
+            .unwrap();
+        let reopened = NativeObjectHistory::from_project_file("order-reopened", &encoded).unwrap();
+        assert_eq!(drawing(&reopened), after);
+        owner.undo(owner.content_revision()).unwrap();
+        assert_eq!(drawing(&owner), before);
+        owner.redo(owner.content_revision()).unwrap();
+        assert_eq!(drawing(&owner), after);
     }
 }
 
 #[test]
 fn order_constant_and_actual_vm_errors_never_publish_partial_state() {
-    for element in [false,true] {
+    for element in [false, true] {
         for code in ["7", "(()=>{throw new Error('bake')})()", "while(true){}"] {
-            let mut owner = order_owner(code,element);
+            let mut owner = order_owner(code, element);
             let before = drawing(&owner);
             let p = order_payload(element);
             let target = serde_json::from_value(p["target"].clone()).unwrap();
-            let req = request(&owner,"order-result",p);
-            let result = dispatch(&mut owner,&req);
+            let req = request(&owner, "order-result", p);
+            let result = dispatch(&mut owner, &req);
             if code == "7" {
-                assert_eq!(result["ok"],true,"{result}");
+                assert_eq!(result["ok"], true, "{result}");
                 let pin = owner.acquire_snapshot(1).unwrap();
                 let order = pin.document().property_order(&target).unwrap();
                 assert!(order.track.missing());
-                assert_eq!(order.static_value.value().unwrap(),&vec![serde_json::Number::from_f64(7.).unwrap()]);
+                assert_eq!(
+                    order.static_value.value().unwrap(),
+                    &vec![serde_json::Number::from_f64(7.).unwrap()]
+                );
             } else {
-                assert_eq!(result["ok"],false);
-                assert_eq!(drawing(&owner),before);
-                assert_eq!(owner.content_revision(),0);
+                assert_eq!(result["ok"], false);
+                assert_eq!(drawing(&owner), before);
+                assert_eq!(owner.content_revision(), 0);
             }
         }
     }

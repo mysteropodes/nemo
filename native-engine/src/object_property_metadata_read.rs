@@ -111,7 +111,9 @@ fn descriptor(
     // Native Order has separate storage; inspect that real slot, never infer
     // absence from an empty generic holder. Time remap remains separately owned.
     let authored = if property == "order" && document.property_order(holder.target()).is_some() {
-        let order = document.property_order(holder.target()).ok_or_else(unavailable)?;
+        let order = document
+            .property_order(holder.target())
+            .ok_or_else(unavailable)?;
         json!({"availability":"available",
             "keyCount":order.track.value().map_or(0, |t| t.keys.len()),
             "hasStaticOverride":order.static_value.value().is_some(),

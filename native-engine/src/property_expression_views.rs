@@ -277,7 +277,9 @@ fn resolve_self(
         .position(|l| l.layer_uid() == target.layer_uid())?;
     if target.stroke_id().is_some() {
         let holders = document.property_holders().unwrap_or(&[]);
-        if !holders.iter().any(|h| h.target() == target) && document.property_order(target).is_none() {
+        if !holders.iter().any(|h| h.target() == target)
+            && document.property_order(target).is_none()
+        {
             return None;
         }
     }

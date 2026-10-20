@@ -145,8 +145,12 @@ impl SnapshotReads {
     }
     pub(crate) fn has_expression(&self, target: &PropertyHolderTarget, property: &str) -> bool {
         if property == "order" {
-            return self.snapshot.document().property_order(target)
-                .and_then(|o| o.expression.value()).is_some_and(|e| e.enabled && !e.code.is_empty());
+            return self
+                .snapshot
+                .document()
+                .property_order(target)
+                .and_then(|o| o.expression.value())
+                .is_some_and(|e| e.enabled && !e.code.is_empty());
         }
         self.holder(target)
             .and_then(|h| h.properties().iter().find(|r| r.property() == property))
@@ -168,15 +172,21 @@ impl SnapshotReads {
     }
     fn keys(&self) -> Result<Option<KeyTrack>, &'static str> {
         let track = if self.property == "order" {
-            self.snapshot.document().property_order(&self.target).and_then(|o| o.track.value())
-        } else { self.holder(&self.target)
-            .and_then(|h| {
-                h.properties()
-                    .iter()
-                    .find(|r| r.property() == self.property)
-            })
-            .and_then(|r| r.track.value()) };
-        track.map(|track| {
+            self.snapshot
+                .document()
+                .property_order(&self.target)
+                .and_then(|o| o.track.value())
+        } else {
+            self.holder(&self.target)
+                .and_then(|h| {
+                    h.properties()
+                        .iter()
+                        .find(|r| r.property() == self.property)
+                })
+                .and_then(|r| r.track.value())
+        };
+        track
+            .map(|track| {
                 let keys = track
                     .keys
                     .iter()

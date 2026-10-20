@@ -347,12 +347,24 @@ pub(crate) fn prepare_retained_property_expression_request(
         }
     })?;
     if property == "order" {
-        let code = snapshot.document().property_order(target)
+        let code = snapshot
+            .document()
+            .property_order(target)
             .and_then(|order| order.expression.value())
             .filter(|e| e.enabled && !e.code.is_empty())
-            .ok_or(ObjectFrameError::Unavailable)?.code.clone();
-        return Ok(PropertyExpressionRequest { snapshot: snapshot.clone(), target: target.clone(),
-            property: property.to_owned(), frame, depth, code, raw, dim: Dim::for_prop(property, Some(1)) });
+            .ok_or(ObjectFrameError::Unavailable)?
+            .code
+            .clone();
+        return Ok(PropertyExpressionRequest {
+            snapshot: snapshot.clone(),
+            target: target.clone(),
+            property: property.to_owned(),
+            frame,
+            depth,
+            code,
+            raw,
+            dim: Dim::for_prop(property, Some(1)),
+        });
     }
     let holder = snapshot
         .document()

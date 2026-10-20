@@ -122,8 +122,11 @@ pub fn sample_property_raw(
         return Err(PropertySampleError::MissingTarget);
     }
     if property == "order" {
-        let order = document.property_order(target).ok_or(PropertySampleError::Unavailable)?;
-        return super::order::numeric_at(order, at).map(|v| vec![v])
+        let order = document
+            .property_order(target)
+            .ok_or(PropertySampleError::Unavailable)?;
+        return super::order::numeric_at(order, at)
+            .map(|v| vec![v])
             .map_err(|_| PropertySampleError::Unavailable);
     }
     if property == "timeRemap" {

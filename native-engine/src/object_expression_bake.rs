@@ -3,8 +3,8 @@ use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::evaluation::property_expression_bake::{optimize, BakedTrack};
 use crate::history::NativeObjectHistory;
 use crate::object_document::{
-    object_deserialize, AuthoredOrder, OrderCurvePoint, OrderKey, OrderTrack, Presence, PropertyHolderTarget,
-    PropertyRecord,
+    object_deserialize, AuthoredOrder, OrderCurvePoint, OrderKey, OrderTrack, Presence,
+    PropertyHolderTarget, PropertyRecord,
 };
 use crate::object_expression_runtime::{evaluate_property_for_owner, ExpressionLimits};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
@@ -93,37 +93,45 @@ pub(super) fn prepare(
         .acquire_snapshot(owner.content_revision())
         .ok_or(Unavailable)?;
     let (dimension, replacement) = if payload.property == "order" {
-        let order = origin.document().property_order(&payload.target).cloned().ok_or(NotFound)?;
-        if !order.expression.value().is_some_and(|e| e.enabled && !e.code.is_empty()) {
+        let order = origin
+            .document()
+            .property_order(&payload.target)
+            .cloned()
+            .ok_or(NotFound)?;
+        if !order
+            .expression
+            .value()
+            .is_some_and(|e| e.enabled && !e.code.is_empty())
+        {
             return Err(Unavailable);
         }
         (1, Stored::Order(order))
     } else {
-    let holder = origin
-        .document()
-        .property_holders
-        .value()
-        .and_then(|h| h.iter().find(|h| h.target() == &payload.target))
-        .ok_or(NotFound)?;
-    let dimension = holder
-        .metadata_in_document(origin.document(), &payload.property)
-        .filter(|m| m.animatable())
-        .ok_or(Unavailable)?
-        .dimension();
-    let replacement = holder
-        .properties()
-        .iter()
-        .find(|p| p.property() == payload.property)
-        .cloned()
-        .ok_or(NotFound)?;
-    if !replacement
-        .expression
-        .value()
-        .is_some_and(|e| e.enabled && !e.code.is_empty())
-    {
-        return Err(Unavailable);
-    }
-    (dimension, Stored::Property(replacement))
+        let holder = origin
+            .document()
+            .property_holders
+            .value()
+            .and_then(|h| h.iter().find(|h| h.target() == &payload.target))
+            .ok_or(NotFound)?;
+        let dimension = holder
+            .metadata_in_document(origin.document(), &payload.property)
+            .filter(|m| m.animatable())
+            .ok_or(Unavailable)?
+            .dimension();
+        let replacement = holder
+            .properties()
+            .iter()
+            .find(|p| p.property() == payload.property)
+            .cloned()
+            .ok_or(NotFound)?;
+        if !replacement
+            .expression
+            .value()
+            .is_some_and(|e| e.enabled && !e.code.is_empty())
+        {
+            return Err(Unavailable);
+        }
+        (dimension, Stored::Property(replacement))
     };
     let end = origin.document().total_frames().saturating_sub(1).max(1);
     let count = usize::try_from(end)
@@ -163,18 +171,30 @@ pub(super) fn prepare(
     }
     let baked = optimize(0, &samples, TOLERANCE, &|| false).map_err(|_| Unavailable)?;
     let static_value = baked.static_value.as_deref().map(values).transpose()?;
-    let baked_track = if static_value.is_some() { Presence::Missing } else { Presence::Present(track(&baked)?) };
+    let baked_track = if static_value.is_some() {
+        Presence::Missing
+    } else {
+        Presence::Present(track(&baked)?)
+    };
     match replacement {
         Stored::Property(mut record) => {
-            if let Some(value) = static_value { record.static_value = Presence::Present(value); }
+            if let Some(value) = static_value {
+                record.static_value = Presence::Present(value);
+            }
             record.track = baked_track;
-            if let Presence::Present(expression) = &mut record.expression { expression.enabled = false; }
+            if let Presence::Present(expression) = &mut record.expression {
+                expression.enabled = false;
+            }
             ObjectFillOwner::prepare_baked_property(origin, &payload.target, record)
         }
         Stored::Order(mut order) => {
-            if let Some(value) = static_value { order.static_value = Presence::Present(value); }
+            if let Some(value) = static_value {
+                order.static_value = Presence::Present(value);
+            }
             order.track = baked_track;
-            if let Presence::Present(expression) = &mut order.expression { expression.enabled = false; }
+            if let Presence::Present(expression) = &mut order.expression {
+                expression.enabled = false;
+            }
             ObjectFillOwner::prepare_baked_order(origin, &payload.target, order)
         }
     }
