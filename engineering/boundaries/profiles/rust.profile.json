@@ -134,7 +134,6 @@
         "object_text_animator_selector.rs",
         "object_text_animator_props.rs",
         "project_metadata_fields.rs",
-        "project_metadata_wire.rs",
         "project_metadata_annotations.rs",
         "project_metadata_presets.rs"
       ],
@@ -174,7 +173,8 @@
         "object_audio_track_baseline.rs",
         "project_audio_asset_wire.rs",
         "project_asset_source_wire.rs",
-        "object_property_codec.rs"
+        "object_property_codec.rs",
+        "project_metadata_wire.rs"
       ],
       "publicApi": [
         "codec.rs",

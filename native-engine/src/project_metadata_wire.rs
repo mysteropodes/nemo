@@ -1,5 +1,5 @@
 //! Strict project metadata DTO shared by both native envelope versions.
-use super::ProjectWireError;
+use crate::object_codec::project::ProjectWireError;
 use crate::object_document::{
     Presence, ProjectCommentRecord, ProjectMetadata, ProjectPresetCatalog, ProjectWorkspaceRecord,
 };
