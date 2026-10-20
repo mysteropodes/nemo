@@ -1,15 +1,13 @@
 /* Native animator intentions. Drafts are detached; only the sealed item owner writes records. */
-(function(root,factory){var C=typeof module==='object'&&module.exports?require('./native-object-item-command.js'):root.NemoNativeObjectItemCommand;
-  var I=typeof module==='object'&&module.exports?require('./native-object-item-contract.js'):root.NemoNativeObjectItemContract;
-  var R=typeof module==='object'&&module.exports?require('./native-text-read.js'):root.NemoNativeTextRead;
-  var api=factory(C,I,R);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextAnimator=api;
-}(typeof globalThis==='object'?globalThis:this,function(Command,Item,Read){
+(function(root,factory){var I=typeof module==='object'&&module.exports?require('./native-object-item-contract.js'):root.NemoNativeObjectItemContract;
+  var api=factory(I);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextAnimator=api;
+}(typeof globalThis==='object'?globalThis:this,function(Item){
   'use strict';
   function fault(code,message){var e=new Error(message);e.code=code;return e;}
   function clone(v){return JSON.parse(JSON.stringify(v));}
-  function same(a,b){return Read.samePin(a,b);}
-  function create(session,context){
-    var reader=Read.create(session),command=Command.create(session,'item'),pending=null,busy=false;
+  function create(session,context,ports){
+    if(!ports||!ports.reader||typeof ports.reader.readAnimators!=='function'||!ports.command||typeof ports.command.execute!=='function'||typeof ports.samePin!=='function')throw fault('unavailable','Native animator reader and command ports required');
+    var reader=ports.reader,command=ports.command,same=ports.samePin,pending=null,busy=false;
     function current(expected){var c=context(),p=session.info();if(!session.isActive()||!c||!c.layerUid||!same(c.pin,p)||expected&&(!same(expected.pin,p)||expected.layerUid!==c.layerUid||expected.frame!==c.frame||expected.selectionKey!==c.selectionKey))throw fault('stale_revision','Text animator intent is stale');return clone(c);}
     async function load(){var c=current(),value=await reader.readAnimators(c.layerUid,c.frame,c.pin);current(c);var ids=new Set();value.animators.forEach(function(r){Item.animator(r);if(ids.has(r.id))throw fault("uncorrelated","Duplicate native animator identity");ids.add(r.id);});value.selectors.forEach(function(s){
       if(!s||typeof s.available!=='boolean'||Object.keys(s).length!==2)throw fault('uncorrelated','Native selector availability invalid');

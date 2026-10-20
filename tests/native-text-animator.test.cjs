@@ -1,6 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const Model=require('../src/js/adapters/native-text-animator.js');
+const Read=require('../src/js/adapters/native-text-read.js'),Command=require('../src/js/adapters/native-object-item-command.js');
+const make=f=>Model.create(f.session,f.context,{reader:Read.create(f.session),command:Command.create(f.session,'item'),samePin:Read.samePin});
 const Desktop=require('../src/js/adapters/native-text-animator-desktop.js');
 const Item=require('../src/js/adapters/native-object-item-contract.js');
 const turn=()=>new Promise(setImmediate),copy=v=>JSON.parse(JSON.stringify(v));
@@ -27,12 +29,12 @@ function fixture(){
  const context=()=>({pin:pin(),layerUid:'L0',frame:0,selectionKey:selected});
  const doc={body:new Element('body'),createElement:t=>new Element(t),getElementById:id=>find(doc.body,n=>n.id===id)};
  ['p-textanim-sec','p-textanim-add-row','p-textanim-empty','p-textanim-list','p-textanim-add'].forEach(id=>{const n=doc.createElement('div');n.id=id;doc.body.appendChild(n);});
- const root={document:doc,state:{appMode:'motion',currentFrame:0,activeLayerIdx:0,playing:false},NemoNativeObjectProject:{desktop:()=>session},NemoNativeTextAnimator:Model};
+ const root={document:doc,state:{appMode:'motion',currentFrame:0,activeLayerIdx:0,playing:false},NemoNativeObjectProject:{desktop:()=>session},NemoNativeTextAnimator:Model,NemoNativeTextRead:Read,NemoNativeObjectItemCommand:Command};
  return {session,context,commands,root,doc,advance(){revision++;},select(){selected='b';},setRecords(v){records=v;},unavailable(){evaluatedAvailable=false;},input(label){return find(doc.body,n=>n.attributes['aria-label']===label);}};
 }
 function find(n,p){if(p(n))return n;for(const c of n.children){const x=find(c,p);if(x)return x;}return null;}
 test('native animator caller sends one detached sealed intent and rejects stale origins',async()=>{
- const f=fixture(),m=Model.create(f.session,f.context),loaded=await m.load();loaded.animators[0].props.position[0]=30;
+ const f=fixture(),m=make(f),loaded=await m.load();loaded.animators[0].props.position[0]=30;
  await m.upsert(loaded.animators[0],loaded.context);assert.equal(f.commands.length,1);assert.equal(f.commands[0].animator.props.position[0],30);
  await assert.rejects(()=>m.upsert(loaded.animators[0],loaded.context),e=>e.code==='stale_revision');assert.equal(f.commands.length,1);
 });
@@ -65,3 +67,5 @@ test('native inspector owns a fresh visible animator mount and revokes retired m
  const old=f.input('position X');assert.ok(old);assert.ok(container.contains(old));Desktop.mount(f.root,container);await turn();assert.equal(container.children.filter(n=>n.id==='native-text-animators').length,1);
  mounted.retire();old.value='999';old.fire('change');await turn();assert.equal(f.commands.length,0);assert.equal(container.children.length,0);
 });
+
+test("animator application refuses absent I/O ports without deriving adapter fallbacks",()=>{const f=fixture();assert.throws(()=>Model.create(f.session,f.context),e=>e.code==='unavailable');assert.equal(f.commands.length,0);});

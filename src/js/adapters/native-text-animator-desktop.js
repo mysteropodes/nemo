@@ -15,8 +15,8 @@
     if(!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=p.totalFrames)return null;
     return {pin:p,layerUid:layer.layerUid,frame:frame,selectionKey:JSON.stringify([state.activeLayerIdx,root._layerSel||[]])};
   }
-  function binding(root){var s=session(root),p=s&&s.info(),b=bindings.get(root);if(!s||!root.NemoNativeTextAnimator)return null;
-    if(!b||b.session!==s||b.owner!==owner(p)){b={session:s,owner:owner(p),ticket:0,key:null,data:null,error:null,loading:false,writing:false};b.model=root.NemoNativeTextAnimator.create(s,function(){var m=mounts.get(root);return bindings.get(root)===b&&(!m||!m.retired&&root.document.body.contains(m.section))?context(root,s):null;});bindings.set(root,b);}return b;
+  function binding(root){var s=session(root),p=s&&s.info(),b=bindings.get(root);if(!s||!root.NemoNativeTextAnimator||!root.NemoNativeTextRead||!root.NemoNativeObjectItemCommand)return null;
+    if(!b||b.session!==s||b.owner!==owner(p)){b={session:s,owner:owner(p),ticket:0,key:null,data:null,error:null,loading:false,writing:false};b.model=root.NemoNativeTextAnimator.create(s,function(){var m=mounts.get(root);return bindings.get(root)===b&&(!m||!m.retired&&root.document.body.contains(m.section))?context(root,s):null;},{reader:root.NemoNativeTextRead.create(s),command:root.NemoNativeObjectItemCommand.create(s,'item'),samePin:root.NemoNativeTextRead.samePin});bindings.set(root,b);}return b;
   }
   function node(root,tag,text){var n=root.document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
   function status(root,text){var n=element(root,'p-textanim-empty');if(n){n.style.display='';n.textContent=text;}}
