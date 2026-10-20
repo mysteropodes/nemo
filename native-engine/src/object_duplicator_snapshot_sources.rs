@@ -1,12 +1,14 @@
 //! Raw drawing inputs of a duplicator, retained in the admitted frame context.
 //! Hidden pool/path layers remain readable, as getEffectiveStrokes does; paint
 //! visibility and path effects belong to the separate rendered-source consumer.
-use super::{context::FrameContext, sources, ObjectFrameError, ObjectFrameSelector};
 use crate::evaluation::object_component_kernels::object_duplicator_evaluate::{
     evaluate_duplicator, Evaluation, LayerSources, Ports, Request,
 };
 use crate::evaluation::object_component_kernels::object_effector_layers::MotionPort;
 use crate::object_document::{FrameScopeKind, ObjectLayer, ObjectRecord, RangeEvaluator};
+use crate::object_frame_packet::{
+    context::FrameContext, sources, ObjectFrameError, ObjectFrameSelector,
+};
 use crate::revision::ObjectSnapshot;
 use std::cell::Cell;
 
