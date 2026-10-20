@@ -321,6 +321,14 @@ fn unsupported_raster(plan: &ObjectPaintPlan, index: usize) -> SvgExportError {
     }
 }
 
+/// T12: a decoded video frame is a bitmap; SVG export refuses it like a raster.
+fn unsupported_video(plan: &ObjectPaintPlan, index: usize) -> SvgExportError {
+    SvgExportError::UnsupportedComponent {
+        source_layer_index: plan.video_slots()[index].layer_index,
+        reason: "video paint has no SVG representation",
+    }
+}
+
 fn emit_frame(
     plan: &ObjectPaintPlan,
     spec: &SvgFrameSpec,
@@ -337,6 +345,9 @@ fn emit_frame(
     // Refuse an unsupported component paint before counting/writing ANY header,
     // matching the existing all-or-nothing mixed raster policy.
     for entry in ordered_entries(plan) {
+        if let PaintEntry::Video(index) = entry {
+            return Err(unsupported_video(plan, index));
+        }
         if let PaintEntry::Component(component) = entry {
             if component.contour.is_none() || component.svg_rgba.is_none() {
                 return Err(SvgExportError::UnsupportedComponent {
@@ -383,6 +394,7 @@ fn emit_frame(
                 count += 1;
             }
             PaintEntry::Raster(index) => return Err(unsupported_raster(plan, index)),
+            PaintEntry::Video(index) => return Err(unsupported_video(plan, index)),
         }
     }
     sink.put(DOCUMENT_TAIL)?;

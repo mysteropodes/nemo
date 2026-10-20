@@ -500,7 +500,8 @@
         "property_expression_lookup.rs",
         "object_frame_context.rs",
         "object_audio_track_sampling.rs",
-        "object_expression_reads.rs"
+        "object_expression_reads.rs",
+        "object_frame_video.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -572,7 +573,8 @@
         "object_text_scene_fonts.rs",
         "object_text_scene_bundled.rs",
         "object_scene_parent_chain.rs",
-        "object_scene_parent_curve.rs"
+        "object_scene_parent_curve.rs",
+        "object_media_scene_join.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -691,10 +693,12 @@
         "object_expression_property.rs",
         "object_expression_read_bridge.rs",
         "object_expression_read_runtime.rs",
-        "object_expression_harden.rs"
+        "object_expression_harden.rs",
+        "native_media_frame_export.rs"
       ],
       "publicApi": [
-        "application.rs"
+        "application.rs",
+        "native_media_frame_export.rs"
       ],
       "sizeProfile": "Rust production module"
     },
@@ -1339,6 +1343,7 @@
         "native_media_export_job_host.rs",
         "native_media_export_job_lifecycle.rs",
         "native_media_export_job_support.rs",
+        "native_media_frame_export.rs",
         "native_import_transaction.rs",
         "native_import_transaction_atomic.rs",
         "native_import_transaction_chain.rs",
@@ -1988,7 +1993,8 @@
         "native_object_inactive_requests.rs",
         "native_object_retained_tabs.rs",
         "native_object_font.rs",
-        "native_object_image.rs"
+        "native_object_image.rs",
+        "native_object_video.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"
@@ -2017,6 +2023,7 @@
         "vectorize.rs",
         "video_decode.rs",
         "video_decode/decode.rs",
+        "video_decode/export_port.rs",
         "video_decode/indexed.rs",
         "video_decode/optimized.rs",
         "video_decode/process.rs",
@@ -2025,6 +2032,7 @@
         "video_decode/tests.rs",
         "video_decode/tests_cache.rs",
         "video_decode/tests_decode.rs",
+        "video_decode/tests_export_port.rs",
         "video_decode/tests_indexed.rs",
         "video_decode/tests_perf.rs",
         "video_decode/tests_sessions.rs"

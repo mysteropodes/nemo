@@ -26,6 +26,7 @@ use crate::export_job::native_media_export::native_media_export_lease::{
 };
 use crate::export_job::native_media_export::native_media_export_plan::BatchPlan;
 use crate::export_job::ObjectHostExportOutcome;
+use crate::object_render_scene::media_scene::DecodedVideoFrame;
 use crate::object_render_scene::scene_effect_kernels::object_scene_resource_set::{
     decoded_rgba8_bytes, SceneResourceEntry, SceneResourceKind, SceneResourceSetError,
 };
@@ -173,6 +174,16 @@ impl<'p, D: MediaDecodePort> MediaExportGate<'p, D> {
         self.release_error.as_ref()
     }
 
+    /// Open (or reuse) the session of `asset_id` without decoding: its size and
+    /// source frame count. The session is closed by `finish` like any other.
+    pub(crate) fn probe(&mut self, asset_id: &str) -> Result<SessionInfo, AcquireError> {
+        let result = self.session_for(asset_id);
+        if let Err(error) = &result {
+            self.error = Some(error.clone());
+        }
+        result
+    }
+
     /// Decode every spec'd frame (repeats decode once) and declare them as one
     /// immutable scene resource set. On failure no frame stays leased by this call.
     pub(crate) fn acquire(
@@ -313,19 +324,26 @@ impl<'p, D: MediaDecodePort> MediaExportGate<'p, D> {
             .map_err(decode_error)?;
         // The port holds the frame now: the token is minted first, so a short
         // buffer still releases it exactly once (the token drops into the ledger).
-        let token = self.ledger.token(decoded.id, decoded.rgba, Some(charge));
-        if token.as_ref().len() as u64 != bytes {
+        let token = self.ledger.token(decoded.id, Some(charge));
+        if decoded.rgba.len() as u64 != bytes {
+            drop(token);
             return Err(decode_error(DecodeFailure(format!(
                 "decoded {} bytes, expected {bytes}",
-                token.as_ref().len()
+                decoded.rgba.len()
             ))));
         }
+        let frame = DecodedVideoFrame {
+            width: session.width,
+            height: session.height,
+            rgba: decoded.rgba,
+            lease: Box::new(token),
+        };
         Ok(SceneResourceEntry::new(
             resource_id,
             self.version.clone(),
             SceneResourceKind::Media,
             bytes,
-            Arc::new(token),
+            Arc::new(frame),
         ))
     }
 

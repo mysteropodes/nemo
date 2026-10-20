@@ -36,6 +36,9 @@ pub use scheduled::{
 
 #[path = "object_raster_scene_join.rs"]
 pub(crate) mod raster_scene;
+// T12 / T28.media: video placements drawn from decoded source frames.
+#[path = "object_media_scene_join.rs"]
+pub(crate) mod media_scene;
 pub(crate) use paint::raster::{ordered_entries, PaintEntry, PaintIndex};
 pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
 #[path = "object_paint_plan.rs"]
@@ -91,6 +94,8 @@ pub struct ObjectCompositionWitness {
     resources: Option<Arc<ObjectSceneResourceSet>>,
     /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
     scene_effects: Option<Arc<SceneEffectPlan>>,
+    /// Decoded video frames of the plan's video slots (T12); `None` while undecoded.
+    media: Option<Arc<media_scene::MediaDraws>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     rasters: Option<Arc<raster_scene::RasterResources>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
@@ -107,6 +112,7 @@ pub fn prepare_object_composition(
         viewport: false,
         resources: None,
         scene_effects: None,
+        media: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         reference: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
@@ -275,6 +281,7 @@ pub struct ObjectRenderScene {
     rasters: Arc<[raster_scene::RasterSource]>,
     texts: text_scene::TextSources,
     components: component_scene::ComponentSources,
+    videos: Arc<[media_scene::VideoSlot]>,
 }
 impl ObjectRenderScene {
     pub fn packet(&self) -> &ObjectFramePacket {
@@ -310,6 +317,7 @@ pub fn prepare_object_render_scene(
         rasters: raster_scene::sources(packet)?.into(),
         texts: text_scene::prepare(packet)?,
         components: component_scene::prepare(packet, expected)?,
+        videos: media_scene::slots(packet)?.into(),
     })
 }
 

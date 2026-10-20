@@ -7,6 +7,7 @@ use native_engine::{
         ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, ObjectHostExportRequest,
         StagedArtifactPort,
     },
+    native_media_frame_export::{begin_native_media_frames, NativeMediaRelease, NativeVideoPort},
     object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector},
     object_render_scene::{
         prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
@@ -19,10 +20,13 @@ use native_engine::{
 pub(super) struct ObjectExportSession {
     request_id: String,
     pub(super) reconciliation: ExportReleaseReconciliation,
+    /// T12: what the export's video frames and decode sessions released.
+    pub(super) media: Option<NativeMediaRelease>,
 }
 impl ObjectExportSession {
     fn permits_next(&self, request_id: &str) -> bool {
         self.request_id != request_id
+            && self.media.as_ref().is_none_or(|media| media.complete)
             && self.reconciliation.cleanup_complete
             && matches!(self.reconciliation.receipts.as_slice(), [receipt]
                 if receipt.status == JobStatus::Succeeded
@@ -143,7 +147,21 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object export snapshot is unavailable")?;
-        let witness_for = |frame| {
+        // T12: every drawn video is preflighted (typed MissingLink) before
+        // staging; its decoded frames are released once the witnesses are gone.
+        let mut decoder = crate::native_dispatch::video::video_decoder();
+        let mut video_port = NativeVideoPort::new(decoder.as_mut());
+        let mut media = begin_native_media_frames(
+            &mut video_port,
+            &snapshot,
+            expected,
+            frames,
+            true,
+            &crate::native_dispatch::video::linked_file_readable,
+            crate::native_dispatch::video::now_ms(),
+        )
+        .map_err(|refusal| refusal.to_string())?;
+        let mut witness_for = |frame| {
             let selector = ObjectFrameSelector {
                 frame,
                 ..expected.clone()
@@ -154,8 +172,9 @@ impl NativeObjectHost {
                 .map_err(|error| format!("object export scene: {error:?}"))?;
             let plan = prepare_object_paint_plan(&scene, &selector)
                 .map_err(|error| format!("object export paint: {error:?}"))?;
-            prepare_object_composition(&plan, &selector)
-                .map_err(|error| format!("object export witness: {error:?}"))
+            let base = prepare_object_composition(&plan, &selector)
+                .map_err(|error| format!("object export witness: {error:?}"))?;
+            media.witness(frame, base)
         };
         // Preserve the single-frame pre-staging selector refusal contract.
         let mut first = Some(witness_for(expected.frame)?);
@@ -199,10 +218,16 @@ impl NativeObjectHost {
                 export_object_svg_frames(&self.history, scheduler, port, request, frames, witnesses)
             }
         };
-        if !outcome.release.receipts.is_empty() || !outcome.release.cleanup_complete {
+        // The witnesses (and the frames they hold) are gone with the closures.
+        let media = media.finish();
+        if !outcome.release.receipts.is_empty()
+            || !outcome.release.cleanup_complete
+            || !media.complete
+        {
             self.object_export = Some(ObjectExportSession {
                 request_id: session_request_id,
                 reconciliation: outcome.release.clone(),
+                media: (media.frames_acquired > 0 || !media.complete).then_some(media),
             });
         }
         Ok(outcome)

@@ -162,12 +162,17 @@ fn a_witness_of_another_frame_is_refused_by_the_job_and_still_returns_its_frames
 
 fn token_pixels(set: &ObjectSceneResourceSet, id: &str) -> Vec<u8> {
     use crate::export_job::native_media_export::native_media_export_lease::FrameToken;
+    use crate::object_render_scene::media_scene::DecodedVideoFrame;
     let entry = set.get(id).expect("declared media frame");
-    let token = entry
+    let frame = entry
         .retention()
-        .downcast_ref::<FrameToken>()
-        .expect("a media entry retains its frame token");
-    token.as_ref().to_vec()
+        .downcast_ref::<DecodedVideoFrame>()
+        .expect("a media entry retains its decoded frame");
+    assert!(
+        frame.lease.is::<FrameToken>(),
+        "and the frame keeps its lease"
+    );
+    frame.rgba.clone()
 }
 
 #[test]

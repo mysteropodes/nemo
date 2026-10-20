@@ -85,6 +85,8 @@ use tauri::ipc::Response;
 // `session::open_session_core` and `optimized::create_optimized_media_core`
 // are its only callers.
 mod decode;
+// T12: the native export/preview decoder over the same sessions.
+mod export_port;
 mod indexed;
 mod optimized;
 mod process;
@@ -92,6 +94,9 @@ mod readahead;
 mod session;
 
 use decode::decode_frame_core;
+pub(crate) use export_port::boxed_decoder;
+#[cfg(test)]
+use export_port::DesktopVideoDecoder;
 use optimized::create_optimized_media_core;
 use readahead::spawn_readahead;
 use session::open_session_core;
@@ -199,22 +204,26 @@ pub fn close_video_session(
 ) -> Result<(), String> {
     let removed = lock_or_recover(&state.0).remove(&session_id);
     if let Some(arc) = removed {
-        let mut s = lock_or_recover(&arc);
-        s.readahead_active = false; // ask the readahead thread to stop (waits at most one frame read)
-        if let Some(mut p) = s.proc.take() {
-            let _ = p.child.kill();
-            let _ = p.child.wait(); // reap — avoid leaking a zombie ffmpeg process on every close
-        }
-        if let Some(seq) = s.indexed.as_mut() {
-            if let Some(mut conv) = seq.conv.take() {
-                // Dropping jpeg_tx (inside conv) ends the writer thread;
-                // kill+reap the persistent converter like any other child.
-                let _ = conv.child.kill();
-                let _ = conv.child.wait();
-            }
-        }
+        shutdown_session(&mut lock_or_recover(&arc));
     }
     Ok(())
+}
+
+/// Stop readahead and kill+reap every child process of `s`.
+fn shutdown_session(s: &mut VideoSession) {
+    s.readahead_active = false; // ask the readahead thread to stop (waits at most one frame read)
+    if let Some(mut p) = s.proc.take() {
+        let _ = p.child.kill();
+        let _ = p.child.wait(); // reap — avoid leaking a zombie ffmpeg process on every close
+    }
+    if let Some(seq) = s.indexed.as_mut() {
+        if let Some(mut conv) = seq.conv.take() {
+            // Dropping jpeg_tx (inside conv) ends the writer thread;
+            // kill+reap the persistent converter like any other child.
+            let _ = conv.child.kill();
+            let _ = conv.child.wait();
+        }
+    }
 }
 
 /// Where the all-intra "optimized media" for `path` lives (Resolve's
@@ -278,6 +287,8 @@ mod tests;
 mod tests_cache;
 #[cfg(test)]
 mod tests_decode;
+#[cfg(test)]
+mod tests_export_port;
 #[cfg(test)]
 mod tests_indexed;
 #[cfg(test)]

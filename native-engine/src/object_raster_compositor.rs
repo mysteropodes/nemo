@@ -45,6 +45,15 @@ impl Compositor {
                         .prepared
                         .draw(&mut self.scene, Affine::IDENTITY, &source.path)
                 }
+                // T12: a video slot draws only from its decoded frame, never blank.
+                PaintEntry::Video(index) => {
+                    let (image, transform, opacity) = prepared
+                        .video_image(index)
+                        .ok_or_else(|| CompositorError::new("native video frame is unavailable"))?;
+                    let brush =
+                        vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
+                    self.scene.draw_image(&brush, transform);
+                }
                 PaintEntry::Raster(index) => {
                     #[cfg(all(feature = "application", feature = "project_media_codec"))]
                     {

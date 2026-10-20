@@ -14,12 +14,14 @@ pub(crate) enum PaintIndex {
     Raster(usize),
     Text(usize),
     Component(usize),
+    Video(usize),
 }
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
     Raster(usize),
     Text(&'a crate::object_render_scene::text_scene::TextSource),
     Component(&'a crate::object_render_scene::component_scene::ComponentPaint),
+    Video(usize),
 }
 impl ObjectPaintPlan {
     pub(crate) fn has_components(&self) -> bool {
@@ -53,6 +55,9 @@ impl ObjectPaintPlan {
     pub(crate) fn raster_sources(&self) -> &[RasterSource] {
         &self.scene.rasters
     }
+    pub(crate) fn video_slots(&self) -> &[crate::object_render_scene::media_scene::VideoSlot] {
+        &self.scene.videos
+    }
 }
 pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = PaintEntry<'_>> + '_ {
     plan.mixed.iter().map(|index| match index {
@@ -65,6 +70,7 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
         PaintIndex::Component(index) => {
             PaintEntry::Component(&plan.scene.components.paints[*index])
         }
+        PaintIndex::Video(index) => PaintEntry::Video(*index),
     })
 }
 pub(super) fn prepare(

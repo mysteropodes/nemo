@@ -7,6 +7,9 @@ use native_engine::{
         DesktopViewportHost, ObjectViewportFrame, PresentationReceipt, SurfacePort, ViewportStatus,
     },
     export_job::ReconciliationStage,
+    native_media_frame_export::{
+        begin_native_media_frames, declared_scene_resources, NativeVideoPort,
+    },
     object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector},
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
@@ -222,6 +225,20 @@ impl NativeObjectHost {
             plan,
             key,
         } = prepared;
+        // T12: the frame's videos (MissingLink refused before any decode). Media is
+        // attached after the reference cache so the cache never holds a lease.
+        let mut decoder = crate::native_dispatch::video::video_decoder();
+        let mut video_port = NativeVideoPort::new(decoder.as_mut());
+        let mut media = begin_native_media_frames(
+            &mut video_port,
+            &snapshot,
+            expected,
+            &[expected.frame],
+            true,
+            &crate::native_dispatch::video::linked_file_readable,
+            crate::native_dispatch::video::now_ms(),
+        )
+        .map_err(|refusal| refusal.to_string())?;
         let composition = self.prepare_reference_preview(
             &plan,
             key.output_spec().dimensions(),
@@ -231,6 +248,20 @@ impl NativeObjectHost {
                     .map_err(|e| format!("preview reference: {e:?}"))
             },
         )?;
+        let composition = media.witness(expected.frame, composition)?;
+        let key = if media.draws_video(expected.frame) {
+            EvaluationKey::new(
+                key.document_snapshot_id(),
+                key.context_id(),
+                key.frame(),
+                key.quality(),
+                key.output_spec().clone(),
+                declared_scene_resources(&composition),
+            )
+            .map_err(|e| e.to_string())?
+        } else {
+            key
+        };
         if self
             .preview
             .pending
@@ -286,6 +317,9 @@ impl NativeObjectHost {
                 return Err(error);
             }
         };
+        // The presented frame no longer needs its decoded video.
+        drop(composition);
+        let media_released = media.finish().complete;
         match receipt.status() {
             ViewportStatus::Presented => {
                 self.preview
@@ -300,6 +334,10 @@ impl NativeObjectHost {
             ViewportStatus::Failed(reason) => {
                 self.preview.blocked = Some(format!("preview failed: {reason:?}"))
             }
+        }
+        if !media_released {
+            // A leaked decoded frame blocks the next preview until cleanup.
+            self.preview.blocked = Some("preview video frames were not released".into());
         }
         Ok(receipt)
     }
