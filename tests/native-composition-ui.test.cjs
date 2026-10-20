@@ -170,3 +170,18 @@ test('a ruler menu opened before native readiness never acquires a later documen
   const action=h.menus[0].find(x=>x.label.startsWith('Ajouter un repère ici'));
   await h.ready();action.action();await h.settled();assert.equal(h.edits().length,0);h.unchanged();
 });
+
+test('fresh readback after same-pin subscription replacement cannot revive old menu or drag',async()=>{
+  for(const gesture of ['menu','drag','bpm-menu']) {
+    const h=fixture();await h.ready();const old=h.controller.read(),marker=h.marker();
+    if(gesture==='menu')marker.fire('contextmenu');
+    else if(gesture==='drag'){marker.fire('mousedown');h.document.fire('mousemove',{clientX:30});}
+    else h.elements['bars-row'].fire('contextmenu');
+    h.resubscribe();await h.ready();const fresh=h.controller.read();
+    assert.deepEqual(fresh.info,old.info);assert.notStrictEqual(fresh,old);
+    if(gesture==='menu')h.menus[0].find(x=>x.label==='Supprimer le repère').action();
+    else if(gesture==='drag')h.document.fire('mouseup');
+    else {h.prompts.push('141','2');h.menus[0].find(x=>x.label==='Grille BPM…').action();}
+    await h.settled();assert.equal(h.edits().length,0);assert(h.notices.length>0);h.unchanged();
+  }
+});

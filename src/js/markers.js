@@ -19,7 +19,7 @@
   function intent(action, origin) {
     var c = window.NemoNativeCompositionController;
     if (!c || !origin) { unavailable(); return null; }
-    c.edit(action, origin.info); return true;
+    c.edit(action, origin); return true;
   }
   function ordinal(m, origin) { return origin && origin.composition.markers.indexOf(m) >= 0 ? m.ordinal : null; }
 
@@ -241,7 +241,7 @@
           { label: 'Repère suivant  (Maj+→)', action: function () { gotoAdjacent(1); } },
           { label: 'Repère précédent  (Maj+←)', action: function () { gotoAdjacent(-1); } },
           { sep: true },
-          { label: 'Grille BPM…', action: function () { if (window.SMBpm) SMBpm.openSettings(); } },
+          { label: 'Grille BPM…', action: function () { if (window.SMBpm) SMBpm.openSettings(origin); } },
           { label: 'Réduire la composition à la zone de travail', action: function () { if (window.SM && SM.trimToWorkArea) SM.trimToWorkArea(); } },
           { sep: true },
           { label: 'Supprimer tous les repères', disabled: !compMarkers().length, action: function () {

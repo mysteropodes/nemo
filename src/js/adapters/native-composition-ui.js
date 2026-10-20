@@ -20,9 +20,9 @@
     }
     async function edit(action,expected){
       var shown=model.read();
-      if(retired||pending||loading||!expected||!shown||Object.keys(shown.info).some(function(k){return shown.info[k]!==expected[k];})){notice();return {status:'unavailable'};}
+      if(retired||pending||loading||!expected||!shown||shown!==expected){notice();return {status:'unavailable'};}
       pending=true;
-      try {var result=await model.edit(action,expected);repaint();
+      try {var result=await model.edit(action,expected.info);repaint();
         if(!['applied-presented','unchanged'].includes(result.status))notice();return result;
       }catch(error){notice();return {status:'unconfirmed',code:error&&error.code||'unavailable'};}
       finally{pending=false;}

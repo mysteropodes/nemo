@@ -14,7 +14,7 @@
   function submit(action, origin) {
     var c = window.NemoNativeCompositionController;
     if (!c || !origin) { if (window.showToast) showToast('Native BPM settings are unavailable.'); return; }
-    return c.edit(action, origin.info);
+    return c.edit(action, origin);
   }
   function cfg() {
     if (native()) {
@@ -72,8 +72,9 @@
     grid.appendChild(frag);
   }
 
-  function openSettings() {
-    var origin = native() ? projection() : null, c = cfg();
+  function openSettings(origin) {
+    origin = native() ? (arguments.length ? origin : projection()) : null;
+    var c = cfg();
     if (native() && !origin) { submit({}, null); return; }
     var v = prompt('Tempo en BPM (0 pour masquer la grille)', String(c.bpm));
     if (v === null) return;
