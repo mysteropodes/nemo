@@ -1,5 +1,6 @@
 //! Actual stored native descriptors -> real retained Roboto contours, history and reopen.
-use super::tests::support;
+#[path = "object_raster_asset_commands_support.rs"]
+mod support;
 use super::tests::{drawing, owner, plan};
 use super::*;
 use crate::object_document::object_text_layout_kernels::animator::{AnimatorRecord, TextAnimators};
