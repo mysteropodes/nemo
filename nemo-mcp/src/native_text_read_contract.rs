@@ -227,7 +227,7 @@ pub(super) fn result(document: &str, p: &Value, r: &Value) -> bool {
             }
             if exact(r, &required, &[]).is_none()
                 || if animator {
-                    r["layerUid"] != v["layerUid"] || r["frame"] != v["frame"]
+                    r["layerUid"] != v["layerUid"] || r["frame"].as_f64() != v["frame"].as_f64()
                 } else {
                     r["target"] != v["target"]
                 }

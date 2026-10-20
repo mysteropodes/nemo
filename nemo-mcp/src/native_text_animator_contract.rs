@@ -114,3 +114,55 @@ pub(super) fn record(v: &Value) -> bool {
     }
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn text_animator_real_item_contract_accepts_original_nullable_props_and_keyed_selector() {
+        let a = json!({"id":"ta","selector":{"amount":null},"props":{"scale":[0,0]},"properties":[{"property":"amount","track":{"keys":[{"frame":0,"v":[0]},{"frame":4,"v":[100]}]}}]});
+        assert!(record(&a));
+        let p = json!({"command":"object.text.animator.upsert","layerUid":"L0","animator":a});
+        assert!(crate::native_contract::item::request(
+            crate::native_contract::item::ITEM,
+            &p
+        ));
+        assert!(crate::native_contract::item::result(
+            crate::native_contract::item::ITEM,
+            &p,
+            &json!({"applied":true,"historyEntriesAdded":1,"operation":"text.animator.upsert","strokeId":"ta"})
+        ));
+        assert!(!crate::native_contract::item::result(
+            crate::native_contract::item::ITEM,
+            &p,
+            &json!({"applied":true,"historyEntriesAdded":1,"operation":"text.animator.upsert","strokeId":"other"})
+        ));
+        for bad in [
+            json!({"id":"ta","selector":{},"props":{"position":[1]}}),
+            json!({"id":"ta","selector":{},"properties":[{"property":"amount","static":[null]}]}),
+            json!({"id":"ta","selector":{"foreign":2}}),
+        ] {
+            assert!(!record(&bad));
+        }
+    }
+    #[test]
+    fn text_animator_real_pinned_read_contract_accepts_numeric_frame_and_correlates_chunk() {
+        let p = json!({"atRevision":0,"documentSnapshotId":"snapshot-0","view":{"kind":"animators","layerUid":"L0","frame":0,"offset":0,"limit":1024}});
+        assert!(crate::native_contract::text_read::request(&p));
+        let text = r#"{"animators":[],"selectors":[],"hasText":false}"#;
+        let mut r = json!({"instanceId":"instance","documentId":"document","atRevision":0,"documentSnapshotId":"snapshot-0","kind":"animators","layerUid":"L0","frame":0.0,"offset":0,"textBytes":text.len(),"text":text,"nextOffset":null});
+        assert!(crate::native_contract::text_read::result(
+            "document", &p, &r
+        ));
+        r["frame"] = json!(1);
+        assert!(!crate::native_contract::text_read::result(
+            "document", &p, &r
+        ));
+        r["frame"] = json!(0.0);
+        r["layerUid"] = json!("other");
+        assert!(!crate::native_contract::text_read::result(
+            "document", &p, &r
+        ));
+    }
+}
