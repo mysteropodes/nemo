@@ -1,4 +1,5 @@
 'use strict';
+const ProjectFile = require('../../src/js/adapters/native-object-project-file.js');
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const {isDeepStrictEqual} = require('node:util');
 const C = require('../../src/js/adapters/native-custom-brush-contract.js');
@@ -69,7 +70,8 @@ async function fixture(initial,options={}){
   const storage=new Map([['sm-brush-favorites',JSON.stringify(options.favorites||[])],['nemo-brush-tool-presets',JSON.stringify({personal:{label:'Personal',fields:{brushSize:8}}})]]);
   const calls=[],notices=[],previews=[];let catalog=copy(initial),revision=0,serial=0,ticket=1,running=0,active=true,held=null,refusal=false,broken=false;
   let tail=Promise.resolve(),context,controller,history=[copy(initial)],historyAt=0;
-  let info={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'s0'};
+  let info={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'s0',
+    canvasW:320,canvasH:180,fps:24,totalFrames:40,layers:[{layerUid:'drawing',visible:true}]};
   const shown=pin=>({...pin,presentation:{...pin,owner:'native',status:'presented'}});
   const root={document:doc,state:{brushPreset:'none',brushSize:12,tool:'select'},innerWidth:1200,innerHeight:900,TextEncoder,
     localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},
@@ -113,10 +115,15 @@ async function fixture(initial,options={}){
     runResourceCommand(fn){running++;const job=tail.then(()=>{const origin=info;return fn({
       dispatch:q=>root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('catalog-fixture',{dispatch}).dispatch(q),
       readPresentedObjectSession:()=>active&&running===1&&info===origin?shown(origin):null,
-      reconcile:async next=>{assert.equal(next,revision);info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();controller.presented();return info;}
+      reconcile:async next=>{assert.equal(next,revision);info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();
+        assert.equal(ProjectFile.refreshLayerTable(browserRoot,info),true);controller.presented();return info;}
     });}).finally(()=>{running--;if(controller)controller.presented();});tail=job.catch(()=>{});return job;}};
-  root.NemoNativeObjectProject={desktop:()=>session};root.NemoNativeObjectProjectFile={projectionReadyForUI:()=>active&&!running};
+  root.NemoNativeObjectProject={desktop:()=>session};
+  root.NemoNativeObjectProjectFile={projectionReadyForUI:(valueRoot,value)=>active&&!running&&ProjectFile.projectionReadyForUI(valueRoot,value)};
   root.window=root;root.globalThis=root;context=vm.createContext(root);
+  const browserRoot=vm.runInContext('globalThis',context),selectedPaths=root.selectedPaths;
+  function project(){ProjectFile.projectView(browserRoot,info);root.selectedPaths=selectedPaths;}
+  if(!options.browser)project();
   for(const file of actualOrder()){
     let source=fs.readFileSync(require.resolve('../../src/js/'+file),'utf8');
     if(file==='tools.js'){
@@ -135,8 +142,11 @@ async function fixture(initial,options={}){
     edits:()=>calls.filter(q=>q.operation===C.EDIT),popover:kind=>body.querySelector(kind==='editor'?'.bp-editor-pop':kind==='menu'?'.brush-menu-pop':'.bp-picker-pop'),
     action:value=>vm.runInContext('JSON.parse('+JSON.stringify(JSON.stringify(value))+')',context),
     hold(){let release;held=new Promise(resolve=>release=resolve);return release;},refuse(code='unavailable'){refusal=code;},staleRead(){broken=true;},resubscribe(){ticket++;},
-    replace(value){catalog=copy(value);revision++;info={...info,documentId:'other',lifecycleGeneration:info.lifecycleGeneration+1,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();controller.presented();},
-    history(delta){historyAt+=delta;catalog=copy(history[historyAt]);revision++;info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();controller.presented();},
+    fullInfo:()=>info,projectionReady:value=>ProjectFile.projectionReadyForUI(browserRoot,value),
+    drift(){root.state.canvasW++;},repairProjection:project,
+    replace(value){catalog=copy(value);revision++;info={...info,documentId:'other',lifecycleGeneration:info.lifecycleGeneration+1,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();project();controller.presented();},
+    history(delta){historyAt+=delta;catalog=copy(history[historyAt]);revision++;info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();
+      assert.equal(ProjectFile.refreshLayerTable(browserRoot,info),true);controller.presented();},
     retire(){active=false;controller.dispose();}};
 }
 module.exports={fixture,copy};

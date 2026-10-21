@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "664958928e8a2f5962080434941172f025b3fed1",
-  "describe": "v0.7.0-alpha.4-2650-g66495892"
+  "head": "0f57811442156c1d576b89a575987af4bc97a4f3",
+  "describe": "v0.7.0-alpha.4-2657-g0f578114"
  },
- "inputsDigest": "93a680bd05e91e3e808a886054de2ba123f7387c2d7c473a618df98e0d15b96e",
+ "inputsDigest": "00593c2294a819fe4ba8aeffa45504d3da48cf297bb0db672a1f7c3fde7af9fe",
  "states": [
   "inventoried",
   "characterized",
@@ -2485,7 +2485,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 128,
+    "functionsVisited": 127,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9096 action()"
@@ -4994,7 +4994,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 121,
+    "functionsVisited": 120,
     "via": "variable trigger",
     "references": []
    },
@@ -5164,7 +5164,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 85,
     "via": "helper el()",
     "references": []
    },
@@ -9203,7 +9203,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 70,
+    "functionsVisited": 69,
     "via": "chain",
     "references": []
    },
@@ -10213,7 +10213,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 64,
+    "functionsVisited": 63,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2902 updateCornersPanel()",
@@ -17424,7 +17424,7 @@
     "container": "web-changelog-row",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 75,
+    "functionsVisited": 74,
     "via": "variable toggle",
     "references": []
    },
@@ -27545,7 +27545,7 @@
    "source": "src/js/rig-widget.js:519",
    "meta": {
     "i18n": "widgetMenuAxisRangePrefix",
-    "functionsVisited": 195
+    "functionsVisited": 194
    },
    "fixtures": [
     "static-props",
@@ -27585,7 +27585,7 @@
    "source": "src/js/rig-widget.js:533",
    "meta": {
     "i18n": "widgetMenuSizeEllipsis",
-    "functionsVisited": 195
+    "functionsVisited": 194
    },
    "fixtures": [
     "static-props",

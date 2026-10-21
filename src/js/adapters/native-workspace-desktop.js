@@ -31,6 +31,11 @@
         same(stamp.session.info(), stamp.info) && stamp.session.readSubscriptionGeneration() === stamp.ticket;
     }
     function guard(stamp) { if (!current(stamp)) throw fault('stale_revision'); }
+    // Identity stamps remain narrow; readiness receives same-pin full native metadata.
+    function available(stamp) {
+      var info = stamp.session.info();
+      return same(info, stamp.info) && ports.available(stamp.session, info) === true;
+    }
     function ready(stamp, context) {
       guard(stamp);
       if (!context || !presented(context.readPresentedObjectSession(), stamp.info)) throw fault();
@@ -61,7 +66,7 @@
         return freeze(await query(stamp, context, { kind: 'record' }));
       });
       guard(stamp);
-      if (!presented(stamp.session.readPresentedObjectSession(), stamp.info) || ports.available(stamp.session, stamp.info) !== true) throw fault();
+      if (!presented(stamp.session.readPresentedObjectSession(), stamp.info) || !available(stamp)) throw fault();
       var projection = freeze({ info: stamp.info, workspace: data });
       if (typeof ports.publish === 'function' && ports.publish(projection) !== true) throw fault();
       guard(stamp); proofs.set(projection, stamp); cache = { stamp: stamp, value: projection }; return projection;
@@ -70,7 +75,7 @@
       try {
         if (cache && current(cache.stamp)) {
           if (presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
-              ports.available(cache.stamp.session, cache.stamp.info) === true) return cache.value;
+            available(cache.stamp)) return cache.value;
           return null; // The existing queue may temporarily hide presentation without changing native metadata.
         }
       } catch (_) {}

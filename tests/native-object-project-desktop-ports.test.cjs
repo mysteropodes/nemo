@@ -6,23 +6,32 @@ const Ports=require('../src/js/adapters/native-object-project-desktop.js');
 const Underlay=require('../src/js/adapters/native-viewport-underlay.js');
 const Files=require('../src/js/adapters/native-object-project-file.js');
 const Application=require('../src/js/adapters/native-application.js');
+const CompositionUI=require('../src/js/adapters/native-composition-ui.js');
+const PaletteUI=require('../src/js/adapters/native-palette-ui.js');
 const turn=()=>new Promise(setImmediate);
+const timerTurn=()=>new Promise(resolve=>setTimeout(resolve,0));
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
-  const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[];
+  let paletteReplyHold=null;
+  const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[],notifications=[];
   let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
   const document={documentElement:{clientWidth:1200,clientHeight:900,
     classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
     style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}},
-    getElementById:id=>{assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
+    getElementById:id=>{
+      if(['palette-grid','palette-tabs','btn-palette-new','btn-palette-add-fill','btn-palette-add-stroke',
+        'btn-palette-replace','btn-palette-swap','palette-replace-scope'].includes(id))return null;
+      assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId,contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,lifecycleGeneration:generation,
     documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:layerRows.map(row=>({...row})),reference:null});
   const root={document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
+    NemoNativeObjectProject:Project,
     NemoNativeObjectProjectFile:{...Files,refreshLayerTable:(r,i)=>{log.push('project');return !projectionRefused&&Files.refreshLayerTable(r,i);}},
     NemoNativeApplicationAdapter:Application,NemoNativeObjectUI:{refreshTiming:r=>{assert.equal(r,root);log.push('timing');},refreshPolicy:r=>{assert.equal(r,root);log.push('policy');}},
-    NemoNativeProjectSettingsController:{willProject:i=>{assert.equal(i.documentId,documentId);log.push('willProject');},presented:()=>log.push('presented')},
+    NemoNativeProjectSettingsController:{willProject:i=>{assert.equal(i.documentId,documentId);log.push('willProject');},
+      presented:i=>{notifications.push(i);log.push('presented');}},
     SMReference:{refreshNative:()=>log.push('reference')},SMProject:{refreshActiveTabDirtyDot:()=>log.push('dirty')},
     updateUI:()=>log.push('update'),showToast:text=>log.push('toast:'+text)};
   async function invoke(command,args){
@@ -43,6 +52,23 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
           items:[{kind:'layer',target:{contextId:'scene-root',layerUid:'drawing'}}],nextOffset:null,
           unavailableCategories:['conditionalMotionRows','pathVerticesTrimStrokeBrushMesh','referenceOnlyElements',
             'expressionDiagnostics','layerEffectMatteReveal','propertyWrites'].map(category=>({category,state:'unavailable',reason:'not-admitted'}))};
+      }else if(r.operation==='query.document.object.project.composition.read'||r.operation==='query.document.object.project.palette.read'){
+        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
+        assert.equal(p.contextId,'scene-root');
+        const composition=r.operation==='query.document.object.project.composition.read';
+        let value;
+        if(p.selector.kind==='settings'){
+          if(!composition&&paletteReplyHold)await paletteReplyHold.promise;
+          value=composition?{markersPresent:false,markerCount:0,effectiveBpm:120,effectiveBpmOffset:0,effectiveBpmShow:false}:
+            {palettesPresent:true,paletteCount:0,effectiveActivePaletteIdx:0};
+        }else{
+          assert.equal(p.selector.kind,composition?'markerPage':'palettePage');
+          assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
+          value=composition?{kind:'markerPage',markersPresent:false,markerCount:0,cursor:0,items:[],nextCursor:null}:
+            {kind:'palettePage',palettesPresent:true,paletteCount:0,cursor:0,items:[],nextCursor:null};
+        }
+        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
+          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
       }else if(r.operation==='command.document.object.layer.policy.edit'){
         assert.equal(r.expectedRevision,revision);revision++;result={applied:true,historyEntriesAdded:1};
       }else throw Error('unexpected fake public operation');
@@ -63,9 +89,10 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     transports.push(transport);return transport;
   }};
   const session=Project.desktop(root);
-  const open=()=>session.openPath('/fake.json',{reveal:async i=>{Files.projectView(root,i);root.updateUI();}});
-  return {root,session,open,log,calls,classes,styles,transports,info,
-    layers:value=>{layerRows=value.map(row=>({...row}));},
+  const open=async()=>{const value=await session.openPath('/fake.json',{reveal:async i=>{Files.projectView(root,i);root.updateUI();}});
+    await timerTurn();return value;};
+  return {root,session,open,log,calls,classes,styles,transports,notifications,info,
+    layers:value=>{layerRows=value.map(row=>({...row}));},paletteReplyGate:value=>{paletteReplyHold=value;},
     hold:v=>held=v,foreign:v=>foreign=v,rect:v=>rect=v,refuseProjection:v=>projectionRefused=v,ackGate:v=>rawAck=v,previewGate:v=>previewHold=v,mutateReply:v=>replyMutation=v,
     async emit(){const t=transports.at(-1),from=revision;revision++;const event={...info(),requestId:'event-'+revision,fromRevision:from,toRevision:revision};return t.synchronize(event,t.binding);}};
 }
@@ -204,7 +231,7 @@ test('factory retains policy-specific SDK dispatch and policy notifications afte
   // Test a connected factory instance directly; it still creates no Project session.
   await ports.subscribeRevisions(()=>{},()=>{});assert.equal(ports.policyAvailable(),true);
   assert.strictEqual(await ports.dispatchApplication(q),q);assert.equal(dispatched,1);
-  const before=f.log.length;ports.presented(f.session.info());assert.deepEqual(f.log.slice(before),['presented','policy']);
+  const before=f.log.length;ports.presented(f.session.info());await timerTurn();assert.deepEqual(f.log.slice(before),['presented','policy']);
 });
 
 test('SDK-valid advancing partial-page cursor is preserved without a local completeness guess',async()=>{
@@ -243,4 +270,113 @@ test('real desktop metadata rejects a late malformed parent before any partial p
   assert.equal(JSON.stringify(f.root.state),before);assert.strictEqual(f.root.state.layers,table);
   assert.equal(f.session.isIndeterminate(),true);
   assert.equal(f.calls.some(c=>c.r&&c.r.operation&&c.r.operation.startsWith('command.')),false);
+});
+
+test('actual desktop queue settles composition and palette read-only projections before synchronous controller fanout can hide them',async()=>{
+  const f=fixture();await f.open();f.root.NemoNativeObjectProject=Project;
+  const before=retained(f),hold=gate();f.paletteReplyGate(hold);
+  let composition=null,palette=null,paletteRead=null;
+  try{
+    composition=CompositionUI.install(f.root);palette=PaletteUI.install(f.root);
+    // The original synchronous resource-finally fanout started Palette before
+    // the composition continuation. The first result now survives that boundary.
+    const first=await composition.presented();
+    paletteRead=palette.presented();
+    assert.ok(first,'the first composition projection must survive another controller entering the real queue');
+    hold.resolve();await paletteRead;
+    const compositionValue=composition.read(),paletteValue=palette.read();
+    assert.ok(compositionValue);assert.ok(paletteValue);
+    assert.deepEqual(compositionValue.info,paletteValue.info);
+    assert.equal(compositionValue.info.contentRevision,0);
+    for(const key of ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'])
+      assert.equal(compositionValue.info[key],before.info[key]);
+    const queries=f.calls.filter(call=>call.command==='nemo_native_dispatch');
+    assert.deepEqual(queries.filter(call=>call.r.operation==='query.document.object.project.composition.read')
+      .map(call=>call.r.payload.selector.kind),['settings','markerPage']);
+    assert.deepEqual(queries.filter(call=>call.r.operation==='query.document.object.project.palette.read')
+      .map(call=>call.r.payload.selector.kind),['settings','palettePage']);
+    assert.equal(queries.length,4);
+    assert.ok(queries.every(call=>call.r.operation.startsWith('query.')&&!Object.hasOwn(call.r,'expectedRevision')));
+    assert.equal(f.transports.length,1);assertRetained(f,before);
+  }finally{
+    // Capture any already-held Palette read before disposal, even if an earlier
+    // assertion fails. Retire both controllers before releasing the fake reply
+    // so their existing presented callbacks cannot start a microtask retry loop.
+    if(palette&&!paletteRead)paletteRead=palette.presented();
+    if(composition)composition.dispose();
+    if(palette)palette.dispose();
+    hold.resolve();
+    if(paletteRead)await paletteRead;
+  }
+});
+
+test('completion notification drops stale revision, owner, subscription and same-revision presentation captures',async()=>{
+  for(const mode of ['revision','owner','subscription','presentation']){
+    const f=fixture();await f.open();const ports=Ports.createPorts(f.root),old=f.session.info();
+    const before=f.notifications.length,start=f.log.length;
+    ports.presented(old);
+    if(mode==='revision')await f.emit();
+    if(mode==='owner')await f.session.openPath('/replacement.json',{reveal:async info=>Files.projectView(f.root,info)});
+    if(mode==='subscription')assert.equal(await f.session.openPath('/cancel.json',{confirm:async()=>false}),false);
+    if(mode==='presentation')await f.session.presentPreview(2);
+    await timerTurn();
+    const fresh=f.notifications.slice(before);
+    // Revision synchronization captured a null public presentation while busy;
+    // the separately tested native ACK timer owns its final notification.
+    const expected=mode==='revision'?0:1;
+    assert.equal(fresh.length,expected,mode);
+    assert.deepEqual(f.log.slice(start).filter(value=>['presented','policy'].includes(value)),
+      expected?['presented','policy']:[],mode);
+    if(expected)assert.strictEqual(fresh[0],f.session.info());
+    if(mode==='revision')assert.equal(f.session.info().contentRevision,1);
+    if(mode==='owner')assert.notEqual(f.session.info().documentId,old.documentId);
+    if(mode==='subscription')assert.strictEqual(f.session.info(),old);
+    if(mode==='presentation'){
+      assert.strictEqual(f.session.info(),old);
+      assert.equal(f.session.readPresentedObjectSession().presentation.frame,2);
+    }
+  }
+});
+
+test('newest same-port completion is coalesced and callback exceptions cannot reject settled native work',async()=>{
+  const f=fixture();await f.open();const ports=Ports.createPorts(f.root),pin=retained(f);
+  const before=f.notifications.length,start=f.log.length;
+  ports.presented(pin.info);ports.presented(pin.info);await timerTurn();
+  assert.equal(f.notifications.length-before,1);
+  assert.deepEqual(f.log.slice(start),['presented','policy']);assertRetained(f,pin);
+  let attempted=0;
+  f.root.NemoNativeProjectSettingsController.presented=()=>{attempted++;throw Error('controlled advisory callback failure');};
+  await f.session.presentPreview(1);await timerTurn();
+  assert.equal(attempted,1);
+  assert.equal(f.session.info().contentRevision,0);
+  assert.equal(f.session.readPresentedObjectSession().presentation.frame,1);
+  assert.equal(f.session.isIndeterminate(),false);
+});
+
+test('fresh fenced completion with two null presentations still renders disabled lifecycle UI',async()=>{
+  const f=fixture();await f.open();const ports=Ports.createPorts(f.root),info=f.session.info(),disabled=[];
+  const original=f.root.NemoNativeProjectSettingsController.presented;
+  f.root.NemoNativeProjectSettingsController.presented=value=>{
+    disabled.push(f.session.isIndeterminate()&&f.session.readPresentedObjectSession()===null);original(value);
+  };
+  const before=f.notifications.length,start=f.log.length;
+  ports.presented(info);
+  f.transports[0].disconnected(new Error('controlled subscription loss'));
+  assert.equal(f.session.isIndeterminate(),true);
+  assert.equal(f.session.readPresentedObjectSession(),null);
+  ports.presented(f.session.info());await timerTurn();
+  assert.deepEqual(disabled,[true]);assert.equal(f.notifications.length-before,1);
+  assert.strictEqual(f.notifications.at(-1),info);
+  assert.deepEqual(f.log.slice(start).filter(value=>['presented','policy'].includes(value)),['presented','policy']);
+  assert.equal(f.session.readPresentedObjectSession(),null);
+});
+
+test('unknown current owner and lookalike metadata cannot receive completion notification',async()=>{
+  const f=fixture();await f.open();const ports=Ports.createPorts(f.root),info=f.session.info();
+  const before=f.notifications.length,start=f.log.length,calls=f.calls.length;
+  ports.presented(info);delete f.root.NemoNativeObjectProject;await timerTurn();
+  assert.equal(f.notifications.length,before);assert.deepEqual(f.log.slice(start),[]);
+  f.root.NemoNativeObjectProject=Project;
+  ports.presented({...info});await timerTurn();
+  assert.equal(f.notifications.length,before);assert.equal(f.calls.length,calls);
 });
