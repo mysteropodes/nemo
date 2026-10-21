@@ -313,7 +313,10 @@ impl ObjectMaskInputs {
         mixed.retain(|index| match index {
             PaintIndex::Contour(index) => ordinary(*index),
             PaintIndex::Duplicator(index) => !self.is_duplicator_mask(*index),
-            PaintIndex::Raster(_) | PaintIndex::Text(_) | PaintIndex::Component(_) => true,
+            PaintIndex::Raster(_)
+            | PaintIndex::Text(_)
+            | PaintIndex::Component(_)
+            | PaintIndex::Video(_) => true,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintIndex::Brush(_) => true,
         });

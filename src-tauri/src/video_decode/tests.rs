@@ -102,6 +102,25 @@ pub(super) fn hevc_fixture_encoder() -> &'static str {
     })
 }
 
+// Wall-clock assertions and the FFmpeg work of sibling tests in this process.
+// `cargo test` runs every test on all cores; a latency bound measured while
+// other tests encode fixtures or spawn decoders measures the scheduler, not the
+// decoder. A timing test holds the exclusive guard for its measured loop only;
+// FFmpeg-spawning tests hold the shared guard. Never nest either guard (and
+// never hold one across `gen_video`/`make_indexed_media`): std's RwLock is not
+// reentrant. Other test binaries/processes are outside this lock's reach.
+static FFMPEG_TIMING: std::sync::RwLock<()> = std::sync::RwLock::new(());
+
+/// Shared guard: this test spawns FFmpeg work concurrently with other such tests.
+pub(super) fn ffmpeg_shared() -> std::sync::RwLockReadGuard<'static, ()> {
+    FFMPEG_TIMING.read().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Exclusive guard: no in-process FFmpeg-spawning test runs while it is held.
+pub(super) fn ffmpeg_timing_exclusive() -> std::sync::RwLockWriteGuard<'static, ()> {
+    FFMPEG_TIMING.write().unwrap_or_else(|e| e.into_inner())
+}
+
 /// Generates fixtures with the same checked executable used for decode/probe,
 /// cached by filename within this test process. The bundled LGPL sidecar is
 /// the default; NEMO_TEST_FFMPEG_PATH may select an explicit executable path
@@ -123,6 +142,7 @@ pub(super) fn gen_video(filename: &str, lavfi: &str, codec_args: &[&str]) -> std
     let _guard = GEN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let complete = path.metadata().map(|m| m.len() > 0).unwrap_or(false);
     if !complete {
+        let _ffmpeg = ffmpeg_shared(); // encoding never overlaps a timed loop
         let part = dir.join(format!("{filename}.part"));
         let _ = std::fs::remove_file(&part);
         let mut args: Vec<&str> = vec!["-y", "-f", "lavfi", "-i", lavfi];
@@ -238,6 +258,7 @@ pub(super) fn make_indexed_media() -> String {
             let src = make_test_video(); // 320x240, 60 frames, 30fps
             let target = test_fixture_dir().join("optimized_indexed.mjpeg");
             let target_s = target.to_str().unwrap().to_string();
+            let _ffmpeg = ffmpeg_shared(); // the transcode never overlaps a timed loop
             create_optimized_media_core(src.to_str().unwrap(), &target_s).unwrap();
             target_s
         })

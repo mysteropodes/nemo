@@ -116,6 +116,8 @@
         "object_frame_bulk_move_document.rs",
         "object_audio_track_record.rs",
         "object_media_placement_offset.rs",
+        "object_media_video_timing.rs",
+        "object_media_motion_flow.rs",
         "audio_wave_admission.rs",
         "object_audio_track_edit.rs",
         "object_property_targets.rs",
@@ -531,7 +533,9 @@
         "property_expression_lookup.rs",
         "object_frame_context.rs",
         "object_audio_track_sampling.rs",
+        "object_media_video_remap.rs",
         "object_expression_reads.rs",
+        "object_frame_video.rs",
         "property_expression_bake.rs",
         "object_text_animator_evaluation.rs",
         "object_frame_motion_values.rs",
@@ -618,6 +622,7 @@
         "object_text_scene_bundled.rs",
         "object_scene_parent_chain.rs",
         "object_scene_parent_curve.rs",
+        "object_media_scene_join.rs",
         "object_scene_producer_text_animator.rs",
         "object_duplicator_scene.rs",
         "object_mask_inputs.rs",
@@ -751,10 +756,13 @@
         "object_expression_read_runtime.rs",
         "object_expression_harden.rs",
         "object_expression_bake.rs",
-        "object_brush_runtime.rs"
+        "object_brush_runtime.rs",
+        "native_media_frame_export.rs",
+        "native_media_video_facts.rs"
       ],
       "publicApi": [
-        "application.rs"
+        "application.rs",
+        "native_media_frame_export.rs"
       ],
       "sizeProfile": "Rust production module"
     },
@@ -766,6 +774,7 @@
         "read_queries.rs",
         "object_snapshot.rs",
         "object_timing_snapshot.rs",
+        "object_layer_placement_snapshot.rs",
         "object_project_admission.rs",
         "reference_image_resources.rs",
         "object_property_read.rs",
@@ -1085,6 +1094,9 @@
         "object_media_link_history_refusals.rs",
         "object_media_link_track.rs",
         "object_media_link_track_controls.rs",
+        "object_media_link_track_timing.rs",
+        "object_media_link_edit_timing.rs",
+        "object_media_link_command_timing.rs",
         "native_import_svg_explode.rs",
         "native_import_svg_explode_rows.rs",
         "native_import_svg_explode_pins.rs",
@@ -1420,6 +1432,9 @@
         "native_media_export_job_host.rs",
         "native_media_export_job_lifecycle.rs",
         "native_media_export_job_support.rs",
+        "native_media_frame_export.rs",
+        "native_media_frame_export_timing.rs",
+        "native_media_retained_witness.rs",
         "native_import_transaction.rs",
         "native_import_transaction_atomic.rs",
         "native_import_transaction_chain.rs",
@@ -1648,6 +1663,9 @@
         "object_audio_track_baseline.rs",
         "object_audio_track_owner.rs",
         "object_media_placement_offset.rs",
+        "object_media_video_timing.rs",
+        "object_layer_placement_snapshot.rs",
+        "object_media_motion_flow.rs",
         "project_audio_retention.rs",
         "audio_wave_admission.rs",
         "project_audio_retention_fixture.rs",
@@ -1826,6 +1844,8 @@
         "src/native_frame_bulk_move_wire_tests.rs",
         "src/native_layer_range_contract.rs",
         "src/native_layer_range_contract_tests.rs",
+        "src/native_layer_placement_contract.rs",
+        "src/native_layer_placement_contract_tests.rs",
         "src/native_layer_shift_contract.rs",
         "src/native_layer_shift_contract_tests.rs",
         "src/native_layer_shift_wire_tests.rs",
@@ -2067,6 +2087,7 @@
       "files": [
         "native_application_dispatch_release_tests.rs",
         "native_object_host_tests.rs",
+        "native_media_host_tests.rs",
         "native_object_bootstrap_tests.rs",
         "native_object_host_read_tests.rs",
         "native_object_host_command_tests.rs",
@@ -2150,7 +2171,8 @@
         "native_object_retained_tabs.rs",
         "native_object_font.rs",
         "native_object_image.rs",
-        "native_object_preview_prepare.rs"
+        "native_object_preview_prepare.rs",
+        "native_object_video.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"
@@ -2179,6 +2201,7 @@
         "vectorize.rs",
         "video_decode.rs",
         "video_decode/decode.rs",
+        "video_decode/export_port.rs",
         "video_decode/indexed.rs",
         "video_decode/optimized.rs",
         "video_decode/process.rs",
@@ -2187,6 +2210,7 @@
         "video_decode/tests.rs",
         "video_decode/tests_cache.rs",
         "video_decode/tests_decode.rs",
+        "video_decode/tests_export_port.rs",
         "video_decode/tests_indexed.rs",
         "video_decode/tests_perf.rs",
         "video_decode/tests_sessions.rs"

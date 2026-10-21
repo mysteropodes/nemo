@@ -357,33 +357,34 @@
     }
     function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&view.matches(presentation,info)&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
-    async function readLayerView(layerUid,frame,pin,rangeView){
+    async function readLayerView(layerUid,frame,pin,view){
       async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
       function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&value.presentation.frame===frame&&
         integer(frame,0)&&frame<pin.totalFrames&&pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length===1;}
       try{
         await settled();if(!ready())return null;
-        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId(rangeView?'range':'timing'),instanceId:pin.instanceId,documentId:pin.documentId,
+        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId(view||'timing'),instanceId:pin.instanceId,documentId:pin.documentId,
           operation:'query.document.object.layer.timing',payload:{atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,
             contextId:'scene-root',layerUid:layerUid,frame:frame}};
-        if(rangeView)request.payload.view='range';
+        if(view)request.payload.view=view;
         var response=await raw('nemo_native_dispatch',request);await settled();
         if(ticket!==subscriptionTicket||!ready()||!response||response.ok!==true||response.instanceId!==pin.instanceId||
           response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)return null;
         var result=response.result;
-        if(!result||Object.keys(result).length!==(rangeView?9:11)||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
+        if(!result||Object.keys(result).length!==(view?9:11)||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
           ['atRevision','documentSnapshotId','contextId','layerUid','frame'].some(function(k){return result[k]!==request.payload[k];}))return null;
-        if(rangeView){
+        if(view==='placement'&&!(result.kind==='layerPlacement'&&typeof result.placement==='object'))return null;
+        if(view==='range'){
           var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
           if(result.kind!=='layerRange'||!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
             !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return null;
-          return freeze(JSON.parse(JSON.stringify(result)));
         }
-        return freeze(Object.assign({},result));
+        return freeze(view?JSON.parse(JSON.stringify(result)):Object.assign({},result));
       }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
     }
-    function readLayerTiming(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,false);}
-    function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,true);}
+    function readLayerTiming(layerUid,frame,pin){return readLayerView(layerUid,frame,pin);}
+    function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'range');}
+    function readLayerPlacement(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'placement');}
     var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
       dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
       state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
@@ -418,7 +419,7 @@
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
-      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,readLayerRange:readLayerRange,
+      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,readLayerRange:readLayerRange,readLayerPlacement:readLayerPlacement,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
       get editFrames(){return FrameEdit&&typeof ports.dispatchApplication==='function'&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&

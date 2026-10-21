@@ -8,6 +8,7 @@ use native_engine::{
         ExportReleaseReconciliation, ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome,
         ObjectHostExportRequest, StagedArtifactPort,
     },
+    native_media_frame_export::{begin_native_media_frames, NativeMediaRelease, NativeVideoPort},
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
         prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
@@ -21,10 +22,13 @@ use native_engine::{
 pub(super) struct ObjectExportSession {
     request_id: String,
     pub(super) reconciliation: ExportReleaseReconciliation,
+    /// T12: what the export's video frames and decode sessions released.
+    pub(super) media: Option<NativeMediaRelease>,
 }
 impl ObjectExportSession {
     fn permits_next(&self, request_id: &str) -> bool {
         self.request_id != request_id
+            && self.media.as_ref().is_none_or(|media| media.complete)
             && self.reconciliation.cleanup_complete
             && matches!(self.reconciliation.receipts.as_slice(), [receipt]
                 if receipt.status == JobStatus::Succeeded
@@ -145,7 +149,7 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object export snapshot is unavailable")?;
-        // Preserve the current finite request admission before guest or artifact work.
+        // Bound the exact original request before any media, guest or artifact work.
         if frames.is_empty()
             || frames.len() > native_engine::export_job::MAX_OBJECT_EXPORT_FRAMES
             || frames.first() != Some(&expected.frame)
@@ -153,6 +157,20 @@ impl NativeObjectHost {
         {
             return Err("native object export frames are invalid".into());
         }
+        // T12: every drawn video is preflighted (typed MissingLink) before
+        // staging; its decoded frames are released once the witnesses are gone.
+        let mut decoder = crate::native_dispatch::video::video_decoder();
+        let mut video_port = NativeVideoPort::new(decoder.as_mut());
+        let mut media = begin_native_media_frames(
+            &mut video_port,
+            &snapshot,
+            expected,
+            frames,
+            true,
+            &crate::native_dispatch::video::linked_file_readable,
+            crate::native_dispatch::video::now_ms(),
+        )
+        .map_err(|refusal| refusal.to_string())?;
         let session_request_id = request_id.clone();
         let request = ObjectHostExportRequest {
             request_id,
@@ -228,8 +246,9 @@ impl NativeObjectHost {
                                     .is_ok()
                             })
                             .map_err(|error| format!("export brush resources: {error:?}"))?;
-                        prepare_object_composition(&plan, &selector)
-                            .map_err(|error| format!("export composition: {error:?}"))
+                        let base = prepare_object_composition(&plan, &selector)
+                            .map_err(|error| format!("export composition: {error:?}"))?;
+                        media.witness(frame, base)
                     },
                 )
             }
@@ -251,8 +270,9 @@ impl NativeObjectHost {
                         .map_err(|error| format!("object export scene: {error:?}"))?;
                     let plan = prepare_object_paint_plan(&scene, &selector)
                         .map_err(|error| format!("object export paint: {error:?}"))?;
-                    prepare_object_composition(&plan, &selector)
-                        .map_err(|error| format!("object export witness: {error:?}"))
+                    let base = prepare_object_composition(&plan, &selector)
+                        .map_err(|error| format!("object export witness: {error:?}"))?;
+                    media.witness(frame, base)
                 };
                 let mut prepared = std::collections::BTreeMap::new();
                 let mut refusal = None;
@@ -279,10 +299,16 @@ impl NativeObjectHost {
                 export_object_svg_frames(&self.history, scheduler, port, request, frames, witnesses)
             }
         };
-        if !outcome.release.receipts.is_empty() || !outcome.release.cleanup_complete {
+        // Branch-local witnesses and materializers are gone before media reconciliation.
+        let media = media.finish();
+        if !outcome.release.receipts.is_empty()
+            || !outcome.release.cleanup_complete
+            || !media.complete
+        {
             self.object_export = Some(ObjectExportSession {
                 request_id: session_request_id,
                 reconciliation: outcome.release.clone(),
+                media: (media.frames_acquired > 0 || !media.complete).then_some(media),
             });
         }
         Ok(outcome)

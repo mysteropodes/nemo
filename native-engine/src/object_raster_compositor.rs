@@ -3,6 +3,17 @@ use crate::compositor::object_compositor::prepare_command;
 use crate::compositor::{Compositor, CompositorError};
 use crate::object_render_scene::{ordered_entries, ObjectCompositionWitness, PaintEntry};
 use vello::kurbo::Affine;
+/// T12: the layered path draws solid layers only, so a video is refused, never omitted.
+pub(super) fn refuse_layered_video(
+    plan: &crate::object_render_scene::ObjectPaintPlan,
+) -> Result<(), CompositorError> {
+    if plan.video_slots().is_empty() {
+        return Ok(());
+    }
+    Err(CompositorError::new(
+        "native video layered effects are unavailable",
+    ))
+}
 impl Compositor {
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     pub(super) fn retire_raster_cache(
@@ -24,7 +35,7 @@ impl Compositor {
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         {
             if prepared.has_scene_images() {
-                self.retained_object_reference = Some(prepared.clone());
+                self.retained_object_reference = Some(prepared.without_media());
             }
             // Vello can replace an image atlas on a solid-only pass. Every live native asset is
             // explicitly restored before use; instances of the same asset share one ImageData ID.
@@ -58,6 +69,15 @@ impl Compositor {
                 PaintEntry::Text(source) => source.draw(scene),
                 PaintEntry::Component(source) => {
                     source.prepared.draw(scene, Affine::IDENTITY, &source.path)
+                }
+                // T12: a video slot draws only from its decoded frame, never blank.
+                PaintEntry::Video(index) => {
+                    let (image, transform, opacity) = prepared
+                        .video_image(index)
+                        .ok_or_else(|| CompositorError::new("native video frame is unavailable"))?;
+                    let brush =
+                        vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
+                    self.scene.draw_image(&brush, transform);
                 }
                 PaintEntry::Duplicator(source) => {
                     source.prepared.draw(scene, Affine::IDENTITY, &source.path)

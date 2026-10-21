@@ -17,6 +17,7 @@ fn perf_1080p_sequential_holds_30fps_budget() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_timing_exclusive(); // after fixture generation: never nested
     let (avg, p95) = measure_sequential_steady_state(&p, 30);
     eprintln!(
         "[perf] 1080p sequential (steady-state): avg={avg:.1}ms p95={p95:.1}ms (budget 33.3ms)"
@@ -38,6 +39,7 @@ fn perf_4k_sequential_measured() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_timing_exclusive(); // after fixture generation: never nested
     let (avg, p95) = measure_sequential_steady_state(&p, 15);
     eprintln!("[perf] 4K sequential (steady-state): avg={avg:.1}ms p95={p95:.1}ms (budget 33.3ms)");
     assert!(p95 < 41.6, "4K p95 {p95:.1}ms exceeds even the relaxed bar");
@@ -63,6 +65,7 @@ fn perf_session_open_cost() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_timing_exclusive(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     let t0 = std::time::Instant::now();
     decode_frame_core(&mut s, 0).unwrap();
@@ -84,6 +87,7 @@ fn perf_session_open_cost() {
 #[test]
 fn perf_seek_cost_measured() {
     let path = make_test_video(); // gop 15, 60 frames total
+    let _ffmpeg = ffmpeg_timing_exclusive(); // after fixture generation: never nested
     let (mut s, frame_count, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let mut times = Vec::new();
     for target in [7i64, 22, 44, frame_count as i64 - 2] {

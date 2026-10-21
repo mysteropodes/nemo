@@ -156,6 +156,7 @@ pub fn prepare_object_navigated_viewport_composition(
         camera,
         resources: None,
         scene_effects: None,
+        media: None,
         reference,
         rasters: None,
     };

@@ -3,7 +3,8 @@
 //! Audio requires its actual persisted record and sealed source; absent owners still refuse.
 use crate::history::NativeObjectHistory;
 use crate::object_document::media_timing::object_media_link_edit::PlacementEdit;
-use crate::object_document::AssetTarget;
+use crate::object_document::placement_offset::RemapIntent;
+use crate::object_document::{AssetTarget, OrderCurvePoint};
 use crate::request_receipts::DispatchErrorCode;
 use crate::transaction::CompactResult;
 use serde::{Deserialize, Deserializer};
@@ -33,6 +34,45 @@ enum EditIn {
     Remove {
         #[serde(rename = "placementId")]
         placement_id: String,
+    },
+    // T12 bounded remap intents; each fits the 4 KiB request budget.
+    #[serde(rename = "enableTimeRemap")]
+    EnableTimeRemap {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        #[serde(rename = "inFrame")]
+        in_frame: serde_json::Number,
+        #[serde(rename = "outFrame")]
+        out_frame: serde_json::Number,
+        #[serde(rename = "lastSourceFrame")]
+        last_source_frame: serde_json::Number,
+    },
+    #[serde(rename = "disableTimeRemap")]
+    DisableTimeRemap {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+    },
+    #[serde(rename = "removeTimeRemapKey")]
+    RemoveTimeRemapKey {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        frame: serde_json::Number,
+    },
+    #[serde(rename = "setTimeRemapKey")]
+    SetTimeRemapKey {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        frame: serde_json::Number,
+        value: serde_json::Number,
+        #[serde(rename = "curvePoints", default)]
+        curve: Option<Vec<OrderCurvePoint>>,
+    },
+    #[serde(rename = "setInterpMode")]
+    SetInterpMode {
+        #[serde(rename = "placementId")]
+        placement_id: String,
+        #[serde(rename = "interpMode")]
+        interp_mode: String,
     },
 }
 
@@ -68,6 +108,13 @@ enum TargetIn {
 // Absent is a whole-layer placement; explicit null is not an absent member.
 fn present_id<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
     String::deserialize(deserializer).map(Some)
+}
+
+fn remap(placement_id: String, intent: RemapIntent) -> PlacementEdit {
+    PlacementEdit::TimeRemap {
+        placement_id,
+        intent,
+    }
 }
 
 fn parse_edit(bytes: &[u8]) -> Result<PlacementEdit, DispatchErrorCode> {
@@ -106,6 +153,44 @@ fn parse_edit(bytes: &[u8]) -> Result<PlacementEdit, DispatchErrorCode> {
             delta_frames,
         },
         EditIn::Remove { placement_id } => PlacementEdit::Remove { placement_id },
+        EditIn::EnableTimeRemap {
+            placement_id,
+            in_frame,
+            out_frame,
+            last_source_frame,
+        } => remap(
+            placement_id,
+            RemapIntent::Enable {
+                in_frame,
+                out_frame,
+                last_source_frame,
+            },
+        ),
+        EditIn::DisableTimeRemap { placement_id } => remap(placement_id, RemapIntent::Disable),
+        EditIn::RemoveTimeRemapKey {
+            placement_id,
+            frame,
+        } => remap(placement_id, RemapIntent::RemoveKey { frame }),
+        EditIn::SetTimeRemapKey {
+            placement_id,
+            frame,
+            value,
+            curve,
+        } => remap(
+            placement_id,
+            RemapIntent::SetKey {
+                frame,
+                value,
+                curve,
+            },
+        ),
+        EditIn::SetInterpMode {
+            placement_id,
+            interp_mode,
+        } => PlacementEdit::SetInterpMode {
+            placement_id,
+            interp_mode,
+        },
     })
 }
 
@@ -136,3 +221,7 @@ impl NativeObjectHistory {
 #[cfg(all(test, feature = "project_media_codec"))]
 #[path = "../tests/object_media_link_command.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_media_link_command_timing.rs"]
+mod timing_tests;

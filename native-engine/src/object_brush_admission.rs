@@ -3,7 +3,7 @@ use crate::evaluation::object_scene_style_kernels::bitmap_brush_resources_store:
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameSelector};
 use crate::object_render_scene::{
     brush_scene::{self, BrushRuntime},
-    component_scene, duplicator_scene, object_scene_producer_contour, paint,
+    component_scene, duplicator_scene, media_scene, object_scene_producer_contour, paint,
     prepare_object_paint_plan, raster_scene, text_scene, validate_pins, ObjectPaintPlan,
     ObjectRenderScene, ObjectSceneError,
 };
@@ -33,6 +33,7 @@ impl ObjectBrushAdmission {
             rasters: raster_scene::sources_excluding(packet, &claimed)?.into(),
             texts: text_scene::prepare(packet)?,
             components: component_scene::prepare(packet, expected)?,
+            videos: media_scene::slots(packet)?.into(),
             brushes: None,
         };
         // The real registry must account for every selected source, including
