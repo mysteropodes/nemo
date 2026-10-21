@@ -165,7 +165,7 @@ test('retired queued completion cannot disable a replacement owner editor sharin
  f.binding.retire();
  const next=portsFixture();next.state.document='document-B';next.state.generation++;
  const originalInfo=next.session.info;next.session.info=()=>({...originalInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});next.session.readPresentedObjectSession=()=>({...next.session.info(),presentation:{frame:0}});
- f.perspectiveOwner(next.session);
+ f.perspectiveOwner(next.session);f.root.NemoNativeObjectProject={desktop:()=>next.session};
  const binding=Desktop.mount(f.root,f.binding.container,{currentSession:()=>next.session,fontResources:()=>({list:async()=>[]})});await f.turn();await binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:null});
  assert.equal(f.get('text-apply').disabled,false,'replacement draft is ready before old queue settles');assert.ok(binding.core.snapshot().draft);
  gate.resolve();await f.turn();

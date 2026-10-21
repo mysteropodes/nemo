@@ -144,11 +144,21 @@ impl Fixture {
         let native = self.state.native_state();
         let mut guard = native.lock().unwrap();
         let generation = guard.active_generation().unwrap();
-        let owner = guard.active_mut(generation).unwrap().as_any_mut()
-            .downcast_mut::<crate::native_dispatch::NativeObjectHost>().unwrap();
-        (owner.project_file_info().unwrap(), owner.project_file_snapshot(
-            self.raw["contentRevision"].as_u64().unwrap(),
-            self.raw["documentSnapshotId"].as_str().unwrap()).unwrap())
+        let owner = guard
+            .active_mut(generation)
+            .unwrap()
+            .as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
+            .unwrap();
+        (
+            owner.project_file_info().unwrap(),
+            owner
+                .project_file_snapshot(
+                    self.raw["contentRevision"].as_u64().unwrap(),
+                    self.raw["documentSnapshotId"].as_str().unwrap(),
+                )
+                .unwrap(),
+        )
     }
     pub(super) fn request(&self, operation: &str, payload: Value) -> String {
         json!({"apiVersion":2,"requestId":format!("desktop-command-{}",self.raw["contentRevision"]),"instanceId":self.raw["instanceId"],
