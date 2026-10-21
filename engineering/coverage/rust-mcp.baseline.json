@@ -673,6 +673,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "T26/#2238 mask contract controls: derived only by the original buildBaseline from the complete actual cargo-llvm-cov report at 664958928e8a2f5962080434941172f025b3fed1. Report SHA256 df9ecde2f549df75c1ecf7b64cc1b62416f977d7a7c26d71c0780fdbbb2666e1. Every existing record, floor, aggregate total, exclusion and recorded provenance is preserved. No owner/installed/GPU acceptance is implied."
+    },
+    "nemo-mcp/src/native_layer_placement_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "T12 placement contract: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 46bf022fdf911e8500f61a5257e401390a37512b (MCP source unchanged at the current head), booking 1062/6312708003 on Cyrill's Mac, 439 tests/0 failed across 20 binaries. Report SHA256 8f9a0ad5e2165c5af30dd3af63eb9655814bf743db79d60c87dfd2eb8ad42c07. Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_layer_placement_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T12 placement contract: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 46bf022fdf911e8500f61a5257e401390a37512b (MCP source unchanged at the current head), booking 1062/6312708003 on Cyrill's Mac, 439 tests/0 failed across 20 binaries. Report SHA256 8f9a0ad5e2165c5af30dd3af63eb9655814bf743db79d60c87dfd2eb8ad42c07. Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     }
   },
   "nativeObjectContractRegistration": {
