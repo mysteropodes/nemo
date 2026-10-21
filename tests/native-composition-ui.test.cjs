@@ -20,12 +20,13 @@ function fixture() {
     querySelectorAll:selector=>selector==='.tl-marker'?elements['bars-row'].children.filter(x=>x.className.startsWith('tl-marker')):[]});
   const persisted=Object.freeze([{frame:39,name:'legacy'}]),layerMarkers=Object.freeze([{frame:20}]);
   const state={markers:persisted,layers:[{markers:layerMarkers}],totalFrames:40,currentFrame:3,fps:24};
-  let info={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'s0'},
+  let info={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'s0',
+    canvasW:320,canvasH:180,fps:24,totalFrames:40,layers:[{layerUid:'drawing',visible:true}]},
     revision=0,ticket=1,pending=0,serial=0,active=true,tail=Promise.resolve(),block=null;
   let metadata={markers:[{frame:2.5,name:'First',color:''},{frame:8,name:'Second'}]};
   const calls=[],notices=[],prompts=[],menus=[],jumps=[];
   const shown=pin=>({...pin,presentation:{...pin,owner:'native',status:'presented'}});
-  let controller;
+  let controller,browserRoot;
   async function dispatch(q) {
     calls.push(clone(q));root.NemoNativeCompositionContract.payload(q.operation,q.payload);
     if(block){const held=block;block=null;held.entered();await held.wait;}
@@ -58,26 +59,39 @@ function fixture() {
     runResourceCommand(action){pending++;const work=tail.then(async()=>{const origin=info;
       return action({dispatch,readPresentedObjectSession:()=>active&&pending===1&&info===origin?shown(origin):null,
         async reconcile(r){assert.equal(r,revision);info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};
-          controller.willProject(info);controller.presented(info);return info;}});
+          controller.willProject(info);assert.equal(root.NemoNativeObjectProjectFile.refreshLayerTable(browserRoot,info),true);
+          controller.presented(info);return info;}});
     }).finally(()=>{pending--;controller.presented(info);});tail=work.catch(()=>{});return work;}};
+  const promptCalls=[];
   const root={document,state,FC:10,__TAURI__:{core:{}},SM:{t:x=>x},
-    NemoNativeObjectProject:{desktop:()=>session},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>active&&pending===0},
-    showToast:x=>notices.push(x),showContextMenu:(x,y,items)=>menus.push(items),prompt:()=>prompts.shift(),
+    NemoNativeObjectProject:{desktop:()=>session},
+    showToast:x=>notices.push(x),showContextMenu:(x,y,items)=>menus.push(items),prompt:(...args)=>{promptCalls.push(args);return prompts.shift();},
     pushUndo(){throw new Error('legacy JS history must not run on native desktop');},renderTimeline(){},
     goToFrame:f=>jumps.push(f),addEventListener(){}};
   root.window=root;root.globalThis=root;
   const context=vm.createContext(root);
-  for(const file of ['adapters/native-composition-contract.js','adapters/native-composition-desktop.js','adapters/native-composition-ui.js','markers.js','bpm-grid.js'])vm.runInContext(fs.readFileSync(require.resolve('../src/js/'+file),'utf8'),context,{filename:file});
-  controller=root.NemoNativeCompositionController;document.fire('DOMContentLoaded');
+  // These actual production scripts use their original HTML registration order.
+  const wanted=['adapters/native-object-layer-splice.js','adapters/native-object-project-file.js','markers.js','bpm-grid.js',
+    'adapters/native-composition-contract.js','adapters/native-composition-desktop.js','adapters/native-composition-ui.js'];
+  const html=fs.readFileSync(require.resolve('../src/index.html'),'utf8');
+  const scripts=Array.from(html.matchAll(/<script src="js\/([^"]+)"/g),match=>match[1]).filter(file=>wanted.includes(file));
+  assert.deepEqual(scripts,wanted);
+  for(const file of scripts)vm.runInContext(fs.readFileSync(require.resolve('../src/js/'+file),'utf8'),context,{filename:file});
+  browserRoot=vm.runInContext('globalThis',context);
+  function project(){root.NemoNativeObjectProjectFile.projectView(browserRoot,info);
+    state.layers[0].markers=layerMarkers;state.currentFrame=3;}
+  project();controller=root.NemoNativeCompositionController;document.fire('DOMContentLoaded');
   const edits=()=>calls.filter(q=>q.operation===Contract.EDIT);
   async function settled(){for(let i=0;i<20;i++){await tail;await new Promise(resolve=>setImmediate(resolve));if(!controller.isPending())return;}throw Error('controller did not settle');}
-  return {root,state,elements,document,controller,calls,notices,prompts,menus,jumps,edits,settled,
+  return {root,state,elements,document,controller,calls,notices,prompts,promptCalls,menus,jumps,edits,settled,
+    projectionReady:value=>root.NemoNativeObjectProjectFile.projectionReadyForUI(browserRoot,value),
+    fullInfo:()=>info,drift(){state.canvasW++;},repairProjection:project,
     sameInstall:()=>vm.runInContext('NemoNativeCompositionUI.install(globalThis) === NemoNativeCompositionController',context),
     async ready(){await controller.presented();await settled();},
     marker:()=>elements['bars-row'].children.find(x=>x.className==='tl-marker tl-marker-comp'),
     unchanged(){assert.strictEqual(state.markers,persisted);assert.strictEqual(state.layers[0].markers,layerMarkers);
       for(const k of ['bpm','bpmOffset','bpmShow'])assert.equal(Object.hasOwn(state,k),false);},
-    replace(){info={...info,documentId:'replacement',lifecycleGeneration:2};controller.willProject(info);},
+    replace(){info={...info,documentId:'replacement',lifecycleGeneration:2};controller.willProject(info);project();},
     resubscribe(){ticket++;},
     hold(){let entered,release;const started=new Promise(r=>entered=r),wait=new Promise(r=>release=r);block={entered,wait};return {started,release};},
     retire(){active=false;controller.dispose();}};
@@ -207,4 +221,28 @@ test('a retained browser scripting facade switches to native projection and refu
   assert.throws(()=>api.markers.removeAt(39),/composition application API/);
   assert.equal(h.state.bpm,93);assert.equal(h.state.bpmOffset,7);
   assert.equal(h.state.markers[0].name,'legacy');assert.equal(h.edits().length,0);
+});
+
+
+test('actual HTML-bound BPM uses full project readiness while keeping five-field authority pins',async()=>{
+  const h=fixture();assert.equal(h.projectionReady(h.fullInfo()),true);await h.ready();
+  const origin=h.controller.read();assert.ok(origin);
+  assert.deepEqual(Object.keys(origin.info).sort(),['contentRevision','documentId','documentSnapshotId','instanceId','lifecycleGeneration']);
+  assert.equal(h.projectionReady(origin.info),false,'a narrow authority pin is not full UI metadata');
+  h.prompts.push('137.5','4');h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+  assert.equal(h.promptCalls.length,2);assert.equal(h.edits().length,1);
+  assert.deepEqual(h.edits()[0].payload.action,{kind:'setBpm',bpm:137.5,bpmOffset:4,bpmShow:true});
+  assert.equal(h.controller.read().composition.effectiveBpm,137.5);h.unchanged();
+  h.drift();assert.equal(h.controller.read(),null);
+  h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+  assert.equal(h.promptCalls.length,2,'unavailable full projection cannot start prompts');
+  assert.equal(h.edits().length,1);assert.equal(h.controller.read(),null);
+  h.repairProjection();await h.ready();assert.ok(h.controller.read());
+  assert.equal(h.edits().length,1,'restoring presentation never replays the old intent');h.unchanged();
+});
+
+test('full UI drift during a held native read refuses the complete projection',async()=>{
+  const h=fixture(),hold=h.hold(),reading=h.controller.presented();await hold.started;
+  h.drift();hold.release();assert.equal(await reading,null);await h.settled();
+  assert.equal(h.controller.read(),null);assert.equal(h.edits().length,0);h.unchanged();
 });
