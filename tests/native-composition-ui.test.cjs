@@ -62,9 +62,10 @@ function fixture() {
           controller.willProject(info);assert.equal(root.NemoNativeObjectProjectFile.refreshLayerTable(browserRoot,info),true);
           controller.presented(info);return info;}});
     }).finally(()=>{pending--;controller.presented(info);});tail=work.catch(()=>{});return work;}};
-  const promptCalls=[];
+  const promptCalls=[],diagnostics=[];
   const root={document,state,FC:10,__TAURI__:{core:{}},SM:{t:x=>x},
     NemoNativeObjectProject:{desktop:()=>session},
+    NemoNativeObjectProjectDesktop:{openDiagnostic(value,event,code){assert.strictEqual(value,vm.runInContext('window',context));diagnostics.push([event,code]);}},
     showToast:x=>notices.push(x),showContextMenu:(x,y,items)=>menus.push(items),prompt:(...args)=>{promptCalls.push(args);return prompts.shift();},
     pushUndo(){throw new Error('legacy JS history must not run on native desktop');},renderTimeline(){},
     goToFrame:f=>jumps.push(f),addEventListener(){}};
@@ -83,9 +84,10 @@ function fixture() {
   project();controller=root.NemoNativeCompositionController;document.fire('DOMContentLoaded');
   const edits=()=>calls.filter(q=>q.operation===Contract.EDIT);
   async function settled(){for(let i=0;i<20;i++){await tail;await new Promise(resolve=>setImmediate(resolve));if(!controller.isPending())return;}throw Error('controller did not settle');}
-  return {root,state,elements,document,controller,calls,notices,prompts,promptCalls,menus,jumps,edits,settled,
+  return {root,state,elements,document,controller,calls,notices,prompts,promptCalls,menus,jumps,edits,settled,diagnostics,
     projectionReady:value=>root.NemoNativeObjectProjectFile.projectionReadyForUI(browserRoot,value),
     fullInfo:()=>info,drift(){state.canvasW++;},repairProjection:project,
+    setController(value){browserRoot.NemoNativeCompositionController=value;assert.strictEqual(browserRoot.NemoNativeCompositionController,value);},
     sameInstall:()=>vm.runInContext('NemoNativeCompositionUI.install(globalThis) === NemoNativeCompositionController',context),
     async ready(){await controller.presented();await settled();},
     marker:()=>elements['bars-row'].children.find(x=>x.className==='tl-marker tl-marker-comp'),
@@ -245,4 +247,21 @@ test('full UI drift during a held native read refuses the complete projection',a
   const h=fixture(),hold=h.hold(),reading=h.controller.presented();await hold.started;
   h.drift();hold.release();assert.equal(await reading,null);await h.settled();
   assert.equal(h.controller.read(),null);assert.equal(h.edits().length,0);h.unchanged();
+});
+
+
+test('only the ordinary BPM settings origin read emits bounded refusal detail',async()=>{
+  const h=fixture();h.root.SMBpm.refresh();h.root.SMBpm.framesPerBeat();assert.deepEqual(h.diagnostics,[]);
+  h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+  assert.deepEqual(h.diagnostics,[['bpm-settings-refused','cache-empty']]);assert.equal(h.promptCalls.length,0);
+  await h.ready();h.prompts.push(null);h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+  assert.equal(h.promptCalls.length,1);assert.equal(h.diagnostics.length,1);assert.equal(h.edits().length,0);
+  h.drift();h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+  assert.deepEqual(h.diagnostics.at(-1),['bpm-settings-refused','projection-unready']);assert.equal(h.promptCalls.length,1);
+  const controller=h.root.NemoNativeCompositionController;h.setController(null);
+  h.elements['btn-bpm'].fire('contextmenu');assert.deepEqual(h.diagnostics.at(-1),['bpm-settings-refused','controller-missing']);
+  h.setController(controller);
+  h.root.NemoNativeObjectProjectDesktop.openDiagnostic=()=>{throw Error('PRIVATE diagnostic sink');};
+  assert.doesNotThrow(()=>h.elements['btn-bpm'].fire('contextmenu'));await h.settled();
+  assert.equal(h.promptCalls.length,1);assert.equal(h.edits().length,0);h.unchanged();
 });
