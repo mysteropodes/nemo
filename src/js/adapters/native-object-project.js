@@ -242,9 +242,7 @@
       if(receipt.failure){
         presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented'));
       }
-      presentation=freeze({owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
-        viewGeneration:receipt.viewGeneration,view:receipt.view,instanceId:request.instanceId,documentId:request.documentId,
-        contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration});
+      presentation=freeze(Exposure.presentedFrame(receipt,request,frame));
       presentationBounds=bounds;if(ports.surfaceChanged)ports.surfaceChanged(presentation,bounds);
       return presentation;
     }

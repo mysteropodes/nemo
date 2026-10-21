@@ -93,6 +93,11 @@
     var view=projection(receipt.view,viewMode||'canvas',navigation);if(!view)return {failure:'view'};
     return {failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view};
   }
+  function presentedFrame(receipt,request,frame){
+    return {owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
+      viewGeneration:receipt.viewGeneration,view:receipt.view,instanceId:request.instanceId,documentId:request.documentId,
+      contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration};
+  }
   function create(subscribe,guard){
     var active=true,connected=false,epoch=0,visible=null,binding=null,detached=false,waiter=null,reason=null,rejectStop;
     var stopped=new Promise(function(_,reject){rejectStop=reject;});stopped.catch(function(){});
@@ -153,5 +158,5 @@
     return Object.freeze({connect:connect,join:join,run:run,cancel:cancel,detach:detach,close:close,
       assertActive:assertActive,isStopped:function(){return !active;}});
   }
-  return Object.freeze({create:create,inspectReceipt:inspectReceipt,viewMode:viewMode,matchesView:matchesView,navigation:navigation});
+  return Object.freeze({create:create,inspectReceipt:inspectReceipt,presentedFrame:presentedFrame,viewMode:viewMode,matchesView:matchesView,navigation:navigation});
 }));
