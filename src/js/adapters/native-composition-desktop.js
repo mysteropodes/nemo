@@ -20,12 +20,22 @@
       var pin={};pinKeys.forEach(function(k){pin[k]=info[k];});
       return {session:session,info:Object.freeze(pin),ticket:session.readSubscriptionGeneration(),generation:generation};
     }
-    function current(stamp){return !retired&&stamp.generation===generation&&ports.currentSession()===stamp.session&&
-      stamp.session.isActive()&&same(stamp.session.info(),stamp.info)&&stamp.session.readSubscriptionGeneration()===stamp.ticket;}
+    function current(stamp,failed){
+      function check(value,code){if(!value&&failed)failed(code);return value;}
+      return check(!retired,'retired')&&check(stamp.generation===generation,'generation-stale')&&
+        check(ports.currentSession()===stamp.session,'session-replaced')&&check(stamp.session.isActive(),'inactive')&&
+        check(same(stamp.session.info(),stamp.info),'five-pin-stale')&&
+        check(stamp.session.readSubscriptionGeneration()===stamp.ticket,'subscription-stale');
+    }
     function guard(stamp){if(!current(stamp))throw fault('stale_revision');}
     function actionReady(stamp,ctx){guard(stamp);if(!ctx||!presented(ctx.readPresentedObjectSession(),stamp.info))throw fault();}
     // Identity stamps remain narrow; readiness receives the same-pin full native metadata.
-    function available(stamp){var info=stamp.session.info();return same(info,stamp.info)&&ports.available(stamp.session,info)===true;}
+    function available(stamp,failed){
+      var info=stamp.session.info();
+      if(!same(info,stamp.info)){if(failed)failed('five-pin-stale');return false;}
+      var value=ports.available(stamp.session,info)===true;
+      if(!value&&failed)failed('projection-unready');return value;
+    }
     function response(request,value){
       if(!value||value.apiVersion!==2||value.requestId!==request.requestId||typeof value.ok!=='boolean')throw fault();
       Contract.correlate(request,value);
@@ -80,8 +90,21 @@
       } catch(error){cache=null;return Object.freeze({status:receipt?'applied-unconfirmed':'unconfirmed',applied:receipt?receipt.result.applied:null,code:error&&error.code||'unavailable'});}
     }
     return Object.freeze({refresh:refresh,edit:edit,invalidate:invalidate,
-      read:function(){try{if(cache&&current(cache.stamp)&&presented(cache.stamp.session.readPresentedObjectSession(),cache.stamp.info)&&
-        available(cache.stamp))return cache.value;}catch(_){}cache=null;return null;},
+      // Only an explicit caller receives the first refusal; normal presentation reads stay silent.
+      read:function(onRefusal){
+        var code=null;function failed(value){if(code===null)code=value;}
+        try{
+          if(!cache)failed('cache-empty');
+          else if(current(cache.stamp,failed)){
+            var shown=cache.stamp.session.readPresentedObjectSession();
+            if(!presented(shown,cache.stamp.info))failed(shown?'presentation-mismatch':'presentation-missing');
+            else if(available(cache.stamp,failed))return cache.value;
+          }
+        }catch(_){failed('exception');}
+        cache=null;
+        if(typeof onRefusal==='function')try{onRefusal(code||'unknown');}catch(_){}
+        return null;
+      },
       dispose:function(){retired=true;invalidate();}});
   }
   return Object.freeze({create:create});

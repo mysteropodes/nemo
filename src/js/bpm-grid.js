@@ -10,7 +10,17 @@
 // state.bpmShow are the whole model.
 (function () {
   function native() { return !!(window.__TAURI__ && window.__TAURI__.core); }
-  function projection() { var c = window.NemoNativeCompositionController; return c && c.read(); }
+  function projection(onRefusal) {
+    var c = window.NemoNativeCompositionController;
+    if (!c && typeof onRefusal === 'function') try { onRefusal('controller-missing'); } catch (_) {}
+    return c && c.read(onRefusal);
+  }
+  function settingsRefused(code) {
+    try {
+      var desktop = window.NemoNativeObjectProjectDesktop;
+      if (desktop && typeof desktop.openDiagnostic === 'function') desktop.openDiagnostic(window, 'bpm-settings-refused', code);
+    } catch (_) {}
+  }
   function submit(action, origin) {
     var c = window.NemoNativeCompositionController;
     if (!c || !origin) { if (window.showToast) showToast('Native BPM settings are unavailable.'); return; }
@@ -73,7 +83,7 @@
   }
 
   function openSettings(origin) {
-    origin = native() ? (arguments.length ? origin : projection()) : null;
+    origin = native() ? (arguments.length ? origin : projection(settingsRefused)) : null;
     var c = cfg();
     if (native() && !origin) { submit({}, null); return; }
     var v = prompt('Tempo en BPM (0 pour masquer la grille)', String(c.bpm));

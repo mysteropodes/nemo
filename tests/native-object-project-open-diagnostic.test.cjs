@@ -132,3 +132,19 @@ test('collector publishes complete snapshots only after the pending write and re
   release();await turn();assert.equal(calls.length,2);assert.equal(calls[1][0],'rename');
   assert.equal(calls[1][2],'/private/app-data/diagnostics/native-open.json');
 });
+
+
+test('BPM entry refusal uses only fixed collector vocabulary and never records caller detail',async()=>{
+  const f=fixture(),observed=[];f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>observed.push([event,code]);
+  const codes=['controller-missing','cache-empty','retired','generation-stale','session-replaced','inactive',
+    'five-pin-stale','subscription-stale','presentation-missing','presentation-mismatch','projection-unready','exception'];
+  for(const code of codes)Desktop.openDiagnostic(f.root,'bpm-settings-refused',code);
+  for(const code of ['PRIVATE /Users/secret document-id stack',null,{documentId:'PRIVATE'}])
+    Desktop.openDiagnostic(f.root,'bpm-settings-refused',code);
+  await turn();await turn();const records=await f.records();
+  assert.deepEqual(records.map(record=>record.code),[...codes,'unknown','unknown','unknown']);
+  assert.ok(records.every(record=>record.event==='bpm-settings-refused'));
+  assert.deepEqual(observed.map(record=>record[1]),[...codes,'unknown','unknown','unknown']);
+  assert.doesNotMatch(JSON.stringify(records),/PRIVATE|Users|secret|document-id|stack/);
+  assert.deepEqual(f.commands,[]);assert.deepEqual(f.effects,[]);
+});
