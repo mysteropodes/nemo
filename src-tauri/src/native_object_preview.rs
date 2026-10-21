@@ -1,5 +1,8 @@
 //! Owner-held work only: GPU and surface remain borrowed from the caller.
 use crate::native_dispatch::{NativeObjectHost, NativeReleaseProgress};
+use native_engine::desktop_viewport::{
+    ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+};
 use native_engine::{
     application::{
         prepare_object_motion_exposure_frame_for_control,
@@ -13,8 +16,8 @@ use native_engine::{
     export_job::ReconciliationStage,
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
-        prepare_object_paint_plan, prepare_object_render_scene,
-        prepare_object_navigated_viewport_composition, prepare_scheduled_object_composition_from_witness,
+        prepare_object_navigated_viewport_composition, prepare_object_paint_plan,
+        prepare_object_render_scene, prepare_scheduled_object_composition_from_witness,
         ObjectCompositionWitness, ObjectPaintPlan,
     },
     object_snapshot::ObjectSnapshot,
@@ -25,7 +28,6 @@ use native_engine::{
     },
 };
 use std::collections::BTreeSet;
-use native_engine::desktop_viewport::{ObjectPreviewView, ObjectPreviewNavigation, ObjectViewProjection, ObjectPresentedFrame};
 
 // CPU-only admission; never exported, cloned or detached from this owner.
 struct PreparedObjectPreview {
@@ -146,7 +148,13 @@ impl NativeObjectHost {
         output: OutputSpec,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
-        self.with_prepared_object_preview_for_view(expected, output, ObjectPreviewView::Canvas, false, operation)
+        self.with_prepared_object_preview_for_view(
+            expected,
+            output,
+            ObjectPreviewView::Canvas,
+            false,
+            operation,
+        )
     }
 
     /// Called only after the existing exact pending-event proof route admits it.
@@ -157,7 +165,13 @@ impl NativeObjectHost {
         output: OutputSpec,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
-        self.with_prepared_object_preview_for_view(expected, output, ObjectPreviewView::Canvas, true, operation)
+        self.with_prepared_object_preview_for_view(
+            expected,
+            output,
+            ObjectPreviewView::Canvas,
+            true,
+            operation,
+        )
     }
 
     pub(crate) fn with_prepared_object_preview_for_view<T>(
@@ -168,17 +182,34 @@ impl NativeObjectHost {
         pending_proof_fallback: bool,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
-        self.with_prepared_object_preview_for_navigation(expected, output, view, ObjectPreviewNavigation::default(), pending_proof_fallback, operation)
+        self.with_prepared_object_preview_for_navigation(
+            expected,
+            output,
+            view,
+            ObjectPreviewNavigation::default(),
+            pending_proof_fallback,
+            operation,
+        )
     }
     pub(crate) fn with_prepared_object_preview_for_navigation<T>(
-        &mut self, expected: &ObjectFrameSelector<'_>, output: OutputSpec,
-        view: ObjectPreviewView, navigation: ObjectPreviewNavigation, pending_proof_fallback: bool,
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        view: ObjectPreviewView,
+        navigation: ObjectPreviewNavigation,
+        pending_proof_fallback: bool,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
         if self.preview.prepared.is_some() {
             return Err("native object preview preparation is already borrowed".into());
         }
-        let prepared = self.prepare_object_preview_navigation(expected, output, view, navigation, pending_proof_fallback)?;
+        let prepared = self.prepare_object_preview_navigation(
+            expected,
+            output,
+            view,
+            navigation,
+            pending_proof_fallback,
+        )?;
         self.preview.prepared = Some(prepared);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
         self.preview.prepared = None;
@@ -194,18 +225,36 @@ impl NativeObjectHost {
         output: OutputSpec,
         pending_proof_fallback: bool,
     ) -> Result<PreparedObjectPreview, String> {
-        self.prepare_object_preview_view(expected, output, ObjectPreviewView::Canvas, pending_proof_fallback)
+        self.prepare_object_preview_view(
+            expected,
+            output,
+            ObjectPreviewView::Canvas,
+            pending_proof_fallback,
+        )
     }
 
     fn prepare_object_preview_view(
-        &mut self, expected: &ObjectFrameSelector<'_>, output: OutputSpec,
-        view: ObjectPreviewView, pending_proof_fallback: bool,
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        view: ObjectPreviewView,
+        pending_proof_fallback: bool,
     ) -> Result<PreparedObjectPreview, String> {
-        self.prepare_object_preview_navigation(expected, output, view, ObjectPreviewNavigation::default(), pending_proof_fallback)
+        self.prepare_object_preview_navigation(
+            expected,
+            output,
+            view,
+            ObjectPreviewNavigation::default(),
+            pending_proof_fallback,
+        )
     }
     fn prepare_object_preview_navigation(
-        &mut self, expected: &ObjectFrameSelector<'_>, output: OutputSpec,
-        view: ObjectPreviewView, navigation: ObjectPreviewNavigation, pending_proof_fallback: bool,
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        view: ObjectPreviewView,
+        navigation: ObjectPreviewNavigation,
+        pending_proof_fallback: bool,
     ) -> Result<PreparedObjectPreview, String> {
         navigation.validate()?;
         if self.released.is_some() || self.preview.released {
@@ -277,11 +326,14 @@ impl NativeObjectHost {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<PresentationReceipt, String> {
-        self.present_prepared_object_preview_view(expected, compositor, viewport).map(|result| result.receipt)
+        self.present_prepared_object_preview_view(expected, compositor, viewport)
+            .map(|result| result.receipt)
     }
 
     pub(crate) fn present_prepared_object_preview_view<P: SurfacePort>(
-        &mut self, expected: &ObjectFrameSelector<'_>, compositor: &mut Compositor,
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<ObjectPresentedFrame, String> {
         let prepared = self
@@ -320,12 +372,23 @@ impl NativeObjectHost {
             key.output_spec().dimensions(),
             compositor,
             |previous| {
-                prepare_object_navigated_viewport_composition(&plan, expected, previous,
-                    view == ObjectPreviewView::StoredCamera, navigation.zoom(), navigation.pan()).map_err(|e| format!("preview reference: {e:?}"))
+                prepare_object_navigated_viewport_composition(
+                    &plan,
+                    expected,
+                    previous,
+                    view == ObjectPreviewView::StoredCamera,
+                    navigation.zoom(),
+                    navigation.pan(),
+                )
+                .map_err(|e| format!("preview reference: {e:?}"))
             },
         )?;
         let view = ObjectViewProjection::from_navigation(
-            view, navigation, composition.viewport_document_transform().ok_or("preview requires an actual viewport witness")?,
+            view,
+            navigation,
+            composition
+                .viewport_document_transform()
+                .ok_or("preview requires an actual viewport witness")?,
             composition.viewport_stored_camera_available(),
         )?;
         if self

@@ -20,10 +20,22 @@ pub(super) struct ReferenceScene {
 
 /// One canonical quality identity, sealed by this actual viewport producer.
 pub fn object_viewport_quality(camera_view: bool, zoom: f64, pan: [f64; 2]) -> String {
-    let base = if camera_view { "final-camera-view" } else { "final" };
-    if zoom == 1. && pan == [0.,0.] { return base.into(); }
-    let [x,y] = pan.map(|n| if n == 0. { 0. } else { n });
-    format!("{}:{:016x}:{:016x}:{:016x}", base, zoom.to_bits(), x.to_bits(), y.to_bits())
+    let base = if camera_view {
+        "final-camera-view"
+    } else {
+        "final"
+    };
+    if zoom == 1. && pan == [0., 0.] {
+        return base.into();
+    }
+    let [x, y] = pan.map(|n| if n == 0. { 0. } else { n });
+    format!(
+        "{}:{:016x}:{:016x}:{:016x}",
+        base,
+        zoom.to_bits(),
+        x.to_bits(),
+        y.to_bits()
+    )
 }
 
 /// The old witness is only a one-entry read cache. Every selector and setting is
@@ -33,7 +45,7 @@ pub fn prepare_object_viewport_composition(
     expected: &ObjectFrameSelector<'_>,
     previous: Option<&ObjectCompositionWitness>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
-    prepare_object_navigated_viewport_composition(plan, expected, previous, false, 1., [0.,0.])
+    prepare_object_navigated_viewport_composition(plan, expected, previous, false, 1., [0., 0.])
 }
 
 /// Explicit session-only Camera View. Exports retain their separate stored-project route.
@@ -42,7 +54,7 @@ pub fn prepare_object_camera_viewport_composition(
     expected: &ObjectFrameSelector<'_>,
     previous: Option<&ObjectCompositionWitness>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
-    prepare_object_navigated_viewport_composition(plan, expected, previous, true, 1., [0.,0.])
+    prepare_object_navigated_viewport_composition(plan, expected, previous, true, 1., [0., 0.])
 }
 
 pub fn prepare_object_navigated_viewport_composition(
@@ -55,23 +67,45 @@ pub fn prepare_object_navigated_viewport_composition(
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
     let camera = if camera_view {
-        plan.packet().stored_camera_matrix().map_err(|_| ObjectSceneError::UnsupportedGeometry {
-            source_object_index: 0, reason: "stored camera transform unavailable",
-        })?
-    } else { None };
+        plan.packet()
+            .stored_camera_matrix()
+            .map_err(|_| ObjectSceneError::UnsupportedGeometry {
+                source_object_index: 0,
+                reason: "stored camera transform unavailable",
+            })?
+    } else {
+        None
+    };
     // Session navigation changes no source geometry, project camera or export.
-    let camera = if zoom == 1. && pan == [0.,0.] { camera } else {
+    let camera = if zoom == 1. && pan == [0., 0.] {
+        camera
+    } else {
         if !zoom.is_finite() || zoom <= 0. || pan.iter().any(|n| !n.is_finite()) {
-            return Err(ObjectSceneError::UnsupportedGeometry { source_object_index: 0, reason: "viewport navigation unavailable" });
+            return Err(ObjectSceneError::UnsupportedGeometry {
+                source_object_index: 0,
+                reason: "viewport navigation unavailable",
+            });
         }
-        let (w,h) = plan.packet().snapshot().project().ok_or(ObjectSceneError::ReferenceUnavailable)?.project().canvas_dimensions();
+        let (w, h) = plan
+            .packet()
+            .snapshot()
+            .project()
+            .ok_or(ObjectSceneError::ReferenceUnavailable)?
+            .project()
+            .canvas_dimensions();
         let centre = (f64::from(w) * 0.5, f64::from(h) * 0.5);
-        let matrix = Affine::translate(centre) * Affine::scale(zoom)
-            * Affine::translate((-centre.0,-centre.1))
-            * Affine::new(camera.unwrap_or([1.,0.,0.,1.,0.,0.])) * Affine::translate((-pan[0],-pan[1]));
-        let values = matrix.as_coeffs(); let determinant = values[0]*values[3]-values[1]*values[2];
+        let matrix = Affine::translate(centre)
+            * Affine::scale(zoom)
+            * Affine::translate((-centre.0, -centre.1))
+            * Affine::new(camera.unwrap_or([1., 0., 0., 1., 0., 0.]))
+            * Affine::translate((-pan[0], -pan[1]));
+        let values = matrix.as_coeffs();
+        let determinant = values[0] * values[3] - values[1] * values[2];
         if values.iter().any(|n| !n.is_finite()) || !determinant.is_finite() || determinant == 0. {
-            return Err(ObjectSceneError::UnsupportedGeometry { source_object_index: 0, reason: "viewport navigation unavailable" });
+            return Err(ObjectSceneError::UnsupportedGeometry {
+                source_object_index: 0,
+                reason: "viewport navigation unavailable",
+            });
         }
         Some(values)
     };
@@ -134,12 +168,18 @@ impl ObjectCompositionWitness {
     /// Exact affine consumed by this viewport witness, before surface stretching.
     /// Artwork/export witnesses cannot issue a viewport coordinate proof.
     pub fn viewport_document_transform(&self) -> Option<[f64; 6]> {
-        self.viewport.then(|| self.camera.unwrap_or([1., 0., 0., 1., 0., 0.]))
+        self.viewport
+            .then(|| self.camera.unwrap_or([1., 0., 0., 1., 0., 0.]))
     }
 
     /// Availability is sampled from this exact retained packet, never legacy UI state.
     pub fn viewport_stored_camera_available(&self) -> bool {
-        self.viewport && self.plan.packet().stored_camera_matrix().is_ok_and(|matrix| matrix.is_some())
+        self.viewport
+            && self
+                .plan
+                .packet()
+                .stored_camera_matrix()
+                .is_ok_and(|matrix| matrix.is_some())
     }
     /// Compares only the original encoded allocation. Visibility, opacity and
     /// frame changes can reuse it; replacement/removal cannot retain its raster.

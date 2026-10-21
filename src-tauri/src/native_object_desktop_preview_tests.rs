@@ -369,14 +369,22 @@ fn camera_view_is_strict_session_only_and_bad_modes_refuse_before_target() {
     let f = Fixture::new();
     let canvas = admit_request(&f.raw.to_string(), f.state.instance_id()).unwrap();
     assert_eq!(canvas.view_mode, ObjectPreviewView::Canvas);
-    for invalid in [json!(null), json!(false), json!(1), json!("camera"), json!({"mode":"stored-camera"})] {
-        let mut raw = f.raw.clone(); raw["viewMode"] = invalid;
+    for invalid in [
+        json!(null),
+        json!(false),
+        json!(1),
+        json!("camera"),
+        json!({"mode":"stored-camera"}),
+    ] {
+        let mut raw = f.raw.clone();
+        raw["viewMode"] = invalid;
         assert!(f.run(&raw.to_string()).is_err());
     }
-    let mut raw = f.raw.clone(); raw["viewMode"] = json!("stored-camera");
+    let mut raw = f.raw.clone();
+    raw["viewMode"] = json!("stored-camera");
     let admitted = admit_request(&raw.to_string(), f.state.instance_id()).unwrap();
     assert_eq!(admitted.view_mode, ObjectPreviewView::StoredCamera);
-    raw["cameraMatrix"] = json!([1,0,0,1,0,0]);
+    raw["cameraMatrix"] = json!([1, 0, 0, 1, 0, 0]);
     assert!(f.run(&raw.to_string()).is_err());
     assert_eq!(f.creations.get(), 0);
 }
@@ -391,19 +399,32 @@ fn gpu_actual_camera_view_changes_painter_cache_and_returns_the_painted_inverse(
     let f = Fixture::with_document(source);
     let before = f.raw.clone();
     let canvas = f.run(&f.raw.to_string()).unwrap();
-    assert_eq!(canvas.view.document_to_composition, [1.,0.,0.,1.,0.,0.]);
-    let mut locked = f.raw.clone(); locked["viewMode"] = json!("stored-camera");
-    f.trace.borrow_mut().color = [255;4]; // Authored blue square is outside the camera crop.
+    assert_eq!(
+        canvas.view.document_to_composition,
+        [1., 0., 0., 1., 0., 0.]
+    );
+    let mut locked = f.raw.clone();
+    locked["viewMode"] = json!("stored-camera");
+    f.trace.borrow_mut().color = [255; 4]; // Authored blue square is outside the camera crop.
     let camera = f.run(&locked.to_string()).unwrap();
     assert_eq!(camera.status, "presented");
     assert!(camera.view.camera_available);
     assert!(canvas.view.camera_available);
     assert_ne!(canvas.work_id, camera.work_id);
-    assert_eq!(camera.view.document_to_composition, [2.,0.,0.,2.,-160.,-90.]);
-    assert_eq!(camera.view.composition_to_document, [0.5,0.,0.,0.5,80.,45.]);
-    f.trace.borrow_mut().color = [0,0,255,255];
+    assert_eq!(
+        camera.view.document_to_composition,
+        [2., 0., 0., 2., -160., -90.]
+    );
+    assert_eq!(
+        camera.view.composition_to_document,
+        [0.5, 0., 0., 0.5, 80., 45.]
+    );
+    f.trace.borrow_mut().color = [0, 0, 255, 255];
     let unlocked = f.run(&f.raw.to_string()).unwrap();
-    assert_eq!(unlocked.view.document_to_composition, [1.,0.,0.,1.,0.,0.]);
+    assert_eq!(
+        unlocked.view.document_to_composition,
+        [1., 0., 0., 1., 0., 0.]
+    );
     assert_ne!(unlocked.work_id, camera.work_id);
     assert_eq!(f.raw, before);
     assert_eq!(f.raw["contentRevision"].as_u64(), Some(0));
@@ -413,44 +434,77 @@ fn gpu_actual_camera_view_changes_painter_cache_and_returns_the_painted_inverse(
 #[test]
 fn viewport_navigation_refuses_non_closed_or_nonfinite_requests_before_target_creation() {
     let f = Fixture::new();
-    for invalid in [json!(null),json!([]),json!({}),json!({"zoom":0,"pan":[0,0]}),
-        json!({"zoom":-1,"pan":[0,0]}),json!({"zoom":1,"pan":[0]}),
-        json!({"zoom":1,"pan":[0,null]}),json!({"zoom":1,"pan":[0,0],"matrix":[1,0,0,1,0,0]})] {
-        let mut raw = f.raw.clone(); raw["navigation"] = invalid;
+    for invalid in [
+        json!(null),
+        json!([]),
+        json!({}),
+        json!({"zoom":0,"pan":[0,0]}),
+        json!({"zoom":-1,"pan":[0,0]}),
+        json!({"zoom":1,"pan":[0]}),
+        json!({"zoom":1,"pan":[0,null]}),
+        json!({"zoom":1,"pan":[0,0],"matrix":[1,0,0,1,0,0]}),
+    ] {
+        let mut raw = f.raw.clone();
+        raw["navigation"] = invalid;
         assert!(f.run(&raw.to_string()).is_err());
     }
-    let raw = f.raw.to_string().replacen("\"viewport\":", "\"navigation\":{\"zoom\":1e999,\"pan\":[0,0]},\"viewport\":", 1);
+    let raw = f.raw.to_string().replacen(
+        "\"viewport\":",
+        "\"navigation\":{\"zoom\":1e999,\"pan\":[0,0]},\"viewport\":",
+        1,
+    );
     assert!(f.run(&raw).is_err());
-    let duplicate = f.raw.to_string().replacen("\"viewport\":", "\"navigation\":{\"zoom\":1,\"zoom\":2,\"pan\":[0,0]},\"viewport\":", 1);
+    let duplicate = f.raw.to_string().replacen(
+        "\"viewport\":",
+        "\"navigation\":{\"zoom\":1,\"zoom\":2,\"pan\":[0,0]},\"viewport\":",
+        1,
+    );
     assert!(f.run(&duplicate).is_err());
     assert_eq!(f.creations.get(), 0);
 }
 
 #[test]
-fn gpu_camera_navigation_changes_real_pixels_cache_and_inverse_without_history_or_export_authority() {
+fn gpu_camera_navigation_changes_real_pixels_cache_and_inverse_without_history_or_export_authority()
+{
     let source = json!({"format":"nemo.native-project-document","formatVersion":1,
         "project":{"canvasW":320,"canvasH":180,"fps":24,"cameraLayerOn":true,
             "cameraKeys":[{"frame":0,"x":160,"y":90,"w":160}]},
         "drawing":document(),"viewportReference":null,"assets":[]});
     let f = Fixture::with_document(source);
     let retained = || {
-        let native = f.state.native_state(); let guard = native.lock().unwrap(); let (_,owner) = guard.active().unwrap();
-        (owner.project_file_info().unwrap(), owner.project_file_snapshot(0, f.raw["documentSnapshotId"].as_str().unwrap()).unwrap())
+        let native = f.state.native_state();
+        let guard = native.lock().unwrap();
+        let (_, owner) = guard.active().unwrap();
+        (
+            owner.project_file_info().unwrap(),
+            owner
+                .project_file_snapshot(0, f.raw["documentSnapshotId"].as_str().unwrap())
+                .unwrap(),
+        )
     };
     let before = (f.raw.clone(), retained());
-    let mut camera = f.raw.clone(); camera["viewMode"] = json!("stored-camera");
-    f.trace.borrow_mut().color = [255;4];
+    let mut camera = f.raw.clone();
+    camera["viewMode"] = json!("stored-camera");
+    f.trace.borrow_mut().color = [255; 4];
     let locked = f.run(&camera.to_string()).unwrap();
-    let mut manual = camera.clone(); manual["navigation"] = json!({"zoom":0.5,"pan":[0,0]});
+    let mut manual = camera.clone();
+    manual["navigation"] = json!({"zoom":0.5,"pan":[0,0]});
     // Half of the 2x camera is identity: blue [4,4]-[28,28], white [40,40].
-    f.trace.borrow_mut().color = [0,0,255,255];
+    f.trace.borrow_mut().color = [0, 0, 255, 255];
     let navigated = f.run(&manual.to_string()).unwrap();
-    assert_eq!(navigated.view.document_to_composition, [1.,0.,0.,1.,0.,0.]);
-    assert_eq!(navigated.view.composition_to_document, [1.,0.,0.,1.,0.,0.]);
+    assert_eq!(
+        navigated.view.document_to_composition,
+        [1., 0., 0., 1., 0., 0.]
+    );
+    assert_eq!(
+        navigated.view.composition_to_document,
+        [1., 0., 0., 1., 0., 0.]
+    );
     assert_eq!(navigated.view.navigation.zoom(), 0.5);
-    assert_eq!(navigated.view.navigation.pan(), [0.,0.]);
+    assert_eq!(navigated.view.navigation.pan(), [0., 0.]);
     assert_ne!(navigated.work_id, locked.work_id);
-    let mut wrong = manual.clone(); wrong["documentSnapshotId"] = json!("foreign");
+    let mut wrong = manual.clone();
+    wrong["documentSnapshotId"] = json!("foreign");
     assert!(f.run(&wrong.to_string()).is_err());
     assert_eq!(f.trace.borrow().acquisitions, 2);
     assert_eq!((f.raw.clone(), retained()), before);

@@ -97,7 +97,9 @@ pub(super) struct Fixture {
     slot: TestObjectSlot<View>,
 }
 impl Fixture {
-    pub(super) fn new() -> Self { Self::with_document(document()) }
+    pub(super) fn new() -> Self {
+        Self::with_document(document())
+    }
     pub(super) fn with_document(source: Value) -> Self {
         let state = Arc::new(ApplicationMcp::default());
         state

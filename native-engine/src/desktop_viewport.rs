@@ -18,7 +18,9 @@ mod viewport_scene_overlay;
 pub use object_consumer::ObjectViewportFrame;
 #[path = "object_viewport_projection.rs"]
 mod object_viewport_projection;
-pub use object_viewport_projection::{ObjectPreviewView, ObjectPreviewNavigation, ObjectViewProjection, ObjectPresentedFrame};
+pub use object_viewport_projection::{
+    ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+};
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

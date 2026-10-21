@@ -61,7 +61,7 @@
     if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
     const captured=shown.presentation;let actionReady=null;
     const guarded={info:owner.info,isActive:owner.isActive,requestId:owner.requestId,runResourceCommand:action=>owner.runResourceCommand(ctx=>{
-      const exact=()=>{const p=ctx.readPresentedObjectSession&&ctx.readPresentedObjectSession();return p&&p.presentation===captured&&state.currentFrame===captured.frame&&JSON.stringify(Mapping.bounds(root,owner.info()))===JSON.stringify(rect);};
+      const exact=()=>{const p=ctx.readPresentedObjectSession&&ctx.readPresentedObjectSession();return p&&p.presentation===captured&&(captured.view?captured.view.mode:'canvas')===(state.cameraView===true?'stored-camera':'canvas')&&state.currentFrame===captured.frame&&JSON.stringify(Mapping.bounds(root,owner.info()))===JSON.stringify(rect);};
       if(!exact())throw command.fault('stale_owner','Fill presentation changed');
       actionReady=exact;try{return action({reconcile:ctx.reconcile,dispatch:q=>{if(!exact())throw command.fault('stale_owner','Fill presentation changed');return ctx.dispatch(q);}});}finally{actionReady=null;}
     })};

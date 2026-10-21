@@ -138,14 +138,16 @@ test('ordinary Fill retains the real Project action-local presentation while its
     classList:{contains:()=>true},style:{getPropertyValue:k=>String({left:20,top:30,right:660,bottom:390}[k.replace('--nemo-native-','')])}}}};
   session=Project.create({frame:()=>root.state.currentFrame,viewMode:()=>root.state.cameraView?'stored-camera':'canvas',projectionReady:()=>true,
    mapping:()=>({cssBounds:{x:20,y:30,width:640,height:360},physicalExtent:{width:640,height:360},compositionExtent:{width:320,height:180},reportedDpr:1}),
-   invoke:async(command,args)=>{const q=args&&JSON.parse(args.requestJson);
+   dispatchApplication:async(q)=>{
+    assert.equal(session.readPresentedObjectSession(),null,'public pending fence remains active');
+    assert.equal(q.operation,OP);sent.push(q);revision++;
+    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,ok:true,contentRevision:revision,result:{applied:true,historyEntriesAdded:1}};
+   },invoke:async(command,args)=>{const q=args&&JSON.parse(args.requestJson);
     if(command==='nemo_native_object_client_status')return {...info(),available:installed};
     if(command==='nemo_native_object_bootstrap'){installed=true;return {...info(),requestId:q.requestId,resourceCount:0,viewportAvailable:false};}
     if(command==='nemo_native_object_reference')return {...info(),requestId:q.requestId};
     if(command==='nemo_native_object_preview')return {status:'presented',workId:'fill-work-'+revision,viewGeneration:1};
-    assert.equal(command,'nemo_native_dispatch');assert.equal(session.readPresentedObjectSession(),null,'public pending fence remains active');
-    assert.equal(q.operation,OP);sent.push(q);revision++;
-    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,ok:true,contentRevision:revision,result:{applied:true,historyEntriesAdded:1}};
+    assert.fail('Unexpected private command: '+command);
    }});
   root.NemoNativeObjectProject={desktop:()=>session};await session.openPath('/fill.json');assert.ok(session.readPresentedObjectSession());
   fill.handlePointerDown(root,{clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}},{mapping:require('../src/js/adapters/native-viewport-underlay.js').canvasMapping});

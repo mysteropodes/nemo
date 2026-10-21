@@ -8,7 +8,10 @@ use crate::native_application_viewport::{self as viewport_host, NativeViewportCo
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
-    desktop_viewport::{DesktopViewportHost, SurfacePort, ObjectPreviewView, ObjectPreviewNavigation, ObjectViewProjection, ObjectPresentedFrame},
+    desktop_viewport::{
+        DesktopViewportHost, ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView,
+        ObjectViewProjection, SurfacePort,
+    },
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
     scheduler::OutputSpec,
@@ -25,7 +28,9 @@ pub(crate) struct ObjectPreviewReceipt {
 }
 impl std::ops::Deref for ObjectPreviewReceipt {
     type Target = NativePreviewReceipt;
-    fn deref(&self) -> &Self::Target { &self.preview }
+    fn deref(&self) -> &Self::Target {
+        &self.preview
+    }
 }
 
 const MAX_BYTES: usize = 8192;
@@ -145,7 +150,10 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             ));
         }
     }
-    request.navigation.validate().map_err(|message| host_error("invalid_request", message))?;
+    request
+        .navigation
+        .validate()
+        .map_err(|message| host_error("invalid_request", message))?;
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
     Ok(request)
@@ -210,7 +218,12 @@ pub(crate) fn preview_with_target(
                     }))
                 };
                 owner.with_prepared_object_preview_for_navigation(
-                    &selector, output, request.view_mode, request.navigation, revision_sync.is_some(), consume,
+                    &selector,
+                    output,
+                    request.view_mode,
+                    request.navigation,
+                    revision_sync.is_some(),
+                    consume,
                 )
             },
         )

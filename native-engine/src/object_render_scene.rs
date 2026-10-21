@@ -24,7 +24,10 @@ use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 #[path = "object_reference_scene.rs"]
 mod reference;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
-pub use reference::{prepare_object_viewport_composition, prepare_object_camera_viewport_composition, prepare_object_navigated_viewport_composition, object_viewport_quality};
+pub use reference::{
+    object_viewport_quality, prepare_object_camera_viewport_composition,
+    prepare_object_navigated_viewport_composition, prepare_object_viewport_composition,
+};
 
 #[path = "object_scheduled_scene.rs"]
 mod scheduled;
@@ -144,7 +147,9 @@ pub fn prepare_object_composition(
 
 impl ObjectCompositionWitness {
     /// Viewport content is never an artwork export source, even with no image.
-    pub(crate) fn expected_quality(&self) -> &str { self.viewport_quality.as_deref().unwrap_or("final") }
+    pub(crate) fn expected_quality(&self) -> &str {
+        self.viewport_quality.as_deref().unwrap_or("final")
+    }
     pub(crate) fn is_viewport(&self) -> bool {
         self.viewport
     }
