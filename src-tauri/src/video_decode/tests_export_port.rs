@@ -84,3 +84,16 @@ fn dropping_the_decoder_closes_every_session_still_open() {
     assert_eq!(running, 2, "both sessions hold a live ffmpeg child");
     drop(decoder); // must kill and reap both children without panicking
 }
+
+/// Decodes `frames` of `path` through the real export port, closing the session:
+/// ((width, height, frame_count), RGBA per frame). Shared with the T12 host test.
+pub(super) fn decoded_frames(path: &str, frames: &[u32]) -> ((u32, u32, u32), Vec<Vec<u8>>) {
+    let mut decoder = DesktopVideoDecoder::default();
+    let info = decoder.open(path).unwrap();
+    let out = frames
+        .iter()
+        .map(|&n| decoder.decode(info.session, n).unwrap())
+        .collect();
+    decoder.close(info.session).unwrap();
+    ((info.width, info.height, info.frame_count), out)
+}

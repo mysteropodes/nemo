@@ -6,9 +6,10 @@
 //! producer: dimensions from the PNG header, frame counts from the published
 //! directory, and pixels decoded by the ffmpeg sidecar, never by the engine's
 //! own encoder. Needs macOS (Metal + the bundled sidecar).
-use super::tests::{ffmpeg_shared, gen_video, test_ffmpeg_path};
 use crate::native_application_ports::DesktopArtifactPort;
 use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
+use crate::video_decode::tests::{ffmpeg_shared, gen_video, test_ffmpeg_path};
+use crate::video_decode::tests_export_port::decoded_frames;
 use native_engine::{
     compositor::Compositor,
     desktop_viewport::{
@@ -378,7 +379,7 @@ fn viewport() -> (DesktopViewportHost<Capture>, Rc<RefCell<Vec<Vec<u8>>>>) {
 }
 
 fn install_decoder() {
-    crate::native_dispatch::video::install_video_decoder(super::boxed_decoder);
+    crate::native_dispatch::video::install_video_decoder(crate::video_decode::boxed_decoder);
 }
 
 // ---- acceptance ---------------------------------------------------------------
@@ -472,17 +473,14 @@ fn two_real_sources_drive_preview_and_export_through_replacement_offset_and_rema
 fn the_two_sources_differ_in_every_channel_including_alpha_at_every_timestamp() {
     // Guards the acceptance test against fixtures that could not tell A from B
     // or one frame from another: decoded straight from the real sidecar.
-    use native_engine::native_media_frame_export::NativeVideoDecoder;
     let (path_a, path_b) = (source_a(), source_b());
+    let frames = [0, 4, 7, 11];
     let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
-    let mut decoder = super::DesktopVideoDecoder::default();
-    let ia = decoder.open(&path_a).unwrap();
-    let ib = decoder.open(&path_b).unwrap();
-    assert_eq!((ia.width, ia.height, ia.frame_count), (W, H, 20));
-    assert_eq!((ib.width, ib.height, ib.frame_count), (W, H, 12));
-    for n in [0, 4, 7, 11] {
-        let fa = decoder.decode(ia.session, n).unwrap();
-        let fb = decoder.decode(ib.session, n).unwrap();
+    let (info_a, all_a) = decoded_frames(&path_a, &frames);
+    let (info_b, all_b) = decoded_frames(&path_b, &frames);
+    assert_eq!(info_a, (W, H, 20));
+    assert_eq!(info_b, (W, H, 12));
+    for ((fa, fb), n) in all_a.iter().zip(&all_b).zip(frames) {
         // The sidecar's lossless pipe returns the exact generated texels.
         for y in 0..H {
             for x in 0..W {
@@ -494,6 +492,4 @@ fn the_two_sources_differ_in_every_channel_including_alpha_at_every_timestamp() 
         assert!(fa.chunks_exact(4).any(|p| p[3] != 255), "A has real alpha");
         assert!(fb.chunks_exact(4).any(|p| p[3] != 255), "B has real alpha");
     }
-    decoder.close(ia.session).unwrap();
-    decoder.close(ib.session).unwrap();
 }

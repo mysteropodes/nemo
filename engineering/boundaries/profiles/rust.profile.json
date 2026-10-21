@@ -1412,6 +1412,7 @@
         "native_media_export_job_support.rs",
         "native_media_frame_export.rs",
         "native_media_frame_export_timing.rs",
+        "native_media_retained_witness.rs",
         "native_import_transaction.rs",
         "native_import_transaction_atomic.rs",
         "native_import_transaction_chain.rs",
@@ -2053,6 +2054,7 @@
       "files": [
         "native_application_dispatch_release_tests.rs",
         "native_object_host_tests.rs",
+        "native_media_host_tests.rs",
         "native_object_bootstrap_tests.rs",
         "native_object_host_read_tests.rs",
         "native_object_host_command_tests.rs",
