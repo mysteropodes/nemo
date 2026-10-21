@@ -27,7 +27,7 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}},
     getElementById:id=>{
       if(['palette-grid','palette-tabs','btn-palette-new','btn-palette-add-fill','btn-palette-add-stroke',
-        'btn-palette-replace','btn-palette-swap','palette-replace-scope','fb-avatars-pop'].includes(id))return null;
+        'btn-palette-replace','btn-palette-swap','palette-replace-scope','fb-avatars-pop','zoom-scrub'].includes(id))return null;
       assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId,contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,lifecycleGeneration:generation,
     documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:layerRows.map(row=>({...row})),reference:null});
