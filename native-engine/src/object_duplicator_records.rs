@@ -12,11 +12,13 @@
 //!
 //! Admission is label-strict where the baseline silently falls through
 //! (`mode`, `sourceMode`, `timeOffset.direction`, effector `falloff` and channel
-//! `prop` are closed sets the UI writes) and reference-strict only where the
-//! baseline cannot run: no chained duplicator (a path layer or pool member that
-//! is itself a duplicator, or the host itself) and, in path mode, no path layer
-//! that names no layer. A pool member or an effector target that no longer
-//! exists stays representable because the baseline skips it at evaluation.
+//! `prop` are closed sets the UI writes). References retain the existing self
+//! path and duplicator pool-member refusals, and path mode requires a known
+//! layer in the host's context. Another duplicator is representable as a path
+//! reference: baseline `_resolveDuplicatorPath` returns null before reading
+//! that layer, then `applyLayerDuplicator` returns the seed. A missing pool
+//! member or effector target stays representable because the baseline skips
+//! it at evaluation.
 use crate::object_document::{object_deserialize, Presence};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
@@ -298,11 +300,10 @@ impl DuplicatorDescriptor {
                     ));
                 }
                 let key = (context_id, path.as_str());
-                if hosts.contains(&key) {
-                    return Err(DuplicatorRecordError::Chained(
-                        "the path layer is itself a duplicator",
-                    ));
-                }
+                // Baseline app.js:1466-1470 (fbe4b8a3) returns no path for
+                // another duplicator BEFORE reading its strokes. Preserve
+                // that representable reference and the seed fallback; this
+                // does not follow or recursively evaluate the referenced host.
                 if !known.contains(&key) {
                     return Err(DuplicatorRecordError::Unresolved(
                         "the path layer names no layer",

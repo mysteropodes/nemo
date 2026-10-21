@@ -361,3 +361,6 @@ fn real_project_expression_context_flows_through_the_original_public_dispatch() 
     assert_eq!(read(&pin, missing), Err(DispatchErrorCode::NotFound));
     assert_eq!(owner.history_depths(), (0, 0));
 }
+
+#[path = "object_property_expression_state.rs"]
+mod expression_state;

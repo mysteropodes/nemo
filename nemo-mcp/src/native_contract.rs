@@ -27,6 +27,8 @@ pub(crate) mod text_read;
 pub(crate) mod audio_track;
 #[path = "native_composition_contract.rs"]
 pub(crate) mod composition;
+#[path = "native_custom_brush_contract.rs"]
+pub(crate) mod custom_brush;
 #[path = "native_guide_contract.rs"]
 pub(crate) mod guide;
 #[path = "native_palette_contract.rs"]
@@ -39,6 +41,11 @@ pub(crate) mod placement;
 pub(crate) mod settings;
 #[path = "native_shadow_contract.rs"]
 pub(crate) mod shadow;
+#[path = "native_workspace_contract.rs"]
+pub(crate) mod workspace;
+
+#[path = "native_comments_contract.rs"]
+pub(crate) mod comments;
 
 #[path = "native_diagnostics_contract.rs"]
 mod diagnostics;
@@ -120,6 +127,9 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | guide::READ
             | shadow::READ
             | perspective::READ
+            | workspace::READ
+            | custom_brush::READ
+            | comments::READ
             | font::QUERY
             | brush::QUERY
             | "query.document.object.layer.timing"
@@ -150,6 +160,9 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         guide::READ | guide::EDIT => guide::request(operation, payload),
         shadow::READ | shadow::EDIT => shadow::request(operation, payload),
         perspective::READ | perspective::EDIT => perspective::request(operation, payload),
+        workspace::READ | workspace::EDIT => workspace::request(operation, payload),
+        comments::READ | comments::EDIT => comments::request(operation, payload),
+        custom_brush::READ | custom_brush::EDIT => custom_brush::request(operation, payload),
         placement::OP => placement::request(payload),
         audio_track::OP => audio_track::request(payload),
         layer_policy::OP => layer_policy::request(payload),
@@ -317,6 +330,15 @@ pub(crate) fn validate_result(
     }
     if matches!(operation, palette::READ | palette::EDIT) {
         return palette::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, comments::READ | comments::EDIT) {
+        return comments::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, custom_brush::READ | custom_brush::EDIT) {
+        return custom_brush::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, workspace::READ | workspace::EDIT) {
+        return workspace::result(operation, request_document_id, payload, result);
     }
     if matches!(operation, perspective::READ | perspective::EDIT) {
         return perspective::result(operation, request_document_id, payload, result);

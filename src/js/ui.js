@@ -777,7 +777,7 @@
   // enregistrés") — same restore-then-save-on-mouseup shape as the panel
   // widths below, and the same value SMWorkspace carries into the project.
   try{var savedTlH=localStorage.getItem('nemo-timeline-height'); if(savedTlH)ta.style.height=savedTlH;}catch(e){}
-  rh.addEventListener('mousedown',function(e){rsy=e.clientY;rsh=ta.offsetHeight;window._tlResize=true;e.preventDefault();});
+  rh.addEventListener('mousedown',function(e){if(window.SMWorkspace&&SMWorkspace.begin('timeline')===false)return;rsy=e.clientY;rsh=ta.offsetHeight;window._tlResize=true;e.preventDefault();});
   window.addEventListener('mousemove',function(e){
     if(!window._tlResize)return;
     // Cap was a flat 500px regardless of window size — feedback: "monter
@@ -794,6 +794,7 @@
     if(!window._tlResize)return;
     window._tlResize=false;
     try{localStorage.setItem('nemo-timeline-height',ta.style.height||'');}catch(e){}
+    if(window.SMWorkspace)SMWorkspace.settle('timeline');
   });
 
   // Layers panel horizontal resize — same drag-a-thin-bar pattern as the
@@ -816,9 +817,9 @@
 
   var lpr=document.getElementById('layer-panel-resize'),lp=document.getElementById('layer-panel'),lprx,lprw;
   restorePanelWidth('nemo-layer-panel-width',lp);
-  lpr.addEventListener('mousedown',function(e){lprx=e.clientX;lprw=lp.offsetWidth;window._lpResize=true;lpr.classList.add('active');e.preventDefault();});
+  lpr.addEventListener('mousedown',function(e){if(window.SMWorkspace&&SMWorkspace.begin('layer')===false)return;lprx=e.clientX;lprw=lp.offsetWidth;window._lpResize=true;lpr.classList.add('active');e.preventDefault();});
   window.addEventListener('mousemove',function(e){if(!window._lpResize)return;lp.style.width=Math.max(90,Math.min(400,lprw+(e.clientX-lprx)))+'px';});
-  window.addEventListener('mouseup',function(){if(!window._lpResize)return;window._lpResize=false;lpr.classList.remove('active');savePanelWidth('nemo-layer-panel-width',lp);});
+  window.addEventListener('mouseup',function(){if(!window._lpResize)return;window._lpResize=false;lpr.classList.remove('active');savePanelWidth('nemo-layer-panel-width',lp);if(window.SMWorkspace)SMWorkspace.settle('layer');});
 
   // Left (tools) and right (props) panel horizontal resize — same
   // drag-a-thin-bar pattern as #layer-panel-resize above. Each move also
@@ -828,9 +829,9 @@
   // the window edge (reported layout bug).
   var tpr=document.getElementById('tools-panel-resize'),tp=document.getElementById('tools-panel'),tprx,tprw;
   restorePanelWidth('nemo-tools-panel-width',tp);
-  tpr.addEventListener('mousedown',function(e){tprx=e.clientX;tprw=tp.offsetWidth;window._tpResize=true;tpr.classList.add('active');e.preventDefault();});
+  tpr.addEventListener('mousedown',function(e){if(window.SMWorkspace&&SMWorkspace.begin('tools')===false)return;tprx=e.clientX;tprw=tp.offsetWidth;window._tpResize=true;tpr.classList.add('active');e.preventDefault();});
   window.addEventListener('mousemove',function(e){if(!window._tpResize)return;tp.style.width=Math.max(50,Math.min(160,tprw+(e.clientX-tprx)))+'px';window.dispatchEvent(new Event('resize'));});
-  window.addEventListener('mouseup',function(){if(!window._tpResize)return;window._tpResize=false;tpr.classList.remove('active');window.dispatchEvent(new Event('resize'));savePanelWidth('nemo-tools-panel-width',tp);});
+  window.addEventListener('mouseup',function(){if(!window._tpResize)return;window._tpResize=false;tpr.classList.remove('active');window.dispatchEvent(new Event('resize'));savePanelWidth('nemo-tools-panel-width',tp);if(window.SMWorkspace)SMWorkspace.settle('tools');});
 
   var ppr=document.getElementById('props-panel-resize'),pp=document.getElementById('props-panel'),pprx,pprw;
   // Collapse-to-rail (timeline.js, PR #209) applies AFTER this file runs
@@ -841,9 +842,9 @@
   // so there's no visible flash of a wide collapsed panel.
   restorePanelWidth('nemo-props-panel-width',pp);
   if(pp.style.width)window._propsExpandedWidth=pp.style.width;
-  ppr.addEventListener('mousedown',function(e){pprx=e.clientX;pprw=pp.offsetWidth;window._ppResize=true;ppr.classList.add('active');e.preventDefault();});
+  ppr.addEventListener('mousedown',function(e){if(window.SMWorkspace&&SMWorkspace.begin('props')===false)return;pprx=e.clientX;pprw=pp.offsetWidth;window._ppResize=true;ppr.classList.add('active');e.preventDefault();});
   window.addEventListener('mousemove',function(e){if(!window._ppResize)return;pp.style.width=Math.max(240,Math.min(520,pprw-(e.clientX-pprx)))+'px';window.dispatchEvent(new Event('resize'));});
-  window.addEventListener('mouseup',function(){if(!window._ppResize)return;window._ppResize=false;ppr.classList.remove('active');window.dispatchEvent(new Event('resize'));savePanelWidth('nemo-props-panel-width',pp);});
+  window.addEventListener('mouseup',function(){if(!window._ppResize)return;window._ppResize=false;ppr.classList.remove('active');window.dispatchEvent(new Event('resize'));savePanelWidth('nemo-props-panel-width',pp);if(window.SMWorkspace)SMWorkspace.settle('props');});
 
   // ---- WORKSPACE (2026-09, feedback #790) ------------------------------
   //
@@ -872,65 +873,16 @@
       if(m)pp.appendChild(m);
     });
   }
-  function _w(id){var el=document.getElementById(id);return el&&el.style.width?el.style.width:null;}
-  window.SMWorkspace={
-    capture:function(){
-      var ta=document.getElementById('timeline-area');
-      var pp=document.getElementById('props-panel');
-      var ws={
-        layerPanelWidth:_w('layer-panel'),
-        toolsPanelWidth:_w('tools-panel'),
-        // A collapsed props panel has no inline width of its own — the
-        // expanded one is stashed aside by togglePropsPanelCollapse, and
-        // that is the width worth restoring.
-        propsPanelWidth:(pp&&pp.classList.contains('collapsed'))?(window._propsExpandedWidth||null):_w('props-panel'),
-        propsPanelCollapsed:!!(pp&&pp.classList.contains('collapsed')),
-        timelineHeight:(ta&&ta.style.height)?ta.style.height:null,
-        panelOrder:_secOrderNow(),
-      };
-      try{ws.motionColumns=localStorage.getItem('nemo-motion-columns')||null;}catch(e){}
-      return ws;
-    },
-    apply:function(ws){
-      if(!ws||typeof ws!=='object')return false;
-      function set(id,v,key){
-        var el=document.getElementById(id);
-        if(!el||!v||typeof v!=='string')return;
-        el.style.width=v;
-        try{localStorage.setItem(key,v);}catch(e){}
-      }
-      set('layer-panel',ws.layerPanelWidth,'nemo-layer-panel-width');
-      set('tools-panel',ws.toolsPanelWidth,'nemo-tools-panel-width');
-      var pp=document.getElementById('props-panel');
-      if(pp&&ws.propsPanelWidth&&typeof ws.propsPanelWidth==='string'){
-        window._propsExpandedWidth=ws.propsPanelWidth;
-        if(!pp.classList.contains('collapsed'))pp.style.width=ws.propsPanelWidth;
-        try{localStorage.setItem('nemo-props-panel-width',ws.propsPanelWidth);}catch(e){}
-      }
-      if(typeof ws.propsPanelCollapsed==='boolean'&&pp&&window.togglePropsPanelCollapse){
-        var isCollapsed=pp.classList.contains('collapsed');
-        if(isCollapsed!==ws.propsPanelCollapsed)window.togglePropsPanelCollapse(ws.propsPanelCollapsed);
-      }
-      var ta=document.getElementById('timeline-area');
-      if(ta&&ws.timelineHeight&&typeof ws.timelineHeight==='string'){
-        ta.style.height=ws.timelineHeight;
-        try{localStorage.setItem('nemo-timeline-height',ws.timelineHeight);}catch(e){}
-      }
-      if(Array.isArray(ws.panelOrder)&&ws.panelOrder.length){
-        _applySecOrder(ws.panelOrder);
-        try{localStorage.setItem('nemo-panel-order',JSON.stringify(ws.panelOrder));}catch(e){}
-      }
-      if(ws.motionColumns&&typeof ws.motionColumns==='string'){
-        try{localStorage.setItem('nemo-motion-columns',ws.motionColumns);}catch(e){}
-        var lp=document.getElementById('layer-panel');
-        if(lp)lp.dataset.motionColumns=ws.motionColumns;
-      }
-      // The canvas sizes itself from a window resize (see the panel drag
-      // handlers above, which fire one for the same reason).
-      window.dispatchEvent(new Event('resize'));
-      return true;
-    },
-  };
+  window.SMWorkspace=NemoNativeWorkspaceUI.presentation(window,{
+    order:_secOrderNow,applyOrder:_applySecOrder,
+    cancelGesture:function(){
+      window._tlResize=false;window._lpResize=false;window._tpResize=false;window._ppResize=false;
+      [lpr,tpr,ppr].forEach(function(handle){if(handle)handle.classList.remove('active');});
+      if(secDrag){secDrag.el=null;secDrag.started=false;}
+      if(secDropIndicator)secDropIndicator.style.display='none';
+      document.querySelectorAll('.psec').forEach(function(sec){sec.classList.remove('drag-sec','drag-over-sec');});
+    }
+  });
 
   // No local FC here (was a stale hardcoded 14, a duplicate of app.js's
   // global FC that drifted out of sync with it — real bug, caused the
@@ -1231,6 +1183,7 @@
   document.addEventListener('mousedown',function(e){
     var h=e.target.closest?e.target.closest('.phdr'):null;if(!h)return;
     var sec=h.parentElement;if(!sec.classList.contains('psec'))return;
+    if(window.SMWorkspace&&SMWorkspace.begin('panelOrder')===false)return;
     secDrag.el=sec;secDrag.startX=e.clientX;secDrag.startY=e.clientY;secDrag.started=false;
     secDrag.wasFloating=sec.classList.contains('floating');
     var r=sec.getBoundingClientRect();secDrag.offX=e.clientX-r.left;secDrag.offY=e.clientY-r.top;
@@ -1287,11 +1240,13 @@
         }
         else pp3.appendChild(secDrag.el);
         saveSecOrder();
+        if(window.SMWorkspace)SMWorkspace.settle('panelOrder');
       }
       window._secDragJustEnded=true;
       document.querySelectorAll('.psec').forEach(function(s){s.classList.remove('drag-sec','drag-over-sec');});
       secDropIndicator.style.display='none';
     }
+    if(window.SMWorkspace)SMWorkspace.release('panelOrder');
     secDrag.el=null;secDrag.started=false;
   });
   window.addEventListener('resize',function(){

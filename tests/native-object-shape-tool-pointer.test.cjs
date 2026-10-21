@@ -193,11 +193,11 @@ test('all42 retained bootstrap identities match their explicit amended ordinal l
  assert.deepEqual(paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal),expected);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
- assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[233,234,237]);
- assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,235);
- assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,116);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,117);
- assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 116/);
- assert.match(fixture,/assert\.deepEqual\(positions, \[13, 15, 16, 17, 18, 19, 20, 22, 23\]/);
+ assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[239,240,243]);
+ assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,241);
+ assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,119);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,120);
+ assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 119/);
+ assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 23, 24\]/);
 });
 
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{

@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-custom-brush",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.customBrushPreset.read",
+    "command.document.object.project.customBrushPreset.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCustomBrushPresetReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCustomBrushPresetEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete 4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
+  },
+  "semantics": "Original brush editor save/update and both existing catalog delete controls use pinned native catalog identity and the existing document queue/history. The 36 optional typed fields and ordered raw IDs are preserved. Missing delete is a native no-op. Local favorites, tool bundles, selection and diameter remain transient/local. Desktop hover and texture application refuse before legacy live selection/history writes. Detached confirmed preview geometry is presentation only. Catalog management supplies no native custom vector drawing source/provider. Source-only proposal; runtime and installed acceptance remain open.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned ordered native catalog settings",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "customBrushPreset-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.customBrushPreset.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "customBrushPreset-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "customBrushPresetsPresent": false,
+            "presetCount": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "Original explicit editor save creates one checkpoint",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "customBrushPreset-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.customBrushPreset.edit",
+        "payload": {
+          "command": "object.project.customBrushPreset.edit",
+          "action": {
+            "kind": "upsert",
+            "id": "custom-raw",
+            "preset": {
+              "label": "My brush",
+              "savedBrushSize": 12,
+              "markerTip": false
+            }
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "customBrushPreset-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

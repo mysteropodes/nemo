@@ -103,7 +103,7 @@ fn cut(
     let mut changed = false;
     for uid in layers {
         let index = layer_position(document, uid).ok_or(DispatchErrorCode::NotFound)?;
-        if document.layers[index].locked() {
+        if document.layer_is_locked(document.layers[index].layer_uid()) {
             continue;
         }
         let frames: Vec<u32> = selection

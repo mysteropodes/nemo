@@ -15,6 +15,9 @@ const OP_PROJECT_PALETTE: &str = "command.document.object.project.palette.edit";
 const OP_PROJECT_GUIDE: &str = "command.document.object.project.guide.edit";
 const OP_PROJECT_SHADOW: &str = "command.document.object.project.shadow.edit";
 const OP_PROJECT_PERSPECTIVE: &str = "command.document.object.project.perspective.edit";
+const OP_PROJECT_WORKSPACE: &str = "command.document.object.project.workspace.edit";
+const OP_PROJECT_COMMENTS: &str = "command.document.object.project.comments.edit";
+const OP_PROJECT_CUSTOM_BRUSH: &str = "command.document.object.project.customBrushPreset.edit";
 
 pub(super) fn is_project_settings_operation(operation: &str) -> bool {
     matches!(
@@ -25,6 +28,9 @@ pub(super) fn is_project_settings_operation(operation: &str) -> bool {
             | OP_PROJECT_GUIDE
             | OP_PROJECT_SHADOW
             | OP_PROJECT_PERSPECTIVE
+            | OP_PROJECT_WORKSPACE
+            | OP_PROJECT_CUSTOM_BRUSH
+            | OP_PROJECT_COMMENTS
     )
 }
 
@@ -165,6 +171,9 @@ impl NativeObjectHistory {
             OP_PROJECT_GUIDE => self.prepare_guide_delta_json(&payload),
             OP_PROJECT_SHADOW => self.prepare_shadow_delta_json(&payload),
             OP_PROJECT_PERSPECTIVE => self.prepare_perspective_delta_json(&payload),
+            OP_PROJECT_WORKSPACE => self.prepare_workspace_capture_json(&payload),
+            OP_PROJECT_COMMENTS => self.prepare_comments_delta_json(&payload),
+            OP_PROJECT_CUSTOM_BRUSH => self.prepare_custom_brush_delta_json(&payload),
             _ => {
                 return Err((
                     DispatchErrorCode::InvalidRequest,

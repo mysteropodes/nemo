@@ -51,6 +51,7 @@
   // not just restoring a scalar.
   var _previewSnapshot = null;
   function eligiblePathsForPreview() {
+    if(window.__TAURI__&&window.__TAURI__.core)return [];
     if (!(state.tool === 'select' || state.tool === 'subselect') || !selectedPaths.length) return [];
     return selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)); });
   }
@@ -104,6 +105,7 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   function revertBrushPreview() {
+    if(window.__TAURI__&&window.__TAURI__.core){_previewSnapshot=null;return;}
     if (!_previewSnapshot) return;
     _previewSnapshot.forEach(function (rec) {
       stripAnyBrushTexture(rec.p);
@@ -315,13 +317,18 @@
     }
   }
   function makeBrushItem(key, active, onSelect, isCustom, onRefresh) {
+    var nativeCatalog=!!(window.__TAURI__&&window.__TAURI__.core),catalog=window.NemoNativeCustomBrushUI;
+    var owner=nativeCatalog&&catalog.controller(window),origin=owner&&owner.read(),view=popover;
     var btn = document.createElement('button');
     btn.className = 'bp-item' + (active ? ' active' : '') + (isCustom ? ' bp-item-custom' : '');
     var canvas = document.createElement('canvas'); canvas.width = 150; canvas.height = 26;
     var span = document.createElement('span'); span.textContent = window.BrushPresetPicker.labelFor(key);
     btn.appendChild(canvas); btn.appendChild(span);
     window.BrushPresetPicker.drawPreview(canvas, key);
-    btn.addEventListener('click', function () { onSelect(key); });
+    btn.addEventListener('click', function () {
+      if(nativeCatalog&&(popover!==view||!view.contains(btn)||isCustom&&(!owner||!owner.ready(origin)))){catalog.notice(window);return;}
+      onSelect(key);
+    });
     btn.addEventListener('mouseenter', function () { previewVectorBrush(key); });
     btn.addEventListener('mouseleave', function () { revertBrushPreview(); });
     if (isCustom) {
@@ -333,6 +340,7 @@
       btn.title = window.SM.t('titleClickSelectDblClickEdit');
       btn.addEventListener('dblclick', function (e) {
         e.preventDefault(); e.stopPropagation();
+        if(nativeCatalog&&(popover!==view||!view.contains(btn)||!owner||!owner.ready(origin))){catalog.notice(window);return;}
         if (window.BrushEditor) window.BrushEditor.open(key, function (newKey) {
           window.BrushPresetPicker.selectPreset(newKey);
           if (onRefresh) onRefresh();
@@ -341,6 +349,15 @@
       var delBtn = document.createElement('span'); delBtn.className = 'bp-item-del'; delBtn.title = SM.t('elementsDelete'); delBtn.textContent = '×';
       delBtn.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
+        if(nativeCatalog){
+          if(delBtn.disabled||popover!==view||!view.contains(btn)||!owner||!owner.ready(origin)){catalog.notice(window);return;}
+          var selectionIntent=catalog.selectionIntent(window);delBtn.disabled=true;
+          owner.edit({kind:'delete',id:key},origin).then(function(result){
+            if(popover!==view||!view.contains(btn)||!owner.confirmed(result))return;
+            if(state.brushPreset===key&&catalog.selectionIntent(window)===selectionIntent)window.BrushPresetPicker.selectPreset('none');
+            if(BrushPresetPicker.refreshFavorites)BrushPresetPicker.refreshFavorites();if(onRefresh)onRefresh();
+          }).finally(function(){delBtn.disabled=false;});return;
+        }
         if (window.state && state.customBrushPresets) delete state.customBrushPresets[key];
         if (state.brushPreset === key) { window.BrushPresetPicker.selectPreset('none'); }
         if (onRefresh) onRefresh();
@@ -464,5 +481,5 @@
     if (window.renderLabsFloatPanel) renderLabsFloatPanel();
   }
 
-  window.BrushMenu = { toggle: toggle, isOpen: isOpen, close: closePopover };
+  window.BrushMenu = { toggle: toggle, isOpen: isOpen, close: closePopover, refresh:function(){if(popover)buildContent(popover);} };
 })();

@@ -409,7 +409,8 @@ fn project_snapshot_info(
             if let Some(shy) = layer.shy.value() {
                 info["shy"] = serde_json::json!(shy);
             }
-            if let Some(locked) = layer.locked.value() {
+            let locked = project.drawing().layer_is_locked(layer.layer_uid());
+            if locked || layer.locked.value().is_some() {
                 info["locked"] = serde_json::json!(locked);
             }
             if let Some(color) = layer.color.value() {

@@ -8,6 +8,7 @@ class Node{
  set textContent(v){this.replaceChildren();this._text=String(v);}get textContent(){return this._text+this.children.map(n=>n.textContent).join('');}
  appendChild(n){if(n.parentNode)n.parentNode.removeChild(n);this.children.push(n);n.parentNode=this;return n;}
  removeChild(n){this.children.splice(this.children.indexOf(n),1);n.parentNode=null;return n;}
+ contains(n){for(;n;n=n.parentNode)if(n===this)return true;return false;}
  replaceChildren(...nodes){this.children.forEach(n=>n.parentNode=null);this.children=[];this._text='';nodes.forEach(n=>this.appendChild(n));}
  setAttribute(k,v){this.attrs[k]=String(v);}
  addEventListener(type,fn){this.listeners.set(type,[...this.listeners.get(type)||[],fn]);}

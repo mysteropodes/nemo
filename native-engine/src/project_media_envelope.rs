@@ -5,8 +5,8 @@ use std::sync::Arc;
 #[path = "project_settings.rs"]
 mod project_settings;
 pub(crate) use project_settings::{
-    ProjectCommentRecord, ProjectMetadata, ProjectMetadataError, ProjectPresetCatalog,
-    ProjectWorkspaceRecord,
+    BrushPresetRecord, ProjectCommentRecord, ProjectMetadata, ProjectMetadataError,
+    ProjectPresetCatalog, ProjectWorkspaceRecord,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-workspace",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.workspace.read",
+    "command.document.object.project.workspace.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectWorkspaceReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectWorkspaceEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
+  },
+  "semantics": "Existing workspace layout-settle capture and pinned raw read use the native document/history owner. Four resize mouseups, docked section drop, original collapse callback and actual motion-columns change capture six mandatory fields plus optional raw motionColumns. No mousemove, open/restore, Save or picker capture. No movement and identical captures add no command/checkpoint. Missing, partial, null and empty fields preserve original presentation semantics; unavailable projection refuses separately. UI rollback and drag geometry are transient. Original Save uses its authoritative pin. Source-only candidate; installed layout/history/save-reopen acceptance remains open.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned absent workspace preserves original layout fallback",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "workspace-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.workspace.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "record"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "workspace-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "workspacePresent": false
+          }
+        }
+      }
+    },
+    {
+      "label": "Explicit original resize settlement captures layout once",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "workspace-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.workspace.edit",
+        "payload": {
+          "command": "object.project.workspace.edit",
+          "action": {
+            "kind": "capture",
+            "workspace": {
+              "layerPanelWidth": "180px",
+              "toolsPanelWidth": null,
+              "propsPanelWidth": "300px",
+              "propsPanelCollapsed": false,
+              "timelineHeight": "180px",
+              "panelOrder": [
+                "transform",
+                "effects"
+              ],
+              "motionColumns": "3d"
+            }
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "workspace-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

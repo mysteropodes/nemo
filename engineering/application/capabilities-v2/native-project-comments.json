@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-comments",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.comments.read",
+    "command.document.object.project.comments.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCommentsReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectCommentsEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete 4096-byte pinned response or typed refusal; whole raw records and exact ordinal page progress."
+  },
+  "semantics": "Original project team-comment append, existing Save text/resolved and ordinal delete share the native metadata/history owner. Genuine Comment pointer origins use the existing Select dispatch and admitted native viewport mapping; no Paper writer or optimistic persistent mirror. Duplicate/missing imported IDs and partial attribution remain raw. Feedback/account/debug/attachments are excluded. Source-only candidate; native/installed pointer, save/reopen and consumer acceptance remains unrun.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned absent team comments remain absent",
+      "request": {
+        "apiVersion": 2,
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "requestId": "comments-read-7",
+        "operation": "query.document.object.project.comments.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "requestId": "comments-read-7",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "commentsPresent": false,
+            "commentCount": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "Existing Save permits empty text and resolves one ordinal",
+      "request": {
+        "apiVersion": 2,
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "requestId": "comments-save-7",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.comments.edit",
+        "payload": {
+          "command": "object.project.comments.edit",
+          "action": {
+            "kind": "update",
+            "ordinal": 2,
+            "text": "",
+            "resolved": true
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "requestId": "comments-save-7",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

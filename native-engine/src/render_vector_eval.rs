@@ -349,7 +349,7 @@ pub(crate) fn duplicator_geometry(
         segments =
             motion::apply_element_motion(packet.snapshot(), record, packet.frame(), segments)?;
     }
-    segments = motion::apply_layer_position(packet.snapshot(), record, packet.frame(), segments)?;
+    segments = motion::apply_duplicator_layer_position(packet, record, layer_index, segments)?;
     Ok((segments, record.geometry.closed))
 }
 
@@ -459,10 +459,13 @@ pub(crate) fn evaluate_record(
         packet.frame(),
         stored,
     )?;
-    evaluated.segments = motion::apply_layer_position(
-        packet.snapshot(),
+    // load_packet_stored proved this seed's exact packet/context/exposure.
+    // The retained seed still compiles atomically before derived paint replaces
+    // its order slot; use only this successful host's existing admission fact.
+    evaluated.segments = motion::apply_duplicator_layer_position(
+        packet,
         record.record(),
-        packet.frame(),
+        record.source_layer_index(),
         evaluated.segments,
     )?;
     Ok(evaluated)

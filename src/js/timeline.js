@@ -717,7 +717,9 @@ window.SM={
     window.SM.setStrokeColor(f);
   },
   setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
-  setBrushPreset:function(v){state.brushPreset=v||'none';
+  setBrushPreset:function(v){
+    if(window.__TAURI__&&window.__TAURI__.core)return window.NemoNativeCustomBrushUI?NemoNativeCustomBrushUI.select(window,v):false;
+    state.brushPreset=v||'none';
     // Restore the saved diameter for a custom preset (feedback #73 — see
     // brush-editor.js's own comment on savedBrushSize for why this is
     // custom-preset-only). Syncs the real UI field too, not just state,
@@ -7806,7 +7808,9 @@ function stopRecording(){
 }
 function openCommentPopover(worldPt,existing){
   if(!document.getElementById('comment-popover'))return;
-  _activeComment=existing||{
+  var nativeComment=window.NemoNativeCommentsUI?NemoNativeCommentsUI.begin(window,existing):(window.__TAURI__&&window.__TAURI__.core?false:null);
+  if(nativeComment===false)return;
+  _activeComment=nativeComment||existing||{
     id:'c_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6),
     x:worldPt.x,y:worldPt.y,frame:state.currentFrame,
     authorId:state.userProfile&&state.userProfile.id,
@@ -7814,10 +7818,11 @@ function openCommentPopover(worldPt,existing){
     authorColor:state.userProfile&&state.userProfile.color,
     text:'',createdAt:Date.now(),resolved:false,
   };
+  var editing=nativeComment?NemoNativeCommentsUI.existing(window,_activeComment):!!existing;
   var pop=document.getElementById('comment-popover');
   var ca=document.getElementById('canvas-area');
   var rect=ca.getBoundingClientRect();
-  var vp=view.projectToView(worldPt);
+  var vp=NemoProjectCommentsPresentation.position(window,worldPt,_activeComment);
   var rawLeft=rect.left+vp.x+12,rawTop=rect.top+vp.y-8;
   // Clamp fully on-screen (2026-08-27, "si la fenetre de feedback est trop
   // basse dans l'ecran aucun moyen de la faire defiler pour valider") — a
@@ -7834,13 +7839,13 @@ function openCommentPopover(worldPt,existing){
   pop.style.left=Math.round(Math.max(margin,Math.min(rawLeft,window.innerWidth-estW-margin)))+'px';
   pop.style.top=Math.round(Math.max(margin,Math.min(rawTop,window.innerHeight-estH-margin)))+'px';
   document.getElementById('comment-author-row').textContent=
-    (existing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
+    (editing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
   document.getElementById('comment-text').value=_activeComment.text||'';
   var fbNameEl0=document.getElementById('comment-fb-name'),fbEmailEl0=document.getElementById('comment-fb-email');
   if(fbNameEl0)fbNameEl0.value=(state.userProfile&&state.userProfile.name)||'';
   if(fbEmailEl0)fbEmailEl0.value=(state.userProfile&&state.userProfile.email)||'';
   document.getElementById('comment-resolved').checked=!!_activeComment.resolved;
-  document.getElementById('comment-delete').style.display=existing?'':'none';
+  document.getElementById('comment-delete').style.display=editing?'':'none';
   _activeFbTags=[];
   document.querySelectorAll('#comment-fb-tags .fb-tag').forEach(function(b){b.classList.remove('active');});
   var fbBlocking=document.getElementById('comment-fb-blocking');if(fbBlocking)fbBlocking.checked=false;
@@ -7856,6 +7861,7 @@ function openCommentPopover(worldPt,existing){
 function closeCommentPopover(){
   var pop=document.getElementById('comment-popover');
   if(pop)pop.style.display='none';
+  if(window.NemoNativeCommentsUI)NemoNativeCommentsUI.cancel(window,_activeComment);
   _activeComment=null;
   _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
   setCommentShots([]);
@@ -7933,6 +7939,8 @@ function initCommentPopover(){
   saveBtn.addEventListener('click',function(){
     if(!_activeComment)return;
     if(_recording)stopRecording();
+    if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.save(window,_activeComment,document.getElementById('comment-text').value,document.getElementById('comment-resolved').checked))return;
+    if(window.__TAURI__&&window.__TAURI__.core)return;
     _activeComment.text=document.getElementById('comment-text').value;
     _activeComment.resolved=document.getElementById('comment-resolved').checked;
     if(!state.comments)state.comments=[];
@@ -7945,7 +7953,10 @@ function initCommentPopover(){
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   });
   delBtn.addEventListener('click',function(){
-    if(!_activeComment||!state.comments)return;
+    if(!_activeComment)return;
+    if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.remove(window,_activeComment))return;
+    if(window.__TAURI__&&window.__TAURI__.core)return;
+    if(!state.comments)return;
     var idx=state.comments.indexOf(_activeComment);
     if(idx>=0)state.comments.splice(idx,1);
     saveActiveLayerFrame();closeCommentPopover();updateUI();refreshFbAvatars();
@@ -9213,84 +9224,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // out-of-project tooling for the dev loop. Click opens a compact list of
 // those comments; clicking one jumps to its frame. Read-only glance —
 // editing/resolving still happens on the pin itself via the Comment tool.
-function fbInitial(name){return (name||'?').trim().charAt(0).toUpperCase()||'?';}
-function refreshFbAvatars(){
-  var el=document.getElementById('fb-avatars');
-  if(!el)return;
-  var comments=state.comments||[];
-  var seen={},people=[];
-  if(state.userProfile){people.push({id:state.userProfile.id,name:state.userProfile.name,color:state.userProfile.color,me:true});seen[state.userProfile.id]=true;}
-  comments.forEach(function(c){
-    if(c.authorId&&!seen[c.authorId]){seen[c.authorId]=true;people.push({id:c.authorId,name:c.authorName,color:c.authorColor});}
-  });
-  el.innerHTML='';
-  var maxShown=4;
-  people.slice(0,maxShown).forEach(function(p){
-    var av=document.createElement('div');
-    av.className='fb-av';av.style.background=p.color||'#888';
-    av.textContent=fbInitial(p.name);
-    av.title=(p.name||'?')+(p.me?' (toi)':'');
-    el.appendChild(av);
-  });
-  if(people.length>maxShown){
-    var more=document.createElement('div');
-    more.className='fb-av fb-av-more';more.textContent='+'+(people.length-maxShown);
-    el.appendChild(more);
-  }
-}
-function renderFbAvatarPopover(){
-  var pop=document.getElementById('fb-avatars-pop');
-  if(!pop)return;
-  pop.innerHTML='';
-  var comments=(state.comments||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
-  if(!comments.length){
-    pop.innerHTML='<div class="fb-pop-empty">Aucun commentaire d\'équipe sur ce projet.</div>';
-    return;
-  }
-  comments.forEach(function(cm){
-    var item=document.createElement('div');item.className='fb-pop-item';
-    var av=document.createElement('div');av.className='fb-pop-av';
-    av.style.background=cm.authorColor||'#888';
-    av.textContent=fbInitial(cm.authorName);
-    item.appendChild(av);
-    var body=document.createElement('div');body.className='fb-pop-body';
-    var note=document.createElement('div');note.className='fb-pop-note';note.textContent=cm.text||'';note.title=cm.text||'';
-    body.appendChild(note);
-    var meta=document.createElement('div');meta.className='fb-pop-meta';
-    meta.appendChild(document.createTextNode((cm.authorName||'?')+' · frame '+((cm.frame||0)+1)));
-    var st=document.createElement('span');
-    st.className='fb-pop-status'+(cm.resolved?' resolved':'');
-    st.textContent=cm.resolved?'résolu':'à traiter';
-    meta.appendChild(st);
-    body.appendChild(meta);
-    item.appendChild(body);
-    item.addEventListener('click',function(){
-      if(typeof cm.frame==='number')goToFrame(cm.frame);
-      document.getElementById('fb-avatars-pop').classList.remove('open');
-    });
-    pop.appendChild(item);
-  });
-}
-function toggleFbAvatarsPopover(){
-  var pop=document.getElementById('fb-avatars-pop');
-  if(!pop)return;
-  if(pop.classList.contains('open')){pop.classList.remove('open');return;}
-  renderFbAvatarPopover();
-  var r=document.getElementById('fb-avatars').getBoundingClientRect();
-  pop.style.top=(r.bottom+6)+'px';
-  pop.style.right=(window.innerWidth-r.right)+'px';
-  pop.classList.add('open');
-}
-function initFbAvatars(){
-  var el=document.getElementById('fb-avatars');
-  if(!el)return;
-  el.addEventListener('click',function(e){e.stopPropagation();toggleFbAvatarsPopover();});
-  document.addEventListener('click',function(e){
-    var pop=document.getElementById('fb-avatars-pop');
-    if(pop&&pop.classList.contains('open')&&!pop.contains(e.target))pop.classList.remove('open');
-  });
-  refreshFbAvatars();
-}
+function refreshFbAvatars(){return NemoProjectCommentsPresentation.create(window).refresh();}
+function renderFbAvatarPopover(){return NemoProjectCommentsPresentation.create(window).render();}
+function toggleFbAvatarsPopover(){return NemoProjectCommentsPresentation.create(window).toggle();}
+function initFbAvatars(){return NemoProjectCommentsPresentation.create(window).init();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFbAvatars);else initFbAvatars();
 
 // ---- GitHub feedback triage dashboard (beta testers → mysteropodes/
@@ -10653,6 +10590,9 @@ document.getElementById('p-brushpreset').addEventListener('change',function(){wi
 // swatch is clicked — same eligibility/strip/apply logic as before, just
 // callable from more than one caller.
 function applyVectorBrushToSelection(preset){
+  if(window.__TAURI__&&window.__TAURI__.core){
+    showToast('Native custom vector brush application is unavailable.');return false;
+  }
   // `p.strokeColor` used to gate eligibility — excluded every fill-
   // camouflaged anchor (a Bitmap Brush stroke with a fill, or any already-
   // textured anchor with strokeColor nulled by the SAME camouflage
@@ -11742,30 +11682,7 @@ function renderPropsPanelRail(show){
 }
 window.renderPropsPanelRail=renderPropsPanelRail;
 function togglePropsPanelCollapse(force){
-  var panel=document.getElementById('props-panel');
-  if(!panel)return;
-  var collapsed=force!==undefined?force:!panel.classList.contains('collapsed');
-  // Panel-width persistence (ui.js) sets a plain inline style.width, which
-  // always wins over the .collapsed class's own `width:36px` rule (inline
-  // beats any selector, regardless of specificity) — without clearing it
-  // here first, a resized-then-collapsed panel would stay visually wide
-  // with just the rail's few narrow items floating in the leftover space.
-  // Stashed on window (not a local var) so ui.js's own startup restore can
-  // prime it too, for the "starts collapsed" case.
-  if(collapsed){
-    if(panel.style.width)window._propsExpandedWidth=panel.style.width;
-    panel.style.width='';
-  }else if(window._propsExpandedWidth){
-    panel.style.width=window._propsExpandedWidth;
-  }
-  panel.classList.toggle('collapsed',collapsed);
-  // Dragging a 36px rail wider makes no sense — hide the resize handle
-  // rather than leave a control that would just fight the collapsed width.
-  var resizeHandle=document.getElementById('props-panel-resize');
-  if(resizeHandle)resizeHandle.style.display=collapsed?'none':'';
-  if(collapsed&&window._lastPropsShow)renderPropsPanelRail(window._lastPropsShow);
-  syncPropsPanelCollapseTitle();
-  try{localStorage.setItem('nemo-props-panel-collapsed',collapsed?'1':'0');}catch(e){}
+  return window.SMWorkspace.toggleProps(force);
 }
 window.togglePropsPanelCollapse=togglePropsPanelCollapse;
 // STATE-dependent title (collapse vs expand) — can't live on data-i18n-title,

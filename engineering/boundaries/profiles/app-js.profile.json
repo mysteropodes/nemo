@@ -3435,6 +3435,126 @@
       "publicApi": [
         "native-perspective-ui.js"
       ]
+    },
+    {
+      "id": "app.native.workspace.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-workspace-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-workspace-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.workspace.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-workspace-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-workspace-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.workspace.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-workspace-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-workspace-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.custom-brush.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-custom-brush-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-custom-brush-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.custom-brush.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-custom-brush-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-custom-brush-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.custom-brush.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-custom-brush-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-custom-brush-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.comments.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-comments-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-comments-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.comments.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-comments-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-comments-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.comments.ui",
+      "layer": "bootstrap",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-comments-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-comments-ui.js"
+      ]
+    },
+    {
+      "id": "app.comments.presentation.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "project-comments-presentation.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "project-comments-presentation.js"
+      ]
     }
   ],
   "layerRules": {

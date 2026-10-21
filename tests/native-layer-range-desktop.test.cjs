@@ -8,6 +8,7 @@ class Node {
  constructor(tag='div'){this.tagName=tag.toUpperCase();this.children=[];this.parentNode=null;this.style={};this.dataset={};this.attrs={};this.events=new Map();this.classes=new Set();this.className='';this.classList={toggle:(k,on)=>on?this.classes.add(k):this.classes.delete(k),add:k=>this.classes.add(k),remove:k=>this.classes.delete(k)};}
  appendChild(n){if(n.parentNode)n.parentNode.removeChild(n);this.children.push(n);n.parentNode=this;return n;}
  removeChild(n){this.children.splice(this.children.indexOf(n),1);n.parentNode=null;return n;}
+ contains(n){for(;n;n=n.parentNode)if(n===this)return true;return false;}
  replaceChildren(...nodes){this.children.forEach(n=>n.parentNode=null);this.children=[];nodes.forEach(n=>this.appendChild(n));}
  setAttribute(k,v){this.attrs[k]=String(v);}
  addEventListener(k,fn){this.events.set(k,[...(this.events.get(k)||[]),fn]);}

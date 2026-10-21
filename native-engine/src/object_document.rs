@@ -34,8 +34,8 @@ pub(crate) use audio_tracks::{AudioTrackRecord, AudioTracks};
 #[path = "project_media_envelope.rs"]
 mod project;
 pub(crate) use project::{
-    ProjectCommentRecord, ProjectEnvelope, ProjectMetadata, ProjectMetadataError,
-    ProjectPresetCatalog, ProjectReferenceState, ProjectWorkspaceRecord,
+    BrushPresetRecord, ProjectCommentRecord, ProjectEnvelope, ProjectMetadata,
+    ProjectMetadataError, ProjectPresetCatalog, ProjectReferenceState, ProjectWorkspaceRecord,
 };
 #[path = "project_camera_state.rs"]
 mod camera;
@@ -209,6 +209,10 @@ pub struct ObjectDocument {
     pub(crate) audio_tracks: Presence<AudioTracks>,
 }
 
+#[path = "object_follow_path_record.rs"]
+mod follow_path;
+pub(crate) use follow_path::FollowPathRecord;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectLayer {
@@ -227,6 +231,9 @@ pub struct ObjectLayer {
     pub(crate) color: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) parent_layer_uid: Presence<Option<String>>,
+    /// Original ld.followPath; absent, explicit null and authored object stay distinct.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) follow_path: Presence<Option<FollowPathRecord>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) folder_id: Presence<Option<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
@@ -314,6 +321,7 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] key_lock: Presence<Option<KeyLockMode>>,
     #[serde(default)] color: Presence<String>,
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
+    #[serde(default)] follow_path: Presence<Option<FollowPathRecord>>,
     #[serde(default)] folder_id: Presence<Option<String>>,
     #[serde(default)] shy: Presence<bool>,
     #[serde(default)] timing: Presence<LayerTiming>,
@@ -411,6 +419,7 @@ impl ObjectLayer {
             key_lock: Presence::Missing,
             color: Presence::Missing,
             parent_layer_uid: Presence::Missing,
+            follow_path: Presence::Missing,
             folder_id: Presence::Missing,
             shy: Presence::Missing,
             timing: Presence::Missing,

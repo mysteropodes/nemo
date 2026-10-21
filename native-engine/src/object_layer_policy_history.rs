@@ -30,3 +30,7 @@ impl NativeObjectHistory {
 #[cfg(test)]
 #[path = "../tests/object_layer_policy_edit.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/object_duplicator_lock_policy.rs"]
+mod duplicator_tests;

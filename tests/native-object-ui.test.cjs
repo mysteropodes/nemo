@@ -108,6 +108,8 @@ test('native inspector reuses actual bound Reference nodes, preserves collapsed 
   Object.defineProperty(root.state,'refMedia',{get(){throw Error('legacy reference read');}});
   const context=vm.createContext({window:root,document:doc,state:root.state,SM:root.SM,showToast:()=>{},
     requestAnimationFrame:f=>f(),syncPropsPanelCollapseTitle:()=>{},localStorage:{setItem(){}}});
+  root.localStorage=context.localStorage;
+  root.SMWorkspace=require('../src/js/adapters/native-workspace-ui.js').presentation(root,{order:()=>null,applyOrder(){}});
   vm.runInContext(shipped('renderPropsPanelRail')+'\n'+shipped('togglePropsPanelCollapse'),context);
   root.renderPropsPanelRail=context.renderPropsPanelRail;root.togglePropsPanelCollapse=context.togglePropsPanelCollapse;
   vm.runInContext(fs.readFileSync('src/js/reference-bridge.js','utf8'),context);

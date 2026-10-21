@@ -16,6 +16,7 @@
     if(!View||!container||!ports||!ports.document||typeof ports.query!=='function'||typeof ports.readContext!=='function'||typeof ports.readSelection!=='function')throw new TypeError('Native Motion panel ports are unavailable');
     var doc=ports.document,retired=false,serial=0,client=View.createConsumer(ports),accepted=null;
     var propertySet=null,mode='all',contentOnly=false,collapsed=false,search='',scope='inspector',rowBindings=[],valueEditors=[],loading=false;
+    var expressionRows=[],expressionFlight=null,expressionWanted=false,expressionScope=null;
     var maxPages=ports.pageBudget===undefined?Infinity:ports.pageBudget;
     if(maxPages!==Infinity&&(!Number.isSafeInteger(maxPages)||maxPages<1))throw new TypeError('Invalid explicit native Motion read budget');
     var section=make('section',''),toolbar=make('div',''),status=make('div',''),body=make('div',''),controls=[];
@@ -130,7 +131,7 @@
     function savePreference(){try{if(ports.writePreference)ports.writePreference('nemo-motion-filter',mode);}catch(_){}}
     function button(label,action){var node=make('button',label);node.type='button';node.addEventListener('click',action);toolbar.appendChild(node);controls.push([node,action]);return node;}
     function clearValues(){valueEditors.forEach(function(editor){editor.dispose();});valueEditors=[];}
-    function clearBody(){clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=[];body.replaceChildren();}
+    function clearBody(){releaseExpressionRows();clearValues();clearKeys();rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=[];body.replaceChildren();}
     function labelTarget(t,token){return (ports.labelTarget&&ports.labelTarget(t,token.pin))||((t.strokeId===undefined?'Layer ':'Element ')+(t.strokeId===undefined?t.layerUid:t.strokeId));}
     function wantedTargets(targets,selection){
       if(!targets.some(function(item){return item.kind==='context'&&item.contextId===selection.contextId;}))throw new Error('Native active context is absent');
@@ -163,10 +164,62 @@
       });
       fragment.appendChild(block);return true;
     }
+    async function readExpressionState(item,token,ticket,signature,frame,flight){
+      function valid(){var context;try{context=ports.readContext();}catch(_){return false;}return expressionFlight===flight&&!flight.superseded&&current(token,ticket,signature)&&context.frame===frame&&body.contains(item.line)&&item.node.parentNode===item.line;}
+      if(!valid()||typeof ports.readProperty!=='function')return;
+      var selector={instanceId:token.pin.instanceId,documentId:token.pin.documentId,atRevision:token.pin.contentRevision,documentSnapshotId:token.pin.documentSnapshotId,
+        view:{kind:'expressionState',target:item.target,property:item.property,frame:frame}};
+      try{
+        var result=await ports.readProperty(selector);
+        if(!valid())return;
+        if(!result||result.kind!=='expressionState'||result.frame!==frame||result.property!==item.property||key(result.target)!==key(item.target)||
+            ['instanceId','documentId','atRevision','documentSnapshotId'].some(function(k){return result[k]!==selector[k];})||
+            !result.expression||typeof result.expression.present!=='boolean'||typeof result.expression.enabled!=='boolean'||!result.evaluation)throw Error('Invalid expression state');
+        var evaluation=result.evaluation,diagnostic=evaluation.state==='evaluated'?evaluation.diagnostic:null;
+        if(!result.expression.present){item.node.hidden=true;return;}
+        item.node.hidden=false;item.node.textContent='';item.node.dataset.errorLine='-1';
+        if(evaluation.state!=='evaluated'){item.node.textContent='Expression has not been evaluated for this frame.';return;}
+        if(diagnostic===null){item.node.hidden=true;return;}
+        var translations={mustReturnNumber:'exprErrorMustReturnNumber',mustReturnNumberOrXY:'exprErrorMustReturnNumberOrXY',tooDeep:'exprErrorTooDeep',timeout:'exprErrorTimeout'};
+        if(Object.prototype.hasOwnProperty.call(translations,diagnostic.kind)){
+          var translated=typeof ports.translate==='function'?ports.translate(translations[diagnostic.kind]):null;
+          item.node.textContent=typeof translated==='string'&&translated!==translations[diagnostic.kind]?translated:({mustReturnNumber:'Expression must return a number.',mustReturnNumberOrXY:'Expression must return a number or coordinates.',tooDeep:'Too many chained expression references.',timeout:'Expression took too long and was disabled.'})[diagnostic.kind];
+        }else if(['runtime','syntax'].includes(diagnostic.kind)&&typeof diagnostic.message==='string'){
+          item.node.textContent=diagnostic.message;
+          if(Number.isInteger(diagnostic.line)&&diagnostic.line>0)item.node.dataset.errorLine=String(diagnostic.line);
+        }else throw Error('Invalid expression diagnostic');
+      }catch(_){if(valid()){item.node.hidden=false;item.node.textContent='Expression diagnostics are unavailable.';item.node.dataset.errorLine='-1';}}
+    }
+    function invalidateExpressionDisplay(){
+      expressionRows.forEach(function(item){item.node.hidden=true;item.node.textContent='';item.node.dataset.errorLine='-1';});
+    }
+    function releaseExpressionRows(){
+      invalidateExpressionDisplay();expressionRows=[];expressionScope=null;expressionWanted=false;
+      // Keep the live flight marker until settlement. Retiring rows must not
+      // admit another overlapping request batch through the old panel API.
+      if(expressionFlight)expressionFlight.superseded=true;
+    }
+    function refreshExpressionStates(){
+      if(retired||!validAccepted()||!expressionRows.length){invalidateExpressionDisplay();expressionWanted=false;return;}
+      var context;try{context=ports.readContext();}catch(_){invalidateExpressionDisplay();return;}
+      if(!context||!View.isCurrentContext(accepted.token,context)){invalidateExpressionDisplay();return;}
+      var scopeKey=JSON.stringify([context.pin,context.frame,context.viewGeneration,accepted.selection.signature]);
+      if(expressionScope!==scopeKey){invalidateExpressionDisplay();expressionScope=scopeKey;}
+      if(expressionFlight){expressionWanted=true;expressionFlight.superseded=true;return;}
+      var flight={},token=accepted.token,ticket=serial,signature=accepted.selection.signature;
+      expressionWanted=false;expressionFlight=flight;
+      // One finite visible-row batch; paints while it runs coalesce into one
+      // latest-context read after settlement, preserving controls and drafts.
+      Promise.all(expressionRows.map(function(item){return readExpressionState(item,token,ticket,signature,context.frame,flight);})).finally(function(){
+        if(expressionFlight!==flight)return;
+        expressionFlight=null;
+        if(expressionWanted){expressionWanted=false;refreshExpressionStates();}
+      });
+    }
     function paintRows(){
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       if(['errors','effects','mattes'].includes(mode)){clearBody();notify('This Motion filter is unavailable.');return false;}
-      var fragment=make('div',''),unknown=false,shown=0,nextBindings=[],nextValues=[],selected=new Set(accepted.selection.selected.map(key));
+      var fragment=make('div',''),unknown=false,shown=0,nextBindings=[],nextValues=[],nextExpressions=[],selected=new Set(accepted.selection.selected.map(key));
       if(!selected.size&&accepted.selection.primary)selected.add(key(accepted.selection.primary));
       accepted.targets.forEach(function(item){
         if(item.kind==='context'){if(item.contextId===accepted.selection.contextId){var heading=make('div','Context '+item.contextId);heading.className='phdr';fragment.appendChild(heading);}return;}
@@ -205,6 +258,10 @@
             bakeButton.addEventListener('click',onBake);nextBindings.push([bakeButton,onBake]);line.appendChild(bakeButton);
           }
           if(Value&&typeof ports.readProperty==='function'&&row.authored.availability==='available')nextValues.push({container:line,target:group.target,row:row});
+          if(typeof ports.readProperty==='function'&&f.availability==='available'){
+            var diagnostic=make('span','');diagnostic.className='motion-expr-error';diagnostic.setAttribute('role','status');diagnostic.hidden=true;line.appendChild(diagnostic);
+            nextExpressions.push({node:diagnostic,line:line,target:group.target,property:row.property});
+          }
           fragment.appendChild(line);shown++;});
       });
       // Unsupported native families do not become an empty global-U result.
@@ -212,6 +269,7 @@
       if(!validAccepted()){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       rowBindings.forEach(function(pair){pair[0].removeEventListener('click',pair[1]);});rowBindings=nextBindings;clearValues();body.replaceChildren(fragment);
       nextValues.forEach(function(item){var editor=Value.create(item.container,{document:doc,readContext:ports.readContext,readProperty:ports.readProperty,get editProperty(){return item.row.property==='order'?null:ports.editProperty;}},item.target,item.row);valueEditors.push(editor);Promise.resolve(editor.refresh()).catch(function(){editor.cancel();});});
+      expressionRows=nextExpressions;refreshExpressionStates();
       notify(collapsed?'Properties collapsed.':contentOnly&&unknown?'Partial reveal: some property groups are unavailable.':unknown?'Some property filters are unavailable.':shown?(keyEditor?'Select Keys to inspect native animation.':'Properties are read-only.'):accepted.groups.length?'No matching properties.':'Select a native target to view properties.');return true;
     }
     function paint(){try{return paintRows();}catch(_){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}}
@@ -243,7 +301,7 @@
       try{token=View.captureContext(ports.readContext());selection=selectionInfo();}catch(_){token=null;}
       if(!token){accepted=null;clearBody();notify('Native properties are unavailable.');return false;}
       if(!force&&accepted&&current(accepted.token,ticket,accepted.selection.signature)){
-        try{var wanted=wantedTargets(accepted.targets,selection);if(accepted.groupKey===groupKey(wanted))return repaint?paint():true;}catch(_){}
+        try{var wanted=wantedTargets(accepted.targets,selection);if(accepted.groupKey===groupKey(wanted)){if(repaint)return paint();refreshExpressionStates();return true;}}catch(_){}
       }
       ticket=++serial;loading=true;accepted=null;clearBody();notify('Loading properties…');
       try{

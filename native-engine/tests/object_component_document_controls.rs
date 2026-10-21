@@ -24,7 +24,7 @@ fn the_unmutated_golden_document_is_admissible() {
 #[test]
 fn every_single_mutation_is_refused_by_its_own_rule() {
     let all = cases();
-    assert_eq!(all.len(), 37);
+    assert_eq!(all.len(), 36);
     for case in all {
         let mut value = golden_value();
         apply(&mut value, &case.pointer, &case.edit);
@@ -49,6 +49,25 @@ fn every_single_mutation_is_refused_by_its_own_rule() {
             case.label
         );
     }
+}
+
+#[test]
+fn a_path_reference_to_a_duplicator_is_retained_for_original_no_chain_fallback() {
+    // Baseline app.js1466-1470 returns no resolved path; it does not reject
+    // the stored project. Actual frame fallback has its own retained-output test.
+    let mut value = golden_value();
+    value["componentTables"]["duplicators"]["duplicators"][3]["duplicator"]["pathLayerUid"] =
+        json!("ly_toggle");
+    let ordered = admit(&value).unwrap();
+    let ordered_bytes = encode_ordered_project(&ordered).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<Value>(&ordered_bytes).unwrap(),
+        value
+    );
+    let stored = decode_storage_project(value.to_string().as_bytes()).unwrap();
+    let saved = encode_storage_project(&stored).unwrap();
+    assert_eq!(serde_json::from_slice::<Value>(&saved).unwrap(), value);
+    assert_eq!(decode_storage_project(&saved).unwrap(), stored);
 }
 
 #[test]

@@ -289,20 +289,13 @@ fn parented_missing_targets_foreign_context_and_nonfinite_frames_refuse() {
 }
 
 #[test]
-fn malformed_parent_links_and_unrepresented_follow_path_still_refuse_storage() {
-    for fault in [
-        "missing-parent",
-        "self-parent",
-        "cycle",
-        "follow-path",
-        "keyed-parent",
-    ] {
+fn malformed_or_keyed_parent_links_still_refuse_storage() {
+    for fault in ["missing-parent", "self-parent", "cycle", "keyed-parent"] {
         let mut doc = parented(json!([]));
         match fault {
             "missing-parent" => doc["layers"][0]["parentLayerUid"] = json!("missing"),
             "self-parent" => doc["layers"][0]["parentLayerUid"] = json!("L0"),
             "cycle" => doc["layers"][2]["parentLayerUid"] = json!("L0"),
-            "follow-path" => doc["layers"][0]["followPath"] = json!({"targetLayerUid":"P"}),
             _ => doc["layers"][0]["parentKeys"] = json!([{"frame":0,"uid":"P"}]),
         }
         let before = serde_json::to_vec(&doc).unwrap();

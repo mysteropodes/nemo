@@ -348,3 +348,31 @@ fn retained_radial_path_and_seeded_random_literals_reach_the_actual_scene_paint_
         assert_eq!(snapshot.content_revision(), 0);
     }
 }
+
+#[test]
+fn retained_no_chain_fallback_paints_the_original_seed_once_without_persistent_copies() {
+    use crate::object_codec::encode_storage_project;
+    use crate::object_frame_packet::duplicators::tests::retained_mode_document;
+    let snapshot = snapshot(retained_mode_document("chain"));
+    let before = encode_storage_project(snapshot.document()).unwrap();
+    let pin = selector(&snapshot, 2);
+    let packet = prepare_object_exposure_frame(&snapshot, &pin).unwrap();
+    assert!(packet.duplicator_outputs().is_empty());
+    let scene = prepare_object_render_scene(&packet, &pin).unwrap();
+    let plan = prepare_object_paint_plan(&scene, &pin).unwrap();
+    let entries = ordered_entries(&plan).collect::<Vec<_>>();
+    assert_eq!(entries.len(), 1);
+    let PaintEntry::Contour(command) = &entries[0] else {
+        panic!("original BrokenPath fallback paints the seed, not a derived copy");
+    };
+    assert_eq!(command.source().record(), &snapshot.document().objects()[1]);
+    let PathEl::MoveTo(point) = command.path().elements()[0] else {
+        panic!("original seed path start");
+    };
+    assert_eq!([point.x, point.y], [100., 100.]);
+    assert_eq!(plan.commands().len(), 1);
+    assert_eq!(plan.packet().records().len(), 1);
+    assert_eq!(snapshot.document().objects().len(), 4);
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+    assert_eq!(snapshot.content_revision(), 0);
+}
