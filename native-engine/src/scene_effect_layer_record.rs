@@ -23,6 +23,10 @@
 //! folder layer owns no drawing objects (the baseline never renders their content: `getEffectiveStrokes`
 //! returns `[]` for an effect layer and the folder wire entry carries no items).
 //!
+//! Native storage also retains explicit null blend/matte modes under the original field-presence criterion.
+//! Effective reads treat null as absent. The baseline export emits authored null verbatim; its string-only
+//! import guard drops it, so this lossless storage admission is not claimed as the baseline import result.
+//!
 //! The canvas background is NOT a layer field: the baseline `isCanvasBackground` entry is synthesized from the
 //! project `canvasBg`, which the project settings record already admits.
 use crate::object_document::{object_deserialize, ObjectLayer, ObjectRecord, Presence};
@@ -228,13 +232,13 @@ pub(crate) fn validate_layer_compositing(
 }
 
 impl ObjectLayer {
-    /// The stored blend name; `None` is absent (an explicit `"normal"` is `Some("normal")`).
+    /// The effective blend name; absent and stored null return `None`, explicit Normal stays named.
     pub(crate) fn blend_mode(&self) -> Option<&str> {
-        self.blend_mode.value().map(String::as_str)
+        self.blend_mode.value().and_then(Option::as_deref)
     }
-    /// The stored first-matte mode; `None` is absent (an explicit `"none"` is `Some("none")`).
+    /// The effective first-matte name; absent and stored null return `None`, explicit None stays named.
     pub(crate) fn matte_mode(&self) -> Option<&str> {
-        self.matte_mode.value().map(String::as_str)
+        self.matte_mode.value().and_then(Option::as_deref)
     }
     /// The first matte's source layer UID, if one is stored.
     pub(crate) fn matte_source_uid(&self) -> Option<&str> {

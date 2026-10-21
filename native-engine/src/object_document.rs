@@ -250,9 +250,9 @@ pub struct ObjectLayer {
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) groups: Presence<GroupTable>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) blend_mode: Presence<String>,
+    pub(crate) blend_mode: Presence<Option<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
-    pub(crate) matte_mode: Presence<String>,
+    pub(crate) matte_mode: Presence<Option<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) matte_source_layer_uid: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
@@ -328,7 +328,7 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] path_fx: Presence<Vec<PathFxRecord>>,
     #[serde(default)] widget: Presence<WidgetRecord>,
     #[serde(default)] groups: Presence<GroupTable>,
-    #[serde(default)] blend_mode: Presence<String>, #[serde(default)] matte_mode: Presence<String>,
+    #[serde(default)] blend_mode: Presence<Option<String>>, #[serde(default)] matte_mode: Presence<Option<String>>,
     #[serde(default)] matte_source_layer_uid: Presence<String>, #[serde(default)] mattes_more: Presence<Vec<MatteRef>>,
     #[serde(default)] is_effect_layer: Presence<bool>, #[serde(default)] is_folder_layer: Presence<bool>,
     #[serde(default)] folder_collapsed: Presence<bool>, #[serde(default)] effects: Presence<Vec<LayerEffect>>,
