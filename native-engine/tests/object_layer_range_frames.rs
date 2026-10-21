@@ -5,6 +5,7 @@ use crate::object_document::FrameScopeKind;
 use crate::object_frame_packet::{
     prepare_object_exposure_frame, prepare_object_frame, ObjectFrameError, ObjectFrameSelector,
 };
+use crate::object_render_scene::{prepare_object_paint_plan, prepare_object_render_scene};
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 
@@ -123,12 +124,65 @@ fn missing_timing_outside_the_window_is_still_unavailable_not_fake_empty() {
 fn source_range_support_does_not_admit_unsupported_visible_vector_parenting() {
     let mut value = drawing(2, 8, true);
     value["layers"][0]["parentLayerUid"] = json!("L1");
+    // The static2D parent producer is admitted; a3D ancestor is still unjoined.
+    value["layers"][1]["threeD"] = json!(true);
     value["layers"][0]["range"] = json!({"inPoint":2,"outPoint":4});
     let snapshot = snapshot(&value);
+    let bytes = encode_storage_project(snapshot.document()).unwrap();
     assert_eq!(
         prepare_object_exposure_frame(&snapshot, &selector(&snapshot, 3)).err(),
         Some(ObjectFrameError::Unavailable)
     );
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), bytes);
+}
+
+#[test]
+fn source_range_static_parent_motion_reaches_real_paint_with_multiplicative_opacity() {
+    let mut value = drawing(2, 8, true);
+    value["layers"][0]["parentLayerUid"] = json!("L1");
+    value["layers"][0]["range"] = json!({"inPoint":2,"outPoint":4});
+    value["propertyHolders"] = json!([
+        {"target":{"contextId":"scene-root","layerUid":"L0"},
+         "properties":[{"property":"opacity","static":[50]}]},
+        {"target":{"contextId":"scene-root","layerUid":"L1"},
+         "properties":[{"property":"position","static":[10,-4]},
+                       {"property":"opacity","static":[50]}]}
+    ]);
+    let snapshot = snapshot(&value);
+    let bytes = encode_storage_project(snapshot.document()).unwrap();
+    for (frame, expected) in [
+        (0, vec![("s1", 0.5)]),
+        (3, vec![("s0", 0.25), ("s1", 0.5)]),
+        (5, vec![("s1", 0.5)]),
+    ] {
+        let pins = selector(&snapshot, frame);
+        let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
+        assert_eq!(
+            packet.source_frame_for_layer(0),
+            (frame == 3).then_some(0)
+        );
+        assert_eq!(packet.source_frame_for_layer(1), Some(0));
+        let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+        let paint = prepare_object_paint_plan(&scene, &pins).unwrap();
+        assert_eq!(paint.commands().len(), expected.len());
+        for (command, (id, alpha)) in paint.commands().zip(expected) {
+            assert_eq!(command.source().record().target().stroke_id(), id);
+            assert_eq!(command.contour().segments()[0].point, [11., 16.]);
+            assert_eq!(command.contour().segments()[0].handle_in, [-2., 0.]);
+            assert_eq!(command.contour().segments()[0].handle_out, [3., -1.]);
+            assert_eq!(command.paint()[3].as_f64(), Some(alpha));
+            assert_eq!(
+                command.source().record().geometry.segments[0].point.x.as_f64(),
+                Some(1.)
+            );
+        }
+        assert_eq!(paint.packet().frame(), frame);
+        assert_eq!(
+            paint.packet().document_snapshot_id(),
+            snapshot.snapshot_id()
+        );
+    }
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), bytes);
 }
 
 #[test]
@@ -161,10 +215,27 @@ fn visibility_and_unconsumed_motion_keep_their_original_publication_guards() {
     value["layers"][0]["visible"] = json!(true);
     value["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
         "properties":[{"property":"rotation","static":[30]}]}]);
+    let rotation = snapshot(&value);
+    let bytes = encode_storage_project(rotation.document()).unwrap();
+    let pins = selector(&rotation, 3);
+    let packet = prepare_object_exposure_frame(&rotation, &pins).unwrap();
+    let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+    let paint = prepare_object_paint_plan(&scene, &pins).unwrap();
+    assert_eq!(paint.commands().len(), 2);
+    let unchanged = paint.commands().nth(1).unwrap();
+    assert_eq!(unchanged.source().record().target().stroke_id(), "s1");
+    assert_eq!(unchanged.contour().segments()[0].point, [1., 20.]);
+    assert!(paint.commands().all(|command| command.paint()[3].as_f64() == Some(1.)));
+    assert_eq!(encode_storage_project(rotation.document()).unwrap(), bytes);
+    // A dormant3D-only field has no2D consumer even when its drawing is outside the range.
+    value["propertyHolders"][0]["properties"][0] =
+        json!({"property":"positionZ","static":[30]});
     let unsupported = snapshot(&value);
+    let bytes = encode_storage_project(unsupported.document()).unwrap();
     assert_eq!(
         prepare_object_exposure_frame(&unsupported, &selector(&unsupported, 0)).err(),
         Some(ObjectFrameError::Unavailable),
         "out-of-range selection does not conceal an unconsumed authored property"
     );
+    assert_eq!(encode_storage_project(unsupported.document()).unwrap(), bytes);
 }

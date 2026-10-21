@@ -374,15 +374,13 @@ fn original_mask_translation_does_not_admit_expanded_or_parent_batch_transforms(
         let o = owner(&v);
         let s = o.acquire_snapshot(0).unwrap();
         let before = encode_storage_project(s.document()).unwrap();
-        let p = prepare_object_frame(&s, &pins(&s, 7)).unwrap();
-        assert!(matches!(
-            prepare_object_render_scene(&p, &pins(&s, 7)),
-            Err(ObjectSceneError::UnsupportedGeometry {
-                reason:
-                    "layer Motion on mixed mask, Text or raster geometry awaits one complete batch",
-                ..
-            })
-        ));
+        // These mixed transforms are refused by the original Frame admission,
+        // before a scene can publish an untransformed mask.
+        assert_eq!(
+            prepare_object_frame(&s, &pins(&s, 7)).unwrap_err(),
+            crate::object_frame_packet::ObjectFrameError::Unavailable,
+            "expanded mixed transform must stay unavailable: {kind}"
+        );
         assert_eq!(encode_storage_project(s.document()).unwrap(), before);
         assert_eq!(o.history_depths(), (0, 0));
     }
