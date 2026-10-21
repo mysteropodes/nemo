@@ -23,7 +23,9 @@ fn ordinary_editable_source(mut doc: Value) -> Value {
             "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}
     }));
     doc["compositionOrder"]["contexts"][0]["layers"]
-        .as_array_mut().unwrap().push(json!({
+        .as_array_mut()
+        .unwrap()
+        .push(json!({
             "layerUid":"Edit","naturalPosition":position,"order":{}
         }));
     let mut record = doc["objects"][0].clone();
@@ -31,7 +33,9 @@ fn ordinary_editable_source(mut doc: Value) -> Value {
     record["target"]["strokeId"] = json!("editable");
     doc["objects"].as_array_mut().unwrap().push(record);
     doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
-        .as_array_mut().unwrap().push(json!({
+        .as_array_mut()
+        .unwrap()
+        .push(json!({
             "layerUid":"Edit","strokeId":"editable","naturalPosition":0,"order":{}
         }));
     doc

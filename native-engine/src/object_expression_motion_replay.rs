@@ -74,8 +74,7 @@ pub fn prepare_object_motion_exposure_frame_for_control(
     // Empty captures have no effects to finalize. Retire only their obsolete
     // source cache after exact live-owner admission; every real effect
     // (including successful diagnostic clears) remains pending even if stale.
-    if control.committed_without_source.is_none()
-        && admit_frame_context(snapshot, selector).is_ok()
+    if control.committed_without_source.is_none() && admit_frame_context(snapshot, selector).is_ok()
     {
         control.pending.retain(|record| {
             !record.effects.is_empty()
