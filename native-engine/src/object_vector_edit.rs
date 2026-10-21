@@ -8,6 +8,7 @@
 //!   the empty string; the owner allocates `native-stroke:{next revision}:{n}` and the caller cannot choose it.
 //! - `object.vector.replace`: `record` replaces the record with the same full target, in place.
 //! - `object.vector.delete`: `stableTarget` names the record to remove.
+//! - `object.vector.mask.edit`: `stableTarget` and `maskEdit` change only original Path mask tags.
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
     object_deserialize, FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, Presence,
@@ -19,6 +20,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
+#[path = "object_mask_edit.rs"]
+mod mask_edit;
 #[path = "object_vector_edit_order.rs"]
 pub(crate) mod order;
 use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
@@ -34,11 +37,13 @@ struct VectorPayload {
     command: String,
     record: Presence<ObjectRecord>,
     stable_target: Presence<ObjectTarget>,
+    mask_edit: Presence<mask_edit::MaskEdit>,
 }
 object_deserialize!(VectorPayload {
     command: String,
     #[serde(default)] record: Presence<ObjectRecord>,
-    #[serde(default)] stable_target: Presence<ObjectTarget>
+    #[serde(default)] stable_target: Presence<ObjectTarget>,
+    #[serde(default)] mask_edit: Presence<mask_edit::MaskEdit>
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +51,7 @@ pub(crate) enum VectorEditKind {
     Create,
     Replace,
     Delete,
+    Mask,
 }
 impl VectorEditKind {
     fn label(self) -> &'static str {
@@ -53,6 +59,7 @@ impl VectorEditKind {
             Self::Create => "create",
             Self::Replace => "replace",
             Self::Delete => "delete",
+            Self::Mask => "mask.edit",
         }
     }
 }
@@ -346,19 +353,36 @@ impl ObjectFillOwner {
             payload.command.as_str(),
             payload.record,
             payload.stable_target,
+            payload.mask_edit,
         ) {
-            ("object.vector.create", Presence::Present(record), Presence::Missing) => {
-                create(&origin, record)?
-            }
-            ("object.vector.replace", Presence::Present(record), Presence::Missing) => {
-                replace(&origin, record)?
-            }
-            ("object.vector.delete", Presence::Missing, Presence::Present(target)) => {
-                delete(&origin, target)?
-            }
+            (
+                "object.vector.create",
+                Presence::Present(record),
+                Presence::Missing,
+                Presence::Missing,
+            ) => create(&origin, record)?,
+            (
+                "object.vector.replace",
+                Presence::Present(record),
+                Presence::Missing,
+                Presence::Missing,
+            ) => replace(&origin, record)?,
+            (
+                "object.vector.delete",
+                Presence::Missing,
+                Presence::Present(target),
+                Presence::Missing,
+            ) => delete(&origin, target)?,
+            (
+                "object.vector.mask.edit",
+                Presence::Missing,
+                Presence::Present(target),
+                Presence::Present(intent),
+            ) => mask_edit::apply(&origin, target, intent)?,
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
-        if edit.changed {
+        // Mask tags do not move source geometry or invalidate fill provenance.
+        if edit.changed && edit.kind != VectorEditKind::Mask {
             let target = target.ok_or(DispatchErrorCode::InvalidRequest)?;
             let scope =
                 crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope {

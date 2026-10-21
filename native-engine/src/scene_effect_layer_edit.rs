@@ -79,7 +79,7 @@ fn apply(layer: &mut ObjectLayer, edit: &Edit) -> Result<(), DispatchErrorCode> 
     match edit {
         Edit::Blend(mode) => {
             layer.blend_mode = match blend_write(mode) {
-                Some(stored) => Presence::Present(stored.to_string()),
+                Some(stored) => Presence::Present(Some(stored.to_string())),
                 None => Presence::Missing,
             };
         }
@@ -90,10 +90,12 @@ fn apply(layer: &mut ObjectLayer, edit: &Edit) -> Result<(), DispatchErrorCode> 
                 .matte_mode()
                 .map_or(true, |mode| mode.is_empty() || mode == "none")
             {
-                layer.matte_mode = Presence::Present("alpha".to_string());
+                layer.matte_mode = Presence::Present(Some("alpha".to_string()));
             }
         }
-        Edit::MatteMode(mode) => layer.matte_mode = Presence::Present(mode.clone()),
+        Edit::MatteMode(mode) => {
+            layer.matte_mode = Presence::Present(Some(mode.clone()));
+        }
         Edit::MatteClear => {
             layer.matte_mode = Presence::Missing;
             layer.matte_source_layer_uid = Presence::Missing;

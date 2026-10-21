@@ -3,7 +3,7 @@
  * over the shipped Paper.js by tools/gen-oracle.cjs); `toRecord` maps that to the native record; `toDict` is the inverse.
  * The importer rules live HERE, not in storage: `strokeWidth || 3`, the white `#fff` fallback, Paper's miterLimit 10 and
  * dashOffset 0, 3-decimal outline rounding (_r3) and hex8 <-> {r,g,b,a}. A stroke the record cannot carry without changing
- * its look (unsupported gradients, texture/bitmap brushes, text, masks, per-element effects) is a typed refusal, never a silent drop. */
+ * its look (unsupported gradients, texture/bitmap brushes, text, per-element effects) is a typed refusal, never a silent drop. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -15,10 +15,10 @@
   // Members the record owns; everything else a dictionary carries is reported (UNMAPPED) or refuses the mapping (REFUSED).
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
-    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx'];
+    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather'];
   // Look-changing members with no record slot: mapping them as a plain path would lose the look without a word.
   const REFUSED = ['strokeGradientAlongPath', 'bitmapBrushSpec', 'brushTexturePreset', 'isBrushTextureCopy', 'isText', 'isTextRoot',
-    'isVectorText', 'isMask', 'effects'];
+    'isVectorText', 'effects'];
   const SHAPE_MEMBERS = { rect: ['tl', 'tr', 'br', 'bl'], ellipse: ['startAngle', 'sweep', 'innerRadius'], star: ['pointCount', 'innerRatio', 'cornerRadius'] };
   const FX_TYPES = [
     { id: 'zigzag', params: [{ key: 'p1', def: 12 }, { key: 'p2', def: 4 }, { key: 'p3', def: 0 }] },
@@ -113,6 +113,14 @@
     }
     if (dict.strokeId) out.strokeId = dict.strokeId;
     if (dict.boxAngle) out.boxAngle = dict.boxAngle;
+    for (const key of ['isMask', 'maskMode', 'maskFeather']) {
+      if (!has(dict, key)) continue;
+      const v = dict[key];
+      if (v !== null && (key === 'isMask' ? typeof v !== 'boolean' : key === 'maskMode' ? typeof v !== 'string' : typeof v !== 'number' || !Number.isFinite(v))) {
+        refuse('invalid_dict', `invalid ${key}`);
+      }
+      out[key] = v;
+    }
     if (dict.paramShape) out.paramShape = dict.paramShape;
     const seed=(p)=>Array.isArray(p)&&p.length===2&&p.every((n)=>typeof n==='number'&&Number.isFinite(n));
     ['fillSeed','fillSeeds','fillWalls','fillGapPx'].forEach((key)=>{
@@ -176,6 +184,7 @@
       }
       if (n.paramShape !== undefined) ext.paramShape = shape(n.paramShape);
       if (n.boxAngle !== undefined) ext.boxAngle = n.boxAngle;
+      for (const key of ['isMask', 'maskMode', 'maskFeather']) if (has(n, key)) ext[key] = n[key];
       const trace={};
       [['fillSeed','seed'],['fillSeeds','seeds'],['fillWalls','walls'],['fillGapPx','gapPx']].forEach(([key,stored])=>{
         if(has(n,key))trace[stored]=JSON.parse(JSON.stringify(n[key]));
@@ -231,6 +240,7 @@
     }
     if (record.target.strokeId) out.strokeId = record.target.strokeId;
     if (x.boxAngle) out.boxAngle = x.boxAngle;
+    for (const key of ['isMask', 'maskMode', 'maskFeather']) if (has(x, key)) out[key] = x[key];
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
     if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
     if(x.fillTrace)[['seed','fillSeed'],['seeds','fillSeeds'],['walls','fillWalls'],['gapPx','fillGapPx']].forEach(([stored,key])=>{

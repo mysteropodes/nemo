@@ -715,6 +715,28 @@
         },
         "fillTrace": {
           "$ref": "#/$defs/ObjectFillTrace"
+        },
+        "isMask": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maskMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maskFeather": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "minProperties": 1,
@@ -872,6 +894,79 @@
         }
       }
     },
+    "ObjectVectorMaskEdit": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "mode"
+          ],
+          "properties": {
+            "kind": {
+              "const": "mode"
+            },
+            "mode": {
+              "enum": [
+                "add",
+                "subtract",
+                "intersect"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "feather"
+            },
+            "value": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unset"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectVectorMaskPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "stableTarget",
+        "maskEdit"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.vector.mask.edit"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "maskEdit": {
+          "$ref": "#/$defs/ObjectVectorMaskEdit"
+        }
+      },
+      "description": "Original Path mask metadata: selected mode/unset or same-frame layer-shared feather; authored geometry and paint remain unchanged."
+    },
     "ObjectVectorEditPayload": {
       "oneOf": [
         {
@@ -882,9 +977,12 @@
         },
         {
           "$ref": "#/$defs/ObjectVectorDeletePayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectVectorMaskPayload"
         }
       ],
-      "description": "Vector create, replace or delete. The complete original UTF-8 request envelope is bounded at 65536 bytes, never split or truncated. Other operations and all replies retain their 4096-byte bounds."
+      "description": "Vector create, replace, delete or original Path mask metadata edit. The complete original UTF-8 request envelope is bounded at 65536 bytes, never split or truncated. Other operations and all replies retain their 4096-byte bounds."
     },
     "ObjectParametricSetPayload": {
       "type": "object",
@@ -1058,14 +1156,15 @@
           "enum": [
             "create",
             "replace",
-            "delete"
+            "delete",
+            "mask.edit"
           ]
         },
         "strokeId": {
           "$ref": "#/$defs/ObjectOpaqueId"
         }
       },
-      "description": "Compact vector edit receipt: the stroke an owner allocated (create) or the stable target named (replace, delete). Parameter and path-effect edits answer with the compact CommandResult."
+      "description": "Compact vector edit receipt: the stroke an owner allocated (create) or the stable target named (replace, delete, mask.edit). Parameter and path-effect edits answer with the compact CommandResult."
     },
     "ObjectPropertyMetadataPayload": {
       "$ref": "./native-property-metadata-v1.schema.json#/$defs/Selector"
@@ -7536,6 +7635,9 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectCommentsReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectQueryResult"
             }
           ]
         },

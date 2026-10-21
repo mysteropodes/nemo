@@ -82,6 +82,9 @@ pub(crate) fn fill_record(
             param_shape: Presence::Missing,
             box_angle: Presence::Missing,
             fill_gradient: Presence::Missing,
+            is_mask: Presence::Missing,
+            mask_mode: Presence::Missing,
+            mask_feather: Presence::Missing,
             fill_trace: Presence::Present(
                 FillTrace::stamp(click, hit.wall_ids.clone(), hit.gap_px).unwrap(),
             ),

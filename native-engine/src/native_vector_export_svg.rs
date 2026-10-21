@@ -365,6 +365,18 @@ fn emit_frame(
             }
         }
     }
+    if let Some(mask) = plan
+        .mask_inputs()
+        .layers()
+        .iter()
+        .flat_map(|layer| layer.masks())
+        .next()
+    {
+        return Err(SvgExportError::Unsupported {
+            source_object_index: mask.source_object_index(),
+            reason: "native vector masks have no SVG representation",
+        });
+    }
     sink.put(&document_head(spec.width, spec.height))?;
     let mut count = 0;
     for entry in ordered_entries(plan) {

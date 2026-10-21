@@ -150,7 +150,7 @@ test('desktop() binds one client per host window', () => {
   assert.ok(client && typeof client.createStroke === 'function');
   assert.equal(Vector.desktop(host), client);
   assert.notEqual(Vector.desktop({ NemoNativeObjectProject: { desktop: () => session } }), client);
-  assert.deepEqual(Object.keys(client).sort(), ['createStroke', 'defaultEffect', 'deleteStroke', 'replaceStroke', 'scaleParametric', 'setParametric', 'setPathEffects', 'translateParametric']);
+  assert.deepEqual(Object.keys(client).sort(), ['createStroke', 'defaultEffect', 'deleteStroke', 'editMask', 'replaceStroke', 'scaleParametric', 'setParametric', 'setPathEffects', 'translateParametric']);
 });
 
 test('a stroke the record cannot carry, or the owner could not store, is named and never sent', async () => {

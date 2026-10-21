@@ -4,6 +4,8 @@ use super::*;
 use serde_json::json;
 #[path = "native_fill_trace_contract_tests.rs"]
 mod fill_trace;
+#[path = "native_mask_contract_tests.rs"]
+mod masks;
 
 fn stable() -> Value {
     json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":3},"layerUid":"L1","strokeId":"native-stroke:8:0"})

@@ -49,7 +49,9 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
                 .objects()
                 .get(layer.source_indices[copy_index])
                 .ok_or_else(|| invalid("duplicator original source is unavailable"))?;
-            if source.has_enabled_effects() || copy.record.has_enabled_effects() {
+            if !copy.record.is_mask()
+                && (source.has_enabled_effects() || copy.record.has_enabled_effects())
+            {
                 return Err(invalid(
                     "per-element effect evaluation awaits its native scene consumer",
                 ));
@@ -69,17 +71,22 @@ pub(crate) fn prepare(packet: &ObjectFramePacket) -> Result<DuplicatorScene, Obj
             record.target.layer_uid = packet.source_layers()[layer.layer_index]
                 .layer_uid()
                 .to_owned();
-            let opacity = packet
-                .layer_opacity(layer.layer_index)
-                .map_err(|_| invalid("duplicator host opacity is unavailable"))?
-                * placement.placement.opacity_factor;
-            let style = crate::object_frame_packet::duplicators::paint_style(
-                packet,
-                &record,
-                opacity,
-                placement.placement.hue_deg,
-            )
-            .map_err(invalid)?;
+            let style = if record.is_mask() {
+                crate::evaluation::object_scene_style_kernels::object_scene_style_item::SceneItemStyle::solid_fill(
+                    crate::object_render_scene::mask_inputs::white_solid().map_err(invalid)?)
+            } else {
+                let opacity = packet
+                    .layer_opacity(layer.layer_index)
+                    .map_err(|_| invalid("duplicator host opacity is unavailable"))?
+                    * placement.placement.opacity_factor;
+                crate::object_frame_packet::duplicators::paint_style(
+                    packet,
+                    &record,
+                    opacity,
+                    placement.placement.hue_deg,
+                )
+                .map_err(invalid)?
+            };
             let (segments, closed) = if is_vector_record(&record) {
                 let (segments, closed) = duplicator_geometry(packet, &record, layer.layer_index)
                     .map_err(|e| invalid(e.message()))?;

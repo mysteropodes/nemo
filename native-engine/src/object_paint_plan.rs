@@ -4,6 +4,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
+use crate::object_render_scene::mask_inputs::{ObjectMaskInput, ObjectMaskInputs};
 use crate::object_render_scene::object_scene_producer_contour;
 use crate::object_render_scene::{
     validate_pins, ObjectRenderEntry, ObjectRenderScene, ObjectSceneError,
@@ -72,14 +73,18 @@ impl<'a> ObjectPaintCommand<'a> {
 #[derive(Debug, Clone)]
 pub struct ObjectPaintPlan {
     scene: Arc<ObjectRenderScene>,
+    masks: Arc<ObjectMaskInputs>,
     indices: Arc<[usize]>,
     mixed: Arc<[PaintIndex]>,
 }
 impl ObjectPaintPlan {
-    /// Encoded-source versions retained by this immutable plan, in stable asset order.
-    pub fn raster_resource_versions(&self) -> Result<Vec<(String, String)>, ObjectSceneError> {
-        crate::object_render_scene::raster_scene::declared_versions(self)
+    pub(crate) fn mask_inputs(&self) -> &ObjectMaskInputs {
+        &self.masks
     }
+    pub(crate) fn mask_path(&self, mask: &ObjectMaskInput) -> Option<&BezPath> {
+        self.masks.path_in_scene(&self.scene, mask)
+    }
+
     pub fn packet(&self) -> &ObjectFramePacket {
         self.scene.packet()
     }
@@ -121,11 +126,15 @@ pub fn prepare_object_paint_plan(
     } else {
         raster::prepare(scene, expected)?
     };
-    let (indices, mixed) =
+    let (mut indices, mut mixed) =
         crate::object_render_scene::duplicator_scene::expand_order(scene, indices, mixed)?;
+    // Original producer coverage/order is proved ABOVE before mask extraction.
+    let masks = Arc::new(ObjectMaskInputs::from_scene(scene).map_err(ObjectPaintPlanError::Pins)?);
+    masks.exclude_mask_paint(scene, &mut indices, &mut mixed);
     let mixed = crate::object_render_scene::media_scene::insert_slots(scene, mixed)?;
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),
+        masks,
         indices: indices.into(),
         mixed: mixed.into(),
     })
