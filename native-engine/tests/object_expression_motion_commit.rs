@@ -364,8 +364,12 @@ fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fil
                 _ => invalid.frame = u32::MAX,
             }
             assert!(prepare_object_motion_exposure_frame_for_control(
-                &o, &current, &invalid, &mut control,
-            ).is_err());
+                &o,
+                &current,
+                &invalid,
+                &mut control,
+            )
+            .is_err());
             assert_eq!(format!("{control:?}"), pending);
         }
         assert_eq!(calls(), entered);
