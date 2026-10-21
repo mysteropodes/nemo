@@ -3,7 +3,7 @@ use crate::history::NativeObjectHistory;
 use crate::object_codec::encode_storage_project;
 use crate::object_document::{Presence, PropertyHolderTarget};
 use crate::object_expression_runtime::motion_frame::tests::{
-    add_effector, fixture, owner, pins, x_values,
+    add_effector, fixture, ordinary_editable_source, owner, pins, x_values,
 };
 use crate::object_expression_runtime::{
     finalize_object_motion_frame_effects_for_owner,
@@ -319,7 +319,7 @@ fn ordinary_raw_and_no_holder_reads_complete_without_a_guest_or_history_change()
 fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fill_undo() {
     use crate::commands::ObjectFillOwner;
     for no_holder in [false, true] {
-        let mut doc = fixture("[frame,0]");
+        let mut doc = ordinary_editable_source(fixture("[frame,0]"));
         if no_holder {
             doc.as_object_mut().unwrap().remove("propertyHolders");
         } else {
@@ -348,7 +348,7 @@ fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fil
         let fill = o.prepare_fill_json(&serde_json::to_vec(&json!({
             "command":"object.fill.set",
             "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
-                "layerUid":"L0","strokeId":"stroke-0"},
+                "layerUid":"Edit","strokeId":"editable"},
             "fill":{"kind":"solid","r":0.25,"g":0.5,"b":0.75,"a":1}
         })).unwrap()).unwrap();
         o.commit_fill(fill).unwrap();
@@ -428,7 +428,7 @@ fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fil
 #[test]
 fn successful_nonempty_effect_receipts_remain_pending_after_an_actual_fill_source_change() {
     use crate::commands::ObjectFillOwner;
-    let mut o = owner(fixture("[frame,0]"));
+    let mut o = owner(ordinary_editable_source(fixture("[frame,0]")));
     let old = o.acquire_snapshot(0).unwrap();
     let original = encode_storage_project(old.document()).unwrap();
     let mut control = ObjectMotionFrameControl::default();
@@ -448,7 +448,7 @@ fn successful_nonempty_effect_receipts_remain_pending_after_an_actual_fill_sourc
             &serde_json::to_vec(&json!({
                 "command":"object.fill.set",
                 "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
-                    "layerUid":"L0","strokeId":"stroke-0"},
+                    "layerUid":"Edit","strokeId":"editable"},
                 "fill":{"kind":"solid","r":0.25,"g":0.5,"b":0.75,"a":1}
             }))
             .unwrap(),

@@ -5,7 +5,7 @@ use crate::object_expression_runtime::motion_frame::tests::commit_tests::{
     calls, diagnostic, prepare, target,
 };
 use crate::object_expression_runtime::motion_frame::tests::{
-    add_effector, fixture, owner, pins, x_values,
+    add_effector, fixture, ordinary_editable_source, owner, pins, x_values,
 };
 use crate::object_expression_runtime::{
     finalize_object_motion_frame_effects_for_owner,
@@ -136,7 +136,7 @@ fn outer_and_nested_timeout_disables_are_one_atomic_undo_and_require_a_fresh_own
 
 #[test]
 fn actual_source_edit_refuses_old_effect_commit_and_keeps_its_complete_receipts() {
-    let mut o = owner(fixture("while(true){}"));
+    let mut o = owner(ordinary_editable_source(fixture("while(true){}")));
     let old = o.acquire_snapshot(0).unwrap();
     let mut control = ObjectMotionFrameControl::default();
     assert!(prepare(&o, &old, 2, &mut control).is_err());
@@ -145,7 +145,7 @@ fn actual_source_edit_refuses_old_effect_commit_and_keeps_its_complete_receipts(
         .prepare_fill_json(
             &serde_json::to_vec(&json!({"command":"object.fill.set",
         "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
-            "layerUid":"L0","strokeId":"stroke-0"},
+            "layerUid":"Edit","strokeId":"editable"},
         "fill":{"kind":"solid","r":0.25,"g":0.5,"b":0.75,"a":1}}))
             .unwrap(),
         )

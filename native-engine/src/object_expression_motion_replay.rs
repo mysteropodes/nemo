@@ -1,4 +1,5 @@
 //! Pure frame reconstruction and original owner-control read collection.
+use crate::evaluation::object_component_kernels::object_context_admission::admit_frame_context;
 use crate::history::NativeObjectHistory;
 use crate::object_expression_runtime::motion_frame::commit::{
     batch_limit, same_source, selector_matches, ObjectMotionFrameControl, RecordedFrame,
@@ -74,7 +75,7 @@ pub fn prepare_object_motion_exposure_frame_for_control(
     // source cache after exact live-owner admission; every real effect
     // (including successful diagnostic clears) remains pending even if stale.
     if control.committed_without_source.is_none()
-        && selector.frame < snapshot.document().total_frames()
+        && admit_frame_context(snapshot, selector).is_ok()
     {
         control.pending.retain(|record| {
             !record.effects.is_empty()

@@ -149,7 +149,7 @@ fn stale_foreign_and_wrong_frame_pins_never_clear_a_retained_effect() {
 
 #[test]
 fn a_verified_new_revision_retires_old_effects_without_applying_stale_disables() {
-    let mut o = owner(fixture("while(true){}"));
+    let mut o = owner(ordinary_editable_source(fixture("while(true){}")));
     let old = o.acquire_snapshot(0).unwrap();
     let mut retained = None;
     assert!(prepare_object_motion_exposure_frame_for_owner(
@@ -163,7 +163,7 @@ fn a_verified_new_revision_retires_old_effects_without_applying_stale_disables()
         .prepare_fill_json(
             &serde_json::to_vec(&json!({"command":"object.fill.set",
         "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
-            "layerUid":"L0","strokeId":"stroke-0"},
+            "layerUid":"Edit","strokeId":"editable"},
         "fill":{"kind":"solid","r":0.25,"g":0.5,"b":0.75,"a":1}}))
             .unwrap(),
         )
