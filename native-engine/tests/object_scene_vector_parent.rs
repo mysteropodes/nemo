@@ -1,5 +1,6 @@
 //! Actual retained ordinary path parent chains; original rest fixtures and literal baseline arithmetic.
 use super::{drawing, owner, packet, pins, plan, starts, svg};
+use crate::history::NativeObjectHistory;
 use crate::object_codec::{decode_storage_project, encode_storage_project};
 use crate::object_document::{Presence, PropertyHolderTarget};
 use crate::object_expression_runtime::prepare_object_motion_exposure_frame_for_owner;
@@ -426,7 +427,7 @@ fn drawing_only_null_requires_actual_position_and_keeps_no_canvas_unavailable() 
             .remove("expression");
         source["propertyHolders"][0]["properties"][0]["static"] = json!([5, 7]);
         let document = decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap();
-        let o = crate::history::NativeObjectHistory::new("bare-null", document).unwrap();
+        let o = NativeObjectHistory::new("bare-null", document).unwrap();
         let snapshot = o.acquire_snapshot(0).unwrap();
         let before = null_bytes(&snapshot);
         let p = prepare_object_exposure_frame(&snapshot, &pins(&snapshot, 0)).unwrap();
@@ -491,16 +492,16 @@ fn actual_null_duplicate_undo_redo_and_reopen_preserve_role_and_pivot_presence()
             source["layers"][1].get("nullPos")
         );
         let changed = null_bytes(&after);
-        assert_eq!(
-            encode_storage_project(&decode_storage_project(&changed).unwrap()).unwrap(),
-            changed
-        );
-        let file = o.serialize_project_file(1, after.snapshot_id()).unwrap();
-        let reopened =
-            crate::history::NativeObjectHistory::from_project_file("reopened-null", &file).unwrap();
-        let loaded = reopened.acquire_snapshot(0).unwrap();
-        assert_ne!(loaded.document_id(), after.document_id());
-        assert_eq!(null_bytes(&loaded), changed);
+        let decoded = decode_storage_project(&changed).unwrap();
+        assert_eq!(encode_storage_project(&decoded).unwrap(), changed);
+        #[cfg(feature = "project_media_codec")]
+        {
+            let file = o.serialize_project_file(1, after.snapshot_id()).unwrap();
+            let reopened = NativeObjectHistory::from_project_file("reopened-null", &file).unwrap();
+            let loaded = reopened.acquire_snapshot(0).unwrap();
+            assert_ne!(loaded.document_id(), after.document_id());
+            assert_eq!(null_bytes(&loaded), changed);
+        }
         assert_eq!(o.undo(1).unwrap(), 2);
         assert_eq!(null_bytes(&o.acquire_snapshot(2).unwrap()), bytes);
         assert_eq!(o.redo(2).unwrap(), 3);

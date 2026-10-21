@@ -56,12 +56,21 @@ fn drawing(legacy: bool) -> Value {
                         {"layerUid":"L1","strokeId":"first","naturalPosition":0,"order":{}},
                         {"layerUid":"L1","strokeId":"second","naturalPosition":1,"order":{}}]}]}]}})
 }
+#[cfg(feature = "project_media_codec")]
 fn owner(drawing: &Value) -> NativeObjectHistory {
     let project = json!({"format":"nemo.native-project-document","formatVersion":1,
         "project":{"canvasW":400,"canvasH":200,"fps":24},"drawing":drawing,
         "viewportReference":null,"assets":[]});
     NativeObjectHistory::from_project_file("ordinary-batch", project.to_string().as_bytes())
         .unwrap()
+}
+#[cfg(not(feature = "project_media_codec"))]
+fn owner(drawing: &Value) -> NativeObjectHistory {
+    use crate::object_document::{ProjectEnvelope, ProjectMetadata};
+    let document =
+        crate::object_codec::decode_storage_project(drawing.to_string().as_bytes()).unwrap();
+    let project = ProjectEnvelope::no_media(ProjectMetadata::new(400, 200, 24.).unwrap(), document);
+    NativeObjectHistory::from_admitted_project("ordinary-batch", project).unwrap()
 }
 fn pins(s: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
     ObjectFrameSelector {
@@ -330,14 +339,18 @@ fn shared_motion_admission_refuses_mask_and_multiple_parent_controls_without_pub
     // Unsupported descriptor bytes cannot become an apparently single-parent native layer.
     let mut source = three_d(false);
     source["layers"][0]["parentLayerUid2"] = json!("L2");
-    let project = json!({"format":"nemo.native-project-document","formatVersion":1,
-        "project":{"canvasW":400,"canvasH":200,"fps":24},"drawing":source,
-        "viewportReference":null,"assets":[]});
-    assert!(NativeObjectHistory::from_project_file(
-        "ordinary-batch",
-        project.to_string().as_bytes()
-    )
-    .is_err());
+    assert!(crate::object_codec::decode_storage_project(source.to_string().as_bytes()).is_err());
+    #[cfg(feature = "project_media_codec")]
+    {
+        let project = json!({"format":"nemo.native-project-document","formatVersion":1,
+            "project":{"canvasW":400,"canvasH":200,"fps":24},"drawing":source,
+            "viewportReference":null,"assets":[]});
+        assert!(NativeObjectHistory::from_project_file(
+            "ordinary-batch",
+            project.to_string().as_bytes()
+        )
+        .is_err());
+    }
 }
 
 #[path = "object_scene_vector_parent.rs"]

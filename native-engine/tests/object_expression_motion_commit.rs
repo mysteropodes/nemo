@@ -355,16 +355,19 @@ fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fil
         let current = o.acquire_snapshot(1).unwrap();
         let filled = encode_storage_project(current.document()).unwrap();
         assert_ne!(filled, original);
-        let mut invalid = pins(&current, 2);
-        invalid.document_snapshot_id = "wrong";
-        assert!(prepare_object_motion_exposure_frame_for_control(
-            &o,
-            &current,
-            &invalid,
-            &mut control,
-        )
-        .is_err());
-        assert_eq!(format!("{control:?}"), pending);
+        for fault in ["snapshot", "context", "scope", "frame"] {
+            let mut invalid = pins(&current, 2);
+            match fault {
+                "snapshot" => invalid.document_snapshot_id = "wrong",
+                "context" => invalid.context_id = "missing",
+                "scope" => invalid.scope_kind = crate::object_document::FrameScopeKind::Reference,
+                _ => invalid.frame = u32::MAX,
+            }
+            assert!(prepare_object_motion_exposure_frame_for_control(
+                &o, &current, &invalid, &mut control,
+            ).is_err());
+            assert_eq!(format!("{control:?}"), pending);
+        }
         assert_eq!(calls(), entered);
         assert_eq!((o.content_revision(), o.history_depths()), (1, (1, 0)));
         assert_eq!(encode_storage_project(current.document()).unwrap(), filled);
