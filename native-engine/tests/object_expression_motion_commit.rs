@@ -333,11 +333,17 @@ fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fil
         let original = encode_storage_project(old.document()).unwrap();
         let mut control = ObjectMotionFrameControl::default();
         let entered = calls();
-        assert_eq!(x_values(&prepare(&o, &old, 2, &mut control).unwrap()), [20., 20., 30.]);
+        assert_eq!(
+            x_values(&prepare(&o, &old, 2, &mut control).unwrap()),
+            [20., 20., 30.]
+        );
         assert_eq!(control.pending_frames(), [2]);
         assert!(control.has_pending() && !control.requires_revision());
         let pending = format!("{control:?}");
-        assert_eq!(x_values(&prepare(&o, &old, 2, &mut control).unwrap()), [20., 20., 30.]);
+        assert_eq!(
+            x_values(&prepare(&o, &old, 2, &mut control).unwrap()),
+            [20., 20., 30.]
+        );
         assert_eq!(format!("{control:?}"), pending);
         let fill = o.prepare_fill_json(&serde_json::to_vec(&json!({
             "command":"object.fill.set",
@@ -352,17 +358,31 @@ fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fil
         let mut invalid = pins(&current, 2);
         invalid.document_snapshot_id = "wrong";
         assert!(prepare_object_motion_exposure_frame_for_control(
-            &o, &current, &invalid, &mut control,
-        ).is_err());
+            &o,
+            &current,
+            &invalid,
+            &mut control,
+        )
+        .is_err());
         assert_eq!(format!("{control:?}"), pending);
         assert_eq!(calls(), entered);
         assert_eq!((o.content_revision(), o.history_depths()), (1, (1, 0)));
         assert_eq!(encode_storage_project(current.document()).unwrap(), filled);
-        assert_eq!(x_values(&prepare(&o, &current, 2, &mut control).unwrap()), [20., 20., 30.]);
+        assert_eq!(
+            x_values(&prepare(&o, &current, 2, &mut control).unwrap()),
+            [20., 20., 30.]
+        );
         let committed = finalize_object_motion_frame_effects_for_owner(
-            &mut o, &pins(&current, 2), &[2], &mut control,
-        ).unwrap();
-        assert_eq!((committed.before_revision(), committed.content_revision()), (1, 1));
+            &mut o,
+            &pins(&current, 2),
+            &[2],
+            &mut control,
+        )
+        .unwrap();
+        assert_eq!(
+            (committed.before_revision(), committed.content_revision()),
+            (1, 1)
+        );
         assert_eq!(committed.document_snapshot_id(), current.snapshot_id());
         assert!(committed.frame_ready() && !committed.changed());
         assert!(!control.has_pending());
@@ -372,11 +392,21 @@ fn stale_empty_raw_receipts_retire_only_after_valid_current_pins_and_survive_fil
         o.undo(1).unwrap();
         let undone = o.acquire_snapshot(2).unwrap();
         assert_eq!(encode_storage_project(undone.document()).unwrap(), original);
-        assert_eq!(x_values(&prepare(&o, &undone, 2, &mut control).unwrap()), [20., 20., 30.]);
+        assert_eq!(
+            x_values(&prepare(&o, &undone, 2, &mut control).unwrap()),
+            [20., 20., 30.]
+        );
         let restored = finalize_object_motion_frame_effects_for_owner(
-            &mut o, &pins(&undone, 2), &[2], &mut control,
-        ).unwrap();
-        assert_eq!((restored.before_revision(), restored.content_revision()), (2, 2));
+            &mut o,
+            &pins(&undone, 2),
+            &[2],
+            &mut control,
+        )
+        .unwrap();
+        assert_eq!(
+            (restored.before_revision(), restored.content_revision()),
+            (2, 2)
+        );
         assert_eq!(restored.document_snapshot_id(), undone.snapshot_id());
         assert!(restored.frame_ready() && !restored.changed());
         assert!(!control.has_pending());
@@ -396,19 +426,27 @@ fn successful_nonempty_effect_receipts_remain_pending_after_an_actual_fill_sourc
     let original = encode_storage_project(old.document()).unwrap();
     let mut control = ObjectMotionFrameControl::default();
     let entered = calls();
-    assert_eq!(x_values(&prepare(&o, &old, 2, &mut control).unwrap()), [20., 22., 34.]);
+    assert_eq!(
+        x_values(&prepare(&o, &old, 2, &mut control).unwrap()),
+        [20., 22., 34.]
+    );
     assert!(calls() > entered);
     let retired = calls();
     assert_eq!(control.pending_frames(), [2]);
     assert!(control.has_pending() && !control.requires_revision());
     let pending = format!("{control:?}");
     assert!(pending.contains("effects: [Evaluated {"));
-    let fill = o.prepare_fill_json(&serde_json::to_vec(&json!({
-        "command":"object.fill.set",
-        "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
-            "layerUid":"L0","strokeId":"stroke-0"},
-        "fill":{"kind":"solid","r":0.25,"g":0.5,"b":0.75,"a":1}
-    })).unwrap()).unwrap();
+    let fill = o
+        .prepare_fill_json(
+            &serde_json::to_vec(&json!({
+                "command":"object.fill.set",
+                "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+                    "layerUid":"L0","strokeId":"stroke-0"},
+                "fill":{"kind":"solid","r":0.25,"g":0.5,"b":0.75,"a":1}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
     o.commit_fill(fill).unwrap();
     let current = o.acquire_snapshot(1).unwrap();
     let filled = encode_storage_project(current.document()).unwrap();
@@ -416,8 +454,12 @@ fn successful_nonempty_effect_receipts_remain_pending_after_an_actual_fill_sourc
     assert!(prepare(&o, &current, 2, &mut control).is_err());
     assert_eq!(format!("{control:?}"), pending);
     assert!(finalize_object_motion_frame_effects_for_owner(
-        &mut o, &pins(&current, 2), &[2], &mut control,
-    ).is_err());
+        &mut o,
+        &pins(&current, 2),
+        &[2],
+        &mut control,
+    )
+    .is_err());
     assert_eq!(format!("{control:?}"), pending);
     assert_eq!(control.pending_frames(), [2]);
     assert_eq!(control.diagnostic_records(), json!([]));
