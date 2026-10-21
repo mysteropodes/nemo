@@ -96,7 +96,7 @@ fn history(state: &ApplicationMcp, id: &str, action: &str) -> Value {
     let mut r = request(state, id, "unused");
     r["operation"] = json!(format!("command.document.object.{action}"));
     r["payload"] = json!({"command":format!("object.{action}")});
-    serde_json::to_value(state.dispatch_object_request_json(&r.to_string()).unwrap()).unwrap()
+    invoke(state, r)
 }
 fn depths(state: &ApplicationMcp) -> (usize, usize) {
     with_host(state, |host| host.history.history_depths())

@@ -88,6 +88,8 @@ impl NativeApplicationRequest {
         if matches!(
             self.operation.as_str(),
             "command.document.object.layer.visibility.set"
+                | "command.document.object.undo"
+                | "command.document.object.redo"
                 | crate::native_contract::layer_policy::OP
                 | crate::native_contract::layer_cut::OP
                 | crate::native_contract::property_track::OP
@@ -113,7 +115,12 @@ impl NativeApplicationRequest {
                 | crate::native_contract::vector::PARAMETRIC
                 | crate::native_contract::vector::EFFECTS
         ) {
-            let action = if self.operation == crate::native_contract::font::IMPORT {
+            let action = if matches!(
+                self.operation.as_str(),
+                "command.document.object.undo" | "command.document.object.redo"
+            ) {
+                "history"
+            } else if self.operation == crate::native_contract::font::IMPORT {
                 "font import"
             } else if self.operation == crate::native_contract::property_edit::OP {
                 "property edit"
