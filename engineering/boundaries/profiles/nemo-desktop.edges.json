@@ -433,7 +433,6 @@
           "export_job::PendingFrame",
           "export_job::ReconciliationStage",
           "export_job::StagedArtifactPort",
-          "export_job::export_object_frames",
           "export_job::export_object_svg_frames",
           "history::InactiveProject",
           "history::NativeObjectHistory",
