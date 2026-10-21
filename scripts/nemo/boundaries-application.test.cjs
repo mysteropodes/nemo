@@ -239,10 +239,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 130, 131, 132, 133, 134, 179, 240, 241, 279, 280, 281, 282, 285, 286, 287, 288]);
+    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 130, 131, 132, 133, 134, 180, 244, 245, 283, 284, 285, 286, 289, 290, 291, 292]);
   // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 42 identities and adjacency stay fixed; Comments adds its four ordinary source members.
-  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 242);
-  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 242);
+  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 246);
+  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 246);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -250,10 +250,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 176);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 177);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 178);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 180);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 177);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 178);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 179);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 181);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
@@ -349,7 +349,8 @@ test('every exclusion retains explicit classification, evidence and nested conte
 test('application size enforcement ignores known graph debt but rejects growth and expired exceptions', (t) => {
   const current = checkApplicationSize(read('app-js.profile.json'), { root: ROOT });
   assert.equal(current.ok, true);
-  assert.equal(current.exceptionsApplied.length, 36);
+  assert.equal(current.exceptionsApplied.length, 35);
+  assert.equal(current.exceptionsApplied.some(entry => entry.path === 'src/js/feedback-bridge.js'), false);
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo app size '));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
