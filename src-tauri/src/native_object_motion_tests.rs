@@ -183,9 +183,9 @@ fn dropping_the_actual_cpu_preparation_on_a_caller_error_keeps_the_owner_clean()
 fn pending_original_effects_follow_the_real_retained_document_across_tab_activation() {
     let mut owner = host("while(true){}");
     let origin = snapshot(&owner);
-    let selector = selector(&origin, 1);
+    let expected = selector(&origin, 1);
     assert!(owner
-        .with_prepared_object_preview::<()>(&selector, output(), |_| Ok(()))
+        .with_prepared_object_preview::<()>(&expected, output(), |_| Ok(()))
         .is_err());
     let receipt = format!("{:?}", owner.preview.motion_control);
     let incoming =

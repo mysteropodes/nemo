@@ -1,8 +1,7 @@
 //! Actual owner receipts, original RevisionSync ACK/settle, CPU fallback. UNRUN.
 use crate::application_mcp::revision_sync::RevisionEvent;
 use crate::application_mcp::ApplicationMcp;
-use crate::native_dispatch::object_host::{finalizer_fixture, finalizer_svg};
-use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
+use crate::native_dispatch::{finalizer_fixture, finalizer_svg, NativeDispatch, NativeObjectHost};
 use native_engine::{
     object_codec::encode_storage_project, object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector, object_snapshot::ObjectSnapshot,

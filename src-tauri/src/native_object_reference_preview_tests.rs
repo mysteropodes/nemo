@@ -319,7 +319,7 @@ fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
     );
     let current = snapshot(&owner);
     let prepared = owner
-        .prepare_object_preview(&selector(&current, 0), output())
+        .prepare_object_preview(&selector(&current, 0), output(), false)
         .unwrap();
     assert!(owner.preview.reference_cache.is_some());
     let count = trace.borrow().acquired;

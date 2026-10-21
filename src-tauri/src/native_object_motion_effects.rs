@@ -53,16 +53,11 @@ impl NativeObjectHost {
     #[cfg(test)]
     pub(crate) fn motion_diagnostic_for_test(&self, frame: f64) -> Option<serde_json::Value> {
         let snapshot = self.history.acquire_snapshot(self.content_revision())?;
-        self.motion_diagnostic_for(
-            &snapshot,
-            &native_engine::object_document::PropertyHolderTarget {
-                context_id: "scene-root".into(),
-                layer_uid: "L0".into(),
-                stroke_id: native_engine::object_document::Presence::Missing,
-            },
-            "dupOffsetPos",
-            frame,
-        )
+        let target: native_engine::object_document::PropertyHolderTarget =
+            serde_json::from_value(serde_json::json!({
+                "contextId":"scene-root", "layerUid":"L0"
+            })).ok()?;
+        self.motion_diagnostic_for(&snapshot, &target, "dupOffsetPos", frame)
     }
     #[cfg(test)]
     pub(crate) fn motion_state_for_test(
