@@ -436,9 +436,14 @@ fn gpu_stored_text_animator_and_layer_motion_share_original_glyphs_and_export_pi
     assert_eq!(support::state(&o), before);
     // Same original Hello/TA/own-Motion fixture, now through a genuine content-free Null.
     doc["layers"][0]["parentLayerUid"] = json!("N");
-    doc["layers"].as_array_mut().unwrap().push(json!({"layerUid":"N","visible":false,
+    doc["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"N","visible":false,
         "isNullLayer":true,"nullPos":[100,80]}));
-    doc["compositionOrder"]["contexts"][0]["layers"].as_array_mut().unwrap()
+    doc["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
         .push(json!({"layerUid":"N","naturalPosition":1,"order":{}}));
     doc["propertyHolders"].as_array_mut().unwrap().push(json!({
         "target":{"contextId":"scene-root","layerUid":"N"},
@@ -452,12 +457,13 @@ fn gpu_stored_text_animator_and_layer_motion_share_original_glyphs_and_export_pi
     assert_eq!(reflected, render(&mut gpu, &null_export));
     // Original ink cell(39,29)/(57,51), rotated180 around(100,80):
     // destination sample cells are(160,130)/(142,108), not rounded edge guesses.
-    assert_eq!(pixel(&reflected,160,130), [17,34,51,255]);
-    assert_eq!(pixel(&reflected,142,108), [17,34,51,255]);
-    assert_eq!(pixel(&reflected,142,130), [255;4]);
-    assert_eq!(pixel(&reflected,39,29), [255;4]);
+    assert_eq!(pixel(&reflected, 160, 130), [17, 34, 51, 255]);
+    assert_eq!(pixel(&reflected, 142, 108), [17, 34, 51, 255]);
+    assert_eq!(pixel(&reflected, 142, 130), [255; 4]);
+    assert_eq!(pixel(&reflected, 39, 29), [255; 4]);
     assert_eq!(support::state(&null_owner), null_before);
-    drop(null_snapshot); drop(null_owner);
+    drop(null_snapshot);
+    drop(null_owner);
     assert_eq!(reflected, render(&mut gpu, &null_export));
     drop(snapshot);
     drop(o);
