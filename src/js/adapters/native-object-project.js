@@ -16,6 +16,8 @@
   function same(a,b){return !!a&&!!b&&['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration'].every(function(k){return a[k]===b[k];});}
   var metadata=Metadata&&Metadata.decode;if(typeof metadata!=='function')throw new Error('Native project metadata parser is unavailable');
   function create(ports){
+    if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
+    if(!Exposure||typeof Exposure.navigation!=='function')throw new Error('Native project view ports are unavailable');
     var view=Exposure.navigation(ports.viewMode),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
@@ -384,7 +386,6 @@
     }
     function readLayerTiming(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,false);}
     function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,true);}
-    if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
       dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
       state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
