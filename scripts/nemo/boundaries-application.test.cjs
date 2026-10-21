@@ -400,7 +400,7 @@ function assertF06Bootstrap(html) {
     assert.equal(selected[0].tag, '<script src="' + source + '"></script>', source + ' must be synchronous classic');
     return scripts.indexOf(selected[0]);
   });
-  assert.deepEqual(positions, [13, 15, 16, 17, 18, 19, 20, 22, 23],
+  assert.deepEqual(positions, [14, 16, 17, 18, 19, 20, 21, 23, 24],
     'underlay → parser → properties → desktop → Exposure → Project → ProjectFile → UI must remain in that order');
   const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
     const selected = scripts.filter((entry) => entry.src === source);
