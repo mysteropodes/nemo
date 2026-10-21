@@ -87,7 +87,7 @@ function fixture() {
   return {root,state,elements,document,controller,calls,notices,prompts,promptCalls,menus,jumps,edits,settled,diagnostics,
     projectionReady:value=>root.NemoNativeObjectProjectFile.projectionReadyForUI(browserRoot,value),
     fullInfo:()=>info,drift(){state.canvasW++;},repairProjection:project,
-    setController(value){browserRoot.NemoNativeCompositionController=value;},
+    setController(value){browserRoot.NemoNativeCompositionController=value;assert.strictEqual(browserRoot.NemoNativeCompositionController,value);},
     sameInstall:()=>vm.runInContext('NemoNativeCompositionUI.install(globalThis) === NemoNativeCompositionController',context),
     async ready(){await controller.presented();await settled();},
     marker:()=>elements['bars-row'].children.find(x=>x.className==='tl-marker tl-marker-comp'),
