@@ -70,8 +70,18 @@ pub fn prepare_object_motion_exposure_frame_for_control(
     if !selector_matches(snapshot, selector) {
         return Err("Motion control selector does not name the exact owner snapshot".into());
     }
-    // Only finalized projections can retire here. The exact live owner/source
-    // was verified above; pending effects below remain intact even if stale.
+    // Empty captures have no effects to finalize. Retire only their obsolete
+    // source cache after exact live-owner admission; every real effect
+    // (including successful diagnostic clears) remains pending even if stale.
+    if control.committed_without_source.is_none() {
+        control.pending.retain(|record| {
+            !record.effects.is_empty()
+                || record.source.instance_id() != snapshot.instance_id()
+                || record.source.document_id() != snapshot.document_id()
+                || same_source(&record.source, snapshot)
+        });
+    }
+    // Only finalized projections can retire here. Pending effects stay intact.
     control.retire_finalized_diagnostics(snapshot);
     if let Some(record) = control
         .pending
