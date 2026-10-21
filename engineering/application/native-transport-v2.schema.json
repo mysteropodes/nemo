@@ -6415,6 +6415,108 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.workspace.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectWorkspaceReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.workspace.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectWorkspaceEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.customBrushPreset.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectCustomBrushPresetReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.customBrushPreset.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectCustomBrushPresetEditPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.project.comments.read"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectCommentsReadPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.project.comments.edit"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectProjectCommentsEditPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -7268,6 +7370,15 @@
             },
             {
               "$ref": "#/$defs/ObjectProjectPerspectiveReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectWorkspaceReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectCustomBrushPresetReadResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectProjectCommentsReadResult"
             }
           ]
         },
@@ -12678,6 +12789,1070 @@
               "$ref": "#/$defs/ObjectProjectPerspectiveVPPageValue"
             }
           ]
+        }
+      }
+    },
+    "ObjectProjectWorkspaceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "layerPanelWidth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toolsPanelWidth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "propsPanelWidth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timelineHeight": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "motionColumns": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "propsPanelCollapsed": {
+          "type": "boolean"
+        },
+        "panelOrder": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectWorkspaceCaptureValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layerPanelWidth",
+        "toolsPanelWidth",
+        "propsPanelWidth",
+        "propsPanelCollapsed",
+        "timelineHeight",
+        "panelOrder"
+      ],
+      "properties": {
+        "layerPanelWidth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toolsPanelWidth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "propsPanelWidth": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timelineHeight": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "motionColumns": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "propsPanelCollapsed": {
+          "type": "boolean"
+        },
+        "panelOrder": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectWorkspaceEditAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "workspace"
+      ],
+      "properties": {
+        "kind": {
+          "const": "capture"
+        },
+        "workspace": {
+          "$ref": "#/$defs/ObjectProjectWorkspaceCaptureValue"
+        }
+      }
+    },
+    "ObjectProjectWorkspaceSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "record"
+        }
+      }
+    },
+    "ObjectProjectWorkspaceEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.workspace.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectWorkspaceEditAction"
+        }
+      }
+    },
+    "ObjectProjectWorkspaceReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectWorkspaceSelector"
+        }
+      }
+    },
+    "ObjectProjectWorkspaceRecordValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspacePresent"
+      ],
+      "properties": {
+        "workspacePresent": {
+          "type": "boolean"
+        },
+        "workspace": {
+          "$ref": "#/$defs/ObjectProjectWorkspaceRecord"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "workspacePresent": {
+              "const": false
+            }
+          },
+          "not": {
+            "required": [
+              "workspace"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "workspacePresent": {
+              "const": true
+            }
+          },
+          "required": [
+            "workspace"
+          ]
+        }
+      ]
+    },
+    "ObjectProjectWorkspaceReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "$ref": "#/$defs/ObjectProjectWorkspaceRecordValue"
+        }
+      }
+    },
+    "ObjectProjectCustomBrushPresetRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "bristleCount": {
+          "type": "number"
+        },
+        "dashGap": {
+          "type": "number"
+        },
+        "edgeNoise": {
+          "type": "number"
+        },
+        "fixedAngle": {
+          "type": "number"
+        },
+        "grain": {
+          "type": "number"
+        },
+        "nibSize": {
+          "type": "number"
+        },
+        "noise": {
+          "type": "number"
+        },
+        "opacity": {
+          "type": "number"
+        },
+        "opacityJitter": {
+          "type": "number"
+        },
+        "polySides": {
+          "type": "number"
+        },
+        "pressureEnd": {
+          "type": "number"
+        },
+        "pressureMid": {
+          "type": "number"
+        },
+        "pressureStart": {
+          "type": "number"
+        },
+        "rotationJitter": {
+          "type": "number"
+        },
+        "roughness": {
+          "type": "number"
+        },
+        "roundness": {
+          "type": "number"
+        },
+        "scatter": {
+          "type": "number"
+        },
+        "scribbleAngleSpread": {
+          "type": "number"
+        },
+        "scribbleCount": {
+          "type": "number"
+        },
+        "scribbleLen": {
+          "type": "number"
+        },
+        "scribbleLenJitter": {
+          "type": "number"
+        },
+        "scribbleSpread": {
+          "type": "number"
+        },
+        "scribbleWidth": {
+          "type": "number"
+        },
+        "sharpness": {
+          "type": "number"
+        },
+        "sizeJitter": {
+          "type": "number"
+        },
+        "spaceJitter": {
+          "type": "number"
+        },
+        "spacing": {
+          "type": "number"
+        },
+        "tipCorner": {
+          "type": "number"
+        },
+        "valueJitter": {
+          "type": "number"
+        },
+        "savedBrushSize": {
+          "type": "number"
+        },
+        "rotationMode": {
+          "type": "string"
+        },
+        "scatterDistribution": {
+          "type": "string"
+        },
+        "tipShape": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "markerTip": {
+          "type": "boolean"
+        },
+        "customStamp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "segments"
+          ],
+          "properties": {
+            "segments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "point"
+                ],
+                "properties": {
+                  "point": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "handleIn": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "handleOut": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                }
+              }
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "pointCount": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "ObjectProjectCustomBrushPresetSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "settings"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "catalogPage"
+            },
+            "cursor": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "record"
+            },
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCustomBrushPresetEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "preset"
+          ],
+          "properties": {
+            "kind": {
+              "const": "upsert"
+            },
+            "id": {
+              "type": "string"
+            },
+            "preset": {
+              "$ref": "#/$defs/ObjectProjectCustomBrushPresetRecord"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "delete"
+            },
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCustomBrushPresetEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.customBrushPreset.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectCustomBrushPresetEditAction"
+        }
+      }
+    },
+    "ObjectProjectCustomBrushPresetReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectCustomBrushPresetSelector"
+        }
+      }
+    },
+    "ObjectProjectCustomBrushPresetReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "customBrushPresetsPresent",
+                "presetCount"
+              ],
+              "properties": {
+                "customBrushPresetsPresent": {
+                  "type": "boolean"
+                },
+                "presetCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "customBrushPresetsPresent",
+                "presetCount",
+                "cursor",
+                "items",
+                "nextCursor"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "customBrushPresetPage"
+                },
+                "customBrushPresetsPresent": {
+                  "type": "boolean"
+                },
+                "presetCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "cursor": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ordinal",
+                      "id"
+                    ],
+                    "properties": {
+                      "ordinal": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "maxItems": 16
+                },
+                "nextCursor": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "id",
+                "preset"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "customBrushPresetRecord"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "preset": {
+                  "$ref": "#/$defs/ObjectProjectCustomBrushPresetRecord"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ObjectProjectCommentRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "frame": {
+          "type": "number"
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorColor": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "resolved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectProjectCommentDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "x",
+        "y",
+        "frame",
+        "text",
+        "createdAt",
+        "resolved"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "frame": {
+          "type": "number"
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorColor": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "[^\\u0009-\\u000d\\u0020\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "resolved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectProjectCommentsSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "settings"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal"
+          ],
+          "properties": {
+            "kind": {
+              "const": "record"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cursor",
+            "limit"
+          ],
+          "properties": {
+            "kind": {
+              "const": "commentsPage"
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCommentsEditAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "comment"
+          ],
+          "properties": {
+            "kind": {
+              "const": "append"
+            },
+            "comment": {
+              "$ref": "#/$defs/ObjectProjectCommentDraft"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal",
+            "text",
+            "resolved"
+          ],
+          "properties": {
+            "kind": {
+              "const": "update"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "text": {
+              "type": "string"
+            },
+            "resolved": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal"
+          ],
+          "properties": {
+            "kind": {
+              "const": "delete"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCommentsEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.comments.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectProjectCommentsEditAction"
+        }
+      }
+    },
+    "ObjectProjectCommentsReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "selector"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "selector": {
+          "$ref": "#/$defs/ObjectProjectCommentsSelector"
+        }
+      }
+    },
+    "ObjectProjectCommentsReadValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "commentsPresent",
+            "commentCount"
+          ],
+          "properties": {
+            "commentsPresent": {
+              "type": "boolean"
+            },
+            "commentCount": {
+              "$ref": "#/$defs/Revision"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "commentsPresent",
+            "commentCount",
+            "cursor",
+            "items",
+            "nextCursor"
+          ],
+          "properties": {
+            "kind": {
+              "const": "projectCommentsPage"
+            },
+            "commentsPresent": {
+              "type": "boolean"
+            },
+            "commentCount": {
+              "$ref": "#/$defs/Revision"
+            },
+            "cursor": {
+              "$ref": "#/$defs/Revision"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "ordinal",
+                  "comment"
+                ],
+                "properties": {
+                  "ordinal": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "comment": {
+                    "$ref": "#/$defs/ObjectProjectCommentRecord"
+                  }
+                }
+              }
+            },
+            "nextCursor": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Revision"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ordinal",
+            "comment"
+          ],
+          "properties": {
+            "kind": {
+              "const": "projectCommentRecord"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "comment": {
+              "$ref": "#/$defs/ObjectProjectCommentRecord"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectProjectCommentsReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "result"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "documentId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "result": {
+          "$ref": "#/$defs/ObjectProjectCommentsReadValue"
         }
       }
     }

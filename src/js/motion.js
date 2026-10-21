@@ -619,11 +619,6 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // untouched, while the column/filter preferences follow the workstation.
   var _motionSearch = '';
   var _motionFilterMode = 'all';
-  // Default column preset (2026-08-29, Cyril: "3D/mograph par default") — the
-  // 3D Layer/Duplicator toggle icons only show under this preset (see
-  // style.css's `[data-motion-columns]` rules); 'animation' (the prior
-  // default) hid them, which read as "these icons disappeared" until you
-  // knew to open the column picker and switch presets.
   var _motionColumnPreset = '3d';
   var _motionSnapEnabled = true;
   try {
@@ -631,6 +626,10 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     _motionColumnPreset = localStorage.getItem('nemo-motion-columns') || '3d';
     _motionSnapEnabled = localStorage.getItem('nemo-motion-snap') !== '0';
   } catch (e) {}
+  window.SMWorkspace.bindMotion({
+    read:function(){return _motionColumnPreset;},
+    apply:function(value){_motionColumnPreset=value;var panel=document.getElementById('layer-panel');if(panel)panel.dataset.motionColumns=value;}
+  });
   function propHasContent(holder, prop) {
     if (prop === 'opacity' && nativeOwns(holder, prop)) {
       var model = nativeOpacityModel(holder, state.currentFrame);
@@ -6867,7 +6866,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         var old = document.getElementById('motion-filter-pop');
-        if (old) { old.remove(); return; }
+        if (old) { if(old._workspaceDispose)old._workspaceDispose(); old.remove(); return; }
         var pop = document.createElement('div'); pop.id = 'motion-filter-pop'; pop.className = 'ctx-menu motion-filter-pop';
         var search = document.createElement('input'); search.type = 'search'; search.className = 'motion-filter-search';
         search.placeholder = 'Calque ou propriété…'; search.value = _motionSearch;
@@ -6877,12 +6876,12 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
           var o = document.createElement('option'); o.value = it[0]; o.textContent = it[1]; filter.appendChild(o);
         });
         filter.value = _motionFilterMode;
-        var colLabel = document.createElement('label'); colLabel.textContent = 'Colonnes';
-        var cols = document.createElement('select'); cols.className = 'motion-filter-select';
-        [['compact','Compact'],['animation','Animation'],['compositing','Compositing'],['3d','3D / Mograph']].forEach(function (it) {
-          var o = document.createElement('option'); o.value = it[0]; o.textContent = it[1]; cols.appendChild(o);
+        var column=NemoNativeWorkspaceUI.motionColumns(window,panel,{
+          read:function(){return _motionColumnPreset;},
+          apply:function(value){_motionColumnPreset=value;}
         });
-        cols.value = _motionColumnPreset;
+        var colLabel=column.label,cols=column.select;
+        pop._workspaceDispose=column.dispose;
         var snapRow = document.createElement('label'); snapRow.className = 'motion-filter-check';
         var snap = document.createElement('input'); snap.type = 'checkbox'; snap.checked = _motionSnapEnabled;
         snapRow.appendChild(snap); snapRow.appendChild(document.createTextNode(' Magnétisme des clés'));
@@ -6895,9 +6894,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
         function rerender() { renderLayerList(); renderTimeline(); }
         search.addEventListener('input', function () { _motionSearch = search.value.trim().toLowerCase(); rerender(); });
         filter.addEventListener('change', function () { _motionFilterMode = filter.value; try { localStorage.setItem('nemo-motion-filter', _motionFilterMode); } catch (x) {} rerender(); });
-        cols.addEventListener('change', function () { _motionColumnPreset = cols.value; panel.dataset.motionColumns = _motionColumnPreset; try { localStorage.setItem('nemo-motion-columns', _motionColumnPreset); } catch (x) {} });
         snap.addEventListener('change', function () { _motionSnapEnabled = snap.checked; try { localStorage.setItem('nemo-motion-snap', _motionSnapEnabled ? '1' : '0'); } catch (x) {} });
-        function close(ev) { if (!pop.contains(ev.target) && ev.target !== btn) { pop.remove(); document.removeEventListener('pointerdown', close, true); } }
+        function close(ev) { if (!pop.contains(ev.target) && ev.target !== btn) { column.dispose(); pop.remove(); document.removeEventListener('pointerdown', close, true); } }
         setTimeout(function () { document.addEventListener('pointerdown', close, true); search.focus(); search.select(); }, 0);
       });
     }

@@ -308,7 +308,10 @@
         "object_project_palette_edit.rs",
         "object_project_guide_edit.rs",
         "object_project_shadow_edit.rs",
-        "object_project_perspective_edit.rs"
+        "object_project_perspective_edit.rs",
+        "object_project_workspace_edit.rs",
+        "object_project_custom_brush_edit.rs",
+        "object_project_comments_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -763,7 +766,11 @@
         "object_boolean_frame_motion.rs",
         "object_project_guide_read.rs",
         "object_project_shadow_read.rs",
-        "object_project_perspective_read.rs"
+        "object_project_perspective_read.rs",
+        "object_project_workspace_read.rs",
+        "object_project_metadata_dispatch.rs",
+        "object_project_custom_brush_read.rs",
+        "object_project_comments_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1648,7 +1655,13 @@
         "object_duplicator_frame.rs",
         "object_duplicator_scene.rs",
         "object_perspective_public.rs",
-        "object_perspective_read.rs"
+        "object_perspective_read.rs",
+        "object_workspace_public.rs",
+        "object_workspace_read.rs",
+        "object_custom_brush_public.rs",
+        "object_custom_brush_read.rs",
+        "object_comments_public.rs",
+        "object_comments_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1794,7 +1807,13 @@
         "src/native_shadow_contract.rs",
         "src/native_shadow_contract_tests.rs",
         "src/native_perspective_contract.rs",
-        "src/native_perspective_contract_tests.rs"
+        "src/native_perspective_contract_tests.rs",
+        "src/native_workspace_contract.rs",
+        "src/native_workspace_contract_tests.rs",
+        "src/native_custom_brush_contract.rs",
+        "src/native_custom_brush_contract_tests.rs",
+        "src/native_comments_contract.rs",
+        "src/native_comments_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -2062,7 +2081,10 @@
         "native_audio_track_public_tests.rs",
         "native_shadow_dispatch_tests.rs",
         "native_perspective_dispatch_tests.rs",
-        "native_perspective_read_dispatch_tests.rs"
+        "native_perspective_read_dispatch_tests.rs",
+        "native_workspace_dispatch_tests.rs",
+        "native_custom_brush_dispatch_tests.rs",
+        "native_comments_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

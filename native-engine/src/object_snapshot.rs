@@ -26,6 +26,8 @@ pub(crate) mod object_image_mesh_edit_read;
 #[path = "object_parametric_edit_read.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_parametric_edit_read;
+#[path = "object_project_metadata_dispatch.rs"]
+mod project_metadata_dispatch;
 #[cfg(all(test, feature = "test-commands"))]
 #[path = "../tests/object_property_metadata_dispatch.rs"]
 mod property_metadata_dispatch_tests;
@@ -287,50 +289,8 @@ impl ObjectSnapshot {
         if request.operation == "query.document.object.property.read" {
             return self.dispatch_property_read(&request);
         }
-        if request.operation == "query.document.object.project.composition.read" {
-            #[cfg(all(feature = "history", feature = "project_media_codec"))]
-            return self.dispatch_composition_read(&request);
-            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
-            return failure(
-                DispatchErrorCode::Unavailable,
-                "Native composition metadata is unavailable.",
-            );
-        }
-        if request.operation == "query.document.object.project.palette.read" {
-            #[cfg(all(feature = "history", feature = "project_media_codec"))]
-            return self.dispatch_palette_read(&request);
-            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
-            return failure(
-                DispatchErrorCode::Unavailable,
-                "Native palette metadata is unavailable.",
-            );
-        }
-        if request.operation == "query.document.object.project.guide.read" {
-            #[cfg(all(feature = "history", feature = "project_media_codec"))]
-            return self.dispatch_guide_read(&request);
-            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
-            return failure(
-                DispatchErrorCode::Unavailable,
-                "Native guide metadata is unavailable.",
-            );
-        }
-        if request.operation == "query.document.object.project.shadow.read" {
-            #[cfg(all(feature = "history", feature = "project_media_codec"))]
-            return self.dispatch_shadow_read(&request);
-            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
-            return failure(
-                DispatchErrorCode::Unavailable,
-                "Native Shadow metadata is unavailable.",
-            );
-        }
-        if request.operation == "query.document.object.project.perspective.read" {
-            #[cfg(all(feature = "history", feature = "project_media_codec"))]
-            return self.dispatch_perspective_read(&request);
-            #[cfg(not(all(feature = "history", feature = "project_media_codec")))]
-            return failure(
-                DispatchErrorCode::Unavailable,
-                "Native Perspective metadata is unavailable.",
-            );
+        if let Some(response) = self.dispatch_project_metadata_read(&request)? {
+            return Ok(response);
         }
         if request.operation != "query.document.object" {
             return failure(

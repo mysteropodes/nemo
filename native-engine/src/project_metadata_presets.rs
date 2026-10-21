@@ -146,6 +146,9 @@ object_deserialize!(BrushPresetRecord {
     #[serde(default)] custom_stamp:Presence<CustomStamp>
 });
 impl BrushPresetRecord {
+    pub(crate) fn label(&self) -> Option<&str> {
+        self.label.value().map(String::as_str)
+    }
     fn valid(&self) -> bool {
         [
             &self.bristle_count,
@@ -197,6 +200,19 @@ pub(crate) struct ProjectPresetCatalog(Vec<(String, BrushPresetRecord)>);
 impl ProjectPresetCatalog {
     pub(crate) fn entries(&self) -> &[(String, BrushPresetRecord)] {
         &self.0
+    }
+    /// Original save overwrites an existing key in place, or appends a new custom key.
+    pub(crate) fn with_upsert(mut self, id: String, preset: BrushPresetRecord) -> Self {
+        if let Some(entry) = self.0.iter_mut().find(|entry| entry.0 == id) {
+            entry.1 = preset;
+        } else {
+            self.0.push((id, preset));
+        }
+        self
+    }
+    pub(crate) fn without_id(mut self, id: &str) -> Self {
+        self.0.retain(|entry| entry.0 != id);
+        self
     }
     fn valid(&self) -> bool {
         let mut seen = HashSet::new();

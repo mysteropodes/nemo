@@ -241,4 +241,134 @@ mod wire {
                 .is_err()
         );
     }
+
+    #[test]
+    fn flat_palette_wraps_once_with_original_precedence_and_canonical_only_reopen() {
+        let canonical = json!([{"id":"kept","name":"Original","colors":["#CaF",""]}]);
+        let wrapped = json!([{"id":"p0","name":"Palette 1","colors":["#AbC","", "#AbC"]}]);
+        for version in [1, 2] {
+            for (fields, expected) in [
+                (json!({"colorPalette":["#AbC","", "#AbC"]}), wrapped.clone()),
+                (
+                    json!({"palettes":[],"colorPalette":["#AbC","", "#AbC"]}),
+                    wrapped.clone(),
+                ),
+                (
+                    json!({"palettes":canonical,"colorPalette":["ignored"]}),
+                    canonical.clone(),
+                ),
+                (
+                    json!({"colorPalette":[]}),
+                    json!([{"id":"p0","name":"Palette 1","colors":[]}]),
+                ),
+                (json!({"palettes":[]}), json!([])),
+            ] {
+                let mut fields = fields;
+                fields["activePaletteIdx"] = json!(-0.5);
+                fields["comments"] = json!([{"text":"retained attribution","authorName":"Artist"}]);
+                let owner = NativeObjectHistory::from_project_file(
+                    "flat-palette",
+                    &input(version, fields.clone()),
+                )
+                .unwrap();
+                let actual = project(&owner);
+                assert_eq!(actual["palettes"], expected, "{version}:{fields}");
+                assert_eq!(actual["activePaletteIdx"], fields["activePaletteIdx"]);
+                assert_eq!(actual["comments"], fields["comments"]);
+                assert!(actual.get("colorPalette").is_none());
+                assert_eq!(owner.content_revision(), 0);
+                assert_eq!(owner.history_depths(), (0, 0));
+                let bytes = save(&owner);
+                let reopened =
+                    NativeObjectHistory::from_project_file("flat-palette-fresh", &bytes).unwrap();
+                assert_eq!(save(&reopened), bytes);
+                assert_eq!(project(&reopened)["palettes"], expected);
+            }
+        }
+    }
+
+    #[test]
+    fn flat_palette_two_document_replacement_keeps_absence_empty_and_old_snapshot_isolated() {
+        for version in [1, 2] {
+            let mut owner = NativeObjectHistory::from_project_file(
+                "palette-replacement",
+                &input(
+                    version,
+                    json!({"colorPalette":["#original"],"activePaletteIdx":4.5}),
+                ),
+            )
+            .unwrap();
+            let old = owner.acquire_snapshot(owner.content_revision()).unwrap();
+            let first_bytes = save(&owner);
+            for fields in [json!({}), json!({"palettes":[]}), json!({})] {
+                let current = owner.acquire_snapshot(owner.content_revision()).unwrap();
+                let next = owner
+                    .prepare_project_replacement(
+                        current.snapshot_id(),
+                        &input(version, fields.clone()),
+                    )
+                    .unwrap();
+                owner.commit_project_replacement(next).unwrap();
+                let actual = project(&owner);
+                assert_eq!(actual.get("palettes"), fields.get("palettes"));
+                assert!(actual.get("colorPalette").is_none());
+                assert!(actual.get("activePaletteIdx").is_none());
+                assert_eq!(owner.content_revision(), 0);
+                assert_eq!(owner.history_depths(), (0, 0));
+                let reopened = NativeObjectHistory::from_project_file(
+                    "palette-replacement-fresh",
+                    &save(&owner),
+                )
+                .unwrap();
+                assert_eq!(save(&reopened), save(&owner));
+            }
+            assert_eq!(old.serialize_project_file().unwrap(), first_bytes);
+        }
+    }
+
+    #[test]
+    fn flat_palette_alias_retains_strict_value_duplicate_unknown_and_envelope_guards() {
+        for version in [1, 2] {
+            for invalid in [
+                json!({"colorPalette":null}),
+                json!({"colorPalette":42}),
+                json!({"colorPalette":{}}),
+                json!({"colorPalette":[null]}),
+                json!({"colorPalette":[1]}),
+                json!({"palettes":null,"colorPalette":[]}),
+                json!({"colorPalette":[],"unrelatedUnknown":true}),
+                json!({"palettes":[{"id":"p","name":"P","colors":[]}],"colorPalette":false}),
+            ] {
+                assert!(NativeObjectHistory::from_project_file(
+                    "flat-invalid",
+                    &input(version, invalid)
+                )
+                .is_err());
+            }
+            let raw = String::from_utf8(input(version, json!({"colorPalette":[]}))).unwrap();
+            let duplicated = raw.replace(
+                "\"colorPalette\":[]",
+                "\"colorPalette\":[],\"colorPalette\":[\"duplicate\"]",
+            );
+            assert_ne!(raw, duplicated);
+            assert!(NativeObjectHistory::from_project_file(
+                "flat-duplicate",
+                duplicated.as_bytes()
+            )
+            .is_err());
+            for (field, value) in [
+                ("format", json!("legacy-project")),
+                ("formatVersion", json!(3)),
+            ] {
+                let mut invalid: Value =
+                    serde_json::from_slice(&input(version, json!({"colorPalette":[]}))).unwrap();
+                invalid[field] = value;
+                assert!(NativeObjectHistory::from_project_file(
+                    "flat-envelope",
+                    &serde_json::to_vec(&invalid).unwrap()
+                )
+                .is_err());
+            }
+        }
+    }
 }

@@ -358,3 +358,15 @@ mod shadow_tests;
 #[cfg(test)]
 #[path = "native_perspective_dispatch_tests.rs"]
 mod perspective_tests;
+
+#[cfg(test)]
+#[path = "native_workspace_dispatch_tests.rs"]
+mod workspace_tests;
+
+#[cfg(test)]
+#[path = "native_custom_brush_dispatch_tests.rs"]
+mod custom_brush_tests;
+
+#[cfg(test)]
+#[path = "native_comments_dispatch_tests.rs"]
+mod comments_tests;

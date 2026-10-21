@@ -8,6 +8,8 @@ use serde_json::Number;
 
 #[path = "object_project_composition_edit.rs"]
 mod composition_delta;
+#[path = "object_project_custom_brush_edit.rs"]
+mod custom_brush_delta;
 #[path = "object_project_guide_edit.rs"]
 mod guide_delta;
 #[path = "object_project_palette_edit.rs"]
@@ -16,6 +18,11 @@ mod palette_delta;
 mod perspective_delta;
 #[path = "object_project_shadow_edit.rs"]
 mod shadow_delta;
+#[path = "object_project_workspace_edit.rs"]
+mod workspace_capture;
+
+#[path = "object_project_comments_edit.rs"]
+mod comments_delta;
 
 #[derive(Debug)]
 struct CompositionMarkerInput {
