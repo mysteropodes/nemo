@@ -67,12 +67,11 @@ fn duplicator_policy_unlock_is_refused_without_authored_or_history_mutation() {
         let source = fixture(locked);
         let owner = owner(&source);
         let before = state(&owner);
+        assert_eq!(serde_json::from_slice::<Value>(&before.3).unwrap(), source);
         assert_eq!(
-            serde_json::from_slice::<Value>(&before.3).unwrap(),
-            source
-        );
-        assert_eq!(
-            owner.prepare_layer_policy_json(&policy("host", false)).unwrap_err(),
+            owner
+                .prepare_layer_policy_json(&policy("host", false))
+                .unwrap_err(),
             DispatchErrorCode::Unavailable
         );
         assert_eq!(state(&owner), before);
@@ -88,13 +87,17 @@ fn duplicator_fill_and_selection_are_refused_even_when_the_stored_flag_is_absent
             "layerUid":"host","strokeId":"ink","frameScope":{"kind":"authored","frame":0}},
             "fill":{"kind":"solid","r":0.8,"g":0.1,"b":0.3,"a":1}});
         assert_eq!(
-            owner.prepare_fill_json(fill.to_string().as_bytes()).unwrap_err(),
+            owner
+                .prepare_fill_json(fill.to_string().as_bytes())
+                .unwrap_err(),
             DispatchErrorCode::Unavailable
         );
         let selection = json!({"command":"object.selection.delete","contextId":"scene-root",
             "layerUid":"host","frame":0,"mode":"motion","strokeIds":["ink"]});
         assert_eq!(
-            owner.prepare_selection_delete_json(selection.to_string().as_bytes()).unwrap_err(),
+            owner
+                .prepare_selection_delete_json(selection.to_string().as_bytes())
+                .unwrap_err(),
             DispatchErrorCode::Unavailable
         );
         assert_eq!(state(&owner), before);
@@ -108,7 +111,9 @@ fn forced_drawing_lock_preserves_motion_edits_with_one_history_entry_and_exact_u
     let before = state(&owner);
     let request = json!({"command":"object.property.edit","target":{"contextId":"scene-root",
         "layerUid":"host"},"property":"opacity","action":{"kind":"setValue","frame":0,"values":[60]}});
-    let prepared = owner.prepare_property_edit_json(request.to_string().as_bytes()).unwrap();
+    let prepared = owner
+        .prepare_property_edit_json(request.to_string().as_bytes())
+        .unwrap();
     assert_eq!(state(&owner), before);
     assert_eq!(owner.commit_property_edit(prepared), Ok(1));
     assert_eq!(owner.history_depths(), (1, 0));
@@ -117,7 +122,10 @@ fn forced_drawing_lock_preserves_motion_edits_with_one_history_entry_and_exact_u
     assert_eq!(value["layers"], source["layers"]);
     assert_eq!(value["objects"], source["objects"]);
     assert_eq!(value["componentTables"], source["componentTables"]);
-    assert_eq!(value["propertyHolders"][0]["properties"][0]["static"], json!([60]));
+    assert_eq!(
+        value["propertyHolders"][0]["properties"][0]["static"],
+        json!([60])
+    );
     assert_eq!(owner.undo(1), Ok(2));
     assert_eq!(state(&owner).3, before.3);
     assert_eq!(owner.redo(2), Ok(3));
@@ -128,9 +136,13 @@ fn forced_drawing_lock_preserves_motion_edits_with_one_history_entry_and_exact_u
 fn an_ordinary_layer_retains_its_original_lock_and_unlock_history() {
     let mut owner = owner(&fixture(Some(false)));
     let before = state(&owner);
-    let lock = owner.prepare_layer_policy_json(&policy("ordinary", true)).unwrap();
+    let lock = owner
+        .prepare_layer_policy_json(&policy("ordinary", true))
+        .unwrap();
     assert_eq!(owner.commit_layer_policy(lock), Ok(1));
-    let unlock = owner.prepare_layer_policy_json(&policy("ordinary", false)).unwrap();
+    let unlock = owner
+        .prepare_layer_policy_json(&policy("ordinary", false))
+        .unwrap();
     assert_eq!(owner.commit_layer_policy(unlock), Ok(2));
     assert_eq!(owner.history_depths(), (2, 0));
     assert_eq!(owner.undo(2), Ok(3));
@@ -146,11 +158,9 @@ fn project_info_reports_effective_lock_and_save_reopen_preserves_authored_flags(
         let wire = json!({"format":"nemo.native-project-document","formatVersion":1,
             "project":{"canvasW":320,"canvasH":180,"fps":24},"drawing":source,
             "viewportReference":null,"assets":[]});
-        let owner = NativeObjectHistory::from_project_file(
-            "dup-project",
-            wire.to_string().as_bytes(),
-        )
-        .unwrap();
+        let owner =
+            NativeObjectHistory::from_project_file("dup-project", wire.to_string().as_bytes())
+                .unwrap();
         let before = state(&owner);
         let info = owner.project_file_info().unwrap();
         assert_eq!(info["layers"][0]["locked"], true);
@@ -160,7 +170,10 @@ fn project_info_reports_effective_lock_and_save_reopen_preserves_authored_flags(
         assert_eq!(stored["drawing"], source);
         assert_eq!(state(&owner), before);
         let reopened = NativeObjectHistory::from_project_file("reopened", &bytes).unwrap();
-        assert_eq!(reopened.project_file_info().unwrap()["layers"][0]["locked"], true);
+        assert_eq!(
+            reopened.project_file_info().unwrap()["layers"][0]["locked"],
+            true
+        );
         assert_eq!(state(&reopened).3, before.3);
         assert_eq!(reopened.history_depths(), (0, 0));
     }

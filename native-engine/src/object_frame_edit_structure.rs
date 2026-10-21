@@ -250,12 +250,9 @@ fn insert_targets<'a>(
         }
     }
     targets.retain(|uid| {
-        document
-            .layers
-            .iter()
-            .any(|layer| {
-                layer.layer_uid.as_str() == *uid && !document.layer_is_locked(layer.layer_uid())
-            })
+        document.layers.iter().any(|layer| {
+            layer.layer_uid.as_str() == *uid && !document.layer_is_locked(layer.layer_uid())
+        })
     });
     Ok(targets)
 }

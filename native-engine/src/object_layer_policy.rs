@@ -30,8 +30,7 @@ impl ObjectDocument {
     /// Fill calls this only after resolving its actual authored object target.
     /// Generic Motion property/track preparation deliberately does not call it.
     pub(crate) fn layer_allows_fill_edit(&self, uid: &str) -> bool {
-        self.layers.iter().any(|layer| layer.layer_uid() == uid)
-            && !self.layer_is_locked(uid)
+        self.layers.iter().any(|layer| layer.layer_uid() == uid) && !self.layer_is_locked(uid)
     }
 }
 #[cfg(all(test, feature = "history"))]
