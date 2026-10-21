@@ -12,8 +12,10 @@
 //! mask feather) comes back as the typed `GpuBlendError::Unavailable` it already is; nothing is dropped.
 //! No texture, device or scheduler state is touched: the compositor entries run the returned stack.
 use crate::compositor::scene_effect_gpu_blend::{
-    layer_runs_from_plan, GpuBlendError, GpuLayerInput, GpuLayerStack,
+    layer_runs_from_plan, GpuBlendError, GpuFill, GpuLayerInput, GpuLayerPaint, GpuLayerStack,
+    GpuMask, GpuMaskMode,
 };
+use crate::object_render_scene::mask_inputs::ObjectMaskMode;
 use crate::object_render_scene::scene_effect_kernels::scene_effect_order::CompositionPlan;
 use crate::object_render_scene::scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 use crate::object_render_scene::ObjectPaintPlan;
@@ -49,7 +51,7 @@ pub(crate) fn select_composition_path<'a>(
     join: &SceneEffectPlan,
     plan: &'a ObjectPaintPlan,
 ) -> Result<PathSelection<'a>, PathSelectionError> {
-    if !join.is_for_packet(plan.packet()) {
+    if !join.is_for_packet(plan.packet()) || !plan.mask_inputs().is_for_packet(plan.packet()) {
         return Err(PathSelectionError::WrongPlan);
     }
     if let Some((source_layer_index, source_object_index)) = join.first_unavailable() {
@@ -59,6 +61,14 @@ pub(crate) fn select_composition_path<'a>(
         });
     }
     if matches!(join.plan(), CompositionPlan::Flat { .. }) {
+        if plan
+            .mask_inputs()
+            .layers()
+            .iter()
+            .any(|layer| !layer.masks().is_empty())
+        {
+            return Err(PathSelectionError::WrongPlan);
+        }
         return Ok(PathSelection::Flat);
     }
     let runs = layer_runs_from_plan(plan).map_err(PathSelectionError::Stack)?;
@@ -72,6 +82,32 @@ pub(crate) fn select_composition_path<'a>(
             },
         )?;
         inputs[slot].paint = run.paint;
+    }
+    for layer in plan.mask_inputs().layers() {
+        let source_layer_index = layer.source_layer_index();
+        let slot = join
+            .wire_index_of_source(source_layer_index)
+            .ok_or(PathSelectionError::UnknownLayer { source_layer_index })?;
+        let invalid = || PathSelectionError::Stack(GpuBlendError::InvalidPaint { layer: slot });
+        let feather = layer.feather() as f32;
+        if !feather.is_finite() {
+            return Err(invalid());
+        }
+        inputs[slot].mask_feather = feather;
+        for mask in layer.masks() {
+            let path = plan.mask_path(mask).ok_or(PathSelectionError::WrongPlan)?;
+            let mode = match mask.mode() {
+                ObjectMaskMode::Add => GpuMaskMode::Add,
+                ObjectMaskMode::Subtract => GpuMaskMode::Subtract,
+                ObjectMaskMode::Intersect => GpuMaskMode::Intersect,
+            };
+            inputs[slot].masks.push(GpuMask {
+                mode,
+                paint: GpuLayerPaint {
+                    fills: vec![GpuFill::solid(path, mask.rgba())],
+                },
+            });
+        }
     }
     let stack = GpuLayerStack::from_plan(join.plan(), inputs).map_err(PathSelectionError::Stack)?;
     if !stack.covers_plan(plan) {

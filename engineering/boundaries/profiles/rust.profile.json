@@ -311,7 +311,8 @@
         "object_project_perspective_edit.rs",
         "object_project_workspace_edit.rs",
         "object_project_custom_brush_edit.rs",
-        "object_project_comments_edit.rs"
+        "object_project_comments_edit.rs",
+        "object_mask_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -605,7 +606,9 @@
         "object_scene_parent_chain.rs",
         "object_scene_parent_curve.rs",
         "object_scene_producer_text_animator.rs",
-        "object_duplicator_scene.rs"
+        "object_duplicator_scene.rs",
+        "object_mask_inputs.rs",
+        "scene_effect_scene_join_inputs.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -1662,7 +1665,10 @@
         "object_custom_brush_public.rs",
         "object_custom_brush_read.rs",
         "object_comments_public.rs",
-        "object_comments_read.rs"
+        "object_comments_read.rs",
+        "object_mask_storage.rs",
+        "object_mask_storage_controls.rs",
+        "object_mask_inputs.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1814,7 +1820,8 @@
         "src/native_custom_brush_contract.rs",
         "src/native_custom_brush_contract_tests.rs",
         "src/native_comments_contract.rs",
-        "src/native_comments_contract_tests.rs"
+        "src/native_comments_contract_tests.rs",
+        "src/native_mask_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

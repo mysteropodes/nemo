@@ -239,6 +239,10 @@ pub(crate) fn island_record(
                 box_angle: angle.clone().map_or(Presence::Missing, Presence::Present),
                 fill_gradient: gradient.map_or(Presence::Missing, Presence::Present),
                 fill_trace: trace.map_or(Presence::Missing, Presence::Present),
+                // Original BOOL_KEEP_DATA_ALL does not transfer mask tags.
+                is_mask: Presence::Missing,
+                mask_mode: Presence::Missing,
+                mask_feather: Presence::Missing,
             })
         }
         _ => Presence::Missing,

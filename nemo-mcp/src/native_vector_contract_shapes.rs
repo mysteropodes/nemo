@@ -202,6 +202,9 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
             "boxAngle",
             "fillGradient",
             "fillTrace",
+            "isMask",
+            "maskMode",
+            "maskFeather",
         ],
     )
     .is_some_and(|object| {
@@ -211,6 +214,15 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
                 .is_none_or(|v| pressure(v) && !has_stroke)
             && object.get("paramShape").is_none_or(|v| shape(v, false))
             && object.get("boxAngle").is_none_or(finite)
+            && object
+                .get("isMask")
+                .is_none_or(|v| v.is_null() || v.is_boolean())
+            && object
+                .get("maskMode")
+                .is_none_or(|v| v.is_null() || v.is_string())
+            && object
+                .get("maskFeather")
+                .is_none_or(|v| v.is_null() || finite(v))
             && object.get("fillTrace").is_none_or(fill_trace)
             && object
                 .get("fillGradient")

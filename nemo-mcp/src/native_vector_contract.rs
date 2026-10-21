@@ -88,6 +88,20 @@ fn effect(value: &Value) -> bool {
     })
 }
 
+fn mask_edit(value: &Value) -> bool {
+    match value["kind"].as_str() {
+        Some("mode") => {
+            exact(value, &["kind", "mode"], &[]).is_some()
+                && one_of(&value["mode"], &["add", "subtract", "intersect"])
+        }
+        Some("feather") => {
+            exact(value, &["kind", "value"], &[]).is_some() && finite(&value["value"])
+        }
+        Some("unset") => exact(value, &["kind"], &[]).is_some(),
+        _ => false,
+    }
+}
+
 pub(crate) fn request(operation: &str, payload: &Value) -> bool {
     let Some(command) = payload["command"].as_str() else {
         return false;
@@ -108,6 +122,11 @@ pub(crate) fn request(operation: &str, payload: &Value) -> bool {
         }
         (VECTOR, "object.vector.delete") => {
             named(&["stableTarget"]) && target(&payload["stableTarget"], false)
+        }
+        (VECTOR, "object.vector.mask.edit") => {
+            named(&["stableTarget", "maskEdit"])
+                && target(&payload["stableTarget"], false)
+                && mask_edit(&payload["maskEdit"])
         }
         (PARAMETRIC, "object.parametric.set") => {
             named(&["stableTarget", "paramShape"])
@@ -158,7 +177,9 @@ pub(crate) fn result(operation: &str, payload: &Value, value: &Value) -> bool {
             let stroke_matches = match ran {
                 "create" => value["applied"] == true && stroke.starts_with("native-stroke:"),
                 "replace" => payload["record"]["target"]["strokeId"].as_str() == Some(stroke),
-                "delete" => payload["stableTarget"]["strokeId"].as_str() == Some(stroke),
+                "delete" | "mask.edit" => {
+                    payload["stableTarget"]["strokeId"].as_str() == Some(stroke)
+                }
                 _ => false,
             };
             exact(

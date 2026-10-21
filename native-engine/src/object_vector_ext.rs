@@ -1,7 +1,8 @@
 //! L01-E (G14/G22): the one extension slot of an `editable-vector-path` record. It carries the pressure
 //! fields (object_vector_pressure.rs), the `paramShape` record (object_parametric_record.rs) and the
 //! stroke-level `boxAngle` (baseline `serP`: the rotation of the shape's frame, maintained by every rotate
-//! gesture for any stroke, so it is independent of `paramShape`). The member is absent for plain vectors
+//! gesture for any stroke, so it is independent of `paramShape`), plus the original per-Path mask tags.
+//! The member is absent for plain vectors
 //! and for the legacy `closed-solid-fill-cubic-path` family, which refuses it (admission:
 //! object_vector_ext_codec.rs).
 use crate::object_document::{object_deserialize, ParamShape, Presence, PressureFields};
@@ -28,14 +29,37 @@ pub struct VectorExt {
     pub(crate) fill_gradient: Presence<StoredGradient>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) fill_trace: Presence<FillTrace>,
+    /// Original Path.data tags, never a stored layer-level mask list.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_mask: Presence<Option<bool>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) mask_mode: Presence<Option<String>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) mask_feather: Presence<Option<Number>>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
     #[serde(default)] param_shape: Presence<ParamShape>,
     #[serde(default)] box_angle: Presence<Number>,
     #[serde(default)] fill_gradient: Presence<StoredGradient>,
-    #[serde(default)] fill_trace: Presence<FillTrace>
+    #[serde(default)] fill_trace: Presence<FillTrace>,
+    #[serde(default)] is_mask: Presence<Option<bool>>,
+    #[serde(default)] mask_mode: Presence<Option<String>>,
+    #[serde(default)] mask_feather: Presence<Option<Number>>
 });
+
+impl VectorExt {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.pressure.missing()
+            && self.param_shape.missing()
+            && self.box_angle.missing()
+            && self.fill_gradient.missing()
+            && self.fill_trace.missing()
+            && self.is_mask.missing()
+            && self.mask_mode.missing()
+            && self.mask_feather.missing()
+    }
+}
 
 /// Named L07-I positive subset: exactly two stops, linear or radial. No coercion or defaults.
 #[derive(Debug, Clone, PartialEq, Serialize)]
