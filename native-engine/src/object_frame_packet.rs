@@ -485,12 +485,10 @@ where
             }
         }
     }
-    let text_records = text::select(snapshot, selector, context_layers, &source_frames)?;
-    let video_records = video::select(snapshot, selector, context_layers, &source_frames)?;
     let mut packet = ObjectFramePacket {
         duplicators: Vec::new(),
-        text_records,
-        video_records,
+        text_records: text::select(snapshot, selector, context_layers, &source_frames)?,
+        video_records: video::select(snapshot, selector, context_layers, &source_frames)?,
         raster_records,
         snapshot: snapshot.clone(),
         context_id: selector.context_id.to_owned(),
