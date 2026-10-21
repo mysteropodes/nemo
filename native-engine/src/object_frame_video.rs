@@ -8,7 +8,9 @@
 //! source-frame mapping and placement are the consumers'. Placements stay in
 //! inventory order, which is deterministic.
 use crate::object_document::{AssetKind, AssetTarget, ObjectLayer};
-use crate::object_frame_packet::{ObjectFrameError, ObjectFramePacket, ObjectFrameSelector};
+use crate::object_frame_packet::{
+    sources, FrameContext, ObjectFrameError, ObjectFramePacket, ObjectFrameSelector,
+};
 use crate::revision::ObjectSnapshot;
 
 #[derive(Debug, Clone)]
@@ -100,11 +102,10 @@ pub(crate) fn drawn_placement_ids(
     else {
         return Ok(Vec::new());
     };
-    let context = super::FrameContext::admit(snapshot, selector, exposure)?;
+    let context = FrameContext::admit(snapshot, selector, exposure)?;
     let layers = context.layers(snapshot.document());
     let component = context.is_component();
-    let sources =
-        super::sources::select(snapshot, selector, layers, exposure || component, component)?;
+    let sources = sources::select(snapshot, selector, layers, exposure || component, component)?;
     Ok(select(snapshot, selector, layers, &sources)?
         .into_iter()
         .map(|index| inventory.placements()[index.placement].id().to_owned())
