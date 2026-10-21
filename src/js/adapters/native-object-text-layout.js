@@ -36,10 +36,10 @@
     var commands=Command.create(session,'item');
     function send(payload,origin,guard){
       var expected=origin&&Object.assign({},origin);
-      return commands.execute(Contract.ITEM,function(pin){
+      return commands.execute(Contract.ITEM,function(pin,ctx){
         if(expected&&['instanceId','documentId','lifecycleGeneration'].some(function(k){return pin[k]!==expected[k];}))throw fault('stale_owner','owner_changed','Native text owner changed before execution');
         if(expected&&['contentRevision','documentSnapshotId'].some(function(k){return pin[k]!==expected[k];}))throw fault('stale_revision','snapshot_changed','Native text snapshot changed before execution');
-        if(guard&&guard(pin)!==true)throw fault('stale_revision','intent_changed','Native text intent changed before execution');
+        if(guard&&guard(pin,ctx)!==true)throw fault('stale_revision','intent_changed','Native text intent changed before execution');
         return payload;
       });
     }

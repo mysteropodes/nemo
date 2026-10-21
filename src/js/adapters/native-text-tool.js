@@ -14,9 +14,9 @@
     if(!ports||!ports.session||typeof ports.context!=='function'||!ports.reader||typeof ports.reader.create!=='function'||!ports.writer||typeof ports.writer.create!=='function')throw new Error('Native Text ports unavailable');
     var Reader=ports.reader,Writer=ports.writer;
     var session=ports.session,reader=Reader.create(session),draft=null,busy=false,discovering=false,unknown=null,serial=0,retired=false;
-    function context(presented){var c=ports.context(presented!==false);
+    function context(presented,lease){var c=ports.context(presented!==false,lease);
       if(retired||!c||!c.pin||!session.isActive()||!same(c.pin,session.info())||typeof c.layerUid!=='string'||!c.layerUid||!Number.isInteger(c.frame)||c.frame<0)throw fault('unavailable','Native Text context unavailable');return c;}
-    function current(c,revision,presented){try{var n=context(presented);return owner(c.pin,n.pin)&&(!revision||same(c.pin,n.pin))&&c.layerUid===n.layerUid&&c.frame===n.frame&&c.selectionKey===n.selectionKey&&c.viewKey===n.viewKey;}catch(_){return false;}}
+    function current(c,revision,presented,lease){try{var n=context(presented,lease);return owner(c.pin,n.pin)&&(!revision||same(c.pin,n.pin))&&c.layerUid===n.layerUid&&c.frame===n.frame&&c.selectionKey===n.selectionKey&&c.viewKey===n.viewKey;}catch(_){return false;}}
     function notify(){if(ports.state)ports.state({busy:busy,discovering:discovering,unknown:!!unknown,draft:!!draft});}
     function resetOwner(){if(unknown){var p=session.info();if(!owner(unknown.pin,p)){unknown=null;draft=null;serial++;}}}
     function requireWrite(){resetOwner();if(retired||busy||unknown)throw fault(unknown?'item_command_indeterminate':'unavailable',unknown?'Resolve the previous text command or reopen the document.':'Text command is busy or retired.');}
@@ -51,7 +51,7 @@
       var block=Object.assign({},d.block,patch);if(typeof block.text!=='string'||!block.text.trim()){cancel();return {applied:false,skipped:'blank_text'};}
       busy=true;notify();
       try{
-        var writer=Writer.create(session),guard=function(){return current(d.context,true,false);},receipt=d.target?await writer.editBlock(d.target,patch,d.context.pin,guard):await writer.createBlock(d.context.layerUid,d.context.frame,block,d.context.pin,guard);
+        var writer=Writer.create(session),guard=function(pin,ctx){return same(pin,d.context.pin)&&current(d.context,true,false,ctx);},receipt=d.target?await writer.editBlock(d.target,patch,d.context.pin,guard):await writer.createBlock(d.context.layerUid,d.context.frame,block,d.context.pin,guard);
         if(current(d.context,false,true)){draft=null;serial++;if(ports.committed)ports.committed(receipt);}
         return receipt;
       }catch(error){if(error&&error.code==='item_command_indeterminate'){unknown={pin:clone(d.context.pin),replay:error.replay};}throw error;}

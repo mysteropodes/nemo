@@ -140,6 +140,16 @@ impl Fixture {
             "viewport":{"cssBounds":{"x":0,"y":0,"width":320,"height":180},"physicalExtent":{"width":320,"height":180},
                 "compositionExtent":{"width":320,"height":180},"reportedDpr":1}});
     }
+    pub(super) fn retained_project(&self) -> (Value, Option<Vec<u8>>) {
+        let native = self.state.native_state();
+        let mut guard = native.lock().unwrap();
+        let generation = guard.active_generation().unwrap();
+        let owner = guard.active_mut(generation).unwrap().as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>().unwrap();
+        (owner.project_file_info().unwrap(), owner.project_file_snapshot(
+            self.raw["contentRevision"].as_u64().unwrap(),
+            self.raw["documentSnapshotId"].as_str().unwrap()).unwrap())
+    }
     pub(super) fn request(&self, operation: &str, payload: Value) -> String {
         json!({"apiVersion":2,"requestId":format!("desktop-command-{}",self.raw["contentRevision"]),"instanceId":self.raw["instanceId"],
             "documentId":self.raw["documentId"],"expectedRevision":self.raw["contentRevision"],"operation":operation,"payload":payload}).to_string()

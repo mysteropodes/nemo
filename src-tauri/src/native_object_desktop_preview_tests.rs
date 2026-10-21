@@ -471,17 +471,7 @@ fn gpu_camera_navigation_changes_real_pixels_cache_and_inverse_without_history_o
             "cameraKeys":[{"frame":0,"x":160,"y":90,"w":160}]},
         "drawing":document(),"viewportReference":null,"assets":[]});
     let f = Fixture::with_document(source);
-    let retained = || {
-        let native = f.state.native_state();
-        let guard = native.lock().unwrap();
-        let (_, owner) = guard.active().unwrap();
-        (
-            owner.project_file_info().unwrap(),
-            owner
-                .project_file_snapshot(0, f.raw["documentSnapshotId"].as_str().unwrap())
-                .unwrap(),
-        )
-    };
+    let retained = || f.retained_project();
     let before = (f.raw.clone(), retained());
     let mut camera = f.raw.clone();
     camera["viewMode"] = json!("stored-camera");

@@ -34,7 +34,7 @@ async function fixture(initial, browser = false) {
   doc.createElement = () => node(); doc.createTextNode = text => ({ textContent: text });
   doc.documentElement = { clientWidth: 1200, clientHeight: 900, classList: { contains: n => n === 'nemo-native-underlay' },
     style: { getPropertyValue: name => String(({ left: rect.left, top: rect.top, right: rect.left+rect.width, bottom: rect.top+rect.height })[name.replace('--nemo-native-','')]) } };
-  let metadata = copy(initial), revision = 0, ticket = 1, serial = 0, running = 0, tail = Promise.resolve(), gate = null, refuse = false;
+  let metadata = copy(initial), revision = 0, ticket = 1, serial = 0, running = 0, tail = Promise.resolve(), gate = null, refuse = false, actionReader = null, lastLease = null;
   const calls = [], checkpoints = [], notices = [], navigation = []; let select = 0, text = 0, feedback = 0;
   let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
@@ -85,11 +85,17 @@ async function fixture(initial, browser = false) {
     readPresentedObjectSession:()=>running?null:shown(info),
     runResourceCommand(fn){running++;const job=tail.then(async()=>{
       if(gate){const held=gate;gate=null;await held;}
-      const pin=info;return fn({dispatch:q=>adapter.dispatch(q),readPresentedObjectSession:()=>pin===info?shown(pin):null,
+      const pin=info;let live=true;const lease={dispatch:q=>adapter.dispatch(q),readPresentedObjectSession:()=>{
+        if(!live||pin!==info||actionReader==='refused')return null;const value=shown(pin);
+        if(actionReader==='foreign')return {...value,documentId:'foreign'};
+        if(actionReader==='view')return {...value,presentation:{...value.presentation,workId:'foreign-view'}};
+        return value;},
         reconcile:async next=>{assert.equal(next,revision);info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};
           presentation={...info,owner:'native',status:'presented',frame:root.state.currentFrame,contextId:'scene-root',workId:'w'+revision};
           controller.willProject();assert.equal(ProjectFile.refreshLayerTable(root,info),true);
-          controller.presented();return info;}});
+          controller.presented();return info;}};
+      if(actionReader==='missing')delete lease.readPresentedObjectSession;lastLease=lease;
+      try{return await fn(lease);}finally{live=false;}
     }).finally(()=>{running--;});tail=job.catch(()=>{});return job;}}
   root.NemoNativeObjectProject={desktop:()=>session};
   root.NemoNativeObjectProjectFile={projectionReadyForUI:(valueRoot,value)=>!running&&ProjectFile.projectionReadyForUI(valueRoot,value)};
@@ -113,7 +119,7 @@ async function fixture(initial, browser = false) {
   if(!browser)await settled();
   const pointer=(x=100,y=100,extra={})=>root.target.fire('pointerdown',{target:elements.get('drawing-canvas'),pointerId:1,isPrimary:true,button:0,clientX:x,clientY:y,...extra});
   return {root,doc,elements,events,pointer,settled,calls,checkpoints,notices,navigation,metadata:()=>copy(metadata),counts:()=>({select,text,feedback}),
-    hold(){let release;gate=new Promise(resolve=>release=resolve);return release;},refuse(value){refuse=value;},
+    publicShown:()=>session.readPresentedObjectSession(),actionLease:()=>lastLease,actionReader:value=>{actionReader=value;},hold(){let release;gate=new Promise(resolve=>release=resolve);return release;},refuse(value){refuse=value;},
     camera(){root.state.cameraView=true;presentation={...presentation,view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};},pan(){presentation={...presentation,workId:presentation.workId+'-pan'};},resize(){rect={...rect,left:rect.left+1};},
     replace(){info={...info,documentId:'other',lifecycleGeneration:2};ticket++;controller.willProject();project();},
     subscription(){ticket++;},
@@ -253,4 +259,19 @@ test('native Camera View uses the presented inverse for actual comment append an
  assert.equal(f.metadata()[0].x,100);assert.equal(f.metadata()[0].y,60);assert.equal(f.metadata()[0].text,'camera comment');assert.equal(f.checkpoints.length,1);
  const stale=await fixture([]);stale.camera();stale.pointer(100,90);const old=stale.root._activeComment;stale.root.state.cameraView=false;
  UI.save(stale.root,old,'stale camera',false);await stale.settled();assert.equal(stale.calls.filter(q=>q.operation===C.EDIT).length,0);assert.equal(stale.checkpoints.length,0);
+});
+
+test('comment action keeps the public getter fenced while its actual view lease authorizes one append',async()=>{
+ const f=await fixture([]);f.camera();f.pointer(100,90);const record=f.root._activeComment,release=f.hold();
+ UI.save(f.root,record,'leased camera comment',false);await turn();assert.equal(f.publicShown(),null);assert.equal(f.checkpoints.length,0);
+ release();await f.settled();assert.equal(f.calls.filter(q=>q.operation===C.EDIT).length,1);
+ assert.deepEqual([f.metadata()[0].x,f.metadata()[0].y,f.metadata()[0].text],[100,60,'leased camera comment']);assert.equal(f.checkpoints.length,1);
+ assert.equal(f.actionLease().readPresentedObjectSession(),null,'queue-local reader cannot survive its action');
+});
+test('comment action refuses missing, foreign, refused and different-presentation leases without a checkpoint',async()=>{
+ for(const mode of ['missing','foreign','refused','view']){
+  const f=await fixture([]);f.pointer();const record=f.root._activeComment;f.actionReader(mode);
+  UI.save(f.root,record,'must refuse',false);await f.settled();
+  assert.equal(f.calls.filter(q=>q.operation===C.EDIT).length,0,mode);assert.equal(f.checkpoints.length,0,mode);assert.deepEqual(f.metadata(),[]);
+ }
 });
