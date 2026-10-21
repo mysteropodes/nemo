@@ -20,6 +20,7 @@ use crate::transaction::{CompactFailure, CompactResult, ReceiptLookup, RetainedD
 // #2106 size split: the payload-bearing operation bodies live in the private child below.
 #[path = "object_command_dispatch_edits.rs"]
 mod edits;
+use edits::OP_PROJECT_SETTINGS;
 
 // #2207 staged placement producer; public capability admission remains separate.
 #[path = "object_media_link_command.rs"]
@@ -38,7 +39,6 @@ const OP_LAYER_PLAYHEAD_CUT: &str = "command.document.object.layer.cut";
 const OP_LAYER_POLICY: &str = "command.document.object.layer.policy.edit";
 const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const OP_PROPERTY_TRACK_EDIT: &str = "command.document.object.property.track.edit";
-const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
 const OP_OBJECT_ITEM: &str = "command.document.object.item.edit";
 const OP_WIDGET_CREATE: &str = "command.document.object.widget.create";
 const OP_WIDGET_WRITE: &str = "command.document.object.widget.write";
@@ -105,6 +105,7 @@ impl NativeObjectHistory {
         ) -> Result<crate::commands::PreparedPropertyEdit, DispatchErrorCode>,
     ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
         if !Self::layer_lifecycle_operation(&request.operation)
+            && !edits::is_project_settings_operation(&request.operation)
             && !Self::group_operation(&request.operation)
             && !Self::component_setup_operation(&request.operation)
             && !Self::compositing_operation(&request.operation)
@@ -123,7 +124,6 @@ impl NativeObjectHistory {
                     | OP_LAYER_POLICY
                     | OP_PROPERTY_EDIT
                     | OP_PROPERTY_TRACK_EDIT
-                    | OP_PROJECT_SETTINGS
                     | OP_PLACEMENT_EDIT
                     | OP_AUDIO_TRACK_EDIT
                     | OP_OBJECT_VECTOR
@@ -381,10 +381,8 @@ impl NativeObjectHistory {
                 self.dispatch_audio_track_edit(&request.payload)
             } else if request.operation == OP_PLACEMENT_EDIT {
                 self.dispatch_placement_edit(&request.payload)
-            } else if request.operation == OP_PROJECT_SETTINGS {
-                let payload = serde_json::to_vec(&request.payload)
-                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-                self.dispatch_project_settings_command(&payload)
+            } else if edits::is_project_settings_operation(&request.operation) {
+                self.dispatch_project_settings_command(request)
             } else if matches!(
                 request.operation.as_str(),
                 OP_PROPERTY_EDIT | OP_PROPERTY_TRACK_EDIT

@@ -1,4 +1,4 @@
-/* Tutorial UI placement only; native document/render authority stays in Rust. */
+/* Tutorial native UI placement and step reads; document/render authority stays in Rust. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -48,6 +48,52 @@
       var finished = false, timer = root.setTimeout(done, 200);
       function done() { if (!finished) { finished = true; root.clearTimeout(timer); resolve(); } }
       root.requestAnimationFrame(function () { root.requestAnimationFrame(done); });
+    });
+  }
+
+  // Native measurement for the original Perspective toggle step; no lesson definition or document writes.
+  function perspectiveStep(root, step, stillCurrent) {
+    var baseline = null;
+    var pinKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
+    function samePin(a, b) { return !!a && !!b && pinKeys.every(function (key) { return a[key] === b[key]; }); }
+    function sample() {
+      try {
+        var project = root.NemoNativeObjectProject, controller = root.NemoNativePerspectiveController;
+        var session = project && project.desktop(root), pin = session && session.info();
+        if (!session || !session.isActive() || !pin || !controller || typeof root.readPerspectiveSettings !== 'function') return null;
+        var projection = controller.read(), settings = root.readPerspectiveSettings();
+        if (!projection || !settings || !projection.perspective || projection.perspective.settings !== settings ||
+            !samePin(projection.info, pin) || controller.read() !== projection || project.desktop(root) !== session) return null;
+        var shown = session.readPresentedObjectSession(), ticket = session.readSubscriptionGeneration();
+        if (!samePin(shown, pin) || !samePin(shown.presentation, pin) || shown.presentation.owner !== 'native' ||
+            shown.presentation.status !== 'presented' || !samePin(session.info(), pin) ||
+            !Number.isSafeInteger(ticket) || !Number.isSafeInteger(pin.contentRevision) || pin.contentRevision < 0 ||
+            typeof pin.documentSnapshotId !== 'string' ||
+            settings.perspectiveEnabled !== undefined && typeof settings.perspectiveEnabled !== 'boolean') return null;
+        return { session: session, ticket: ticket, instanceId: pin.instanceId, documentId: pin.documentId,
+          lifecycleGeneration: pin.lifecycleGeneration, revision: pin.contentRevision,
+          snapshot: pin.documentSnapshotId, value: !!settings.perspectiveEnabled };
+      } catch (_) { return null; }
+    }
+    function sameOwner(a, b) {
+      return a && b && a.session === b.session && a.ticket === b.ticket && a.instanceId === b.instanceId &&
+        a.documentId === b.documentId && a.lifecycleGeneration === b.lifecycleGeneration;
+    }
+    return Object.assign({}, step, {
+      before: function (win) {
+        baseline = win === root && stillCurrent() ? sample() : null;
+      },
+      check: function (win) {
+        if (win !== root || !stillCurrent()) return false;
+        var next = sample();
+        if (!next) return false; // Unavailable does not become a false baseline.
+        if (!sameOwner(baseline, next)) { baseline = next; return false; }
+        if (next.revision === baseline.revision && next.snapshot === baseline.snapshot) return false;
+        if (next.revision <= baseline.revision || next.snapshot === baseline.snapshot) { baseline = next; return false; }
+        var changed = next.value !== baseline.value;
+        baseline = next;
+        return changed;
+      }
     });
   }
 
@@ -185,5 +231,5 @@
     }
     return Object.freeze({ place: place, close: close, ready: function () { return ready; } });
   }
-  return Object.freeze({ create: create, plan: plan, matches: matches, positionTooltip: positionTooltip });
+  return Object.freeze({ create: create, plan: plan, matches: matches, positionTooltip: positionTooltip, perspectiveStep: perspectiveStep });
 }));

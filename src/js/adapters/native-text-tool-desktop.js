@@ -24,6 +24,17 @@
     if(old)old.retire();
     var doc=root.document,session=ports.currentSession();if(!session||!Tool||!Item||!Reader||typeof Reader.create!=='function'||!Writer||typeof Writer.create!=='function')return null;
     var b={container:container,ports:ports,retired:false},drag=null,discovery=null,lastTool=root.state&&root.state.tool,area=null,fontChoices=[],fontTicket=0,readyPin=null,shown=null,dirty=new Set(),modelState={busy:false,unknown:false},page=null,refreshing=false;
+    var perspectiveRefreshNeeded=false,perspectiveRefreshScheduled=false,removePerspectiveRead=null;
+    function flushPerspectiveRefresh(){
+      if(!ownsUI()||!perspectiveRefreshNeeded||perspectiveRefreshScheduled||modelState.busy||modelState.unknown||refreshing)return;
+      perspectiveRefreshScheduled=true;
+      Promise.resolve().then(function(){
+        perspectiveRefreshScheduled=false;
+        if(!ownsUI()||!perspectiveRefreshNeeded||modelState.busy||modelState.unknown||refreshing)return;
+        perspectiveRefreshNeeded=false;b.refresh();
+      });
+    }
+    function perspectiveReadChanged(){perspectiveRefreshNeeded=true;flushPerspectiveRefresh();}
     function node(tag,text){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
     var section=node('section'),title=node('div','Text'),status=node('div','Refresh to select native text in the current authored frame.'),select=node('select'),refresh=node('button','Refresh text'),prev=node('button','Previous'),next=node('button','Next'),resolve=node('button','Resolve pending text');
     section.id='native-text-controls';title.className='phdr';select.setAttribute('aria-label','Native text block');status.setAttribute('role','status');
@@ -45,9 +56,12 @@
       var edges=[r.left,r.top,r.left+r.width,r.top+r.height];
       if(typeof html.style.getPropertyValue!=='function'||!['left','top','right','bottom'].every(function(k,i){return parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===edges[i];}))return null;
       return {left:r.left,top:r.top,width:r.width,height:r.height};}
+    var perspectiveProof=null;
     function context(presented){
       var current=b.ports.currentSession(),s=root.state,info=current&&current.info();
-      if(b.retired||current!==session||!current.isActive()||!info||!s||s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.activeSymbolId||s.shadowMode||s.maskMode||s.symmetryEnabled||s.perspectiveEnabled)return null;
+      var port=root.NemoNativePerspectiveController,perspective=port&&(presented?port.read():typeof port.readForCommand==='function'&&port.readForCommand(perspectiveProof));
+      if(b.retired||current!==session||!current.isActive()||!info||!s||s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.activeSymbolId||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!Tool.samePin(perspective.info,info)||perspective.perspective.settings.perspectiveEnabled)return null;
+      if(presented)perspectiveProof=perspective;
       var layer=info.layers[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(info);
       if(!rect||!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=info.totalFrames)return null;
       if(presented){var p=current.readPresentedObjectSession();if(!p||!Tool.samePin(p,info)||!p.presentation||p.presentation.frame!==frame)return null;}
@@ -93,7 +107,7 @@
       controls();trace(root,'show.visible',null,{area:!!area});
     }
     var core=Tool.create({session:session,reader:Reader,writer:Writer,context:context,defaultColor:function(){var color=root.state.strokeColor||'#000000';return /^#[0-9a-fA-F]{3}$/.test(color)?'#'+color.slice(1).split('').map(function(x){return x+x;}).join(''):color;},
-      draft:show,state:function(s){modelState=s;controls();},cancelled:hide,committed:function(){hide();notify('Text updated.');b.refresh();}});
+      draft:show,state:function(s){modelState=s;controls();flushPerspectiveRefresh();},cancelled:hide,committed:function(){hide();notify('Text updated.');b.refresh();}});
     async function commit(){if(!ownsUI()||!shown||modelState.busy||modelState.unknown)return;
       if(!hexValidity()){notify('Enter a color as #rrggbb.');controls();return;}var changes={};
       dirty.forEach(function(k){changes[k]=k==='font'?chosenFont(font.value):k==='size'?Number(fields.size.value):k==='text'&&area?area.value:fields[k].value;
@@ -121,7 +135,7 @@
         var placeholder=node('option','Select text in this authored frame');placeholder.value='';select.appendChild(placeholder);
         result.page.items.forEach(function(row,i){var option=node('option',row.target.strokeId);option.value=String(i);select.appendChild(option);});select.value='';
         notify(result.page.items.length?'Select a text block to edit.':'No authored text at this frame. Use the Text tool to place text.');
-      }catch(error){readyPin=null;page=null;notify(error.message||'Native text is unavailable.');}finally{refreshing=false;controls();}};
+      }catch(error){readyPin=null;page=null;notify(error.message||'Native text is unavailable.');}finally{refreshing=false;controls();flushPerspectiveRefresh();}};
     b.handle=function(method,e){
       syncTool();if(b.retired||!root.state||root.state.tool!=='text')return false;
       var sampled={};function read(k){return sampled[k]=e[k];}
@@ -148,9 +162,12 @@
         core.openNew({anchorTopLeft:wide?{x:Math.min(held.point.x,end.x),y:Math.min(held.point.y,end.y)}:held.point,fixedWidth:wide?Math.abs(end.x-held.point.x):null})
           .catch(function(error){trace(root,'openNew.error',null);if(discovery===token)notify(error.message);}).finally(function(){trace(root,'openNew.finished',null,{current:discovery===token,shown:!!shown});if(discovery===token)discovery=null;});
       }return true;};
-    b.retire=function(){if(b.retired)return;if(b.animators)b.animators.retire();var owned=ownsUI();hide();b.retired=true;core.retire();events.forEach(function(a){a[0].removeEventListener(a[1],a[2],a[3]);});
+    b.retire=function(){if(b.retired)return;perspectiveRefreshNeeded=false;if(removePerspectiveRead){removePerspectiveRead();removePerspectiveRead=null;}if(b.animators)b.animators.retire();var owned=ownsUI();hide();b.retired=true;core.retire();events.forEach(function(a){a[0].removeEventListener(a[1],a[2],a[3]);});
       if(owned&&font){font.replaceChildren.apply(font,savedFonts);font.value=savedFontValue;}if(colorHexLabel.parentNode)colorHexLabel.parentNode.removeChild(colorHexLabel);if(owned&&colorParent)colorParent.style.flexWrap=colorParentWrap;if(section.parentNode)section.parentNode.removeChild(section);};
-    b.ready=function(){var c=context(true);return !!c&&!!readyPin&&Tool.samePin(c.pin,readyPin);};b.core=core;bindings.set(root,b);b.refresh();return b;
+    b.ready=function(){var c=context(true);return !!c&&!!readyPin&&Tool.samePin(c.pin,readyPin);};b.core=core;bindings.set(root,b);
+    var perspectiveController=root.NemoNativePerspectiveController;
+    if(perspectiveController&&typeof perspectiveController.onRead==='function')removePerspectiveRead=perspectiveController.onRead(perspectiveReadChanged);
+    b.refresh();return b;
   }
   function handle(root,method,e,cancelOtherIntent){
     var b=bindings.get(root);if(method!=='move')trace(root,'route',method,{binding:!!b});

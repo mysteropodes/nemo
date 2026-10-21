@@ -27,6 +27,21 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  const pop=add('div','text-popover');pop.style.display='none';for(const [tag,id]of [['textarea','text-input'],['input','text-size'],['select','text-font'],['input','text-color'],['select','text-align'],['button','text-apply'],['button','text-cancel']])add(tag,id,pop);
  const root=new Element('window',doc);root.document=doc;doc.parentNode=root;root.state={appMode:'anim2d',tool:'text',activeLayerIdx:0,currentFrame:0,strokeColor:'#123456',layers:[{layerUid:'L0'}]};root._layerSel=[0];root.window=root;
  const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});f.session.readPresentedObjectSession=()=>({...f.session.info(),presentation:{frame:root.state.currentFrame}});
+ // Controlled immutable native Perspective projection; never read legacy Perspective fields.
+ let perspectiveMode='disabled',perspectiveOwner=f.session;const perspectiveListeners=new Set();
+ const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
+ root.NemoNativePerspectiveController=Object.freeze({read(){
+  const owner=perspectiveOwner,info=owner.info(),shown=owner.readPresentedObjectSession();
+  if(perspectiveMode==='unavailable'||perspectiveMode==='publication-wait'||!owner.isActive()||!shown||perspectiveKeys.some(k=>shown[k]!==info[k]))return null;
+  const pin=Object.fromEntries(perspectiveKeys.map(k=>[k,info[k]]));
+  if(perspectiveMode==='stale')pin.documentSnapshotId='stale-perspective-snapshot';
+  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'})})});
+  perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
+ },readForCommand(value){
+  const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
+  return (perspectiveMode==='disabled'||perspectiveMode==='publication-wait')&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+ },onRead(listener){perspectiveListeners.add(listener);return ()=>perspectiveListeners.delete(listener);}});
+
  const logs={legacy:0,zoom:0,selected:0};let intent;zoom.addEventListener('pointerdown',()=>logs.zoom++);canvas.addEventListener('pointerdown',()=>logs.legacy++);
  doc.getElementById('text-apply').addEventListener('click',()=>logs.legacy++);
  root.NemoNativeTextToolDesktop=desktopModule;root.NemoNativeOpacityCutover={blocksLegacy:()=>true};root.NemoSelectCanvasIntent={create(){if(!selectionIntent)throw new Error('Text reached generic native selection route');intent=require('../src/js/adapters/select-canvas-intent.js').create({context:()=> 'stable',probe:()=>Object.freeze({mode:'clear'}),select:()=>logs.selected++});return intent;}};
@@ -34,7 +49,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  const script=fs.readFileSync(path.join(__dirname,'../src/js/select-bridge.js'),'utf8');
  vm.runInNewContext(script,{window:root,document:doc,state:root.state,console,selectedPaths:[],userLayers:[],project:{layers:[]},view:{zoom:1},setTimeout,clearTimeout},{filename:'actual-select-bridge.js'});
  const get=id=>doc.getElementById(id);
- return {...f,root,doc,get,binding,canvas,zoom,logs,turn,intent:()=>intent,resize:r=>{rect=r;},input:(id,value)=>{get(id).value=value;get(id).fire('input');},apply:()=>get('text-apply').fire('click'),
+ return {...f,perspectiveRead:()=>perspectiveListeners.forEach(fn=>fn(root.NemoNativePerspectiveController.read())),perspectiveListenerCount:()=>perspectiveListeners.size,perspectiveMode:value=>perspectiveMode=value,perspectiveOwner:owner=>perspectiveOwner=owner,root,doc,get,binding,canvas,zoom,logs,turn,intent:()=>intent,resize:r=>{rect=r;},input:(id,value)=>{get(id).value=value;get(id).fire('input');},apply:()=>get('text-apply').fire('click'),
   click:async(x=100,y=100)=>{canvas.fire('pointerdown',{clientX:x,clientY:y});canvas.fire('pointerup',{clientX:x,clientY:y});await turn();}};
 }
 test('actual select-bridge capture routes ordinary point text to existing editor and suppresses legacy writers',async()=>{
@@ -131,6 +146,7 @@ test('retired queued completion cannot disable a replacement owner editor sharin
  f.binding.retire();
  const next=portsFixture();next.state.document='document-B';next.state.generation++;
  const originalInfo=next.session.info;next.session.info=()=>({...originalInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});next.session.readPresentedObjectSession=()=>({...next.session.info(),presentation:{frame:0}});
+ f.perspectiveOwner(next.session);
  const binding=Desktop.mount(f.root,f.binding.container,{currentSession:()=>next.session,fontResources:()=>({list:async()=>[]})});await f.turn();await binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:null});
  assert.equal(f.get('text-apply').disabled,false,'replacement draft is ready before old queue settles');assert.ok(binding.core.snapshot().draft);
  gate.resolve();await f.turn();
@@ -353,4 +369,29 @@ test('actual Text inspector mounts late animator capability once and retires its
  f.root.NemoNativeTextAnimatorDesktop={mount(root,container){assert.equal(root,f.root);assert.equal(container,f.get('native-inspector'));mounts++;return {refresh(){refreshes++;},retire(){retires++;}};}};
  await f.binding.refresh();await f.binding.refresh();assert.equal(mounts,1);assert.ok(refreshes>=1);
  f.binding.retire();assert.equal(retires,1);
+});
+
+test('actual native Text admission refuses unavailable, stale and enabled Perspective projections',async()=>{
+ for(const mode of ['unavailable','stale','enabled']){
+  const f=await fixture();f.perspectiveMode(mode);
+  Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
+  await f.click();assert.equal(f.binding.core.snapshot().draft,null,mode);assert.equal(f.owner.log.executed.length,0,mode);assert.equal(f.logs.legacy,0,mode);
+ }
+});
+
+test('fresh Perspective read coalesces existing Text refresh and removes its listener on retirement',async()=>{
+ const f=await fixture();let refreshes=0;const original=f.binding.refresh;
+ f.binding.refresh=function(){refreshes++;return original.apply(this,arguments);};
+ f.perspectiveRead();f.perspectiveRead();f.perspectiveRead();await f.turn();assert.equal(refreshes,1);
+ assert.equal(f.perspectiveListenerCount(),1);f.binding.retire();assert.equal(f.perspectiveListenerCount(),0);
+ f.perspectiveRead();await f.turn();assert.equal(refreshes,1);
+});
+test('Text command settles once while fresh Perspective read gates post-reconcile editor publication',async()=>{
+ const f=await fixture();await f.click();f.input('text-input','Confirmed native text');f.apply();
+ f.perspectiveMode('publication-wait');await f.turn();await f.turn();
+ assert.equal(f.owner.log.executed.length,1);assert.equal(f.binding.core.snapshot().busy,false);
+ assert(f.binding.core.snapshot().draft,'old editor is not promoted as current while native metadata is unavailable');
+ f.perspectiveMode('disabled');f.perspectiveRead();await f.turn();await f.turn();
+ assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.get('text-popover').style.display,'none');
+ assert.equal(f.owner.log.executed.length,1,'publication must never replay the text command');
 });

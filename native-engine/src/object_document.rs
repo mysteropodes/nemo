@@ -34,7 +34,8 @@ pub(crate) use audio_tracks::{AudioTrackRecord, AudioTracks};
 #[path = "project_media_envelope.rs"]
 mod project;
 pub(crate) use project::{
-    ProjectEnvelope, ProjectMetadata, ProjectMetadataError, ProjectReferenceState,
+    ProjectCommentRecord, ProjectEnvelope, ProjectMetadata, ProjectMetadataError,
+    ProjectPresetCatalog, ProjectReferenceState, ProjectWorkspaceRecord,
 };
 #[path = "project_camera_state.rs"]
 mod camera;

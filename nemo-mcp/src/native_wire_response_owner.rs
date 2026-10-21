@@ -11,6 +11,19 @@ pub(super) fn correlated(
     let frame_edit_command = crate::native_contract::frame_edit::declares(&request.operation);
     let image_owner = crate::native_contract::item::placed_png_owner_matches(request, response);
     let correlated_operation = request.operation == crate::native_contract::text_read::OP
+        || matches!(
+            request.operation.as_str(),
+            crate::native_contract::composition::READ
+                | crate::native_contract::composition::EDIT
+                | crate::native_contract::palette::READ
+                | crate::native_contract::palette::EDIT
+                | crate::native_contract::guide::READ
+                | crate::native_contract::guide::EDIT
+                | crate::native_contract::shadow::READ
+                | crate::native_contract::shadow::EDIT
+                | crate::native_contract::perspective::READ
+                | crate::native_contract::perspective::EDIT
+        )
         || request.operation == crate::native_contract::metadata::OP
         || request.operation == crate::native_contract::placement::OP
         || request.operation == crate::native_contract::audio_track::OP
@@ -82,4 +95,43 @@ pub(super) fn reports_document(
                     request, response,
                 )
         })
+}
+
+/// Keep successful pinned-read headers and inner ownership on the same revision.
+pub(super) fn pinned_read_correlated(
+    request: &NativeApplicationRequest,
+    response: &NativeApplicationResponse,
+    result: &serde_json::Value,
+) -> bool {
+    (!matches!(
+        request.operation.as_str(),
+        "query.document.object"
+            | "query.document.object.layer.timing"
+            | crate::native_contract::metadata::OP
+            | crate::native_contract::text_read::OP
+            | crate::native_contract::property_read::OP
+            | crate::native_contract::composition::READ
+            | crate::native_contract::palette::READ
+            | crate::native_contract::guide::READ
+            | crate::native_contract::shadow::READ
+            | crate::native_contract::perspective::READ
+    ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
+        == Some(response.content_revision))
+        && (!matches!(
+            request.operation.as_str(),
+            "query.document.object.layer.timing"
+                | crate::native_contract::metadata::OP
+                | crate::native_contract::text_read::OP
+                | crate::native_contract::property_read::OP
+                | crate::native_contract::composition::READ
+                | crate::native_contract::palette::READ
+                | crate::native_contract::guide::READ
+                | crate::native_contract::shadow::READ
+                | crate::native_contract::perspective::READ
+        ) || (response.instance_id == request.instance_id
+            && response.document_id == request.document_id
+            && result.get("instanceId").and_then(serde_json::Value::as_str)
+                == Some(response.instance_id.as_str())
+            && result.get("documentId").and_then(serde_json::Value::as_str)
+                == Some(response.document_id.as_str())))
 }

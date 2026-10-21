@@ -135,6 +135,9 @@
         "object_text_animator_record.rs",
         "object_text_animator_selector.rs",
         "object_text_animator_props.rs",
+        "project_metadata_fields.rs",
+        "project_metadata_annotations.rs",
+        "project_metadata_presets.rs",
         "project_camera_state.rs"
       ],
       "publicApi": [
@@ -301,7 +304,12 @@
         "object_fill_trace_owner.rs",
         "object_property_bake_edit.rs",
         "object_text_animator_commands.rs",
-        "object_text_animator_edit.rs"
+        "object_text_animator_edit.rs",
+        "object_project_composition_edit.rs",
+        "object_project_palette_edit.rs",
+        "object_project_guide_edit.rs",
+        "object_project_shadow_edit.rs",
+        "object_project_perspective_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -752,7 +760,12 @@
         "object_text_font_resources.rs",
         "object_layer_range_snapshot.rs",
         "object_property_target_pages.rs",
-        "object_boolean_frame_motion.rs"
+        "object_project_composition_read.rs",
+        "object_project_palette_read.rs",
+        "object_boolean_frame_motion.rs",
+        "object_project_guide_read.rs",
+        "object_project_shadow_read.rs",
+        "object_project_perspective_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1617,13 +1630,27 @@
         "property_expression_bake.rs",
         "object_expression_bake.rs",
         "object_text_animator.rs",
+        "project_metadata_fields.rs",
+        "project_metadata_annotations.rs",
+        "project_metadata_presets.rs",
+        "object_composition_dispatch.rs",
+        "object_composition_read.rs",
+        "object_composition_public.rs",
+        "object_composition_public_reads.rs",
+        "object_palette_edit.rs",
+        "object_palette_read.rs",
+        "object_palette_public.rs",
         "object_frame_motion_values.rs",
         "object_frame_camera.rs",
         "object_boolean_frame_motion.rs",
+        "object_guide_public.rs",
+        "object_shadow_public.rs",
         "object_duplicator_snapshot.rs",
         "object_duplicator_sources.rs",
         "object_duplicator_frame.rs",
-        "object_duplicator_scene.rs"
+        "object_duplicator_scene.rs",
+        "object_perspective_public.rs",
+        "object_perspective_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1761,7 +1788,17 @@
         "src/native_audio_track_wire_tests.rs",
         "src/native_fill_trace_contract_tests.rs",
         "src/native_fill_trace_wire.rs",
-        "src/native_text_animator_contract.rs"
+        "src/native_text_animator_contract.rs",
+        "src/native_composition_contract.rs",
+        "src/native_composition_contract_tests.rs",
+        "src/native_palette_contract.rs",
+        "src/native_palette_contract_tests.rs",
+        "src/native_guide_contract.rs",
+        "src/native_guide_contract_tests.rs",
+        "src/native_shadow_contract.rs",
+        "src/native_shadow_contract_tests.rs",
+        "src/native_perspective_contract.rs",
+        "src/native_perspective_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -2014,6 +2051,7 @@
         "native_text_read_dispatch_tests.rs",
         "native_property_edit_dispatch_tests.rs",
         "native_property_bake_dispatch_tests.rs",
+        "native_composition_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
         "native_asset_remove_dispatch_tests.rs",
@@ -2021,7 +2059,10 @@
         "native_project_placement_public_tests.rs",
         "native_project_placement_audio_fixture.rs",
         "native_layer_playhead_cut_public_tests.rs",
-        "native_audio_track_public_tests.rs"
+        "native_audio_track_public_tests.rs",
+        "native_shadow_dispatch_tests.rs",
+        "native_perspective_dispatch_tests.rs",
+        "native_perspective_read_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

@@ -22,7 +22,25 @@
   var lastZoom = null, lastCenterX = null, lastCenterY = null, lastW = null, lastH = null;
   var guideEls = { h: [], v: [] }; // parallel to state.guides.h/.v, index-aligned
 
+  function nativeGuides() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+  function guideSource() {
+    if (nativeGuides()) {
+      var controller = window.NemoNativeGuideController, projection = controller && controller.read();
+      return projection ? projection.guides : null;
+    }
+    ensureGuides(); return state.guides;
+  }
+  function nativeGuideDrag(event, axis, ordinal) {
+    if (!nativeGuides()) return false;
+    event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation();
+    var controller = window.NemoNativeGuideController;
+    if (controller) controller.beginDrag(event, axis, ordinal, guideContainer());
+    else if (window.showToast) showToast('Native guides are unavailable.');
+    return true;
+  }
+
   function ensureGuides() {
+    if (nativeGuides()) return;
     if (!state.guides) state.guides = { h: [], v: [] };
     if (!state.guides.h) state.guides.h = [];
     if (!state.guides.v) state.guides.v = [];
@@ -115,32 +133,32 @@
     var line = document.createElement('div'); line.className = 'guide-line ' + axis;
     var hit = document.createElement('div'); hit.className = 'guide-hit ' + axis; hit.style.pointerEvents = 'auto';
     guideContainer().appendChild(line); guideContainer().appendChild(hit);
-    wireGuideDrag(hit, axis, i);
-    var rec = { line: line, hit: hit };
+    var stop = wireGuideDrag(hit, axis, i);
+    var rec = { line: line, hit: hit, stop: stop };
     arr[i] = rec;
     return rec;
   }
   function pruneGuideEls(axis, count) {
     var arr = guideEls[axis];
-    while (arr.length > count) { var r = arr.pop(); if (r) { r.line.remove(); r.hit.remove(); } }
+    while (arr.length > count) { var r = arr.pop(); if (r) { r.stop(); r.line.remove(); r.hit.remove(); } }
   }
   function renderGuides() {
-    ensureGuides();
-    if (!state.rulersOn) { pruneGuideEls('h', 0); pruneGuideEls('v', 0); return; }
-    state.guides.h.forEach(function (wy, i) {
+    var guides = guideSource();
+    if (!guides || !state.rulersOn) { pruneGuideEls('h', 0); pruneGuideEls('v', 0); return; }
+    guides.h.forEach(function (wy, i) {
       var r = ensureGuideEl('h', i);
       var sy = w2v(0, wy).y;
       r.line.style.top = sy + 'px'; r.hit.style.top = (sy - 3) + 'px';
       r.line.style.display = r.hit.style.display = (sy >= 0 && sy <= area.clientHeight) ? '' : 'none';
     });
-    pruneGuideEls('h', state.guides.h.length);
-    state.guides.v.forEach(function (wx, i) {
+    pruneGuideEls('h', guides.h.length);
+    guides.v.forEach(function (wx, i) {
       var r = ensureGuideEl('v', i);
       var sx = w2v(wx, 0).x;
       r.line.style.left = sx + 'px'; r.hit.style.left = (sx - 3) + 'px';
       r.line.style.display = r.hit.style.display = (sx >= 0 && sx <= area.clientWidth) ? '' : 'none';
     });
-    pruneGuideEls('v', state.guides.v.length);
+    pruneGuideEls('v', guides.v.length);
   }
 
   // Dragging an EXISTING guide: reposition live; release back over its
@@ -150,14 +168,17 @@
   function wireGuideDrag(hitEl, axis, indexRef) {
     // Same document-level capture-phase fix as wireRulerDrag above — the
     // hit strip is also a descendant of #canvas-area.
-    document.addEventListener('pointerdown', function (e) {
+    function onPointerDown(e) {
       if (e.target !== hitEl) return;
       if (state.guidesLocked) return;
+      var nativeIndex = guideEls[axis].findIndex(function (record) { return record && record.hit === hitEl; });
+      if (nativeGuideDrag(e, axis, nativeIndex + 1)) return;
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
       var pointerId = e.pointerId;
       var i = guideEls[axis].indexOf(guideEls[axis].filter(function (r) { return r && r.hit === hitEl; })[0]);
       function onMove(ev) {
         if (ev.pointerId !== pointerId) return;
+        if (nativeGuides()) return;
         ev.stopImmediatePropagation();
         var rect = area.getBoundingClientRect();
         if (axis === 'h') {
@@ -176,13 +197,16 @@
         ev.stopImmediatePropagation();
         document.removeEventListener('pointermove', onMove, true);
         document.removeEventListener('pointerup', onUp, true);
+        if (nativeGuides()) return;
         var rect = area.getBoundingClientRect();
         var backOnRuler = axis === 'h' ? (ev.clientY - rect.top) < RULER_SIZE : (ev.clientX - rect.left) < RULER_SIZE;
         if (backOnRuler) { state.guides[axis].splice(i, 1); renderGuides(); }
       }
       document.addEventListener('pointermove', onMove, true);
       document.addEventListener('pointerup', onUp, true);
-    }, true);
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return function () { document.removeEventListener('pointerdown', onPointerDown, true); };
   }
 
   // Dragging a NEW guide out from a ruler bar.
@@ -205,6 +229,7 @@
     document.addEventListener('pointerdown', function (e) {
       if (e.target !== rulerEl) return;
       if (state.guidesLocked || !state.rulersOn) return;
+      if (nativeGuideDrag(e, axis, null)) return;
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
       var pointerId = e.pointerId;
       var ghost = document.createElement('div');
@@ -216,13 +241,14 @@
         else ghost.style.left = Math.max(RULER_SIZE, ev.clientX - rect.left) + 'px';
       }
       place(e);
-      function onMove(ev) { if (ev.pointerId === pointerId) { ev.stopImmediatePropagation(); place(ev); } }
+      function onMove(ev) { if (!nativeGuides() && ev.pointerId === pointerId) { ev.stopImmediatePropagation(); place(ev); } }
       function onUp(ev) {
         if (ev.pointerId !== pointerId) return;
         ev.stopImmediatePropagation();
         document.removeEventListener('pointermove', onMove, true);
         document.removeEventListener('pointerup', onUp, true);
         ghost.remove();
+        if (nativeGuides()) return;
         var rect = area.getBoundingClientRect();
         // Released back on the ruler (didn't actually drag out) — no-op,
         // same convention as every reference app: a click-without-drag on
@@ -247,16 +273,17 @@
   // original point unchanged if nothing's close enough / guides are off.
   function snapPoint(worldPt, tolPx) {
     if (!state.rulersOn || !state.guidesSnap) return worldPt;
-    ensureGuides();
+    var guides = guideSource();
+    if (!guides) { var error = new Error('Native guides are unavailable.'); error.code = 'unavailable'; throw error; }
     tolPx = tolPx || 8;
     var sp = w2v(worldPt.x, worldPt.y);
     var bestVx = null, bestVdx = tolPx + 1;
-    state.guides.v.forEach(function (wx) {
+    guides.v.forEach(function (wx) {
       var sx = w2v(wx, 0).x, d = Math.abs(sx - sp.x);
       if (d < bestVdx) { bestVdx = d; bestVx = wx; }
     });
     var bestHy = null, bestHdy = tolPx + 1;
-    state.guides.h.forEach(function (wy) {
+    guides.h.forEach(function (wy) {
       var sy = w2v(0, wy).y, d = Math.abs(sy - sp.y);
       if (d < bestHdy) { bestHdy = d; bestHy = wy; }
     });

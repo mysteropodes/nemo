@@ -8,6 +8,26 @@ use crate::history::NativeObjectHistory;
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest};
 use crate::transaction::{CompactResult, RetainedDisposition};
 
+// These field-specific namespaces share preparation/commit, not action shapes.
+pub(super) const OP_PROJECT_SETTINGS: &str = "command.document.object.project.settings.edit";
+const OP_PROJECT_COMPOSITION: &str = "command.document.object.project.composition.edit";
+const OP_PROJECT_PALETTE: &str = "command.document.object.project.palette.edit";
+const OP_PROJECT_GUIDE: &str = "command.document.object.project.guide.edit";
+const OP_PROJECT_SHADOW: &str = "command.document.object.project.shadow.edit";
+const OP_PROJECT_PERSPECTIVE: &str = "command.document.object.project.perspective.edit";
+
+pub(super) fn is_project_settings_operation(operation: &str) -> bool {
+    matches!(
+        operation,
+        OP_PROJECT_SETTINGS
+            | OP_PROJECT_COMPOSITION
+            | OP_PROJECT_PALETTE
+            | OP_PROJECT_GUIDE
+            | OP_PROJECT_SHADOW
+            | OP_PROJECT_PERSPECTIVE
+    )
+}
+
 impl NativeObjectHistory {
     /// Raster-item / text-block edit: the typed preparation, the response-bound preflight and the sealed commit.
     pub(super) fn dispatch_item_edit_command(
@@ -127,12 +147,32 @@ impl NativeObjectHistory {
             )),
         }
     }
-    /// Project settings: the typed preparation and the sealed commit.
+    /// Field-specific metadata deltas use one existing typed preparation/sealed commit.
     pub(super) fn dispatch_project_settings_command(
         &mut self,
-        payload: &[u8],
+        request: &OpacityRequest,
     ) -> Result<CompactResult, (DispatchErrorCode, &'static str)> {
-        match self.prepare_project_settings_json(payload) {
+        let payload = serde_json::to_vec(&request.payload).map_err(|_| {
+            (
+                DispatchErrorCode::InvalidRequest,
+                "Project settings payload cannot be encoded.",
+            )
+        })?;
+        let prepared = match request.operation.as_str() {
+            OP_PROJECT_SETTINGS => self.prepare_project_settings_json(&payload),
+            OP_PROJECT_COMPOSITION => self.prepare_composition_delta_json(&payload),
+            OP_PROJECT_PALETTE => self.prepare_palette_delta_json(&payload),
+            OP_PROJECT_GUIDE => self.prepare_guide_delta_json(&payload),
+            OP_PROJECT_SHADOW => self.prepare_shadow_delta_json(&payload),
+            OP_PROJECT_PERSPECTIVE => self.prepare_perspective_delta_json(&payload),
+            _ => {
+                return Err((
+                    DispatchErrorCode::InvalidRequest,
+                    "Unsupported project metadata edit.",
+                ))
+            }
+        };
+        match prepared {
             Ok(candidate) => {
                 let before = self.content_revision();
                 self.commit_project_settings(candidate)

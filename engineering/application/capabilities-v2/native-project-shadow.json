@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-shadow",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.shadow.read",
+    "command.document.object.project.shadow.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectShadowReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectShadowEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
+  },
+  "semantics": "Original Shadow popover add-and-select and ordinal select through one native document/history queue. Imported IDs, duplicate IDs, order and exact color spelling survive. Active swatch retains first-ID-match semantics. Pinned settings distinguish absence and explicit empty metadata; presentation alone materializes nothing. An explicit add/select materializes exactly the original six defaults when absent or empty. Arming is transient and follows confirmed native edit/presentation only. Pages use zero-based cursors, limits1..16 and strict progress inside complete4096-byte envelopes or typed refusal. No legacy desktop mirror/fallback; browser compatibility remains deferred R24. Source candidate only; drawing/render parity, installed UI/history/save-reopen and full T08 acceptance remain open.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned Shadow absence without materializing defaults",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "shadow-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.shadow.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "shadow-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "shadowPalettePresent": false,
+            "shadowColorCount": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "Original Shadow add-and-select in one native history entry",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "shadow-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.shadow.edit",
+        "payload": {
+          "command": "object.project.shadow.edit",
+          "action": {
+            "kind": "add",
+            "id": "sh7",
+            "color": "#aBcDEF"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "shadow-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

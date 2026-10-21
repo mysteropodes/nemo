@@ -65,6 +65,21 @@ async function fixture(tool='draw',native=true){
  // VM global proxies have a different WeakMap identity; resolve the actual cached
  // desktop session explicitly, without substituting any Project/queue method.
  root.NemoNativeObjectProject={...Project,desktop:()=>session};
+ // Controlled immutable native Perspective projection; never read legacy Perspective fields.
+ let perspectiveMode='disabled',perspectiveOwner=session;
+ const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
+ root.NemoNativePerspectiveController=Object.freeze({read(){
+  const owner=perspectiveOwner,info=owner.info(),shown=owner.readPresentedObjectSession();
+  if(perspectiveMode==='unavailable'||!owner.isActive()||!shown||perspectiveKeys.some(k=>shown[k]!==info[k]))return null;
+  const pin=Object.fromEntries(perspectiveKeys.map(k=>[k,info[k]]));
+  if(perspectiveMode==='stale')pin.documentSnapshotId='stale-perspective-snapshot';
+  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'})})});
+  perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
+ },readForCommand(value){
+  const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
+  return perspectiveMode==='disabled'&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+ }});
+
  root.NemoNativeObjectProjectFile={...Files,projectionReadyForUI:(_proxy,pin)=>Files.projectionReadyForUI(root,pin)};
  // Baseline Paper defaults are verified separately; Point is geometry-only here.
  const paper=require('./helpers/native-import-paper.cjs').load();root.Point=paper.Point;root.Segment=paper.Segment;root.CompoundPath=paper.CompoundPath;
@@ -81,7 +96,7 @@ async function fixture(tool='draw',native=true){
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/draw-bridge.js'),'utf8'),context,{filename:'draw-bridge.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
- return {root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ return {perspectiveMode:value=>perspectiveMode=value,root,context,paper,advance:(ms=16)=>clock+=ms,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeFreehandToolController.whenSettled();}};
 }
@@ -217,5 +232,14 @@ test('pressure taps refuse before dispatch, finalize pending/current UI, and all
   f.advance();send(f,'pointerdown',20,20,{pointerType:'pen',pressure:.3});f.advance();send(f,'pointermove',60,40,{pointerType:'pen',pressure:.7});f.advance();send(f,'pointerup',100,60,{pointerType:'pen',pressure:0});
   assert.equal((await settled(f)).status,'applied',JSON.stringify({smoothing,stabilizer}));assert.equal(f.calls.length,1);assert.equal(f.records.size,1);assert.equal(f.session.info().contentRevision,1);
   assert.ok(f.session.readPresentedObjectSession());assert.equal(f.paper.project.activeLayer.children.length,0);
+ }
+});
+
+test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
+ for(const mode of ['unavailable','stale','enabled']){
+  const f=await fixture();f.perspectiveMode(mode);
+  Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
+  f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
+  assert.equal(f.calls.length,0,mode);assert.equal(f.body.children.length,0,mode);
  }
 });
