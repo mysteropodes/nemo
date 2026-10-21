@@ -3438,7 +3438,7 @@
     },
     {
       "id": "app.native.guide.ui",
-      "layer": "adapters",
+      "layer": "bootstrap",
       "dir": "src/js/adapters",
       "files": [
         "native-guide-ui.js"
