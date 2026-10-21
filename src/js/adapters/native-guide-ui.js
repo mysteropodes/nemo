@@ -104,7 +104,8 @@
         if (next && changed(busyStamp, next) && available(next.session, next.info)) refreshNeeded = true;
         return loading || Promise.resolve(null);
       }
-      if (model.read()) return Promise.resolve(model.read());
+      var value = model.read();
+      if (value) { repaint(); return Promise.resolve(value); }
       busyStamp = identity(); loading = model.refresh().catch(function () { return null; })
         .finally(function () { loading = null; settled(); }); repaint(); return loading;
     }
