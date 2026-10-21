@@ -107,7 +107,7 @@ fn trim_admission_requires_actual_authored_bitmap_target_and_refuses_expression_
             "foreign" => wire["propertyHolders"][0]["target"]["strokeId"] = json!("plain"),
             "control" => {
                 wire["propertyHolders"][0]["controls"] =
-                    json!([{ "key":"c","name":"C","type":"slider","default":[0]}])
+                    json!([{ "key":"c","name":"C","type":"number","default":[0]}])
             }
             _ => wire["propertyHolders"][0]["properties"][0]["property"] = json!("rotation"),
         }
@@ -124,7 +124,7 @@ fn real_history_and_full_project_reopen_keep_brush_fields_and_retained_snapshot(
     use crate::history::NativeObjectHistory;
     let wire = json!({"format":"nemo.native-project-document","formatVersion":2,"project":{"canvasW":48,"canvasH":48,"fps":24},
         "drawing":drawing(),"viewportReference":null,"assets":[{"id":"ink","name":"Ink","kind":"image","source":{"kind":"embedded",
-            "mediaType":"image/png","encoding":"base64","data":crate::object_codec::encoded_wire_test::PNG}}],"assetInventory":{"assetIds":["ink"]}});
+            "mediaType":"image/png","encoding":"base64","data":crate::object_codec::encoded_wire_test::PNG}}],"assetInventory":{"assetIds":["ink"],"placements":[]}});
     let mut owner =
         NativeObjectHistory::from_project_file("brush-history", wire.to_string().as_bytes())
             .unwrap();

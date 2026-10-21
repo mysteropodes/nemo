@@ -29,7 +29,7 @@ fn project() -> Value {
     json!({"format":"nemo.native-project-document","formatVersion":2,"project":{"canvasW":64,"canvasH":64,"fps":24},
         "viewportReference":null,"assets":[{"id":"ink","name":"Authored ink","kind":"image","source":{"kind":"embedded",
             "mediaType":"image/png","encoding":"base64","data":"iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR4nGNgYPgPBgAU9AX7uVYDfQAAAABJRU5ErkJggg=="}}],
-        "assetInventory":{"assetIds":["ink"]},"drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":12,
+        "assetInventory":{"assetIds":["ink"],"placements":[]},"drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":12,
             "layers":[{"layerUid":"L0","timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
                 "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],"objects":[anchor],
             "items":{"raster":[{"target":{"contextId":"scene-root","layerUid":"L0","strokeId":"ink","frameScope":{"kind":"authored","frame":0}},

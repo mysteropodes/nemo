@@ -34,7 +34,7 @@ fn project(drawing: Value) -> Value {
     json!({"format":"nemo.native-project-document","formatVersion":2,
         "project":{"canvasW":48,"canvasH":48,"fps":24},"drawing":drawing,"viewportReference":null,
         "assets":[{"id":"ink","name":"Authored ink","kind":"image","source":{"kind":"embedded",
-            "mediaType":"image/png","encoding":"base64","data":png()}}],"assetInventory":{"assetIds":["ink"]}})
+            "mediaType":"image/png","encoding":"base64","data":png()}}],"assetInventory":{"assetIds":["ink"],"placements":[]}})
 }
 fn owner(drawing: Value) -> NativeObjectHistory {
     NativeObjectHistory::from_project_file(

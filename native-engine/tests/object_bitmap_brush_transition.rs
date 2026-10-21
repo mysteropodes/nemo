@@ -12,7 +12,7 @@ fn project() -> Value {
         "assets":[{"id":"ink","name":"Ink","kind":"image","source":{
             "kind":"embedded","mediaType":"image/png","encoding":"base64",
             "data":crate::object_codec::encoded_wire_test::PNG}}],
-        "assetInventory":{"assetIds":["ink"]}})
+        "assetInventory":{"assetIds":["ink"],"placements":[]}})
 }
 fn history() -> NativeObjectHistory {
     NativeObjectHistory::from_project_file("compound-guard", project().to_string().as_bytes())

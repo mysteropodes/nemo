@@ -22,7 +22,7 @@ impl BitmapBrushFields {
             "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null,
             "assets":[{"id":"ink","name":"Authored brush","kind":"image","source":{"kind":"embedded",
                 "mediaType":"image/png","encoding":"base64","data":"iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR4nGNgYPgPBgAU9AX7uVYDfQAAAABJRU5ErkJggg=="}}],
-            "assetInventory":{"assetIds":["ink"]}})
+            "assetInventory":{"assetIds":["ink"],"placements":[]}})
     }
     pub(crate) fn runtime_test_owner(trim: bool) -> NativeObjectHistory {
         NativeObjectHistory::from_project_file(
