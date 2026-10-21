@@ -77,7 +77,7 @@ impl Compositor {
                         .ok_or_else(|| CompositorError::new("native video frame is unavailable"))?;
                     let brush =
                         vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
-                    self.scene.draw_image(&brush, transform);
+                    scene.draw_image(&brush, transform);
                 }
                 PaintEntry::Duplicator(source) => {
                     source.prepared.draw(scene, Affine::IDENTITY, &source.path)

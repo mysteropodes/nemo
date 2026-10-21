@@ -1,6 +1,8 @@
 //! Stored camera on the complete accepted SVG paint family, before counting bytes.
 //! Applies to absolute anchors and handles, preserving original alpha and path order.
-use crate::export_job::native_vector_export::native_vector_export_svg::{Sink, SvgExportError};
+use crate::export_job::native_vector_export::native_vector_export_svg::{
+    unsupported_video, Sink, SvgExportError,
+};
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Camera {
@@ -83,6 +85,7 @@ pub(super) fn for_plan(plan: &ObjectPaintPlan) -> Result<Option<Camera>, SvgExpo
                 }
             }
             PaintEntry::Raster(_) => {}
+            PaintEntry::Video(index) => return Err(unsupported_video(plan, index)),
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             PaintEntry::Brush(_) => {}
         }
