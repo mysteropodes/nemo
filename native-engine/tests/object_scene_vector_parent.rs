@@ -234,12 +234,23 @@ fn missing_cycle_foreign_owner_stale_frame_and_overdepth_never_publish_parented_
     let s = o.acquire_snapshot(0).unwrap();
     let mut effects = None;
     let before = encode_storage_project(s.document()).unwrap();
-    assert!(
-        prepare_object_motion_exposure_frame_for_owner(&o, &s, &pins(&s, 0), &mut effects).is_err()
-    );
+    let refusal =
+        prepare_object_motion_exposure_frame_for_owner(&o, &s, &pins(&s, 0), &mut effects)
+            .unwrap_err();
     assert_eq!(encode_storage_project(s.document()).unwrap(), before);
     assert_eq!(o.history_depths(), (0, 0));
-    assert!(effects.is_none());
+    // C02 retains a verified owner's admission failure, even before any guest effects.
+    assert_eq!(
+        refusal,
+        "evaluated Motion frame refused: Pin(Unavailable); scene-root/0; effects=[]"
+    );
+    assert_eq!(
+        effects
+            .as_ref()
+            .expect("retain the depth admission refusal")
+            .to_string(),
+        refusal
+    );
     // Exact documented D30 boundary:64 ancestors remain eligible,65 cannot be admitted.
     deep["layers"].as_array_mut().unwrap().pop();
     deep["layers"][64]

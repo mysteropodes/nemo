@@ -19,7 +19,16 @@ use crate::scheduler::{
 fn document() -> Value {
     let mut value = source();
     let mut drawing = crate::object_render_scene::paint_test_document(&[0]);
-    drawing["objects"] = json!([drawing["objects"][0].clone()]);
+    // The original shared fixture reverses encounter order; select the actual
+    // L0:a record named by this retained composition plan, not index zero (L2:a).
+    let record = drawing["objects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|record| record["target"]["layerUid"] == "L0" && record["target"]["strokeId"] == "a")
+        .unwrap()
+        .clone();
+    drawing["objects"] = json!([record]);
     drawing["objects"][0]["geometry"]["segments"] = json!([[100, 60], [120, 60], [100, 80]].map(
         |[x, y]| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})
     ));
