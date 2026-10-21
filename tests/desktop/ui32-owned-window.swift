@@ -350,7 +350,13 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
     let wanted=restoring ? originals[base] : value
     var posted=false, attempted=false
     do {
-      try ui32GuardedAction(identity,{
+      try ui32GuardedAction({
+        if base == "fixture.open" && attempted && posted {
+          result["fixtureOpenIdentity"]=try ui32FixtureOpenIdentity(base,attempted,posted,
+            now:{DispatchTime.now().uptimeNanoseconds},
+            pause:{Thread.sleep(forTimeInterval:Double($0)/1_000_000_000)},identity:identity)
+        } else {try identity()}
+      },{
         let current=try resolve(rule); try check(CFEqual(current,selected)); try ui32ContentReadStep("guarded-new-context"){try newContext(command)}; try enabledVisible(selected)
         if entryEnabled && !base.hasPrefix("entry.") {
           var overlays=[String:Set<String>]()
@@ -429,9 +435,11 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       if let readback=attr(current,kAXValueAttribute) as? String { result["readback"]=readback } else { result["readback"]=NSNull() }
     }
     } catch {
-      throw ActionRefusal(diagnostics:["purpose":"UI32","command":command,"ordinal":ordinal,"actionPosted":posted,"actionAttempted":attempted,
+      var facts:[String:Any]=["purpose":"UI32","command":command,"ordinal":ordinal,"actionPosted":posted,"actionAttempted":attempted,
         "stage":posted ? "post-action-or-scope" : "pre-action-or-perform","underlying":ui32ActionCause(error),"profileFocus":result["profileFocus"] ?? NSNull(),
-        "note":"No retry; inspect actual result before any new appointment."])
+        "note":"No retry; inspect actual result before any new appointment."]
+      if let proof=result["fixtureOpenIdentity"] {facts["fixtureOpenIdentity"]=proof}
+      throw ActionRefusal(diagnostics:facts)
     }
     result["actionPosted"]=posted; result["actionAttempted"]=attempted
     // AX acknowledgement/readback alone is not application acceptance.
