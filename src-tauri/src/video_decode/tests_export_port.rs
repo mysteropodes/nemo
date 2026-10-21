@@ -1,6 +1,6 @@
 //! T12: the export/preview decoder port over real ffmpeg sessions, with two
 //! lossless sources whose pixels are a known function of (x, y, frame).
-use super::tests::gen_video;
+use super::tests::{ffmpeg_shared, gen_video};
 use super::DesktopVideoDecoder;
 use native_engine::native_media_frame_export::NativeVideoDecoder;
 
@@ -34,6 +34,7 @@ fn pixel(rgba: &[u8], width: u32, x: u32, y: u32) -> [u8; 4] {
 #[test]
 fn two_sources_decode_their_own_exact_pixels_at_the_requested_frame() {
     let (a, b) = (source_a(), source_b());
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let mut decoder = DesktopVideoDecoder::default();
     let ia = decoder.open(&a).unwrap();
     let ib = decoder.open(&b).unwrap();
@@ -56,6 +57,7 @@ fn two_sources_decode_their_own_exact_pixels_at_the_requested_frame() {
 #[test]
 fn a_session_closes_exactly_once_and_cannot_decode_after() {
     let a = source_a();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let mut decoder = DesktopVideoDecoder::default();
     let info = decoder.open(&a).unwrap();
     decoder.decode(info.session, 4).unwrap();
@@ -68,6 +70,7 @@ fn a_session_closes_exactly_once_and_cannot_decode_after() {
 #[test]
 fn dropping_the_decoder_closes_every_session_still_open() {
     let a = source_a();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let mut decoder = DesktopVideoDecoder::default();
     let first = decoder.open(&a).unwrap();
     let second = decoder.open(&a).unwrap();

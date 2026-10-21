@@ -31,6 +31,7 @@ fn optimized_media_transcode_produces_a_valid_index() {
 #[test]
 fn indexed_session_random_access_never_respawns_and_is_consistent() {
     let target = make_indexed_media();
+    let _ffmpeg = ffmpeg_shared();
     let (mut s, frame_count, _) = open_session_core_t(&target).unwrap();
     assert!(
         s.indexed.is_some(),
@@ -67,7 +68,10 @@ fn indexed_session_random_access_never_respawns_and_is_consistent() {
 
 #[test]
 fn indexed_random_seek_cost_is_flat_and_small() {
+    // Fixture first (it takes the shared guard), then measure the decoder
+    // alone, not concurrent in-process FFmpeg tests.
     let target = make_indexed_media();
+    let _timing = ffmpeg_timing_exclusive();
     let (mut s, _, _) = open_session_core_t(&target).unwrap();
     decode_frame_core(&mut s, 0).unwrap(); // absorb converter spawn
     s.cache.clear(); // measure decode, not cache hits
@@ -115,6 +119,7 @@ fn stale_index_is_rejected_not_misread() {
     let len = f.metadata().unwrap().len();
     f.set_len(len - 100).unwrap();
     drop(f);
+    let _ffmpeg = ffmpeg_shared();
     let err = match open_session_core_t(&stale_s) {
         Err(e) => e,
         Ok(_) => panic!("stale index was accepted — sentinel check is broken"),

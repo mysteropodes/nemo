@@ -39,7 +39,12 @@ fn undo(state: &ApplicationMcp, receipt: &Value, revision: u64) {
         json!({"command":"object.undo"}),
     );
     r["operation"] = json!("command.document.object.undo");
-    assert_eq!(dispatch(state, r)["ok"], true);
+    // Public history stays undeclared in the capability catalog: undo through the
+    // bounded desktop object route the shipped app uses (native-object-project.js).
+    let response = state.dispatch_object_request_json(&r.to_string()).unwrap();
+    let response = serde_json::to_value(response).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    assert_eq!(response["contentRevision"], revision + 1);
 }
 #[test]
 fn audio_metadata_public_host_reaches_actual_record_save_reopen_undo_and_retained_replay() {
