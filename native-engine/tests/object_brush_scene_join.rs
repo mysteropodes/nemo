@@ -349,23 +349,35 @@ fn brush_with_real_duplicator(same_layer: bool) -> Value {
     let source = crate::object_frame_packet::duplicators::tests::fixture(0);
     let mut drawing = BitmapBrushFields::test_drawing();
     drawing["layers"][0]["timing"] = source["layers"][0]["timing"].clone();
-    drawing["layers"].as_array_mut().unwrap().push(source["layers"][0].clone());
-    drawing["objects"].as_array_mut().unwrap().extend(
-        source["objects"].as_array().unwrap().iter().cloned(),
-    );
+    drawing["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(source["layers"][0].clone());
+    drawing["objects"]
+        .as_array_mut()
+        .unwrap()
+        .extend(source["objects"].as_array().unwrap().iter().cloned());
     let mut layer = source["compositionOrder"]["contexts"][0]["layers"][0].clone();
     layer["naturalPosition"] = json!(1);
     drawing["compositionOrder"]["contexts"][0]["layers"]
-        .as_array_mut().unwrap().push(layer);
+        .as_array_mut()
+        .unwrap()
+        .push(layer);
     let scopes = drawing["compositionOrder"]["contexts"][0]["scopes"]
-        .as_array_mut().unwrap();
-    for scope in source["compositionOrder"]["contexts"][0]["scopes"].as_array().unwrap() {
-        if let Some(existing) = scopes.iter_mut().find(|existing| {
-            existing["frameScope"] == scope["frameScope"]
-        }) {
-            existing["elements"].as_array_mut().unwrap().extend(
-                scope["elements"].as_array().unwrap().iter().cloned(),
-            );
+        .as_array_mut()
+        .unwrap();
+    for scope in source["compositionOrder"]["contexts"][0]["scopes"]
+        .as_array()
+        .unwrap()
+    {
+        if let Some(existing) = scopes
+            .iter_mut()
+            .find(|existing| existing["frameScope"] == scope["frameScope"])
+        {
+            existing["elements"]
+                .as_array_mut()
+                .unwrap()
+                .extend(scope["elements"].as_array().unwrap().iter().cloned());
         } else {
             scopes.push(scope.clone());
         }
@@ -390,13 +402,18 @@ fn bitmap_mask_anchor_refuses_a_plan_instead_of_colour_painting_its_companion() 
     assert_eq!(s.brushes.as_ref().unwrap().paints.len(), 1);
     assert!(matches!(
         prepare_object_paint_plan(&s, &selector(&pin)),
-        Err(ObjectPaintPlanError::Pins(ObjectSceneError::UnsupportedGeometry {
-            source_object_index: 0,
-            reason: "bitmap brush masks have no admitted native mask representation",
-        }))
+        Err(ObjectPaintPlanError::Pins(
+            ObjectSceneError::UnsupportedGeometry {
+                source_object_index: 0,
+                reason: "bitmap brush masks have no admitted native mask representation",
+            }
+        ))
     ));
     assert_eq!(pin.content_revision(), 0);
-    assert_eq!(owner.serialize_project_file(0, pin.snapshot_id()).unwrap(), before);
+    assert_eq!(
+        owner.serialize_project_file(0, pin.snapshot_id()).unwrap(),
+        before
+    );
 }
 
 #[test]
@@ -410,27 +427,57 @@ fn real_duplicator_on_another_layer_keeps_brush_ink_but_same_layer_copies_refuse
         let packet = prepare_object_frame(&pin, &selected).unwrap();
         assert_eq!(packet.duplicator_outputs().len(), 1);
         assert_eq!(packet.duplicator_outputs()[0].output.copies.len(), 3);
-        assert_eq!(packet.duplicator_outputs()[0].layer_index, if same_layer { 0 } else { 1 });
+        assert_eq!(
+            packet.duplicator_outputs()[0].layer_index,
+            if same_layer { 0 } else { 1 }
+        );
         let admitted = ObjectBrushAdmission::prepare(&packet, &selected).unwrap();
         let mut services = runtime();
         let result = admitted.materialize(&mut services, None);
         if same_layer {
-            assert!(matches!(result, Err(ObjectSceneError::UnsupportedGeometry {
-                reason: "native materialized brush paint unavailable", ..
-            })));
+            assert!(matches!(
+                result,
+                Err(ObjectSceneError::UnsupportedGeometry {
+                    reason: "native materialized brush paint unavailable",
+                    ..
+                })
+            ));
         } else {
             let plan = result.unwrap();
             let entries: Vec<_> = ordered_entries(&plan).collect();
-            assert_eq!(entries.iter().filter(|entry| matches!(entry, PaintEntry::Brush(_))).count(), 1);
-            assert_eq!(entries.iter().filter(|entry| matches!(entry, PaintEntry::Duplicator(_))).count(), 3);
-            assert_eq!(entries.iter().filter(|entry| matches!(entry, PaintEntry::Contour(_))).count(), 1);
+            assert_eq!(
+                entries
+                    .iter()
+                    .filter(|entry| matches!(entry, PaintEntry::Brush(_)))
+                    .count(),
+                1
+            );
+            assert_eq!(
+                entries
+                    .iter()
+                    .filter(|entry| matches!(entry, PaintEntry::Duplicator(_)))
+                    .count(),
+                3
+            );
+            assert_eq!(
+                entries
+                    .iter()
+                    .filter(|entry| matches!(entry, PaintEntry::Contour(_)))
+                    .count(),
+                1
+            );
             let sources = plan.brush_sources().unwrap();
             assert_eq!(sources.paints[0].layer_index, 0);
-            let InkState::Ink(ink) = &sources.paints[0].ink else { panic!("authored ink required") };
+            let InkState::Ink(ink) = &sources.paints[0].ink else {
+                panic!("authored ink required")
+            };
             assert_eq!(ink.bitmap.rgba8(), AUTHORED_PIXELS);
             assert_eq!(plan.scene_resource_versions().unwrap().len(), 1);
         }
         assert_eq!(pin.content_revision(), 0);
-        assert_eq!(owner.serialize_project_file(0, pin.snapshot_id()).unwrap(), before);
+        assert_eq!(
+            owner.serialize_project_file(0, pin.snapshot_id()).unwrap(),
+            before
+        );
     }
 }

@@ -224,7 +224,9 @@ pub(crate) fn expand_order(
         if let Some(copies) = scene.duplicators.layers.get(&index) {
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             if !copies.is_empty()
-                && original.iter().any(|paint| matches!(paint, PaintIndex::Brush(_)))
+                && original
+                    .iter()
+                    .any(|paint| matches!(paint, PaintIndex::Brush(_)))
             {
                 return Err(ObjectPaintPlanError::Unavailable);
             }
