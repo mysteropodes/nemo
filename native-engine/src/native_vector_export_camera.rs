@@ -1,6 +1,6 @@
 //! Stored camera on the complete accepted SVG paint family, before counting bytes.
 //! Applies to absolute anchors and handles, preserving original alpha and path order.
-use crate::native_vector_export_svg::{Sink, SvgExportError};
+use crate::export_job::native_vector_export::native_vector_export_svg::{Sink, SvgExportError};
 use crate::object_render_scene::{ordered_entries, ObjectPaintPlan, PaintEntry};
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Camera {
