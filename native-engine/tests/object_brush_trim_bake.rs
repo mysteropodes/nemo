@@ -338,3 +338,70 @@ fn unaffordable_replacement_retains_old_slot_pixels_and_all_charges() {
     assert!(old.same_allocation_as(&ink(&retry).bitmap));
     assert_eq!(old.rgba8(), old_bytes);
 }
+
+#[test]
+fn closed_square_whole_cycle_offsets_keep_exact_corners_and_zero_seam() {
+    let a = anchor(true);
+    let before = a.clone();
+    for offset in [100., -100., 300., -300.] {
+        let out = trim(
+            &a,
+            &TrimWindow {
+                start: 75.,
+                end: 125.,
+                offset,
+            },
+        );
+        // Two edges span half of the original eighty-sample closed curve.
+        assert_eq!(out.segments.len(), 41);
+        assert_eq!(out.segments[0].point, [0., 10.]);
+        assert_eq!(out.segments[20].point, [0., 0.]);
+        assert_eq!(out.segments[40].point, [10., 0.]);
+        assert!(!out.closed);
+        assert!(out.segments.iter().all(|s| {
+            s.handle_in == Some([0.; 2]) && s.handle_out == Some([0.; 2])
+        }));
+        assert_eq!(a, before);
+    }
+}
+
+#[test]
+fn translated_scaled_and_reversed_squares_keep_authored_trim_vertices() {
+    for (corners, expected) in [
+        (
+            [[13., -7.], [23., -7.], [23., 3.], [13., 3.]],
+            [[13., 3.], [13., -7.], [23., -7.]],
+        ),
+        (
+            [[0., 0.], [20., 0.], [20., 20.], [0., 20.]],
+            [[0., 20.], [0., 0.], [20., 0.]],
+        ),
+        (
+            [[0., 0.], [0., 10.], [10., 10.], [10., 0.]],
+            [[10., 0.], [0., 0.], [0., 10.]],
+        ),
+    ] {
+        let a = TrimAnchor {
+            segments: corners.into_iter().map(segment).collect(),
+            closed: true,
+        };
+        let before = a.clone();
+        let out = trim(
+            &a,
+            &TrimWindow {
+                start: 75.,
+                end: 125.,
+                offset: 0.,
+            },
+        );
+        assert_eq!(out.segments.len(), 41);
+        assert_eq!(out.segments[0].point, expected[0]);
+        assert_eq!(out.segments[20].point, expected[1]);
+        assert_eq!(out.segments[40].point, expected[2]);
+        assert!(!out.closed);
+        assert!(out.segments.iter().all(|s| {
+            s.handle_in == Some([0.; 2]) && s.handle_out == Some([0.; 2])
+        }));
+        assert_eq!(a, before);
+    }
+}

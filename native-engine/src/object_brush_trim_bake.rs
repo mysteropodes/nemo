@@ -173,10 +173,17 @@ fn trim(anchor: &TrimAnchor, window: &TrimWindow) -> TrimmedPath {
         }
     }
     let mut lengths = vec![0.];
+    let mut compensation = 0.;
     for pair in points.windows(2) {
         let dx = pair[1][0] - pair[0][0];
         let dy = pair[1][1] - pair[0][1];
-        lengths.push(lengths.last().unwrap() + (dx * dx + dy * dy).sqrt());
+        // Keep the sampled geometry; compensate accumulation so authored
+        // cyclic seams do not drift with the number of polyline samples.
+        let previous = *lengths.last().unwrap();
+        let adjusted = (dx * dx + dy * dy).sqrt() - compensation;
+        let next = previous + adjusted;
+        compensation = (next - previous) - adjusted;
+        lengths.push(next);
     }
     let total = *lengths.last().unwrap();
     if !total.is_finite() {
