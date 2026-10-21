@@ -5,8 +5,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::Sce
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_record_with_pose, is_vector_record,
 };
-use crate::object_document::{ObjectRecord, SolidFill};
-use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord};
+use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectRecord, SolidFill};
 use crate::object_render_scene::object_scene_producer_contour::CompiledContour;
 use crate::object_render_scene::render_vector_path::VectorShape;
 use crate::object_render_scene::PaintIndex;

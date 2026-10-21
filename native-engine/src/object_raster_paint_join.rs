@@ -170,11 +170,11 @@ fn append_object_entry(
         SceneOutcome::Unavailable(_) => Err(ObjectPaintPlanError::Unavailable),
     }
 }
-impl super::ObjectPaintPlan {
+impl ObjectPaintPlan {
     /// Encoded-source versions retained by this immutable plan, in stable asset order.
     pub fn raster_resource_versions(
         &self,
-    ) -> Result<Vec<(String, String)>, super::ObjectSceneError> {
+    ) -> Result<Vec<(String, String)>, crate::object_render_scene::ObjectSceneError> {
         crate::object_render_scene::raster_scene::declared_versions(self)
     }
 }
