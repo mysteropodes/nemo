@@ -41,3 +41,19 @@ const desktopBounds={x:40,y:60,width:320,height:180};
 test('desktop hides only the captured stage, repeated presentation is idempotent, clear restores exact prior visibility',()=>{for(const visible of [true,false]){const f=desktopFixture(visible);f.desktop.surfaceChanged(A,desktopBounds);assert.equal(f.stage.visible,false);f.desktop.surfaceChanged(A,desktopBounds);assert.equal(f.stage.visible,false);assert.deepEqual(f.updates,visible?[false]:[]);f.desktop.surfaceChanged(null);assert.equal(f.stage.visible,visible);assert.deepEqual(f.updates,visible?[false,true]:[false]);const count=f.updates.length;f.desktop.surfaceChanged(null);assert.equal(f.updates.length,count);opaque(f);}});
 test('desktop stage identity replacement fails closed and restores the original captured stage without touching the replacement',()=>{const f=desktopFixture();f.desktop.surfaceChanged(A,desktopBounds);const replacement={visible:true};f.root.stageLayer=replacement;assert.throws(()=>f.desktop.surfaceChanged(A,desktopBounds),/stage changed/);assert.equal(f.stage.visible,true);assert.equal(replacement.visible,true);opaque(f);});
 test('desktop refuses missing presentation backdrop without inventing a document or hiding unrelated layers',()=>{const f=desktopFixture();delete f.root.stageLayer;assert.throws(()=>f.desktop.surfaceChanged(A,desktopBounds),/backdrop is unavailable/);assert.equal(f.stage.visible,true);assert.deepEqual(f.updates,[]);opaque(f);});
+
+test('native presented camera affine maps both directions after real CSS stretch without Paper',()=>{
+ const M=require('../src/js/adapters/native-viewport-underlay.js').canvasMapping;
+ const presentation={view:{mode:'stored-camera',documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};
+ const c={bounds:{left:20,top:30,width:640,height:360},canvasW:320,canvasH:180,presentation};
+ assert.deepEqual(M.point({clientX:100,clientY:90},c),{x:100,y:60});
+ assert.deepEqual(M.screen({x:100,y:60},c),{x:100,y:90});
+ const rotated={...c,presentation:{view:{mode:'stored-camera',documentToComposition:[0,2,-2,0,300,-100],compositionToDocument:[0,-.5,.5,0,50,150]}}};
+ assert.deepEqual(M.screen({x:100,y:60},rotated),{x:380,y:230});
+ assert.deepEqual(M.point({clientX:380,clientY:230},rotated),{x:100,y:60});
+ assert.equal(M.matchesView({state:{cameraView:true}},presentation),true);
+ assert.equal(M.matchesView({state:{cameraView:false}},presentation),false);
+ assert.equal(M.matchesView({state:{cameraView:true}},{frame:0}),false);
+ assert.deepEqual(M.point({clientX:100,clientY:90},{...c,presentation:{frame:0}}),{x:40,y:30});
+ assert.throws(()=>M.point({clientX:100,clientY:90},{...c,presentation:{view:{mode:'stored-camera',compositionToDocument:[1,0,0,NaN,0,0]}}}));
+});

@@ -45,7 +45,7 @@ async function fixture(tool='rect',native=true){
   if(command==='nemo_native_status'||command==='nemo_native_object_client_status')return {...info(),available:installed};
   if(command==='nemo_native_object_bootstrap'){installed=true;generation++;revision=0;records.clear();return {...info(),requestId:q.requestId,resourceCount:0,viewportAvailable:false};}
   if(command==='nemo_native_object_reference')return {...info(),requestId:q.requestId};
-  if(command==='nemo_native_object_preview'){log.push('present-'+q.contentRevision);return {status:'presented',workId:'work-'+generation+'-'+revision,viewGeneration:1};}
+  if(command==='nemo_native_object_preview'){log.push('present-'+q.contentRevision);return {status:'presented',workId:'work-'+generation+'-'+revision,viewGeneration:1,...(q.viewMode==='stored-camera'?{view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}}:{})};}
   if(command==='nemo_native_revision_sync'){
    if(q.action==='binding')return {...info(),subscriptionId:'subscription-'+generation};
    if(q.action==='subscribe'){binding=q.binding;return q.binding;}
@@ -207,4 +207,15 @@ test('native drawing refuses unavailable, stale and enabled Perspective projecti
   f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
   assert.equal(f.calls.length,0,mode);assert.equal(f.body.children.length,0,mode);
  }
+});
+
+test('locked native camera maps real shape pointer and SVG draft through the same presented transform',async()=>{
+ const f=await fixture();f.root.state.cameraView=true;assert.equal(f.session.readPresentedObjectSession(),null);await f.session.presentPreview(0);
+ f.area.fire('pointerdown');f.area.fire('pointermove',{clientX:240,clientY:210});
+ assert.match(f.body.firstChild.firstChild.attributes.d,/M 90 55/);
+ assert.equal(f.body.firstChild.firstChild.attributes.transform,'matrix(2 0 0 2 -160 -90)');
+ f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal((await f.root.NemoNativeShapeToolController.whenSettled()).status,'applied');
+ assert.deepEqual(f.calls[0].payload.record.geometry.segments.map(s=>[s.point.x,s.point.y]),[[90,55],[130,55],[130,85],[90,85]]);
+ const stale=await fixture();stale.area.fire('pointerdown');stale.root.state.cameraView=true;stale.area.fire('pointerup',{clientX:240,clientY:210});
+ assert.equal(stale.calls.length,0);assert.equal(stale.body.children.length,0);
 });

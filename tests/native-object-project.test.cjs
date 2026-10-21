@@ -684,3 +684,60 @@ test('SVG sees current native history revision and refuses submission once Open 
   assert.equal(blocked.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1);
   assert.equal(session.isActive(),true);assert.equal(session.info().documentId,'document');
 });
+
+test('Camera View uses native projection proof while PNG and SVG exports never inherit the session selector',async()=>{
+ const h=host(),original=h.invoke;let mode='canvas';
+ const view={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ h.invoke=async(command,args)=>{const result=await original(command,args),q=args&&JSON.parse(args.requestJson);
+  if(command==='nemo_native_object_export'&&q.format==='svg')return {...result,artifactFiles:['frame_0001.svg']};
+  return command==='nemo_native_object_preview'&&q.viewMode==='stored-camera'?{...result,view:structuredClone(view)}:result;};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0,viewMode:()=>mode});
+ await s.openPath('/project.json');const before=JSON.stringify(s.info());const canvas=s.readPresentedObjectSession().presentation;
+ assert.equal(canvas.view.mode,'canvas');mode='stored-camera';assert.equal(s.readPresentedObjectSession(),null);
+ const camera=await s.presentPreview(0);assert.deepEqual(camera.view,view);assert.notEqual(camera,canvas);assert(Object.isFrozen(camera.view.documentToComposition));
+ await s.exportPng('/camera-png',[0]);await s.exportSvg('/camera-svg',[0]);
+ for(const {r} of h.calls.filter(c=>c.command==='nemo_native_object_export'))assert.equal(Object.hasOwn(r,'viewMode'),false);
+ assert.equal(JSON.stringify(s.info()),before);mode='canvas';assert.equal(s.readPresentedObjectSession(),null);
+ assert.equal((await s.presentPreview(0)).view.mode,'canvas');
+});
+
+test('Camera View refuses missing, foreign, singular or inconsistent native mapping and stale async choice',async()=>{
+ for(const view of [undefined,{mode:'canvas',cameraAvailable:true,documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]},
+  {mode:'stored-camera',cameraAvailable:true,documentToComposition:[0,0,0,0,0,0],compositionToDocument:[1,0,0,1,0,0]},
+  {mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[1,0,0,1,0,0]}]){
+  const h=host(),invoke=h.invoke;let mode='canvas';h.invoke=async(command,args)=>{const r=await invoke(command,args);return command==='nemo_native_object_preview'&&mode==='stored-camera'?{...r,view}:r;};
+  const s=Project.create({invoke:h.invoke,mapping:()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}}),viewMode:()=>mode});
+  await s.openPath('/project.json');mode='stored-camera';await assert.rejects(s.presentPreview(0));assert.equal(s.readPresentedObjectSession(),null);assert.equal(s.info().contentRevision,0);
+ }
+ const h=host(),invoke=h.invoke,wait=deferred();let mode='canvas',hold=false;
+ h.invoke=async(command,args)=>{const r=await invoke(command,args);if(command==='nemo_native_object_preview'&&hold){await wait.promise;return {...r,view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};}return r;};
+ const s=Project.create({invoke:h.invoke,mapping:()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}}),viewMode:()=>mode});
+ await s.openPath('/project.json');mode='stored-camera';hold=true;const pending=s.presentPreview(0);await turn();mode='canvas';wait.resolve();await assert.rejects(pending);assert.equal(s.readPresentedObjectSession(),null);
+});
+
+test('actual native camera toolbar click uses current receipt availability and never the legacy camera writer',()=>{
+ const {extractFunction}=require('./fixtures/lib/sandbox.cjs'),source=fs.readFileSync(require.resolve('../src/js/camera.js'),'utf8');
+ const events=[],button={hidden:false,setAttribute(k,v){this[k]=v;},addEventListener(k,fn){this[k]=fn;}};
+ let available=true;const state={cameraView:false,currentFrame:4};
+ Object.defineProperties(state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera key read');}}});
+ const session={isActive:()=>true,readPresentedObjectSession:()=>({presentation:{view:{cameraAvailable:available}}}),renderPreview:frame=>events.push(frame)};
+ const root={state,document:{getElementById:id=>id==='btn-camera'?button:null},SM:{t:k=>k},NemoNativeObjectProject:{desktop:()=>session}};
+ root.window=root;const context=vm.createContext(root);
+ for(const name of ['nativeSession','renderNativeViewLock','applyCameraView','initUI'])vm.runInContext(extractFunction(source,name),context);
+ vm.runInContext('initUI();renderNativeViewLock();',context);assert.equal(button.hidden,false);assert.equal(button['aria-pressed'],'false');
+ button.click();assert.equal(state.cameraView,true);assert.deepEqual(events,[4]);assert.equal(button['aria-pressed'],'true');
+ available=false;vm.runInContext('renderNativeViewLock()',context);assert.equal(button.hidden,true);button.click();assert.deepEqual(events,[4]);
+ available=true;button.click();assert.equal(state.cameraView,false);assert.deepEqual(events,[4,4]);
+});
+
+test('session view change invalidates the original pending action lease before another native paint',async()=>{
+ const h=host(),entered=deferred(),release=deferred();let mode='canvas';
+ const s=Project.create({invoke:h.invoke,mapping:()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}}),projectionReady:()=>true,viewMode:()=>mode});
+ await s.openPath('/project.json');const original=s.readPresentedObjectSession().presentation;
+ const action=s.runResourceCommand(async ctx=>{assert.equal(ctx.readPresentedObjectSession().presentation,original);entered.resolve();await release.promise;assert.equal(ctx.readPresentedObjectSession(),null);});
+ await entered.promise;mode='stored-camera';assert.equal(s.readPresentedObjectSession(),null);release.resolve();await action;
+ assert.equal(s.info().contentRevision,0);assert.equal(h.calls.some(c=>c.command==='nemo_native_dispatch'),false);
+ const inspect=require('../src/js/adapters/native-object-open-exposure.js').inspectReceipt;
+ const dormant={status:'presented',workId:'native-dormant',viewGeneration:1,view:{mode:'stored-camera',cameraAvailable:false,documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]}};
+ assert.equal(inspect(dormant,true,false,'stored-camera').failure,null);
+});

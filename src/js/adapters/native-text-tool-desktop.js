@@ -53,7 +53,7 @@
     function on(n,name,fn,capture){if(!n)return;n.addEventListener(name,fn,!!capture);events.push([n,name,fn,!!capture]);}
     function ownsUI(){return !b.retired&&bindings.get(root)===b;}
     function notify(message){if(ownsUI())status.textContent=message;}
-    var perspectiveProof=null;
+    var perspectiveProof=null,presentedView=null;
     function context(presented){
       var current=b.ports.currentSession(),s=root.state,info=current&&current.info();
       var port=root.NemoNativePerspectiveController,perspective=port&&(presented?port.read():typeof port.readForCommand==='function'&&port.readForCommand(perspectiveProof));
@@ -61,9 +61,10 @@
       if(presented)perspectiveProof=perspective;
       var layer=info.layers[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(root,info);
       if(!rect||!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=info.totalFrames)return null;
-      if(presented){var p=current.readPresentedObjectSession();if(!p||!Tool.samePin(p,info)||!p.presentation||p.presentation.frame!==frame)return null;}
+      if(presented){var p=current.readPresentedObjectSession();if(!p||!Tool.samePin(p,info)||!p.presentation||!Mapping.matchesView(root,p.presentation)||p.presentation.frame!==frame)return null;presentedView=p.presentation;}
+      if(!presentedView||!Mapping.matchesView(root,presentedView))return null;
       return {pin:{instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration,contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId},layerUid:layer.layerUid,frame:frame,
-        selectionKey:JSON.stringify([s.activeLayerIdx,root._layerSel||[],s.tool]),viewKey:JSON.stringify(rect),bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH};
+        selectionKey:JSON.stringify([s.activeLayerIdx,root._layerSel||[],s.tool]),viewKey:JSON.stringify([rect,presentedView.view||null]),presentation:presentedView,bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH};
     }
     function controls(){if(!ownsUI())return;var c=context(true),blocked=modelState.busy||modelState.unknown;
       if(apply)apply.disabled=blocked||!shown||!c||invalidHex;colorHex.disabled=blocked||!shown||!c;select.disabled=blocked||!page;refresh.disabled=b.retired||refreshing||modelState.busy;
@@ -93,6 +94,10 @@
       if(!d.target&&d.placement.fixedWidth!==null){
         area=node('textarea');area.id='native-text-area-draft';area.setAttribute('aria-label','Text');area.value=d.block.text;
         Object.assign(area.style,{position:'fixed',zIndex:'201',left:at.x+'px',top:at.y+'px',width:(d.placement.fixedWidth*c.bounds.width/c.canvasW)+'px',minHeight:Math.max(24,d.block.size*1.25*c.bounds.height/c.canvasH)+'px',fontSize:(d.block.size*c.bounds.height/c.canvasH)+'px',color:d.block.color,background:'transparent'});
+        if(c.presentation.view&&c.presentation.view.mode==='stored-camera'){
+          var m=Mapping.transform(c,false),sx=c.bounds.width/c.canvasW,sy=c.bounds.height/c.canvasH;
+          Object.assign(area.style,{width:d.placement.fixedWidth+'px',minHeight:Math.max(24/sy,d.block.size*1.25)+'px',fontSize:d.block.size+'px',transformOrigin:'0 0',transform:'matrix('+[sx*m[0],sy*m[1],sx*m[2],sy*m[3],0,0].join(',')+')'});
+        }
         area.addEventListener('input',function(){dirty.add('text');input.value=area.value;});area.addEventListener('keydown',key);
         area.addEventListener('blur',function(e){if(!e.relatedTarget||!pop.contains(e.relatedTarget))commit();});doc.body.appendChild(area);area.focus();
       }else input.focus();

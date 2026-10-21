@@ -230,3 +230,46 @@ fn camera_clip_stays_project_sized_in_larger_real_png_and_svg_outputs() {
     assert_eq!(saved(&o), before);
     assert_eq!(o.history_depths(), (0, 0));
 }
+
+#[test]
+fn explicit_camera_viewport_uses_same_retained_camera_without_relabeling_export_or_canvas() {
+    use crate::object_render_scene::prepare_object_camera_viewport_composition;
+    let o = owner(&document()); let before = saved(&o); let s = snapshot(&o); let p = plan(&s, 4);
+    let pins = selector(&s, 4);
+    let camera = prepare_object_camera_viewport_composition(&p, &pins, None).unwrap();
+    assert_eq!(camera.viewport_document_transform(), Some([2.,0.,0.,2.,-160.,-90.]));
+    let canvas = prepare_object_viewport_composition(&p, &pins, Some(&camera)).unwrap();
+    assert_eq!(canvas.viewport_document_transform(), Some([1.,0.,0.,1.,0.,0.]));
+    let export = prepare_object_composition(&p, &pins).unwrap();
+    assert_eq!(export.viewport_document_transform(), None);
+    assert_eq!(export.camera_matrix(), camera.camera_matrix());
+    let mut wrong = pins.clone(); wrong.document_snapshot_id = "foreign";
+    assert!(prepare_object_camera_viewport_composition(&p, &wrong, None).is_err());
+    assert_eq!(p.commands().next().unwrap().contour().segments()[0].point, [100.,60.]);
+    assert_eq!(saved(&o), before); assert_eq!(o.history_depths(), (0,0));
+    drop(o);
+    assert_eq!(camera.viewport_document_transform(), Some([2.,0.,0.,2.,-160.,-90.]));
+}
+
+#[test]
+fn camera_view_keeps_real_reference_fit_and_image_allocation_bound_to_the_same_witness() {
+    use crate::object_render_scene::prepare_object_camera_viewport_composition;
+    let mut value = document();
+    value["viewportReference"] = json!({"kind":"still-image","assetId":"ref","name":"reference.png","visible":true,"opacity":0.5,"offsetFrames":0});
+    // Existing literal 2x1 BLUE PNG from native_object_reference_preview_tests.rs.
+    value["assets"] = json!([{"id":"ref","mediaType":"image/png","encoding":"base64","data":"iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR4nGNgYPgPBgAU9AX7uVYDfQAAAABJRU5ErkJggg=="}]);
+    let o = owner(&value); let before = saved(&o); let s = snapshot(&o); let p = plan(&s, 4); let pins = selector(&s, 4);
+    let canvas = prepare_object_viewport_composition(&p, &pins, None).unwrap();
+    let camera = prepare_object_camera_viewport_composition(&p, &pins, Some(&canvas)).unwrap();
+    let (normal, normal_fit, opacity) = canvas.reference_image().unwrap();
+    let (locked, locked_fit, locked_opacity) = camera.reference_image().unwrap();
+    assert_eq!(normal_fit.as_coeffs(), [160.,0.,0.,160.,0.,10.]);
+    assert_eq!(locked_fit.as_coeffs(), [320.,0.,0.,320.,-160.,-70.]);
+    assert_eq!(normal.data.id(), locked.data.id());
+    assert_eq!((opacity, locked_opacity), (0.5,0.5));
+    assert!(camera.reference_matches_plan(&p));
+    assert_eq!(saved(&o), before); assert_eq!(o.history_depths(), (0,0));
+    let unlocked = prepare_object_viewport_composition(&p, &pins, Some(&camera)).unwrap();
+    assert_eq!(unlocked.reference_image().unwrap().1.as_coeffs(), [160.,0.,0.,160.,0.,10.]);
+    assert_eq!(unlocked.reference_image().unwrap().0.data.id(), locked.data.id());
+}

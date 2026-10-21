@@ -97,11 +97,12 @@ pub(super) struct Fixture {
     slot: TestObjectSlot<View>,
 }
 impl Fixture {
-    pub(super) fn new() -> Self {
+    pub(super) fn new() -> Self { Self::with_document(document()) }
+    pub(super) fn with_document(source: Value) -> Self {
         let state = Arc::new(ApplicationMcp::default());
         state
             .install_native_object(
-                decode_storage_project(&serde_json::to_vec(&document()).unwrap()).unwrap(),
+                decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap(),
             )
             .unwrap();
         let mut fixture = Self {
@@ -145,7 +146,7 @@ impl Fixture {
         &self,
         raw: &str,
     ) -> crate::native_application_contract::HostResult<
-        crate::native_application_contract::NativePreviewReceipt,
+        crate::native_application_contract::ObjectPreviewReceipt,
     > {
         let request = admit_request(raw, self.state.instance_id())?;
         preview_with_target(&self.state, &request, |consumer| {

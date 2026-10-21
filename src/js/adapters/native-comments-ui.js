@@ -44,7 +44,7 @@
           state.spaceDown || state.isPanning || state.activeSymbolId || state.tool !== 'comment') return null;
       var frame = state.currentFrame, shown = lease ? lease.readPresentedObjectSession() : session.readPresentedObjectSession();
       if (!Number.isSafeInteger(frame) || frame < 0 || frame >= info.totalFrames || !same(shown, info) ||
-          !shown.presentation || shown.presentation.owner !== 'native' || shown.presentation.status !== 'presented' || shown.presentation.frame !== frame) return null;
+          !shown.presentation || shown.presentation.owner !== 'native' || shown.presentation.status !== 'presented' || shown.presentation.frame !== frame || !Mapping.matchesView(root, shown.presentation)) return null;
       var rect = Mapping.bounds(root, info); if (!rect) return null;
       var edges = [rect.left, rect.top, rect.left + rect.width, rect.top + rect.height];
       return { session: session, projection: projection, presentation: shown.presentation, ticket: session.readSubscriptionGeneration(), frame: frame,

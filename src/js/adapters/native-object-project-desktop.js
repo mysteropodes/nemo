@@ -21,7 +21,7 @@
     return bound.compose(base,policy);
   }
   var stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
-  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation',
+  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view',
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
     'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
   function safeCode(event,code){
@@ -72,6 +72,10 @@
     var running=true,lease=Object.freeze({readPresentedObjectSession:function(){return running&&origin&&current()===true?origin:null;}});
     try{return action(lease);}finally{running=false;}
   }
+  function didPaintUI(root,ports){
+    if(ports.bindPolicyEntries)ports.bindPolicyEntries();
+    if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
+  }
   function createPorts(root){
     var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
     function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
@@ -96,6 +100,7 @@
       return true;
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
+      viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
         var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
         var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';
@@ -152,6 +157,7 @@
           if(!current||current.session!==stamp.session||current.info!==stamp.info||current.ticket!==stamp.ticket||
             current.document!==stamp.document||current.presentation!==stamp.presentation)return;
           settingsNotice('presented',info);
+          if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
         }catch(_){}},0);
       },
@@ -160,5 +166,5 @@
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
   }
-  return Object.freeze({createPorts:createPorts,openDiagnostic:openDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation});
+  return Object.freeze({createPorts:createPorts,didPaintUI:didPaintUI,openDiagnostic:openDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation});
 }));

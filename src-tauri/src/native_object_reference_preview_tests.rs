@@ -352,3 +352,22 @@ fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
 
 #[path = "native_object_exposure_tests.rs"]
 mod exposure_tests;
+
+#[test]
+fn camera_choice_has_distinct_native_cache_identity_even_without_active_keys() {
+    use crate::native_application_contract::ObjectPreviewView;
+    let mut owner = host(); let source = snapshot(&owner); let pins = selector(&source, 0);
+    let before = owner.project_file_snapshot(source.content_revision(), source.snapshot_id()).unwrap().unwrap();
+    let canvas = owner.prepare_object_preview(&pins, output(), false).unwrap();
+    let camera = owner.prepare_object_preview_view(&pins, output(), ObjectPreviewView::StoredCamera, false).unwrap();
+    assert_eq!(canvas.key.quality(), "final");
+    assert_eq!(camera.key.quality(), "final-camera-view");
+    assert_ne!(canvas.key, camera.key);
+    let witness = native_engine::object_render_scene::prepare_object_camera_viewport_composition(&camera.plan, &pins, None).unwrap();
+    assert_eq!(witness.viewport_document_transform(), Some([1.,0.,0.,1.,0.,0.]));
+    assert!(!witness.viewport_stored_camera_available());
+    let mut wrong = pins.clone(); wrong.document_snapshot_id = "foreign";
+    assert!(owner.prepare_object_preview_view(&wrong, output(), ObjectPreviewView::StoredCamera, false).is_err());
+    assert_eq!(owner.project_file_snapshot(source.content_revision(), source.snapshot_id()).unwrap().unwrap(), before);
+    assert_eq!(owner.history.history_depths(), (0,0));
+}

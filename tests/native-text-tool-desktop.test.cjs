@@ -26,7 +26,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  const stage=add('div','canvas-area'),canvas=add('canvas','drawing-canvas',stage),zoom=add('input','zoom-scrub',stage),container=add('div','native-inspector');let rect={left:20,top:30,width:640,height:360};canvas.getBoundingClientRect=()=>({...rect});const published={'--nemo-native-left':'20px','--nemo-native-top':'30px','--nemo-native-right':'660px','--nemo-native-bottom':'390px'};doc.documentElement.style.getPropertyValue=k=>published[k];
  const pop=add('div','text-popover');pop.style.display='none';for(const [tag,id]of [['textarea','text-input'],['input','text-size'],['select','text-font'],['input','text-color'],['select','text-align'],['button','text-apply'],['button','text-cancel']])add(tag,id,pop);
  const root=new Element('window',doc);root.document=doc;doc.parentNode=root;root.state={appMode:'anim2d',tool:'text',activeLayerIdx:0,currentFrame:0,strokeColor:'#123456',layers:[{layerUid:'L0'}]};root._layerSel=[0];root.window=root;
- const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});f.session.readPresentedObjectSession=()=>({...f.session.info(),presentation:{frame:root.state.currentFrame}});
+ const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});f.session.readPresentedObjectSession=()=>({...f.session.info(),presentation:{frame:root.state.currentFrame,...(options.cameraView?{view:options.cameraView}:{})}});root.state.cameraView=!!options.cameraView;
  // Controlled immutable native Perspective projection; never read legacy Perspective fields.
  let perspectiveMode='disabled',perspectiveOwner=f.session;const perspectiveListeners=new Set();
  const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
@@ -394,4 +394,15 @@ test('Text command settles once while fresh Perspective read gates post-reconcil
  f.perspectiveMode('disabled');f.perspectiveRead();await f.turn();await f.turn();
  assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.get('text-popover').style.display,'none');
  assert.equal(f.owner.log.executed.length,1,'publication must never replay the text command');
+});
+
+test('native camera receipt maps actual point Text and area draft while a view change refuses the old draft',async()=>{
+ const cameraView={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ const f=await fixture(false,Desktop,{cameraView});await f.click(100,110);f.input('text-input','Camera text');f.apply();await f.turn();
+ assert.deepEqual(f.owner.log.received[0].payload.block.anchorTopLeft,{x:100,y:65});assert.equal(f.logs.legacy,0);
+ const area=await fixture(false,Desktop,{cameraView});area.canvas.fire('pointerdown',{clientX:100,clientY:110});area.canvas.fire('pointermove',{clientX:300,clientY:190});area.canvas.fire('pointerup',{clientX:300,clientY:190});await area.turn();
+ const draft=area.get('native-text-area-draft');assert.ok(draft);assert.equal(draft.style.width,'50px');assert.equal(draft.style.transform,'matrix(4,0,0,4,0,0)');
+ draft.value='Area camera';draft.fire('input');draft.fire('keydown',{key:'Enter',ctrlKey:true});await area.turn();
+ assert.equal(area.owner.log.received[0].payload.block.fixedWidth,50);
+ const stale=await fixture(false,Desktop,{cameraView});await stale.click();stale.input('text-input','stale');stale.root.state.cameraView=false;stale.apply();await stale.turn();assert.equal(stale.owner.log.executed.length,0);
 });

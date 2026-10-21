@@ -509,3 +509,12 @@ test('ordinary Open metadata settles when Perspective repaint re-enters the actu
     await Promise.allSettled([...renders,opening]);await timerTurn();await turn();
   }
 });
+
+test('desktop reads only existing session Camera View choice and keeps the native UI lock hook',()=>{
+ const seen=[],root={state:{cameraView:false},__TAURI__:{core:{invoke(){throw Error('no host request');}}},NemoNativeViewportUnderlay:Underlay,
+  SMCamera:{renderNativeViewLock(){seen.push('lock');}}};
+ const ports=Ports.createPorts(root);assert.equal(ports.viewMode(),'canvas');root.state.cameraView=true;assert.equal(ports.viewMode(),'stored-camera');
+ Ports.didPaintUI(root,{bindPolicyEntries(){seen.push('policy');}});assert.deepEqual(seen,['policy','lock']);
+ Object.defineProperties(root.state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera keys read');}}});
+ assert.equal(ports.viewMode(),'stored-camera');
+});

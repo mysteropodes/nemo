@@ -229,10 +229,11 @@
     async function present(frame,pin,revisionSync,exposure){
       var request;
       try{request=frameRequest(frame,pin);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
+      var mode=Exposure.viewMode(ports.viewMode);if(mode!=='canvas')request.viewMode=mode;
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request),allowDeferred);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&Exposure.viewMode(ports.viewMode)===mode,allowDeferred,mode);}
         catch(error){throw previewFailure('receipt-access',error);}}
       try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),false);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
@@ -240,7 +241,7 @@
         presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented'));
       }
       presentation=freeze({owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
-        viewGeneration:receipt.viewGeneration,instanceId:request.instanceId,documentId:request.documentId,
+        viewGeneration:receipt.viewGeneration,view:receipt.view,instanceId:request.instanceId,documentId:request.documentId,
         contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration});
       presentationBounds=bounds;if(ports.surfaceChanged)ports.surfaceChanged(presentation,bounds);
       return presentation;
@@ -282,7 +283,7 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
-    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&origin.presentation===presentation&&same(info,origin)&&ticket===subscriptionTicket&&
+    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&origin.presentation===presentation&&Exposure.matchesView(presentation,ports.viewMode)&&same(info,origin)&&ticket===subscriptionTicket&&
       (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
       typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
     function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
@@ -354,7 +355,7 @@
       return {apiVersion:2,requestId:request.requestId,instanceId:value.instanceId,documentId:value.documentId,contentRevision:value.contentRevision,ok:true,
         result:{atRevision:value.contentRevision,documentSnapshotId:value.documentSnapshotId,documentDigest:value.documentDigest,byteCount:value.byteCount}};
     }
-    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&same(info,presentation)&&pending===0?
+    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&Exposure.matchesView(presentation,ports.viewMode)&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
     async function readLayerView(layerUid,frame,pin,rangeView){
       async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
@@ -483,7 +484,7 @@
     var ports=nativeObjectUiPorts(root);
     try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
       throw new Error('Native document UI presentation is unavailable');
-      if(ports.bindPolicyEntries)ports.bindPolicyEntries();}
+      Desktop.didPaintUI(root,ports);}
     catch(error){return uiFailure(root,error);}
     return true;
   }

@@ -4,9 +4,10 @@
   const common=typeof module==='object'&&module.exports;
   const command=common?require('./native-object-vector-command.js'):root.NemoNativeObjectVectorCommand;
   const contract=common?require('./native-object-edit-contract.js'):root.NemoNativeObjectEditContract;
-  const api=factory(command,contract);
+  const mapping=(common?require('./native-viewport-underlay.js'):root.NemoNativeViewportUnderlay).canvasMapping;
+  const api=factory(command,contract,mapping);
   if(common)module.exports=api;else root.NemoNativeFillDesktop=api;
-}(typeof globalThis==='object'?globalThis:this,function(command,contract){
+}(typeof globalThis==='object'?globalThis:this,function(command,contract,Mapping){
   'use strict';
   const OP='command.document.object.fill.trace';
   const PIN=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
@@ -54,16 +55,24 @@
     const toast=(text)=>{if(typeof root.showToast==='function')root.showToast(text);};
     const t=(key)=>root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;
     if(event.altKey){toast('Close Gap is unavailable.');return true;}
-    const editor=create({current:()=>current(root),ready:(session,info)=>session===current(root)
+    const owner=current(root),shown=owner&&owner.readPresentedObjectSession&&owner.readPresentedObjectSession(),info=owner&&owner.info();
+    const rect=info&&Mapping.bounds(root,info);
+    if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
+    const captured=shown.presentation;
+    const guarded={info:owner.info,isActive:owner.isActive,requestId:owner.requestId,runResourceCommand:action=>owner.runResourceCommand(ctx=>{
+      const exact=()=>{const p=ctx.readPresentedObjectSession&&ctx.readPresentedObjectSession();return p&&p.presentation===captured&&Mapping.matchesView(root,captured)&&JSON.stringify(Mapping.bounds(root,owner.info()))===JSON.stringify(rect);};
+      if(!exact())throw command.fault('stale_owner','Fill presentation changed');
+      return action({reconcile:ctx.reconcile,dispatch:q=>{if(!exact())throw command.fault('stale_owner','Fill presentation changed');return ctx.dispatch(q);}});
+    })};
+    const editor=create({current:()=>current(root)===owner?guarded:current(root),ready:(session,info)=>session===guarded&&current(root)===owner&&Mapping.matchesView(root,captured)
       &&root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true,
       target:(info)=>{
         const row=info.layers&&info.layers[state.activeLayerIdx];
         return row&&!row.locked?{layerUid:row.layerUid,contextId:'scene-root',frame:state.currentFrame}:null;
       }});
     try{
-      const bridge=root.SMEngineBridge;
-      if(!bridge||typeof bridge.screenToWorld!=='function')throw new Error('Native fill coordinates are unavailable');
-      const point=bridge.screenToWorld(event.clientX,event.clientY);
+      const mapped=Mapping.point(event,{bounds:rect,canvasW:info.canvasW,canvasH:info.canvasH,presentation:captured});
+      const point=[mapped.x,mapped.y];
       editor.fill({point,color:state.fillColor,opacity:state.opacity/100,remove:event.shiftKey===true})
         .then((r)=>{if(r.applied)toast(t(event.shiftKey?'toastFillRemoved':'toastFillApplied'));})
         .catch((error)=>toast(error&&error.code==='stale_owner'?'Fill target changed. Try again.':'Fill is unavailable.'));

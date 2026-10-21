@@ -14,7 +14,7 @@ use native_engine::{
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
-        prepare_object_viewport_composition, prepare_scheduled_object_composition_from_witness,
+        prepare_object_viewport_composition, prepare_object_camera_viewport_composition, prepare_scheduled_object_composition_from_witness,
         ObjectCompositionWitness, ObjectPaintPlan,
     },
     object_snapshot::ObjectSnapshot,
@@ -25,12 +25,14 @@ use native_engine::{
     },
 };
 use std::collections::BTreeSet;
+use crate::native_application_contract::{ObjectPreviewView, ObjectViewProjection, ObjectPresentedFrame};
 
 // CPU-only admission; never exported, cloned or detached from this owner.
 struct PreparedObjectPreview {
     snapshot: ObjectSnapshot,
     plan: ObjectPaintPlan,
     key: EvaluationKey,
+    view: ObjectPreviewView,
 }
 
 #[derive(Default)]
@@ -143,7 +145,7 @@ impl NativeObjectHost {
         output: OutputSpec,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
-        self.with_prepared_preview_mode(expected, output, false, operation)
+        self.with_prepared_object_preview_for_view(expected, output, ObjectPreviewView::Canvas, false, operation)
     }
 
     /// Called only after the existing exact pending-event proof route admits it.
@@ -154,20 +156,21 @@ impl NativeObjectHost {
         output: OutputSpec,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
-        self.with_prepared_preview_mode(expected, output, true, operation)
+        self.with_prepared_object_preview_for_view(expected, output, ObjectPreviewView::Canvas, true, operation)
     }
 
-    fn with_prepared_preview_mode<T>(
+    pub(crate) fn with_prepared_object_preview_for_view<T>(
         &mut self,
         expected: &ObjectFrameSelector<'_>,
         output: OutputSpec,
+        view: ObjectPreviewView,
         pending_proof_fallback: bool,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
         if self.preview.prepared.is_some() {
             return Err("native object preview preparation is already borrowed".into());
         }
-        let prepared = self.prepare_object_preview(expected, output, pending_proof_fallback)?;
+        let prepared = self.prepare_object_preview_view(expected, output, view, pending_proof_fallback)?;
         self.preview.prepared = Some(prepared);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
         self.preview.prepared = None;
@@ -182,6 +185,13 @@ impl NativeObjectHost {
         expected: &ObjectFrameSelector<'_>,
         output: OutputSpec,
         pending_proof_fallback: bool,
+    ) -> Result<PreparedObjectPreview, String> {
+        self.prepare_object_preview_view(expected, output, ObjectPreviewView::Canvas, pending_proof_fallback)
+    }
+
+    fn prepare_object_preview_view(
+        &mut self, expected: &ObjectFrameSelector<'_>, output: OutputSpec,
+        view: ObjectPreviewView, pending_proof_fallback: bool,
     ) -> Result<PreparedObjectPreview, String> {
         if self.released.is_some() || self.preview.released {
             return Err("native object host was released".into());
@@ -231,7 +241,7 @@ impl NativeObjectHost {
             snapshot.snapshot_id(),
             expected.context_id,
             expected.frame,
-            "final",
+            view.quality(),
             output,
             plan.scene_resource_versions()
                 .map_err(|error| format!("preview raster resources: {error:?}"))?,
@@ -241,6 +251,7 @@ impl NativeObjectHost {
             snapshot,
             plan,
             key,
+            view,
         })
     }
 
@@ -250,6 +261,13 @@ impl NativeObjectHost {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<PresentationReceipt, String> {
+        self.present_prepared_object_preview_view(expected, compositor, viewport).map(|result| result.receipt)
+    }
+
+    pub(crate) fn present_prepared_object_preview_view<P: SurfacePort>(
+        &mut self, expected: &ObjectFrameSelector<'_>, compositor: &mut Compositor,
+        viewport: &mut DesktopViewportHost<P>,
+    ) -> Result<ObjectPresentedFrame, String> {
         let prepared = self
             .preview
             .prepared
@@ -278,15 +296,22 @@ impl NativeObjectHost {
             snapshot,
             plan,
             key,
+            view,
         } = prepared;
         let composition = self.prepare_reference_preview(
             &plan,
             key.output_spec().dimensions(),
             compositor,
             |previous| {
-                prepare_object_viewport_composition(&plan, expected, previous)
-                    .map_err(|e| format!("preview reference: {e:?}"))
+                match view {
+                    ObjectPreviewView::Canvas => prepare_object_viewport_composition(&plan, expected, previous),
+                    ObjectPreviewView::StoredCamera => prepare_object_camera_viewport_composition(&plan, expected, previous),
+                }.map_err(|e| format!("preview reference: {e:?}"))
             },
+        )?;
+        let view = ObjectViewProjection::from_transform(
+            view, composition.viewport_document_transform().ok_or("preview requires an actual viewport witness")?,
+            composition.viewport_stored_camera_available(),
         )?;
         if self
             .preview
@@ -358,7 +383,7 @@ impl NativeObjectHost {
                 self.preview.blocked = Some(format!("preview failed: {reason:?}"))
             }
         }
-        Ok(receipt)
+        Ok(ObjectPresentedFrame { receipt, view })
     }
 
     fn prepare_reference_preview(

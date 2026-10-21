@@ -114,7 +114,7 @@ async function fixture(initial, browser = false) {
   const pointer=(x=100,y=100,extra={})=>root.target.fire('pointerdown',{target:elements.get('drawing-canvas'),pointerId:1,isPrimary:true,button:0,clientX:x,clientY:y,...extra});
   return {root,doc,elements,events,pointer,settled,calls,checkpoints,notices,navigation,metadata:()=>copy(metadata),counts:()=>({select,text,feedback}),
     hold(){let release;gate=new Promise(resolve=>release=resolve);return release;},refuse(value){refuse=value;},
-    pan(){presentation={...presentation,workId:presentation.workId+'-pan'};},resize(){rect={...rect,left:rect.left+1};},
+    camera(){root.state.cameraView=true;presentation={...presentation,view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};},pan(){presentation={...presentation,workId:presentation.workId+'-pan'};},resize(){rect={...rect,left:rect.left+1};},
     replace(){info={...info,documentId:'other',lifecycleGeneration:2};ticket++;controller.willProject();project();},
     subscription(){ticket++;},
     fullInfo:()=>info,projectionReady:value=>ProjectFile.projectionReadyForUI(root,value),
@@ -245,4 +245,12 @@ test('comments uses full project readiness and retains narrow immutable authorit
   f.repairProjection(); await f.controller.presented(); await f.settled();
   assert.ok(f.controller.read());
   assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 0, 'restoring readiness does not replay a gesture');
+});
+
+test('native Camera View uses the presented inverse for actual comment append and rejects a changed-view origin',async()=>{
+ const f=await fixture([]);f.camera();f.pointer(100,90);const record=f.root._activeComment;
+ assert.equal(record.x,100);assert.equal(record.y,60);UI.save(f.root,record,'camera comment',false);await f.settled();
+ assert.equal(f.metadata()[0].x,100);assert.equal(f.metadata()[0].y,60);assert.equal(f.metadata()[0].text,'camera comment');assert.equal(f.checkpoints.length,1);
+ const stale=await fixture([]);stale.camera();stale.pointer(100,90);const old=stale.root._activeComment;stale.root.state.cameraView=false;
+ UI.save(stale.root,old,'stale camera',false);await stale.settled();assert.equal(stale.calls.filter(q=>q.operation===C.EDIT).length,0);assert.equal(stale.checkpoints.length,0);
 });

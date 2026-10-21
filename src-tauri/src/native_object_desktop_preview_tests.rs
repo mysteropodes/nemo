@@ -362,3 +362,50 @@ fn failed_or_panicking_factory_callback_clears_cpu_preparation_without_gpu_or_lo
     assert_eq!(f.creations.get(), 0);
     assert_eq!(f.trace.borrow().acquisitions, 0);
 }
+
+#[test]
+fn camera_view_is_strict_session_only_and_bad_modes_refuse_before_target() {
+    use crate::native_application_contract::ObjectPreviewView;
+    let f = Fixture::new();
+    let canvas = admit_request(&f.raw.to_string(), f.state.instance_id()).unwrap();
+    assert_eq!(canvas.view_mode, ObjectPreviewView::Canvas);
+    for invalid in [json!(null), json!(false), json!(1), json!("camera"), json!({"mode":"stored-camera"})] {
+        let mut raw = f.raw.clone(); raw["viewMode"] = invalid;
+        assert!(f.run(&raw.to_string()).is_err());
+    }
+    let mut raw = f.raw.clone(); raw["viewMode"] = json!("stored-camera");
+    let admitted = admit_request(&raw.to_string(), f.state.instance_id()).unwrap();
+    assert_eq!(admitted.view_mode, ObjectPreviewView::StoredCamera);
+    raw["cameraMatrix"] = json!([1,0,0,1,0,0]);
+    assert!(f.run(&raw.to_string()).is_err());
+    assert_eq!(f.creations.get(), 0);
+}
+
+#[test]
+fn gpu_actual_camera_view_changes_painter_cache_and_returns_the_painted_inverse() {
+    let drawing = document();
+    let source = json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":320,"canvasH":180,"fps":24,"cameraLayerOn":true,
+            "cameraKeys":[{"frame":0,"x":160,"y":90,"w":160}]},
+        "drawing":drawing,"viewportReference":null,"assets":[]});
+    let f = Fixture::with_document(source);
+    let before = f.raw.clone();
+    let canvas = f.run(&f.raw.to_string()).unwrap();
+    assert_eq!(canvas.view.document_to_composition, [1.,0.,0.,1.,0.,0.]);
+    let mut locked = f.raw.clone(); locked["viewMode"] = json!("stored-camera");
+    f.trace.borrow_mut().color = [255;4]; // Authored blue square is outside the camera crop.
+    let camera = f.run(&locked.to_string()).unwrap();
+    assert_eq!(camera.status, "presented");
+    assert!(camera.view.camera_available);
+    assert!(canvas.view.camera_available);
+    assert_ne!(canvas.work_id, camera.work_id);
+    assert_eq!(camera.view.document_to_composition, [2.,0.,0.,2.,-160.,-90.]);
+    assert_eq!(camera.view.composition_to_document, [0.5,0.,0.,0.5,80.,45.]);
+    f.trace.borrow_mut().color = [0,0,255,255];
+    let unlocked = f.run(&f.raw.to_string()).unwrap();
+    assert_eq!(unlocked.view.document_to_composition, [1.,0.,0.,1.,0.,0.]);
+    assert_ne!(unlocked.work_id, camera.work_id);
+    assert_eq!(f.raw, before);
+    assert_eq!(f.raw["contentRevision"].as_u64(), Some(0));
+    assert_eq!(f.trace.borrow().acquisitions, 3);
+}

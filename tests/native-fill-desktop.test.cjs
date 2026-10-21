@@ -84,3 +84,25 @@ test('native pointer capture cannot enter the legacy writer when projection is u
   assert.deepEqual(events.slice(0,2),['stop','prevent']);
   assert.equal(fill.handlePointerDown({state:{tool:'fill'}},{ }),false);
 });
+
+function cameraPointerFixture(hold=false){
+ const f=fixture({hold}),before=f.session.info,run=f.session.runResourceCommand;
+ const rect={left:20,top:30,width:640,height:360},view={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ f.session.info=()=>({...before(),canvasW:320,canvasH:180,layers:[{layerUid:'L',locked:false}]});
+ const presentation={...f.session.info(),owner:'native',status:'presented',frame:3,view};
+ const shown=()=>({...f.session.info(),presentation});f.session.readPresentedObjectSession=shown;
+ f.session.runResourceCommand=action=>run(ctx=>action({...ctx,readPresentedObjectSession:shown}));
+ const root={state:{tool:'fill',playing:false,currentFrame:3,activeLayerIdx:0,cameraView:true,fillColor:'#369',opacity:50},
+  NemoNativeOpacityCutover:{blocksLegacy:()=>true},NemoNativeObjectProject:{desktop:()=>f.session},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>true},
+  document:{getElementById:()=>({getBoundingClientRect:()=>rect}),documentElement:{clientWidth:1200,clientHeight:900,
+   classList:{contains:()=>true},style:{getPropertyValue:k=>String({left:20,top:30,right:660,bottom:390}[k.replace('--nemo-native-','')])}}},
+  SMEngineBridge:{screenToWorld(){assert.fail('legacy Paper/WASM coordinates');}},showToast(){}};
+ const pointer=()=>fill.handlePointerDown(root,{clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}});
+ return {...f,root,pointer};
+}
+test('actual Fill pointer uses current native camera proof and its inverse through the existing command queue',async()=>{
+ const f=cameraPointerFixture();assert.equal(f.pointer(),true);await new Promise(setImmediate);await new Promise(setImmediate);
+ assert.equal(f.dispatched.length,1);assert.deepEqual(f.dispatched[0].payload.point,[100,60]);assert.equal(f.executions(),1);
+ const stale=cameraPointerFixture(true);stale.pointer();stale.root.state.cameraView=false;stale.release();await new Promise(setImmediate);
+ assert.equal(stale.dispatched.length,0);assert.equal(stale.executions(),0);
+});

@@ -24,7 +24,7 @@ use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 #[path = "object_reference_scene.rs"]
 mod reference;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
-pub use reference::prepare_object_viewport_composition;
+pub use reference::{prepare_object_viewport_composition, prepare_object_camera_viewport_composition};
 
 #[path = "object_scheduled_scene.rs"]
 mod scheduled;

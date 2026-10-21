@@ -350,7 +350,15 @@
 
   // ---- timeline row (layer panel + frame grid, prepended by hooks in
   // renderLayerList()/renderTimeline() so both stay aligned) ----
+  function nativeSession(){var p=window.NemoNativeObjectProject,s=p&&p.desktop(window);return s&&s.isActive()?s:null;}
+  // Reuse the actual camera toolbar button; do not insert an unmatched timeline row.
+  function renderNativeViewLock(){
+    var s=nativeSession(),button=document.getElementById('btn-camera');if(!s||!button)return false;
+    var shown=s.readPresentedObjectSession(),p=shown&&shown.presentation;button.hidden=!(p&&p.view&&p.view.cameraAvailable===true);
+    button.title=window.SM.t('titleCameraViewLockHint');button.setAttribute('aria-pressed',String(state.cameraView===true));return true;
+  }
   function renderPanelRow(list) {
+    if(nativeSession())return renderNativeViewLock();
     ensureState();
     if (!state.cameraLayerOn) return;
     var row = document.createElement('div');
@@ -531,6 +539,7 @@
     _camViewZoomMult = 1; _camViewPan = { x: 0, y: 0 };
   }
   function applyCameraView() {
+    var native=nativeSession();if(native){native.renderPreview(state.currentFrame);return;}
     if (!state.cameraView) return;
     var cam = cameraAtFrame(state.currentFrame);
     if (!cam) return;
@@ -617,6 +626,7 @@
   function initUI() {
     var btn = document.getElementById('btn-camera');
     if (btn) btn.addEventListener('click', function () {
+      if(nativeSession()){var shown=nativeSession().readPresentedObjectSession();if(!shown||!shown.presentation.view||shown.presentation.view.cameraAvailable!==true)return;state.cameraView=!state.cameraView;applyCameraView();renderNativeViewLock();return;}
       ensureState();
       if (!state.cameraLayerOn) {
         state.cameraLayerOn = true;
@@ -659,6 +669,7 @@
     buildOverlayItems: buildOverlayItems,
     onDown: onDown, onDrag: onDrag, onUp: onUp,
     renderPanelRow: renderPanelRow,
+    renderNativeViewLock: renderNativeViewLock,
     renderGridRow: renderGridRow,
     renderCameraRow: renderCameraRow,
     applyCameraView: applyCameraView,

@@ -6,7 +6,23 @@
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
   // Inspect each returned receipt once; no later guard reads hostile accessors again.
-  function inspectReceipt(receipt,ownerMatches,allowDeferred){
+  function viewMode(read){var mode=read?read():'canvas';if(!['canvas','stored-camera'].includes(mode))throw new Error('Native preview view is unavailable');return mode;}
+  function matchesView(value,read){try{return !!value&&!!value.view&&value.view.mode===viewMode(read);}catch(_){return false;}}
+  function projection(value,mode){
+    if(!['canvas','stored-camera'].includes(mode))return null;
+    if(value===undefined&&mode==='canvas')return {mode:'canvas',documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]};
+    if(!value||Object.keys(value).sort().join(',')!=='cameraAvailable,compositionToDocument,documentToComposition,mode')return null;
+    var actualMode=value.mode,available=value.cameraAvailable,forward=value.documentToComposition,inverse=value.compositionToDocument;
+    if(actualMode!==mode||typeof available!=='boolean'||![forward,inverse].every(function(m){return Array.isArray(m)&&m.length===6;}))return null;
+    forward=forward.slice();inverse=inverse.slice();
+    if(![forward,inverse].every(function(m){return m.every(Number.isFinite);}))return null;
+    var a=forward[0],b=forward[1],c=forward[2],d=forward[3],e=forward[4],f=forward[5],det=a*d-b*c;
+    if(!Number.isFinite(det)||det===0)return null;
+    var expected=[d/det,-b/det,-c/det,a/det,(c*f-d*e)/det,(b*e-a*f)/det];
+    if(!inverse.every(function(n,i){return n===expected[i];})||(mode==='canvas'||!available)&&!forward.every(function(n,i){return n===[1,0,0,1,0,0][i];}))return null;
+    return {mode:mode,cameraAvailable:available,documentToComposition:forward,compositionToDocument:inverse};
+  }
+  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode){
     if(!ownerMatches)return {failure:'owner'};
     if(!receipt)return {failure:'receipt'};
     var status=receipt.status;
@@ -17,7 +33,8 @@
     if(typeof workId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(workId))return {failure:'work-id'};
     var viewGeneration=receipt.viewGeneration;
     if(!Number.isSafeInteger(viewGeneration)||viewGeneration<1)return {failure:'view-generation'};
-    return {failure:null,status:status,workId:workId,viewGeneration:viewGeneration};
+    var view=projection(receipt.view,viewMode||'canvas');if(!view)return {failure:'view'};
+    return {failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view};
   }
   function create(subscribe,guard){
     var active=true,connected=false,epoch=0,visible=null,binding=null,detached=false,waiter=null,reason=null,rejectStop;
@@ -62,10 +79,10 @@
       for(;;){
         check();var seen=epoch,receipt=inspect(await join(invoke),connected);
         if(receipt.failure)return receipt;
-        if(retained&&(receipt.workId!==retained.workId||receipt.viewGeneration!==retained.viewGeneration))
+        if(retained&&(receipt.workId!==retained.workId||receipt.viewGeneration!==retained.viewGeneration||JSON.stringify(receipt.view)!==JSON.stringify(retained.view)))
           throw new Error('Native project deferred preview work changed');
         if(receipt.status!=='deferred-occluded'||!connected)return receipt;
-        retained={workId:receipt.workId,viewGeneration:receipt.viewGeneration};
+        retained={workId:receipt.workId,viewGeneration:receipt.viewGeneration,view:receipt.view};
         await join(verifyOwner);
         // Only a new actual visible exposure can wake this wait. No timer retries.
         await wait(seen);check();await join(verifyOwner);
@@ -79,5 +96,5 @@
     return Object.freeze({connect:connect,join:join,run:run,cancel:cancel,detach:detach,close:close,
       assertActive:assertActive,isStopped:function(){return !active;}});
   }
-  return Object.freeze({create:create,inspectReceipt:inspectReceipt});
+  return Object.freeze({create:create,inspectReceipt:inspectReceipt,viewMode:viewMode,matchesView:matchesView});
 }));

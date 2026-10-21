@@ -25,7 +25,30 @@ pub fn prepare_object_viewport_composition(
     expected: &ObjectFrameSelector<'_>,
     previous: Option<&ObjectCompositionWitness>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
+    prepare_viewport(plan, expected, previous, false)
+}
+
+/// Explicit session-only Camera View. Exports retain their separate stored-project route.
+pub fn prepare_object_camera_viewport_composition(
+    plan: &ObjectPaintPlan,
+    expected: &ObjectFrameSelector<'_>,
+    previous: Option<&ObjectCompositionWitness>,
+) -> Result<ObjectCompositionWitness, ObjectSceneError> {
+    prepare_viewport(plan, expected, previous, true)
+}
+
+fn prepare_viewport(
+    plan: &ObjectPaintPlan,
+    expected: &ObjectFrameSelector<'_>,
+    previous: Option<&ObjectCompositionWitness>,
+    camera_view: bool,
+) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
+    let camera = if camera_view {
+        plan.packet().stored_camera_matrix().map_err(|_| ObjectSceneError::UnsupportedGeometry {
+            source_object_index: 0, reason: "stored camera transform unavailable",
+        })?
+    } else { None };
     let prior_images = previous;
     let previous = previous.and_then(|witness| witness.reference.as_ref());
     let read = visible_reference(
@@ -45,6 +68,9 @@ pub fn prepare_object_viewport_composition(
             (f64::from(read.canvas.0) - f64::from(width) * scale) * 0.5,
             (f64::from(read.canvas.1) - f64::from(height) * scale) * 0.5,
         ]);
+        // The reference is viewport-only world content. The artwork consumer
+        // applies camera separately, so compose it into this image fit exactly once.
+        let transform = camera.map_or(transform, |matrix| Affine::new(matrix) * transform);
         let image = match previous.filter(|value| value.pixels.same_allocation_as(&read.pixels)) {
             Some(value) => value.image.clone(),
             None => ImageData {
@@ -66,7 +92,7 @@ pub fn prepare_object_viewport_composition(
     let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: true,
-        camera: None,
+        camera,
         resources: None,
         scene_effects: None,
         reference,
@@ -78,6 +104,16 @@ pub fn prepare_object_viewport_composition(
 }
 
 impl ObjectCompositionWitness {
+    /// Exact affine consumed by this viewport witness, before surface stretching.
+    /// Artwork/export witnesses cannot issue a viewport coordinate proof.
+    pub fn viewport_document_transform(&self) -> Option<[f64; 6]> {
+        self.viewport.then(|| self.camera.unwrap_or([1., 0., 0., 1., 0., 0.]))
+    }
+
+    /// Availability is sampled from this exact retained packet, never legacy UI state.
+    pub fn viewport_stored_camera_available(&self) -> bool {
+        self.viewport && self.plan.packet().stored_camera_matrix().is_ok_and(|matrix| matrix.is_some())
+    }
     /// Compares only the original encoded allocation. Visibility, opacity and
     /// frame changes can reuse it; replacement/removal cannot retain its raster.
     pub fn reference_matches_plan(&self, plan: &ObjectPaintPlan) -> bool {
