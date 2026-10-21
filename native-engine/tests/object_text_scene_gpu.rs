@@ -148,7 +148,11 @@ fn assert_repeatable(
         let actual = render(gpu, witness);
         let actual_hash = crate::request_receipts::sha256(&actual);
         eprintln!("{label} render{iteration} sha256={actual_hash:02x?}");
-        assert_eq!(actual.len(), first.len(), "{label} render{iteration} length");
+        assert_eq!(
+            actual.len(),
+            first.len(),
+            "{label} render{iteration} length"
+        );
         if let Some(index) = first.iter().zip(&actual).position(|(a, b)| a != b) {
             let (x, y) = ((index / 4) % WIDTH, (index / 4) / WIDTH);
             panic!(
