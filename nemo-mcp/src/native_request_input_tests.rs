@@ -445,7 +445,7 @@ fn public_object_history_success_is_exact_and_correlated_to_its_request() {
             &request
         )
         .is_ok());
-        for revision in [0, 7, 9, 9_007_199_254_740_991] {
+        for revision in [0_u64, 7, 9, 9_007_199_254_740_991] {
             let mut wrong_revision = response.clone();
             wrong_revision["contentRevision"] = json!(revision);
             assert!(crate::wire::validate_native_response(
