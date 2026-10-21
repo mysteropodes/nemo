@@ -1,6 +1,6 @@
 //! Tight immutable Bezier path construction for the native parent pivot.
-use crate::object_render_scene::text_scene::parent_chain::ChainUnavailable;
-use vello::kurbo::BezPath;
+use crate::object_render_scene::text_scene::parent_chain::{ChainUnavailable, SceneParentChains};
+use vello::kurbo::{BezPath, Rect};
 
 /// Tight native Bezier bounds; never the control-point hull/envelope centre.
 pub(super) fn curve_path(
@@ -33,4 +33,23 @@ pub(super) fn curve_path(
         path.close_path();
     }
     Ok(path)
+}
+
+// One finite native geometry union for vector, raster and Text parent pivots.
+impl SceneParentChains {
+    pub(super) fn add(&mut self, layer: usize, rect: Rect) -> Result<(), ChainUnavailable> {
+        if ![rect.x0, rect.y0, rect.x1, rect.y1]
+            .iter()
+            .all(|v| v.is_finite())
+            || rect.x0 > rect.x1
+            || rect.y0 > rect.y1
+        {
+            return Err(ChainUnavailable::MissingGeometry);
+        }
+        self.bounds
+            .entry(layer)
+            .and_modify(|old| *old = old.union(rect))
+            .or_insert(rect);
+        Ok(())
+    }
 }

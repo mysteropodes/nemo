@@ -312,21 +312,6 @@ impl SceneParentChains {
             && target.scope_kind() == self.packet.scope_kind()
             && self.packet.source_frame_for_layer(layer) == Some(target.frame())
     }
-    fn add(&mut self, layer: usize, rect: Rect) -> Result<(), ChainUnavailable> {
-        if ![rect.x0, rect.y0, rect.x1, rect.y1]
-            .iter()
-            .all(|v| v.is_finite())
-            || rect.x0 > rect.x1
-            || rect.y0 > rect.y1
-        {
-            return Err(ChainUnavailable::MissingGeometry);
-        }
-        self.bounds
-            .entry(layer)
-            .and_modify(|old| *old = old.union(rect))
-            .or_insert(rect);
-        Ok(())
-    }
     fn include_vectors(&mut self) -> Result<(), (usize, ChainUnavailable)> {
         // The real rest evaluator owns pathFX/paramShape ordering, before layer pose.
         // Legacy closed-cubic records use the existing strict contour admission.
