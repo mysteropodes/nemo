@@ -84,6 +84,33 @@ pub(super) fn select(
     Ok(selected)
 }
 
+/// The drawn video placement ids at `selector` for the media preflight, through
+/// the packet's own context admission and layer source gate but without its
+/// Motion consumption gate: Motion never changes a layer's presence or
+/// visibility, and the motion-bound packet that is actually drawn still refuses
+/// whatever it cannot evaluate.
+pub(crate) fn drawn_placement_ids(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    exposure: bool,
+) -> Result<Vec<String>, ObjectFrameError> {
+    let Some(inventory) = snapshot
+        .project()
+        .and_then(|project| project.asset_inventory())
+    else {
+        return Ok(Vec::new());
+    };
+    let context = super::FrameContext::admit(snapshot, selector, exposure)?;
+    let layers = context.layers(snapshot.document());
+    let component = context.is_component();
+    let sources =
+        super::sources::select(snapshot, selector, layers, exposure || component, component)?;
+    Ok(select(snapshot, selector, layers, &sources)?
+        .into_iter()
+        .map(|index| inventory.placements()[index.placement].id().to_owned())
+        .collect())
+}
+
 impl ObjectFramePacket {
     pub(crate) fn video_records(
         &self,

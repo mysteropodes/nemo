@@ -49,9 +49,7 @@ use crate::object_render_scene::media_scene::VideoFrameDraw;
 #[path = "native_media_video_facts.rs"]
 mod video_facts;
 use crate::object_document::{AssetInventory, AssetKind};
-use crate::object_frame_packet::{
-    prepare_object_exposure_frame, prepare_object_frame, ObjectFrameSelector,
-};
+use crate::object_frame_packet::ObjectFrameSelector;
 use crate::object_render_scene::ObjectCompositionWitness;
 use crate::request_receipts::ResponseEnvelope;
 use crate::revision::ObjectSnapshot;
@@ -226,16 +224,10 @@ fn drawn_placements(
                 frame,
                 ..expected.clone()
             };
-            let packet = if exposure {
-                prepare_object_exposure_frame(snapshot, &selector)
-            } else {
-                prepare_object_frame(snapshot, &selector)
-            }
+            let ids = crate::object_frame_packet::video::drawn_placement_ids(
+                snapshot, &selector, exposure,
+            )
             .map_err(|error| unavailable(frame, format!("frame packet: {error:?}")))?;
-            let ids = packet
-                .video_records()
-                .map(|video| video.placement_id().to_owned())
-                .collect();
             Ok((frame, ids))
         })
         .collect()
