@@ -1,5 +1,5 @@
 //! Owned numeric Motion values from the exact frame producer; no evaluator escapes.
-use super::{MotionValues, ObjectFrameError, ObjectFramePacket, Presence, PropertyHolderTarget};
+use crate::object_frame_packet::{MotionValues, ObjectFrameError, ObjectFramePacket, Presence, PropertyHolderTarget};
 use crate::evaluation::object_component_kernels::duplicator_placement_modes::JsNumber;
 use crate::evaluation::object_component_kernels::object_effector_layers::MotionPort;
 use crate::evaluation::property_projection_3d::Pose3D;

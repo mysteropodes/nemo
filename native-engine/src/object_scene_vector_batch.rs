@@ -5,7 +5,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_record_rest_with_pose, has_unjoined_parent_blend, is_vector_record,
     record_layer_has_active_path_fx, EvalSegment, EvaluatedVector,
 };
-use crate::object_document::{ObjectRecord, Presence, PropertyHolderTarget};
+use crate::object_frame_packet::{ObjectRecord, Presence, PropertyHolderTarget};
 use crate::object_frame_packet::projection::{project_layer_3d, transform_layer_2d};
 use crate::object_frame_packet::{MotionValues, ObjectFramePacket, ObjectFrameRecord};
 use std::collections::BTreeMap;
