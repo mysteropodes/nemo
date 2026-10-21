@@ -4,7 +4,7 @@ const {createRequire}=require('node:module');
 const SDK=require('../src/js/adapters/native-application.js');
 const fixturePath=path.join(__dirname,'native-motion-property-panel.test.cjs');
 const fixtureSource=fs.readFileSync(fixturePath,'utf8');
-const {host,tree,tick}=new Function('require',fixtureSource.slice(0,fixtureSource.indexOf('\ntest('))+';return {host,tree,tick};')(createRequire(fixturePath));
+const {host,tree,tick}=new Function('require','__dirname',fixtureSource.slice(0,fixtureSource.indexOf('\ntest('))+';return {host,tree,tick};')(createRequire(fixturePath),path.dirname(fixturePath));
 const rows=require('../engineering/application/examples/native-property-metadata-v1/cases.json').propertyPageOracle;
 function query(){return {apiVersion:2,requestId:'expression-state',instanceId:'instance',documentId:'document',operation:'query.document.object.property.read',payload:{atRevision:7,documentSnapshotId:'native-object:document:7',view:{kind:'expressionState',target:{contextId:'scene-root',layerUid:'L0'},property:'opacity',frame:2}}};}
 function reply(q,evaluation){return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,contentRevision:q.payload.atRevision,ok:true,result:{instanceId:q.instanceId,documentId:q.documentId,atRevision:q.payload.atRevision,documentSnapshotId:q.payload.documentSnapshotId,kind:q.payload.view.kind,target:q.payload.view.target,property:q.payload.view.property,dimension:1,frame:q.payload.view.frame,expression:{present:true,enabled:false},evaluation}};}
