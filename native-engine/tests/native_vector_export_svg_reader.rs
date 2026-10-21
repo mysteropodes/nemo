@@ -22,6 +22,7 @@ pub(crate) struct ParsedSvg {
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) paths: Vec<ParsedPath>,
+    pub(crate) camera_clip: Option<[u32; 2]>,
 }
 
 fn attr<'a>(tag: &'a str, name: &str) -> Result<&'a str, String> {
@@ -102,6 +103,23 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<ParsedSvg, String> {
         return Err("viewBox does not match width/height".into());
     }
     let body = rest.strip_suffix("\n</svg>").ok_or("missing closing tag")?;
+    let (camera_clip, body) = if body.starts_with("<defs><clipPath id=\"nemo-camera-clip\">") {
+        let (clip, rest) = body.split_once('\n').ok_or("camera clip lacks group")?;
+        let w: u32 = attr(clip, "width")?
+            .parse()
+            .map_err(|_| "camera clip width")?;
+        let h: u32 = attr(clip, "height")?
+            .parse()
+            .map_err(|_| "camera clip height")?;
+        if w == 0 || h == 0 || clip != format!("<defs><clipPath id=\"nemo-camera-clip\"><rect x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\"/></clipPath></defs>") { return Err("invalid camera clip".into()); }
+        let body = rest
+            .strip_prefix("<g clip-path=\"url(#nemo-camera-clip)\">\n")
+            .and_then(|b| b.strip_suffix("\n</g>"))
+            .ok_or("invalid camera clip group")?;
+        (Some([w, h]), body)
+    } else {
+        (None, body)
+    };
     let paths = if body.is_empty() {
         Vec::new()
     } else {
@@ -113,6 +131,7 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<ParsedSvg, String> {
         width: width.parse().map_err(|_| "width")?,
         height: height.parse().map_err(|_| "height")?,
         paths,
+        camera_clip,
     })
 }
 

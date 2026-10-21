@@ -2,6 +2,7 @@
 use super::{MotionValues, ObjectFrameError, ObjectFramePacket, Presence, PropertyHolderTarget};
 use crate::evaluation::object_component_kernels::duplicator_placement_modes::JsNumber;
 use crate::evaluation::object_component_kernels::object_effector_layers::MotionPort;
+use crate::evaluation::property_projection_3d::Pose3D;
 use crate::object_document::{ObjectDocument, PropertyHolder};
 
 pub(crate) const KEYS: [&str; 5] = ["position", "anchor", "rotation", "scale", "opacity"];
@@ -9,6 +10,7 @@ pub(crate) const KEYS: [&str; 5] = ["position", "anchor", "rotation", "scale", "
 pub(super) struct MotionReceipt {
     target: PropertyHolderTarget,
     values: MotionValues,
+    pose: Option<Pose3D>,
 }
 
 pub(super) fn capture(
@@ -16,9 +18,13 @@ pub(super) fn capture(
     motion: &dyn MotionPort,
 ) -> Result<Vec<MotionReceipt>, ObjectFrameError> {
     let mut needed = std::collections::BTreeSet::new();
-    for layer in packet
+    for layer in packet.records().filter(|r| {
+        let target = PropertyHolderTarget {context_id: packet.context_id().to_owned(),
+            layer_uid: packet.source_layers()[r.source_layer_index()].layer_uid().to_owned(), stroke_id: Presence::Missing};
+        crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(packet.snapshot().document(), &target)
+    }).map(|r| r.source_layer_index()).chain(packet
         .raster_records()
-        .map(|r| r.layer_index())
+        .map(|r| r.layer_index()))
         .chain(packet.text_records().map(|r| r.layer_index()))
     {
         let mut next = Some(layer);
@@ -113,12 +119,61 @@ pub(super) fn capture(
                 scale: pair("scale")?,
                 opacity: scalar("opacity")?,
             };
-            Ok(MotionReceipt { target, values })
+            // The original producer evaluates ordinary2D Motion first, even
+            // when3D then suppresses its final affine/opacity paint. Reuse those
+            // actual values; never run those guests a second time forPose3D.
+            let pose = if target.stroke_id().is_none()
+                && packet.source_layers().iter().any(|l| {
+                    l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true)
+                }) {
+                Some(Pose3D {
+                    position: values.position,
+                    anchor: values.anchor,
+                    rotation: values.rotation,
+                    scale: values.scale,
+                    position_z: scalar("positionZ")?,
+                    rotation_x: scalar("rotationX")?,
+                    rotation_y: scalar("rotationY")?,
+                })
+            } else {
+                None
+            };
+            Ok(MotionReceipt {
+                target,
+                values,
+                pose,
+            })
         })
         .collect()
 }
 
 impl ObjectFramePacket {
+    pub(crate) fn sampled_pose_3d(
+        &self,
+        target: &PropertyHolderTarget,
+    ) -> Result<Option<Pose3D>, ObjectFrameError> {
+        if target.context_id() != self.context_id()
+            || target.context_id() != "scene-root"
+            || target.stroke_id().is_some()
+        {
+            return Err(ObjectFrameError::InvalidContext);
+        }
+        let layer = self
+            .source_layers()
+            .iter()
+            .find(|l| l.layer_uid() == target.layer_uid())
+            .ok_or(ObjectFrameError::InvalidSource)?;
+        if layer.three_d.value() != Some(&true) {
+            return Ok(None);
+        }
+        match self.motion_receipts.iter().find(|r| &r.target == target) {
+            Some(receipt) => receipt.pose.map(Some).ok_or(ObjectFrameError::Unavailable),
+            None => self
+                .snapshot()
+                .sampled_pose_3d(target, f64::from(self.frame()))
+                .map_err(|_| ObjectFrameError::Unavailable),
+        }
+    }
     /// The receipt is private and inseparable from this packet's snapshot/frame.
     /// Strict raw packets continue to refuse enabled expressions.
     pub(crate) fn sampled_motion_values(
@@ -156,14 +211,24 @@ pub(crate) fn text_element(document: &ObjectDocument, target: &PropertyHolderTar
 pub(crate) fn remaining_holder(
     document: &ObjectDocument,
     holder: &PropertyHolder,
+    evaluated: bool,
 ) -> Option<PropertyHolder> {
     let target = holder.target();
     let layer = target.stroke_id().is_none()
         && crate::evaluation::object_vector_kernels::render_vector_eval::motion::scene_consumer_uses_layer(document, target);
-    if !(layer || text_element(document, target)) {
+    let common =
+        crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(
+            document, target,
+        );
+    let three_d = common
+        && document
+            .layers()
+            .iter()
+            .any(|l| l.layer_uid() == target.layer_uid() && l.three_d.value() == Some(&true));
+    if !(layer || common || text_element(document, target)) {
         return None;
     }
-    // Until the vector batch consumer is joined, a mixed visible contour layer
+    // A mixed visible contour and Text/raster layer
     // may consume only its shared opacity here. Other pose fields must not be
     // admitted on the strength of a Text/raster sibling alone.
     let mixed = layer
@@ -176,13 +241,17 @@ pub(crate) fn remaining_holder(
                 })
         });
     let mut remaining = holder.clone();
-    remaining
-        .properties
-        .retain(|p| !KEYS.contains(&p.property()) || (mixed && p.property() != "opacity"));
+    remaining.properties.retain(|p| {
+        let key = p.property();
+        let consumed = KEYS.contains(&key)
+            || (three_d && ["positionZ", "rotationX", "rotationY"].contains(&key));
+        let owned = consumed && (common || !mixed || key == "opacity");
+        !owned || (!evaluated && p.expression.value().is_some_and(|e| e.enabled))
+    });
     if remaining.properties.len() == holder.properties().len() {
         return None;
     }
-    if remaining.properties.is_empty() {
+    if evaluated && remaining.properties.is_empty() {
         remaining.controls = Presence::Missing;
     }
     Some(remaining)

@@ -2,8 +2,7 @@
 //! Recursive property reads retain the same snapshot and execution budget.
 use crate::evaluation::property_expression_runtime::{evaluate_with_fallback, Diagnostic, Outcome};
 use crate::object_expression_pin::{
-    prepare_retained_property_expression_request, PropertyDependencyEffect,
-    PropertyExpressionRequest,
+    prepare_retained_holder_expression_request, PropertyDependencyEffect, PropertyExpressionRequest,
 };
 use crate::object_expression_runtime::property::{evaluate_shared, reads::SnapshotReads};
 use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
@@ -52,11 +51,11 @@ fn effective(
     frame: f64,
 ) -> Result<Value, &'static str> {
     let raw = reads.raw(uid, property, frame)?;
-    let target = reads.target(uid)?;
-    if !reads.has_expression(&target, property) {
+    let target = reads.source_target(uid)?;
+    if !reads.source_has_expression(&target, property) {
         return Ok(json!(raw));
     }
-    let request = prepare_retained_property_expression_request(
+    let request = prepare_retained_holder_expression_request(
         reads.snapshot(),
         &target,
         property,
@@ -104,7 +103,7 @@ pub(super) fn bind<'js>(
     limits: ExpressionLimits,
     state: ReadState,
 ) -> Result<Function<'js>, ExpressionRefusal> {
-    let reads = SnapshotReads::bind(
+    let reads = SnapshotReads::bind_holder(
         request.snapshot(),
         request.target(),
         request.property(),

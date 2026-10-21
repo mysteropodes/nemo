@@ -66,6 +66,7 @@ pub fn prepare_object_viewport_composition(
     let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: true,
+        camera: None,
         resources: None,
         scene_effects: None,
         reference,

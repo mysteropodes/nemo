@@ -7,8 +7,14 @@ pub(crate) use crate::object_document::{
 };
 use crate::revision::ObjectSnapshot;
 pub(crate) use property_sampling::frame_motion::MotionValues;
+#[path = "object_expression_holder_source.rs"]
+pub(crate) mod expression_sources;
 #[path = "object_frame_motion_receipts.rs"]
 pub(crate) mod motion_receipts;
+#[path = "object_frame_projection.rs"]
+pub(crate) mod projection;
+#[path = "object_frame_text_selectors.rs"]
+mod text_selectors;
 
 #[path = "object_frame_context.rs"]
 mod context;
@@ -207,6 +213,7 @@ pub struct ObjectFramePacket {
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
     motion_receipts: Vec<motion_receipts::MotionReceipt>,
+    selector_receipts: Vec<text_selectors::SelectorReceipt>,
 }
 
 impl ObjectFramePacket {
@@ -276,6 +283,12 @@ impl ObjectFramePacket {
     }
     pub fn frame(&self) -> u32 {
         self.frame
+    }
+    /// Same stored camera provider for trusted export and locked-view consumers.
+    pub(crate) fn stored_camera_matrix(&self) -> Result<Option<[f64; 6]>, ObjectFrameError> {
+        self.snapshot
+            .sampled_camera_matrix(f64::from(self.frame))
+            .map_err(|_| ObjectFrameError::Unavailable)
     }
     /// Raw layer opacity at evaluation time, never the held drawing's source frame.
     /// Packet admission has already refused unconsumed holders and enabled expressions.

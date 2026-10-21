@@ -67,6 +67,15 @@ pub(crate) trait MotionPort {
     ) -> Result<Sampled, Unavailable> {
         Err(Unavailable::Property(key))
     }
+    /// Exact inline animator source in the provider-owned context and frame.
+    fn selector_value(
+        &self,
+        _layer_uid: &str,
+        _animator_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        Err(Unavailable::Property(key))
+    }
     /// `layerMotionAt(layerIndex, frame)`: `Ok(None)` is the baseline's `null`.
     fn motion_delta(&self, layer_uid: &str) -> Result<Option<MotionDelta>, Unavailable>;
 }

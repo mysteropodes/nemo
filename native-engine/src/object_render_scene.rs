@@ -92,6 +92,7 @@ pub use paint::{
 pub struct ObjectCompositionWitness {
     plan: ObjectPaintPlan,
     viewport: bool,
+    camera: Option<[f64; 6]>,
     resources: Option<Arc<ObjectSceneResourceSet>>,
     /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
     scene_effects: Option<Arc<SceneEffectPlan>>,
@@ -106,9 +107,16 @@ pub fn prepare_object_composition(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
+    let camera = plan.packet().stored_camera_matrix().map_err(|_| {
+        ObjectSceneError::UnsupportedGeometry {
+            source_object_index: 0,
+            reason: "stored camera transform unavailable",
+        }
+    })?;
     let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: false,
+        camera,
         resources: None,
         scene_effects: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
@@ -136,6 +144,18 @@ impl ObjectCompositionWitness {
     /// Viewport content is never an artwork export source, even with no image.
     pub(crate) fn is_viewport(&self) -> bool {
         self.viewport
+    }
+    /// Artwork-only transform; unlocked Canvas presentation stays untransformed.
+    pub(crate) fn camera_matrix(&self) -> Option<[f64; 6]> {
+        self.camera
+    }
+    pub(crate) fn camera_canvas_dimensions(&self) -> Option<(u32, u32)> {
+        self.camera?;
+        self.plan
+            .packet()
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions())
     }
     /// Read the same retained snapshot used for every painted record.
     pub(crate) fn canvas_background_rgba8(&self) -> [u8; 4] {
@@ -205,6 +225,7 @@ impl ObjectCompositionWitness {
     /// selector/packet types into composition consumers.
     pub fn same_identity_as(&self, other: &Self) -> bool {
         self.viewport == other.viewport
+            && self.camera == other.camera
             && self.instance_id() == other.instance_id()
             && self.document_id() == other.document_id()
             && self.content_revision() == other.content_revision()

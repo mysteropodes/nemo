@@ -235,6 +235,10 @@ pub(super) fn visible_vector_parents_supported(document: &ObjectDocument) -> boo
     !document.layers().iter().any(|layer| {
         layer.visible()
             && layer.parent_layer_uid.value().is_some_and(Option::is_some)
+            && !(layer.three_d.value() == Some(&true)
+                && crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(document, &PropertyHolderTarget {
+                    context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: Presence::Missing,
+                }))
             && document
                 .objects()
                 .iter()

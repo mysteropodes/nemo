@@ -100,6 +100,35 @@ impl MotionPort for SnapshotMotion<'_> {
         self.target_value(&target, key)
     }
 
+    fn selector_value(
+        &self,
+        layer_uid: &str,
+        animator_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        let context=crate::evaluation::object_component_kernels::object_context_resolver::ContextSource::of_document(self.snapshot.document())
+            .context(self.context_id).map_err(|_|Unavailable::Property(key))?;
+        let animator = context
+            .layers()
+            .iter()
+            .find(|l| l.layer_uid() == layer_uid)
+            .and_then(|l| l.text_animators.value())
+            .and_then(|a| a.0.iter().find(|a| a.id == animator_id))
+            .ok_or(Unavailable::Property(key))?;
+        if animator
+            .properties
+            .value()
+            .into_iter()
+            .flatten()
+            .any(|p| p.property() == key && p.expression.value().is_some_and(|e| e.enabled))
+        {
+            return Err(Unavailable::Property(key));
+        }
+        let value = animator
+            .raw_selector_property(key, self.frame)
+            .map_err(|_| Unavailable::Property(key))?;
+        Ok(Some(vec![JsNumber::Value(value)]))
+    }
     fn motion_delta(&self, layer_uid: &str) -> Result<Option<MotionDelta>, Unavailable> {
         let context = crate::evaluation::object_component_kernels::object_context_resolver::ContextSource::of_document(self.snapshot.document())
             .context(self.context_id)

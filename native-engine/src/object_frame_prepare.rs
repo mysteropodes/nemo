@@ -32,7 +32,7 @@ where
     } else {
         holders_fully_consumed(document)
     };
-    if snapshot.frame_needs_camera_or_3d_join() || !consumed {
+    if snapshot.frame_has_unjoined_3d() || !consumed {
         return Err(ObjectFrameError::Unavailable.into());
     }
     let source_frames = sources::select(
@@ -97,6 +97,7 @@ where
     let mut packet = ObjectFramePacket {
         duplicators: Vec::new(),
         motion_receipts: Vec::new(),
+        selector_receipts: Vec::new(),
         text_records,
         raster_records,
         snapshot: snapshot.clone(),
@@ -111,6 +112,8 @@ where
     if let Some(motion) = motion {
         packet.motion_receipts =
             crate::object_frame_packet::motion_receipts::capture(&packet, motion)?;
+        packet.selector_receipts =
+            crate::object_frame_packet::text_selectors::capture(&packet, motion)?;
     }
     packet.duplicators = duplicators::prepare(&packet, exposure, motion)?;
     Ok(packet)

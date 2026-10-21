@@ -6,20 +6,14 @@ use crate::object_frame_packet::{sample_property_raw, PropertySampleError};
 use crate::revision::ObjectSnapshot;
 
 impl ObjectSnapshot {
-    /// Until the common scene producer applies the returned pose, do not admit
-    /// a frame that would silently ignore authored camera or 3D projection.
-    pub(crate) fn frame_needs_camera_or_3d_join(&self) -> bool {
-        self.project().is_some_and(|project| {
-            project.project().camera_layer_on() == Some(true)
-                && project
-                    .project()
-                    .camera_keys()
-                    .is_some_and(|keys| !keys.is_empty())
-        }) || self
-            .document()
-            .layers()
-            .iter()
-            .any(|layer| layer.visible() && layer.three_d.value() == Some(&true))
+    /// Camera paint has its retained composition/export consumer. ThreeD still
+    /// requires the actual layer-batch join before the frame can be admitted.
+    pub(crate) fn frame_has_unjoined_3d(&self) -> bool {
+        self.document().layers().iter()
+            .any(|layer| layer.visible() && layer.three_d.value() == Some(&true)
+                && !crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(self.document(), &PropertyHolderTarget {
+                    context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: crate::object_document::Presence::Missing,
+                }))
     }
     /// Camera pose independent of the viewport's session-only cameraView switch.
     /// Export and camera-locked preview select this same stored-camera provider.

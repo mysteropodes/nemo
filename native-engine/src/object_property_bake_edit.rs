@@ -1,7 +1,7 @@
 //! Seal a native-produced replacement in the existing property transaction.
 use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
-    AuthoredOrder, Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord,
+    AuthoredOrder, ExpressionHolder, Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord,
 };
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
@@ -74,6 +74,17 @@ impl ObjectFillOwner {
         targets: &[(PropertyHolderTarget, String)],
     ) -> Result<(PreparedPropertyEdit, crate::object_document::ObjectDocument), DispatchErrorCode>
     {
+        let targets = targets
+            .iter()
+            .map(|(target, key)| (ExpressionHolder::Property(target.clone()), key.clone()))
+            .collect::<Vec<_>>();
+        Self::prepare_holder_expression_disables(origin, &targets)
+    }
+    pub(crate) fn prepare_holder_expression_disables(
+        origin: ObjectSnapshot,
+        targets: &[(ExpressionHolder, String)],
+    ) -> Result<(PreparedPropertyEdit, crate::object_document::ObjectDocument), DispatchErrorCode>
+    {
         let mut document = origin.document().clone();
         let mut seen = Vec::new();
         for (target, property) in targets {
@@ -81,9 +92,55 @@ impl ObjectFillOwner {
                 continue;
             }
             seen.push((target, property));
-            let expression = if property == "order" {
+            let expression = if let ExpressionHolder::TextAnimator {
+                context_id,
+                layer_uid,
+                animator_id,
+            } = target
+            {
+                let layers = if context_id == "scene-root" {
+                    &mut document.layers
+                } else {
+                    let Presence::Present(tables) = &mut document.component_tables else {
+                        return Err(DispatchErrorCode::NotFound);
+                    };
+                    let Presence::Present(set) = &mut tables.components else {
+                        return Err(DispatchErrorCode::NotFound);
+                    };
+                    &mut set
+                        .components
+                        .iter_mut()
+                        .find(|c| c.symbol_id == *context_id)
+                        .ok_or(DispatchErrorCode::NotFound)?
+                        .layers
+                };
+                let layer = layers
+                    .iter_mut()
+                    .find(|l| l.layer_uid() == layer_uid)
+                    .ok_or(DispatchErrorCode::NotFound)?;
+                let Presence::Present(animators) = &mut layer.text_animators else {
+                    return Err(DispatchErrorCode::NotFound);
+                };
+                let animator = animators
+                    .0
+                    .iter_mut()
+                    .find(|a| a.id == *animator_id)
+                    .ok_or(DispatchErrorCode::NotFound)?;
+                let Presence::Present(properties) = &mut animator.properties else {
+                    return Err(DispatchErrorCode::NotFound);
+                };
+                &mut properties
+                    .iter_mut()
+                    .find(|p| p.property() == property)
+                    .ok_or(DispatchErrorCode::NotFound)?
+                    .expression
+            } else if property == "order" {
                 &mut document
-                    .property_order_mut(target)
+                    .property_order_mut(
+                        target
+                            .property_target()
+                            .ok_or(DispatchErrorCode::NotFound)?,
+                    )
                     .ok_or(DispatchErrorCode::NotFound)?
                     .expression
             } else {
@@ -92,7 +149,7 @@ impl ObjectFillOwner {
                 };
                 &mut holders
                     .iter_mut()
-                    .find(|holder| holder.target() == target)
+                    .find(|holder| Some(holder.target()) == target.property_target())
                     .ok_or(DispatchErrorCode::NotFound)?
                     .properties
                     .iter_mut()

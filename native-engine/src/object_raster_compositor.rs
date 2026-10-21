@@ -32,23 +32,35 @@ impl Compositor {
                 self.renderer.mark_override_image_dirty(image);
             }
         }
+        // Append the whole artwork after all per-item paint, preserving stroke,
+        // gradient, glyph and image transforms. No affine is applied twice.
+        let camera = prepared.camera_matrix();
+        let clip = if camera.is_some() {
+            Some(
+                prepared
+                    .camera_canvas_dimensions()
+                    .ok_or_else(|| CompositorError::new("stored camera clip is unavailable"))?,
+            )
+        } else {
+            None
+        };
+        let mut artwork = vello::Scene::new();
+        let scene = if camera.is_some() {
+            &mut artwork
+        } else {
+            &mut self.scene
+        };
         for entry in ordered_entries(prepared.plan()) {
             match entry {
-                PaintEntry::Contour(command) => prepare_command(command)?.draw(
-                    &mut self.scene,
-                    Affine::IDENTITY,
-                    command.path(),
-                ),
-                PaintEntry::Text(source) => source.draw(&mut self.scene),
+                PaintEntry::Contour(command) => {
+                    prepare_command(command)?.draw(scene, Affine::IDENTITY, command.path())
+                }
+                PaintEntry::Text(source) => source.draw(scene),
                 PaintEntry::Component(source) => {
-                    source
-                        .prepared
-                        .draw(&mut self.scene, Affine::IDENTITY, &source.path)
+                    source.prepared.draw(scene, Affine::IDENTITY, &source.path)
                 }
                 PaintEntry::Duplicator(source) => {
-                    source
-                        .prepared
-                        .draw(&mut self.scene, Affine::IDENTITY, &source.path)
+                    source.prepared.draw(scene, Affine::IDENTITY, &source.path)
                 }
                 PaintEntry::Raster(index) => {
                     #[cfg(all(feature = "application", feature = "project_media_codec"))]
@@ -59,7 +71,7 @@ impl Compositor {
                             })?;
                         let brush =
                             vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
-                        self.scene.draw_image(&brush, transform);
+                        scene.draw_image(&brush, transform);
                     }
                     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
                     {
@@ -71,6 +83,28 @@ impl Compositor {
                 }
             }
         }
+        if let Some(matrix) = camera {
+            let (width, height) = clip.expect("camera clip preflighted");
+            self.scene.push_clip_layer(
+                vello::peniko::Fill::NonZero,
+                Affine::IDENTITY,
+                &vello::kurbo::Rect::new(0., 0., f64::from(width), f64::from(height)),
+            );
+            self.scene.append(&artwork, Some(Affine::new(matrix)));
+            self.scene.pop_layer();
+        }
         Ok(())
     }
+}
+/// A layered GPU result needs its own final whole-image camera pass; do not
+/// pretend that transforming only the flat source paints covers that path.
+pub(super) fn check_layered_camera(
+    prepared: &ObjectCompositionWitness,
+) -> Result<(), CompositorError> {
+    if prepared.camera_matrix().is_some() {
+        return Err(CompositorError::new(
+            "stored camera with layered effects is unavailable",
+        ));
+    }
+    Ok(())
 }

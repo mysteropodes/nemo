@@ -14,6 +14,10 @@ mod names;
 #[path = "object_property_targets.rs"]
 mod targets;
 
+#[path = "object_expression_holder.rs"]
+mod expression_holder;
+pub(crate) use expression_holder::ExpressionHolder;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PropertyHolderTarget {

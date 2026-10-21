@@ -217,6 +217,7 @@ impl Compositor {
         output: ObjectOutputSpec,
         stack: &GpuLayerStack<'_>,
     ) -> Result<ObjectCompositionResult, CompositorError> {
+        raster::check_layered_camera(prepared)?;
         let plan = prepared.plan();
         output_budget(
             output.width,

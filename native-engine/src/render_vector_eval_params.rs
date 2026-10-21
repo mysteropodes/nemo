@@ -172,15 +172,12 @@ fn holders_consumed(document: &ObjectDocument, evaluated: bool) -> bool {
             } else {
                 crate::object_frame_packet::duplicators::remaining_holder(document, holder)
             };
-            let remaining = if evaluated {
-                crate::object_frame_packet::motion_receipts::remaining_holder(
-                    document,
-                    remaining.as_ref().unwrap_or(holder),
-                )
-                .or(remaining)
-            } else {
-                remaining
-            };
+            let remaining = crate::object_frame_packet::motion_receipts::remaining_holder(
+                document,
+                remaining.as_ref().unwrap_or(holder),
+                evaluated,
+            )
+            .or(remaining);
             match remaining {
                 Some(ref remaining) if remaining.properties().is_empty() => remaining
                     .controls

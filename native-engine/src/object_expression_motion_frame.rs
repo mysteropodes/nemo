@@ -9,13 +9,11 @@ use crate::evaluation::object_component_kernels::object_effector_layers::{
     MotionPort, Unavailable,
 };
 use crate::history::NativeObjectHistory;
-use crate::object_document::{Presence, PropertyHolderTarget};
+use crate::object_document::{ExpressionHolder, Presence, PropertyHolderTarget};
 use crate::object_expression_pin::{
     verify_owner_snapshot, PropertyDependencyEffect, PropertyEvaluation,
 };
-use crate::object_expression_runtime::property::{
-    evaluate_property_for_owner_with_effect_log, evaluate_property_for_owner_with_effects,
-};
+use crate::object_expression_runtime::property::evaluate_holder_for_owner_with_effects;
 use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
 use crate::object_frame_packet::{ObjectFrameError, ObjectFramePacket, ObjectFrameSelector};
 use crate::revision::ObjectSnapshot;
@@ -34,12 +32,12 @@ std::thread_local! {
 #[derive(Debug)]
 enum MotionEffect {
     Evaluated {
-        target: PropertyHolderTarget,
+        target: ExpressionHolder,
         property: String,
         result: PropertyEvaluation,
     },
     Refused {
-        target: PropertyHolderTarget,
+        target: ExpressionHolder,
         property: String,
         refusal: ExpressionRefusal,
         dependencies: Vec<PropertyDependencyEffect>,
@@ -129,9 +127,26 @@ impl<'a> EvaluatedMotion<'a> {
     }
 }
 impl EvaluatedMotion<'_> {
+    fn raw_holder_value(
+        &self,
+        target: &ExpressionHolder,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        match target {
+            ExpressionHolder::Property(target) => match target.stroke_id() {
+                Some(stroke) => self.raw.element_value(target.layer_uid(), stroke, key),
+                None => self.raw.value(target.layer_uid(), key),
+            },
+            ExpressionHolder::TextAnimator {
+                layer_uid,
+                animator_id,
+                ..
+            } => self.raw.selector_value(layer_uid, animator_id, key),
+        }
+    }
     fn target_value(
         &self,
-        target: PropertyHolderTarget,
+        target: ExpressionHolder,
         key: &'static str,
     ) -> Result<Sampled, Unavailable> {
         if let Some(replay) = self.replay {
@@ -148,35 +163,17 @@ impl EvaluatedMotion<'_> {
                     ));
                 }
             }
-            // An unrecorded enabled key still refuses through the strict port.
-            return match target.stroke_id() {
-                Some(stroke) => self.raw.element_value(target.layer_uid(), stroke, key),
-                None => self.raw.value(target.layer_uid(), key),
-            };
+            // An unrecorded enabled source still refuses through the strict port.
+            return self.raw_holder_value(&target, key);
         }
-        let enabled = self
-            .snapshot
-            .document()
-            .property_holders()
-            .unwrap_or(&[])
-            .iter()
-            .filter(|h| h.target() == &target)
-            .flat_map(|h| h.properties())
-            .any(|p| p.property() == key && p.expression.value().is_some_and(|e| e.enabled));
+        let enabled =
+            crate::object_frame_packet::expression_sources::enabled(self.snapshot, &target, key);
         if !enabled {
-            return match target.stroke_id() {
-                Some(stroke) => self.raw.element_value(target.layer_uid(), stroke, key),
-                None => self.raw.value(target.layer_uid(), key),
-            };
+            return self.raw_holder_value(&target, key);
         }
         #[cfg(test)]
         MOTION_EVALUATIONS.with(|count| count.set(count.get() + 1));
-        let evaluate = if self.capture_all {
-            evaluate_property_for_owner_with_effect_log
-        } else {
-            evaluate_property_for_owner_with_effects
-        };
-        let (result, dependencies) = evaluate(
+        let (result, dependencies) = evaluate_holder_for_owner_with_effects(
             self.owner,
             self.snapshot,
             &target,
@@ -184,6 +181,7 @@ impl EvaluatedMotion<'_> {
             self.frame,
             0,
             self.limits,
+            self.capture_all,
         );
         match result {
             Ok(result) => {
@@ -220,7 +218,7 @@ impl EvaluatedMotion<'_> {
 impl MotionPort for EvaluatedMotion<'_> {
     fn value(&self, uid: &str, key: &'static str) -> Result<Sampled, Unavailable> {
         let target = self.target(uid);
-        self.target_value(target, key)
+        self.target_value(ExpressionHolder::Property(target), key)
     }
     fn element_value(
         &self,
@@ -230,9 +228,24 @@ impl MotionPort for EvaluatedMotion<'_> {
     ) -> Result<Sampled, Unavailable> {
         let mut target = self.target(uid);
         target.stroke_id = Presence::Present(stroke_id.to_owned());
-        self.target_value(target, key)
+        self.target_value(ExpressionHolder::Property(target), key)
     }
 
+    fn selector_value(
+        &self,
+        uid: &str,
+        animator_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        self.target_value(
+            ExpressionHolder::TextAnimator {
+                context_id: self.context.to_owned(),
+                layer_uid: uid.to_owned(),
+                animator_id: animator_id.to_owned(),
+            },
+            key,
+        )
+    }
     fn motion_delta(&self, uid: &str) -> Result<Option<MotionDelta>, Unavailable> {
         // Same local computeMotionMat order as the original. No parent pose is
         // added here, and all five consumed fields use the evaluated provider.

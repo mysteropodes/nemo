@@ -16,7 +16,7 @@
 //!   record all stay typed errors; `ObjectPaintPlan`'s own `join` then re-validates
 //!   targets and coverage exactly as before.
 //!
-//! Existing factor-one paint keeps its source numbers. A raw layer-opacity holder
+//! Existing factor-one paint keeps its source numbers. The packet-owned layer factor
 //! folds the pinned factor into each retained paint before layer effects; source
 //! records stay unchanged. `SceneSolid::rgba_f32` keeps the same `[0, 1]` admission.
 
@@ -40,6 +40,9 @@ use crate::object_render_scene::{ObjectPaintPlanError, ObjectRenderScene, Object
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::collections::BTreeMap;
 use vello::kurbo::BezPath;
+
+#[path = "object_scene_vector_batch.rs"]
+mod batch;
 
 /// Producer name in the pinned registry.
 pub(crate) const PRODUCER: &str = "contour";
@@ -71,6 +74,7 @@ pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
     let mut output = ProducerOutput::new(PRODUCER, ScenePin::of_packet(packet));
     let mut rejections = Vec::new();
     let poses = packet_poses(packet);
+    let batches = batch::prepare(packet, &poses);
     for record in packet.records() {
         let index = record.source_object_index();
         let compiled = (|| {
@@ -82,7 +86,7 @@ pub(crate) fn produce(packet: &ObjectFramePacket) -> ContourProduction {
                 Some(Err(reason)) => return Err(*reason),
                 None => None,
             };
-            compile(packet, record, pose)
+            compile(packet, record, pose, &batches)
         })();
         output = match compiled {
             Ok(compiled) => output.with_item(index, compiled),
@@ -178,77 +182,47 @@ fn compile(
     packet: &ObjectFramePacket,
     source: ObjectFrameRecord<'_>,
     pose: Option<&PosedStroke>,
+    batches: &batch::VectorBatches,
 ) -> Result<CompiledContour, &'static str> {
     if source.record().is_mask() {
+        batches.check(source.source_layer_index())?;
         return crate::object_render_scene::mask_inputs::compile_mask(packet, source, pose);
     }
     if source.record().has_enabled_effects() {
         return Err("per-element effect evaluation awaits its native scene consumer");
     }
+    batches.check(source.source_layer_index())?;
     if is_vector_record(source.record()) {
-        return compile_vector(packet, source, pose);
+        return compile_vector(packet, source, pose, batches);
     }
     // The baseline applies a layer's path effects to every stroke of the layer (app.js:1813); the legacy family
     // does not go through the join, so an active stack must refuse rather than draw the stored geometry.
     if record_layer_has_active_path_fx(packet, source.record()) {
         return Err("layer path effects on a legacy record await the vector join");
     }
-    // Field access is confined to the original record returned by the admitted
-    // evaluation port. No document lookup or second source authority exists.
     let record = source.record();
-    let geometry = &record.geometry;
-    if record.family != "closed-solid-fill-cubic-path"
-        || geometry.kind != "cubic-path"
-        || !geometry.closed
-        || geometry.coordinate_space != "document-world"
-        || geometry.handle_space != "relative"
-    {
-        return Err("packet geometry has no admitted contour representation");
-    }
-    let number = |value: &serde_json::Number| {
-        value
-            .as_f64()
-            .filter(|n| n.is_finite())
-            .ok_or("packet geometry coordinates must be finite f64 values")
+    let prepared = batches.get(source)?;
+    let evaluated = match prepared {
+        Some(prepared) => prepared.geometry.clone(),
+        None => batch::legacy_rest(packet, source, pose)?,
     };
-    let segments = geometry
+    let segments = evaluated
         .segments
         .iter()
-        .map(|segment| {
-            Ok(CubicSegment {
-                point: [number(&segment.point.x)?, number(&segment.point.y)?],
-                handle_in: [number(&segment.handle_in.x)?, number(&segment.handle_in.y)?],
-                handle_out: [
-                    number(&segment.handle_out.x)?,
-                    number(&segment.handle_out.y)?,
-                ],
-            })
+        .map(|segment| CubicSegment {
+            point: segment.point,
+            handle_in: segment.handle_in,
+            handle_out: segment.handle_out,
         })
-        .collect::<Result<Vec<_>, &'static str>>()?;
-    if pose.is_some_and(|pose| {
-        pose.stroke_id != record.target.stroke_id
-            || pose.closed != geometry.closed
-            || pose.segments.len() != geometry.segments.len()
-    }) {
-        return Err("rig pose topology differs from the selected stored path");
-    }
-    let segments = match pose {
-        Some(pose) => pose
-            .segments
-            .iter()
-            .map(|segment| CubicSegment {
-                point: segment.point,
-                handle_in: segment.handle_in,
-                handle_out: segment.handle_out,
-            })
-            .collect(),
-        None => segments,
-    };
+        .collect();
     let contour = ClosedCubicPath::new(segments)?;
     let envelope = contour.transformed_envelope([1., 0., 0., 1., 0., 0.])?;
-    let layer_opacity = packet
-        .layer_opacity(source.source_layer_index())
-        .map_err(|_| "raw layer opacity is unavailable")?;
+    let layer_opacity = match prepared {
+        Some(prepared) => prepared.layer_opacity,
+        None => packet
+            .layer_opacity(source.source_layer_index())
+            .map_err(|_| "raw layer opacity is unavailable")?,
+    };
     let style =
         style_of_record_with_opacity(record, layer_opacity).map_err(|error| error.message())?;
     let solid = primary_solid(&style).map_err(|error| error.message())?;
@@ -269,20 +243,27 @@ fn compile(
 /// * the drawn path is open or closed exactly as stored (`VectorShape`), with its clipping contour and envelope;
 /// * the retained solid is the fill, else the stroke paint, else transparent: an item without any paint is valid and draws
 ///   nothing, exactly as the baseline draws it.
-/// Trim paths, gradient paint and the Motion/camera transforms are other stages and other leaves; none is faked here.
+/// Whole-layer Motion comes from the prepared common batch; unjoined paint transforms and camera stay explicit.
 fn compile_vector(
     packet: &ObjectFramePacket,
     source: ObjectFrameRecord<'_>,
     pose: Option<&PosedStroke>,
+    batches: &batch::VectorBatches,
 ) -> Result<CompiledContour, &'static str> {
-    let layer_opacity = packet
-        .layer_opacity(source.source_layer_index())
-        .map_err(|_| "raw layer opacity is unavailable")?;
+    let prepared = batches.get(source)?;
+    let layer_opacity = match prepared {
+        Some(prepared) => prepared.layer_opacity,
+        None => packet
+            .layer_opacity(source.source_layer_index())
+            .map_err(|_| "raw layer opacity is unavailable")?,
+    };
     let style = style_of_record_with_opacity(source.record(), layer_opacity)
         .map_err(|error| error.message())?;
     prepare_item(&style).map_err(|error| error.message())?;
-    let evaluated =
-        evaluate_record_with_pose(packet, source, pose).map_err(|error| error.message())?;
+    let evaluated = match prepared {
+        Some(prepared) => prepared.geometry.clone(),
+        None => evaluate_record_with_pose(packet, source, pose).map_err(|error| error.message())?,
+    };
     let segments = evaluated
         .segments
         .iter()
@@ -396,3 +377,7 @@ mod tests;
 #[cfg(all(test, feature = "export_job"))]
 #[path = "../tests/rig_pose_scene_join.rs"]
 mod rig_pose_scene_join_tests;
+
+#[cfg(all(test, feature = "export_job", feature = "object_expression_runtime"))]
+#[path = "../tests/object_scene_vector_batch.rs"]
+mod vector_batch_tests;

@@ -18,10 +18,8 @@ mod tests;
 
 use crate::evaluation::property_expression_runtime::{Dim, GuestValue, Outcome, EXPR_MAX_DEPTH};
 use crate::history::NativeObjectHistory;
-use crate::object_document::PropertyHolderTarget;
-use crate::object_expression_pin::{
-    prepare_property_expression_request, PropertyEvaluation, PropertyExpressionRequest,
-};
+use crate::object_document::{ExpressionHolder, PropertyHolderTarget};
+use crate::object_expression_pin::{PropertyEvaluation, PropertyExpressionRequest};
 use crate::object_expression_runtime::{
     eval_single_function, in_runtime, with_context_budget, ExpressionLimits, ExpressionRefusal,
     Fail,
@@ -137,7 +135,7 @@ fn evaluate_property_in_context(
     state: ReadState,
 ) -> Result<Outcome, ExpressionRefusal> {
     with_context_budget(rt, limits, Arc::clone(&state.polls), |ctx, fail| {
-        let time = reads::SnapshotReads::bind(
+        let time = reads::SnapshotReads::bind_holder(
             request.snapshot(),
             request.target(),
             request.property(),
@@ -299,7 +297,31 @@ fn evaluate_property_with_policy(
     Result<PropertyEvaluation, ExpressionRefusal>,
     Vec<crate::object_expression_pin::PropertyDependencyEffect>,
 ) {
-    let request = match prepare_property_expression_request(
+    evaluate_holder_for_owner_with_effects(
+        owner,
+        snapshot,
+        &ExpressionHolder::Property(target.clone()),
+        property,
+        frame,
+        depth,
+        limits,
+        capture_clean,
+    )
+}
+pub(crate) fn evaluate_holder_for_owner_with_effects(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    target: &ExpressionHolder,
+    property: &str,
+    frame: f64,
+    depth: u32,
+    limits: ExpressionLimits,
+    capture_clean: bool,
+) -> (
+    Result<PropertyEvaluation, ExpressionRefusal>,
+    Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+) {
+    let request = match crate::object_expression_pin::prepare_holder_expression_request(
         owner, snapshot, target, property, frame, depth,
     ) {
         Ok(request) => request,

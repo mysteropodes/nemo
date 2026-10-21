@@ -250,3 +250,6 @@ fn owner_text_sibling_does_not_admit_unconsumed_visible_vector_pose() {
         assert_eq!(support::state(&o), before);
     }
 }
+
+#[path = "object_text_selector_expressions.rs"]
+mod selectors;

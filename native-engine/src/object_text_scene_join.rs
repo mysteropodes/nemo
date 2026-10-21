@@ -213,7 +213,7 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
         }
         pending.push((input, raw));
     }
-    for (layer_index, layer) in packet.source_layers().iter().enumerate() {
+    for layer_index in 0..packet.source_layers().len() {
         let bases = pending
             .iter()
             .filter(|(input, _)| input.layer_index == layer_index)
@@ -245,13 +245,8 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
         if blocks.is_empty() {
             continue;
         }
-        let animators = layer
-            .text_animators
-            .value()
-            .into_iter()
-            .flat_map(|records| &records.0)
-            .map(|r| r.resolve(f64::from(packet.frame())))
-            .collect::<Result<Vec<_>, _>>()
+        let animators = packet
+            .resolved_text_animators(layer_index)
             .map_err(|_| unavailable(0, "native Text selector evaluation unavailable"))?;
         let fps = packet
             .snapshot()

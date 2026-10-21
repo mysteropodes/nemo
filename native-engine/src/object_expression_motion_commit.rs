@@ -2,7 +2,7 @@
 use crate::commands::ObjectFillOwner;
 use crate::evaluation::property_expression_runtime::Diagnostic;
 use crate::history::NativeObjectHistory;
-use crate::object_document::{FrameScopeKind, PropertyHolderTarget};
+use crate::object_document::{ExpressionHolder, FrameScopeKind};
 use crate::object_expression_runtime::motion_frame::{verify, MotionEffect};
 use crate::object_frame_packet::ObjectFrameSelector;
 use crate::revision::ObjectSnapshot;
@@ -138,8 +138,8 @@ fn batch_limit() -> usize {
 }
 
 fn add_disable(
-    targets: &mut Vec<(PropertyHolderTarget, String)>,
-    target: &PropertyHolderTarget,
+    targets: &mut Vec<(ExpressionHolder, String)>,
+    target: &ExpressionHolder,
     property: &str,
 ) {
     if !targets
@@ -149,9 +149,7 @@ fn add_disable(
         targets.push((target.clone(), property.to_owned()));
     }
 }
-fn disable_targets(
-    records: &[RecordedFrame],
-) -> Result<Vec<(PropertyHolderTarget, String)>, String> {
+fn disable_targets(records: &[RecordedFrame]) -> Result<Vec<(ExpressionHolder, String)>, String> {
     let mut targets = Vec::new();
     for record in records {
         for effect in &record.effects {
@@ -303,7 +301,7 @@ pub fn finalize_object_motion_frame_effects_for_owner(
     validate_frames(owner, &current, expected, frames, &control.pending)?;
     let targets = disable_targets(&control.pending)?;
     let (candidate, expected_document) =
-        ObjectFillOwner::prepare_expression_disables(current.clone(), &targets)
+        ObjectFillOwner::prepare_holder_expression_disables(current.clone(), &targets)
             .map_err(|error| format!("Motion atomic disable preparation: {error:?}"))?;
     let before_revision = current.content_revision();
     let content_revision = owner
