@@ -443,7 +443,10 @@ test('ordinary Open readonly lifecycle converges and composition recovers after 
     assert.equal(commentPublications.length,1);assert.deepEqual(commentPublications[0].info,shown.info);
     assert.ok(queries.every(call=>call.r.operation.startsWith('query.')&&!Object.hasOwn(call.r,'expectedRevision')));
     const count=queries.length;await timerTurn();await turn();
-    assert.equal(f.calls.filter(call=>call.command==='nemo_native_dispatch').length,count,'settled callbacks must converge; refusal observations='+JSON.stringify(refusals));
+    assert.equal(f.calls.filter(call=>call.command==='nemo_native_dispatch').length,count,'settled callbacks must converge; observations='+JSON.stringify({refusals:refusals,
+      dispatches:f.calls.filter(call=>call.command==='nemo_native_dispatch').map(call=>({operation:call.r.operation,
+        selectorKind:call.r.payload&&call.r.payload.selector&&call.r.payload.selector.kind,atRevision:call.r.payload&&call.r.payload.atRevision})),
+      infoRevision:f.session.info().contentRevision,publicPresented:!!f.session.readPresentedObjectSession()}));
     assert.equal(f.session.info().contentRevision,0);assert.equal(f.transports.length,1);assert.equal(f.session.isIndeterminate(),false);
   }finally{
     // Retire actual controllers before release so failed assertions cannot leak a timer/query loop.
