@@ -102,13 +102,33 @@ fn gpu_real_host_brush_preview_invalidate_and_export_share_native_runtime_and_li
         .present_object_preview(&selector(&source, 0), output(), &mut gpu, &mut view)
         .unwrap();
     assert!(matches!(deferred.status(), ViewportStatus::Deferred(_)));
-    assert_eq!(owner.preview.scheduler.lease_counters().live(), 1);
+    let pending = owner.preview.pending.as_ref().unwrap();
+    let work_id = pending.work_id();
+    assert!(owner.preview.scheduler.is_current(pending));
+    assert_eq!(pending.key().declared_resource_versions().len(), 1);
+    let lease_ids = owner.preview.scheduler.lease_ids(work_id).unwrap();
+    assert_eq!(lease_ids.1.len(), 1, "one admitted Brush resource lease");
+    assert_ne!(lease_ids.0, lease_ids.1[0], "snapshot and resource leases differ");
+    let leased = owner.preview.scheduler.lease_counters();
+    assert_eq!((leased.acquired(), leased.released(), leased.live()), (2, 0, 2));
+    let retried = owner
+        .present_object_preview(&selector(&source, 0), output(), &mut gpu, &mut view)
+        .unwrap();
+    assert!(matches!(retried.status(), ViewportStatus::Deferred(_)));
+    assert_eq!(retried.identity(), deferred.identity());
+    assert_eq!(owner.preview.pending.as_ref().unwrap().work_id(), work_id);
+    assert_eq!(owner.preview.scheduler.lease_ids(work_id).unwrap(), lease_ids);
+    assert_eq!(owner.preview.scheduler.lease_counters(), leased);
     trace.borrow_mut().defer = false;
     let shown = owner
         .present_object_preview(&selector(&source, 0), output(), &mut gpu, &mut view)
         .unwrap();
     assert_eq!(shown.status(), &ViewportStatus::Presented);
     assert_eq!(shown.identity(), deferred.identity());
+    assert!(owner.preview.pending.is_none());
+    assert!(owner.preview.scheduler.lease_ids(work_id).is_none());
+    let settled = owner.preview.scheduler.lease_counters();
+    assert_eq!((settled.acquired(), settled.released(), settled.live()), (2, 2, 0));
     pixel(&trace, 8, 8, [0, 255, 0, 255]);
     pixel(&trace, 13, 15, [0, 0, 255, 255]);
     pixel(&trace, 40, 40, [255; 4]);
@@ -163,6 +183,8 @@ fn gpu_real_host_brush_preview_invalidate_and_export_share_native_runtime_and_li
         }
     }
     assert_eq!(owner.preview.scheduler.lease_counters().live(), 0);
+    let complete = owner.preview.scheduler.lease_counters();
+    assert_eq!(complete.acquired(), complete.released());
     assert_eq!(
         owner
             .project_file_snapshot(0, source.snapshot_id())
