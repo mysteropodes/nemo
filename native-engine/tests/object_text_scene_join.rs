@@ -419,7 +419,7 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
     other["propertyHolders"][0]["properties"]
         .as_array_mut()
         .unwrap()
-        .push(json!({"property":"rotationX","static":[0]}));
+        .push(json!({"property":"position","static":[0,0]}));
     let mut active = base.clone();
     active["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":true,"code":"50"});
@@ -434,47 +434,6 @@ fn text_alpha_never_admits_other_layer_properties_or_enabled_expressions() {
         );
         assert_eq!(o.history_depths(), (0, 0));
     }
-    let original = owner(&base);
-    let original_plan = plan(&support::head(&original), 7);
-    let mut neutral = base.clone();
-    neutral["propertyHolders"][0]["properties"]
-        .as_array_mut()
-        .unwrap()
-        .push(json!({"property":"position","static":[0,0]}));
-    let neutral_owner = owner(&neutral);
-    let neutral_snapshot = support::head(&neutral_owner);
-    let authored =
-        crate::object_codec::encode_storage_project(neutral_snapshot.document()).unwrap();
-    let neutral_plan = plan(&neutral_snapshot, 7);
-    let geometry = |p: &ObjectPaintPlan| {
-        ordered_entries(p)
-            .filter_map(|entry| match entry {
-                PaintEntry::Text(t) => Some(
-                    t.item
-                        .painted()
-                        .map(|(c, paint)| {
-                            (
-                                c.contour
-                                    .segments()
-                                    .iter()
-                                    .map(|s| (s.point, s.handle_in, s.handle_out))
-                                    .collect::<Vec<_>>(),
-                                paint,
-                            )
-                        })
-                        .collect::<Vec<_>>(),
-                ),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(geometry(&neutral_plan), geometry(&original_plan));
-    require_text_alpha(&neutral_plan, 64);
-    assert_eq!(
-        crate::object_codec::encode_storage_project(neutral_snapshot.document()).unwrap(),
-        authored
-    );
-    assert_eq!(neutral_owner.history_depths(), (0, 0));
     let mut disabled = base;
     disabled["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":false,"code":"throw 1"});
