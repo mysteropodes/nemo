@@ -2,6 +2,7 @@
 import Foundation
 
 func ui32FixtureSelfTest() throws {
+  try ui32FixtureOpenIdentitySelfTest()
   try ui32PanelTraceSelfTest()
   try ui32FixedFixtureSelfTest()
   try ui32ContentScopeSelfTest()
@@ -151,6 +152,117 @@ func ui32PanelTraceSelfTest() throws {
       }
       if fault == "foreign" || fault == "owner-error" {try check(!readNodes.contains(2) && !parentNodes.contains(2) && !described.contains(2))}
       try check(!described.contains(99))
+    }
+  }
+}
+
+// Full identity is an injected read only; no action or AX is simulated as acceptance.
+func ui32FixtureOpenIdentitySelfTest() throws {
+  let busy: [String: Any] = ["axPidMatches": true, "axPidQueryError": 0,
+    "applicationWindowsQueryError": -25204, "applicationWindowsReadable": false,
+    "pinnedAXWindowMember": false, "minimizedQueryError": -25204,
+    "minimizedReadable": false, "minimized": false,
+    "pinnedCGWindowListReadable": true, "pinnedCGWindowCount": 1]
+  func identityError(_ facts: [String: Any]) -> IdentityRefusal {
+    IdentityRefusal(stage: "application-window-membership", facts: facts)
+  }
+  try check(ui32FixtureOpenBusy(identityError(busy)))
+  var changed = [[String: Any]]()
+  for key in busy.keys {
+    var absent = busy; absent.removeValue(forKey: key); changed.append(absent)
+    var wrongType = busy
+    if type(of: busy[key]!) == Bool.self { wrongType[key] = 0 }
+    else { wrongType[key] = false }
+    changed.append(wrongType)
+    var wrongValue = busy
+    if let value = busy[key] as? Bool, type(of: busy[key]!) == Bool.self { wrongValue[key] = !value }
+    else { wrongValue[key] = 99 }
+    changed.append(wrongValue)
+  }
+  var extra = busy; extra["unexpected"] = true; changed.append(extra)
+  for facts in changed {
+    try check(!ui32FixtureOpenBusy(identityError(facts)))
+    var reads = 0, waits = 0, refused = false
+    do {
+      _ = try ui32FixtureOpenIdentity("fixture.open", true, true, now: { 0 },
+        pause: { _ in waits += 1 }, identity: { reads += 1; throw identityError(facts) })
+    } catch { refused = true }
+    try check(refused && reads == 1 && waits == 0)
+  }
+  try check(!ui32FixtureOpenBusy(IdentityRefusal(stage: "process-start", facts: busy)))
+  try check(!ui32FixtureOpenBusy(Refusal(code: "adapter-refused")))
+  let scenarios = ["immediate", "settled", "persistent", "other", "before-read",
+    "after-first-read", "late-immediate", "before-delay", "delay-deadline", "after-delay", "after-second-read",
+    "clock-regression", "overflow", "command", "unattempted", "unposted"]
+  for scenario in scenarios {
+    var clock: UInt64 = scenario == "overflow" ? UInt64.max : 100
+    var ticks = 0, reads = 0, waits = 0, refused = false
+    var delays = [UInt64]()
+    var proof = [String: Any]()
+    do {
+      proof = try ui32FixtureOpenIdentity(scenario == "command" ? "fixture.observe" : "fixture.open",
+        scenario != "unattempted", scenario != "unposted", now: {
+          ticks += 1
+          if ticks == 2 && scenario == "before-read" { clock = 750_000_100 }
+          if ticks == 2 && scenario == "clock-regression" { clock = 99 }
+          if ticks == 4 && scenario == "delay-deadline" { clock = 750_000_100 }
+          return clock
+        }, pause: { delay in
+          delays.append(delay)
+          waits += 1; clock += delay
+          if scenario == "after-delay" { clock = 750_000_100 }
+        }, identity: {
+          reads += 1
+          if ["after-first-read", "late-immediate"].contains(scenario) || (scenario == "after-second-read" && reads == 2) {
+            clock = 750_000_100
+          }
+          if scenario == "before-delay" { clock = 700_000_100 }
+          if scenario == "other" { throw Refusal(code: "adapter-refused") }
+          if !["immediate", "late-immediate"].contains(scenario) && (reads == 1 || scenario == "persistent") { throw identityError(busy) }
+        })
+    } catch let error as ActionRefusal { refused = true; proof = error.diagnostics }
+    catch { refused = true }
+    try check(refused == !["immediate", "settled"].contains(scenario))
+    let unread = ["before-read", "clock-regression", "overflow", "command", "unattempted", "unposted"].contains(scenario)
+    let second = ["settled", "persistent", "after-second-read"].contains(scenario)
+    try check(reads == (unread ? 0 : second ? 2 : 1))
+    try check(delays.allSatisfy { $0 == 75_000_000 })
+    let delayed = ["settled", "persistent", "after-delay", "after-second-read"].contains(scenario)
+    try check(waits == (delayed ? 1 : 0) && proof["readAttempts"] as? Int == reads)
+    if !unread && !["immediate", "late-immediate"].contains(scenario) {
+      let first = proof["firstReadFailure"] as? [String: Any]
+      try check(first != nil && first!["kind"] as? String == (scenario == "other" ? "refusal" : "identity"))
+    }
+    if !refused { try check(proof["reason"] as? String == "full-original-identity") }
+  }
+  // The real generic guarded-action route still posts exactly ONE Open action.
+  for scenario in ["immediate", "settled", "persistent", "strict-post-scope"] {
+    var attempted = false, posted = false, actions = 0, identities = 0, postScopes = 0
+    var waits = 0, refused = false, retained = [String: Any]()
+    func identity() throws {
+      identities += 1
+      if posted && (identities == 3 && scenario != "immediate" || scenario == "persistent") {
+        throw identityError(busy)
+      }
+      if postScopes > 0 && scenario == "strict-post-scope" { throw Refusal(code: "adapter-refused") }
+    }
+    do {
+      try ui32GuardedAction({
+        if attempted && posted {
+          retained = try ui32FixtureOpenIdentity("fixture.open", attempted, posted,
+            now: { 0 }, pause: { _ in waits += 1 }, identity: identity)
+        } else { try identity() }
+      }, {}, { actions += 1; attempted = true }, postScope: {
+        postScopes += 1; try identity()
+      }, posted: { posted = true })
+    } catch { refused = true }
+    try check(actions == 1 && attempted && posted)
+    try check(refused == ["persistent", "strict-post-scope"].contains(scenario))
+    try check(postScopes == (scenario == "persistent" ? 0 : 1))
+    try check(identities == (scenario == "immediate" || scenario == "persistent" ? 4 : 5))
+    try check(waits == (scenario == "immediate" ? 0 : 1))
+    if scenario == "settled" || scenario == "strict-post-scope" {
+      try check(retained["readAttempts"] as? Int == 2 && retained["firstReadFailure"] as? [String: Any] != nil)
     }
   }
 }
