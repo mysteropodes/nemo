@@ -306,11 +306,15 @@ pub fn validate_native_response(
                         .and_then(serde_json::Value::as_u64)
                         == Some(response.content_revision))
                 && response_owner::pinned_read_correlated(request, response, result)
-                && (request.operation != "command.document.object.layer.create"
-                    || request
-                        .expected_revision
-                        .and_then(|revision| revision.checked_add(1))
-                        == Some(response.content_revision))
+                && (!matches!(
+                    request.operation.as_str(),
+                    "command.document.object.layer.create"
+                        | "command.document.object.undo"
+                        | "command.document.object.redo"
+                ) || request
+                    .expected_revision
+                    .and_then(|revision| revision.checked_add(1))
+                    == Some(response.content_revision))
                 && (!matches!(
                     request.operation.as_str(),
                     "command.document.object.project.settings.edit"

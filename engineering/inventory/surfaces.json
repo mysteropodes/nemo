@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1c160223e1bc5d2a455cdaaba1e73c50b8321379",
-  "describe": "v0.7.0-alpha.4-2686-g1c160223"
+  "head": "5e275f4d609b82acd8d236fb5f674922e25dbc79",
+  "describe": "v0.7.0-alpha.4-2698-g5e275f4d"
  },
- "inputsDigest": "fe7bb5b782a839f07a0c9fb0b6ddf26aa485c062019e40f6c5f83adc999b0234",
+ "inputsDigest": "562f5355e286d96967238a13882073b329b06afeaa0331948b3fd995f8de587d",
  "states": [
   "inventoried",
   "characterized",
@@ -126,7 +126,7 @@
   },
   "SMBpm": {
    "file": "src/js/bpm-grid.js",
-   "line": 125,
+   "line": 192,
    "members": 0
   },
   "SMCamera": {
@@ -956,8 +956,8 @@
    "capability": "Grille BPM — clic : afficher/masquer · clic droit : régler le tempo",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/bpm-grid.js:118 init()",
-    "src/js/bpm-grid.js:119 init()"
+    "src/js/bpm-grid.js:185 init()",
+    "src/js/bpm-grid.js:186 init()"
    ],
    "events": [
     "click",
@@ -979,10 +979,10 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 51,
+    "functionsVisited": 65,
     "via": "variable b",
     "references": [
-     "src/js/bpm-grid.js:111 refresh()"
+     "src/js/bpm-grid.js:178 refresh()"
     ]
    },
    "fixtures": [
@@ -23867,7 +23867,7 @@
    "source": "src/js/markers.js:244",
    "meta": {
     "i18n": null,
-    "functionsVisited": 36
+    "functionsVisited": 51
    },
    "fixtures": [
     "static-props",
