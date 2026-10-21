@@ -60,7 +60,7 @@
       guard(stamp); return reply.result.result;
     }
     async function refresh(expected) {
-      cache = null; var stamp = capture();
+      var stamp = capture(); cache = null;
       if (expected && !same(expected, stamp.info)) throw fault('stale_revision');
       var data = await stamp.session.runResourceCommand(async function (context) {
         var settings = await query(stamp, context, { kind: 'settings' });

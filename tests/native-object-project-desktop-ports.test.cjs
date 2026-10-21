@@ -8,12 +8,13 @@ const Files=require('../src/js/adapters/native-object-project-file.js');
 const Application=require('../src/js/adapters/native-application.js');
 const CompositionUI=require('../src/js/adapters/native-composition-ui.js');
 const PaletteUI=require('../src/js/adapters/native-palette-ui.js');
+const CommentsUI=require('../src/js/adapters/native-comments-ui.js');
 const turn=()=>new Promise(setImmediate);
 const timerTurn=()=>new Promise(resolve=>setTimeout(resolve,0));
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
-  let paletteReplyHold=null;
+  let paletteReplyHold=null,commentsReplyHold=null;
   const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[],notifications=[];
   let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
@@ -69,6 +70,18 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
         }
         result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
           documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
+      }else if(r.operation==='query.document.object.project.comments.read'){
+        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
+        assert.equal(p.contextId,'scene-root');let value;
+        if(p.selector.kind==='settings'){
+          if(commentsReplyHold){const own=commentsReplyHold;commentsReplyHold=null;own.entered();await own.promise;}
+          value={commentsPresent:false,commentCount:0};
+        }else{
+          assert.equal(p.selector.kind,'commentsPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
+          value={kind:'projectCommentsPage',commentsPresent:false,commentCount:0,cursor:0,items:[],nextCursor:null};
+        }
+        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
+          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
       }else if(r.operation==='command.document.object.layer.policy.edit'){
         assert.equal(r.expectedRevision,revision);revision++;result={applied:true,historyEntriesAdded:1};
       }else throw Error('unexpected fake public operation');
@@ -93,6 +106,7 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     await timerTurn();return value;};
   return {root,session,open,log,calls,classes,styles,transports,notifications,info,
     layers:value=>{layerRows=value.map(row=>({...row}));},paletteReplyGate:value=>{paletteReplyHold=value;},
+    commentsReplyGate:value=>{commentsReplyHold=value;},
     hold:v=>held=v,foreign:v=>foreign=v,rect:v=>rect=v,refuseProjection:v=>projectionRefused=v,ackGate:v=>rawAck=v,previewGate:v=>previewHold=v,mutateReply:v=>replyMutation=v,
     async emit(){const t=transports.at(-1),from=revision;revision++;const event={...info(),requestId:'event-'+revision,fromRevision:from,toRevision:revision};return t.synchronize(event,t.binding);}};
 }
@@ -379,4 +393,64 @@ test('unknown current owner and lookalike metadata cannot receive completion not
   f.root.NemoNativeObjectProject=Project;
   ports.presented({...info});await timerTurn();
   assert.equal(f.notifications.length,before);assert.equal(f.calls.length,calls);
+});
+
+
+// Positive original-consumer oracle: native and DOM replies are controlled,
+// while Project/Desktop notification, SDK, models and controllers are production.
+test('ordinary Open readonly lifecycle converges and composition recovers after Comments queue settlement',async()=>{
+  const f=fixture(),compositionPublications=[],commentPublications=[],refusals=[];
+  let composition=null,comments=null;
+  function readGate(){const held=gate(),started=gate();return {...held,started:started.promise,entered:started.resolve};}
+  async function bounded(promise,label){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{
+    timer=setTimeout(()=>reject(Error(label+' did not settle')),1000);})]);}finally{clearTimeout(timer);}}
+  const first=readGate(),second=readGate(),firstCommentPublication=gate();
+  const lookup=f.root.document.getElementById;
+  f.root.document.getElementById=id=>id==='fb-avatars-pop'?null:lookup(id);
+  f.root.document.addEventListener=()=>{};f.root.document.removeEventListener=()=>{};
+  f.root.addEventListener=()=>{};f.root.removeEventListener=()=>{};
+  // Capture only complete readbacks through the existing controller repaint ports.
+  f.root.SMBpm={refresh(){const value=composition&&composition.read();if(value)compositionPublications.push(value);}};
+  f.root.refreshFbAvatars=()=>{const value=comments&&comments.read();if(value){
+    if(commentPublications[commentPublications.length-1]!==value)commentPublications.push(value);
+    firstCommentPublication.resolve(value);}};
+  try{
+    composition=CompositionUI.install(f.root);comments=CommentsUI.install(f.root);
+    await turn(); // Original inactive installation settles before the ordinary user Open.
+    f.commentsReplyGate(first);await f.open();await bounded(first.started,'first Comments settings');
+    assert.equal(compositionPublications.length,1,'ordinary Open must publish the complete composition before Comments enters');
+    const shown=compositionPublications[0],owner=f.session.info();
+    assert.equal(shown.composition.effectiveBpm,120);assert.equal(shown.composition.effectiveBpmOffset,0);
+    assert.equal(shown.composition.effectiveBpmShow,false);assert.deepEqual(shown.composition.markers,[]);
+    assert.equal(Object.isFrozen(shown),true);assert.equal(shown.info.contentRevision,0);
+    assert.equal(f.session.readPresentedObjectSession(),null,'held native queue work must remain unavailable');
+    assert.equal(composition.read(code=>refusals.push(code)),null,'a busy reader cannot expose the hidden presentation');
+    assert.equal(composition.read(code=>refusals.push(code)),null,'repeated busy reads must remain unavailable');
+    // No direct presented() or manual refresh requests any later work. Hold a
+    // repeated query if production issues one, so a failing oracle cannot loop.
+    f.commentsReplyGate(second);first.resolve();
+    await bounded(firstCommentPublication.promise,'first complete Comments projection');
+    await timerTurn();await turn(); // Drain the existing post-completion callback, not a delay-based retry.
+    const recovered=composition.read(code=>refusals.push(code));
+    const queries=f.calls.filter(call=>call.command==='nemo_native_dispatch');
+    const commentQueries=queries.filter(call=>call.r.operation==='query.document.object.project.comments.read');
+    assert.equal(commentQueries.filter(call=>call.r.payload.selector.kind==='settings').length,1,
+      'current same-pin Comments must not start another read; refusal observations='+JSON.stringify(refusals));
+    assert.deepEqual(commentQueries.map(call=>call.r.payload.selector.kind),['settings','commentsPage']);
+    assert.ok(recovered,'BPM composition must recover after readonly queue completion without a manual refresh');
+    assert.deepEqual(recovered.info,shown.info);assert.deepEqual(recovered.composition,shown.composition);
+    assert.equal(f.session.info(),owner);assert.ok(f.session.readPresentedObjectSession());
+    assert.equal(commentPublications.length,1);assert.deepEqual(commentPublications[0].info,shown.info);
+    assert.ok(queries.every(call=>call.r.operation.startsWith('query.')&&!Object.hasOwn(call.r,'expectedRevision')));
+    const count=queries.length;await timerTurn();await turn();
+    assert.equal(f.calls.filter(call=>call.command==='nemo_native_dispatch').length,count,'settled callbacks must converge; observations='+JSON.stringify({refusals:refusals,
+      dispatches:f.calls.filter(call=>call.command==='nemo_native_dispatch').map(call=>({operation:call.r.operation,
+        selectorKind:call.r.payload&&call.r.payload.selector&&call.r.payload.selector.kind,atRevision:call.r.payload&&call.r.payload.atRevision})),
+      infoRevision:f.session.info().contentRevision,publicPresented:!!f.session.readPresentedObjectSession()}));
+    assert.equal(f.session.info().contentRevision,0);assert.equal(f.transports.length,1);assert.equal(f.session.isIndeterminate(),false);
+  }finally{
+    // Retire actual controllers before release so failed assertions cannot leak a timer/query loop.
+    if(composition)composition.dispose();if(comments)comments.dispose();
+    first.resolve();second.resolve();await turn();await timerTurn();await turn();
+  }
 });
