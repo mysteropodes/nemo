@@ -146,3 +146,22 @@ test('canceling an unsaved draft never materializes absent catalog metadata',asy
   el.querySelector('.bpe-slider[data-key="grain"]').fire('input');el.querySelector('#bpe-cancel').fire('click');await f.settled();
   assert.equal(f.catalog(),undefined);assert.equal(f.edits().length,0);assert.equal(f.checkpoints(),0);
 });
+
+test('custom-brush uses full project readiness and retains narrow immutable authority pins', async () => {
+  const f = await fixture();
+  assert.equal(f.projectionReady(f.fullInfo()), true);
+  const origin = f.controller.read(); assert.ok(origin);
+  assert.deepEqual(Object.keys(origin.info).sort(),
+    ['contentRevision', 'documentId', 'documentSnapshotId', 'instanceId', 'lifecycleGeneration']);
+  assert.equal(Object.isFrozen(origin.info), true);
+  assert.equal(f.projectionReady(origin.info), false, 'identity pins cannot stand in for project metadata');
+  const calls = f.calls.length;
+  f.drift(); assert.equal(f.controller.read(), null);
+  assert.equal(await f.controller.presented(), null); await f.settled();
+  assert.equal(f.controller.read(), null);
+  assert.equal(f.calls.length, calls, 'invalid full projection refuses before dispatch');
+  assert.equal(f.edits().length, 0);
+  f.repairProjection(); await f.controller.presented(); await f.settled();
+  assert.ok(f.controller.read());
+  assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
+});

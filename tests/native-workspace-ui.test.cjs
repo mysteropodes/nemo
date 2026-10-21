@@ -1,4 +1,5 @@
 'use strict';
+const ProjectFile = require('../src/js/adapters/native-object-project-file.js');
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const C = require('../src/js/adapters/native-workspace-contract.js');
 const copy = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -47,7 +48,8 @@ async function fixture(initial, browser = false) {
   doc.querySelector = selector => doc.querySelectorAll(selector)[0] || null; doc.elementFromPoint = () => elements.transform;
   const storage = new Map(), notices = [], calls = [], history = [copy(initial)]; let historyAt = 0, revision = 0, serial = 0, running = 0;
   let metadata = copy(initial), active = true, refused = false, ticket = 1, held = null, tail = Promise.resolve(), controller, context;
-  let info = { apiVersion: 2, available: true, kind: 'native-object', instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0' };
+  let info = { apiVersion: 2, available: true, kind: 'native-object', instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   const shown = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented', frame: 0, contextId: 'scene-root', viewGeneration: 1, workId: 'work-' + pin.documentSnapshotId } });
   const root = { document: doc, localStorage: { getItem: key => storage.has(key) ? storage.get(key) : null,
     setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) }, Event: function (type) { this.type = type; },
@@ -78,12 +80,16 @@ async function fixture(initial, browser = false) {
         return fn({ dispatch: q => root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('workspace-ui', { dispatch }).dispatch(q),
           readPresentedObjectSession: () => active && running === 1 && origin === info ? shown(origin) : null,
           reconcile: async next => { assert.equal(next, revision); info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
-            controller.willProject(info); controller.presented(info); return info; } });
+            controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true);
+            controller.presented(info); return info; } });
       }).finally(() => { running--; if (controller) controller.presented(info); }); tail = job.catch(() => {}); return job;
     } };
   root.NemoNativeObjectProject = { desktop: () => session };
-  root.NemoNativeObjectProjectFile = { projectionReadyForUI: () => active && !running };
+  root.NemoNativeObjectProjectFile = { projectionReadyForUI: (valueRoot, value) => active && !running && ProjectFile.projectionReadyForUI(valueRoot, value) };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
+  const browserRoot = vm.runInContext('globalThis', context);
+  function project() { ProjectFile.projectView(browserRoot, info); }
+  if (!browser) project();
   for (const file of actualOrder()) {
     let source = fs.readFileSync(require.resolve('../src/js/' + file), 'utf8');
     if (file === 'ui.js') {
@@ -111,10 +117,13 @@ async function fixture(initial, browser = false) {
     resize(kind, move = true) { const handle = elements[{ layer: 'layer-panel-resize', tools: 'tools-panel-resize', props: 'props-panel-resize', timeline: 'tl-resize' }[kind]];
       handle.fire('mousedown', { clientX: 100, clientY: 200 }); if (move) events.fire('mousemove', { clientX: 125, clientY: 170 }); events.fire('mouseup'); },
     refuse() { refused = true; }, hold() { let resolve; held = new Promise(r => resolve = r); return resolve; },
+    fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(browserRoot, value),
+    drift() { root.state.canvasW++; }, repairProjection: project,
     replace(value) { metadata = copy(value); revision++; info = { ...info, documentId: 'other', lifecycleGeneration: info.lifecycleGeneration + 1,
-      contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info); controller.presented(info); },
+      contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info); project(); controller.presented(info); },
     history(delta) { historyAt += delta; metadata = copy(history[historyAt]); revision++; info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
-      controller.willProject(info); controller.presented(info); }, resubscribe() { ticket++; },
+      controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true);
+      controller.presented(info); }, resubscribe() { ticket++; },
     unavailable() { active = false; }, column: root.fixtureColumn };
 }
 test('actual four resize callbacks capture at mouseup only; stationary mouseup never materializes absent workspace', async () => {
@@ -220,4 +229,23 @@ test('replacement with truly absent workspace retires the old transient drag bef
   const f = await fixture(); f.elements['layer-panel-resize'].fire('mousedown'); f.events.fire('mousemove', { clientX: 50 });
   f.replace(undefined); f.events.fire('mouseup'); await f.settled();
   assert.equal(f.metadata(), undefined); assert.equal(f.elements['layer-panel'].style.width, '180px'); assert.equal(f.edits().length, 0);
+});
+
+test('workspace uses full project readiness and retains narrow immutable authority pins', async () => {
+  const f = await fixture();
+  assert.equal(f.projectionReady(f.fullInfo()), true);
+  const origin = f.controller.read(); assert.ok(origin);
+  assert.deepEqual(Object.keys(origin.info).sort(),
+    ['contentRevision', 'documentId', 'documentSnapshotId', 'instanceId', 'lifecycleGeneration']);
+  assert.equal(Object.isFrozen(origin.info), true);
+  assert.equal(f.projectionReady(origin.info), false, 'identity pins cannot stand in for project metadata');
+  const calls = f.calls.length;
+  f.drift(); assert.equal(f.controller.read(), null);
+  assert.equal(await f.controller.presented(), null); await f.settled();
+  assert.equal(f.controller.read(), null);
+  assert.equal(f.calls.length, calls, 'invalid full projection refuses before dispatch');
+  assert.equal(f.edits().length, 0);
+  f.repairProjection(); await f.controller.presented(); await f.settled();
+  assert.ok(f.controller.read());
+  assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
 });
