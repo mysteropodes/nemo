@@ -169,6 +169,10 @@ function toggleProps(force){
       cancelGesture: ports.cancelGesture, selectors: selectors, isApplying: function () { return applying > 0; } });
     return api;
   }
+  function bindMotion(root, port) {
+    var presenter = presenters.get(root); if (!presenter) return false;
+    presenter.api.bindMotion(port); return true;
+  }
   // Default column preset (2026-08-29, Cyril: "3D/mograph par default") — the
   // 3D Layer/Duplicator toggle icons only show under this preset (see
   // style.css's `[data-motion-columns]` rules); 'animation' (the prior
@@ -284,5 +288,5 @@ function toggleProps(force){
     installed.set(root, controller); root.NemoNativeWorkspaceController = controller;
     root.addEventListener('pagehide', controller.dispose, { once: true }); presented(); return controller;
   }
-  return Object.freeze({ presentation: presentation, motionColumns: motionColumns, install: install });
+  return Object.freeze({ presentation: presentation, motionColumns: motionColumns, bindMotion: bindMotion, install: install });
 }));

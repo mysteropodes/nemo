@@ -239,6 +239,7 @@ async fn custom_catalog_absent_empty_raw_identity_and_authenticated_refusals_do_
         .await;
         assert_eq!(missing.error.unwrap().code, "not_found");
         assert_eq!(events, 0);
+        let binding = subscribe(&state);
         let (noop, events) = round_trip(
             &state,
             edit(
@@ -254,7 +255,6 @@ async fn custom_catalog_absent_empty_raw_identity_and_authenticated_refusals_do_
         receipt(&noop, 0, false);
         assert_eq!(events, 0);
         assert_eq!(saved(&state, &id), initial);
-        let binding = subscribe(&state);
         let action = json!({"kind":"upsert","id":"\u{0000}日本語","preset":{"rotationMode":"","savedBrushSize":-2.5}});
         for (name, field, code) in [
             ("document", "documentId", "wrong_document"),

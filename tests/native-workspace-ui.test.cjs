@@ -96,7 +96,7 @@ async function fixture(initial, browser = false) {
       assert(register, 'use the actual original collapse-button callback');
       source = source.slice(start, end) + "\nvar btn=document.getElementById('props-panel-collapse-btn');\n" + register[0];
     } else if (file === 'motion.js') {
-      const start = source.indexOf('  window.SMWorkspace.bindMotion({'), end = source.indexOf('  function propHasContent', start);
+      const start = source.indexOf('  NemoNativeWorkspaceUI.bindMotion(window, {'), end = source.indexOf('  function propHasContent', start);
       const colStart = source.indexOf('        var column=NemoNativeWorkspaceUI.motionColumns('), colEnd = source.indexOf('        var snapRow', colStart);
       source = "var _motionColumnPreset='3d',panel=document.getElementById('layer-panel'),pop=document.createElement('div');\n" + source.slice(start, end) + source.slice(colStart, colEnd) + '\nwindow.fixtureColumn=column;';
     }

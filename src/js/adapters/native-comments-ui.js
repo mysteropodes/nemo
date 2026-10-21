@@ -2,7 +2,7 @@
 (function (root, factory) {
   var common = typeof module === 'object' && module.exports;
   var api = factory(common ? require('./native-comments-desktop.js') : root.NemoNativeCommentsDesktop,
-    (common ? require('./native-text-tool-desktop.js') : root.NemoNativeTextToolDesktop).canvasMapping);
+    (common ? require('./native-viewport-underlay.js') : root.NemoNativeViewportUnderlay).canvasMapping);
   if (common) module.exports = api;
   else { root.NemoNativeCommentsUI = api; root.document.addEventListener('DOMContentLoaded', function () { api.install(root); }, { once: true }); }
 }(typeof globalThis === 'object' ? globalThis : this, function (Desktop, Mapping) {
@@ -11,7 +11,7 @@
   function native(root) { return !!(root.__TAURI__ && root.__TAURI__.core); }
   function install(root) {
     if (installed.has(root)) return installed.get(root);
-    if (!native(root) || !Desktop) return null;
+    if (!native(root) || !Desktop || !Mapping) return null;
     var retired = false, loading = null, pending = false, refreshNeeded = false, origins = new WeakMap(), popovers = new WeakSet(), gestureEpoch = 0;
     function current() { return root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root); }
     function available(session, info) {
