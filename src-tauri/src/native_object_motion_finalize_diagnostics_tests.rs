@@ -1,6 +1,6 @@
 //! Completed diagnostic batches publish before proof resolution. ALL UNRUN.
 use crate::application_mcp::revision_sync::motion_finalize::tests::{
-    acknowledge, batch, fill, fixture, owner_state, pins, subscribe,
+    acknowledge, batch, external_revision, fixture, owner_state, pins, subscribe,
 };
 use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use serde_json::{json, Value};
@@ -27,7 +27,7 @@ fn pending_r1_proof_publishes_actual_error_then_clear_before_return_without_ack(
         .dispatch(
             s.instance_id(),
             &s.native,
-            fill(&s, &origin, "diagnostic-r1"),
+            external_revision(&s, &origin, "diagnostic-r1"),
             true,
         )
         .unwrap();

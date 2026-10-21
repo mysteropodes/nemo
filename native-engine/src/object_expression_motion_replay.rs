@@ -123,7 +123,7 @@ pub fn prepare_object_motion_exposure_frame_for_control(
     let effects = motion.effects.into_inner();
     let candidate = prepared.is_ok() && current.is_ok() && refusal.is_none();
     let reason = format!(
-        "Motion effects await owner finalization: frame {}; refusal={refusal:?}; frame={:?}; owner={current:?}",
+        "Motion effects await owner finalization: frame {}; refusal={refusal:?}; frame={:?}; owner={current:?}; effects={effects:?}",
         selector.frame, prepared.as_ref().err(),
     );
     if effects.is_empty() && !candidate {

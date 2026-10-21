@@ -81,13 +81,11 @@ fn read(
         owner.with_prepared_object_preview(&pins(origin, 1), output, |_| Ok(()))
     })
 }
-fn fill(s: &ApplicationMcp, origin: &ObjectSnapshot, id: &str) -> NativeApplicationRequest {
+fn external_revision(s: &ApplicationMcp, origin: &ObjectSnapshot, id: &str) -> NativeApplicationRequest {
     serde_json::from_value(json!({"apiVersion":2,"requestId":id,
         "instanceId":s.instance_id(),"documentId":origin.document_id(),
-        "expectedRevision":origin.content_revision(),"operation":"command.document.object.fill.set",
-        "payload":{"command":"object.fill.set","stableTarget":{"contextId":"scene-root",
-            "frameScope":{"kind":"authored","frame":1},"layerUid":"L0","strokeId":"a"},
-            "fill":{"kind":"solid","r":1,"g":0,"b":0,"a":1}}}))
+        "expectedRevision":origin.content_revision(),"operation":"command.document.object.layer.create",
+        "payload":{"command":"object.layer.create","name":"Independent revision"}}))
     .unwrap()
 }
 
@@ -179,7 +177,7 @@ async fn exact_r1_proof_renders_cached_timeout_fallback_then_ack_settle_allows_o
         .dispatch(
             s.instance_id(),
             &s.native,
-            fill(&s, &origin, "external-r1"),
+            external_revision(&s, &origin, "external-r1"),
             true,
         )
         .unwrap();
@@ -235,7 +233,7 @@ async fn exact_r1_proof_renders_cached_timeout_fallback_then_ack_settle_allows_o
             .dispatch(
                 s.instance_id(),
                 &s.native,
-                fill(&s, &at_r1, "no-piggyback"),
+                external_revision(&s, &at_r1, "no-piggyback"),
                 false,
             )
             .unwrap();
@@ -272,7 +270,7 @@ async fn disconnect_before_prior_ack_preserves_effects_and_never_advances_or_dra
         .dispatch(
             s.instance_id(),
             &s.native,
-            fill(&s, &origin, "disconnect-r1"),
+            external_revision(&s, &origin, "disconnect-r1"),
             true,
         )
         .unwrap();
@@ -370,7 +368,7 @@ async fn cancellation_and_foreign_completion_preserve_exact_owner_batch_without_
         .dispatch(
             s.instance_id(),
             &s.native,
-            fill(&s, &origin, "unrelated-command"),
+            external_revision(&s, &origin, "unrelated-command"),
             false,
         )
         .unwrap();
