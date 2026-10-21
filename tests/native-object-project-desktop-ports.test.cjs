@@ -9,6 +9,7 @@ const Application=require('../src/js/adapters/native-application.js');
 const CompositionUI=require('../src/js/adapters/native-composition-ui.js');
 const PaletteUI=require('../src/js/adapters/native-palette-ui.js');
 const CommentsUI=require('../src/js/adapters/native-comments-ui.js');
+const PerspectiveUI=require('../src/js/adapters/native-perspective-ui.js');
 const turn=()=>new Promise(setImmediate);
 const timerTurn=()=>new Promise(resolve=>setTimeout(resolve,0));
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
@@ -82,6 +83,17 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
         }
         result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
           documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
+      }else if(r.operation==='query.document.object.project.perspective.read'){
+        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
+        assert.equal(p.contextId,'scene-root');
+        const settings={perspectiveVPsPresent:false,perspectiveVPsNull:false,perspectiveVPCount:0,effectiveVPCount:2,vpSource:'default'};
+        if(p.selector.kind==='settings')result=settings;
+        else{
+          assert.equal(p.selector.kind,'vpPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
+          result={kind:'perspectiveVPPage',...settings,cursor:0,items:[{ordinal:1,x:-48,y:90,locked:false},{ordinal:2,x:368,y:90,locked:false}],nextCursor:null};
+        }
+        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
+          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result};
       }else if(r.operation==='command.document.object.layer.policy.edit'){
         assert.equal(r.expectedRevision,revision);revision++;result={applied:true,historyEntriesAdded:1};
       }else throw Error('unexpected fake public operation');
@@ -452,5 +464,48 @@ test('ordinary Open readonly lifecycle converges and composition recovers after 
     // Retire actual controllers before release so failed assertions cannot leak a timer/query loop.
     if(composition)composition.dispose();if(comments)comments.dispose();
     first.resolve();second.resolve();await turn();await timerTurn();await turn();
+  }
+});
+
+test('ordinary Open metadata settles when Perspective repaint re-enters the actual coalescing native preview queue',async()=>{
+  const f=fixture(),published=gate(),renders=new Set(),seen=new Set();
+  let composition=null,comments=null,perspective=null,repaints=0,timer,off=null,opening=null;
+  const lookup=f.root.document.getElementById;
+  f.root.document.getElementById=id=>id==='fb-avatars-pop'?null:lookup(id);
+  f.root.document.addEventListener=()=>{};f.root.document.removeEventListener=()=>{};
+  f.root.addEventListener=()=>{};f.root.removeEventListener=()=>{};
+  function observed(kind,value){if(value){seen.add(kind);if(seen.size===3)published.resolve();}}
+  f.root.SMBpm={refresh(){observed('composition',composition&&composition.read());}};
+  f.root.refreshFbAvatars=()=>observed('comments',comments&&comments.read());
+  // Preserve Project's actual wantedFrame/rendering coalescing without limiting finite repaints.
+  f.root.SMEngineBridge={renderNow(){repaints++;
+    const job=f.session.renderPreview(f.root.state.currentFrame);renders.add(job);return job;}};
+  try{
+    composition=CompositionUI.install(f.root);comments=CommentsUI.install(f.root);perspective=PerspectiveUI.install(f.root);
+    off=perspective.onRead(value=>observed('perspective',value));
+    await turn();opening=f.open();
+    await Promise.race([opening.then(()=>published.promise),new Promise((_,reject)=>{
+      timer=setTimeout(()=>{f.root.SMEngineBridge.renderNow=()=>{};
+        reject(Error('ordinary Open metadata did not settle with Perspective preview re-entry: '+JSON.stringify({seen:[...seen],repaints,
+          calls:f.calls.slice(-12).map(call=>({command:call.command,operation:call.r&&call.r.operation,
+            selector:call.r&&call.r.payload&&call.r.payload.selector&&call.r.payload.selector.kind}))})));},1000);})]);
+    clearTimeout(timer);await timerTurn();await turn();
+    const owner=f.session.info(),before=retained(f);
+    const values=[composition.read(),comments.read(),perspective.read()];
+    assert.ok(values.every(Boolean),'all ordinary metadata controllers must remain readable after publication');
+    for(const value of values)assert.deepEqual(value.info,values[0].info);
+    assert.equal(values[0].composition.effectiveBpm,120);assert.equal(values[0].composition.effectiveBpmOffset,0);
+    assert.equal(values[0].composition.effectiveBpmShow,false);
+    assert.deepEqual(values[2].perspective.items,[{ordinal:1,x:-48,y:90,locked:false},{ordinal:2,x:368,y:90,locked:false}]);
+    assert.strictEqual(f.session.info(),owner);assert.ok(f.session.readPresentedObjectSession());
+    const count=f.calls.length,renderCount=repaints;await timerTurn();await turn();await timerTurn();await turn();
+    assert.equal(f.calls.length,count,'stable metadata must not schedule further native preview or query work');
+    assert.equal(repaints,renderCount,'stable notifications must not repaint into the preview queue');
+    assert.ok(f.calls.filter(call=>call.command==='nemo_native_dispatch').every(call=>call.r.operation.startsWith('query.')));
+    assert.equal(owner.contentRevision,0);assert.equal(f.transports.length,1);assertRetained(f,before);
+  }finally{
+    clearTimeout(timer);f.root.SMEngineBridge.renderNow=()=>{};
+    if(off)off();if(perspective)perspective.dispose();if(composition)composition.dispose();if(comments)comments.dispose();
+    await Promise.allSettled([...renders,opening]);await timerTurn();await turn();
   }
 });
