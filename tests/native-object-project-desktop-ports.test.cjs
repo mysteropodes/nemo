@@ -10,25 +10,28 @@ const CompositionUI=require('../src/js/adapters/native-composition-ui.js');
 const PaletteUI=require('../src/js/adapters/native-palette-ui.js');
 const CommentsUI=require('../src/js/adapters/native-comments-ui.js');
 const PerspectiveUI=require('../src/js/adapters/native-perspective-ui.js');
+const vm=require('node:vm'),fs=require('node:fs');
 const turn=()=>new Promise(setImmediate);
 const timerTurn=()=>new Promise(resolve=>setTimeout(resolve,0));
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
+async function bounded(promise,label,ending='settle'){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{
+  timer=setTimeout(()=>reject(Error(label+' did not '+ending)),1000);})]);}finally{clearTimeout(timer);}}
 function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
   let paletteReplyHold=null,commentsReplyHold=null;
   const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[],notifications=[];
   let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
-  const document={documentElement:{clientWidth:1200,clientHeight:900,
+  const document={addEventListener(){},removeEventListener(){},documentElement:{clientWidth:1200,clientHeight:900,
     classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
     style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}},
     getElementById:id=>{
       if(['palette-grid','palette-tabs','btn-palette-new','btn-palette-add-fill','btn-palette-add-stroke',
-        'btn-palette-replace','btn-palette-swap','palette-replace-scope'].includes(id))return null;
+        'btn-palette-replace','btn-palette-swap','palette-replace-scope','fb-avatars-pop'].includes(id))return null;
       assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId,contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,lifecycleGeneration:generation,
     documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:layerRows.map(row=>({...row})),reference:null});
-  const root={document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
+  const root={addEventListener(){},removeEventListener(){},document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
     NemoNativeObjectProject:Project,
     NemoNativeObjectProjectFile:{...Files,refreshLayerTable:(r,i)=>{log.push('project');return !projectionRefused&&Files.refreshLayerTable(r,i);}},
     NemoNativeApplicationAdapter:Application,NemoNativeObjectUI:{refreshTiming:r=>{assert.equal(r,root);log.push('timing');},refreshPolicy:r=>{assert.equal(r,root);log.push('policy');}},
@@ -46,7 +49,11 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     if(command==='nemo_native_dispatch'){
       log.push(r.operation);const p=r.payload;
       let result;
-      const pin=info();
+      const pin=info(),projectRead=['composition','palette','comments','perspective'].some(kind=>r.operation==='query.document.object.project.'+kind+'.read');
+      if(projectRead){
+        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
+        assert.equal(p.contextId,'scene-root');
+      }
       if(r.operation==='query.document.object.property.metadata'){
         if(held)await held.promise;
         result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
@@ -55,8 +62,6 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
           unavailableCategories:['conditionalMotionRows','pathVerticesTrimStrokeBrushMesh','referenceOnlyElements',
             'expressionDiagnostics','layerEffectMatteReveal','propertyWrites'].map(category=>({category,state:'unavailable',reason:'not-admitted'}))};
       }else if(r.operation==='query.document.object.project.composition.read'||r.operation==='query.document.object.project.palette.read'){
-        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
-        assert.equal(p.contextId,'scene-root');
         const composition=r.operation==='query.document.object.project.composition.read';
         let value;
         if(p.selector.kind==='settings'){
@@ -69,11 +74,9 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
           value=composition?{kind:'markerPage',markersPresent:false,markerCount:0,cursor:0,items:[],nextCursor:null}:
             {kind:'palettePage',palettesPresent:true,paletteCount:0,cursor:0,items:[],nextCursor:null};
         }
-        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
-          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
+        result=value;
       }else if(r.operation==='query.document.object.project.comments.read'){
-        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
-        assert.equal(p.contextId,'scene-root');let value;
+        let value;
         if(p.selector.kind==='settings'){
           if(commentsReplyHold){const own=commentsReplyHold;commentsReplyHold=null;own.entered();await own.promise;}
           value={commentsPresent:false,commentCount:0};
@@ -81,22 +84,19 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
           assert.equal(p.selector.kind,'commentsPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
           value={kind:'projectCommentsPage',commentsPresent:false,commentCount:0,cursor:0,items:[],nextCursor:null};
         }
-        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
-          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
+        result=value;
       }else if(r.operation==='query.document.object.project.perspective.read'){
-        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
-        assert.equal(p.contextId,'scene-root');
         const settings={perspectiveVPsPresent:false,perspectiveVPsNull:false,perspectiveVPCount:0,effectiveVPCount:2,vpSource:'default'};
         if(p.selector.kind==='settings')result=settings;
         else{
           assert.equal(p.selector.kind,'vpPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
           result={kind:'perspectiveVPPage',...settings,cursor:0,items:[{ordinal:1,x:-48,y:90,locked:false},{ordinal:2,x:368,y:90,locked:false}],nextCursor:null};
         }
-        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
-          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result};
       }else if(r.operation==='command.document.object.layer.policy.edit'){
         assert.equal(r.expectedRevision,revision);revision++;result={applied:true,historyEntriesAdded:1};
       }else throw Error('unexpected fake public operation');
+      if(projectRead)result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
+        documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result};
       const reply={apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:pin.documentId,contentRevision:r.operation.startsWith('query.')?pin.contentRevision:revision,ok:true,result};
       if(replyMutation)replyMutation(reply);return reply;
     }
@@ -226,6 +226,111 @@ test('pending preview rejects an in-flight read immediately and does not settle 
   await assert.rejects(pending,/presentation changed/);assert.equal(finished,false);
   previewHold.resolve();await preview;assert.equal(finished,true);
 });
+function bpmEntryDOM(f){
+  const document=f.root.document,lookup=document.getElementById,pagehide=[];
+  function element(tag){const el={tagName:tag,children:[],style:{},events:{},classList:{toggle(){}},
+    setAttribute(k,v){this[k]=String(v);},addEventListener(k,fn){this.events[k]=fn;},
+    appendChild(child){child.parentNode=this;this.children.push(child);return child;},
+    focus(){document.activeElement=this;},select(){},remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(v=>v!==this);}};return el;}
+  const button=element('button');document.body=element('body');document.readyState='complete';
+  document.createElement=element;document.activeElement=null;
+  document.getElementById=id=>id==='btn-bpm'?button:id==='frame-grid'?null:lookup(id);
+  f.root.window=f.root;f.root.addEventListener=(kind,fn)=>{if(kind==='pagehide')pagehide.push(fn);};
+  f.root.NemoNativeObjectProjectDesktop=Ports;
+  return {document,button,pagehide,dialogs:()=>document.body.children.filter(v=>v.id==='bpm-settings-dialog')};
+}
+test('actual Composition recovers after a same-frame pending preview without weakening presentation guards',()=>withPendingBpmEntry(async c=>{
+  const {f,hold,composition,preview,before,frame}=c;
+    assert.equal(f.calls.filter(c=>c.command==='nemo_native_object_preview').length,c.previewCount+1);
+    assert.equal(f.session.readPresentedObjectSession(),null);
+    const refused=[];assert.equal(composition.read(code=>refused.push(code)),null);
+    assert.deepEqual(refused,['presentation-missing']);
+    assert.strictEqual(f.session.info(),before.info);assert.equal(f.root.state.currentFrame,frame);
+    hold.resolve();await preview;await timerTurn();await turn();await timerTurn();await turn();
+    const recovered=composition.read();assert.ok(recovered,'existing presented fanout must recover the complete composition projection');
+    assert.equal(recovered.composition.effectiveBpm,120);assert.equal(recovered.composition.effectiveBpmOffset,0);
+    assert.equal(recovered.composition.effectiveBpmShow,false);
+    for(const key of ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'])
+      assert.equal(recovered.info[key],before.info[key]);
+    assert.strictEqual(f.session.info(),before.info);assert.equal(f.session.readSubscriptionGeneration(),before.generation);
+    assert.equal(f.root.state.currentFrame,frame);assert.equal(f.session.isIndeterminate(),false);
+    assert.ok(f.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>c.r.frame===frame));
+    assert.ok(f.calls.filter(c=>c.command==='nemo_native_dispatch').every(c=>c.r.operation.startsWith('query.')));
+    const settled=f.calls.length;await timerTurn();await turn();assert.equal(f.calls.length,settled);
+},false));
+async function withPendingBpmEntry(check,bpm=true){
+  const f=fixture(),hold=gate(),dom=bpm?bpmEntryDOM(f):null,c={f,hold,dom,jobs:[],composition:null,replacement:null,preview:null,timer:null};
+  try{
+    await f.open();c.composition=CompositionUI.install(f.root);c.origin=await c.composition.presented();assert.ok(c.origin);
+    if(bpm)vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/bpm-grid.js'),'utf8'),f.root);
+    else {await timerTurn();await turn();}
+    c.before=retained(f);c.frame=f.root.state.currentFrame;
+    c.previewCount=f.calls.filter(call=>call.command==='nemo_native_object_preview').length;
+    assert.ok(c.composition.read());
+    f.previewGate(hold);c.preview=f.session.renderPreview(c.frame);await turn();
+    assert.equal(f.session.readPresentedObjectSession(),null);
+    await check(c);
+  }finally{
+    clearTimeout(c.timer);if(dom)dom.pagehide.forEach(fn=>fn());if(c.composition)c.composition.dispose();if(c.replacement)c.replacement.dispose();
+    hold.resolve();await Promise.allSettled([c.preview,...c.jobs]);await timerTurn();await turn();
+  }
+}
+async function ordinaryBpmEntry(requests){
+  await withPendingBpmEntry(async c=>{
+    const {f,hold,dom,composition,before,frame,preview}=c;let prevented=false;
+    for(let i=0;i<requests;i++)dom.button.events.contextmenu({preventDefault(){prevented=true;}});
+    assert.equal(prevented,true);assert.equal(dom.document.body.children.length,0,'a pending preview cannot authorize a dialog');
+    const waiting=requests>1?composition.readWhenPresented():null;
+    assert.equal(dom.dialogs().length,0);assert.strictEqual(f.session.info(),before.info);
+    hold.resolve();await preview;await timerTurn();await turn();await timerTurn();await turn();
+    assert.ok(composition.read(),'the real completion fanout recovered the composition');
+    if(waiting){
+      const value=await bounded(waiting,'duplicate entry waiter');assert.strictEqual(value,composition.read(),'duplicate requests must resolve the actual current projection');
+    }
+    assert.equal(dom.document.body.children.filter(v=>v.id==='bpm-settings-dialog').length,1,
+      'the original settings gesture must open once after its unchanged owner is presented');
+    assert.equal(dom.dialogs().length,1);assert.equal(dom.document.body.children.length,1);
+    assertRetained(f,{...before,presented:f.session.readPresentedObjectSession()});
+    assert.equal(f.root.state.currentFrame,frame);
+    assert.ok(f.calls.filter(call=>call.command==='nemo_native_dispatch').every(call=>call.r.operation.startsWith('query.')));
+    assert.equal(f.session.info().contentRevision,0);assert.equal(f.session.readSubscriptionGeneration(),before.generation);
+    const count=f.calls.length;await timerTurn();await turn();assert.equal(f.calls.length,count);
+  });
+}
+test('one ordinary BPM entry survives a same-frame pending preview without a second gesture',()=>ordinaryBpmEntry(1));
+test('duplicate ordinary BPM entries share one bounded wait and open one form without native edits',()=>ordinaryBpmEntry(4));
+
+test('deferred ordinary BPM entry cannot survive a real revision, owner, subscription, lifecycle or controller change',async()=>{
+  for(const mode of ['revision','owner','subscription','disconnected','disposed','pagehide','controller','competing-edit'])await withPendingBpmEntry(async c=>{
+    const {f,hold,dom,composition,origin,before,preview}=c;let change=null;
+    dom.button.events.contextmenu({preventDefault(){}});
+    const waiting=composition.readWhenPresented();assert.equal(dom.dialogs().length,0);
+    if(mode==='revision')change=f.emit();
+    else if(mode==='owner')change=f.session.openPath('/replacement.json',{reveal:async info=>Files.projectView(f.root,info)});
+    else if(mode==='subscription')change=f.session.openPath('/cancel.json',{confirm:async()=>false});
+    else if(mode==='disconnected')f.transports[0].disconnected(new Error('controlled genuine subscription retirement'));
+    else if(mode==='disposed')composition.dispose();
+    else if(mode==='pagehide')dom.pagehide.forEach(fn=>fn());
+    else if(mode==='controller'){const other=fixture();c.replacement=CompositionUI.install(other.root);f.root.NemoNativeCompositionController=c.replacement;}
+    else assert.equal((await composition.edit({kind:'setBpm',bpmShow:true},origin)).status,'unavailable');
+    if(change){c.jobs.push(change);change.catch(()=>{});}
+    hold.resolve();await preview;if(change)await change;
+    await timerTurn();await turn();await timerTurn();await turn();
+    // Exercise late publication through the replaced controller's real callback; the current slot remains replaced.
+    if(mode==='controller')await composition.presented();
+    const resolved=await bounded(waiting,mode+' waiter','retire');if(mode!=='controller')assert.equal(resolved,null,mode);
+    assert.equal(dom.dialogs().length,0,mode+' must not replay the old ordinary entry');
+    assert.equal(dom.document.body.children.length,0,mode);
+    assert.ok(f.calls.filter(call=>call.command==='nemo_native_dispatch').every(call=>call.r.operation.startsWith('query.')),mode);
+    if(mode==='revision')assert.equal(f.session.info().contentRevision,1);
+    else assert.equal(f.session.info().contentRevision,0);
+    if(mode==='owner')assert.notEqual(f.session.info().documentId,before.info.documentId);
+    if(mode==='subscription'){assert.strictEqual(f.session.info(),before.info);assert.ok(f.session.readSubscriptionGeneration()>before.generation);}
+    if(mode==='disconnected')assert.equal(f.session.isIndeterminate(),true);
+    const count=f.calls.length;await timerTurn();await turn();assert.equal(f.calls.length,count,mode);
+  });
+});
+
 test('readiness loss and native synchronization both refuse delayed reads without owner fencing',async()=>{
   for(const mode of ['disconnect','projection','revision']){const f=fixture();await f.open();const hold=gate();f.hold(hold);const pending=f.session.readPropertyMetadata(selector(f));await turn();
     if(mode==='disconnect')f.transports[0].connected=false;
@@ -414,13 +519,7 @@ test('ordinary Open readonly lifecycle converges and composition recovers after 
   const f=fixture(),compositionPublications=[],commentPublications=[],refusals=[];
   let composition=null,comments=null;
   function readGate(){const held=gate(),started=gate();return {...held,started:started.promise,entered:started.resolve};}
-  async function bounded(promise,label){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{
-    timer=setTimeout(()=>reject(Error(label+' did not settle')),1000);})]);}finally{clearTimeout(timer);}}
   const first=readGate(),second=readGate(),firstCommentPublication=gate();
-  const lookup=f.root.document.getElementById;
-  f.root.document.getElementById=id=>id==='fb-avatars-pop'?null:lookup(id);
-  f.root.document.addEventListener=()=>{};f.root.document.removeEventListener=()=>{};
-  f.root.addEventListener=()=>{};f.root.removeEventListener=()=>{};
   // Capture only complete readbacks through the existing controller repaint ports.
   f.root.SMBpm={refresh(){const value=composition&&composition.read();if(value)compositionPublications.push(value);}};
   f.root.refreshFbAvatars=()=>{const value=comments&&comments.read();if(value){
@@ -470,10 +569,6 @@ test('ordinary Open readonly lifecycle converges and composition recovers after 
 test('ordinary Open metadata settles when Perspective repaint re-enters the actual coalescing native preview queue',async()=>{
   const f=fixture(),published=gate(),renders=new Set(),seen=new Set();
   let composition=null,comments=null,perspective=null,repaints=0,timer,off=null,opening=null;
-  const lookup=f.root.document.getElementById;
-  f.root.document.getElementById=id=>id==='fb-avatars-pop'?null:lookup(id);
-  f.root.document.addEventListener=()=>{};f.root.document.removeEventListener=()=>{};
-  f.root.addEventListener=()=>{};f.root.removeEventListener=()=>{};
   function observed(kind,value){if(value){seen.add(kind);if(seen.size===3)published.resolve();}}
   f.root.SMBpm={refresh(){observed('composition',composition&&composition.read());}};
   f.root.refreshFbAvatars=()=>observed('comments',comments&&comments.read());
