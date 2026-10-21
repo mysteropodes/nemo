@@ -30,7 +30,7 @@ function fixture(hostname = 'nemo.example') {
     document: { title: 'Nemo v1.2.3', addEventListener: (...args) => listeners.push(args) },
     navigator: { userAgent: 'test-agent', onLine: true }, screen: { width: 1440, height: 900 },
     innerWidth: 800, innerHeight: 600, location: { hostname },
-    Date: { now: () => now }, Math: { random: () => 0.5, floor: Math.floor }, fetch,
+    Date: { now: () => now }, Math: Object.assign(Object.create(Math), { random: () => 0.5 }), fetch,
     console: { warn: (...args) => warnings.push(args) },
     localStorage: {
       getItem: key => store.get(key) || null,
