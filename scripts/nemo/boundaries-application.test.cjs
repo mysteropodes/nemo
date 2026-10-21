@@ -349,7 +349,8 @@ test('every exclusion retains explicit classification, evidence and nested conte
 test('application size enforcement ignores known graph debt but rejects growth and expired exceptions', (t) => {
   const current = checkApplicationSize(read('app-js.profile.json'), { root: ROOT });
   assert.equal(current.ok, true);
-  assert.equal(current.exceptionsApplied.length, 36);
+  assert.equal(current.exceptionsApplied.length, 35);
+  assert.equal(current.exceptionsApplied.some(entry => entry.path === 'src/js/feedback-bridge.js'), false);
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo app size '));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
