@@ -24,6 +24,8 @@
       stamp.session.isActive()&&same(stamp.session.info(),stamp.info)&&stamp.session.readSubscriptionGeneration()===stamp.ticket;}
     function guard(stamp){if(!current(stamp))throw fault('stale_revision');}
     function actionReady(stamp,ctx){guard(stamp);if(!ctx||!presented(ctx.readPresentedObjectSession(),stamp.info))throw fault();}
+    // Identity stamps remain narrow; readiness receives the same-pin full native metadata.
+    function available(stamp){var info=stamp.session.info();return same(info,stamp.info)&&ports.available(stamp.session,info)===true;}
     function response(request,value){
       if(!value||value.apiVersion!==2||value.requestId!==request.requestId||typeof value.ok!=='boolean')throw fault();
       Contract.correlate(request,value);
@@ -49,7 +51,7 @@
         if(items.length!==settings.markerCount)throw fault();
         return freeze(Object.assign({},settings,{markers:items}));
       });
-      guard(stamp);if(!presented(stamp.session.readPresentedObjectSession(),stamp.info)||ports.available(stamp.session,stamp.info)!==true)throw fault();
+      guard(stamp);if(!presented(stamp.session.readPresentedObjectSession(),stamp.info)||!available(stamp))throw fault();
       var projection=freeze({info:stamp.info,composition:data});
       if(typeof ports.publish==='function'&&ports.publish(projection)!==true)throw fault();
       guard(stamp);cache={stamp:stamp,value:projection};return projection;
@@ -79,7 +81,7 @@
     }
     return Object.freeze({refresh:refresh,edit:edit,invalidate:invalidate,
       read:function(){try{if(cache&&current(cache.stamp)&&presented(cache.stamp.session.readPresentedObjectSession(),cache.stamp.info)&&
-        ports.available(cache.stamp.session,cache.stamp.info)===true)return cache.value;}catch(_){}cache=null;return null;},
+        available(cache.stamp))return cache.value;}catch(_){}cache=null;return null;},
       dispose:function(){retired=true;invalidate();}});
   }
   return Object.freeze({create:create});
