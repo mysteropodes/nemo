@@ -56,8 +56,16 @@ pub(crate) enum BitmapBrushValueError {
 }
 
 pub(crate) const PROCEDURAL_TIPS: [&str; 10] = [
-    "soft", "hard", "grain", "charcoal-rough", "dry-brush",
-    "watercolor-edge", "splatter", "ink-splatter-fine", "stipple", "marker-flat",
+    "soft",
+    "hard",
+    "grain",
+    "charcoal-rough",
+    "dry-brush",
+    "watercolor-edge",
+    "splatter",
+    "ink-splatter-fine",
+    "stipple",
+    "marker-flat",
 ];
 fn invalid(message: &'static str) -> BitmapBrushValueError {
     BitmapBrushValueError::Invalid(message)
@@ -83,7 +91,10 @@ pub(crate) fn rgba(text: &str) -> Option<[u8; 4]> {
 }
 pub(crate) fn validate_fields(fields: &BitmapBrushFields) -> Result<(), BitmapBrushValueError> {
     let spec = &fields.bitmap_brush_spec;
-    if fields.brush_group_id.is_empty() || fields.brush_group_id.len() > 255 || fields.brush_group_id.contains('\0') {
+    if fields.brush_group_id.is_empty()
+        || fields.brush_group_id.len() > 255
+        || fields.brush_group_id.contains('\0')
+    {
         return Err(invalid("invalid bitmap brush group"));
     }
     // Unknown/custom names remain persisted. The concrete baker must report
@@ -91,8 +102,16 @@ pub(crate) fn validate_fields(fields: &BitmapBrushFields) -> Result<(), BitmapBr
     if spec.tip.is_empty() || spec.tip.len() > 255 || spec.tip.contains('\0') {
         return Err(invalid("invalid bitmap brush tip identity"));
     }
-    if [&spec.size, &spec.spacing, &spec.scatter, &spec.opacity, &spec.seed]
-        .iter().any(|n| !n.as_f64().is_some_and(f64::is_finite)) {
+    if [
+        &spec.size,
+        &spec.spacing,
+        &spec.scatter,
+        &spec.opacity,
+        &spec.seed,
+    ]
+    .iter()
+    .any(|n| !n.as_f64().is_some_and(f64::is_finite))
+    {
         return Err(invalid("bitmap brush spec numbers must be finite"));
     }
     if rgba(&spec.color).is_none() {
@@ -103,37 +122,59 @@ pub(crate) fn validate_fields(fields: &BitmapBrushFields) -> Result<(), BitmapBr
             return Err(invalid("bitmap brush remembered stroke is invalid"));
         }
     }
-    if fields.pre_texture_opacity.value().is_some_and(|n| !n.as_f64().is_some_and(f64::is_finite)) {
+    if fields
+        .pre_texture_opacity
+        .value()
+        .is_some_and(|n| !n.as_f64().is_some_and(f64::is_finite))
+    {
         return Err(invalid("bitmap brush remembered opacity must be finite"));
     }
     if let Some(profile) = fields.bitmap_pressure_profile.value() {
-        if profile.len() > 4096 || profile.iter().flatten().any(|n| !n.as_f64().is_some_and(f64::is_finite)) {
-            return Err(invalid("bitmap brush pressure profile is invalid or over budget"));
+        if profile.len() > 4096
+            || profile
+                .iter()
+                .flatten()
+                .any(|n| !n.as_f64().is_some_and(f64::is_finite))
+        {
+            return Err(invalid(
+                "bitmap brush pressure profile is invalid or over budget",
+            ));
         }
     }
     Ok(())
 }
 pub(crate) fn validate_record(record: &ObjectRecord) -> Result<(), BitmapBrushValueError> {
-    let Some(fields) = record.vector_ext.value().and_then(|ext| ext.bitmap_brush.value()) else {
+    let Some(fields) = record
+        .vector_ext
+        .value()
+        .and_then(|ext| ext.bitmap_brush.value())
+    else {
         return Ok(());
     };
     if record.family != VECTOR_FAMILY {
-        return Err(BitmapBrushValueError::Unsupported("bitmap brush requires editable vector"));
+        return Err(BitmapBrushValueError::Unsupported(
+            "bitmap brush requires editable vector",
+        ));
     }
     validate_fields(fields)?;
     if record.target().context_id() != "scene-root" {
         return Err(BitmapBrushValueError::Unsupported(
-            "bitmap brushes inside component contexts are unavailable"));
+            "bitmap brushes inside component contexts are unavailable",
+        ));
     }
     let Some(vector) = record.vector.value() else {
         return Err(invalid("bitmap brush anchor has no vector body"));
     };
     if record.solid_fill().is_some() {
         if vector.solid_stroke().is_some() || fields.pre_texture_stroke.missing() {
-            return Err(invalid("filled bitmap brush anchor camouflage is inconsistent"));
+            return Err(invalid(
+                "filled bitmap brush anchor camouflage is inconsistent",
+            ));
         }
     } else if vector.opacity.as_f64() != Some(0.0) || fields.pre_texture_opacity.missing() {
-        return Err(invalid("unfilled bitmap brush anchor camouflage is inconsistent"));
+        return Err(invalid(
+            "unfilled bitmap brush anchor camouflage is inconsistent",
+        ));
     }
     Ok(())
 }
@@ -144,18 +185,33 @@ pub(crate) fn trim_holder_consumed(
     holder: &crate::object_document::PropertyHolder,
 ) -> bool {
     let target = &holder.target;
-    let Some(stroke) = target.stroke_id.value() else { return false; };
-    if holder.controls.value().is_some_and(|v| !v.is_empty()) || holder.properties.is_empty() ||
-        !holder.properties.iter().all(|p| ["trimStart", "trimEnd", "trimOffset"].contains(&p.property.as_str()) &&
-            !p.expression.value().is_some_and(|e| e.enabled)) {
+    let Some(stroke) = target.stroke_id.value() else {
+        return false;
+    };
+    if holder.controls.value().is_some_and(|v| !v.is_empty())
+        || holder.properties.is_empty()
+        || !holder.properties.iter().all(|p| {
+            ["trimStart", "trimEnd", "trimOffset"].contains(&p.property.as_str())
+                && !p.expression.value().is_some_and(|e| e.enabled)
+        })
+    {
         return false;
     }
     let mut matched = false;
-    for record in document.objects().iter().filter(|r| r.target.context_id == target.context_id &&
-        r.target.layer_uid == target.layer_uid && r.target.stroke_id == *stroke) {
+    for record in document.objects().iter().filter(|r| {
+        r.target.context_id == target.context_id
+            && r.target.layer_uid == target.layer_uid
+            && r.target.stroke_id == *stroke
+    }) {
         matched = true;
-        if record.target.frame_scope.kind != crate::object_document::FrameScopeKind::Authored ||
-            record.vector_ext.value().and_then(|v| v.bitmap_brush.value()).is_none() || validate_record(record).is_err() {
+        if record.target.frame_scope.kind != crate::object_document::FrameScopeKind::Authored
+            || record
+                .vector_ext
+                .value()
+                .and_then(|v| v.bitmap_brush.value())
+                .is_none()
+            || validate_record(record).is_err()
+        {
             return false;
         }
     }

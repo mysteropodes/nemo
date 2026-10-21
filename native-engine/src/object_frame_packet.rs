@@ -2,8 +2,8 @@
 //! Array positions are provenance only; composition policy belongs to consumers.
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
 pub(crate) use crate::object_document::{
-    AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget, Presence,
-    PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
+    AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget,
+    Presence, PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
 pub(crate) use property_sampling::frame_motion::MotionValues;

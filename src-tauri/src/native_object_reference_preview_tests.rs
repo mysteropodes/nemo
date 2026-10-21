@@ -323,11 +323,13 @@ fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
         .unwrap();
     assert!(owner.preview.reference_cache.is_some());
     let count = trace.borrow().acquired;
-    let plan = owner.preview.brush_runtime.materialize(
-        &prepared.admission,
-        &mut |ids| gpu.retire_object_brush_resources(ids, (64, 64)).is_ok(),
-    )
-    .unwrap();
+    let plan = owner
+        .preview
+        .brush_runtime
+        .materialize(&prepared.admission, &mut |ids| {
+            gpu.retire_object_brush_resources(ids, (64, 64)).is_ok()
+        })
+        .unwrap();
     let failed = owner.prepare_reference_preview(&plan, (64, 64), &mut gpu, |previous| {
         assert!(
             previous.is_none(),
@@ -374,16 +376,20 @@ fn camera_choice_has_distinct_native_cache_identity_even_without_active_keys() {
     let camera = owner
         .prepare_object_preview_view(&pins, output(), ObjectPreviewView::StoredCamera, false)
         .unwrap();
-    let canvas_plan = owner.preview.brush_runtime.materialize(
-        &canvas.admission,
-        &mut |_| panic!("non-brush Camera fixture cannot retire bitmap resources"),
-    )
-    .unwrap();
-    let camera_plan = owner.preview.brush_runtime.materialize(
-        &camera.admission,
-        &mut |_| panic!("non-brush Camera fixture cannot retire bitmap resources"),
-    )
-    .unwrap();
+    let canvas_plan = owner
+        .preview
+        .brush_runtime
+        .materialize(&canvas.admission, &mut |_| {
+            panic!("non-brush Camera fixture cannot retire bitmap resources")
+        })
+        .unwrap();
+    let camera_plan = owner
+        .preview
+        .brush_runtime
+        .materialize(&camera.admission, &mut |_| {
+            panic!("non-brush Camera fixture cannot retire bitmap resources")
+        })
+        .unwrap();
     let canvas_key = canvas.materialized_key(&canvas_plan).unwrap();
     let camera_key = camera.materialized_key(&camera_plan).unwrap();
     assert_eq!(canvas_key.quality(), "final");

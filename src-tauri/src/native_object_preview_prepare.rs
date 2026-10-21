@@ -24,10 +24,7 @@ pub(super) struct PreparedObjectPreview {
 impl PreparedObjectPreview {
     /// Only a materialized native plan supplies resource versions. CPU admission
     /// alone is not a paint plan, scheduler key or presentation proof.
-    pub(super) fn materialized_key(
-        &self,
-        plan: &ObjectPaintPlan,
-    ) -> Result<EvaluationKey, String> {
+    pub(super) fn materialized_key(&self, plan: &ObjectPaintPlan) -> Result<EvaluationKey, String> {
         let packet = self.admission.packet();
         EvaluationKey::new(
             self.snapshot.snapshot_id(),

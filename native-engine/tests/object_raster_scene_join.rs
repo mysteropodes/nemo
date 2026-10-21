@@ -309,7 +309,9 @@ fn unsupported_raster_brush_range_and_context_are_refused_by_the_actual_producti
                             panic!("original fixture gained unexpected Duplicator")
                         }
                         #[cfg(all(feature = "application", feature = "project_media_codec"))]
-                        PaintEntry::Brush(_) => panic!("non-brush fixture gained unexpected bitmap brush"),
+                        PaintEntry::Brush(_) => {
+                            panic!("non-brush fixture gained unexpected bitmap brush")
+                        }
                         PaintEntry::Component(_) => {
                             panic!("PNG-only fixture gained unexpected Component")
                         }

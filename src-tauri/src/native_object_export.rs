@@ -4,13 +4,14 @@ use native_engine::{
     application::prepare_object_motion_exposure_frame_for_control,
     compositor::Compositor,
     export_job::{
-        export_object_frames_with_materializer, export_object_svg_frames, CleanupStatus, ExportReleaseReconciliation,
-        ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, ObjectHostExportRequest,
-        StagedArtifactPort,
+        export_object_frames_with_materializer, export_object_svg_frames, CleanupStatus,
+        ExportReleaseReconciliation, ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome,
+        ObjectHostExportRequest, StagedArtifactPort,
     },
     object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
-        prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene, ObjectBrushAdmission,
+        prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
+        ObjectBrushAdmission,
     },
     scheduler::{ObjectSchedulePins, ObjectScheduleScope, OutputSpec},
 };
@@ -173,9 +174,15 @@ impl NativeObjectHost {
             ObjectExportFormat::Png(compositor) => {
                 let (scheduler, motion_control, runtime) = self.preview.resources_for_export()?;
                 let mut admission_for = |frame| {
-                    let selector = ObjectFrameSelector { frame, ..expected.clone() };
+                    let selector = ObjectFrameSelector {
+                        frame,
+                        ..expected.clone()
+                    };
                     let packet = prepare_object_motion_exposure_frame_for_control(
-                        &self.history, &snapshot, &selector, motion_control,
+                        &self.history,
+                        &snapshot,
+                        &selector,
+                        motion_control,
                     )
                     .map_err(|error| format!("object export selector: {error}"))?;
                     ObjectBrushAdmission::prepare(&packet, &selector)
@@ -187,21 +194,40 @@ impl NativeObjectHost {
                 let mut refusal = None;
                 for &frame in frames {
                     match admission_for(frame) {
-                        Ok(admission) => { admissions.insert(frame, admission); }
-                        Err(error) => { if refusal.is_none() { refusal = Some(error); } }
+                        Ok(admission) => {
+                            admissions.insert(frame, admission);
+                        }
+                        Err(error) => {
+                            if refusal.is_none() {
+                                refusal = Some(error);
+                            }
+                        }
                     }
                 }
-                if let Some(error) = refusal { return Err(error); }
+                if let Some(error) = refusal {
+                    return Err(error);
+                }
                 export_object_frames_with_materializer(
-                    &self.history, scheduler, port, compositor, request, frames,
+                    &self.history,
+                    scheduler,
+                    port,
+                    compositor,
+                    request,
+                    frames,
                     |frame, gpu| {
-                        let admission = admissions.remove(&frame)
+                        let admission = admissions
+                            .remove(&frame)
                             .ok_or_else(|| "object export admission already consumed".to_owned())?;
-                        let selector = ObjectFrameSelector { frame, ..expected.clone() };
-                        let plan = runtime.materialize(&admission, &mut |ids| {
-                            gpu.retire_object_brush_resources(ids, request_dimensions).is_ok()
-                        })
-                        .map_err(|error| format!("export brush resources: {error:?}"))?;
+                        let selector = ObjectFrameSelector {
+                            frame,
+                            ..expected.clone()
+                        };
+                        let plan = runtime
+                            .materialize(&admission, &mut |ids| {
+                                gpu.retire_object_brush_resources(ids, request_dimensions)
+                                    .is_ok()
+                            })
+                            .map_err(|error| format!("export brush resources: {error:?}"))?;
                         prepare_object_composition(&plan, &selector)
                             .map_err(|error| format!("export composition: {error:?}"))
                     },
@@ -210,9 +236,15 @@ impl NativeObjectHost {
             ObjectExportFormat::Svg => {
                 let (scheduler, motion_control) = self.preview.export_frame_ports()?;
                 let mut witness_for = |frame| {
-                    let selector = ObjectFrameSelector { frame, ..expected.clone() };
+                    let selector = ObjectFrameSelector {
+                        frame,
+                        ..expected.clone()
+                    };
                     let packet = prepare_object_motion_exposure_frame_for_control(
-                        &self.history, &snapshot, &selector, motion_control,
+                        &self.history,
+                        &snapshot,
+                        &selector,
+                        motion_control,
                     )
                     .map_err(|error| format!("object export selector: {error}"))?;
                     let scene = prepare_object_render_scene(&packet, &selector)
@@ -226,13 +258,24 @@ impl NativeObjectHost {
                 let mut refusal = None;
                 for &frame in frames {
                     match witness_for(frame) {
-                        Ok(witness) => { prepared.insert(frame, witness); }
-                        Err(error) => { if refusal.is_none() { refusal = Some(error); } }
+                        Ok(witness) => {
+                            prepared.insert(frame, witness);
+                        }
+                        Err(error) => {
+                            if refusal.is_none() {
+                                refusal = Some(error);
+                            }
+                        }
                     }
                 }
-                if let Some(error) = refusal { return Err(error); }
-                let witnesses = |frame| prepared.remove(&frame)
-                    .ok_or_else(|| "object export witness already consumed".into());
+                if let Some(error) = refusal {
+                    return Err(error);
+                }
+                let witnesses = |frame| {
+                    prepared
+                        .remove(&frame)
+                        .ok_or_else(|| "object export witness already consumed".into())
+                };
                 export_object_svg_frames(&self.history, scheduler, port, request, frames, witnesses)
             }
         };

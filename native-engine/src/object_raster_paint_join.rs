@@ -32,7 +32,9 @@ impl ObjectPaintPlan {
         !self.scene.packet().duplicator_outputs().is_empty()
     }
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
-    pub(crate) fn brush_sources(&self) -> Option<&crate::object_render_scene::brush_scene::BrushSources> {
+    pub(crate) fn brush_sources(
+        &self,
+    ) -> Option<&crate::object_render_scene::brush_scene::BrushSources> {
         self.scene.brushes.as_deref()
     }
     pub(crate) fn has_components(&self) -> bool {
@@ -94,8 +96,16 @@ pub(super) fn prepare(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<(Vec<usize>, Vec<PaintIndex>), ObjectPaintPlanError> {
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
-    let brushes: Vec<_> = scene.brushes.iter().flat_map(|sources| sources.paints.iter()
-        .map(|source| (source.source_index, source.layer_index))).collect();
+    let brushes: Vec<_> = scene
+        .brushes
+        .iter()
+        .flat_map(|sources| {
+            sources
+                .paints
+                .iter()
+                .map(|source| (source.source_index, source.layer_index))
+        })
+        .collect();
     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     let brushes = Vec::new();
     prepare_with_brush_indices(scene, expected, &brushes)
@@ -133,11 +143,15 @@ pub(crate) fn prepare_with_brush_indices(
     }
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     for (index, (source, layer)) in brush_indices.iter().enumerate() {
-        if selected.get(source) != Some(layer) { return Err(ObjectPaintPlanError::InvalidOrder); }
+        if selected.get(source) != Some(layer) {
+            return Err(ObjectPaintPlanError::InvalidOrder);
+        }
         rasters = rasters.with_item(*source, PaintIndex::Brush(index));
     }
     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
-    if !brush_indices.is_empty() { return Err(ObjectPaintPlanError::Unavailable); }
+    if !brush_indices.is_empty() {
+        return Err(ObjectPaintPlanError::Unavailable);
+    }
     let mut texts = ProducerOutput::new("text-block", pin);
     for (index, source) in scene.texts.entries.iter().enumerate() {
         if selected.get(&source.source_index) != Some(&source.layer_index) {

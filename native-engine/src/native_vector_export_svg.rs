@@ -332,8 +332,10 @@ fn emit_frame(
 ) -> Result<usize, SvgExportError> {
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     if let Some(source_object_index) = plan.first_brush_source() {
-        return Err(SvgExportError::Unsupported { source_object_index,
-            reason: "retained bitmap brush paint has no SVG representation" });
+        return Err(SvgExportError::Unsupported {
+            source_object_index,
+            reason: "retained bitmap brush paint has no SVG representation",
+        });
     }
     // Unsupported mixed content must refuse the whole frame before even the
     // document header is counted, never disappear behind a successful subset.
@@ -435,10 +437,12 @@ fn emit_frame(
             }
             PaintEntry::Raster(index) => return Err(unsupported_raster(plan, index)),
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
-            PaintEntry::Brush(_) => return Err(SvgExportError::Unsupported {
-                source_object_index: plan.first_brush_source().expect("admitted brush paint"),
-                reason: "retained bitmap brush paint has no SVG representation",
-            }),
+            PaintEntry::Brush(_) => {
+                return Err(SvgExportError::Unsupported {
+                    source_object_index: plan.first_brush_source().expect("admitted brush paint"),
+                    reason: "retained bitmap brush paint has no SVG representation",
+                })
+            }
         }
     }
     if sink.camera.is_some() {

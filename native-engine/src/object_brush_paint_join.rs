@@ -1,11 +1,14 @@
 //! Brush paints retain their charged pixels through the ordinary scene witness.
-use crate::object_render_scene::{ObjectCompositionWitness, ObjectPaintPlan, ObjectSceneError, ObjectSceneResourceSet};
 use crate::object_render_scene::scene_effect_kernels::object_scene_resource_set::SceneResourceEntry;
+use crate::object_render_scene::{
+    ObjectCompositionWitness, ObjectPaintPlan, ObjectSceneError, ObjectSceneResourceSet,
+};
 use std::sync::Arc;
 use vello::{kurbo::Affine, peniko::ImageData};
 impl ObjectPaintPlan {
     pub(crate) fn has_brushes(&self) -> bool {
-        self.brush_sources().is_some_and(|sources| !sources.paints.is_empty())
+        self.brush_sources()
+            .is_some_and(|sources| !sources.paints.is_empty())
     }
     pub(crate) fn first_brush_source(&self) -> Option<usize> {
         self.brush_sources()?.paints.first().map(|p| p.source_index)
@@ -26,23 +29,54 @@ impl ObjectPaintPlan {
         }
     }
 }
-pub(super) fn attach(mut witness: ObjectCompositionWitness) -> Result<ObjectCompositionWitness,ObjectSceneError> {
-    let Some(brushes) = witness.plan.brush_sources() else { return Ok(witness); };
-    let entries = witness.resources.iter().flat_map(|set|set.entries())
-        .chain(brushes.resources().entries()).map(|entry| SceneResourceEntry::new(
-            entry.resource_id(),entry.version(),entry.kind(),entry.charged_bytes(),Arc::clone(entry.retention())))
+pub(super) fn attach(
+    mut witness: ObjectCompositionWitness,
+) -> Result<ObjectCompositionWitness, ObjectSceneError> {
+    let Some(brushes) = witness.plan.brush_sources() else {
+        return Ok(witness);
+    };
+    let entries = witness
+        .resources
+        .iter()
+        .flat_map(|set| set.entries())
+        .chain(brushes.resources().entries())
+        .map(|entry| {
+            SceneResourceEntry::new(
+                entry.resource_id(),
+                entry.version(),
+                entry.kind(),
+                entry.charged_bytes(),
+                Arc::clone(entry.retention()),
+            )
+        })
         .collect();
-    witness.resources = Some(Arc::new(ObjectSceneResourceSet::new(entries).map_err(|_|
-        ObjectSceneError::UnsupportedGeometry {source_object_index:0, reason:"mixed brush resource declarations invalid"})?));
+    witness.resources = Some(Arc::new(ObjectSceneResourceSet::new(entries).map_err(
+        |_| ObjectSceneError::UnsupportedGeometry {
+            source_object_index: 0,
+            reason: "mixed brush resource declarations invalid",
+        },
+    )?));
     Ok(witness)
 }
 impl ObjectCompositionWitness {
-    pub(crate) fn brush_images(&self) -> impl Iterator<Item=&ImageData> {
-        self.plan.brush_sources().into_iter().flat_map(|sources| sources.images())
+    pub(crate) fn brush_images(&self) -> impl Iterator<Item = &ImageData> {
+        self.plan
+            .brush_sources()
+            .into_iter()
+            .flat_map(|sources| sources.images())
     }
-    pub(crate) fn brush_image(&self,index:usize) -> Result<Option<(&ImageData,Affine,f32)>,ObjectSceneError> {
-        let paint = self.plan.brush_sources().and_then(|sources|sources.paints.get(index))
-            .ok_or_else(|| ObjectSceneError::UnsupportedGeometry { source_object_index: index, reason: "admitted brush image unavailable" })?;
+    pub(crate) fn brush_image(
+        &self,
+        index: usize,
+    ) -> Result<Option<(&ImageData, Affine, f32)>, ObjectSceneError> {
+        let paint = self
+            .plan
+            .brush_sources()
+            .and_then(|sources| sources.paints.get(index))
+            .ok_or_else(|| ObjectSceneError::UnsupportedGeometry {
+                source_object_index: index,
+                reason: "admitted brush image unavailable",
+            })?;
         Ok(paint.image())
     }
 }

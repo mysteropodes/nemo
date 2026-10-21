@@ -37,12 +37,12 @@ pub use scheduled::{
     LiveObjectComposition, ScheduledObjectSceneError,
 };
 
-#[path = "object_brush_scene_join.rs"]
-#[cfg(all(feature = "application", feature = "project_media_codec"))]
-pub(crate) mod brush_scene;
 #[path = "object_brush_admission.rs"]
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 mod brush_admission;
+#[path = "object_brush_scene_join.rs"]
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub(crate) mod brush_scene;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 pub use brush_admission::ObjectBrushAdmission;
 #[path = "object_brush_paint_join.rs"]
@@ -327,9 +327,15 @@ pub struct ObjectRenderScene {
 impl ObjectRenderScene {
     pub(crate) fn brush_paints_empty(&self) -> bool {
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
-        { self.brushes.as_ref().is_none_or(|sources| sources.paints.is_empty()) }
+        {
+            self.brushes
+                .as_ref()
+                .is_none_or(|sources| sources.paints.is_empty())
+        }
         #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
-        { true }
+        {
+            true
+        }
     }
     pub fn packet(&self) -> &ObjectFramePacket {
         &self.packet

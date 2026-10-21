@@ -286,7 +286,11 @@ fn cpu_canonical_p38_default_preview_selects_authored_sources_at_0_6_7_12_20() {
             .project_file_snapshot(source.content_revision(), source.snapshot_id())
             .unwrap()
             .unwrap();
-        assert_eq!(saved.as_slice(), bytes, "canonical fixture bytes remain exact");
+        assert_eq!(
+            saved.as_slice(),
+            bytes,
+            "canonical fixture bytes remain exact"
+        );
         assert_eq!(source.document().objects().len(), 3);
         let alpha = source
             .document()

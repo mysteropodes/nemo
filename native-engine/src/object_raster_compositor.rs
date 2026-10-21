@@ -147,12 +147,21 @@ impl Compositor {
         ids: &[String],
         dimensions: (u32, u32),
     ) -> Result<(), CompositorError> {
-        crate::compositor::object_compositor::output_budget(dimensions.0, dimensions.1,
-            self.device.limits().max_texture_dimension_2d)?;
+        crate::compositor::object_compositor::output_budget(
+            dimensions.0,
+            dimensions.1,
+            self.device.limits().max_texture_dimension_2d,
+        )?;
         if ids.is_empty() || ids.iter().any(|id| id.is_empty()) {
-            return Err(CompositorError::new("brush retirement requires actual resource identities"));
+            return Err(CompositorError::new(
+                "brush retirement requires actual resource identities",
+            ));
         }
-        if self.retained_object_reference.as_ref().is_some_and(|old| old.plan().has_brushes()) {
+        if self
+            .retained_object_reference
+            .as_ref()
+            .is_some_and(|old| old.plan().has_brushes())
+        {
             self.reset_object_image_cache()?;
         }
         Ok(())
