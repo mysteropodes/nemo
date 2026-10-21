@@ -87,6 +87,7 @@ function fixture() {
   return {root,state,elements,document,controller,calls,notices,prompts,promptCalls,menus,jumps,edits,settled,diagnostics,
     projectionReady:value=>root.NemoNativeObjectProjectFile.projectionReadyForUI(browserRoot,value),
     fullInfo:()=>info,drift(){state.canvasW++;},repairProjection:project,
+    setController(value){browserRoot.NemoNativeCompositionController=value;},
     sameInstall:()=>vm.runInContext('NemoNativeCompositionUI.install(globalThis) === NemoNativeCompositionController',context),
     async ready(){await controller.presented();await settled();},
     marker:()=>elements['bars-row'].children.find(x=>x.className==='tl-marker tl-marker-comp'),
@@ -257,9 +258,9 @@ test('only the ordinary BPM settings origin read emits bounded refusal detail',a
   assert.equal(h.promptCalls.length,1);assert.equal(h.diagnostics.length,1);assert.equal(h.edits().length,0);
   h.drift();h.elements['btn-bpm'].fire('contextmenu');await h.settled();
   assert.deepEqual(h.diagnostics.at(-1),['bpm-settings-refused','projection-unready']);assert.equal(h.promptCalls.length,1);
-  const controller=h.root.NemoNativeCompositionController;delete h.root.NemoNativeCompositionController;
+  const controller=h.root.NemoNativeCompositionController;h.setController(null);
   h.elements['btn-bpm'].fire('contextmenu');assert.deepEqual(h.diagnostics.at(-1),['bpm-settings-refused','controller-missing']);
-  h.root.NemoNativeCompositionController=controller;
+  h.setController(controller);
   h.root.NemoNativeObjectProjectDesktop.openDiagnostic=()=>{throw Error('PRIVATE diagnostic sink');};
   assert.doesNotThrow(()=>h.elements['btn-bpm'].fire('contextmenu'));await h.settled();
   assert.equal(h.promptCalls.length,1);assert.equal(h.edits().length,0);h.unchanged();
