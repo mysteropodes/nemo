@@ -114,3 +114,39 @@ test('a second action while one is pending is consumed, and the entries stay nat
   assert.strictEqual(f.root.SM.toggleTimeRemap,f.legacy.toggleTimeRemap);
   assert.strictEqual(f.root.SM.setFootageInterpMode,f.legacy.setFootageInterpMode);
 });
+
+test('the Time Remap row value and stopwatch set or remove the key at the playhead through the placement',async()=>{
+  const f=fixture(video({timeRemap:{keyCount:2,keyAtFrame:false}}));f.api.bindTimeRemapEntries();
+  assert.equal(f.root.SM.timeRemapKeyFacts(1),null,'the first answer is the default while the read is pending');
+  await settle();
+  assert.deepEqual(f.root.SM.timeRemapKeyFacts(1),{keyCount:2,keyAtFrame:false});
+  assert.equal(f.root.SM.timeRemapKeyFacts(0),null);
+  assert.equal(await f.root.SM.timeRemapKeyIntent(1,12.5),true);
+  assert.deepEqual(f.calls[0].payload,{kind:'setTimeRemapKey',placementId:'p1',frame:10,value:12.5});
+  assert.equal(await f.root.SM.timeRemapKeyIntent(1,null),false,'no key here and no native value read: nothing is sent');
+  assert.equal(f.calls.length,1);
+  assert.ok(f.effects.some(e=>Array.isArray(e)&&e[0]==='toast'&&/not read natively/.test(e[1])));
+  f.setFacts(video({timeRemap:{keyCount:3,keyAtFrame:true}}));
+  assert.equal(await f.root.SM.timeRemapKeyIntent(1,null),true);
+  assert.deepEqual(f.calls[1].payload,{kind:'removeTimeRemapKey',placementId:'p1',frame:10});
+  f.setFacts(video({timeRemap:{keyCount:1,keyAtFrame:true}}));
+  assert.equal(await f.root.SM.timeRemapKeyIntent(1,null),true);
+  assert.deepEqual(f.calls[2].payload,{kind:'disableTimeRemap',placementId:'p1'});
+  for(const bad of [NaN,Infinity,'3'])assert.equal(await f.root.SM.timeRemapKeyIntent(1,bad),false);
+  f.setFacts(video());assert.equal(await f.root.SM.timeRemapKeyIntent(1,4),false,'an unremapped placement takes no key');
+  assert.equal(f.calls.length,3);assert.equal(f.effects.includes('legacy'),false);
+});
+
+test('the key entries are optional on the legacy owner and are removed again on release',async()=>{
+  const f=fixture(video());assert.equal('timeRemapKeyFacts' in f.legacy,false);f.api.bindTimeRemapEntries();
+  assert.equal(typeof f.root.SM.timeRemapKeyIntent,'function');
+  f.setBlocks(false);f.setActive(false);f.api.disposeTimeRemapEntries();
+  assert.equal('timeRemapKeyFacts' in f.root.SM,false);assert.equal('timeRemapKeyIntent' in f.root.SM,false);
+});
+
+test('motion.js routes the native Time Remap row to the key intent before any legacy writer',()=>{
+  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/js/motion.js'),'utf8');
+  assert.match(src,/holder\.timeRemap \|\| nativeRemapFacts\(holder\)/);
+  const intents=src.match(/if \(remapFacts\) \{ window\.SM\.timeRemapKeyIntent\(state\.layers\.indexOf\(holder\), (null|nv)\); return; \}\n\s*pushUndo\(\);/g)||[];
+  assert.equal(intents.length,2,'stopwatch and value field both return before pushUndo');
+});

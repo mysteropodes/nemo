@@ -10,6 +10,8 @@
   var bindings=new WeakMap();
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   var entries=['toggleTimeRemap','isTimeRemapped','footageInterpMode','setFootageInterpMode'];
+  // Placeholders the legacy owner need not define: rows read their own track there.
+  var optional=['timeRemapKeyFacts','timeRemapKeyIntent'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
   function usable(ports,session){
     return !!session&&ports.currentSession()===session&&session.isActive()===true&&session.blocksLegacy()===true&&
@@ -25,7 +27,7 @@
     var target=root.SM;
     if(!target||!Placement||!entries.every(function(name){return typeof target[name]==='function';}))return null;
     var original={},retired=false,pending=null,facts=new Map();
-    entries.forEach(function(name){original[name]=target[name];});
+    entries.concat(optional).forEach(function(name){original[name]=target[name];});
     // The layer's placement at the playhead, pinned to the presented snapshot.
     function context(li){
       var session=ports.currentSession();
@@ -131,19 +133,44 @@
         return edit(ctx,{kind:'setInterpMode',placementId:p.placementId,interpMode:value});
       });
     }
+    function unavailable(message){if(typeof root.showToast==='function')root.showToast(message);return false;}
+    // The Time Remap row's stopwatch (value null) or value field at the playhead,
+    // as the baseline row: a key here is removed, the last one turns remapping off.
+    function timeRemapKeyIntent(li,value){
+      return serialized(async function(){
+        var ctx=context(li);if(!ctx)return false;
+        facts.delete(ctx.key);
+        var p=await read(ctx);
+        if(!p||!remapped(p)||!context(li))return false;
+        var r=p.timeRemap,id=p.placementId;
+        if(value!==null){
+          if(typeof value!=='number'||!Number.isFinite(value))return false;
+          return edit(ctx,{kind:'setTimeRemapKey',placementId:id,frame:ctx.frame,value:value});
+        }
+        if(!r.keyAtFrame)return unavailable('The remapped source frame at the playhead is not read natively yet. Type the source frame in the Time Remap field to add a key.');
+        if(r.keyCount>1)return edit(ctx,{kind:'removeTimeRemapKey',placementId:id,frame:ctx.frame});
+        if(!await edit(ctx,{kind:'disableTimeRemap',placementId:id}))return false;
+        toast('toastTimeRemapDisabled');return true;
+      });
+    }
     var own={
+      timeRemapKeyFacts:function(li){return known(li,function(p){return remapped(p)?p.timeRemap:null;},null);},
+      timeRemapKeyIntent:timeRemapKeyIntent,
       toggleTimeRemap:toggleTimeRemap,
       isTimeRemapped:function(li){return known(li,remapped,false);},
       footageInterpMode:function(li){return known(li,mode,'none');},
       setFootageInterpMode:setFootageInterpMode
     };
-    entries.forEach(function(name){target[name]=own[name];});
+    entries.concat(optional).forEach(function(name){target[name]=own[name];});
     var binding=Object.freeze(Object.assign({},own,{dispose:function(){
       retired=true;pending=null;facts.clear();
       // An active or indeterminate native owner must keep the refusing entries.
       var session=ports.currentSession();
       if(session&&session.blocksLegacy()===true)return false;
-      if(root.SM===target)entries.forEach(function(name){if(target[name]===own[name])target[name]=original[name];});
+      if(root.SM===target)entries.concat(optional).forEach(function(name){
+        if(target[name]!==own[name])return;
+        if(original[name]===undefined)delete target[name];else target[name]=original[name];
+      });
       bindings.delete(root);return true;
     }}));
     bindings.set(root,binding);return binding;

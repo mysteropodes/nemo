@@ -276,7 +276,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       ctrls.forEach(registerControlPropMeta);
       list = list.concat(ctrls.map(function (c) { return c.key; }));
     }
-    if (holder && holder.timeRemap) return list.concat(['timeRemap']);
+    if (holder && (holder.timeRemap || nativeRemapFacts(holder))) return list.concat(['timeRemap']);
     return list;
   }
   // ---- control CRUD ------------------------------------------------------
@@ -8645,6 +8645,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       var sw = document.createElement('div');
       var swOn = nativeOpacityRoute && nativeOpacityRoute.handled ? nativeOpacityRoute.animated : isAnimated(holder, prop);
       var hasKeyHere = nativeOpacityRoute && nativeOpacityRoute.handled ? nativeOpacityRoute.keyAtFrame : swOn && !!keyAt(trackFor(holder, prop), state.currentFrame);
+      var remapFacts = prop === 'timeRemap' ? nativeRemapFacts(holder) : null;
+      if (remapFacts) { swOn = remapFacts.keyCount > 0; hasKeyHere = remapFacts.keyAtFrame; }
       // Single diamond, three states — merges what used to be two separate
       // icons (this stopwatch AND a second .motion-addkey diamond appended
       // after the value fields further down): they always showed the exact
@@ -8663,6 +8665,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       sw.addEventListener('click', function (e) {
         e.stopPropagation();
         if (motionSurface && motionSurface.routeIntent(nativeOpacityRoute, window.NemoOpacityApplication, 'animated', !swOn, state.currentFrame)) return;
+        if (remapFacts) { window.SM.timeRemapKeyIntent(state.layers.indexOf(holder), null); return; }
         pushUndo();
         if (!swOn) {
           toggleAnimated(holder, prop); // OFF->ON: first key at the current frame (see toggleAnimated's own comment)
@@ -8799,6 +8802,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
           var display = selectedDimensionDisplay(holder, prop, dim, vals[dim]);
           var f = scrubField(display.value, function (nv, edit) {
             if (motionSurface && motionSurface.routeDimension(nativeOpacityRoute, window.NemoOpacityApplication, vals, dim, nv, state.currentFrame)) return;
+            if (remapFacts) { window.SM.timeRemapKeyIntent(state.layers.indexOf(holder), nv); return; }
             pushUndo();
             var changed = edit && edit.relative
               ? offsetSelectedKeyDimension(holder, prop, dim, edit.delta)
@@ -8840,7 +8844,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
             renderLayerList(); renderTimeline();
             reloadIfTimeLinkOffset(prop);
             if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-          }, display.mixed, nativeOpacityRoute);
+          }, display.mixed || !!remapFacts, nativeOpacityRoute);
           fieldWrap.appendChild(f);
         })(d);
       }
@@ -10663,6 +10667,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // threading extra state through render calls).
     rowEl._smHolder = ld; rowEl._smProp = prop;
     rowEl.classList.toggle('prop-selected', isMotionPropSelected(ld, prop));
+    // A native placement exposes key facts, not key frames: the row stays, inert.
+    if (prop === 'timeRemap' && nativeRemapFacts(ld)) { rowEl.style.pointerEvents = 'none'; return; }
     var track = trackFor(ld, prop);
     var w = state.totalFrames * FC;
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -12418,6 +12424,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     return ld && ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li);
   };
   window.SM.isTimeRemapped = function (li) { var ld = state.layers[li]; return !!(ld && ld.timeRemap); };
+  // Only the native binding defines timeRemapKeyFacts/timeRemapKeyIntent; a legacy row reads its own track.
+  function nativeRemapFacts(holder) { var li = state.layers.indexOf(holder), f = window.SM.timeRemapKeyFacts; return li >= 0 && f ? f(li) : null; }
   function disableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld || !ld.timeRemap) return false;
