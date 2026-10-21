@@ -29,6 +29,8 @@ pub(super) fn correlated(
                 | crate::native_contract::comments::READ
                 | crate::native_contract::custom_brush::EDIT
                 | crate::native_contract::comments::EDIT
+                | "command.document.object.undo"
+                | "command.document.object.redo"
         )
         || request.operation == crate::native_contract::metadata::OP
         || request.operation == crate::native_contract::placement::OP

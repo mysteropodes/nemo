@@ -56,7 +56,8 @@ test('N25D3/D4 command producer and independent consumers cannot lose source reg
   const result = coverage.checkSourceCoverage(without, { root, sourcePaths: sources });
   assert.ok(sources.every(file => result.violations.some(v => v.rule === 'coverage-unprofiled-source' && v.file === file)));
   assert.deepEqual(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).operations,
-    ['query.document.object', 'command.document.object.layer.visibility.set']);
+    ['query.document.object', 'command.document.object.layer.visibility.set',
+      'command.document.object.undo', 'command.document.object.redo']);
 });
 
 test('Main SVG export requires its exact dispatch grant and denies ordinary and raw borrowing', (t) => {

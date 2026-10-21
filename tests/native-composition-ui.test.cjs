@@ -3,21 +3,38 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const Contract=require('../src/js/adapters/native-composition-contract.js');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function node(tag='div') {
-  const listeners=new Map(),el={tagName:tag.toUpperCase(),children:[],className:'',style:{setProperty(k,v){this[k]=v;}},
-    classList:{toggle(){}},addEventListener(k,f){if(!listeners.has(k))listeners.set(k,[]);listeners.get(k).push(f);},
-    fire(k,e={}){e={button:0,clientX:0,clientY:0,target:el,currentTarget:el,preventDefault(){},stopPropagation(){},...e};
-      for(const fn of listeners.get(k)||[])fn(e);},
-    appendChild(child){child.parent=this;this.children.push(child);return child;},
-    remove(){if(this.parent)this.parent.children=this.parent.children.filter(x=>x!==this);},
-    querySelectorAll(selector){return this.children.filter(x=>selector==='.bpm-line'&&x.className.startsWith('bpm-line'));},
-    closest(){return null;},getBoundingClientRect(){return {left:0};}};
+  const listeners=new Map(),attributes=new Map();let text='';
+  const el={tagName:tag.toUpperCase(),children:[],className:'',value:'',style:{setProperty(k,v){this[k]=v;}},
+    classList:{toggle(){}},addEventListener(k,f,options){if(!listeners.has(k))listeners.set(k,[]);listeners.get(k).push({f,once:!!(options&&options.once)});},
+    removeEventListener(k,f){listeners.set(k,(listeners.get(k)||[]).filter(item=>item.f!==f));},
+    fire(k,e={}){let stopped=false;const event={button:0,clientX:0,clientY:0,target:el,defaultPrevented:false,
+      preventDefault(){this.defaultPrevented=true;},stopPropagation(){stopped=true;},...e};
+      for(let at=el;at;at=k==='blur'?null:at.parentNode){event.currentTarget=at;
+        for(const item of [...(at._listeners.get(k)||[])]){item.f.call(at,event);if(item.once)at.removeEventListener(k,item.f);}
+        if(stopped)break;}return event;},
+    appendChild(child){child.parent=child.parentNode=this;this.children.push(child);return child;},
+    remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(x=>x!==this);this.parent=this.parentNode=null;},
+    setAttribute(k,v){attributes.set(k,String(v));},getAttribute:k=>attributes.get(k)??null,
+    focus(){if(this.ownerDocument)this.ownerDocument.activeElement=this;},
+    select(){this.selectionStart=0;this.selectionEnd=String(this.value).length;this.selectCalls=(this.selectCalls||0)+1;},
+    querySelector(selector){return this.querySelectorAll(selector)[0]||null;},
+    querySelectorAll(selector){const found=[];function visit(parent){for(const child of parent.children){
+      if(selector[0]==='#'?child.id===selector.slice(1):selector[0]==='.'?child.className.split(/\s+/).includes(selector.slice(1)):child.tagName.toLowerCase()===selector)found.push(child);
+      visit(child);}}visit(this);return found;},
+    closest(){return null;},getBoundingClientRect(){return {left:0};},_listeners:listeners};
+  Object.defineProperty(el,'textContent',{get(){return text+this.children.map(child=>child.textContent).join('');},
+    set(value){text=String(value);for(const child of this.children)child.parent=child.parentNode=null;this.children=[];}});
   return el;
 }
 function fixture() {
   const elements=Object.fromEntries(['bars-row','frame-hdr','fg-wrap','frame-grid','btn-bpm'].map(id=>[id,node()]));
-  const document=Object.assign(node('document'),{readyState:'loading',getElementById:id=>elements[id]||null,
-    createElement:node,createDocumentFragment:()=>node('fragment'),querySelector:()=>null,
+  const created=[],windowEvents=node('window'),body=node('body');
+  const document=Object.assign(node('document'),{readyState:'loading',body,
+    getElementById:id=>elements[id]||body.querySelector('#'+id),
+    createElement:tag=>{const el=node(tag);el.ownerDocument=document;created.push(el);return el;},
+    createDocumentFragment:()=>node('fragment'),querySelector:()=>null,
     querySelectorAll:selector=>selector==='.tl-marker'?elements['bars-row'].children.filter(x=>x.className.startsWith('tl-marker')):[]});
+  body.parentNode=document;
   const persisted=Object.freeze([{frame:39,name:'legacy'}]),layerMarkers=Object.freeze([{frame:20}]);
   const state={markers:persisted,layers:[{markers:layerMarkers}],totalFrames:40,currentFrame:3,fps:24};
   let info={instanceId:'i',documentId:'d',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'s0',
@@ -68,7 +85,7 @@ function fixture() {
     NemoNativeObjectProjectDesktop:{openDiagnostic(value,event,code){assert.strictEqual(value,vm.runInContext('window',context));diagnostics.push([event,code]);}},
     showToast:x=>notices.push(x),showContextMenu:(x,y,items)=>menus.push(items),prompt:(...args)=>{promptCalls.push(args);return prompts.shift();},
     pushUndo(){throw new Error('legacy JS history must not run on native desktop');},renderTimeline(){},
-    goToFrame:f=>jumps.push(f),addEventListener(){}};
+    goToFrame:f=>jumps.push(f),addEventListener:windowEvents.addEventListener,removeEventListener:windowEvents.removeEventListener};
   root.window=root;root.globalThis=root;
   const context=vm.createContext(root);
   // These actual production scripts use their original HTML registration order.
@@ -85,6 +102,7 @@ function fixture() {
   const edits=()=>calls.filter(q=>q.operation===Contract.EDIT);
   async function settled(){for(let i=0;i<20;i++){await tail;await new Promise(resolve=>setImmediate(resolve));if(!controller.isPending())return;}throw Error('controller did not settle');}
   return {root,state,elements,document,controller,calls,notices,prompts,promptCalls,menus,jumps,edits,settled,diagnostics,
+    dialogsCreated:()=>created.filter(el=>el.id==='bpm-settings-dialog').length,pagehide:()=>windowEvents.fire('pagehide'),
     projectionReady:value=>root.NemoNativeObjectProjectFile.projectionReadyForUI(browserRoot,value),
     fullInfo:()=>info,drift(){state.canvasW++;},repairProjection:project,
     setController(value){browserRoot.NemoNativeCompositionController=value;assert.strictEqual(browserRoot.NemoNativeCompositionController,value);},
@@ -97,6 +115,16 @@ function fixture() {
     resubscribe(){ticket++;},
     hold(){let entered,release;const started=new Promise(r=>entered=r),wait=new Promise(r=>release=r);block={entered,wait};return {started,release};},
     retire(){active=false;controller.dispose();}};
+}
+
+function bpmDialog(h){
+  const overlay=h.document.getElementById('bpm-settings-dialog');assert.ok(overlay,'native BPM form must be attached');
+  const form=overlay.querySelector('form'),input=h.document.getElementById('bpm-settings-value');
+  assert.ok(form);assert.ok(input);return {overlay,form,input,label:h.document.getElementById('bpm-settings-label')};
+}
+function submitBpm(h,value){const view=bpmDialog(h);view.input.value=value;assert.equal(view.form.fire('submit').defaultPrevented,true);return view;}
+function enterBpm(h,tempo,offset){
+  const labels=[bpmDialog(h).label.textContent];submitBpm(h,tempo);labels.push(bpmDialog(h).label.textContent);submitBpm(h,offset);return labels;
 }
 
 test('ordinary native consumers publish complete pinned readback without authoring legacy defaults',async()=>{
@@ -113,7 +141,7 @@ test('ordinary add key and BPM buttons submit native intents and display confirm
   assert.equal(h.edits()[0].payload.action.frame,3);assert.equal(h.root.SMMarkers.compMarkers().length,3);
   h.elements['btn-bpm'].fire('click');await h.settled();assert.equal(h.edits().length,2);
   assert.deepEqual(h.edits()[1].payload.action,{kind:'setBpm',bpmShow:true});
-  h.prompts.push('137.5','4');h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+  h.elements['btn-bpm'].fire('contextmenu');enterBpm(h,'137.5','4');await h.settled();
   assert.deepEqual(h.edits()[2].payload.action,{kind:'setBpm',bpm:137.5,bpmOffset:4,bpmShow:true});
   assert.equal(h.root.SMBpm.framesPerBeat(),60/137.5*24);h.unchanged();
 });
@@ -198,7 +226,7 @@ test('fresh readback after same-pin subscription replacement cannot revive old m
     assert.deepEqual(fresh.info,old.info);assert.notStrictEqual(fresh,old);
     if(gesture==='menu')h.menus[0].find(x=>x.label==='Supprimer le repère').action();
     else if(gesture==='drag')h.document.fire('mouseup');
-    else {h.prompts.push('141','2');h.menus[0].find(x=>x.label==='Grille BPM…').action();}
+    else {h.menus[0].find(x=>x.label==='Grille BPM…').action();enterBpm(h,'141','2');}
     await h.settled();assert.equal(h.edits().length,0);assert(h.notices.length>0);h.unchanged();
   }
 });
@@ -231,13 +259,14 @@ test('actual HTML-bound BPM uses full project readiness while keeping five-field
   const origin=h.controller.read();assert.ok(origin);
   assert.deepEqual(Object.keys(origin.info).sort(),['contentRevision','documentId','documentSnapshotId','instanceId','lifecycleGeneration']);
   assert.equal(h.projectionReady(origin.info),false,'a narrow authority pin is not full UI metadata');
-  h.prompts.push('137.5','4');h.elements['btn-bpm'].fire('contextmenu');await h.settled();
-  assert.equal(h.promptCalls.length,2);assert.equal(h.edits().length,1);
+  h.elements['btn-bpm'].fire('contextmenu');const stages=enterBpm(h,'137.5','4');await h.settled();
+  assert.equal(stages.length,2);assert.equal(h.promptCalls.length,0);assert.equal(h.edits().length,1);
   assert.deepEqual(h.edits()[0].payload.action,{kind:'setBpm',bpm:137.5,bpmOffset:4,bpmShow:true});
   assert.equal(h.controller.read().composition.effectiveBpm,137.5);h.unchanged();
   h.drift();assert.equal(h.controller.read(),null);
   h.elements['btn-bpm'].fire('contextmenu');await h.settled();
-  assert.equal(h.promptCalls.length,2,'unavailable full projection cannot start prompts');
+  assert.equal(stages.length,2);assert.equal(h.dialogsCreated(),1,'unavailable full projection cannot start another form');
+  assert.equal(h.promptCalls.length,0,'native full projection never uses window.prompt');
   assert.equal(h.edits().length,1);assert.equal(h.controller.read(),null);
   h.repairProjection();await h.ready();assert.ok(h.controller.read());
   assert.equal(h.edits().length,1,'restoring presentation never replays the old intent');h.unchanged();
@@ -254,14 +283,112 @@ test('only the ordinary BPM settings origin read emits bounded refusal detail',a
   const h=fixture();h.root.SMBpm.refresh();h.root.SMBpm.framesPerBeat();assert.deepEqual(h.diagnostics,[]);
   h.elements['btn-bpm'].fire('contextmenu');await h.settled();
   assert.deepEqual(h.diagnostics,[['bpm-settings-refused','cache-empty']]);assert.equal(h.promptCalls.length,0);
-  await h.ready();h.prompts.push(null);h.elements['btn-bpm'].fire('contextmenu');await h.settled();
-  assert.equal(h.promptCalls.length,1);assert.equal(h.diagnostics.length,1);assert.equal(h.edits().length,0);
+  await h.ready();h.elements['btn-bpm'].fire('contextmenu');h.document.getElementById('bpm-settings-cancel').fire('click');await h.settled();
+  assert.equal(h.dialogsCreated(),1);assert.equal(h.promptCalls.length,0);assert.equal(h.diagnostics.length,1);assert.equal(h.edits().length,0);
   h.drift();h.elements['btn-bpm'].fire('contextmenu');await h.settled();
-  assert.deepEqual(h.diagnostics.at(-1),['bpm-settings-refused','projection-unready']);assert.equal(h.promptCalls.length,1);
+  assert.deepEqual(h.diagnostics.at(-1),['bpm-settings-refused','projection-unready']);assert.equal(h.dialogsCreated(),1);assert.equal(h.promptCalls.length,0);
   const controller=h.root.NemoNativeCompositionController;h.setController(null);
   h.elements['btn-bpm'].fire('contextmenu');assert.deepEqual(h.diagnostics.at(-1),['bpm-settings-refused','controller-missing']);
   h.setController(controller);
   h.root.NemoNativeObjectProjectDesktop.openDiagnostic=()=>{throw Error('PRIVATE diagnostic sink');};
   assert.doesNotThrow(()=>h.elements['btn-bpm'].fire('contextmenu'));await h.settled();
-  assert.equal(h.promptCalls.length,1);assert.equal(h.edits().length,0);h.unchanged();
+  assert.equal(h.dialogsCreated(),1);assert.equal(h.promptCalls.length,0);assert.equal(h.edits().length,0);h.unchanged();
+});
+
+
+test('native BPM form exposes two focused text stages without window prompt or blur commit',async()=>{
+  const h=fixture();await h.ready();h.elements['btn-bpm'].fire('contextmenu');
+  const first=bpmDialog(h);
+  assert.equal(first.form.getAttribute('role'),'dialog');assert.equal(first.form.getAttribute('aria-modal'),'true');
+  assert.equal(first.form.getAttribute('aria-labelledby'),first.label.id);assert.equal(first.label.htmlFor,first.input.id);
+  assert.equal(h.document.getElementById('bpm-settings-confirm').type,'submit');
+  assert.equal(h.document.getElementById('bpm-settings-cancel').type,'button');
+  assert.equal(h.document.getElementById('bpm-settings-close').type,'button');
+  assert.equal(first.label.textContent,'Tempo en BPM (0 pour masquer la grille)');assert.equal(first.input.value,'120');
+  assert.equal(first.input.type,'text');assert.equal(first.input.inputMode,'decimal');
+  assert.strictEqual(h.document.activeElement,first.input);assert.equal(first.input.selectCalls,1);
+  first.input.value='137.5';first.input.fire('blur');assert.equal(h.edits().length,0);
+  assert.strictEqual(bpmDialog(h).overlay,first.overlay);assert.equal(first.input.value,'137.5');
+  submitBpm(h,'137.5');const second=bpmDialog(h);
+  assert.strictEqual(second.overlay,first.overlay);assert.strictEqual(second.input,first.input);
+  assert.equal(second.label.textContent,'Décalage du premier temps, en frames');assert.equal(second.input.value,'0');
+  assert.strictEqual(h.document.activeElement,second.input);assert.equal(second.input.selectCalls,2);assert.equal(h.edits().length,0);
+  submitBpm(h,'4');first.form.fire('submit');await h.settled();
+  assert.equal(h.document.getElementById('bpm-settings-dialog'),null);assert.equal(h.promptCalls.length,0);
+  assert.equal(h.edits().length,1);assert.deepEqual(h.edits()[0].payload.action,{kind:'setBpm',bpm:137.5,bpmOffset:4,bpmShow:true});h.unchanged();
+});
+
+test('both native BPM stages cancel through Cancel, close, Escape or overlay with no command',async()=>{
+  for(const stage of ['tempo','offset'])for(const route of ['cancel','close','escape','overlay']){
+    const h=fixture();await h.ready();h.elements['btn-bpm'].fire('contextmenu');
+    if(stage==='offset')submitBpm(h,'137.5');const view=bpmDialog(h);
+    if(route==='cancel'||route==='close')h.document.getElementById('bpm-settings-'+route).fire('click');
+    else if(route==='escape')assert.equal(view.input.fire('keydown',{key:'Escape'}).defaultPrevented,true);
+    else view.overlay.fire('click');
+    assert.equal(h.document.getElementById('bpm-settings-dialog'),null,stage+'/'+route);
+    view.form.fire('submit');await h.settled();assert.equal(h.edits().length,0,stage+'/'+route);
+    assert.equal(h.promptCalls.length,0);assert.equal(h.fullInfo().contentRevision,0);h.unchanged();
+  }
+});
+
+test('native BPM retains invalid tempo hide and original fractional offset parsing',async()=>{
+  for(const tempo of ['0','-2','not a number','']){
+    const h=fixture();await h.ready();h.elements['btn-bpm'].fire('contextmenu');const view=submitBpm(h,tempo);
+    assert.equal(view.label.textContent,'Tempo en BPM (0 pour masquer la grille)');
+    assert.equal(h.document.getElementById('bpm-settings-dialog'),null);await h.settled();
+    assert.equal(h.edits().length,1);assert.deepEqual(h.edits()[0].payload.action,{kind:'setBpm',bpmShow:false});
+    assert.equal(h.promptCalls.length,0);h.unchanged();
+  }
+  for(const [offset,expected] of [['4.9frames',4],['-2.9',0],['',0]]){
+    const h=fixture();await h.ready();h.elements['btn-bpm'].fire('contextmenu');enterBpm(h,'145.25bpm',offset);await h.settled();
+    assert.equal(h.edits().length,1);assert.deepEqual(h.edits()[0].payload.action,{kind:'setBpm',bpm:145.25,bpmOffset:expected,bpmShow:true});h.unchanged();
+  }
+});
+
+test('native BPM frozen origin refuses stale revision, replacement, resubscription, disposal and controller replacement',async()=>{
+  for(const mode of ['revision','replacement','subscription','disposed','controller']){
+    const h=fixture();await h.ready();const origin=h.controller.read();h.elements['btn-bpm'].fire('contextmenu');submitBpm(h,'137.5');
+    let unexpected=0;
+    if(mode==='revision'){h.elements['btn-bpm'].fire('click');await h.settled();}
+    else if(mode==='replacement'){h.replace();await h.ready();}
+    else if(mode==='subscription'){h.resubscribe();await h.ready();assert.deepEqual(h.controller.read().info,origin.info);}
+    else if(mode==='disposed')h.retire();
+    else h.setController({read:()=>origin,edit(){unexpected++;}});
+    const before=h.edits().length;submitBpm(h,'4');await h.settled();
+    assert.equal(h.edits().length,before,mode);assert.equal(unexpected,0);assert.ok(h.notices.length>0,mode);
+    assert.equal(h.document.getElementById('bpm-settings-dialog'),null);h.unchanged();
+  }
+});
+
+test('native BPM refuses pending confirmation and duplicate submit without replay',async()=>{
+  const h=fixture();await h.ready();h.elements['btn-bpm'].fire('contextmenu');submitBpm(h,'137.5');
+  const held=h.hold();h.elements['btn-bpm'].fire('click');await held.started;
+  try{
+    const view=submitBpm(h,'4');view.form.fire('submit');assert.equal(h.edits().length,1);
+    assert.equal(h.document.getElementById('bpm-settings-dialog'),null);assert.ok(h.notices.length>0);h.unchanged();
+  }finally{held.release();await h.settled();}
+  assert.equal(h.edits().length,1);assert.equal(h.controller.read().composition.effectiveBpm,120);
+});
+
+test('duplicate BPM open preserves draft and captured origin; pagehide disposes its form',async()=>{
+  const h=fixture();await h.ready();h.elements['btn-bpm'].fire('contextmenu');const view=bpmDialog(h);view.input.value='137.5';
+  h.root.SMBpm.openSettings();assert.strictEqual(bpmDialog(h).overlay,view.overlay);assert.equal(view.input.value,'137.5');assert.equal(h.dialogsCreated(),1);
+  h.elements['btn-bpm'].fire('click');await h.settled();h.root.SMBpm.openSettings();
+  assert.strictEqual(bpmDialog(h).overlay,view.overlay);enterBpm(h,'137.5','4');await h.settled();
+  assert.equal(h.edits().length,1,'new readback must not rebase the open form');
+  h.elements['btn-bpm'].fire('contextmenu');const late=bpmDialog(h);h.pagehide();
+  assert.equal(h.document.getElementById('bpm-settings-dialog'),null);late.form.fire('submit');await h.settled();
+  assert.equal(h.edits().length,1);h.unchanged();
+});
+
+test('browser BPM retains synchronous prompt values and both cancellation points',async()=>{
+  for(const values of [[null],['137.5',null],['137.5','4']]){
+    const h=fixture();await h.ready();delete h.root.__TAURI__;h.prompts.push(...values);
+    h.elements['btn-bpm'].fire('contextmenu');await h.settled();
+    assert.equal(h.promptCalls.length,values.length);assert.equal(h.dialogsCreated(),0);assert.equal(h.edits().length,0);
+    assert.equal(h.promptCalls[0][0],'Tempo en BPM (0 pour masquer la grille)');assert.equal(h.promptCalls[0][1],'120');
+    if(values.length===2){assert.equal(h.promptCalls[1][0],'Décalage du premier temps, en frames');assert.equal(h.promptCalls[1][1],'0');}
+    const accepted=values[1]==='4';assert.equal(h.state.bpm,accepted?137.5:120);assert.equal(h.state.bpmOffset,accepted?4:0);
+    assert.equal(h.state.bpmShow,accepted?true:undefined);assert.equal(h.state.markers[0].name,'legacy');
+  }
 });

@@ -149,6 +149,9 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
         "query.document.object" => object::request(payload),
+        "command.document.object.undo" | "command.document.object.redo" => {
+            object::history_request(operation, payload)
+        }
         text_read::OP => text_read::request(payload),
         metadata::OP => metadata::request(payload),
         property_read::OP => property_read::request(payload),
@@ -411,6 +414,12 @@ pub(crate) fn validate_result(
     }
     if operation == "command.document.object.layer.visibility.set" {
         return object::visibility_result(result);
+    }
+    if matches!(
+        operation,
+        "command.document.object.undo" | "command.document.object.redo"
+    ) {
+        return object::history_result(result);
     }
     if operation == "query.diagnostics.recent" {
         return diagnostics_result(result);

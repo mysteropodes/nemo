@@ -574,6 +574,19 @@ cannot route to this owner. Public UI/MCP, history RPC, save/reopen, rendering,
 export, installed desktop and M1 acceptance remain separate open gates. P37's
 History UI and N20K's viewport/publication paths are unchanged.
 
+### Public object history activation
+
+The later #2203 integration registers both distinct object-history operations in
+the active `native.object` capability and shared transport schema. The public
+SDK and native wire require the closed matching command, safe expected revision,
+correlated owner/request/document, and exactly one advanced revision with compact
+success `applied: true, historyEntriesAdded: 0`. The original bounded raw ingress,
+native history authority, retained retries and legacy opacity-history isolation
+remain unchanged. The actual host regression now enters `dispatch_native` for
+Undo/Redo rather than bypassing registration. This supersedes only the staged
+public-unavailability statement above; installed history, save/reopen and other
+desktop acceptance still require their own observed results.
+
 ## N25D5 bounded common application client
 
 The registered Tauri command `nemo_native_object_dispatch` takes `requestJson`
