@@ -1,4 +1,5 @@
 'use strict';
+const ProjectFile = require('../src/js/adapters/native-object-project-file.js');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm');
 const Contract = require('../src/js/adapters/native-palette-contract.js');
@@ -27,7 +28,8 @@ function fixture(options = {}) {
   elements['color-fill'].value = '#aBc'; elements['color-stroke'].value = '#010203';
   const document = Object.assign(node('document'), { readyState: 'loading', createElement: node,
     getElementById: id => elements[id] || null });
-  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0' };
+  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   let metadata = { palettes: [
     { id: 'same', name: 'First', colors: ['#AbC', '#abc', '#00000000'] },
     { id: 'same', name: 'Second', colors: ['#DEF'] }
@@ -95,7 +97,8 @@ function fixture(options = {}) {
         return action({ dispatch: q => root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', { dispatch }).dispatch(q),
           readPresentedObjectSession: () => active && running === 1 && info === origin ? projected(origin) : null,
           async reconcile(next) { assert.equal(next, revision); info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
-            controller.willProject(info); controller.presented(info); return info; } });
+            controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true);
+            controller.presented(info); return info; } });
       }).finally(() => { running--; controller.presented(info); });
       tail = work.catch(() => {}); return work;
     }
@@ -107,11 +110,14 @@ function fixture(options = {}) {
   const root = { document, state, __TAURI__: { core: {} }, SM: { t: x => x,
     setFillColor() { throw Error('legacy fill writer'); }, setStrokeColor() { throw Error('legacy stroke writer'); } },
     NemoNativeObjectProject: { desktop: () => session },
-    NemoNativeObjectProjectFile: { projectionReadyForUI: () => active && !running },
+    NemoNativeObjectProjectFile: { projectionReadyForUI: (valueRoot, value) => active && !running && ProjectFile.projectionReadyForUI(valueRoot, value) },
     showToast: text => notices.push(text), prompt: () => prompts.shift(),
     showContextMenu: (x, y, items) => menus.push(items), addEventListener() {},
     localStorage: { getItem: () => null, setItem() {} }, pushUndo() { throw Error('legacy history'); } };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
+  const browserRoot = vm.runInContext('globalThis', context);
+  function project() { ProjectFile.projectView(browserRoot, info); }
+  project();
   // The ordinary panel loads first, as it does in src/index.html.
   for (const file of ['palette-panel.js', 'adapters/native-palette-contract.js', 'adapters/native-application.js',
     'adapters/native-palette-desktop.js', 'adapters/native-palette-ui.js'])
@@ -125,7 +131,9 @@ function fixture(options = {}) {
     edits: () => calls.filter(q => q.operation === Contract.EDIT),
     metadata: () => clone(metadata), tabs: () => elements['palette-tabs'].children, swatches: () => elements['palette-grid'].children,
     async ready() { await controller.presented(); await settled(); },
-    replace() { info = { ...info, documentId: 'replacement', lifecycleGeneration: 2 }; controller.willProject(info); },
+    fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(browserRoot, value),
+    drift() { root.state.canvasW++; }, repairProjection: project,
+    replace() { info = { ...info, documentId: 'replacement', lifecycleGeneration: 2 }; controller.willProject(info); project(); },
     resubscribe() { ticket++; }, retire() { active = false; controller.dispose(); },
     refuse() { unavailable = true; },
     hold() { let entered, release; const started = new Promise(r => entered = r), wait = new Promise(r => release = r);
@@ -264,4 +272,23 @@ test('actual HTML loads the palette protocol before SDK capture and the model be
   }
   assert.doesNotThrow(load(actual));
   assert.throws(load([wanted[1], wanted[0], wanted[2], wanted[3]]), /^TypeError: operation is not admitted$/);
+});
+
+test('palette uses full project readiness and retains narrow immutable authority pins', async () => {
+  const f = fixture(); await f.ready();
+  assert.equal(f.projectionReady(f.fullInfo()), true);
+  const origin = f.controller.read(); assert.ok(origin);
+  assert.deepEqual(Object.keys(origin.info).sort(),
+    ['contentRevision', 'documentId', 'documentSnapshotId', 'instanceId', 'lifecycleGeneration']);
+  assert.equal(Object.isFrozen(origin.info), true);
+  assert.equal(f.projectionReady(origin.info), false, 'identity pins cannot stand in for project metadata');
+  const calls = f.calls.length;
+  f.drift(); assert.equal(f.controller.read(), null);
+  assert.equal(await f.controller.presented(), null); await f.settled();
+  assert.equal(f.controller.read(), null);
+  assert.equal(f.calls.length, calls, 'invalid full projection refuses before dispatch');
+  assert.equal(f.edits().length, 0);
+  f.repairProjection(); await f.controller.presented(); await f.settled();
+  assert.ok(f.controller.read());
+  assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
 });

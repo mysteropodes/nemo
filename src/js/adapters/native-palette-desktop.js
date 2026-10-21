@@ -31,6 +31,11 @@
         same(stamp.session.info(), stamp.info) && stamp.session.readSubscriptionGeneration() === stamp.ticket;
     }
     function guard(stamp) { if (!current(stamp)) throw fault('stale_revision'); }
+    // Identity stamps remain narrow; readiness receives same-pin full native metadata.
+    function available(stamp) {
+      var info = stamp.session.info();
+      return same(info, stamp.info) && ports.available(stamp.session, info) === true;
+    }
     function ready(stamp, context) {
       guard(stamp);
       if (!context || !presented(context.readPresentedObjectSession(), stamp.info)) throw fault();
@@ -82,7 +87,7 @@
         return freeze({ settings: settings, palettes: palettes, active: active });
       });
       guard(stamp);
-      if (!presented(stamp.session.readPresentedObjectSession(), stamp.info) || ports.available(stamp.session, stamp.info) !== true) throw fault();
+      if (!presented(stamp.session.readPresentedObjectSession(), stamp.info) || !available(stamp)) throw fault();
       var projection = freeze({ info: stamp.info, palette: data });
       if (typeof ports.publish === 'function' && ports.publish(projection) !== true) throw fault();
       guard(stamp); cache = { stamp: stamp, value: projection }; return projection;
@@ -90,7 +95,7 @@
     function read() {
       try {
         if (cache && current(cache.stamp) && presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
-            ports.available(cache.stamp.session, cache.stamp.info) === true) return cache.value;
+            available(cache.stamp)) return cache.value;
       } catch (_) {}
       cache = null; return null;
     }

@@ -1,4 +1,5 @@
 'use strict';
+const ProjectFile = require('../src/js/adapters/native-object-project-file.js');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm');
 const Contract = require('../src/js/adapters/native-shadow-contract.js');
@@ -52,7 +53,8 @@ function fixture(options = {}) {
   const document = Object.assign(node('document'), { body: node('body'), createElement: node,
     getElementById: id => id === 'p-shadowmode' ? checkbox : null });
   const checkbox = Object.assign(node('input'), { checked: false }), events = node('window'), anchor = node('button');
-  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0' };
+  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   let metadata = clone(options.metadata === undefined ? { shadowPalette: [
     { id: 'duplicate', color: '#aBc' }, { id: 'duplicate', color: '#ABC' }, { id: 'sh1', color: '#00000000' }
   ], shadowActiveId: 'duplicate' } : options.metadata);
@@ -105,7 +107,8 @@ function fixture(options = {}) {
           readPresentedObjectSession: () => active && running === 1 && info === origin ? projected(origin) : null,
           async reconcile(next) {
             assert.equal(next, revision); info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
-            controller.willProject(info); controller.presented(info); return info;
+            controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true);
+            controller.presented(info); return info;
           } });
       }).finally(() => { running--; controller.presented(info); });
       tail = work.catch(() => {}); return work;
@@ -119,10 +122,13 @@ function fixture(options = {}) {
     innerWidth: 800, innerHeight: 600, setTimeout, clearTimeout,
     addEventListener: events.addEventListener.bind(events), removeEventListener: events.removeEventListener.bind(events),
     NemoNativeObjectProject: { desktop: () => session },
-    NemoNativeObjectProjectFile: { projectionReadyForUI: () => active && !running },
+    NemoNativeObjectProjectFile: { projectionReadyForUI: (valueRoot, value) => active && !running && ProjectFile.projectionReadyForUI(valueRoot, value) },
     showToast: text => notices.push(text), SMEngineBridge: { renderNow() { renders++; } }, renderLabsFloatPanel() {},
     pushUndo() { throw Error('legacy history'); } };
   root.globalThis = root; root.window = root; context = vm.createContext(root);
+  const browserRoot = vm.runInContext('globalThis', context);
+  function project() { ProjectFile.projectView(browserRoot, info); }
+  project();
   for (const file of filesInHtml()) vm.runInContext(fs.readFileSync(require.resolve('../src/js/' + file), 'utf8'), context, { filename: file });
   controller = root.NemoNativeShadowController;
   async function settled() {
@@ -137,13 +143,16 @@ function fixture(options = {}) {
     async ready() { await controller.presented(); await settled(); }, open() { root.SMShadowBrush.toggle(anchor); },
     picker: () => document.body.children.find(n => n.tagName === 'INPUT'),
     refuse() { unavailable = true; }, resubscribe() { ticket++; },
+    fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(browserRoot, value),
+    drift() { root.state.canvasW++; }, repairProjection: project,
     replace(saved = metadata) {
       metadata = clone(saved); revision++; info = { ...info, documentId: 'reopened-' + revision, lifecycleGeneration: info.lifecycleGeneration + 1,
-        contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info); controller.presented(info);
+        contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info); project(); controller.presented(info);
     },
     history(delta) {
       historyIndex += delta; metadata = clone(history[historyIndex]); revision++;
-      info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info); controller.presented(info);
+      info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info);
+      assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true); controller.presented(info);
     },
     corrupt(fn) { corrupt = fn; }, retire() { active = false; controller.dispose(); root.SMShadowBrush.dispose(); },
     hold() { let entered, release; const started = new Promise(r => entered = r), wait = new Promise(r => release = r);
@@ -316,4 +325,23 @@ test('the original global Shadow path consumer loads before every later bridge w
   assert.match(tools, /var _pen=\{path:null,/);
   const timeline = fs.readFileSync(require.resolve('../src/js/timeline.js'), 'utf8');
   assert.match(timeline, /if\(t!=='pen'&&_pen\.path\)finalizePen\(\)/);
+});
+
+test('shadow uses full project readiness and retains narrow immutable authority pins', async () => {
+  const f = fixture(); await f.ready();
+  assert.equal(f.projectionReady(f.fullInfo()), true);
+  const origin = f.controller.read(); assert.ok(origin);
+  assert.deepEqual(Object.keys(origin.info).sort(),
+    ['contentRevision', 'documentId', 'documentSnapshotId', 'instanceId', 'lifecycleGeneration']);
+  assert.equal(Object.isFrozen(origin.info), true);
+  assert.equal(f.projectionReady(origin.info), false, 'identity pins cannot stand in for project metadata');
+  const calls = f.calls.length;
+  f.drift(); assert.equal(f.controller.read(), null);
+  assert.equal(await f.controller.presented(), null); await f.settled();
+  assert.equal(f.controller.read(), null);
+  assert.equal(f.calls.length, calls, 'invalid full projection refuses before dispatch');
+  assert.equal(f.edits().length, 0);
+  f.repairProjection(); await f.controller.presented(); await f.settled();
+  assert.ok(f.controller.read());
+  assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
 });

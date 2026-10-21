@@ -1,4 +1,5 @@
 'use strict';
+const ProjectFile = require('../src/js/adapters/native-object-project-file.js');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm');
 const C = require('../src/js/adapters/native-perspective-contract.js');
@@ -55,7 +56,13 @@ function fixture(options = {}) {
   const publishedBounds = { '--nemo-native-left': '10px', '--nemo-native-top': '20px', '--nemo-native-right': '650px', '--nemo-native-bottom': '380px' };
   document.documentElement = { clientWidth: 1200, clientHeight: 800, classList: { contains: name => name === 'nemo-native-underlay' },
     style: { getPropertyValue: key => publishedBounds[key] } };
-  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0', canvasW: 320, canvasH: 180 };
+  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
+  // Keep the original consumer's legacy-dimension tripwires. The real file
+  // projection is a controlled UI port, independent of those forbidden getters.
+  const projectionRoot = { state: {} };
+  function project() { ProjectFile.projectView(projectionRoot, info); }
+  project();
   let metadata = clone(options.metadata === undefined ? { perspectiveEnabled: true, perspectiveMode: '2pt', perspectiveDensity: -0.125,
     perspectiveVPs: [{ x: 60, y: 60 }, { x: 260, y: 60, locked: true }] } : options.metadata);
   let revision = 0, ticket = 1, serial = 0, running = 0, active = true, unavailable = false;
@@ -118,7 +125,8 @@ function fixture(options = {}) {
         return action({ dispatch: q => root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', { dispatch }).dispatch(q),
           readPresentedObjectSession: () => active && running === 1 && info === origin ? projected(origin) : null,
           async reconcile(next) { assert.equal(next, revision); info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
-            controller.willProject(info); controller.presented(info); return info; } });
+            controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(projectionRoot, info), true);
+            controller.presented(info); return info; } });
       }).finally(() => { running--; controller.presented(info); });
       tail = work.catch(() => {}); return work;
     }
@@ -128,7 +136,8 @@ function fixture(options = {}) {
     Object.defineProperty(state, key, { get() { throw Error('legacy persistent read ' + key); }, set() { throw Error('legacy persistent write ' + key); } });
   const root = { document, state, __TAURI__: { core: {} }, view: { zoom: 2 }, Point: function (x, y) { this.x = x; this.y = y; },
     SM: { t: key => key }, SMLabs: { list: () => [], toggle() { throw Error('wrong Labs writer'); } },
-    NemoNativeObjectProject: { desktop: () => session }, NemoNativeObjectProjectFile: { projectionReadyForUI: () => active && !running },
+    NemoNativeObjectProject: { desktop: () => session },
+    NemoNativeObjectProjectFile: { projectionReadyForUI: (_root, value) => active && !running && ProjectFile.projectionReadyForUI(projectionRoot, value) },
     localStorage: { getItem: () => null, setItem() {} }, setTimeout, clearTimeout,
     addEventListener: events.addEventListener.bind(events), removeEventListener: events.removeEventListener.bind(events),
     showToast: text => notices.push(text), SMEngineBridge: { isEnabled: () => true, renderNow() {}, suspend() { suspends++; }, resume() { resumes++; },
@@ -154,11 +163,14 @@ function fixture(options = {}) {
     pointer(kind, x, y, extra = {}) { return elements['canvas-area'].fire(kind, { ...screen(x, y), ...extra }); },
     refuse() { unavailable = true; }, resubscribe() { ticket++; }, resize() { rect = { ...rect, left: rect.left + 1 }; },
     corrupt(fn) { corrupt = fn; },
+    fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(projectionRoot, value),
+    drift() { projectionRoot.state.canvasW++; }, repairProjection: project,
     replace(saved = metadata) { metadata = clone(saved); revision++; info = { ...info, documentId: 'reopened-' + revision,
       lifecycleGeneration: info.lifecycleGeneration + 1, contentRevision: revision, documentSnapshotId: 's' + revision };
-      controller.willProject(info); controller.presented(info); },
+      controller.willProject(info); project(); controller.presented(info); },
     history(delta) { historyIndex += delta; metadata = clone(history[historyIndex]); revision++;
-      info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info); controller.presented(info); },
+      info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision }; controller.willProject(info);
+      assert.equal(ProjectFile.refreshLayerTable(projectionRoot, info), true); controller.presented(info); },
     retire() { active = false; controller.dispose(); root.disposePerspectiveBridge(); },
     hold() { let entered, release; const started = new Promise(r => entered = r), wait = new Promise(r => release = r);
       block = { entered, wait }; return { started, release }; }
@@ -290,4 +302,23 @@ test('read publication is strict, once per immutable projection, and unsubscribe
     assert.equal(reads.length, 1);
   }); await h.settled(); assert.equal(reads.length, 1);
   h.replace({}); await h.settled(); assert.equal(reads.length, 2); remove(); h.replace({}); await h.settled(); assert.equal(reads.length, 2);
+});
+
+test('perspective uses full project readiness and retains narrow immutable authority pins', async () => {
+  const f = fixture(); await f.ready();
+  assert.equal(f.projectionReady(f.fullInfo()), true);
+  const origin = f.controller.read(); assert.ok(origin);
+  assert.deepEqual(Object.keys(origin.info).sort(),
+    ['contentRevision', 'documentId', 'documentSnapshotId', 'instanceId', 'lifecycleGeneration']);
+  assert.equal(Object.isFrozen(origin.info), true);
+  assert.equal(f.projectionReady(origin.info), false, 'identity pins cannot stand in for project metadata');
+  const calls = f.calls.length;
+  f.drift(); assert.equal(f.controller.read(), null);
+  assert.equal(await f.controller.presented(), null); await f.settled();
+  assert.equal(f.controller.read(), null);
+  assert.equal(f.calls.length, calls, 'invalid full projection refuses before dispatch');
+  assert.equal(f.edits().length, 0);
+  f.repairProjection(); await f.controller.presented(); await f.settled();
+  assert.ok(f.controller.read());
+  assert.equal(f.edits().length, 0, 'restoring readiness does not replay a gesture');
 });
