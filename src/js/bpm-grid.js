@@ -82,7 +82,7 @@
     grid.appendChild(frag);
   }
 
-  var dismissSettings = null;
+  var dismissSettings = null, pendingSettings = null;
   function openNativeSettings(origin, c) {
     if (dismissSettings) return;
     var owner = window.NemoNativeCompositionController;
@@ -146,13 +146,31 @@
     });
     dismissSettings = close; document.body.appendChild(overlay); stage();
   }
-  window.addEventListener('pagehide', function () { if (dismissSettings) dismissSettings(); }, { once: true });
+  window.addEventListener('pagehide', function () { pendingSettings = null; if (dismissSettings) dismissSettings(); }, { once: true });
 
   function openSettings(origin) {
-    origin = native() ? (arguments.length ? origin : projection(settingsRefused)) : null;
+    if (native()) {
+      if (dismissSettings || pendingSettings) return;
+      var supplied = arguments.length, refusal = null;
+      origin = supplied ? origin : projection(function (code) { refusal = code; settingsRefused(code); });
+      if (!origin) {
+        var owner = window.NemoNativeCompositionController;
+        if (!supplied && refusal === 'presentation-missing' && owner && typeof owner.readWhenPresented === 'function') {
+          var request = pendingSettings = {};
+          function settled(value) {
+            if (pendingSettings !== request) return;
+            pendingSettings = null;
+            if (window.NemoNativeCompositionController !== owner || !value || owner.read() !== value) { submit({}, null); return; }
+            return openNativeSettings(value, { bpm: value.composition.effectiveBpm, offset: value.composition.effectiveBpmOffset });
+          }
+          try { return Promise.resolve(owner.readWhenPresented()).then(settled, function () { return settled(null); }); }
+          catch (_) { return settled(null); }
+        }
+        submit({}, null); return;
+      }
+      return openNativeSettings(origin, { bpm: origin.composition.effectiveBpm, offset: origin.composition.effectiveBpmOffset });
+    }
     var c = cfg();
-    if (native() && !origin) { submit({}, null); return; }
-    if (native()) return openNativeSettings(origin, { bpm: origin.composition.effectiveBpm, offset: origin.composition.effectiveBpmOffset });
     var v = prompt('Tempo en BPM (0 pour masquer la grille)', String(c.bpm));
     if (v === null) return;
     var bpm = parseFloat(v);
