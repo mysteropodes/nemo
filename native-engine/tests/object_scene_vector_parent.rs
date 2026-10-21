@@ -459,7 +459,8 @@ fn null_record_presence_roundtrips_and_malformed_or_content_bearing_nulls_refuse
     }
     let mut source = null_parent(true, Some(json!([0, 0])));
     source["layers"][0]["isNullLayer"] = json!(true);
-    assert!(decode(&source).unwrap_err().message().contains("Null layer"));
+    let error = decode(&source).unwrap_err();
+    assert!(error.message().contains("Null layer"));
     source["layers"][0]
         .as_object_mut()
         .unwrap()
@@ -467,7 +468,8 @@ fn null_record_presence_roundtrips_and_malformed_or_content_bearing_nulls_refuse
     source["items"] = json!({"raster":[{"target":{"contextId":"scene-root","layerUid":"N",
         "frameScope":{"kind":"authored","frame":0},"strokeId":"forbidden"},
         "item":{"assetId":"image","x":0,"y":0,"width":2,"height":2,"opacity":1}}]});
-    assert!(decode(&source).unwrap_err().message().contains("Null layer"));
+    let error = decode(&source).unwrap_err();
+    assert!(error.message().contains("Null layer"));
 }
 
 #[test]
