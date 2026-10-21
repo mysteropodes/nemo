@@ -163,10 +163,22 @@ pub(crate) fn remaining_holder(
     if !(layer || text_element(document, target)) {
         return None;
     }
+    // Until the vector batch consumer is joined, a mixed visible contour layer
+    // may consume only its shared opacity here. Other pose fields must not be
+    // admitted on the strength of a Text/raster sibling alone.
+    let mixed = layer
+        && document.layers().iter().any(|l| {
+            l.layer_uid() == target.layer_uid()
+                && l.visible()
+                && document.objects().iter().any(|record| {
+                    record.target().context_id() == target.context_id()
+                        && record.target().layer_uid() == target.layer_uid()
+                })
+        });
     let mut remaining = holder.clone();
     remaining
         .properties
-        .retain(|p| !KEYS.contains(&p.property()));
+        .retain(|p| !KEYS.contains(&p.property()) || (mixed && p.property() != "opacity"));
     if remaining.properties.len() == holder.properties().len() {
         return None;
     }
