@@ -1,7 +1,11 @@
 //! Owner-held work only: GPU and surface remain borrowed from the caller.
 use crate::native_dispatch::{NativeObjectHost, NativeReleaseProgress};
 use native_engine::{
-    application::ApplicationReleaseReceipt,
+    application::{
+        prepare_object_motion_exposure_frame_for_control,
+        prepare_object_motion_fallback_frame_for_control, ApplicationReleaseReceipt,
+        ObjectMotionFrameControl,
+    },
     compositor::Compositor,
     desktop_viewport::{
         DesktopViewportHost, ObjectViewportFrame, PresentationReceipt, SurfacePort, ViewportStatus,
@@ -10,7 +14,7 @@ use native_engine::{
     native_media_frame_export::{
         begin_native_media_frames, declared_scene_resources, NativeVideoPort,
     },
-    object_frame_packet::{prepare_object_exposure_frame, ObjectFrameSelector},
+    object_frame_packet::ObjectFrameSelector,
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
         prepare_object_viewport_composition, prepare_scheduled_object_composition_from_witness,
@@ -37,6 +41,9 @@ pub(super) struct ObjectPreview {
     scheduler: FrameScheduler,
     prepared: Option<PreparedObjectPreview>,
     reference_cache: Option<ObjectCompositionWitness>,
+    // Required original C02 effects remain at this actual owner. They never
+    // become a render-time history edit or disappear into an error string.
+    pub(super) motion_control: ObjectMotionFrameControl,
     pending: Option<ScheduledFrame>,
     blocked: Option<String>,
     released: bool,
@@ -46,12 +53,23 @@ pub(super) struct ObjectPreview {
 }
 
 impl ObjectPreview {
+    pub(super) fn preparation_borrowed(&self) -> bool {
+        self.prepared.is_some()
+    }
+
     /// Lend only the original scheduler when no preview lease or cleanup debt exists.
     pub(super) fn scheduler_for_export(&mut self) -> Result<&mut FrameScheduler, String> {
         if self.released || self.pending.is_some() || self.blocked.is_some() {
             return Err("native object preview work must settle before export".into());
         }
         Ok(&mut self.scheduler)
+    }
+
+    pub(super) fn export_frame_ports(
+        &mut self,
+    ) -> Result<(&mut FrameScheduler, &mut ObjectMotionFrameControl), String> {
+        self.scheduler_for_export()?;
+        Ok((&mut self.scheduler, &mut self.motion_control))
     }
 
     fn cancel_pending(&mut self) -> Result<(), String> {
@@ -128,10 +146,31 @@ impl NativeObjectHost {
         output: OutputSpec,
         operation: impl FnOnce(&mut Self) -> Result<T, String>,
     ) -> Result<T, String> {
+        self.with_prepared_preview_mode(expected, output, false, operation)
+    }
+
+    /// Called only after the existing exact pending-event proof route admits it.
+    /// Pure fallback never publishes diagnostics, drains receipts or edits history.
+    pub(crate) fn with_prepared_object_preview_for_revision_sync<T>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        operation: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.with_prepared_preview_mode(expected, output, true, operation)
+    }
+
+    fn with_prepared_preview_mode<T>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        pending_proof_fallback: bool,
+        operation: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
         if self.preview.prepared.is_some() {
             return Err("native object preview preparation is already borrowed".into());
         }
-        let prepared = self.prepare_object_preview(expected, output)?;
+        let prepared = self.prepare_object_preview(expected, output, pending_proof_fallback)?;
         self.preview.prepared = Some(prepared);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
         self.preview.prepared = None;
@@ -142,9 +181,10 @@ impl NativeObjectHost {
     }
 
     fn prepare_object_preview(
-        &self,
+        &mut self,
         expected: &ObjectFrameSelector<'_>,
         output: OutputSpec,
+        pending_proof_fallback: bool,
     ) -> Result<PreparedObjectPreview, String> {
         if self.released.is_some() || self.preview.released {
             return Err("native object host was released".into());
@@ -160,8 +200,25 @@ impl NativeObjectHost {
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object preview snapshot is unavailable")?;
         // Validate the complete retained source before disturbing deferred work.
-        let packet = prepare_object_exposure_frame(&snapshot, expected)
-            .map_err(|e| format!("preview selector: {e:?}"))?;
+        let prepared = prepare_object_motion_exposure_frame_for_control(
+            &self.history,
+            &snapshot,
+            expected,
+            &mut self.preview.motion_control,
+        );
+        let packet = match prepared {
+            Ok(packet) => packet,
+            Err(error) if pending_proof_fallback => {
+                prepare_object_motion_fallback_frame_for_control(
+                    &self.history,
+                    &snapshot,
+                    expected,
+                    &self.preview.motion_control,
+                )
+                .map_err(|_| format!("preview selector: {error}"))?
+            }
+            Err(error) => return Err(format!("preview selector: {error}")),
+        };
         let scene = prepare_object_render_scene(&packet, expected)
             .map_err(|e| format!("preview scene: {e:?}"))?;
         let plan = prepare_object_paint_plan(&scene, expected)
@@ -388,3 +445,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_raster_image_preview_tests.rs"]
 mod raster_tests;
+
+#[cfg(test)]
+#[path = "native_object_motion_tests.rs"]
+pub(crate) mod motion_tests;

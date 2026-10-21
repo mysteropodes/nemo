@@ -5745,7 +5745,12 @@ test('L05-G layer range records stay a private document child with a codec admis
     assert.doesNotMatch(read(`native-engine/src/${file}`).split('#[cfg(test)]')[0], /super::/);
   }
   // D27 now consumes admitted ranges through the same snapshot before packet publication.
-  assert.match(read('native-engine/src/object_frame_packet.rs'), /let source_frames = sources::select\(\s*snapshot,\s*selector,\s*context_layers,\s*exposure,\s*context\.is_component\(\),?\s*\)\?;/);
+  const framePacket = read('native-engine/src/object_frame_packet.rs');
+  assert.match(framePacket, /#\[path = "object_frame_prepare\.rs"\]\s*mod prepare;\s*use prepare::prepare_frame_with_order;/);
+  assert.match(framePacket, /prepare_frame_with_order\(snapshot, selector, false, order::prepare_context, None\)/);
+  assert.match(framePacket, /prepare_frame_with_order\(snapshot, selector, true, order::prepare_context, None\)/);
+  const framePrepare = read('native-engine/src/object_frame_prepare.rs');
+  assert.match(framePrepare, /let source_frames = sources::select\(\s*snapshot,\s*selector,\s*context_layers,\s*exposure,\s*context\.is_component\(\),?\s*\)\?;/);
   const sources = read('native-engine/src/object_frame_sources.rs');
   assert.match(sources, /RangeEvaluator::new\(snapshot, selector\.context_id, selector\.frame\)\s*\.map_err\(\|_\| ObjectFrameError::Unavailable\)\?;/);
   assert.match(sources, /ranges\s*\.gates\(layer\.layer_uid\(\)\)\s*\.map_err\(\|_\| ObjectFrameError::Unavailable\)\?;/);

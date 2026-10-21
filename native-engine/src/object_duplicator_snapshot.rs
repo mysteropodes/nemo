@@ -10,6 +10,9 @@ use crate::object_document::{Presence, PropertyHolderTarget};
 use crate::object_frame_packet::sample_property_raw;
 use crate::revision::ObjectSnapshot;
 
+#[path = "object_duplicator_follow_path.rs"]
+mod follow_path;
+
 pub(crate) struct SnapshotMotion<'a> {
     snapshot: &'a ObjectSnapshot,
     context_id: &'a str,
@@ -23,6 +26,21 @@ impl<'a> SnapshotMotion<'a> {
             context_id,
             frame,
         }
+    }
+
+    /// Shared by strict stored Motion and the application-owned evaluated
+    /// local pose. FollowPath never calls back into application evaluation.
+    pub(crate) fn motion_delta_from_local(
+        &self,
+        layer_uid: &str,
+        local: Option<crate::evaluation::motion_parent_chain::MotionMat>,
+    ) -> Result<Option<MotionDelta>, Unavailable> {
+        let mat =
+            follow_path::compose(self.snapshot, self.context_id, self.frame, layer_uid, local)?;
+        Ok(mat.map(|mat| MotionDelta {
+            dx: JsNumber::Value(mat.dx),
+            dy: JsNumber::Value(mat.dy),
+        }))
     }
 
     fn target(&self, layer_uid: &str) -> PropertyHolderTarget {
@@ -66,22 +84,13 @@ impl MotionPort for SnapshotMotion<'_> {
             .context(self.context_id)
             .map_err(|_| Unavailable::LayerMotion)?;
         context.layer(layer_uid).ok_or(Unavailable::LayerMotion)?;
-        // Baseline fbe4b8a3 motion.js layerMotionAt returns the LOCAL
-        // computeMotionMat (plus FollowPath, which ObjectLayer cannot yet
-        // store). It does not call parentChainMats. effector-layer.js adds
-        // only this dx/dy to eff.pos, despite its parent-chain comment.
-        // Preserve that behavior for admitted static parent links; ancestor
-        // pivots, poses and expressions are not inputs of this lookup.
-        // Enabled expressions on the consumed local Motion still refuse.
-        self.snapshot
+        // layerMotionAt is local computeMotionMat plus its optional FollowPath;
+        // the effector's own ancestor pose is deliberately not composed here.
+        let local = self
+            .snapshot
             .sampled_motion_2d(&self.target(layer_uid), self.frame)
-            .map(|mat| {
-                mat.map(|mat| MotionDelta {
-                    dx: JsNumber::Value(mat.dx),
-                    dy: JsNumber::Value(mat.dy),
-                })
-            })
-            .map_err(|_| Unavailable::LayerMotion)
+            .map_err(|_| Unavailable::LayerMotion)?;
+        self.motion_delta_from_local(layer_uid, local)
     }
 }
 

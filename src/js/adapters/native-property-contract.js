@@ -139,7 +139,7 @@
       exact(value, ['atRevision', 'documentSnapshotId', 'view'], [], 'property read');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId);
       const view = value.view;
-      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext'].includes(view.kind)) {
+      if (!plain(view) || !['rawSample', 'authoredKeys', 'expressionContext', 'expressionState'].includes(view.kind)) {
         throw new TypeError('unsupported property read view');
       }
       const fields = view.kind !== 'authoredKeys' ? ['frame'] : ['offset', 'limit'];
@@ -222,10 +222,32 @@
         }
       }
     }
+    function expressionStateResult(value) {
+      if (!Number.isFinite(value.frame)) throw new TypeError('invalid expression state frame');
+      const e=value.expression, result=value.evaluation;
+      exact(e,['present','enabled'],[],'expression state');
+      if (typeof e.present!=='boolean'||typeof e.enabled!=='boolean'||!e.present&&e.enabled) throw new TypeError('invalid expression presence');
+      if (result && result.state==='unavailable') {
+        exact(result,['state','reason'],[],'expression evaluation');
+        if(result.reason!=='not-evaluated') throw new TypeError('invalid expression availability');
+        return;
+      }
+      exact(result,['state','diagnostic'],[],'expression evaluation');
+      if(result.state!=='evaluated'||!e.present) throw new TypeError('invalid expression evaluation');
+      const diagnostic=result.diagnostic;
+      if(diagnostic===null)return;
+      if(diagnostic&&['mustReturnNumber','mustReturnNumberOrXY','tooDeep','timeout'].includes(diagnostic.kind)) exact(diagnostic,['kind'],[],'expression diagnostic');
+      else {
+        exact(diagnostic,['kind','message','line'],[],'expression diagnostic');
+        if(!['runtime','syntax'].includes(diagnostic.kind)||typeof diagnostic.message!=='string'||
+          diagnostic.line!==null&&(!Number.isInteger(diagnostic.line)||diagnostic.line<0||diagnostic.line>0xffffffff)) throw new TypeError('invalid expression diagnostic');
+      }
+    }
     function readResult(value) {
       const raw = value && value.kind === 'rawSample';
       const context = value && value.kind === 'expressionContext';
-      const fields = raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : ['trackPresent', 'items', 'nextOffset'];
+      const expression = value && value.kind === 'expressionState';
+      const fields = raw ? ['frame', 'value'] : context ? ['frame','self','comp','keyCount','compUnavailable'] : expression ? ['frame','expression','evaluation'] : ['trackPresent', 'items', 'nextOffset'];
       exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId',
         'kind', 'target', 'property', 'dimension', ...fields], context ? ['mesh'] : [], 'property read result');
       id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId');
@@ -234,7 +256,9 @@
       if (!Number.isInteger(value.dimension) || value.dimension < 1 || value.dimension > 4) {
         throw new TypeError('invalid property read dimension');
       }
-      if (context) {
+      if (expression) {
+        expressionStateResult(value);
+      } else if (context) {
         expressionContextResult(value);
       } else if (raw) {
         if (!Number.isFinite(value.frame)) throw new TypeError('invalid sampled frame');
@@ -271,7 +295,7 @@
         throw new TypeError('authored page cursor mismatch');
       }
     }
-    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
+    const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
     return Object.freeze({ rangeResult, placementResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }

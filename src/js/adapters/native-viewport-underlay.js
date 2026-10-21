@@ -23,6 +23,13 @@
       return a[key] === b[key];
     });
   }
+  function bounds(root,pin){var doc=root.document,el=doc.getElementById('drawing-canvas'),r=el&&el.getBoundingClientRect(),html=doc.documentElement;
+      if(!r||![r.left,r.top,r.width,r.height,pin.canvasW,pin.canvasH].every(Number.isFinite)||r.width<=0||r.height<=0||pin.canvasW<=0||pin.canvasH<=0||r.left<0||r.top<0||r.left+r.width>html.clientWidth||r.top+r.height>html.clientHeight||!html.classList.contains('nemo-native-underlay'))return null;
+      var edges=[r.left,r.top,r.left+r.width,r.top+r.height];
+      if(typeof html.style.getPropertyValue!=='function'||!['left','top','right','bottom'].every(function(k,i){return parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===edges[i];}))return null;
+      return {left:r.left,top:r.top,width:r.width,height:r.height};}
+    function point(e,c){return {x:(e.clientX-c.bounds.left)*c.canvasW/c.bounds.width,y:(e.clientY-c.bounds.top)*c.canvasH/c.bounds.height};}
+    function screen(p,c){return {x:c.bounds.left+p.x*c.bounds.width/c.canvasW,y:c.bounds.top+p.y*c.bounds.height/c.canvasH};}
   function create(ports) {
     var element = ports.document.documentElement, style = element.style;
     if (element.classList.contains(className)) throw new Error('Native underlay already has an owner');
@@ -112,5 +119,5 @@
       }
     });
   }
-  return Object.freeze({ create: create, desktop: desktop });
+  return Object.freeze({ create: create, desktop: desktop, canvasMapping: Object.freeze({bounds:bounds,point:point,screen:screen}) });
 }));

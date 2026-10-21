@@ -196,7 +196,7 @@ fn shipped_schema_and_descriptor_include_palette_without_dropping_prior_result_b
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
-    assert_eq!(branches.len(), 33);
+    assert_eq!(branches.len(), 36);
     assert_eq!(
         branches[30],
         json!({"$ref":"#/$defs/ObjectProjectGuideReadResult"})
@@ -208,6 +208,18 @@ fn shipped_schema_and_descriptor_include_palette_without_dropping_prior_result_b
     assert_eq!(
         branches[32],
         json!({"$ref":"#/$defs/ObjectProjectPerspectiveReadResult"})
+    );
+    assert_eq!(
+        branches[33],
+        json!({"$ref":"#/$defs/ObjectProjectWorkspaceReadResult"})
+    );
+    assert_eq!(
+        branches[34],
+        json!({"$ref":"#/$defs/ObjectProjectCustomBrushPresetReadResult"})
+    );
+    assert_eq!(
+        branches[35],
+        json!({"$ref":"#/$defs/ObjectProjectCommentsReadResult"})
     );
     assert_eq!(
         branches[27],

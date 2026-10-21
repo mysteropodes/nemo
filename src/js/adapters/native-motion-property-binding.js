@@ -146,6 +146,7 @@
     var caller=Panel.createCaller({document:root.document,container:options.container,pageBudget:options.pageBudget,yieldControl:options.yieldControl,
       isMotion:function(){return !retired&&root.state.appMode==='motion';},readContext:readContext,readSelection:readSelection,readSelections:readSelections,readContextId:readContextId,
       query:query,readProperty:readProperty,keyTimelineChanged:options.keyTimelineChanged,
+      translate:function(key){return root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;},
       get editPropertyTrack(){return typeof ui.editPropertyTrack==='function'?function(payload,pin,current){return editProperty(payload,pin,current,true);}:undefined;},
       get editProperty(){return typeof ui.editProperty==='function'?editProperty:undefined;},
       selectTarget:selectTarget,labelTarget:labelTarget,labelProperty:options.labelProperty,readPreference:options.readPreference,writePreference:options.writePreference});

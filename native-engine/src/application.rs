@@ -5,6 +5,13 @@ use crate::export_job::{
 };
 pub use crate::export_job_lifecycle::ApplicationReleaseReceipt;
 use crate::history::NativeOpacityHistory;
+pub use crate::object_expression_runtime::{
+    finalize_object_motion_frame_effects_for_owner,
+    prepare_object_motion_exposure_frame_for_control,
+    prepare_object_motion_exposure_frame_for_owner,
+    prepare_object_motion_fallback_frame_for_control, ObjectMotionEffectsCommit,
+    ObjectMotionFrameControl, ObjectMotionFrameFailure,
+};
 use crate::protocol::{
     self, ExportBeginPayload, JobIdPayload, OpaqueResourceHandle, OP_JOB_EXPORT_PNG_BEGIN,
     OP_JOB_EXPORT_PNG_CANCEL, OP_JOB_EXPORT_PNG_STATUS,
@@ -103,18 +110,6 @@ pub struct NativeApplication<P, C, R> {
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     NativeApplication<P, C, R>
 {
-    pub fn instance_id(&self) -> &str {
-        self.history.instance_id()
-    }
-
-    pub fn document_id(&self) -> &str {
-        self.history.document_id()
-    }
-
-    pub fn content_revision(&self) -> u64 {
-        self.history.content_revision()
-    }
-
     pub fn acquire_snapshot(&self, revision: u64) -> Option<DocumentSnapshot> {
         if self.replacement.is_some() {
             return None;

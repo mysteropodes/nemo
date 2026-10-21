@@ -151,13 +151,27 @@ fn track_value(
 /// Text/raster layer poses and their actual ancestors use the scene parent consumer.
 /// Visible vector parents, unsupported properties and expressions remain unavailable.
 pub(crate) fn holders_fully_consumed(document: &ObjectDocument) -> bool {
+    holders_consumed(document, false)
+}
+
+/// The owner frame route supplies the real evaluated duplicator/effector port.
+/// All other holders, expression families and paint boundaries stay strict.
+pub(crate) fn holders_fully_consumed_with_motion(document: &ObjectDocument) -> bool {
+    holders_consumed(document, true)
+}
+fn holders_consumed(document: &ObjectDocument, evaluated: bool) -> bool {
     if !crate::evaluation::object_vector_kernels::render_vector_eval::motion::visible_vector_parents_supported(document) {
         return false;
     }
     document.property_holders().is_none_or(|holders| {
         holders.iter().all(|holder| {
-            let remaining =
-                crate::object_frame_packet::duplicators::remaining_holder(document, holder);
+            let remaining = if evaluated {
+                crate::object_frame_packet::duplicators::remaining_holder_with_motion(
+                    document, holder, true,
+                )
+            } else {
+                crate::object_frame_packet::duplicators::remaining_holder(document, holder)
+            };
             match remaining {
                 Some(ref remaining) if remaining.properties().is_empty() => remaining
                     .controls

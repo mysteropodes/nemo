@@ -84,6 +84,9 @@ pub(super) struct Metadata {
     bpm_show: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     palettes: Presence<Vec<Palette>>,
+    // Input compatibility only; the native owner stores canonical palettes.
+    #[serde(skip_serializing)]
+    color_palette: Presence<Vec<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     active_palette_idx: Presence<f64>,
     #[serde(skip_serializing_if = "Presence::missing")]
@@ -125,6 +128,7 @@ crate::object_document::object_deserialize!(Metadata {
     #[serde(default)] bpm_offset: Presence<f64>,
     #[serde(default)] bpm_show: Presence<bool>,
     #[serde(default)] palettes:Presence<Vec<Palette>>,
+    #[serde(default)] color_palette:Presence<Vec<String>>,
     #[serde(default)] active_palette_idx:Presence<f64>,
     #[serde(default)] shadow_palette:Presence<Vec<ShadowColor>>,
     #[serde(default)] shadow_active_id:Presence<String>,
@@ -142,6 +146,23 @@ crate::object_document::object_deserialize!(Metadata {
 
 impl Metadata {
     pub(super) fn into_metadata(self) -> Result<ProjectMetadata, ProjectWireError> {
+        // Match the original import precedence inside an already admitted envelope.
+        // Without an alias, retain native missing versus explicitly empty palettes.
+        let palettes = self.palettes.value();
+        let canonical_palettes = palettes
+            .filter(|items| !items.is_empty())
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|p| (p.id.clone(), p.name.clone(), p.colors.clone()))
+                    .collect()
+            })
+            .or_else(|| {
+                self.color_palette
+                    .value()
+                    .map(|colors| vec![("p0".into(), "Palette 1".into(), colors.clone())])
+            })
+            .or_else(|| palettes.map(|_| Vec::new()));
         ProjectMetadata::new(self.canvas_w, self.canvas_h, self.fps)
             .and_then(|value| {
                 value.with_canvas_background(self.canvas_bg.value().map(String::as_str))
@@ -164,12 +185,7 @@ impl Metadata {
             })
             .and_then(|value| {
                 value.with_palette_metadata(
-                    self.palettes.value().map(|items| {
-                        items
-                            .iter()
-                            .map(|p| (p.id.clone(), p.name.clone(), p.colors.clone()))
-                            .collect()
-                    }),
+                    canonical_palettes,
                     self.active_palette_idx.value().copied(),
                 )
             })
@@ -278,6 +294,7 @@ impl Metadata {
                     })
                     .collect()
             })),
+            color_palette: Presence::Missing,
             active_palette_idx: present(active_palette_idx),
             custom_brush_presets: present(value.custom_brush_presets().cloned()),
             workspace: present(workspace.cloned()),

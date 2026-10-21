@@ -157,7 +157,7 @@ test('retired queued completion cannot disable a replacement owner editor sharin
 
 test('browser Text bootstrap injects actual existing reader and writer modules into the pure core',async()=>{
  // VM objects cross into the Node-realm SDK through the fixture's explicit JSON boundary.
- const browser={NemoNativeTextRead:require('../src/js/adapters/native-text-read.js'),NemoNativeObjectTextLayout:require('../src/js/adapters/native-object-text-layout.js'),NemoNativeObjectItemContract:require('../src/js/adapters/native-object-item-contract.js')};
+ const browser={NemoNativeViewportUnderlay:require('../src/js/adapters/native-viewport-underlay.js'),NemoNativeTextRead:require('../src/js/adapters/native-text-read.js'),NemoNativeObjectTextLayout:require('../src/js/adapters/native-object-text-layout.js'),NemoNativeObjectItemContract:require('../src/js/adapters/native-object-item-contract.js')};
  const coreSource=fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-text-tool.js'),'utf8');
  const desktopSource=fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-text-tool-desktop.js'),'utf8');
  vm.runInNewContext(coreSource,browser,{filename:'actual-native-text-tool.js'});

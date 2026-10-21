@@ -4,6 +4,12 @@ use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::request_receipts::DispatchErrorCode;
 
 impl NativeObjectHistory {
+    pub(crate) fn prepare_comments_delta_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
+        self.owner.prepare_comments_delta_json(bytes)
+    }
     pub(crate) fn prepare_perspective_delta_json(
         &self,
         bytes: &[u8],
@@ -15,6 +21,18 @@ impl NativeObjectHistory {
         bytes: &[u8],
     ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
         self.owner.prepare_shadow_delta_json(bytes)
+    }
+    pub(crate) fn prepare_custom_brush_delta_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
+        self.owner.prepare_custom_brush_delta_json(bytes)
+    }
+    pub(crate) fn prepare_workspace_capture_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectSettings, DispatchErrorCode> {
+        self.owner.prepare_workspace_capture_json(bytes)
     }
     pub(crate) fn prepare_guide_delta_json(
         &self,
@@ -92,3 +110,15 @@ mod shadow_public_tests;
 #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
 #[path = "../tests/object_perspective_public.rs"]
 mod perspective_public_tests;
+
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_workspace_public.rs"]
+mod workspace_public_tests;
+
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_custom_brush_public.rs"]
+mod custom_brush_public_tests;
+
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_comments_public.rs"]
+mod comments_public_tests;

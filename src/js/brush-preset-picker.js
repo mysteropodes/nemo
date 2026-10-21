@@ -16,6 +16,7 @@
 // strokemotion/CLAUDE.md's guidance on keeping duplicated logic in sync).
 (function () {
   var popover = null, closeHandlers = null;
+  var openArgs = null;
   var demoPath = null; // built lazily once Paper.js is ready, reused for every preview render
 
   // Hover-preview on the CANVAS (2026-07 feedback: "on ne voit pas les
@@ -26,6 +27,7 @@
   // declared outside any IIFE) rather than a second copy of that logic.
   var _hoverSnapshot = null;
   function eligibleHoverPaths() {
+    if(window.__TAURI__&&window.__TAURI__.core)return [];
     if (!(window.state && (state.tool === 'select' || state.tool === 'subselect')) || !window.selectedPaths || !selectedPaths.length) return [];
     return selectedPaths.filter(function (p) { return p instanceof Path && !(p.data && (p.data.isVectorBrush || p.data.isFillShape)); });
   }
@@ -43,6 +45,7 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   function revertHoverPreview() {
+    if(window.__TAURI__&&window.__TAURI__.core){_hoverSnapshot=null;return;}
     if (!_hoverSnapshot) return;
     _hoverSnapshot.forEach(function (rec) {
       stripAnyBrushTexture(rec.p);
@@ -91,6 +94,7 @@
   }
 
   function drawPreview(canvas, presetKey) {
+    if(window.NemoNativeCustomBrushUI&&NemoNativeCustomBrushUI.unavailablePreview(window,canvas,presetKey))return;
     var ctx = canvas.getContext('2d');
     var w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
@@ -130,6 +134,7 @@
     ];
   }
   function customKeys() {
+    if(window.__TAURI__&&window.__TAURI__.core){var p=NemoNativeCustomBrushUI.projection(window);return p?p.catalog.items.map(function(row){return row.id;}):[];}
     return Object.keys((window.state && state.customBrushPresets) || {});
   }
   // Favorites (feedback #81) — a personal picker preference, not project
@@ -159,7 +164,10 @@
   function renderFavoritesRow() {
     var row = document.getElementById('p-brushfav-row');
     if (!row) return;
-    var live = favorites.filter(function (k) { return window.resolveBrushPreset && window.resolveBrushPreset(k); });
+    var live = favorites.filter(function (k) {
+      if(window.__TAURI__&&window.__TAURI__.core)return k==='none'||!!NemoNativeCustomBrushUI.resolve(window,k)||NemoNativeCustomBrushUI.exists(window,k)!==false;
+      return window.resolveBrushPreset && window.resolveBrushPreset(k);
+    });
     if (live.length !== favorites.length) { favorites = live; try { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); } catch (e) { } }
     row.style.display = live.length ? '' : 'none';
     row.innerHTML = '';
@@ -174,6 +182,7 @@
     });
   }
   function labelFor(key) {
+    if(window.__TAURI__&&window.__TAURI__.core)return NemoNativeCustomBrushUI.label(window,key);
     if (key === 'none') return 'None (solid)';
     if (window.state && state.customBrushPresets && state.customBrushPresets[key] && state.customBrushPresets[key].label) return state.customBrushPresets[key].label;
     return key.split('-').map(function (w) { return w[0].toUpperCase() + w.slice(1); }).join(' - ');
@@ -213,42 +222,38 @@
     // harmonization pass) calling this same function — caught by checking
     // state.undoStack.length after a single click, not just eyeballing the
     // result, which is why it went unnoticed this long.
-    if (window.SM) window.SM.setBrushPreset(key);
+    if(window.__TAURI__&&window.__TAURI__.core){if(!window.SM||window.SM.setBrushPreset(key)===false)return false;}
+    else if (window.SM) window.SM.setBrushPreset(key);
     paintButton(key);
+    return true;
   }
 
   function open(anchorEl, currentKey, onSelect) {
     closePopover();
     var el = document.createElement('div');
     el.className = 'ctx-menu bp-picker-pop';
-    var html = '';
-    // Star SVG (feedback #81) — inline data URI convention avoided here
-    // since it's just markup, not a cursor; skipped on 'none' (favoriting
-    // "no brush" isn't meaningful).
-    function favStar(k) {
-      if (k === 'none') return '';
-      return '<span class="bp-item-fav' + (isFavorite(k) ? ' is-fav' : '') + '" data-fav="' + k + '" title="' + (isFavorite(k) ? 'Retirer des favoris' : 'Ajouter aux favoris') + '">' + (isFavorite(k) ? '★' : '☆') + '</span>';
-    }
-    builtinGroups().forEach(function (g) {
-      html += '<div class="bp-group-label">' + g.label + '</div><div class="bp-grid">';
-      g.keys.forEach(function (k) {
-        html += '<button class="bp-item' + (k === currentKey ? ' active' : '') + '" data-key="' + k + '" title="' + labelFor(k) + '">' +
-          '<canvas width="150" height="20"></canvas><span>' + labelFor(k) + '</span>' + favStar(k) + '</button>';
+    var nativeCatalog=!!(window.__TAURI__&&window.__TAURI__.core),catalog=window.NemoNativeCustomBrushUI;
+    var owner=nativeCatalog&&catalog.controller(window),origin=owner&&owner.read();
+    openArgs={anchor:anchorEl,key:currentKey,select:onSelect};
+    function appendGroup(label,keys,custom){
+      var heading=document.createElement('div');heading.className='bp-group-label';heading.textContent=label;el.appendChild(heading);
+      var grid=document.createElement('div');grid.className='bp-grid';el.appendChild(grid);
+      keys.forEach(function(key){
+        var button=document.createElement('button');button.className='bp-item'+(custom?' bp-item-custom':'')+(key===currentKey?' active':'');
+        button.dataset.key=key;button.title=labelFor(key);
+        var canvas=document.createElement('canvas');canvas.width=150;canvas.height=20;button.appendChild(canvas);
+        var text=document.createElement('span');text.textContent=labelFor(key);button.appendChild(text);
+        if(key!=='none'){
+          var favorite=document.createElement('span');favorite.className='bp-item-fav'+(isFavorite(key)?' is-fav':'');favorite.dataset.fav=key;
+          favorite.title=isFavorite(key)?'Retirer des favoris':'Ajouter aux favoris';favorite.textContent=isFavorite(key)?'★':'☆';button.appendChild(favorite);
+        }
+        if(custom){var del=document.createElement('span');del.className='bp-item-del';del.dataset.del=key;del.title='Supprimer';del.textContent='×';button.appendChild(del);}
+        grid.appendChild(button);
       });
-      html += '</div>';
-    });
-    var custom = customKeys();
-    if (custom.length) {
-      html += '<div class="bp-group-label">Mes brushes</div><div class="bp-grid">';
-      custom.forEach(function (k) {
-        html += '<button class="bp-item bp-item-custom' + (k === currentKey ? ' active' : '') + '" data-key="' + k + '" title="' + labelFor(k) + '">' +
-          '<canvas width="150" height="20"></canvas><span>' + labelFor(k) + '</span>' + favStar(k) +
-          '<span class="bp-item-del" data-del="' + k + '" title="Supprimer">&times;</span></button>';
-      });
-      html += '</div>';
     }
-    html += '<button class="bp-edit-btn" id="bp-open-editor">Éditer / créer un brush…</button>';
-    el.innerHTML = html;
+    builtinGroups().forEach(function(group){appendGroup(group.label,group.keys,false);});
+    var custom=customKeys();if(custom.length)appendGroup('Mes brushes',custom,true);
+    var editor=document.createElement('button');editor.id='bp-open-editor';editor.className='bp-edit-btn';editor.textContent='Éditer / créer un brush…';el.appendChild(editor);
     document.body.appendChild(el);
     popover = el;
 
@@ -262,8 +267,9 @@
         // pushUndo (via setBrushPreset) must snapshot the true pre-hover
         // state, not the already-mutated preview, or Ctrl+Z would restore
         // to the hovered-but-not-picked brush instead of the original.
+        if(nativeCatalog&&(popover!==el||!el.contains(btn)||btn.classList.contains('bp-item-custom')&&(!owner||!owner.ready(origin)))){catalog.notice(window);return;}
         revertHoverPreview();
-        onSelect(btn.dataset.key);
+        if(onSelect(btn.dataset.key)===false&&nativeCatalog)return;
         // Stay open (2026-07 feedback: "il faut le même [que le menu
         // flottant]... celui-ci disparait une fois que l'on a select une
         // brush") — same convention as the floating Brush Menu's own grid,
@@ -286,6 +292,15 @@
       delBtn.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         var key = delBtn.dataset.del;
+        if(nativeCatalog){
+          if(delBtn.disabled||popover!==el||!owner||!owner.ready(origin)){catalog.notice(window);return;}
+          var selectionIntent=catalog.selectionIntent(window);delBtn.disabled=true;
+          owner.edit({kind:'delete',id:key},origin).then(function(result){
+            if(popover!==el||!el.contains(delBtn)||!owner.confirmed(result))return;
+            if(state.brushPreset===key&&catalog.selectionIntent(window)===selectionIntent)selectPreset('none');
+            renderFavoritesRow();closePopover();open(anchorEl,state.brushPreset||'none',onSelect);
+          }).finally(function(){delBtn.disabled=false;});return;
+        }
         if (window.state && state.customBrushPresets) delete state.customBrushPresets[key];
         if (state.brushPreset === key) { state.brushPreset = 'none'; paintButton('none'); }
         renderFavoritesRow();
@@ -323,7 +338,8 @@
     // reuses this file's exact catalog/preview/select logic rather than
     // keeping a second copy that could drift out of sync.
     groups: builtinGroups, customKeys: customKeys,
-    isFavorite: isFavorite, toggleFavorite: toggleFavorite,
+    isFavorite: isFavorite, toggleFavorite: toggleFavorite, close: closePopover, refreshFavorites: renderFavoritesRow,
+    refresh:function(){paintButton(state.brushPreset||'none');renderFavoritesRow();if(popover&&openArgs){var args=openArgs;closePopover();open(args.anchor,state.brushPreset||'none',args.select);}},
   };
 
   function init() {

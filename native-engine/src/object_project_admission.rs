@@ -234,6 +234,8 @@ impl ObjectSnapshot {
 
 #[path = "object_project_composition_read.rs"]
 mod composition;
+#[path = "object_project_custom_brush_read.rs"]
+mod custom_brush_read;
 #[path = "object_project_guide_read.rs"]
 mod guide_read;
 #[path = "object_project_palette_read.rs"]
@@ -242,6 +244,12 @@ mod palette_read;
 mod perspective_read;
 #[path = "object_project_shadow_read.rs"]
 mod shadow_read;
+#[path = "object_project_workspace_read.rs"]
+mod workspace_read;
+
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_project_comments_read.rs"]
+mod comments_read;
 
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_palette_read.rs"]

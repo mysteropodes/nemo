@@ -4507,6 +4507,7 @@ var SHARPNESS_LAYERS=3;
 // instead of the raw dict so custom presets work everywhere built-ins do,
 // with no separate code path to keep in sync.
 function resolveBrushPreset(key){
+  if(window.__TAURI__&&window.__TAURI__.core)return window.NemoNativeCustomBrushUI?NemoNativeCustomBrushUI.resolve(window,key):null;
   if(!key||key==='none')return null;
   return BRUSH_PRESETS[key]||(state.customBrushPresets&&state.customBrushPresets[key])||null;
 }
@@ -5084,6 +5085,10 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
 // commit, which now passes the SAME seed it used for the gesture's live
 // preview, see liveBrushDabs there). Threaded straight to buildBrushDabs.
 function applyBrushTexture(basePath,presetKey,seed){
+  if(window.__TAURI__&&window.__TAURI__.core){
+    var unavailable=new Error('Custom vector brush Drawing is unavailable until the native source/provider is joined.');
+    unavailable.code='unavailable';throw unavailable;
+  }
   var preset=resolveBrushPreset(presetKey);
   if(!preset||!basePath.segments||basePath.segments.length<2)return basePath;
   // Pressure (vectorBrush) ribbons are a FILLED SHAPE whose width varies
@@ -7219,13 +7224,7 @@ function onMouseDown(event){
     }
     renderArcs();updateUI();
   }else if(state.tool==='comment'){
-    // Existing pin nearby -> reopen it for editing; otherwise start a new
-    // one anchored at the click. Hit radius is in world units scaled by
-    // zoom so it feels consistent regardless of how far zoomed in you are.
-    var hitRadius=14/view.zoom;
-    var existing=(state.comments||[]).filter(function(cm){return cm.frame===state.currentFrame;})
-      .find(function(cm){return event.point.getDistance(new Point(cm.x,cm.y))<hitRadius;});
-    openCommentPopover(event.point,existing);
+    NemoProjectCommentsPresentation.openAt(window,event.point,view.zoom);
   }else if(state.tool==='camera'){
     if(window.SMCamera)SMCamera.onDown(event);
   }else if(state.tool==='text'){

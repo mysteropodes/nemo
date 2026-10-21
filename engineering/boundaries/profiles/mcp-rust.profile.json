@@ -118,7 +118,13 @@
         "src/native_shadow_contract.rs",
         "src/native_shadow_contract_tests.rs",
         "src/native_perspective_contract.rs",
-        "src/native_perspective_contract_tests.rs"
+        "src/native_perspective_contract_tests.rs",
+        "src/native_workspace_contract.rs",
+        "src/native_workspace_contract_tests.rs",
+        "src/native_custom_brush_contract.rs",
+        "src/native_custom_brush_contract_tests.rs",
+        "src/native_comments_contract.rs",
+        "src/native_comments_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

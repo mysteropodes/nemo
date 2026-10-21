@@ -132,7 +132,7 @@ pub(crate) fn check_target(
     frame: u32,
 ) -> Result<usize, SelectionError> {
     let index = layer_index(document, layer_uid)?;
-    if document.layers[index].locked() {
+    if document.layer_is_locked(layer_uid) {
         return Err(SelectionError::Locked(layer_uid.to_string()));
     }
     if frame >= document.total_frames {

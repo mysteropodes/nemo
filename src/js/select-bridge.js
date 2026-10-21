@@ -534,6 +534,7 @@
     return nativePointerIntent;
   }
   function nativePointerEvent(method, e) {
+    if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if(window.NemoNativeTextToolDesktop&&window.NemoNativeTextToolDesktop.handle(window,method,e,nativePointerIntent&&nativePointerIntent.cancel))return true;
     if (nativePointerIntent && nativePointerIntent.snapshot()) {
       try { if (window.NemoNativeOpacityCutover.blocksLegacy() !== true) {

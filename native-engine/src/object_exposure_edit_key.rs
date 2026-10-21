@@ -20,7 +20,7 @@ use crate::commands::object_fill_owner::object_frame_edit_document::{
     clear_cells, clear_key, demote_span, promote_cells, DocumentEdit, FrameEditError,
 };
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{object_deserialize, ObjectDocument, ObjectLayer, Presence};
+use crate::object_document::{object_deserialize, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
@@ -215,10 +215,6 @@ fn refusal(error: FrameEditError) -> DispatchErrorCode {
         | FrameEditError::PreservedOutOfRange => DispatchErrorCode::Unavailable,
     }
 }
-/// Absent reads as the baseline `false`; presence is never authored by an edit that does not change it.
-fn is_locked(layer: &ObjectLayer) -> bool {
-    layer.locked.value().copied().unwrap_or(false)
-}
 fn index_of(document: &ObjectDocument, uid: &str) -> Result<usize, DispatchErrorCode> {
     document
         .layers
@@ -274,8 +270,8 @@ fn plan_promote(
     let mut current = document.clone();
     let (mut changed, mut locked_hit) = (false, false);
     for uid in targets {
-        let index = index_of(&current, uid)?;
-        if is_locked(&current.layers[index]) {
+        index_of(&current, uid)?;
+        if current.layer_is_locked(uid) {
             locked_hit = true;
             continue;
         }
@@ -293,9 +289,9 @@ fn plan_clear(
     layer: &str,
     cell: u32,
 ) -> Result<DocumentEdit, DispatchErrorCode> {
-    let index = index_of(document, layer)?;
+    index_of(document, layer)?;
     check_cell(document, cell)?;
-    if is_locked(&document.layers[index]) {
+    if document.layer_is_locked(layer) {
         return Err(DispatchErrorCode::Unavailable);
     }
     clear_key(document, layer, cell).map_err(refusal)
@@ -322,7 +318,7 @@ fn plan_clear_cells(
         if frames.is_empty() {
             continue;
         }
-        if is_locked(layer) {
+        if current.layer_is_locked(layer.layer_uid()) {
             locked_hit = true;
             continue;
         }
@@ -343,12 +339,12 @@ fn plan_remove_tween(
     from: u32,
     to: u32,
 ) -> Result<DocumentEdit, DispatchErrorCode> {
-    let index = index_of(document, layer)?;
+    index_of(document, layer)?;
     if from > to {
         return Err(DispatchErrorCode::InvalidRequest);
     }
     check_cell(document, to)?;
-    if is_locked(&document.layers[index]) {
+    if document.layer_is_locked(layer) {
         return Err(DispatchErrorCode::Unavailable);
     }
     demote_span(document, layer, from, to).map_err(refusal)

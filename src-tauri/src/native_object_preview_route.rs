@@ -94,6 +94,7 @@ impl ApplicationMcp {
         } else if revision_sync.is_some() {
             return Err("native revision preview proof has no pending event".into());
         }
+        revisions.admit_motion_read(lifecycle_generation, expected, revision_sync.is_some())?;
         let owner = application
             .as_any_mut()
             .downcast_mut::<NativeObjectHost>()
@@ -101,8 +102,30 @@ impl ApplicationMcp {
         // B2B checkpoints pending work before calling SurfacePort. Catch only
         // this consumer unwind so its debt remains releasable without poisoning
         // either shared application lock. No success receipt is synthesized.
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(owner)))
-            .map_err(|_| "native object preview panicked; owner cleanup is required".to_string())?
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(owner)))
+            .unwrap_or_else(|_| {
+                Err("native object preview panicked; owner cleanup is required".into())
+            });
+        let frames = owner.pending_object_motion_frames();
+        if frames.contains(&expected.frame)
+            && owner.matches_project_snapshot(expected.document_snapshot_id)
+        {
+            revisions.reserve_motion(
+                lifecycle_generation,
+                expected,
+                frames,
+                owner.object_motion_requires_revision(),
+            )?;
+        }
+        let publish_diagnostics = result.is_ok() && !owner.object_motion_requires_revision();
+        drop(revisions);
+        drop(authority);
+        // Successful proof reads must publish real clears/errors before their
+        // R1 preview resolves. This seal cannot mutate history or revision.
+        if publish_diagnostics {
+            self.seal_object_motion_diagnostics()?;
+        }
+        result
     }
     #[cfg(test)]
     pub(crate) fn preview_locks_held_for_test(&self) -> bool {

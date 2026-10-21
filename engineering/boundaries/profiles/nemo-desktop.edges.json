@@ -119,7 +119,7 @@
     }
   },
   "permittedEdges": {
-    "note": "Observed at adoption from `mod …;` declarations in lib.rs (the crate root) and `use super::*;` in task_runtime/tests.rs (analyzer output). Layer rules are the enforced contract; this list documents which edges exist so a new one is a visible diff. Plain function-call references such as `video_decode::VideoSessions::default()` in lib.rs are unqualified sibling-module paths, not `crate::`/`super::`/`self::` paths, so they are outside what this analyzer resolves and add no edges beyond the `mod …;` declarations already listed.",
+    "note": "Observed at adoption from `mod \u2026;` declarations in lib.rs (the crate root) and `use super::*;` in task_runtime/tests.rs (analyzer output). Layer rules are the enforced contract; this list documents which edges exist so a new one is a visible diff. Plain function-call references such as `video_decode::VideoSessions::default()` in lib.rs are unqualified sibling-module paths, not `crate::`/`super::`/`self::` paths, so they are outside what this analyzer resolves and add no edges beyond the `mod \u2026;` declarations already listed.",
     "edges": [
       "rust.desktop.shell -> rust.desktop.mcp.adapter (lib.rs: mod application_mcp;)",
       "rust.desktop.shell -> rust.desktop.native.viewport (lib.rs: mod native_viewport;)",
@@ -227,7 +227,9 @@
           "export_job::JobReceipt",
           "export_job::StagedArtifactPort",
           "protocol::OP_JOB_EXPORT_PNG_BEGIN",
-          "scheduler::OutputSpec"
+          "scheduler::OutputSpec",
+          "object_document::FrameScopeKind",
+          "export_job::MAX_OBJECT_EXPORT_FRAMES"
         ],
         "rust.desktop.mcp.adapter.tests": [
           "application::REPRODUCTION_FIXTURE",
@@ -395,7 +397,8 @@
           "object_snapshot::ObjectSnapshot",
           "render_scene::ScheduledFrameIdentity",
           "resource_leases::WorkId",
-          "scheduler::OutputSpec"
+          "scheduler::OutputSpec",
+          "object_codec::encode_storage_project"
         ],
         "rust.desktop.native.dispatch": [
           "application::ApplicationReleaseReceipt",
@@ -451,7 +454,16 @@
           "scheduler::ObjectSchedulePins",
           "scheduler::ObjectScheduleScope",
           "scheduler::OutputSpec",
-          "scheduler::ScheduledFrame"
+          "scheduler::ScheduledFrame",
+          "application::prepare_object_motion_exposure_frame_for_owner",
+          "application::ObjectMotionFrameFailure",
+          "application::prepare_object_motion_exposure_frame_for_control",
+          "application::prepare_object_motion_fallback_frame_for_control",
+          "application::ObjectMotionFrameControl",
+          "application::finalize_object_motion_frame_effects_for_owner",
+          "application::ObjectMotionEffectsCommit",
+          "object_document::PropertyHolderTarget",
+          "export_job::MAX_OBJECT_EXPORT_FRAMES"
         ],
         "rust.desktop.media": [
           "native_media_frame_export::NativeVideoDecoder",

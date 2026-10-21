@@ -19,6 +19,7 @@
       "files": [
         "document.rs",
         "object_document.rs",
+        "object_follow_path_record.rs",
         "object_record.rs",
         "project_media_envelope.rs",
         "object_order_document.rs",
@@ -309,7 +310,10 @@
         "object_project_palette_edit.rs",
         "object_project_guide_edit.rs",
         "object_project_shadow_edit.rs",
-        "object_project_perspective_edit.rs"
+        "object_project_perspective_edit.rs",
+        "object_project_workspace_edit.rs",
+        "object_project_custom_brush_edit.rs",
+        "object_project_comments_edit.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -396,6 +400,7 @@
         "evaluation.rs",
         "animation_curve.rs",
         "object_frame_packet.rs",
+        "object_frame_prepare.rs",
         "object_frame_sources.rs",
         "object_order_evaluation.rs",
         "expression_noise.rs",
@@ -528,6 +533,7 @@
         "object_frame_camera.rs",
         "object_boolean_motion_eval.rs",
         "object_duplicator_snapshot.rs",
+        "object_duplicator_follow_path.rs",
         "object_duplicator_snapshot_sources.rs",
         "object_duplicator_frame.rs"
       ],
@@ -721,6 +727,10 @@
         "object_expression_pin.rs",
         "object_expression_runtime.rs",
         "object_expression_property.rs",
+        "object_expression_motion_frame.rs",
+        "object_expression_motion_commit.rs",
+        "object_expression_motion_replay.rs",
+        "object_expression_motion_diagnostics.rs",
         "object_expression_read_bridge.rs",
         "object_expression_read_runtime.rs",
         "object_expression_harden.rs",
@@ -765,7 +775,11 @@
         "object_boolean_frame_motion.rs",
         "object_project_guide_read.rs",
         "object_project_shadow_read.rs",
-        "object_project_perspective_read.rs"
+        "object_project_perspective_read.rs",
+        "object_project_workspace_read.rs",
+        "object_project_metadata_dispatch.rs",
+        "object_project_custom_brush_read.rs",
+        "object_project_comments_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -926,7 +940,14 @@
         "object_layer_lock_policy.rs",
         "object_layer_lock_project.rs",
         "object_layer_policy_edit.rs",
+        "object_duplicator_lock_policy.rs",
         "object_expression_property.rs",
+        "object_expression_motion_frame.rs",
+        "object_expression_motion_commit.rs",
+        "object_expression_motion_commit_history.rs",
+        "object_expression_motion_commit_revision.rs",
+        "object_expression_motion_effects.rs",
+        "object_expression_motion_vector.rs",
         "object_parametric_geometry.rs",
         "object_parametric_geometry_box.rs",
         "object_parametric_geometry_controls.rs",
@@ -1104,6 +1125,7 @@
         "object_vector_edit_lock.rs",
         "object_vector_edit_support.rs",
         "object_property_public_read.rs",
+        "object_property_expression_state.rs",
         "rig_pose_deform.rs",
         "rig_pose_deform_mesh.rs",
         "rig_pose_deform_rows.rs",
@@ -1646,11 +1668,18 @@
         "object_guide_public.rs",
         "object_shadow_public.rs",
         "object_duplicator_snapshot.rs",
+        "object_duplicator_follow_path.rs",
         "object_duplicator_sources.rs",
         "object_duplicator_frame.rs",
         "object_duplicator_scene.rs",
         "object_perspective_public.rs",
-        "object_perspective_read.rs"
+        "object_perspective_read.rs",
+        "object_workspace_public.rs",
+        "object_workspace_read.rs",
+        "object_custom_brush_public.rs",
+        "object_custom_brush_read.rs",
+        "object_comments_public.rs",
+        "object_comments_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1798,7 +1827,13 @@
         "src/native_shadow_contract.rs",
         "src/native_shadow_contract_tests.rs",
         "src/native_perspective_contract.rs",
-        "src/native_perspective_contract_tests.rs"
+        "src/native_perspective_contract_tests.rs",
+        "src/native_workspace_contract.rs",
+        "src/native_workspace_contract_tests.rs",
+        "src/native_custom_brush_contract.rs",
+        "src/native_custom_brush_contract_tests.rs",
+        "src/native_comments_contract.rs",
+        "src/native_comments_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1847,6 +1882,7 @@
         "application_mcp.rs",
         "native_application_reservations.rs",
         "native_revision_sync.rs",
+        "native_object_motion_finalize.rs",
         "native_object_preview_route.rs",
         "native_revision_dispatch.rs",
         "native_object_client.rs",
@@ -2024,6 +2060,9 @@
         "native_object_v2_persistence_tests.rs",
         "native_object_v2_refusal_tests.rs",
         "native_object_preview_tests.rs",
+        "native_object_motion_tests.rs",
+        "native_object_motion_finalize_tests.rs",
+        "native_object_motion_finalize_diagnostics_tests.rs",
         "native_object_exposure_tests.rs",
         "native_object_preview_lifecycle_tests.rs",
         "native_object_preview_route_tests.rs",
@@ -2062,7 +2101,10 @@
         "native_audio_track_public_tests.rs",
         "native_shadow_dispatch_tests.rs",
         "native_perspective_dispatch_tests.rs",
-        "native_perspective_read_dispatch_tests.rs"
+        "native_perspective_read_dispatch_tests.rs",
+        "native_workspace_dispatch_tests.rs",
+        "native_custom_brush_dispatch_tests.rs",
+        "native_comments_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2074,6 +2116,8 @@
       "files": [
         "native_dispatch.rs",
         "native_object_host.rs",
+        "native_object_motion_effects.rs",
+        "native_object_expression_state.rs",
         "native_object_preview.rs",
         "native_object_export.rs",
         "native_dispatch_replacement.rs",

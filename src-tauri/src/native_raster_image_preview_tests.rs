@@ -57,7 +57,7 @@ fn actual_preview_key_declares_png_resources_on_every_held_frame_then_undo_remov
     let mut declarations = None;
     for frame in [0, 7, 20] {
         let prepared = host
-            .prepare_object_preview(&selector(&original, frame), output())
+            .prepare_object_preview(&selector(&original, frame), output(), false)
             .unwrap();
         assert_eq!(prepared.plan.commands().len(), 0);
         let expected = prepared
@@ -76,13 +76,13 @@ fn actual_preview_key_declares_png_resources_on_every_held_frame_then_undo_remov
     host.history.undo(original.content_revision()).unwrap();
     let after = snapshot(&host);
     let prepared = host
-        .prepare_object_preview(&selector(&after, 0), output())
+        .prepare_object_preview(&selector(&after, 0), output(), false)
         .unwrap();
     assert!(prepared.key.declared_resource_versions().is_empty());
     host.history.redo(after.content_revision()).unwrap();
     let redone = snapshot(&host);
     let prepared = host
-        .prepare_object_preview(&selector(&redone, 20), output())
+        .prepare_object_preview(&selector(&redone, 20), output(), false)
         .unwrap();
     assert_eq!(
         prepared.key.declared_resource_versions(),

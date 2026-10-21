@@ -149,7 +149,7 @@ pub(crate) fn plan_group_edit(
         .position(|layer| layer.layer_uid == layer_uid)
         .ok_or_else(|| GroupPlanError::UnknownLayer(layer_uid.to_string()))?;
     let layer = &document.layers[index];
-    if layer.locked.value() == Some(&true) {
+    if document.layer_is_locked(layer_uid) {
         return Err(GroupPlanError::Locked(layer_uid.to_string()));
     }
     let strokes = layer_stroke_ids(&document.objects, layer_uid, context_id);

@@ -365,3 +365,51 @@ fn exact_authored_key_lock_metadata_is_nullable_and_kept_separate_from_original_
         assert!(!result("document", &q, &value));
     }
 }
+
+#[test]
+fn expression_state_is_closed_correlated_and_does_not_infer_missing_evaluations() {
+    let mut p = payload(false);
+    p["view"]["kind"] = json!("expressionState");
+    let mut v = output(false);
+    v.as_object_mut().unwrap().remove("value");
+    v["kind"] = json!("expressionState");
+    v["expression"] = json!({"present":true,"enabled":false});
+    v["evaluation"] = json!({"state":"unavailable","reason":"not-evaluated"});
+    assert!(request(&p));
+    assert!(result("document", &p, &v));
+    for diagnostic in [
+        Value::Null,
+        json!({"kind":"timeout"}),
+        json!({"kind":"tooDeep"}),
+        json!({"kind":"mustReturnNumber"}),
+        json!({"kind":"mustReturnNumberOrXY"}),
+        json!({"kind":"runtime","message":"data:literal error","line":0}),
+        json!({"kind":"syntax","message":"bad","line":null}),
+    ] {
+        v["evaluation"] = json!({"state":"evaluated","diagnostic":diagnostic});
+        assert!(result("document", &p, &v));
+    }
+    for (pointer, replacement) in [
+        ("/frame", json!(7)),
+        ("/target/layerUid", json!("foreign")),
+        ("/documentSnapshotId", json!("foreign")),
+        ("/expression/present", json!(false)),
+        (
+            "/evaluation/diagnostic",
+            json!({"kind":"timeout","extra":true}),
+        ),
+        (
+            "/evaluation/diagnostic",
+            json!({"kind":"syntax","message":"error","line":-1}),
+        ),
+        ("/evaluation", json!({"state":"evaluated"})),
+        (
+            "/evaluation",
+            json!({"state":"unavailable","reason":"not-evaluated","diagnostic":null}),
+        ),
+    ] {
+        let mut bad = v.clone();
+        *bad.pointer_mut(pointer).unwrap() = replacement;
+        assert!(!result("document", &p, &bad), "{pointer}");
+    }
+}

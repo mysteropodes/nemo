@@ -635,6 +635,39 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "T08 Perspective: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 3fd130cd8f24ae6a06d3905d571daa9bfdaeb008. Report SHA256 0fbd7701e130ff16769c4ac4c867bd70950188a9aa5f1a6d3e9acbe752ffe303. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_workspace_contract.rs": {
+      "lines": 97.82,
+      "regions": 98.47,
+      "functions": 100,
+      "note": "T08 Workspace/custom-brush/comments: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 155a1407a2c1d9afe831440327b84d10022039e8. Report SHA256 a2a67b703c295aa7f38f4a6700074bf7c3e025069bd4393fb409422a8baa3a2e. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_workspace_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T08 Workspace/custom-brush/comments: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 155a1407a2c1d9afe831440327b84d10022039e8. Report SHA256 a2a67b703c295aa7f38f4a6700074bf7c3e025069bd4393fb409422a8baa3a2e. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_custom_brush_contract.rs": {
+      "lines": 94.76,
+      "regions": 95.72,
+      "functions": 100,
+      "note": "T08 Workspace/custom-brush/comments: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 155a1407a2c1d9afe831440327b84d10022039e8. Report SHA256 a2a67b703c295aa7f38f4a6700074bf7c3e025069bd4393fb409422a8baa3a2e. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_custom_brush_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T08 Workspace/custom-brush/comments: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 155a1407a2c1d9afe831440327b84d10022039e8. Report SHA256 a2a67b703c295aa7f38f4a6700074bf7c3e025069bd4393fb409422a8baa3a2e. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_comments_contract.rs": {
+      "lines": 92.57,
+      "regions": 91.82,
+      "functions": 100,
+      "note": "T08 Workspace/custom-brush/comments: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 155a1407a2c1d9afe831440327b84d10022039e8. Report SHA256 a2a67b703c295aa7f38f4a6700074bf7c3e025069bd4393fb409422a8baa3a2e. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_comments_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T08 Workspace/custom-brush/comments: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 155a1407a2c1d9afe831440327b84d10022039e8. Report SHA256 a2a67b703c295aa7f38f4a6700074bf7c3e025069bd4393fb409422a8baa3a2e. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     }
   },
   "nativeObjectContractRegistration": {

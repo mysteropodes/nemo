@@ -5,8 +5,9 @@
   var Item=typeof module==='object'&&module.exports?require('./native-object-item-contract.js'):root.NemoNativeObjectItemContract;
   var Reader=typeof module==='object'&&module.exports?require('./native-text-read.js'):root.NemoNativeTextRead;
   var Writer=typeof module==='object'&&module.exports?require('./native-object-text-layout.js'):root.NemoNativeObjectTextLayout;
-  var api=factory(Tool,Item,Reader,Writer);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
-}(typeof globalThis==='object'?globalThis:this,function(Tool,Item,Reader,Writer){
+  var Mapping=(typeof module==='object'&&module.exports?require('./native-viewport-underlay.js'):root.NemoNativeViewportUnderlay);
+  var api=factory(Tool,Item,Reader,Writer,Mapping&&Mapping.canvasMapping);if(typeof module==='object'&&module.exports)module.exports=api;else root.NemoNativeTextToolDesktop=api;
+}(typeof globalThis==='object'?globalThis:this,function(Tool,Item,Reader,Writer,Mapping){
   'use strict';var bindings=new WeakMap(),traceBudget=64;
   // Temporary local-candidate diagnostic: eager scalars, no Event retention or content.
   function trace(root,decision,method,sampled){
@@ -19,10 +20,11 @@
     }catch(_){} // No input reads, formatting or sink failure may escape diagnostics.
   }
   function consume(e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();}
+  var bounds=Mapping&&Mapping.bounds,point=Mapping&&Mapping.point,screen=Mapping&&Mapping.screen;
   function mount(root,container,ports){
     var old=bindings.get(root);if(old&&old.container===container&&!old.retired){old.ports=ports;old.refresh();return old;}
     if(old)old.retire();
-    var doc=root.document,session=ports.currentSession();if(!session||!Tool||!Item||!Reader||typeof Reader.create!=='function'||!Writer||typeof Writer.create!=='function')return null;
+    var doc=root.document,session=ports.currentSession();if(!session||!Tool||!Item||!Reader||typeof Reader.create!=='function'||!Writer||typeof Writer.create!=='function'||!Mapping||typeof bounds!=='function'||typeof point!=='function'||typeof screen!=='function')return null;
     var b={container:container,ports:ports,retired:false},drag=null,discovery=null,lastTool=root.state&&root.state.tool,area=null,fontChoices=[],fontTicket=0,readyPin=null,shown=null,dirty=new Set(),modelState={busy:false,unknown:false},page=null,refreshing=false;
     var perspectiveRefreshNeeded=false,perspectiveRefreshScheduled=false,removePerspectiveRead=null;
     function flushPerspectiveRefresh(){
@@ -51,18 +53,13 @@
     function on(n,name,fn,capture){if(!n)return;n.addEventListener(name,fn,!!capture);events.push([n,name,fn,!!capture]);}
     function ownsUI(){return !b.retired&&bindings.get(root)===b;}
     function notify(message){if(ownsUI())status.textContent=message;}
-    function bounds(pin){var el=doc.getElementById('drawing-canvas'),r=el&&el.getBoundingClientRect(),html=doc.documentElement;
-      if(!r||![r.left,r.top,r.width,r.height,pin.canvasW,pin.canvasH].every(Number.isFinite)||r.width<=0||r.height<=0||pin.canvasW<=0||pin.canvasH<=0||r.left<0||r.top<0||r.left+r.width>html.clientWidth||r.top+r.height>html.clientHeight||!html.classList.contains('nemo-native-underlay'))return null;
-      var edges=[r.left,r.top,r.left+r.width,r.top+r.height];
-      if(typeof html.style.getPropertyValue!=='function'||!['left','top','right','bottom'].every(function(k,i){return parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===edges[i];}))return null;
-      return {left:r.left,top:r.top,width:r.width,height:r.height};}
     var perspectiveProof=null;
     function context(presented){
       var current=b.ports.currentSession(),s=root.state,info=current&&current.info();
       var port=root.NemoNativePerspectiveController,perspective=port&&(presented?port.read():typeof port.readForCommand==='function'&&port.readForCommand(perspectiveProof));
       if(b.retired||current!==session||!current.isActive()||!info||!s||s.appMode!=='anim2d'||s.playing||s.spaceDown||s.isPanning||s.activeSymbolId||s.shadowMode||s.maskMode||s.symmetryEnabled||!perspective||!Tool.samePin(perspective.info,info)||perspective.perspective.settings.perspectiveEnabled)return null;
       if(presented)perspectiveProof=perspective;
-      var layer=info.layers[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(info);
+      var layer=info.layers[s.activeLayerIdx],frame=s.currentFrame,rect=bounds(root,info);
       if(!rect||!layer||layer.locked||!Number.isInteger(frame)||frame<0||frame>=info.totalFrames)return null;
       if(presented){var p=current.readPresentedObjectSession();if(!p||!Tool.samePin(p,info)||!p.presentation||p.presentation.frame!==frame)return null;}
       return {pin:{instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration,contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId},layerUid:layer.layerUid,frame:frame,
@@ -76,8 +73,6 @@
     function syncHex(){colorHex.value=fields.color.value;hexValidity();}
     function hide(){fontTicket++;shown=null;dirty.clear();invalidHex=false;colorHex.setAttribute('aria-invalid','false');if(!ownsUI())return;
       if(area&&area.parentNode)area.parentNode.removeChild(area);area=null;if(pop)pop.style.display='none';controls();}
-    function point(e,c){return {x:(e.clientX-c.bounds.left)*c.canvasW/c.bounds.width,y:(e.clientY-c.bounds.top)*c.canvasH/c.bounds.height};}
-    function screen(p,c){return {x:c.bounds.left+p.x*c.bounds.width/c.canvasW,y:c.bounds.top+p.y*c.bounds.height/c.canvasH};}
     function chosenFont(value){var i=Number(value);return Number.isInteger(i)&&fontChoices[i]?fontChoices[i].font:null;}
     function fillFonts(rows,d,ticket){
       if(!ownsUI()||shown!==d||ticket!==fontTicket)return;
@@ -175,5 +170,5 @@
     if(handled&&typeof cancelOtherIntent==='function')cancelOtherIntent();
     return handled;
   }
-  return Object.freeze({mount:mount,handle:handle});
+  return Object.freeze({mount:mount,handle:handle,canvasMapping:Mapping});
 }));

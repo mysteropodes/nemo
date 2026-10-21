@@ -69,6 +69,26 @@ pub(super) struct Annotations {
     comments: Option<Arc<[ProjectCommentRecord]>>,
 }
 impl ProjectMetadata {
+    /// Original capture replaces only the workspace; attribution stays shared unchanged.
+    pub(crate) fn with_workspace_metadata(mut self, workspace: ProjectWorkspaceRecord) -> Self {
+        self.annotations.workspace = Some(Arc::new(workspace));
+        self
+    }
+    /// Replace only team comments; the workspace Arc and unrelated metadata stay shared.
+    pub(crate) fn with_comments_metadata(
+        mut self,
+        comments: Vec<ProjectCommentRecord>,
+    ) -> Result<Self, ProjectMetadataError> {
+        if comments.iter().any(|comment| {
+            [&comment.x, &comment.y, &comment.frame, &comment.created_at]
+                .iter()
+                .any(|v| v.value().is_some_and(|n| !n.is_finite()))
+        }) {
+            return Err(ProjectMetadataError::InvalidAnnotations);
+        }
+        self.annotations.comments = Some(Arc::from(comments));
+        Ok(self)
+    }
     pub(crate) fn with_annotations(
         mut self,
         workspace: Option<ProjectWorkspaceRecord>,

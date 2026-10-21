@@ -8,7 +8,7 @@ mod visual;
 pub(crate) use annotations::{ProjectCommentRecord, ProjectWorkspaceRecord};
 #[path = "project_metadata_presets.rs"]
 mod presets;
-pub(crate) use presets::ProjectPresetCatalog;
+pub(crate) use presets::{BrushPresetRecord, ProjectPresetCatalog};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectMetadataError {
