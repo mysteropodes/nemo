@@ -624,6 +624,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "T08 Shadow: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean c8a7ec57f9ed03a488572a8bc8be38dd9c0ae36e. Report SHA256 423e64ec73254cfc06ff635d42234ca79784550c63c20160b7d94c873da2e803. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_perspective_contract.rs": {
+      "lines": 93.47,
+      "regions": 94.52,
+      "functions": 94.44,
+      "note": "T08 Perspective: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 3fd130cd8f24ae6a06d3905d571daa9bfdaeb008. Report SHA256 0fbd7701e130ff16769c4ac4c867bd70950188a9aa5f1a6d3e9acbe752ffe303. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_perspective_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T08 Perspective: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 3fd130cd8f24ae6a06d3905d571daa9bfdaeb008. Report SHA256 0fbd7701e130ff16769c4ac4c867bd70950188a9aa5f1a6d3e9acbe752ffe303. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
     }
   },
   "nativeObjectContractRegistration": {
