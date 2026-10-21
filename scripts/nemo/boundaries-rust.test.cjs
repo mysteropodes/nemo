@@ -602,7 +602,14 @@ test('N25C2f immutable snapshot port stays within actual host seam and its tests
     .filter(([, ports]) => ports.includes(item)).map(([id]) => id),
     ['rust.desktop.native.host.release.tests', seam]);
   const host = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_object_host.rs'), 'utf8');
-  assert.match(host, /snapshot\s*\.\s*dispatch\(request\)/);
+  assert.match(host, /let response = snapshot\s*\.dispatch\(request\.clone\(\)\)\s*\.map_err\(\|_\| "native object read correlation is invalid"\.to_string\(\)\)\?;/);
+  assert.match(host, /let expression_state = request\.operation\(\) == "query\.document\.object\.property\.read"\s*&& serde_json::to_value\(&request\)\s*\.ok\(\)\s*\.is_some_and\(\|wire\| wire\["payload"\]\["view"\]\["kind"\] == "expressionState"\);/);
+  assert.match(host, /if expression_state && response\.is_ok\(\) \{\s*self\.project_expression_state\(&request, response\)\s*\} else \{\s*Ok\(response\)\s*\}/);
+  const projection = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_object_expression_state.rs'), 'utf8');
+  assert.match(projection, /pub\(super\) fn project_expression_state\(\s*&self,/);
+  assert.match(projection, /if !response\.is_ok\(\) \|\| request\.operation\(\) != "query\.document\.object\.property\.read" \{\s*return Ok\(response\);\s*\}/);
+  assert.match(projection, /\.acquire_snapshot\(self\.content_revision\(\)\)/);
+  assert.match(projection, /let Some\(diagnostic\) = self\.motion_diagnostic_for\(&snapshot, &target, property, frame\)\s*else \{\s*return Ok\(response\);\s*\};\s*snapshot\s*\.with_expression_state_evaluation\(request, response, diagnostic\)/);
   assert.match(host, /acquire_snapshot\(self\.content_revision\(\)\)/);
   const descriptor = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object.json'), 'utf8'));
   assert.equal(descriptor.availability.state, 'available');
