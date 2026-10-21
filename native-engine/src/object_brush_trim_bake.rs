@@ -335,11 +335,12 @@ impl TrimProvider for NativeBaker<'_, '_> {
             .ok_or(BakeRefused("native brush tint unavailable"))?;
         for pixel in rgba.chunks_exact_mut(4) {
             let alpha = (f64::from(pixel[3]) * f64::from(color[3]) / 255.).round() as u8;
-            pixel.copy_from_slice(if alpha == 0 {
-                &[0, 0, 0, 0]
+            let rgba = if alpha == 0 {
+                [0, 0, 0, 0]
             } else {
-                &[color[0], color[1], color[2], alpha]
-            });
+                [color[0], color[1], color[2], alpha]
+            };
+            pixel.copy_from_slice(&rgba);
         }
         self.scratch.push(charge);
         Ok(Some(BakedInk {

@@ -83,6 +83,8 @@ pub(super) fn for_plan(plan: &ObjectPaintPlan) -> Result<Option<Camera>, SvgExpo
                 }
             }
             PaintEntry::Raster(_) => {}
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintEntry::Brush(_) => {}
         }
     }
     Ok(Some(camera))

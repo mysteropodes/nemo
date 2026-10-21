@@ -172,6 +172,19 @@ impl ObjectMaskInputs {
         let mut layers = BTreeMap::<usize, ObjectMaskLayer>::new();
         let mut used = BTreeSet::new();
         for source in sources(packet)? {
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            if source
+                .record
+                .vector_ext
+                .value()
+                .and_then(|ext| ext.bitmap_brush.value())
+                .is_some()
+            {
+                return Err(invalid(
+                    source.source,
+                    "bitmap brush masks have no admitted native mask representation",
+                ));
+            }
             let (ordinary_index, paint_index) = if let Some(clone_id) = source.clone_id {
                 let mut matches =
                     scene
@@ -301,6 +314,8 @@ impl ObjectMaskInputs {
             PaintIndex::Contour(index) => ordinary(*index),
             PaintIndex::Duplicator(index) => !self.is_duplicator_mask(*index),
             PaintIndex::Raster(_) | PaintIndex::Text(_) | PaintIndex::Component(_) => true,
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintIndex::Brush(_) => true,
         });
     }
 }
