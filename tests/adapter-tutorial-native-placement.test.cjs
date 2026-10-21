@@ -297,7 +297,8 @@ function tutorialFixture() {
   const context = { window, document, localStorage: { getItem: k => store.get(k), setItem: (k, v) => store.set(k, v) },
     SM: { t: () => '%s completed' },
     setInterval: fn => { handlers.set('timer', fn); return 1; }, clearInterval() {} };
-  vm.runInNewContext(fs.readFileSync('src/js/tutorial.js', 'utf8'), context);
+  vm.runInNewContext(fs.readFileSync('src/js/adapters/tutorial-presentation.js', 'utf8') + '\n' +
+    fs.readFileSync('src/js/tutorial.js', 'utf8'), context);
   handlers.get('DOMContentLoaded')();
   return { handlers, store, nodes, window, placement, places, stopCount: () => stopCount,
     runSource: source => vm.runInNewContext(source, context) };

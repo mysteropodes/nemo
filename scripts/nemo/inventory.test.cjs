@@ -112,7 +112,7 @@ test('ids looked up through a table (getElementById(IDS[key])) are bound', () =>
 test('ids iterated from an array literal (["a","b"].forEach(id => getElementById(id))) are bound', () => {
   const r = byId('dom:#btn-open-tutorial-topbar');
   assert.equal(r.status, 'inventoried');
-  assert.ok(r.handler.some((h) => h.startsWith('src/js/tutorial.js:')), r.handler);
+  assert.ok(r.handler.some((h) => h.startsWith('src/js/adapters/tutorial-presentation.js:')), r.handler);
   assert.ok(r.events.includes('click'));
 });
 
