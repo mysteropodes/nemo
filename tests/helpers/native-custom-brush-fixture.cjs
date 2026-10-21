@@ -131,7 +131,7 @@ async function fixture(initial,options={}){
   doc.fire('DOMContentLoaded');controller=root.NemoNativeCustomBrushController;
   async function settled(){for(let i=0;i<30;i++){await tail;await new Promise(resolve=>setImmediate(resolve));if(!running&&!controller?.isPending())return;}throw Error('catalog queue did not settle');}
   if(!options.browser)await settled();
-  return {root,doc,body,ids,events,storage,calls,notices,previews,controller,settled,session,catalog:()=>copy(catalog),checkpoints:()=>history.length-1,
+  return {root:vm.runInContext('globalThis',context),doc,body,ids,events,storage,calls,notices,previews,controller,settled,session,catalog:()=>copy(catalog),checkpoints:()=>history.length-1,
     edits:()=>calls.filter(q=>q.operation===C.EDIT),popover:kind=>body.querySelector(kind==='editor'?'.bp-editor-pop':kind==='menu'?'.brush-menu-pop':'.bp-picker-pop'),
     action:value=>vm.runInContext('JSON.parse('+JSON.stringify(JSON.stringify(value))+')',context),
     hold(){let release;held=new Promise(resolve=>release=resolve);return release;},refuse(code='unavailable'){refusal=code;},staleRead(){broken=true;},resubscribe(){ticket++;},
