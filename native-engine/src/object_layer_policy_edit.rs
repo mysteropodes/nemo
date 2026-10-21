@@ -53,6 +53,13 @@ impl ObjectFillOwner {
         };
         let origin = self.current_snapshot();
         let mut document = origin.document().clone();
+        // The public padlock cannot turn derived duplicator output into a
+        // writable Drawing. Keep every stored flag and history entry untouched.
+        if matches!(intent, LayerPolicyIntent::Locked(false))
+            && document.layer_is_duplicator(&payload.layer_uid)
+        {
+            return Err(DispatchErrorCode::Unavailable);
+        }
         let layer = document
             .layers
             .iter_mut()

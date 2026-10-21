@@ -202,8 +202,12 @@ impl PreparedRigEdit {
 /// path effect (`rigAutoAssignLayer` runs behind `canEditActiveLayer` -> `editRefusalReason`: what is on
 /// screen is the deformed geometry, so weights computed from the stored points would belong to a shape
 /// nobody sees). A refusal is the typed `Unavailable`; nothing is published.
-fn check_layer(layer: &ObjectLayer, action: &RigAction) -> Result<(), DispatchErrorCode> {
-    if layer.locked() {
+fn check_layer(
+    document: &ObjectDocument,
+    layer: &ObjectLayer,
+    action: &RigAction,
+) -> Result<(), DispatchErrorCode> {
+    if document.layer_is_locked(layer.layer_uid()) {
         return Err(DispatchErrorCode::Unavailable);
     }
     if matches!(action, RigAction::AutoAssign { .. }) && layer_has_active_path_fx(layer) {
@@ -347,7 +351,7 @@ impl ObjectFillOwner {
             .iter()
             .find(|layer| layer.layer_uid() == layer_uid)
             .ok_or(DispatchErrorCode::NotFound)?;
-        check_layer(layer, &action)?;
+        check_layer(document, layer, &action)?;
         let (rig, summary) = apply(document, &layer_uid, layer.rig(), &action)?;
         let mut candidate = document.clone();
         if layer.rig() != Some(&rig) {

@@ -62,7 +62,7 @@ pub(crate) fn plan_split(
     let index = layer_index(document, request.layer_uid)?;
     let source = &document.layers[index];
     let (context, uid) = (request.context_id, request.layer_uid);
-    if source.locked() {
+    if document.layer_is_locked(uid) {
         return Err(SelectionError::Locked(uid.to_string()));
     }
     if request.frame >= document.total_frames {

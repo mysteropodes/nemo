@@ -46,7 +46,7 @@ pub(crate) fn plan_delete(
     }
     removed.sort_unstable();
     for &index in &removed {
-        consult(policy, LayerOp::Delete, &document.layers[index])?;
+        consult(document, policy, LayerOp::Delete, &document.layers[index])?;
     }
     let gone: HashSet<&str> = removed
         .iter()
@@ -59,7 +59,7 @@ pub(crate) fn plan_delete(
             .and_then(|parent| parent.as_deref())
             .is_some_and(|parent| gone.contains(parent));
         if orphaned && !gone.contains(layer.layer_uid.as_str()) {
-            consult(policy, LayerOp::DetachFromDeletedParent, layer)?;
+            consult(document, policy, LayerOp::DetachFromDeletedParent, layer)?;
         }
     }
     let mut candidate = document.clone();

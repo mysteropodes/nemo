@@ -155,7 +155,7 @@ fn expose_frame(
         .iter()
         .position(|layer| layer.layer_uid == layer_uid)
         .ok_or(ImportError::Internal)?;
-    if !batch_layer && document.layers[at].locked() {
+    if !batch_layer && document.layer_is_locked(layer_uid) {
         return Err(ImportError::LayerLocked {
             layer_uid: layer_uid.to_owned(),
         });

@@ -134,7 +134,7 @@ pub(super) fn check_drawing_layer(
         .iter()
         .find(|layer| layer.layer_uid() == target.layer_uid())
         .ok_or(DispatchErrorCode::NotFound)?;
-    if layer.locked() {
+    if document.layer_is_locked(layer.layer_uid()) {
         return Err(DispatchErrorCode::Unavailable);
     }
     if crate::commands::object_fill_owner::path_effects_edit::layer_has_active_path_fx(layer) {

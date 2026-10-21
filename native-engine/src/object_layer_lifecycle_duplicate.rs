@@ -50,7 +50,7 @@ pub(crate) fn plan_duplicate(
         .name
         .value()
         .ok_or_else(|| LifecycleError::SourceUnnamed(source.to_string()))?;
-    consult(policy, LayerOp::Duplicate, layer)?;
+    consult(document, policy, LayerOp::Duplicate, layer)?;
     let before = document.layers.len();
     let slot = u32::try_from(before).map_err(|_| LifecycleError::TooManyLayers)?;
     let taken: HashSet<&str> = document

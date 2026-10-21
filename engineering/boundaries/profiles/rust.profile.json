@@ -931,6 +931,7 @@
         "object_layer_lock_policy.rs",
         "object_layer_lock_project.rs",
         "object_layer_policy_edit.rs",
+        "object_duplicator_lock_policy.rs",
         "object_expression_property.rs",
         "object_expression_motion_frame.rs",
         "object_expression_motion_commit.rs",

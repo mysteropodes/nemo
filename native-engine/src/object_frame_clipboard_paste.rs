@@ -318,7 +318,9 @@ pub(crate) fn paste_cells(
         else {
             continue;
         };
-        if document.layers[layer_index].locked() || cell_matches(&next, layer_index, frame, cell) {
+        if document.layer_is_locked(document.layers[layer_index].layer_uid())
+            || cell_matches(&next, layer_index, frame, cell)
+        {
             continue;
         }
         write_cell(&mut next, layer_index, frame, cell)?;
