@@ -111,6 +111,17 @@ test('property facet is fail-closed without its ordinary classic-script child', 
   assert.throws(() => box.NemoNativeObjectProject.create({}), /property ports are unavailable/);
 });
 
+test('view facet is fail-closed before session initialization without its ordinary classic-script child', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/js/adapters/native-object-project.js'), 'utf8');
+  const box = {NemoNativeObjectProjectMetadata:require('../src/js/adapters/native-object-project-metadata.js'),
+    NemoNativeObjectProjectDesktop:require('../src/js/adapters/native-object-project-desktop.js'),
+    NemoNativeObjectProjectProperties:require('../src/js/adapters/native-object-project-properties.js')};
+  vm.runInNewContext(source, box);
+  let reads = 0; const ports = Object.defineProperty({}, 'viewMode', {get(){reads++; throw Error('unexpected session initialization');}});
+  assert.throws(() => box.NemoNativeObjectProject.create(ports), /view ports are unavailable/);
+  assert.equal(reads, 0);
+});
+
 test('actual SDK and subscribed desktop return immutable correlated D11 samples and exact authored DTOs', async () => {
   const f = fixture(); await f.open(); const before = f.session.info();
   const q = selector(f), result = await f.session.readProperty(q);

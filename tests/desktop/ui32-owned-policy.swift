@@ -110,6 +110,7 @@ func ui32GuardedAction(_ identity:() throws -> Void, _ scope:() throws -> Void, 
 func ui32SelfTest() throws {
   let profileFocusCases=try ui32ProfileFocusSelfTest()
   let f03Cases=try f03SelfTests()
+  try check(try ui32CameraSelfTest()==37)
   try ui32IdentityPhaseSelfTest();try ui32Phase2ReadSelfTest()
   try ui32EntrySelfTest();try ui32NewSemanticSelfTest()
   try ui32AttachedRootCertificateSelfTest()

@@ -39,6 +39,9 @@ fn expected_paths(p: &ObjectPaintPlan) -> Vec<(&[CubicSegment], [f64; 4])> {
             }
             PaintEntry::Raster(_) => panic!("positive SVG oracle requires a raster-free plan"),
             PaintEntry::Duplicator(_) => panic!("original fixture gained unexpected Duplicator"),
+            PaintEntry::Video(_) => panic!("video-free fixture gained unexpected Video"),
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintEntry::Brush(_) => panic!("non-brush fixture gained unexpected bitmap brush"),
             PaintEntry::Component(_) => {
                 panic!("component-free SVG fixture gained unexpected Component")
             }
@@ -390,3 +393,6 @@ fn svg_vector_only_real_control_still_reparses_exact_contour_paint() {
         .contains("<path d="));
     assert_eq!(support::state(&owner), before);
 }
+
+#[path = "object_text_animator_scene.rs"]
+mod animator;

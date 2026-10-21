@@ -82,6 +82,7 @@ pub(crate) fn fill_record(
             param_shape: Presence::Missing,
             box_angle: Presence::Missing,
             fill_gradient: Presence::Missing,
+            bitmap_brush: Presence::Missing,
             is_mask: Presence::Missing,
             mask_mode: Presence::Missing,
             mask_feather: Presence::Missing,

@@ -21,7 +21,7 @@
     return bound.compose(base,policy);
   }
   var stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
-  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation',
+  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view',
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
     'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
   function safeCode(event,code){
@@ -72,6 +72,63 @@
     var running=true,lease=Object.freeze({readPresentedObjectSession:function(){return running&&origin&&current()===true?origin:null;}});
     try{return action(lease);}finally{running=false;}
   }
+  var cameraUIBindings = new WeakMap();
+  function cameraSession(root) {
+    var project = root.NemoNativeObjectProject;
+    return project && typeof project.desktop === 'function' ? project.desktop(root) : null;
+  }
+  function nativeCameraUI(root, session) {
+    return !!(root.__TAURI__ && root.__TAURI__.core) || !!(session &&
+      (session.isActive() || typeof session.blocksLegacy === 'function' && session.blocksLegacy()));
+  }
+  // Reuse the actual camera toolbar button; do not insert an unmatched timeline row.
+  function renderCameraViewLock(root) {
+    if (cameraUIBindings.get(root) !== root.document) return false;
+    var session = cameraSession(root);
+    if (!nativeCameraUI(root, session)) return false;
+    var button = root.document.getElementById('btn-camera');
+    if (!button) return false;
+    var shown = session && session.readPresentedObjectSession(), presentation = shown && shown.presentation;
+    button.hidden = !(presentation && presentation.view && presentation.view.cameraAvailable === true);
+    button.title = root.SM.t('titleCameraViewLockHint');
+    button.setAttribute('aria-pressed', String(root.state.cameraView === true));
+    return true;
+  }
+  function bindCameraUI(root, legacy) {
+    var document = root.document, button = document.getElementById('btn-camera');
+    cameraUIBindings.set(root, document);
+    if (button) button.addEventListener('click', function () {
+      var session = cameraSession(root);
+      if (nativeCameraUI(root, session)) {
+        var shown = session && session.readPresentedObjectSession(), presentation = shown && shown.presentation;
+        if (!presentation || !presentation.view || presentation.view.cameraAvailable !== true) return;
+        root.state.cameraView = !root.state.cameraView;
+        var preview = session.renderPreview(root.state.currentFrame);
+        renderCameraViewLock(root);
+        return preview;
+      }
+      legacy.toggle();
+    });
+    // pushUndo() here (2026-07: "récupère des données exploitable pour
+    // résoudre les soucis" — the feedback action log/undo stack was
+    // silently skipping this button entirely, unlike a camera keyframe
+    // added/removed by DRAGGING, which already calls pushUndo() via
+    // onDown in camera.js) — cameraKeys IS part of
+    // layersSnapshotNow()'s undo snapshot, so this was a real gap, not a
+    // structural exclusion like StoryBoard/audio below.
+    var addKey = document.getElementById('btn-cam-addkey');
+    if (addKey) addKey.addEventListener('click', function () {
+      if (!nativeCameraUI(root, cameraSession(root))) legacy.addKey();
+    });
+    var editEase = document.getElementById('btn-cam-ease-edit');
+    if (editEase) editEase.addEventListener('click', function () {
+      if (!nativeCameraUI(root, cameraSession(root))) legacy.editEase();
+    });
+  }
+  function didPaintUI(root,ports){
+    if(ports.bindPolicyEntries)ports.bindPolicyEntries();
+    if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
+  }
   function createPorts(root){
     var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
     function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
@@ -96,6 +153,7 @@
       return true;
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
+      viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
         var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
         var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';
@@ -151,7 +209,10 @@
           var current=presentationStamp(info);
           if(!current||current.session!==stamp.session||current.info!==stamp.info||current.ticket!==stamp.ticket||
             current.document!==stamp.document||current.presentation!==stamp.presentation)return;
+          var shown=current.presentation,canvas=root.document.getElementById('drawing-canvas'),pill=root.document.getElementById('zoom-scrub'),rect=canvas&&canvas.getBoundingClientRect();
+          if(shown&&shown.view&&rect&&pill&&root.document.activeElement!==pill){var m=shown.view.documentToComposition,z=Math.hypot(m[0]*rect.width/info.canvasW,m[1]*rect.height/info.canvasH);if(Number.isFinite(z))pill.value=Math.round(z*100);}
           settingsNotice('presented',info);
+          renderCameraViewLock(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
         }catch(_){}},0);
       },
@@ -160,5 +221,5 @@
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
   }
-  return Object.freeze({createPorts:createPorts,openDiagnostic:openDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation});
+  return Object.freeze({createPorts:createPorts,didPaintUI:didPaintUI,openDiagnostic:openDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation,bindCameraUI:bindCameraUI,renderCameraViewLock:renderCameraViewLock});
 }));

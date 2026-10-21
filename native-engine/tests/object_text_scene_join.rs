@@ -70,6 +70,9 @@ pub(super) fn labels(plan: &ObjectPaintPlan) -> Vec<String> {
             PaintEntry::Raster(_) => "image".into(),
             PaintEntry::Text(t) => t.item.group_id().to_owned(),
             PaintEntry::Duplicator(_) => panic!("original fixture gained unexpected Duplicator"),
+            PaintEntry::Video(_) => panic!("video-free fixture gained unexpected Video"),
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintEntry::Brush(_) => panic!("non-brush fixture gained unexpected bitmap brush"),
             PaintEntry::Component(_) => {
                 panic!("component-free Text fixture gained unexpected Component")
             }

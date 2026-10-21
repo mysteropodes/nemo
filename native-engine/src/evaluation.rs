@@ -361,3 +361,7 @@ fn opacity(value: &Number, context: &str) -> Result<f64, EvaluationError> {
 fn invalid<T>(message: impl Into<String>) -> Result<T, EvaluationError> {
     Err(EvaluationError::new(EvaluationErrorKind::Invalid, message))
 }
+
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[path = "object_brush_trim_bake.rs"]
+pub(crate) mod brush_trim_bake;

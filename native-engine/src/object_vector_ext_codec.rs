@@ -9,6 +9,9 @@
 //! `paramShape` members, only the effect types of the baseline `TYPES` table. Rules the baseline does not
 //! state are chosen conservatively and listed in HANDOFF.md (strokeProfile kinds, non-negative profileBase,
 //! unknown effect types refused instead of silently skipped, an empty vectorExt refused).
+#[path = "object_bitmap_brush_codec.rs"]
+pub(crate) mod bitmap_brush;
+
 use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::{
     ObjectLayer, ObjectRecord, ParamShape, PressureFields, PARAM_SHAPE_KINDS, PATH_FX_TYPE_IDS,
@@ -52,6 +55,7 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     if ext.fill_trace.value().is_some_and(|trace| !trace.valid()) {
         return Err(invalid("invalid fill trace provenance"));
     }
+    bitmap_brush::validate(record)?;
     if let Some(gradient) = ext.fill_gradient.value() {
         if !gradient.valid() {
             return Err(invalid("invalid stored two-stop gradient"));

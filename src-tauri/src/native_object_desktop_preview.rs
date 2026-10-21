@@ -8,13 +8,30 @@ use crate::native_application_viewport::{self as viewport_host, NativeViewportCo
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
-    desktop_viewport::{DesktopViewportHost, PresentationReceipt, SurfacePort},
+    desktop_viewport::{
+        DesktopViewportHost, ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView,
+        ObjectViewProjection, SurfacePort,
+    },
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
     scheduler::OutputSpec,
 };
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ObjectPreviewReceipt {
+    #[serde(flatten)]
+    pub(crate) preview: NativePreviewReceipt,
+    pub(crate) view: ObjectViewProjection,
+}
+impl std::ops::Deref for ObjectPreviewReceipt {
+    type Target = NativePreviewReceipt;
+    fn deref(&self) -> &Self::Target {
+        &self.preview
+    }
+}
 
 const MAX_BYTES: usize = 8192;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -53,6 +70,10 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) frame: u32,
     pub(crate) output_spec: OutputSpecInput,
     pub(crate) viewport: ViewportInput,
+    #[serde(default)]
+    pub(crate) view_mode: ObjectPreviewView,
+    #[serde(default)]
+    pub(crate) navigation: ObjectPreviewNavigation,
     pub(crate) revision_sync: Option<PreviewRevisionProof>,
     #[serde(default)]
     pub(crate) cancelled_before_dispatch: bool,
@@ -129,6 +150,10 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             ));
         }
     }
+    request
+        .navigation
+        .validate()
+        .map_err(|message| host_error("invalid_request", message))?;
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
     Ok(request)
@@ -143,13 +168,13 @@ impl ObjectPreviewConsumer<'_> {
         self,
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
-    ) -> Result<PresentationReceipt, String> {
+    ) -> Result<ObjectPresentedFrame, String> {
         self.owner
-            .present_prepared_object_preview(&self.selector, compositor, viewport)
+            .present_prepared_object_preview_view(&self.selector, compositor, viewport)
     }
 }
 impl NativeViewportConsumer for ObjectPreviewConsumer<'_> {
-    type Output = PresentationReceipt;
+    type Output = ObjectPresentedFrame;
     fn consume<P: SurfacePort>(
         self,
         compositor: &mut Compositor,
@@ -163,8 +188,8 @@ impl NativeViewportConsumer for ObjectPreviewConsumer<'_> {
 pub(crate) fn preview_with_target(
     state: &ApplicationMcp,
     request: &ObjectPreviewRequest,
-    target: impl FnOnce(ObjectPreviewConsumer<'_>) -> HostResult<PresentationReceipt>,
-) -> HostResult<NativePreviewReceipt> {
+    target: impl FnOnce(ObjectPreviewConsumer<'_>) -> HostResult<ObjectPresentedFrame>,
+) -> HostResult<ObjectPreviewReceipt> {
     let selector = request.selector();
     let output: OutputSpec = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
@@ -192,18 +217,24 @@ pub(crate) fn preview_with_target(
                         selector: selector.clone(),
                     }))
                 };
-                if revision_sync.is_some() {
-                    owner.with_prepared_object_preview_for_revision_sync(&selector, output, consume)
-                } else {
-                    owner.with_prepared_object_preview(&selector, output, consume)
-                }
+                owner.with_prepared_object_preview_for_navigation(
+                    &selector,
+                    output,
+                    request.view_mode,
+                    request.navigation,
+                    revision_sync.is_some(),
+                    consume,
+                )
             },
         )
         .map_err(|message| host_error("unavailable", message))??;
-    Ok(NativePreviewReceipt {
-        work_id: work_label(receipt.identity().work_id()),
-        view_generation: receipt.identity().view_generation().value(),
-        status: viewport_host::status_label(receipt.status()),
+    Ok(ObjectPreviewReceipt {
+        preview: NativePreviewReceipt {
+            work_id: work_label(receipt.receipt.identity().work_id()),
+            view_generation: receipt.receipt.identity().view_generation().value(),
+            status: viewport_host::status_label(receipt.receipt.status()),
+        },
+        view: receipt.view,
     })
 }
 
@@ -213,7 +244,7 @@ pub(crate) async fn nemo_native_object_preview(
     window: tauri::Window,
     state: tauri::State<'_, ApplicationMcp>,
     request_json: String,
-) -> HostResult<NativePreviewReceipt> {
+) -> HostResult<ObjectPreviewReceipt> {
     require_main(&window)?;
     let request = std::sync::Arc::new(admit_request(&request_json, state.instance_id())?);
     for attempt in 0..2 {

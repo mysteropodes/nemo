@@ -9,7 +9,7 @@ use serde_json::Number;
 #[path = "object_frame_camera.rs"]
 mod camera;
 #[path = "object_frame_motion_values.rs"]
-mod frame_motion;
+pub(crate) mod frame_motion;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropertySampleError {

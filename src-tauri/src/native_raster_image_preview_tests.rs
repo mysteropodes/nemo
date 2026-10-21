@@ -59,33 +59,56 @@ fn actual_preview_key_declares_png_resources_on_every_held_frame_then_undo_remov
         let prepared = host
             .prepare_object_preview(&selector(&original, frame), output(), false)
             .unwrap();
-        assert_eq!(prepared.plan.commands().len(), 0);
-        let expected = prepared
-            .plan
+        let plan = host
+            .preview
+            .brush_runtime
+            .materialize(&prepared.admission, &mut |_| {
+                panic!("plain raster fixture cannot retire bitmap resources")
+            })
+            .unwrap();
+        let key = prepared.materialized_key(&plan).unwrap();
+        assert_eq!(plan.commands().len(), 0);
+        let expected = plan
             .raster_resource_versions()
             .unwrap()
             .into_iter()
             .collect();
-        assert_eq!(prepared.key.declared_resource_versions(), &expected);
-        assert_eq!(prepared.key.declared_resource_versions().len(), 1);
+        assert_eq!(key.declared_resource_versions(), &expected);
+        assert_eq!(key.declared_resource_versions().len(), 1);
         if let Some(old) = &declarations {
-            assert_eq!(prepared.key.declared_resource_versions(), old);
+            assert_eq!(key.declared_resource_versions(), old);
         }
-        declarations = Some(prepared.key.declared_resource_versions().clone());
+        declarations = Some(key.declared_resource_versions().clone());
     }
     host.history.undo(original.content_revision()).unwrap();
     let after = snapshot(&host);
     let prepared = host
         .prepare_object_preview(&selector(&after, 0), output(), false)
         .unwrap();
-    assert!(prepared.key.declared_resource_versions().is_empty());
+    let plan = host
+        .preview
+        .brush_runtime
+        .materialize(&prepared.admission, &mut |_| {
+            panic!("plain raster fixture cannot retire bitmap resources")
+        })
+        .unwrap();
+    let key = prepared.materialized_key(&plan).unwrap();
+    assert!(key.declared_resource_versions().is_empty());
     host.history.redo(after.content_revision()).unwrap();
     let redone = snapshot(&host);
     let prepared = host
         .prepare_object_preview(&selector(&redone, 20), output(), false)
         .unwrap();
+    let plan = host
+        .preview
+        .brush_runtime
+        .materialize(&prepared.admission, &mut |_| {
+            panic!("plain raster fixture cannot retire bitmap resources")
+        })
+        .unwrap();
+    let key = prepared.materialized_key(&plan).unwrap();
     assert_eq!(
-        prepared.key.declared_resource_versions(),
+        key.declared_resource_versions(),
         declarations.as_ref().unwrap()
     );
 }
@@ -115,7 +138,15 @@ fn stale_pin_and_wrong_output_refuse_before_target_callback_and_valid_token_neve
     host.with_prepared_object_preview(&selector(&current, 0), output(), |owner| {
         callbacks += 1;
         let prepared = owner.preview.prepared.as_ref().unwrap();
-        assert_eq!(prepared.key.declared_resource_versions().len(), 1);
+        let plan = owner
+            .preview
+            .brush_runtime
+            .materialize(&prepared.admission, &mut |_| {
+                panic!("plain raster fixture cannot retire bitmap resources")
+            })
+            .unwrap();
+        let key = prepared.materialized_key(&plan).unwrap();
+        assert_eq!(key.declared_resource_versions().len(), 1);
         Ok(())
     })
     .unwrap();

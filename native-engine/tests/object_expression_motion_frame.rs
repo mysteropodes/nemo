@@ -15,6 +15,31 @@ fn fixture(code: &str) -> Value {
             "expression":{"enabled":true,"code":code}}]}]);
     doc
 }
+fn ordinary_editable_source(mut doc: Value) -> Value {
+    let position = doc["layers"].as_array().unwrap().len();
+    doc["layers"].as_array_mut().unwrap().push(json!({
+        "layerUid":"Edit","visible":false,"timing":{
+            "format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+            "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}
+    }));
+    doc["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({
+            "layerUid":"Edit","naturalPosition":position,"order":{}
+        }));
+    let mut record = doc["objects"][0].clone();
+    record["target"]["layerUid"] = json!("Edit");
+    record["target"]["strokeId"] = json!("editable");
+    doc["objects"].as_array_mut().unwrap().push(record);
+    doc["compositionOrder"]["contexts"][0]["scopes"][0]["elements"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({
+            "layerUid":"Edit","strokeId":"editable","naturalPosition":0,"order":{}
+        }));
+    doc
+}
 fn owner(doc: Value) -> NativeObjectHistory {
     let doc = decode_storage_project(&serde_json::to_vec(&doc).unwrap()).unwrap();
     let project = ProjectEnvelope::no_media(ProjectMetadata::new(100, 100, 24.).unwrap(), doc);

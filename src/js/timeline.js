@@ -885,7 +885,7 @@ window.SM={
   setCanvasSize:function(w,h){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasSize',width:w,height:h}):Promise.resolve({status:'unavailable'});},setCanvasBg:function(c){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasBackground',color:c}):Promise.resolve({status:'unavailable'});},
   setCanvasClip:function(v){state.canvasClip=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
   setSafetyZones:function(v){state.safetyZones=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
-  fitCanvas:fitCanvas,resetView:resetView,
+  fitCanvas:function(){if(typeof nativeViewportNavigation!=='function'||!nativeViewportNavigation('fit'))return fitCanvas();},resetView:function(){if(typeof nativeViewportNavigation!=='function'||!nativeViewportNavigation('reset'))return resetView();},
   setOnionRange:function(inF,outF){state.onionIn=inF;state.onionOut=outF;renderOS();},
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
@@ -9660,8 +9660,8 @@ function onKeyDown(event){
   // ways, on different platforms). event.code (Equal/Minus/Digit0 +
   // Numpad variants), not event.key — still layout-proof against AZERTY,
   // same reasoning as round 2.
-  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Minus'||event.code==='NumpadSubtract')){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();if(typeof nativeViewportNavigation==='function'&&nativeViewportNavigation('zoom',null,null,1.1))return;view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Minus'||event.code==='NumpadSubtract')){event.preventDefault();if(typeof nativeViewportNavigation==='function'&&nativeViewportNavigation('zoom',null,null,1/1.1))return;view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
   if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Digit0'||event.code==='Numpad0')){event.preventDefault();window.SM.fitCanvas();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
@@ -10897,6 +10897,7 @@ document.getElementById('btn-resetv').addEventListener('click',function(){window
 // scrubbing instead of only on release.
 document.getElementById('zoom-scrub').addEventListener('input',function(){
   var pct=parseFloat(this.value);if(!pct||pct<=0)return;
+  if(typeof nativeViewportNavigation==='function'&&nativeViewportNavigation('absolute',null,null,pct/100))return;
   view.zoom=pct/100;renderArcs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
 });
 document.getElementById('canvas-fit-btn').addEventListener('click',function(e){

@@ -85,8 +85,11 @@
     }
     function read() {
       try {
-        if (cache && current(cache.stamp) && presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
+        if (cache && current(cache.stamp)) {
+          if (presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
             available(cache.stamp)) return cache.value;
+          return null; // The existing queue may temporarily hide presentation without changing native metadata.
+        }
       } catch (_) {}
       cache = null; return null;
     }

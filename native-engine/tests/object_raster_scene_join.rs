@@ -102,6 +102,8 @@ fn real_import_joins_vector_and_raster_in_one_pinned_order_and_keeps_contour_api
                 PaintEntry::Duplicator(_) => {
                     panic!("original fixture gained unexpected Duplicator")
                 }
+                #[cfg(all(feature = "application", feature = "project_media_codec"))]
+                PaintEntry::Brush(_) => panic!("non-brush fixture gained unexpected bitmap brush"),
                 PaintEntry::Component(_) => panic!("PNG-only fixture gained unexpected Component"),
                 PaintEntry::Video(_) => panic!("PNG-only fixture gained unexpected Video"),
             })
@@ -306,6 +308,10 @@ fn unsupported_raster_brush_range_and_context_are_refused_by_the_actual_producti
                         PaintEntry::Text(_) => panic!("PNG-only fixture gained unexpected Text"),
                         PaintEntry::Duplicator(_) => {
                             panic!("original fixture gained unexpected Duplicator")
+                        }
+                        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+                        PaintEntry::Brush(_) => {
+                            panic!("non-brush fixture gained unexpected bitmap brush")
                         }
                         PaintEntry::Component(_) => {
                             panic!("PNG-only fixture gained unexpected Component")

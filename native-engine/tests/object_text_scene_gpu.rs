@@ -135,6 +135,37 @@ fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
     );
     bytes
 }
+// Diagnose the same real GPU witness before comparing the two consumer witnesses.
+fn assert_repeatable(
+    gpu: &mut Compositor,
+    witness: &ObjectCompositionWitness,
+    label: &str,
+    first: &[u8],
+) {
+    let first_hash = crate::request_receipts::sha256(first);
+    eprintln!("{label} render1 sha256={first_hash:02x?}");
+    for iteration in 2..=8 {
+        let actual = render(gpu, witness);
+        let actual_hash = crate::request_receipts::sha256(&actual);
+        eprintln!("{label} render{iteration} sha256={actual_hash:02x?}");
+        assert_eq!(
+            actual.len(),
+            first.len(),
+            "{label} render{iteration} length"
+        );
+        if let Some(index) = first.iter().zip(&actual).position(|(a, b)| a != b) {
+            let (x, y) = ((index / 4) % WIDTH, (index / 4) / WIDTH);
+            panic!(
+                "{label} render1/render{iteration} differ: byte={index} pixel=({x},{y}) \
+                 channel={} first={:?} actual={:?} first_sha256={first_hash:02x?} \
+                 actual_sha256={actual_hash:02x?}",
+                index % 4,
+                pixel(first, x, y),
+                pixel(&actual, x, y),
+            );
+        }
+    }
+}
 fn pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
     bytes[(y * WIDTH + x) * 4..(y * WIDTH + x + 1) * 4]
         .try_into()
@@ -369,4 +400,106 @@ fn gpu_retained_document_font_and_raster_survive_owner_drop_with_original_pixels
         pixels.upgrade().is_none(),
         "last raster Blob/charge holder released"
     );
+}
+
+#[test]
+fn gpu_stored_text_animator_and_layer_motion_share_original_glyphs_and_export_pixels() {
+    let case: Value = GLYPH_ORACLE
+        .lines()
+        .filter_map(|line| line.strip_prefix("CASE "))
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|row| row["name"] == "hello_roboto_100")
+        .unwrap();
+    let mut doc = document();
+    doc["items"]["text"][0]["block"] = json!({"text":case["text"],
+        "font":{"kind":"bundled","fontKey":case["font"]}, "size":case["size"],
+        "color":"#112233", "align":case["align"],
+        "anchorTopLeft":{"x":case["tl"][0],"y":case["tl"][1]}});
+    doc["layers"][0]["textAnimators"] = json!([{"id":"retained", "selector":{},
+        "props":{"position":[20,0]}, "properties":[{"property":"amount","track":{"keys":[
+            {"frame":0,"v":[0]},{"frame":4,"v":[100]}]}}]}]);
+    doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
+        "properties":[{"property":"position","static":[7,9]}]}]);
+    let o = owner(&doc);
+    let before = support::state(&o);
+    let snapshot = support::head(&o);
+    let (view, export) = witnesses(&snapshot);
+    versions(&view, "font:Roboto-Regular");
+    versions(&export, "font:Roboto-Regular");
+    let text = ordered_entries(export.plan())
+        .find_map(|entry| match entry {
+            PaintEntry::Text(text) => Some(text),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(text.item.scene().contours().len(), 7);
+    for (contour, expected) in text
+        .item
+        .scene()
+        .contours()
+        .iter()
+        .take(3)
+        .zip(case["glyphs"][0]["paths"].as_array().unwrap())
+    {
+        let oracle = expected["segs"].as_array().unwrap();
+        assert_eq!(contour.contour.segments().len(), oracle.len());
+        for (segment, row) in contour.contour.segments().iter().zip(oracle) {
+            let numbers = row
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|n| n.as_f64().unwrap())
+                .collect::<Vec<_>>();
+            // Original literal H geometry, TA +20 then own layer +7,+9 exactly once.
+            assert_eq!(segment.point, [numbers[0] + 27.0, numbers[1] + 9.0]);
+            assert_eq!(segment.handle_in, [numbers[2], numbers[3]]);
+            assert_eq!(segment.handle_out, [numbers[4], numbers[5]]);
+        }
+    }
+    let mut gpu = metal();
+    let shown = render(&mut gpu, &view);
+    assert_repeatable(&mut gpu, &view, "same-view", &shown);
+    let exported = render(&mut gpu, &export);
+    assert_repeatable(&mut gpu, &export, "same-export", &exported);
+    assert_eq!(shown, render(&mut gpu, &export));
+    assert_eq!(pixel(&shown, 39, 29), [17, 34, 51, 255]);
+    assert_eq!(pixel(&shown, 57, 51), [17, 34, 51, 255]);
+    assert_eq!(pixel(&shown, 57, 29), [255; 4]);
+    assert_eq!(pixel(&shown, 12, 20), [255; 4]);
+    assert_eq!(pixel(&shown, 319, 179), [255; 4]);
+    assert_eq!(support::state(&o), before);
+    // Same original Hello/TA/own-Motion fixture, now through a genuine content-free Null.
+    doc["layers"][0]["parentLayerUid"] = json!("N");
+    doc["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"N","visible":false,
+        "isNullLayer":true,"nullPos":[100,80]}));
+    doc["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"N","naturalPosition":1,"order":{}}));
+    doc["propertyHolders"].as_array_mut().unwrap().push(json!({
+        "target":{"contextId":"scene-root","layerUid":"N"},
+        "properties":[{"property":"rotation","static":[180]}]}));
+    let null_owner = owner(&doc);
+    let null_before = support::state(&null_owner);
+    let null_snapshot = support::head(&null_owner);
+    let (null_view, null_export) = witnesses(&null_snapshot);
+    versions(&null_export, "font:Roboto-Regular");
+    let reflected = render(&mut gpu, &null_view);
+    assert_eq!(reflected, render(&mut gpu, &null_export));
+    // Original ink cell(39,29)/(57,51), rotated180 around(100,80):
+    // destination sample cells are(160,130)/(142,108), not rounded edge guesses.
+    assert_eq!(pixel(&reflected, 160, 130), [17, 34, 51, 255]);
+    assert_eq!(pixel(&reflected, 142, 108), [17, 34, 51, 255]);
+    assert_eq!(pixel(&reflected, 142, 130), [255; 4]);
+    assert_eq!(pixel(&reflected, 39, 29), [255; 4]);
+    assert_eq!(support::state(&null_owner), null_before);
+    drop(null_snapshot);
+    drop(null_owner);
+    assert_eq!(reflected, render(&mut gpu, &null_export));
+    drop(snapshot);
+    drop(o);
+    assert_eq!(shown, render(&mut gpu, &export));
 }

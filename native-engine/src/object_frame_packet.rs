@@ -2,10 +2,19 @@
 //! Array positions are provenance only; composition policy belongs to consumers.
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
 pub(crate) use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget, Presence,
-    PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
+    AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget,
+    Presence, PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
+pub(crate) use property_sampling::frame_motion::MotionValues;
+#[path = "object_expression_holder_source.rs"]
+pub(crate) mod expression_sources;
+#[path = "object_frame_motion_receipts.rs"]
+pub(crate) mod motion_receipts;
+#[path = "object_frame_projection.rs"]
+pub(crate) mod projection;
+#[path = "object_frame_text_selectors.rs"]
+mod text_selectors;
 
 #[path = "object_frame_context.rs"]
 mod context;
@@ -206,6 +215,8 @@ pub struct ObjectFramePacket {
     duplicators: Vec<duplicators::LayerCopies>,
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
+    motion_receipts: Vec<motion_receipts::MotionReceipt>,
+    selector_receipts: Vec<text_selectors::SelectorReceipt>,
 }
 
 impl ObjectFramePacket {
@@ -276,6 +287,12 @@ impl ObjectFramePacket {
     pub fn frame(&self) -> u32 {
         self.frame
     }
+    /// Same stored camera provider for trusted export and locked-view consumers.
+    pub(crate) fn stored_camera_matrix(&self) -> Result<Option<[f64; 6]>, ObjectFrameError> {
+        self.snapshot
+            .sampled_camera_matrix(f64::from(self.frame))
+            .map_err(|_| ObjectFrameError::Unavailable)
+    }
     /// Raw layer opacity at evaluation time, never the held drawing's source frame.
     /// Packet admission has already refused unconsumed holders and enabled expressions.
     pub(crate) fn layer_opacity(&self, index: usize) -> Result<f64, ObjectFrameError> {
@@ -288,12 +305,8 @@ impl ObjectFramePacket {
             layer_uid: layer.layer_uid().to_owned(),
             stroke_id: Presence::Missing,
         };
-        let values = sample_property_raw(&self.snapshot, &target, "opacity", self.frame as f64)
-            .map_err(|_| ObjectFrameError::Unavailable)?;
-        match values.as_slice() {
-            [value] if value.is_finite() => Ok((value / 100.0).max(0.0)),
-            _ => Err(ObjectFrameError::Unavailable),
-        }
+        let values = self.sampled_motion_values(&target)?;
+        Ok((values.opacity / 100.0).max(0.0))
     }
     /// Selected authored source for this layer; packet.frame() remains evaluation time.
     /// An unexposed layer (or invalid index) has no selected source.

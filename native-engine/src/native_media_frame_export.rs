@@ -8,7 +8,7 @@
 //! (the desktop ffmpeg sessions of `src-tauri`) and whether a linked locator can
 //! be read now.
 //!
-//! Order of one export (or one preview frame), all before anything is staged:
+//! Preflight and owned decoding of one export (or one preview frame):
 //! 1. the drawn video placements of every requested frame come from the frame
 //!    packet itself (visible layer, present at the frame);
 //! 2. link verdicts are taken for those placements' linked locators; the first
@@ -21,6 +21,9 @@
 //!    the gate, attaches them to the scene producer's witness at their slots, and
 //!    the gate's ledger releases every frame and session exactly once at
 //!    [`NativeMediaFrames::finish`] (or drop) whatever the host did.
+//! Steps 1–3 preflight the complete range before staging. Step 4 may run
+//! per frame before rendering; a later decode failure cleans staging before
+//! atomic publication, while retaining every acquired-frame release obligation.
 //!
 //! The placement's stored timing (`timeRemap`, `interpMode`, `frameBlend`) is
 //! the plan's video facts and time-remap sampler: a remapped video selects its

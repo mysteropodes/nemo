@@ -3,10 +3,12 @@ use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, ProducerOutput, SceneOutcome, ScenePin,
 };
 use crate::object_frame_packet::ObjectFrameSelector;
+use crate::object_render_scene::mask_inputs::{ObjectMaskInput, ObjectMaskInputs};
 use crate::object_render_scene::raster_scene::RasterSource;
 use crate::object_render_scene::{
     ObjectPaintCommand, ObjectPaintPlan, ObjectPaintPlanError, ObjectRenderScene,
 };
+use vello::kurbo::BezPath;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PaintIndex {
@@ -16,6 +18,8 @@ pub(crate) enum PaintIndex {
     Component(usize),
     Video(usize),
     Duplicator(usize),
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    Brush(usize),
 }
 pub(crate) enum PaintEntry<'a> {
     Contour(ObjectPaintCommand<'a>),
@@ -24,10 +28,24 @@ pub(crate) enum PaintEntry<'a> {
     Component(&'a crate::object_render_scene::component_scene::ComponentPaint),
     Video(usize),
     Duplicator(&'a crate::object_render_scene::duplicator_scene::DuplicatorPaint),
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    Brush(usize),
 }
 impl ObjectPaintPlan {
+    pub(crate) fn mask_inputs(&self) -> &ObjectMaskInputs {
+        &self.masks
+    }
+    pub(crate) fn mask_path(&self, mask: &ObjectMaskInput) -> Option<&BezPath> {
+        self.masks.path_in_scene(&self.scene, mask)
+    }
     pub(crate) fn has_duplicators(&self) -> bool {
         !self.scene.packet().duplicator_outputs().is_empty()
+    }
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    pub(crate) fn brush_sources(
+        &self,
+    ) -> Option<&crate::object_render_scene::brush_scene::BrushSources> {
+        self.scene.brushes.as_deref()
     }
     pub(crate) fn has_components(&self) -> bool {
         !self.scene.components.paints.is_empty()
@@ -46,6 +64,10 @@ impl ObjectPaintPlan {
     ) -> Result<Vec<(String, String)>, crate::object_render_scene::ObjectSceneError> {
         let mut declared = self.raster_resource_versions()?;
         declared.extend(self.scene.texts.resources.declared_versions());
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if let Some(brushes) = &self.scene.brushes {
+            declared.extend(brushes.resources().declared_versions());
+        }
         Ok(declared)
     }
 
@@ -71,6 +93,8 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
             packet: plan.packet(),
         }),
         PaintIndex::Raster(index) => PaintEntry::Raster(*index),
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        PaintIndex::Brush(index) => PaintEntry::Brush(*index),
         PaintIndex::Text(index) => PaintEntry::Text(&plan.scene.texts.entries[*index]),
         PaintIndex::Component(index) => {
             PaintEntry::Component(&plan.scene.components.paints[*index])
@@ -84,6 +108,26 @@ pub(crate) fn ordered_entries(plan: &ObjectPaintPlan) -> impl Iterator<Item = Pa
 pub(super) fn prepare(
     scene: &ObjectRenderScene,
     expected: &ObjectFrameSelector<'_>,
+) -> Result<(Vec<usize>, Vec<PaintIndex>), ObjectPaintPlanError> {
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    let brushes: Vec<_> = scene
+        .brushes
+        .iter()
+        .flat_map(|sources| {
+            sources
+                .paints
+                .iter()
+                .map(|source| (source.source_index, source.layer_index))
+        })
+        .collect();
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+    let brushes = Vec::new();
+    prepare_with_brush_indices(scene, expected, &brushes)
+}
+pub(crate) fn prepare_with_brush_indices(
+    scene: &ObjectRenderScene,
+    expected: &ObjectFrameSelector<'_>,
+    brush_indices: &[(usize, usize)],
 ) -> Result<(Vec<usize>, Vec<PaintIndex>), ObjectPaintPlanError> {
     let pin = ScenePin::of_packet(scene.packet());
     let expected_pin = ScenePin {
@@ -110,6 +154,17 @@ pub(super) fn prepare(
             return Err(ObjectPaintPlanError::InvalidOrder);
         }
         rasters = rasters.with_item(source.source_index, PaintIndex::Raster(index));
+    }
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    for (index, (source, layer)) in brush_indices.iter().enumerate() {
+        if selected.get(source) != Some(layer) {
+            return Err(ObjectPaintPlanError::InvalidOrder);
+        }
+        rasters = rasters.with_item(*source, PaintIndex::Brush(index));
+    }
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+    if !brush_indices.is_empty() {
+        return Err(ObjectPaintPlanError::Unavailable);
     }
     let mut texts = ProducerOutput::new("text-block", pin);
     for (index, source) in scene.texts.entries.iter().enumerate() {

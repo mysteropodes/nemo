@@ -57,6 +57,25 @@ pub(crate) enum Unavailable {
 pub(crate) trait MotionPort {
     /// `valueAtFrame(layer, key, frame)`: `Ok(None)` is the baseline's `null`.
     fn value(&self, layer_uid: &str, key: &'static str) -> Result<Sampled, Unavailable>;
+    /// Exact element identity in the same provider-owned context and frame.
+    /// Providers that only own layer lookups cannot impersonate element values.
+    fn element_value(
+        &self,
+        _layer_uid: &str,
+        _stroke_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        Err(Unavailable::Property(key))
+    }
+    /// Exact inline animator source in the provider-owned context and frame.
+    fn selector_value(
+        &self,
+        _layer_uid: &str,
+        _animator_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        Err(Unavailable::Property(key))
+    }
     /// `layerMotionAt(layerIndex, frame)`: `Ok(None)` is the baseline's `null`.
     fn motion_delta(&self, layer_uid: &str) -> Result<Option<MotionDelta>, Unavailable>;
 }

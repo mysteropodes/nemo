@@ -74,6 +74,9 @@ pub(crate) fn validate_item_parts(
         if layer.widget.value().is_some() {
             return Err(invalid("a widget layer holds no items"));
         }
+        if layer.is_null_layer() {
+            return Err(invalid("a Null layer holds no items"));
+        }
         if !seen.insert(target) {
             return Err(ObjectCodecError::new(
                 ObjectCodecErrorKind::DuplicateId,

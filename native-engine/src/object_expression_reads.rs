@@ -5,8 +5,10 @@ use crate::evaluation::property_expression_lookup::{
     self as lookup, ControlRecord, Fps, KeyRecord, KeyTrack, KeyValue, LayerRecord, LayerTable,
 };
 use crate::evaluation::property_expression_views::ExpressionContextView;
-use crate::object_document::{ObjectLayer, Presence, PropertyHolder, PropertyHolderTarget};
-use crate::object_frame_packet::sample_property_raw;
+use crate::object_document::{
+    ExpressionHolder, ObjectLayer, Presence, PropertyHolder, PropertyHolderTarget,
+};
+
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 #[cfg(all(test, feature = "history"))]
@@ -16,7 +18,7 @@ mod target_tests;
 #[derive(Clone)]
 pub(crate) struct SnapshotReads {
     snapshot: ObjectSnapshot,
-    target: PropertyHolderTarget,
+    target: ExpressionHolder,
     property: String,
     frame: f64,
 }
@@ -25,6 +27,19 @@ impl SnapshotReads {
     pub(crate) fn bind(
         snapshot: &ObjectSnapshot,
         target: &PropertyHolderTarget,
+        property: &str,
+        frame: f64,
+    ) -> Self {
+        Self::bind_holder(
+            snapshot,
+            &ExpressionHolder::Property(target.clone()),
+            property,
+            frame,
+        )
+    }
+    pub(crate) fn bind_holder(
+        snapshot: &ObjectSnapshot,
+        target: &ExpressionHolder,
         property: &str,
         frame: f64,
     ) -> Self {
@@ -40,7 +55,11 @@ impl SnapshotReads {
     }
     pub(crate) fn target(&self, uid: &str) -> Result<PropertyHolderTarget, &'static str> {
         if uid.is_empty() {
-            return Ok(self.target.clone());
+            return self
+                .target
+                .property_target()
+                .cloned()
+                .ok_or("Inline animator is not a layer holder");
         }
         self.layers()?
             .iter()
@@ -51,6 +70,22 @@ impl SnapshotReads {
             layer_uid: uid.to_owned(),
             stroke_id: Presence::Missing,
         })
+    }
+    pub(crate) fn source_target(&self, uid: &str) -> Result<ExpressionHolder, &'static str> {
+        if uid.is_empty() {
+            Ok(self.target.clone())
+        } else {
+            self.target(uid).map(ExpressionHolder::Property)
+        }
+    }
+    pub(crate) fn source_has_expression(&self, target: &ExpressionHolder, property: &str) -> bool {
+        crate::object_frame_packet::expression_sources::enabled(&self.snapshot, target, property)
+            && crate::object_frame_packet::expression_sources::code(
+                &self.snapshot,
+                target,
+                property,
+            )
+            .is_some_and(|code| !code.is_empty())
     }
     fn layers(&self) -> Result<&[ObjectLayer], &'static str> {
         ContextSource::of_document(self.snapshot.document())
@@ -116,6 +151,10 @@ impl SnapshotReads {
         Ok(index.and_then(|i| table.layers()[i].layer_uid.clone()))
     }
     pub(crate) fn control(&self, uid: &str, name: &str) -> Result<String, &'static str> {
+        // Original resolveHolderLayer does not impersonate an inline animator as a layer.
+        if uid.is_empty() && self.target.property_target().is_none() {
+            return Err("Inline animator has no layer control holder");
+        }
         // Shape controls belong to its owning layer, not the shape holder.
         let uid = if uid.is_empty() {
             self.target.layer_uid()
@@ -140,8 +179,13 @@ impl SnapshotReads {
         property: &str,
         frame: f64,
     ) -> Result<Vec<f64>, &'static str> {
-        sample_property_raw(&self.snapshot, &self.target(uid)?, property, frame)
-            .map_err(|_| "Unavailable native property")
+        crate::object_frame_packet::expression_sources::raw(
+            &self.snapshot,
+            &self.source_target(uid)?,
+            property,
+            frame,
+        )
+        .map_err(|_| "Unavailable native property")
     }
     pub(crate) fn has_expression(&self, target: &PropertyHolderTarget, property: &str) -> bool {
         if property == "order" {
@@ -158,7 +202,12 @@ impl SnapshotReads {
             .is_some_and(|e| e.enabled && !e.code.is_empty())
     }
     fn view(&self, uid: &str) -> Result<ExpressionContextView, &'static str> {
-        ExpressionContextView::bind(&self.snapshot, &self.target(uid)?, &self.property)
+        let target = if uid.is_empty() {
+            self.target.context_target()
+        } else {
+            self.target(uid)?
+        };
+        ExpressionContextView::bind(&self.snapshot, &target, &self.property)
             .map_err(|_| "Unavailable expression context")
     }
     fn fps(&self) -> Result<Fps, &'static str> {
@@ -171,19 +220,22 @@ impl SnapshotReads {
         .map_err(|_| "Invalid project frame rate")
     }
     fn keys(&self) -> Result<Option<KeyTrack>, &'static str> {
-        let track = if self.property == "order" {
+        let track = if let Some(target) = self
+            .target
+            .property_target()
+            .filter(|_| self.property == "order")
+        {
             self.snapshot
                 .document()
-                .property_order(&self.target)
+                .property_order(target)
                 .and_then(|o| o.track.value())
         } else {
-            self.holder(&self.target)
-                .and_then(|h| {
-                    h.properties()
-                        .iter()
-                        .find(|r| r.property() == self.property)
-                })
-                .and_then(|r| r.track.value())
+            crate::object_frame_packet::expression_sources::record(
+                &self.snapshot,
+                &self.target,
+                &self.property,
+            )
+            .and_then(|r| r.track.value())
         };
         track
             .map(|track| {
@@ -204,6 +256,12 @@ impl SnapshotReads {
             .transpose()
     }
     pub(crate) fn info(&self, uid: &str) -> Result<Value, &'static str> {
+        if uid.is_empty() && self.target.property_target().is_none() {
+            return Ok(
+                json!({"name":null,"index":-1,"isShape":false,"hasParent":false,
+                "property":self.property,"parent":null}),
+            );
+        }
         let view = self.view(uid)?;
         let Some(me) = view.self_view() else {
             return Ok(Value::Null);
@@ -226,7 +284,10 @@ impl SnapshotReads {
     /// A compact rest-vertex view, not a mesh copy or evaluated pose. Native
     /// raw vtx tracks stay percent offsets added to the separate rest sculpt.
     pub(crate) fn mesh(&self) -> Result<Option<Value>, &'static str> {
-        let Some(mesh) = PropertyHolder::bound_mesh(self.snapshot.document(), &self.target) else {
+        let Some(target) = self.target.property_target() else {
+            return Ok(None);
+        };
+        let Some(mesh) = PropertyHolder::bound_mesh(self.snapshot.document(), target) else {
             return Ok(None);
         };
         let index = self.vertex_index()?;
@@ -240,7 +301,7 @@ impl SnapshotReads {
             })
             .unwrap_or([0., 0.]);
         Ok(Some(
-            json!({"meshId":self.target.stroke_id(),"vertexIndex":index,
+            json!({"meshId":target.stroke_id(),"vertexIndex":index,
             "vertexCount":mesh.verts.len(),"outlineVertexCount":mesh.outline.len(),
             "vertexUV":uv,"isOutlineVertex":index>=0 && (index as usize)<mesh.outline.len()}),
         ))

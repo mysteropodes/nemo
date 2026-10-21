@@ -203,6 +203,13 @@ pub(crate) fn expand_order(
                 .get(i)
                 .map(|e| e.host_layer_index)
                 .ok_or(ObjectPaintPlanError::InvalidOrder),
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintIndex::Brush(i) => scene
+                .brushes
+                .as_ref()
+                .and_then(|sources| sources.paints.get(i))
+                .map(|paint| paint.layer_index)
+                .ok_or(ObjectPaintPlanError::InvalidOrder),
             // T12 video slots are inserted after this expansion.
             PaintIndex::Duplicator(_) | PaintIndex::Video(_) => {
                 Err(ObjectPaintPlanError::InvalidOrder)
@@ -218,6 +225,14 @@ pub(crate) fn expand_order(
         let index = layer.source_layer_index();
         let original = buckets.remove(&index).unwrap_or_default();
         if let Some(copies) = scene.duplicators.layers.get(&index) {
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            if !copies.is_empty()
+                && original
+                    .iter()
+                    .any(|paint| matches!(paint, PaintIndex::Brush(_)))
+            {
+                return Err(ObjectPaintPlanError::Unavailable);
+            }
             expanded.extend(copies.iter().copied().map(PaintIndex::Duplicator));
         } else {
             expanded.extend(original);

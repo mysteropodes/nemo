@@ -350,6 +350,7 @@ fn resolve_ink(
     stored: &ObjectRecord,
     source: &BrushStrokeSource,
     ctx: &mut BrushContext<'_>,
+    bake_bits: &[u64],
 ) -> Result<InkState, BrushUnavailable> {
     let Some(setup) = source.trim.as_ref().filter(|setup| setup.window.is_some()) else {
         return untrimmed(source, ctx);
@@ -384,7 +385,7 @@ fn resolve_ink(
     let port: RetirePort<'_> = if has_port { Some(&mut forward) } else { None };
     let resolution = ctx
         .slots
-        .resolve(&mut *ctx.store, &request, &mut checked, port)
+        .resolve_with_bake_bits(&mut *ctx.store, &request, &mut checked, port, bake_bits)
         .map_err(BrushUnavailable::Trim)?;
     match resolution {
         Resolution::NoTrim => untrimmed(source, ctx),
@@ -402,6 +403,7 @@ fn build(
     record: &ObjectFrameRecord<'_>,
     source: &BrushStrokeSource,
     ctx: &mut BrushContext<'_>,
+    bake_bits: &[u64],
 ) -> Result<BrushStrokeScene, BrushUnavailable> {
     let stored = record.record();
     let vector =
@@ -420,7 +422,7 @@ fn build(
     if !source.ink_opacity.is_finite() {
         return Err(BrushUnavailable::InkOpacityNotFinite);
     }
-    let ink = resolve_ink(packet, stored, source, ctx)?;
+    let ink = resolve_ink(packet, stored, source, ctx, bake_bits)?;
     Ok(BrushStrokeScene {
         layer_uid: source.layer_uid.clone(),
         stroke_id: source.stroke_id.clone(),
@@ -435,6 +437,15 @@ pub(crate) fn produce(
     packet: &ObjectFramePacket,
     sources: &[BrushStrokeSource],
     ctx: &mut BrushContext<'_>,
+) -> Result<BrushProduction, BrushProduceError> {
+    produce_with_bake_bits(packet, sources, ctx, &[])
+}
+
+pub(crate) fn produce_with_bake_bits(
+    packet: &ObjectFramePacket,
+    sources: &[BrushStrokeSource],
+    ctx: &mut BrushContext<'_>,
+    bake_bits: &[u64],
 ) -> Result<BrushProduction, BrushProduceError> {
     validate(sources)?;
     let by_target: BTreeMap<(String, String), usize> = sources
@@ -452,7 +463,7 @@ pub(crate) fn produce(
         };
         matched.insert(at);
         let index = record.source_object_index();
-        match build(packet, &record, &sources[at], ctx) {
+        match build(packet, &record, &sources[at], ctx, bake_bits) {
             Ok(scene) => {
                 if let InkState::Ink(ink) = &scene.ink {
                     let (id, version) = ink.bitmap.declared_resource();

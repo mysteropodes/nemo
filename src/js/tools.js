@@ -7097,10 +7097,33 @@ function finalizePen(){
   saveActiveLayerFrame();updateUI();
 }
 
+// Native session viewport only: coordinates come from the actual native receipt.
+// A native owner with no current proof consumes the action; it never pans Paper.
+function nativeViewportNavigation(action,event,token,value){
+  var project=window.NemoNativeObjectProject,session=project&&typeof project.desktop==='function'&&project.desktop(window);
+  if(!session||!session.blocksLegacy())return null;
+  var result={handled:true,token:null};
+  if(!session.isActive()||typeof session.beginViewportNavigation!=='function'||typeof session.updateViewportNavigation!=='function')return result;
+  var point=event&&Number.isFinite(event.clientX)&&Number.isFinite(event.clientY)?{x:event.clientX,y:event.clientY}:null;
+  function show(){var shown=session.readPresentedObjectSession();if(!shown)return;
+    var p=shown.presentation,v=p&&p.view,canvas=document.getElementById('drawing-canvas'),pill=document.getElementById('zoom-scrub'),r=canvas&&canvas.getBoundingClientRect();
+    if(v&&r&&pill&&document.activeElement!==pill){var m=v.documentToComposition;var z=Math.hypot(m[0]*r.width/shown.canvasW,m[1]*r.height/shown.canvasH);if(Number.isFinite(z))pill.value=Math.round(z*100);}
+  }
+  try{
+    if(action==='begin-pan'||action==='begin-zoom'){result.token=session.beginViewportNavigation(action==='begin-pan'?'pan':'zoom',point);return result;}
+    if(action==='cancel')return result;
+    if(action!=='drag')token=session.beginViewportNavigation('zoom',point);
+    if(!token)return result;
+    var target=action==='fit'||action==='reset'?action:action==='absolute'?value:undefined;
+    Promise.resolve(session.updateViewportNavigation(token,point,value,target)).then(show,function(error){if(typeof showToast==='function')showToast(error.message);});
+  }catch(error){if(typeof showToast==='function')showToast(error.message);}
+  return result;
+}
+var _nativeToolNavigation=null;
 function onMouseDown(event){
   if(state.playing){stopPlay();return;}
-  if(state.tool==='hand'||state.spaceDown){state.isPanning=true;return;}
-  if(state.tool==='zoom'){if(event.event.altKey)view.zoom=Math.max(.05,view.zoom*.8);else view.zoom=Math.min(20,view.zoom*1.25);updZoom();renderArcs();return;}
+  if(state.tool==='hand'||state.spaceDown){_nativeToolNavigation=nativeViewportNavigation('begin-pan',event.event);state.isPanning=true;return;}
+  if(state.tool==='zoom'){if(nativeViewportNavigation('zoom',event.event,null,event.event.altKey ? 0.8 : 1.25))return;if(event.event.altKey)view.zoom=Math.max(.05,view.zoom*.8);else view.zoom=Math.min(20,view.zoom*1.25);updZoom();renderArcs();return;}
   if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
   // Motion mode (motion.js) is a persistent app-mode, not a tool value —
   // unlike the camera row below (a dedicated 'camera' tool that REPLACES
@@ -7564,7 +7587,7 @@ function onMouseDown(event){
 }
 function onMouseDrag(event){
   if(state.playing)return;
-  if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
+  if(state.isPanning||state.spaceDown){if(_nativeToolNavigation){nativeViewportNavigation('drag',event.event,_nativeToolNavigation.token);return;}var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
   if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
   if(state.appMode==='motion'&&window.SMMotion){if((_legacyMotionGesture||motionGestureActive())&&!allowLegacySelectionEdit(event.event,'select'))return;if(SMMotion.onDrag(event))return;}
@@ -7814,7 +7837,7 @@ function onMouseDrag(event){
   }
 }
 function onMouseUp(event){
-  if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
+  if(state.isPanning){state.isPanning=false;_nativeToolNavigation=null;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
   if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
   if(state.appMode==='motion'&&window.SMMotion){if((_legacyMotionGesture||motionGestureActive())&&!allowLegacySelectionEdit(event.event,'select'))return;var _motionUp=SMMotion.onUp(event);_legacyMotionGesture=false;if(_motionUp)return;}
@@ -8575,6 +8598,7 @@ canvasEl.addEventListener('wheel',function(e){
   var mag=Math.min(1,Math.abs(e.deltaY)/(e.ctrlKey?40:100));
   var pct=(e.ctrlKey?0.06:0.10)*mag;
   var f=e.deltaY>0?(1-pct):(1+pct);
+  if(nativeViewportNavigation('zoom',e,null,f))return;
   var nz=Math.max(.05,Math.min(20,view.zoom*f));
   var mp=view.viewToProject(new Point(e.offsetX,e.offsetY));
   view.zoom=nz;

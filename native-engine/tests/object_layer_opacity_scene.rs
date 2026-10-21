@@ -229,7 +229,7 @@ fn unsupported_properties_controls_enabled_expressions_and_nonordinary_layers_st
     }
     let mut empty = base.clone();
     empty["propertyHolders"][0]["properties"] = json!([]);
-    for value in [position, element, active, controls, folder, effect, empty] {
+    for value in [element, active, controls, folder, effect, empty] {
         let o = owner(&value);
         let s = o.acquire_snapshot(0).unwrap();
         let bytes = encode_storage_project(s.document()).unwrap();
@@ -240,6 +240,25 @@ fn unsupported_properties_controls_enabled_expressions_and_nonordinary_layers_st
         assert_eq!(encode_storage_project(s.document()).unwrap(), bytes);
         assert_eq!(o.history_depths(), (0, 0));
     }
+    // Zero Position is consumed by the actual legacy batch and must preserve both original paints.
+    let o = owner(&position);
+    let s = o.acquire_snapshot(0).unwrap();
+    let bytes = encode_storage_project(s.document()).unwrap();
+    let p = plan(&s, 7);
+    assert_eq!(alpha(&p), [0.375, 0.375]);
+    for command in p.commands() {
+        assert_eq!(command.contour().segments()[0].point, [10.125, 20.]);
+        assert_eq!(command.contour().segments()[0].handle_in, [-2., 0.]);
+        assert_eq!(command.contour().segments()[0].handle_out, [3.25, -1.]);
+        assert_eq!(
+            command.source().record().solid_fill().unwrap().a.as_f64(),
+            Some(0.75)
+        );
+    }
+    assert_eq!(p.packet().frame(), 7);
+    assert_eq!(p.packet().document_snapshot_id(), s.snapshot_id());
+    assert_eq!(encode_storage_project(s.document()).unwrap(), bytes);
+    assert_eq!((o.content_revision(), o.history_depths()), (0, (0, 0)));
     let mut disabled = base;
     disabled["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":false,"code":"throw 1"});

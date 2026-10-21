@@ -67,7 +67,7 @@ test('Main SVG export requires its exact dispatch grant and denies ordinary and 
   assert.ok(grants[owner].includes(item));
   const denied = structuredClone(policy);
   denied.externalCratePorts.native_engine.moduleItems[owner] = grants[owner].filter(grant => grant !== item);
-  assert.ok(denied.externalCratePorts.native_engine.moduleItems[owner].includes('export_job::export_object_frames'),
+  assert.ok(denied.externalCratePorts.native_engine.moduleItems[owner].includes('export_job::export_object_frames_with_materializer'),
     'removing SVG must retain the PNG grant');
   const result = R.checkRustCrate(profile, denied, { root });
   assert.equal(result.ok, false);

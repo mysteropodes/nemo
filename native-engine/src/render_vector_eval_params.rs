@@ -144,6 +144,60 @@ fn track_value(
         })
 }
 
+/// Content-free static Nulls may supply an ancestor pose, never a paint item.
+/// Match the existing parent consumer's unsupported-context checks.
+pub(crate) fn null_layer_motion_target(
+    document: &ObjectDocument,
+    target: &PropertyHolderTarget,
+) -> bool {
+    if document.format_version() != 2
+        || target.context_id() != "scene-root"
+        || target.stroke_id().is_some()
+    {
+        return false;
+    }
+    let Some(layer) = document
+        .layers()
+        .iter()
+        .find(|l| l.layer_uid() == target.layer_uid())
+    else {
+        return false;
+    };
+    layer.is_null_layer()
+        && layer.three_d.value() != Some(&true)
+        && !layer.is_effect_layer()
+        && !layer.is_folder_layer()
+        && layer.widget.value().is_none()
+        && layer.groups.value().is_none()
+        && layer.rig.value().is_none()
+        && !layer.folder_id.value().is_some_and(Option::is_some)
+        && !layer.follow_path.value().is_some_and(Option::is_some)
+        && !layer.blend_mode().is_some_and(|v| v != "normal")
+        && !layer.matte_mode().is_some_and(|v| v != "none")
+        && layer.matte_source_layer_uid.value().is_none()
+        && !layer.mattes_more.value().is_some_and(|v| !v.is_empty())
+        && !layer.effects.value().is_some_and(|v| !v.is_empty())
+        && layer.effects_from.value().is_none()
+        && !layer
+            .path_fx()
+            .is_some_and(|fx| fx.iter().any(|f| f.enabled_flag() != Some(false)))
+        && !document.duplicator_set().is_some_and(|set| {
+            set.duplicator(target.context_id(), target.layer_uid())
+                .is_some()
+        })
+        && !crate::evaluation::object_vector_kernels::render_vector_eval::has_unjoined_parent_blend(
+            document, target,
+        )
+        && !document.objects().iter().any(|r| {
+            r.target.context_id == target.context_id() && r.target.layer_uid == target.layer_uid()
+        })
+        && document.item_records().is_none_or(|items| {
+            !items.targets().any(|t| {
+                t.context_id() == target.context_id() && t.layer_uid() == target.layer_uid()
+            })
+        })
+}
+
 /// True when every property holder of the document is one this join consumes: an element holder of a stroke whose every
 /// authored record is a vector record with a `paramShape`, holding only keys of that shape's kind, no enabled expression
 /// and no expression controls. Ordinary root layer holders admit raw opacity; Position is additionally
@@ -172,6 +226,12 @@ fn holders_consumed(document: &ObjectDocument, evaluated: bool) -> bool {
             } else {
                 crate::object_frame_packet::duplicators::remaining_holder(document, holder)
             };
+            let remaining = crate::object_frame_packet::motion_receipts::remaining_holder(
+                document,
+                remaining.as_ref().unwrap_or(holder),
+                evaluated,
+            )
+            .or(remaining);
             match remaining {
                 Some(ref remaining) if remaining.properties().is_empty() => remaining
                     .controls
@@ -185,6 +245,9 @@ fn holders_consumed(document: &ObjectDocument, evaluated: bool) -> bool {
 }
 
 fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+    if crate::object_document::bitmap_brush::trim_holder_consumed(document, holder) {
+        return true;
+    }
     if let Some(consumed) = crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::component_holder_consumed(document, holder) {
         return consumed;
     }
@@ -199,6 +262,12 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     let Some(stroke_id) = target.stroke_id() else {
         return crate::evaluation::object_vector_kernels::render_vector_eval::motion::layer_holder_consumed(document, holder);
     };
+    if crate::object_frame_packet::motion_receipts::text_element(document, target) {
+        return holder.properties().iter().all(|p| {
+            crate::object_frame_packet::motion_receipts::KEYS.contains(&p.property())
+                && !p.expression.value().is_some_and(|e| e.enabled)
+        });
+    }
     let mut matched = false;
     for record in document.objects() {
         let owner = &record.target;

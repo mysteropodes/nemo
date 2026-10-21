@@ -1,6 +1,6 @@
 //! Pure diagnostic projection and original last-result publication per batch.
 use crate::evaluation::property_expression_runtime::Diagnostic;
-use crate::object_document::PropertyHolderTarget;
+use crate::object_document::{ExpressionHolder, PropertyHolderTarget};
 use crate::object_expression_runtime::motion_frame::commit::{
     same_source, ObjectMotionFrameControl, RecordedFrame,
 };
@@ -9,7 +9,7 @@ use crate::revision::ObjectSnapshot;
 
 #[derive(Debug)]
 pub(super) struct PublishedDiagnostic {
-    target: PropertyHolderTarget,
+    target: ExpressionHolder,
     property: String,
     frame: u32,
     source: ObjectSnapshot,
@@ -34,6 +34,20 @@ impl ObjectMotionFrameControl {
         &self,
         snapshot: &ObjectSnapshot,
         target: &PropertyHolderTarget,
+        property: &str,
+        frame: f64,
+    ) -> Option<serde_json::Value> {
+        self.diagnostic_for_holder(
+            snapshot,
+            &ExpressionHolder::Property(target.clone()),
+            property,
+            frame,
+        )
+    }
+    pub(crate) fn diagnostic_for_holder(
+        &self,
+        snapshot: &ObjectSnapshot,
+        target: &ExpressionHolder,
         property: &str,
         frame: f64,
     ) -> Option<serde_json::Value> {
@@ -62,7 +76,7 @@ impl ObjectMotionFrameControl {
                     serde_json::json!({
                         "instanceId": entry.source.instance_id(),
                         "documentId": entry.source.document_id(),
-                        "target": entry.target,
+                        "target": crate::object_frame_packet::expression_sources::diagnostic_target(&entry.target),
                         "property": entry.property,
                         "frame": entry.frame,
                         "documentSnapshotId": entry.source.snapshot_id(),
@@ -92,28 +106,10 @@ fn diagnostic_value(diagnostic: &Diagnostic) -> serde_json::Value {
 
 pub(super) fn expression_code<'a>(
     snapshot: &'a ObjectSnapshot,
-    target: &PropertyHolderTarget,
+    target: &ExpressionHolder,
     property: &str,
 ) -> Option<&'a str> {
-    if property == "order" {
-        return snapshot
-            .document()
-            .property_order(target)?
-            .expression
-            .value()
-            .map(|expression| expression.code.as_str());
-    }
-    snapshot
-        .document()
-        .property_holders()?
-        .iter()
-        .find(|holder| holder.target() == target)?
-        .properties()
-        .iter()
-        .find(|record| record.property() == property)?
-        .expression
-        .value()
-        .map(|expression| expression.code.as_str())
+    crate::object_frame_packet::expression_sources::code(snapshot, target, property)
 }
 
 fn touched(record: &RecordedFrame, entry: &PublishedDiagnostic) -> bool {
@@ -141,7 +137,7 @@ fn publish_diagnostic(
     ledger: &mut Vec<PublishedDiagnostic>,
     record: &RecordedFrame,
     source: &ObjectSnapshot,
-    target: &PropertyHolderTarget,
+    target: &ExpressionHolder,
     property: &str,
     diagnostic: &Option<Diagnostic>,
 ) {

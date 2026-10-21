@@ -190,3 +190,16 @@ test('desktop binding needs the native session and is cached per host', async ()
   const error = await rejection(bare.createBlock('L0', 0, PLAIN));
   assert.deepEqual([error.code, error.reason], ['unavailable', 'resource_route_unavailable']);
 });
+
+test('text writer forwards the exact live resource context to its existing queued guard',async()=>{
+ const f=adapter(),run=f.session.runResourceCommand;let pending=false,last=null;
+ const origin={...f.session.info(),presentation:{frame:0,owner:'native',status:'presented'}};
+ f.session.readPresentedObjectSession=()=>pending?null:origin;
+ f.session.runResourceCommand=action=>run(async ctx=>{let live=true;pending=true;
+  const leased={...ctx,readPresentedObjectSession:()=>live?origin:null};last=leased;
+  try{return await action(leased);}finally{live=false;pending=false;}});
+ let seen=0;await f.text.createBlock('L0',0,PLAIN,f.session.info(),(pin,ctx)=>{
+  seen++;assert.strictEqual(ctx,last);assert.equal(f.session.readPresentedObjectSession(),null);
+  assert.strictEqual(ctx.readPresentedObjectSession(),origin);assert.equal(pin.documentSnapshotId,origin.documentSnapshotId);return true;});
+ assert.equal(seen,1);assert.equal(f.owner.log.executed.length,1);assert.equal(last.readPresentedObjectSession(),null);
+});
