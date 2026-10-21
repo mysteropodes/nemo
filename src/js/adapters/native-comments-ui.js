@@ -138,6 +138,8 @@
     function presented() {
       if (retired) return Promise.resolve(null);
       if (pending || loading) { refreshNeeded = true; return loading || Promise.resolve(null); }
+      var value = model.read();
+      if (value) { repaint(); return Promise.resolve(value); }
       loading = model.refresh().then(function (value) { repaint(); return value; }).catch(function () { repaint(); return null; })
         .finally(function () { loading = null; var again = refreshNeeded; refreshNeeded = false; if (again && !model.read()) presented(); });
       return loading;
