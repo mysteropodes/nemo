@@ -239,10 +239,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 130, 131, 132, 133, 134, 178, 238, 239, 277, 278, 279, 280, 283, 284, 285, 286]);
+    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 130, 131, 132, 133, 134, 179, 240, 241, 279, 280, 281, 282, 285, 286, 287, 288]);
   // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 42 identities and adjacency stay fixed; Comments adds its four ordinary source members.
-  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 240);
-  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 240);
+  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 242);
+  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 242);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -250,10 +250,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 175);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 176);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 177);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 179);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 176);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 177);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 178);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 180);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
@@ -271,6 +271,15 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.deepEqual(updaterTags, ['<script src="js/adapters/updater-platform.js"></script>']);
   assert.equal(actual.get(updaterPath).scriptOrdinal + 1,
     actual.get('src/js/updater-bridge.js').scriptOrdinal);
+  const contactPath = 'src/js/adapters/p2p-contact-model.js';
+  const contact = policy.retainedSources.find((record) => record.path === contactPath);
+  assert.equal(contact.moduleId, 'app.p2p.contact.model.adapter');
+  assert.equal(contact.executionClass, 'document-classic');
+  assert.deepEqual(contact.loadSites, [actual.get(contactPath)]);
+  assert.deepEqual(html.filter((line) => line.includes('src="js/adapters/p2p-contact-model.js"')),
+    ['<script src="js/adapters/p2p-contact-model.js"></script>']);
+  assert.equal(actual.get(contactPath).scriptOrdinal + 1,
+    actual.get('src/js/p2p-contacts.js').scriptOrdinal);
   const kitsuServicePath = 'src/js/adapters/kitsu-service.js';
   const kitsuService = policy.retainedSources.find((record) => record.path === kitsuServicePath);
   assert.equal(kitsuService.moduleId, 'app.kitsu.service.adapter');

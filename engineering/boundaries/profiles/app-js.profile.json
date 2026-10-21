@@ -433,6 +433,18 @@
       ]
     },
     {
+      "id": "app.p2p.contact.model.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "p2p-contact-model.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "p2p-contact-model.js"
+      ]
+    },
+    {
       "id": "app.p2p.contacts",
       "layer": "app-legacy",
       "dir": "src/js",
