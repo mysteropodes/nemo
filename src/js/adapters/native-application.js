@@ -10,9 +10,9 @@
 
   const editOperation = 'command.document.object.property.edit';
   const trackOperation = 'command.document.object.property.track.edit';
-  const readOperation = 'query.document.object.property.read';
+  const readOperation = 'query.document.object.property.read', objectHistoryOperations = ['command.document.object.undo', 'command.document.object.redo'];
   const operations = new Set([
-    editOperation, trackOperation, readOperation,
+    editOperation, trackOperation, readOperation, ...objectHistoryOperations,
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
@@ -25,7 +25,7 @@
     'job.export.png.begin', 'job.export.png.status', 'job.export.png.cancel',
   ]);
   const requiredRevision = new Set([
-    editOperation, trackOperation,
+    editOperation, trackOperation, ...objectHistoryOperations,
     'command.document.apply', 'transaction.begin', 'history.undo', 'history.redo',
     'job.export.png.begin',
     'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
@@ -183,7 +183,7 @@
       exact(payload, policy ? ['command', 'layerUid', 'flag', 'value'] : ['command', 'layerUid', 'visible'], [], 'object layer command');
       if (payload.command !== (policy ? 'object.layer.policy.edit' : 'object.layer.visibility.set') || typeof payload[policy ? 'value' : 'visible'] !== 'boolean' || policy && !['locked', 'shy'].includes(payload.flag)) throw new TypeError('invalid object layer command');
       objectUid(payload.layerUid);
-    } else if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
+    } else if (objectHistoryOperations.includes(operation)) { exact(payload, ['command'], [], 'object history command'); if (payload.command !== operation.slice('command.document.'.length)) throw new TypeError('invalid object history command'); } else if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
       const evaluate = operation === 'query.document.evaluate';
       exact(payload, evaluate ? ['atRevision', 'contextId', 'frame'] : ['atRevision'], [], 'pinned read');
       revision(payload.atRevision, 'atRevision');
@@ -345,7 +345,7 @@
     } else if (['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit'].includes(operation)) {
       exact(value, ['applied', 'historyEntriesAdded'], [], 'visibility result');
       if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) throw new TypeError('invalid visibility disposition');
-    } else if (operation === 'query.diagnostics.recent') {
+    } else if (objectHistoryOperations.includes(operation)) { exact(value, ['applied', 'historyEntriesAdded'], [], 'object history result'); if (value.applied !== true || value.historyEntriesAdded !== 0) throw new TypeError('invalid object history disposition'); } else if (operation === 'query.diagnostics.recent') {
       exact(value, ['records', 'truncated'], [], 'diagnostics result');
       if (!Array.isArray(value.records) || value.records.length > 32 || typeof value.truncated !== 'boolean') throw new TypeError('invalid diagnostics bounds');
       let prior = 0;
@@ -412,7 +412,7 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value, undefined, objectIdPaths(operation));
-    if ((fontContract && fontContract.admitted(operation)) || ['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
+    if (objectHistoryOperations.includes(operation) || (fontContract && fontContract.admitted(operation)) || ['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
     'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation, readOperation, 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
@@ -463,7 +463,7 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
-          if (['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation, readOperation].includes(outbound.operation)) {
+          if (objectHistoryOperations.includes(outbound.operation) || ['query.document.object', 'query.document.object.layer.timing', 'query.document.object.property.metadata', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation, readOperation].includes(outbound.operation)) {
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
@@ -476,8 +476,8 @@
             if (response.ok && outbound.operation === readOperation) property.readCorrelated(outbound.payload, response.result);
             if (response.ok && outbound.operation === 'query.document.object.layer.timing' &&
                 (['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key]) || (outbound.payload.view==='range')!==(response.result.kind==='layerRange') || (outbound.payload.view==='placement')!==(response.result.kind==='layerPlacement'))) throw new TypeError('timing read selector mismatch');
-            if (response.ok && outbound.operation === 'command.document.object.layer.create' &&
-                response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError('creation receipt revision mismatch');
+            if (response.ok && (objectHistoryOperations.includes(outbound.operation) || outbound.operation === 'command.document.object.layer.create') &&
+                response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError(objectHistoryOperations.includes(outbound.operation) ? 'object history receipt revision mismatch' : 'creation receipt revision mismatch');
             if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation].includes(outbound.operation) &&
                 response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
           }

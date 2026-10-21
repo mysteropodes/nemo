@@ -82,10 +82,77 @@
     grid.appendChild(frag);
   }
 
+  var dismissSettings = null;
+  function openNativeSettings(origin, c) {
+    if (dismissSettings) return;
+    var owner = window.NemoNativeCompositionController;
+    if (!owner || typeof owner.edit !== 'function') { submit({}, null); return; }
+    // Keep the original projection throughout text entry; confirmation must not rebase it.
+    var previousFocus = document.activeElement, tempo = null, offsetStage = false;
+    function element(tag, className, text) {
+      var el = document.createElement(tag);
+      if (className) el.className = className;
+      if (text) el.textContent = text;
+      return el;
+    }
+    var overlay = element('div', 'modal-overlay'); overlay.id = 'bpm-settings-dialog';
+    // Like the existing export dialog, stay outside the native AppKit canvas column.
+    overlay.style.justifyContent = 'flex-end'; overlay.style.paddingRight = '10px'; overlay.style.boxSizing = 'border-box';
+    var form = element('form', 'modal-box');
+    form.style.width = '260px'; form.style.maxWidth = 'calc(100vw - 20px)';
+    form.setAttribute('role', 'dialog'); form.setAttribute('aria-modal', 'true');
+    form.setAttribute('aria-labelledby', 'bpm-settings-label');
+    var header = element('div', 'modal-hdr'); header.appendChild(element('span', '', 'BPM'));
+    var x = element('button', 'modal-x', '×'); x.type = 'button'; x.id = 'bpm-settings-close';
+    x.setAttribute('aria-label', 'Close'); header.appendChild(x); form.appendChild(header);
+    var body = element('div', 'modal-bdy');
+    var label = element('label'); label.id = 'bpm-settings-label'; label.htmlFor = 'bpm-settings-value';
+    var input = element('input', 'pi'); input.id = 'bpm-settings-value'; input.type = 'text';
+    input.inputMode = 'decimal'; input.style.width = '100%';
+    body.appendChild(label); body.appendChild(input);
+    var actions = element('div', 'pr'); actions.style.justifyContent = 'flex-end';
+    var cancel = element('button', 'pbtn', 'Cancel'); cancel.type = 'button'; cancel.id = 'bpm-settings-cancel';
+    var confirm = element('button', 'pbtn ac', 'OK'); confirm.type = 'submit'; confirm.id = 'bpm-settings-confirm';
+    actions.appendChild(cancel); actions.appendChild(confirm); body.appendChild(actions);
+    form.appendChild(body); overlay.appendChild(form);
+    function close() {
+      if (dismissSettings !== close) return;
+      dismissSettings = null; overlay.remove();
+      if (previousFocus && previousFocus.isConnected && typeof previousFocus.focus === 'function') previousFocus.focus();
+    }
+    function commit(action) {
+      if (dismissSettings !== close) return;
+      close();
+      if (window.NemoNativeCompositionController !== owner) { submit({}, null); return; }
+      return owner.edit(action, origin);
+    }
+    function stage() {
+      label.textContent = offsetStage ? 'Décalage du premier temps, en frames' : 'Tempo en BPM (0 pour masquer la grille)';
+      input.value = String(offsetStage ? c.offset : c.bpm); input.focus(); input.select();
+    }
+    form.addEventListener('submit', function (event) {
+      event.preventDefault(); event.stopPropagation();
+      if (dismissSettings !== close) return;
+      if (offsetStage) return commit({ kind: 'setBpm', bpm: tempo, bpmOffset: Math.max(0, parseInt(input.value, 10) || 0), bpmShow: true });
+      tempo = parseFloat(input.value);
+      if (isNaN(tempo) || tempo <= 0) return commit({ kind: 'setBpm', bpmShow: false });
+      offsetStage = true; stage();
+    });
+    x.addEventListener('click', close); cancel.addEventListener('click', close);
+    overlay.addEventListener('click', function (event) { if (event.target === overlay) close(); });
+    overlay.addEventListener('keydown', function (event) {
+      event.stopPropagation();
+      if (event.key === 'Escape') { event.preventDefault(); close(); }
+    });
+    dismissSettings = close; document.body.appendChild(overlay); stage();
+  }
+  window.addEventListener('pagehide', function () { if (dismissSettings) dismissSettings(); }, { once: true });
+
   function openSettings(origin) {
     origin = native() ? (arguments.length ? origin : projection(settingsRefused)) : null;
     var c = cfg();
     if (native() && !origin) { submit({}, null); return; }
+    if (native()) return openNativeSettings(origin, { bpm: origin.composition.effectiveBpm, offset: origin.composition.effectiveBpmOffset });
     var v = prompt('Tempo en BPM (0 pour masquer la grille)', String(c.bpm));
     if (v === null) return;
     var bpm = parseFloat(v);

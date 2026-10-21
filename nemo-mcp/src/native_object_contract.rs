@@ -156,6 +156,23 @@ pub(super) fn visibility_result(value: &Value) -> bool {
     })
 }
 
+pub(super) fn history_request(operation: &str, value: &Value) -> bool {
+    let command = match operation {
+        "command.document.object.undo" => "object.undo",
+        "command.document.object.redo" => "object.redo",
+        _ => return false,
+    };
+    exact(value, &["command"], &[])
+        .is_some_and(|value| value.get("command").and_then(Value::as_str) == Some(command))
+}
+
+pub(super) fn history_result(value: &Value) -> bool {
+    exact(value, &["applied", "historyEntriesAdded"], &[]).is_some_and(|value| {
+        value.get("applied").and_then(Value::as_bool) == Some(true)
+            && value.get("historyEntriesAdded").and_then(Value::as_u64) == Some(0)
+    })
+}
+
 pub(super) fn create_request(value: &Value) -> bool {
     exact(value, &["command", "name"], &[]).is_some_and(|value| {
         value.get("command").and_then(Value::as_str) == Some("object.layer.create")

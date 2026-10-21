@@ -2583,6 +2583,46 @@
         }
       }
     },
+    "ObjectUndoPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.undo"
+        }
+      }
+    },
+    "ObjectRedoPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.redo"
+        }
+      }
+    },
+    "ObjectHistoryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded"
+      ],
+      "properties": {
+        "applied": {
+          "const": true
+        },
+        "historyEntriesAdded": {
+          "const": 0
+        }
+      }
+    },
     "ObjectLayerVisibilityPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -4888,6 +4928,40 @@
     },
     "Request": {
       "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.undo"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectUndoPayload"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/RequiredRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "command.document.object.redo"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectRedoPayload"
+                }
+              }
+            }
+          ]
+        },
         {
           "allOf": [
             {
