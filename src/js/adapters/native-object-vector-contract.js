@@ -144,7 +144,7 @@
     }
   }
   function ext(value, label, hasStroke) {
-    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace'], label);
+    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather'], label);
     if (!Object.keys(value).length) fail(`${label} must be omitted when empty`);
     if (has(value, 'pressure')) {
       pressure(value.pressure, `${label}.pressure`);
@@ -152,6 +152,9 @@
     }
     if (has(value, 'paramShape')) shapeBody(value.paramShape, `${label}.paramShape`, false);
     if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`);
+    if (has(value, 'isMask') && value.isMask !== null && typeof value.isMask !== 'boolean') fail(`${label}.isMask must be a boolean or null`);
+    if (has(value, 'maskMode') && value.maskMode !== null && typeof value.maskMode !== 'string') fail(`${label}.maskMode must be a string or null`);
+    if (has(value, 'maskFeather') && value.maskFeather !== null) num(value.maskFeather, `${label}.maskFeather`);
     if (has(value, 'fillTrace')) {
       const t=value.fillTrace; exact(t, [], ['seed','seeds','walls','gapPx'], label+'.fillTrace');
       if (!has(t,'seed')&&!has(t,'seeds')) fail(label+' fillTrace requires seed or seeds');
@@ -186,6 +189,7 @@
     'object.vector.create': [VECTOR, ['record']],
     'object.vector.replace': [VECTOR, ['record']],
     'object.vector.delete': [VECTOR, ['stableTarget']],
+    'object.vector.mask.edit': [VECTOR, ['stableTarget', 'maskEdit']],
     'object.parametric.set': [PARAMETRIC, ['stableTarget', 'paramShape']],
     'object.parametric.translate': [PARAMETRIC, ['stableTarget', 'delta']],
     'object.parametric.scale': [PARAMETRIC, ['stableTarget', 'scale', 'anchor']],
@@ -195,6 +199,17 @@
     const label = `${command}.${key}`;
     if (key === 'record') record(payloadValue, command === 'object.vector.create');
     else if (key === 'stableTarget') target(payloadValue, label, false);
+    else if (key === 'maskEdit') {
+      if (!plain(payloadValue)) fail(`${label} must be an object`);
+      if (payloadValue.kind === 'mode') {
+        exact(payloadValue, ['kind', 'mode'], [], label);
+        oneOf(payloadValue.mode, ['add', 'subtract', 'intersect'], `${label}.mode`);
+      } else if (payloadValue.kind === 'feather') {
+        exact(payloadValue, ['kind', 'value'], [], label); num(payloadValue.value, `${label}.value`);
+      } else {
+        exact(payloadValue, ['kind'], [], label); oneOf(payloadValue.kind, ['unset'], `${label}.kind`);
+      }
+    }
     else if (key === 'paramShape') shapeBody(payloadValue, label, true);
     else if (key === 'delta' || key === 'scale' || key === 'anchor') pair(payloadValue, label);
     else if (key === 'layerUid') opaque(payloadValue, label);
@@ -217,7 +232,7 @@
     const edit = operation === VECTOR;
     exact(value, edit ? ['applied', 'historyEntriesAdded', 'operation', 'strokeId'] : ['applied', 'historyEntriesAdded'], [], 'vector edit result');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid vector edit disposition');
-    if (edit) { oneOf(value.operation, ['create', 'replace', 'delete'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
+    if (edit) { oneOf(value.operation, ['create', 'replace', 'delete', 'mask.edit'], 'result.operation'); opaque(value.strokeId, 'result.strokeId'); }
   }
   function correlate(request, response) {
     // Native refusals report the actual owner; no successful or unrelated reply gains this exception.

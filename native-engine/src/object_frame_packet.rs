@@ -3,7 +3,7 @@
 use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
 pub(crate) use crate::object_document::{
     AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget, Presence,
-    PropertyHolderTarget, VECTOR_FAMILY,
+    PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
 

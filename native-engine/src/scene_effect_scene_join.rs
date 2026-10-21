@@ -18,7 +18,7 @@
 //! * a scene entry that no producer claimed, or that a producer reported unavailable, stays on its layer as a typed
 //!   [`EntryOutcome::Unavailable`]; nothing is dropped and no producer may publish a partial scene on top of it.
 //!
-//! Inputs no record carries yet (vector masks, item-level effects, canvas-background layers, animated blend and the
+//! Inputs no record carries yet (item-level effects, canvas-background layers, animated blend and the
 //! matte-on track) are not guessed: the adapter supplies the neutral value and a later provider fills the same
 //! `JoinLayerInput` field. Folder children come from `parent_layer_uid`, which the codec still refuses, so a native
 //! folder has none until layer parenting is admitted. The module owns no pixel, texture or scheduler state.
@@ -32,6 +32,7 @@ use crate::object_render_scene::scene_effect_kernels::scene_effect_order::{
 use crate::object_render_scene::scene_effect_kernels::scene_effect_params::{
     any_enabled, plan_effect_stack, plan_effect_stack_into, EffectSpec, EffectStackPlan,
 };
+use crate::object_render_scene::ObjectSceneError;
 use std::collections::{BTreeMap, HashMap};
 
 /// Composition-relevant projection of one document layer, in paint order. Flags and strings are the stored values:
@@ -52,6 +53,7 @@ pub(crate) struct JoinLayerInput {
     pub(crate) effects_from: Option<String>,
     pub(crate) parent_uid: Option<String>,
     pub(crate) mask_count: usize,
+    pub(crate) mask_feather: f64,
     pub(crate) item_effect_enabled: bool,
 }
 
@@ -73,6 +75,7 @@ impl JoinLayerInput {
             effects_from: None,
             parent_uid: None,
             mask_count: 0,
+            mask_feather: 0.,
             item_effect_enabled: false,
         }
     }
@@ -142,6 +145,8 @@ pub(crate) struct PlannedLayer {
     /// `None` when no entry is enabled (the baseline runs no pass at all).
     pub(crate) stack: Option<EffectStackPlan>,
     pub(crate) entries: Vec<PlannedEntry>,
+    pub(crate) mask_count: usize,
+    pub(crate) mask_feather: f64,
 }
 
 /// Slot-level result of the pure join (no pin, no scene entries).
@@ -281,6 +286,16 @@ pub(crate) fn plan_layers(inputs: &[JoinLayerInput], options: &JoinOptions<'_>) 
             effects,
             stack,
             entries: Vec::new(),
+            mask_count: if role == SlotRole::Plain {
+                layer.mask_count
+            } else {
+                0
+            },
+            mask_feather: if role == SlotRole::Plain {
+                layer.mask_feather
+            } else {
+                0.
+            },
         });
     }
     let plan = plan_composition(&composition);
@@ -295,79 +310,20 @@ pub(crate) fn plan_layers(inputs: &[JoinLayerInput], options: &JoinOptions<'_>) 
 pub(crate) enum SceneEffectJoinError {
     /// The scene was joined onto a different instance/document/revision/snapshot/context/scope/frame.
     WrongPin(PinField),
+    MaskInputs(ObjectSceneError),
     /// A v1 or unsupported-scope packet has no paint order; none is invented.
     NoNumericOrder,
     /// The order plan does not list every document layer exactly once, or an entry names a foreign layer.
     InvalidOrder,
     /// Stored keys need their actual parameter sampler; static substitution is forbidden.
-    EffectParametersUnavailable { layer: usize },
+    EffectParametersUnavailable {
+        layer: usize,
+    },
 }
 
-/// Document layers in paint order, read from the packet that carries the pinned snapshot.
-pub(crate) fn layer_inputs(
-    packet: &ObjectFramePacket,
-) -> Result<Vec<JoinLayerInput>, SceneEffectJoinError> {
-    let order = packet
-        .numeric_order()
-        .ok_or(SceneEffectJoinError::NoNumericOrder)?;
-    let source = packet.source_layers();
-    let mut seen = vec![false; source.len()];
-    let mut inputs = Vec::with_capacity(source.len());
-    for placed in order.layers() {
-        let index = placed.source_layer_index();
-        let layer = source
-            .get(index)
-            .ok_or(SceneEffectJoinError::InvalidOrder)?;
-        if std::mem::replace(&mut seen[index], true) {
-            return Err(SceneEffectJoinError::InvalidOrder);
-        }
-        if layer
-            .effects()
-            .is_some_and(|stack| stack.iter().any(|e| e.enabled && e.has_keyed_params()))
-        {
-            return Err(SceneEffectJoinError::EffectParametersUnavailable { layer: index });
-        }
-        let effects = layer
-            .effects()
-            .unwrap_or(&[])
-            .iter()
-            .map(|entry| EffectSpec {
-                effect_type: entry.effect_type.clone(),
-                enabled: entry.enabled,
-                params: [0usize, 1, 2, 3, 4, 5, 6, 7]
-                    .map(|slot| entry.param(slot).map(|v| v as f32)),
-            })
-            .collect();
-        inputs.push(JoinLayerInput {
-            layer_uid: layer.layer_uid().to_owned(),
-            source_layer_index: index,
-            visible: layer.visible(),
-            is_widget: layer.widget.value().is_some(),
-            is_effect: layer.is_effect_layer(),
-            is_folder: layer.is_folder_layer(),
-            blend_mode: layer.blend_mode().map(str::to_owned),
-            matte_mode: layer.matte_mode().map(str::to_owned),
-            matte_source_uid: layer.matte_source_uid().map(str::to_owned),
-            mattes_more: layer
-                .mattes_more()
-                .iter()
-                .map(|extra| (extra.uid.clone(), extra.mode.clone()))
-                .collect(),
-            effects,
-            effects_from: layer.effects_from().map(str::to_owned),
-            parent_uid: layer
-                .parent_layer_uid
-                .value()
-                .and_then(|parent| parent.clone()),
-            mask_count: 0,
-            item_effect_enabled: false,
-        });
-    }
-    if inputs.len() != source.len() {
-        return Err(SceneEffectJoinError::InvalidOrder);
-    }
-    Ok(inputs)
-}
+#[path = "scene_effect_scene_join_inputs.rs"]
+mod inputs;
+pub(crate) use crate::object_render_scene::scene_effect_kernels::scene_effect_scene_join::inputs::layer_inputs;
 
 /// The immutable join of one packet, one pinned scene and the layer records: what the viewport and the export
 /// both read, so a frame has one composition plan whichever door asks for it.
