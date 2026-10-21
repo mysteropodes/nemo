@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e6eec778638811837c82e751b912e3653376bc67",
-  "describe": "v0.7.0-alpha.4-2833-ge6eec778"
+  "head": "86d85cb29d99a62c59d53d7c741861acfeaf7f6e",
+  "describe": "v0.7.0-alpha.4-2842-g86d85cb2"
  },
- "inputsDigest": "dd843e22fcb97d4b3fcff145e107a9b6457088b713773fbb7e1030f033f87c33",
+ "inputsDigest": "32826f1e66383ff8edf1c190c9494c64e78ed093b5f6def334974802e5c99fa9",
  "states": [
   "inventoried",
   "characterized",
@@ -306,7 +306,7 @@
   },
   "SMRulers": {
    "file": "src/js/rulers-bridge.js",
-   "line": 435,
+   "line": 494,
    "members": 0
   },
   "SMSecondViewer": {
@@ -3447,7 +3447,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 73,
+    "functionsVisited": 90,
     "via": "callback id",
     "references": []
    },
@@ -4553,7 +4553,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 24,
+    "functionsVisited": 28,
     "via": "variable _btnRulers",
     "references": [
      "src/js/timeline.js:10919 action()"
