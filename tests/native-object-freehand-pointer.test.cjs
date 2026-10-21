@@ -253,3 +253,12 @@ test('locked camera inversely maps actual freehand samples and cancels a view-ch
  const stale=await fixture();send(stale,'pointerdown',20,20);stale.root.state.cameraView=true;send(stale,'pointerup',100,80);
  assert.equal(stale.calls.length,0);assert.equal(stale.body.children.length,0);
 });
+
+
+test('native freehand capture refuses an absent injected mapping even with the global underlay present',async()=>{
+ const f=await fixture(),tool=f.root.NemoNativeObjectShapeTool;
+ f.root.NemoNativeObjectShapeTool={...tool,create:(root,ports)=>tool.create(root,{...ports,mapping:undefined})};
+ assert.ok(f.root.NemoNativeViewportUnderlay.canvasMapping);
+ const down=f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
+ assert.equal(down.prevented,true);assert.equal(f.calls.length,0);assert.equal(f.records.size,0);assert.equal(f.body.children.length,0);
+});

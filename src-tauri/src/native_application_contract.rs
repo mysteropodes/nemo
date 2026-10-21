@@ -22,10 +22,6 @@ const MAX_PROJECTION_BYTES: usize = 1_048_576;
 mod geometry;
 pub(crate) use geometry::GeometryResourceInput;
 
-#[path = "native_object_preview_view.rs"]
-mod object_preview_view;
-pub(crate) use object_preview_view::{ObjectPreviewView, ObjectViewProjection, ObjectPresentedFrame, ObjectPreviewReceipt};
-
 pub(crate) type HostResult<T> = Result<T, NativeApplicationError>;
 
 #[derive(Debug, Deserialize)]

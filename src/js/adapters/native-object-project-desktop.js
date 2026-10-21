@@ -156,6 +156,8 @@
           var current=presentationStamp(info);
           if(!current||current.session!==stamp.session||current.info!==stamp.info||current.ticket!==stamp.ticket||
             current.document!==stamp.document||current.presentation!==stamp.presentation)return;
+          var shown=current.presentation,canvas=root.document.getElementById('drawing-canvas'),pill=root.document.getElementById('zoom-scrub'),rect=canvas&&canvas.getBoundingClientRect();
+          if(shown&&shown.view&&rect&&pill&&root.document.activeElement!==pill){var m=shown.view.documentToComposition,z=Math.hypot(m[0]*rect.width/info.canvasW,m[1]*rect.height/info.canvasH);if(Number.isFinite(z))pill.value=Math.round(z*100);}
           settingsNotice('presented',info);
           if(root.SMCamera&&typeof root.SMCamera.renderNativeViewLock==='function')root.SMCamera.renderNativeViewLock();
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);

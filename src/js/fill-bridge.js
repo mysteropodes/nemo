@@ -24,7 +24,7 @@
   }
 
   function onDown(e) {
-    if(window.NemoNativeFillDesktop&&window.NemoNativeFillDesktop.handlePointerDown(window,e))return;
+    if(window.NemoNativeFillDesktop&&window.NemoNativeFillDesktop.handlePointerDown(window,e,{mapping:window.NemoNativeViewportUnderlay&&window.NemoNativeViewportUnderlay.canvasMapping}))return;
     if (!shouldIntercept()) return;
     if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();

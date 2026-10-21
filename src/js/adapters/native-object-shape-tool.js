@@ -1,8 +1,8 @@
 /* Ordinary native shape and bounded freehand gestures. Only pointer-local data and SVG preview live here;
  * the existing vector client and Project resource queue own every committed command. */
-(function(root,factory){var api=factory((typeof module==='object'&&module.exports?require('./native-viewport-underlay.js'):root.NemoNativeViewportUnderlay).canvasMapping);if(typeof module==='object'&&module.exports)module.exports=api;
+(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectShapeTool=api;
-}(typeof globalThis==='object'?globalThis:this,function(Mapping){
+}(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
   var tools=['line','rect','ellipse'],shapeTools=tools.concat(['star','speechbubble']);
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
@@ -10,6 +10,7 @@
   function fail(message){throw new Error(message);}
   function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
   function create(root,ports){
+    var Mapping=ports.mapping;
     var admitted=ports.freehand?['draw']:tools,handled=ports.freehand?['draw','fillbrush']:shapeTools;
     var drag=null,pending=null,uncertain=null,overlay=null,retired=false,settled=Promise.resolve({status:'idle'});
     function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
@@ -54,6 +55,7 @@
       return row.layerUid;
     }
     function capture(e){
+      if(!Mapping||['point','transform','matchesView'].some(function(key){return typeof Mapping[key]!=='function';}))fail('Native canvas mapping is unavailable.');
       var s=session(),pin=s&&s.info(),state=root.state,frame=state.currentFrame,shown=s&&s.readPresentedObjectSession();
       if(!s||!s.isActive()||!pin||typeof s.runResourceCommand!=='function'||!shown||!same(pin,shown)||!same(pin,shown.presentation)||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
           !Mapping.matchesView(root,shown.presentation)||shown.presentation.contextId!=='scene-root'||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=pin.totalFrames||

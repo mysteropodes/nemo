@@ -355,7 +355,7 @@ mod exposure_tests;
 
 #[test]
 fn camera_choice_has_distinct_native_cache_identity_even_without_active_keys() {
-    use crate::native_application_contract::ObjectPreviewView;
+    use native_engine::desktop_viewport::ObjectPreviewView;
     let mut owner = host(); let source = snapshot(&owner); let pins = selector(&source, 0);
     let before = owner.project_file_snapshot(source.content_revision(), source.snapshot_id()).unwrap().unwrap();
     let canvas = owner.prepare_object_preview(&pins, output(), false).unwrap();

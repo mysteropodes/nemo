@@ -345,7 +345,11 @@
           "object_document::FrameScopeKind",
           "object_frame_packet::ObjectFrameSelector",
           "resource_leases::WorkId",
-          "scheduler::OutputSpec"
+          "scheduler::OutputSpec",
+          "desktop_viewport::ObjectPreviewView",
+          "desktop_viewport::ObjectPreviewNavigation",
+          "desktop_viewport::ObjectViewProjection",
+          "desktop_viewport::ObjectPresentedFrame"
         ],
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",
@@ -398,7 +402,9 @@
           "render_scene::ScheduledFrameIdentity",
           "resource_leases::WorkId",
           "scheduler::OutputSpec",
-          "object_codec::encode_storage_project"
+          "object_codec::encode_storage_project",
+          "desktop_viewport::ObjectPreviewView",
+          "object_render_scene::prepare_object_camera_viewport_composition"
         ],
         "rust.desktop.native.dispatch": [
           "application::ApplicationReleaseReceipt",
@@ -456,7 +462,12 @@
           "application::finalize_object_motion_frame_effects_for_owner",
           "application::ObjectMotionEffectsCommit",
           "object_document::PropertyHolderTarget",
-          "export_job::MAX_OBJECT_EXPORT_FRAMES"
+          "export_job::MAX_OBJECT_EXPORT_FRAMES",
+          "desktop_viewport::ObjectPreviewView",
+          "desktop_viewport::ObjectPreviewNavigation",
+          "desktop_viewport::ObjectViewProjection",
+          "desktop_viewport::ObjectPresentedFrame",
+          "object_render_scene::prepare_object_navigated_viewport_composition"
         ]
       },
       "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."

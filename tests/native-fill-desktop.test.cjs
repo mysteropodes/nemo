@@ -97,12 +97,29 @@ function cameraPointerFixture(hold=false){
   document:{getElementById:()=>({getBoundingClientRect:()=>rect}),documentElement:{clientWidth:1200,clientHeight:900,
    classList:{contains:()=>true},style:{getPropertyValue:k=>String({left:20,top:30,right:660,bottom:390}[k.replace('--nemo-native-','')])}}},
   SMEngineBridge:{screenToWorld(){assert.fail('legacy Paper/WASM coordinates');}},showToast(){}};
- const pointer=()=>fill.handlePointerDown(root,{clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}});
- return {...f,root,pointer};
+ const ports={mapping:require('../src/js/adapters/native-viewport-underlay.js').canvasMapping};
+ const pointer=()=>fill.handlePointerDown(root,{clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}},ports);
+ return {...f,root,pointer,ports};
 }
 test('actual Fill pointer uses current native camera proof and its inverse through the existing command queue',async()=>{
  const f=cameraPointerFixture();assert.equal(f.pointer(),true);await new Promise(setImmediate);await new Promise(setImmediate);
  assert.equal(f.dispatched.length,1);assert.deepEqual(f.dispatched[0].payload.point,[100,60]);assert.equal(f.executions(),1);
  const stale=cameraPointerFixture(true);stale.pointer();stale.root.state.cameraView=false;stale.release();await new Promise(setImmediate);
  assert.equal(stale.dispatched.length,0);assert.equal(stale.executions(),0);
+});
+
+
+test('native Fill refuses missing injected mapping and its bootstrap supplies the real public mapping',async()=>{
+ const f=cameraPointerFixture();f.root.NemoNativeViewportUnderlay={canvasMapping:f.ports.mapping};f.ports.mapping=undefined;
+ assert.equal(f.pointer(),true);await new Promise(setImmediate);assert.equal(f.dispatched.length,0);
+ const ready=cameraPointerFixture(),listeners=new Map(),document=ready.root.document;
+ ready.root.NemoNativeFillDesktop=fill;ready.root.NemoNativeViewportUnderlay={canvasMapping:ready.ports.mapping};
+ const canvas={getBoundingClientRect:()=>({left:20,top:30,width:640,height:360}),addEventListener:(kind,fn)=>listeners.set(kind,fn)};
+ document.readyState='complete';document.addEventListener=()=>{};
+ document.getElementById=id=>['canvas-area','drawing-canvas'].includes(id)?canvas:null;
+ ready.root.window=ready.root;
+ require('node:vm').runInNewContext(require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/js/fill-bridge.js'),'utf8'),ready.root);
+ listeners.get('pointerdown')({clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}});
+ await new Promise(setImmediate);await new Promise(setImmediate);
+ assert.equal(ready.dispatched.length,1);assert.deepEqual(ready.dispatched[0].payload.point,[100,60]);
 });

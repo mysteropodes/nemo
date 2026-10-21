@@ -18,6 +18,14 @@ pub(super) struct ReferenceScene {
     opacity: f32,
 }
 
+/// One canonical quality identity, sealed by this actual viewport producer.
+pub fn object_viewport_quality(camera_view: bool, zoom: f64, pan: [f64; 2]) -> String {
+    let base = if camera_view { "final-camera-view" } else { "final" };
+    if zoom == 1. && pan == [0.,0.] { return base.into(); }
+    let [x,y] = pan.map(|n| if n == 0. { 0. } else { n });
+    format!("{}:{:016x}:{:016x}:{:016x}", base, zoom.to_bits(), x.to_bits(), y.to_bits())
+}
+
 /// The old witness is only a one-entry read cache. Every selector and setting is
 /// derived again from the new plan's original immutable snapshot.
 pub fn prepare_object_viewport_composition(
@@ -25,7 +33,7 @@ pub fn prepare_object_viewport_composition(
     expected: &ObjectFrameSelector<'_>,
     previous: Option<&ObjectCompositionWitness>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
-    prepare_viewport(plan, expected, previous, false)
+    prepare_object_navigated_viewport_composition(plan, expected, previous, false, 1., [0.,0.])
 }
 
 /// Explicit session-only Camera View. Exports retain their separate stored-project route.
@@ -34,14 +42,16 @@ pub fn prepare_object_camera_viewport_composition(
     expected: &ObjectFrameSelector<'_>,
     previous: Option<&ObjectCompositionWitness>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
-    prepare_viewport(plan, expected, previous, true)
+    prepare_object_navigated_viewport_composition(plan, expected, previous, true, 1., [0.,0.])
 }
 
-fn prepare_viewport(
+pub fn prepare_object_navigated_viewport_composition(
     plan: &ObjectPaintPlan,
     expected: &ObjectFrameSelector<'_>,
     previous: Option<&ObjectCompositionWitness>,
     camera_view: bool,
+    zoom: f64,
+    pan: [f64; 2],
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
     let camera = if camera_view {
@@ -49,6 +59,22 @@ fn prepare_viewport(
             source_object_index: 0, reason: "stored camera transform unavailable",
         })?
     } else { None };
+    // Session navigation changes no source geometry, project camera or export.
+    let camera = if zoom == 1. && pan == [0.,0.] { camera } else {
+        if !zoom.is_finite() || zoom <= 0. || pan.iter().any(|n| !n.is_finite()) {
+            return Err(ObjectSceneError::UnsupportedGeometry { source_object_index: 0, reason: "viewport navigation unavailable" });
+        }
+        let (w,h) = plan.packet().snapshot().project().ok_or(ObjectSceneError::ReferenceUnavailable)?.project().canvas_dimensions();
+        let centre = (f64::from(w) * 0.5, f64::from(h) * 0.5);
+        let matrix = Affine::translate(centre) * Affine::scale(zoom)
+            * Affine::translate((-centre.0,-centre.1))
+            * Affine::new(camera.unwrap_or([1.,0.,0.,1.,0.,0.])) * Affine::translate((-pan[0],-pan[1]));
+        let values = matrix.as_coeffs(); let determinant = values[0]*values[3]-values[1]*values[2];
+        if values.iter().any(|n| !n.is_finite()) || !determinant.is_finite() || determinant == 0. {
+            return Err(ObjectSceneError::UnsupportedGeometry { source_object_index: 0, reason: "viewport navigation unavailable" });
+        }
+        Some(values)
+    };
     let prior_images = previous;
     let previous = previous.and_then(|witness| witness.reference.as_ref());
     let read = visible_reference(
@@ -92,6 +118,7 @@ fn prepare_viewport(
     let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: true,
+        viewport_quality: Some(object_viewport_quality(camera_view, zoom, pan)),
         camera,
         resources: None,
         scene_effects: None,

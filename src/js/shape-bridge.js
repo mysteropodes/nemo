@@ -16,6 +16,7 @@
   function nativeEvent(kind, event) {
     if (!nativeTool && window.NemoNativeObjectShapeTool) {
       nativeTool = window.NemoNativeObjectShapeTool.create(window, {
+        mapping: window.NemoNativeViewportUnderlay && window.NemoNativeViewportUnderlay.canvasMapping,
         geometry: shapeGeom,
         constrain: function (tool, start, end) {
           var a = new Point(start[0], start[1]), b = new Point(end[0], end[1]);

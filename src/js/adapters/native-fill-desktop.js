@@ -4,10 +4,9 @@
   const common=typeof module==='object'&&module.exports;
   const command=common?require('./native-object-vector-command.js'):root.NemoNativeObjectVectorCommand;
   const contract=common?require('./native-object-edit-contract.js'):root.NemoNativeObjectEditContract;
-  const mapping=(common?require('./native-viewport-underlay.js'):root.NemoNativeViewportUnderlay).canvasMapping;
-  const api=factory(command,contract,mapping);
+  const api=factory(command,contract);
   if(common)module.exports=api;else root.NemoNativeFillDesktop=api;
-}(typeof globalThis==='object'?globalThis:this,function(command,contract,Mapping){
+}(typeof globalThis==='object'?globalThis:this,function(command,contract){
   'use strict';
   const OP='command.document.object.fill.trace';
   const PIN=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
@@ -47,7 +46,7 @@
       const s=current(root);return !!(s&&(s.isActive()||typeof s.blocksLegacy==='function'&&s.blocksLegacy()));
     }catch(_){return true;}
   }
-  function handlePointerDown(root,event){
+  function handlePointerDown(root,event,ports){
     if(!nativeMode(root))return false;
     const state=root.state;
     if(!state||state.tool!=='fill'||state.playing)return false;
@@ -55,6 +54,8 @@
     const toast=(text)=>{if(typeof root.showToast==='function')root.showToast(text);};
     const t=(key)=>root.SM&&typeof root.SM.t==='function'?root.SM.t(key):key;
     if(event.altKey){toast('Close Gap is unavailable.');return true;}
+    const Mapping=ports&&ports.mapping;
+    if(!Mapping||['bounds','point','matchesView'].some(key=>typeof Mapping[key]!=='function')){toast('Native fill coordinates are unavailable');return true;}
     const owner=current(root),shown=owner&&owner.readPresentedObjectSession&&owner.readPresentedObjectSession(),info=owner&&owner.info();
     const rect=info&&Mapping.bounds(root,info);
     if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}

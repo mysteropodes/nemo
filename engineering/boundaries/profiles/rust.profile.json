@@ -660,6 +660,7 @@
       "dir": "native-engine/src",
       "files": [
         "desktop_viewport.rs",
+        "object_viewport_projection.rs",
         "object_viewport_consumer.rs",
         "viewport_scene_overlay.rs"
       ],

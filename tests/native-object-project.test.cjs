@@ -741,3 +741,64 @@ test('session view change invalidates the original pending action lease before a
  const dormant={status:'presented',workId:'native-dormant',viewGeneration:1,view:{mode:'stored-camera',cameraAvailable:false,documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]}};
  assert.equal(inspect(dormant,true,false,'stored-camera').failure,null);
 });
+
+function navigationFixture(){
+ const h=host(),invoke=h.invoke,hold=deferred();let mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
+ const literals=new Map([
+  ['1:0,0',[[2,0,0,2,-160,-90],[.5,0,0,.5,80,45]]],
+  ['1:10,-5',[[2,0,0,2,-180,-80],[.5,0,0,.5,90,40]]],
+  ['1:5,-2.5',[[2,0,0,2,-170,-85],[.5,0,0,.5,85,42.5]]],
+  ['2:10,-5',[[4,0,0,4,-520,-250],[.25,0,0,.25,130,62.5]]],
+  ['2:-30,-15',[[4,0,0,4,-360,-210],[.25,0,0,.25,90,52.5]]],
+ ]);
+ h.invoke=async(command,args)=>{const result=await invoke(command,args),q=args&&JSON.parse(args.requestJson);
+  if(command!=='nemo_native_object_preview'||q.viewMode!=='stored-camera')return result;
+  const n=q.navigation||{zoom:1,pan:[0,0]},pair=literals.get(n.zoom+':'+n.pan.join(','));assert.ok(pair,'independent authored navigation literal');
+  if(pause)await hold.promise;
+  const reply={...result,view:{mode:'stored-camera',navigation:n,cameraAvailable:true,documentToComposition:pair[0],compositionToDocument:pair[1]}};return tamper?tamper(reply):reply;};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode});
+ return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
+}
+test('native session hand and zoom retain exact view intent through scrub while excluding export and source/history',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});assert.ok(Object.isFrozen(hand));assert.ok(Object.isFrozen(hand.inverse));
+ const pending=f.s.updateViewportNavigation(hand,{x:80,y:70});assert.equal(f.s.readPresentedObjectSession(),null);await pending;
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:1,pan:[10,-5]});
+ const zoom=f.s.beginViewportNavigation('zoom',null);await f.s.updateViewportNavigation(zoom,null,2);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.documentToComposition,[4,0,0,4,-520,-250]);
+ f.frame=1;await f.s.presentPreview(1);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:2,pan:[10,-5]});
+ await assert.rejects(f.s.updateViewportNavigation(zoom,null,2),/source changed/);
+ await f.s.exportPng('/native-navigation',[0]);
+ const exp=f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r;
+ assert.equal(Object.hasOwn(exp,'navigation'),false);assert.equal(Object.hasOwn(exp,'viewMode'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.mode='canvas';assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(1);
+ f.mode='stored-camera';await f.s.renderPreview(1);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:1,pan:[0,0]});
+});
+test('native navigation anchors the actual inverse and coalesces rapid input without publishing an old tool proof',async()=>{
+ const f=navigationFixture();await f.open();const initial=f.s.readPresentedObjectSession().presentation;
+ const zoom=f.s.beginViewportNavigation('zoom',{x:40,y:30});await f.s.updateViewportNavigation(zoom,{x:40,y:30},2);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:2,pan:[-30,-15]});
+ const inverse=f.s.readPresentedObjectSession().presentation.view.compositionToDocument;
+ assert.deepEqual([inverse[0]*40+inverse[4],inverse[3]*30+inverse[5]],[100,60]);
+ f.mode='canvas';await f.s.renderPreview(0);f.mode='stored-camera';await f.s.renderPreview(0);
+ const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});f.pause();
+ const first=f.s.updateViewportNavigation(hand,{x:90,y:65});await turn();
+ const latest=f.s.updateViewportNavigation(hand,{x:80,y:70});assert.equal(f.s.readPresentedObjectSession(),null);
+ f.release();await Promise.all([first,latest]);
+ const requested=f.h.calls.filter(c=>c.command==='nemo_native_object_preview').slice(-2).map(c=>c.r.navigation);
+ assert.deepEqual(requested,[{zoom:1,pan:[5,-2.5]},{zoom:1,pan:[10,-5]}]);
+ const current=f.s.readPresentedObjectSession().presentation;assert.notEqual(current,initial);
+ assert.deepEqual(current.view.navigation,{zoom:1,pan:[10,-5]});
+ f.rect={x:1,y:0,width:320,height:180};await assert.rejects(f.s.updateViewportNavigation(hand,{x:79,y:70}),/bounds changed/);
+ f.mode='canvas';assert.equal(f.s.beginViewportNavigation('pan',{x:1,y:1}),null);
+});
+
+test('native view receipt refuses mismatched or non-closed navigation without a tool proof or source edit',async()=>{
+ for(const navigation of [null,undefined,{zoom:2,pan:[0,0]},{zoom:1,pan:[0,0],extra:true},{zoom:1,pan:[0,Infinity]}]){
+  const f=navigationFixture();f.tamper(reply=>({...reply,view:{...reply.view,navigation}}));
+  await assert.rejects(f.open());assert.equal(f.s.readPresentedObjectSession(),null);assert.equal(f.s.info().contentRevision,0);
+ }
+});

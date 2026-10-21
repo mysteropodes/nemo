@@ -146,7 +146,7 @@ impl Fixture {
         &self,
         raw: &str,
     ) -> crate::native_application_contract::HostResult<
-        crate::native_application_contract::ObjectPreviewReceipt,
+        crate::native_object_desktop_preview::ObjectPreviewReceipt,
     > {
         let request = admit_request(raw, self.state.instance_id())?;
         preview_with_target(&self.state, &request, |consumer| {

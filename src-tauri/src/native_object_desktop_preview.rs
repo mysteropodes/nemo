@@ -8,7 +8,7 @@ use crate::native_application_viewport::{self as viewport_host, NativeViewportCo
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
-    desktop_viewport::{DesktopViewportHost, SurfacePort},
+    desktop_viewport::{DesktopViewportHost, SurfacePort, ObjectPreviewView, ObjectPreviewNavigation, ObjectViewProjection, ObjectPresentedFrame},
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
     scheduler::OutputSpec,
@@ -16,7 +16,17 @@ use native_engine::{
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
-use crate::native_application_contract::{ObjectPreviewReceipt, ObjectPreviewView, ObjectPresentedFrame};
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ObjectPreviewReceipt {
+    #[serde(flatten)]
+    pub(crate) preview: NativePreviewReceipt,
+    pub(crate) view: ObjectViewProjection,
+}
+impl std::ops::Deref for ObjectPreviewReceipt {
+    type Target = NativePreviewReceipt;
+    fn deref(&self) -> &Self::Target { &self.preview }
+}
 
 const MAX_BYTES: usize = 8192;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -57,6 +67,8 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) viewport: ViewportInput,
     #[serde(default)]
     pub(crate) view_mode: ObjectPreviewView,
+    #[serde(default)]
+    pub(crate) navigation: ObjectPreviewNavigation,
     pub(crate) revision_sync: Option<PreviewRevisionProof>,
     #[serde(default)]
     pub(crate) cancelled_before_dispatch: bool,
@@ -133,6 +145,7 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             ));
         }
     }
+    request.navigation.validate().map_err(|message| host_error("invalid_request", message))?;
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
     Ok(request)
@@ -196,8 +209,8 @@ pub(crate) fn preview_with_target(
                         selector: selector.clone(),
                     }))
                 };
-                owner.with_prepared_object_preview_for_view(
-                    &selector, output, request.view_mode, revision_sync.is_some(), consume,
+                owner.with_prepared_object_preview_for_navigation(
+                    &selector, output, request.view_mode, request.navigation, revision_sync.is_some(), consume,
                 )
             },
         )

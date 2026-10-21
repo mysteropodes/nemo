@@ -542,6 +542,7 @@
         pressure:function(e,w){return smoothPressure(wantsPressure()?pressureOf(e,w):1);},
         width:widthFor,stabilize:stabilizePoint,angle:angledSamples
       });
+      ports.mapping=window.NemoNativeViewportUnderlay&&window.NemoNativeViewportUnderlay.canvasMapping;
       nativeDraw=window.NemoNativeObjectShapeTool.create(window,ports);
       window.NemoNativeFreehandToolController=nativeDraw;
     }
