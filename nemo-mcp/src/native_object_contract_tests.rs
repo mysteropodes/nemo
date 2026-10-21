@@ -2,6 +2,23 @@ use super::*;
 use crate::contract::NativeApplicationRequest;
 use serde_json::json;
 
+#[test]
+fn history_payload_matcher_refuses_legacy_and_foreign_operations() {
+    let undo = json!({"command":"object.undo"});
+    let redo = json!({"command":"object.redo"});
+    assert!(history_request("command.document.object.undo", &undo));
+    assert!(history_request("command.document.object.redo", &redo));
+    for operation in [
+        "history.undo",
+        "history.redo",
+        "command.document.undo",
+        "command.document.redo",
+    ] {
+        assert!(!history_request(operation, &undo));
+        assert!(!history_request(operation, &redo));
+    }
+}
+
 fn cases() -> Value {
     serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
