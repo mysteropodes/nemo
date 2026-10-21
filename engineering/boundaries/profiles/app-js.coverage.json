@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "d1360d6778c566b6def1abdd8f768ad5af42f766",
-    "sourceRootTree": "1ea8924175a817cb1eb8f207bc693a9dff1fd40a",
+    "candidateCommit": "7c1ed26cbb0046512b8543aced73d8dd70df5d2b",
+    "sourceRootTree": "45aed8fc246e3ccf368660aa17cdfd4b18593572",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "00a8b78b50270eeb072e26af23e585d4a3a0b570",
-      "lastChangedCommit": "d1360d6778c566b6def1abdd8f768ad5af42f766"
+      "gitTree": "d553108ce738306be09266f6f08bb89a268de076",
+      "lastChangedCommit": "7c1ed26cbb0046512b8543aced73d8dd70df5d2b"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "bade1b972459b58b7d6cd5e98f0da22f56b0c075",
-      "sha256": "628d9dbd8897975daa670d250e88803ef867e06484ec78404061aa589536fc33",
-      "lastChangedCommit": "8f2c1957ea428fd2652ba1089d9507a7b46eeda1"
+      "gitBlob": "7fc2a644d81e1c5e274224653e52c4529dd8e18f",
+      "sha256": "51d8ea6e1ef67c5bc947915707789b131528eb891cef991933a34d6c37af9d58",
+      "lastChangedCommit": "2253ce52f6272d3c8678187dc2c4ba13484d70ee"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "7bd1fb5c18e0c723c9b2a93a91af53dd4a4b03c4366c073fa128db91e83afd4b"
+      "value": "8b9c3d08bbc7066f4038e4488bd16397ee20bcbceedc11781ecb2cc93a2aba96"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "d2fdade4bc9e3075cc76a836ba500a9df8c975d5",
-        "sha256": "0febbd68b9a9c1911e835ab2ed6992cbe188325cea2e9d4251378e519169c83f",
-        "moduleCount": 302,
-        "basedOnCommit": "d1360d6778c566b6def1abdd8f768ad5af42f766"
+        "gitBlob": "d94d047b6b1865adf9de81265dd36573c481cfc2",
+        "sha256": "06fac69b982fe4a49597a7e866132dc89b784c7f17334e71331cc1a8d18f78b4",
+        "moduleCount": 301,
+        "basedOnCommit": "7c1ed26cbb0046512b8543aced73d8dd70df5d2b"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 299,
-    "externalClassicTags": 296,
+    "totalScriptTags": 298,
+    "externalClassicTags": 295,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 292,
+    "retainedClassicTags": 291,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 295,
+    "classicTagsUnderSrcJsIncludingVendors": 294,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -709,18 +709,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/native-time-remap-ui.js",
-      "moduleId": "app.native.time.remap.ui.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2642,
-          "scriptOrdinal": 293
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/export-svg-frame.js",
       "moduleId": "app.export.svgframe.adapter",
       "executionClass": "document-classic",
@@ -775,8 +763,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2644,
-          "scriptOrdinal": 295
+          "line": 2643,
+          "scriptOrdinal": 294
         }
       ]
     },
@@ -955,8 +943,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2643,
-          "scriptOrdinal": 294
+          "line": 2642,
+          "scriptOrdinal": 293
         }
       ]
     },
@@ -3316,8 +3304,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2647,
-          "scriptOrdinal": 297
+          "line": 2646,
+          "scriptOrdinal": 296
         }
       ]
     },
@@ -3328,8 +3316,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2645,
-          "scriptOrdinal": 296
+          "line": 2644,
+          "scriptOrdinal": 295
         }
       ]
     },
@@ -4144,8 +4132,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2648,
-          "scriptOrdinal": 298
+          "line": 2647,
+          "scriptOrdinal": 297
         }
       ]
     },
@@ -4156,8 +4144,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2649,
-          "scriptOrdinal": 299
+          "line": 2648,
+          "scriptOrdinal": 298
         }
       ]
     },
