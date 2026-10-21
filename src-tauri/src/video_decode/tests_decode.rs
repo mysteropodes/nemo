@@ -6,6 +6,7 @@ use super::*;
 #[test]
 fn open_reports_correct_stream_parameters() {
     let path = make_test_video();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (s, frame_count, duration) = open_session_core_t(path.to_str().unwrap()).unwrap();
     assert_eq!((s.width, s.height), (320, 240));
     assert!((s.fps - 30.0).abs() < 0.01, "fps was {}", s.fps);
@@ -16,6 +17,7 @@ fn open_reports_correct_stream_parameters() {
 #[test]
 fn sequential_decode_yields_correctly_sized_distinct_frames() {
     let path = make_test_video();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let expected_len = (s.width * s.height * 4) as usize;
     let f0 = decode_frame_core(&mut s, 0).unwrap().0;
@@ -29,6 +31,7 @@ fn sequential_decode_yields_correctly_sized_distinct_frames() {
 #[test]
 fn random_seek_is_frame_accurate() {
     let path = make_test_video();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let mut sequential_f40 = Vec::new();
     for i in 0..=40 {
@@ -44,6 +47,7 @@ fn random_seek_is_frame_accurate() {
 #[test]
 fn decode_past_end_clamps_to_last_frame() {
     let path = make_test_video();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, frame_count, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let expected_len = (s.width * s.height * 4) as usize;
     let past = decode_frame_core(&mut s, frame_count as i64 + 100)
@@ -63,6 +67,7 @@ fn webm_tail_seek_does_not_exhaust() {
         "testsrc2=size=320x240:rate=30:duration=2",
         &["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-g", "15"],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, frame_count, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     assert!(frame_count > 0);
     let expected_len = (s.width * s.height * 4) as usize;
@@ -93,6 +98,7 @@ fn codec_hevc_mp4() {
             "hvc1",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     assert_decodes_and_seeks(&p, 320, 240);
 }
 
@@ -103,6 +109,7 @@ fn codec_vp9_webm() {
         "testsrc2=size=320x240:rate=30:duration=2",
         &["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-g", "15"],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     assert_decodes_and_seeks(&p, 320, 240);
 }
 
@@ -120,6 +127,7 @@ fn codec_prores_mov() {
             "yuv422p10le",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     assert_decodes_and_seeks(&p, 320, 240);
 }
 
@@ -143,6 +151,7 @@ fn codec_prores4444_alpha_survives_the_pipe() {
             "yuva444p10le",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     let f0 = decode_frame_core(&mut s, 0).unwrap().0;
     let alphas: Vec<u8> = f0.iter().skip(3).step_by(4).copied().collect();
@@ -173,6 +182,7 @@ fn odd_width_stride_padding() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     assert_decodes_and_seeks(&p, 954, 542);
 }
 
@@ -190,6 +200,7 @@ fn seek_accuracy_at_25fps() {
             "12",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     assert!((s.fps - 25.0).abs() < 0.01, "fps was {}", s.fps);
     let mut sequential_f30 = Vec::new();
@@ -215,6 +226,7 @@ fn interleaved_sessions_stay_isolated() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut a, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
     let (mut b, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
     let a0 = decode_frame_core(&mut a, 0).unwrap().0;
@@ -251,6 +263,7 @@ fn interleaved_sessions_stay_isolated() {
 #[test]
 fn small_forward_gap_reuses_running_process_no_respawn() {
     let path = make_test_video(); // gop 15, 60 frames
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
 
     // Ground truth: frame 12 via pure sequential decode.
