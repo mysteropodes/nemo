@@ -81,7 +81,11 @@ fn read(
         owner.with_prepared_object_preview(&pins(origin, 1), output, |_| Ok(()))
     })
 }
-fn external_revision(s: &ApplicationMcp, origin: &ObjectSnapshot, id: &str) -> NativeApplicationRequest {
+fn external_revision(
+    s: &ApplicationMcp,
+    origin: &ObjectSnapshot,
+    id: &str,
+) -> NativeApplicationRequest {
     serde_json::from_value(json!({"apiVersion":2,"requestId":id,
         "instanceId":s.instance_id(),"documentId":origin.document_id(),
         "expectedRevision":origin.content_revision(),"operation":"command.document.object.layer.create",
