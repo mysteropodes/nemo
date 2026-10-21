@@ -110,8 +110,13 @@ fn sample(packet: &ObjectFramePacket, layer: usize) -> Result<PoseSample, ChainU
         if !crate::evaluation::object_vector_kernels::render_vector_eval::params::null_layer_motion_target(packet.snapshot().document(), &target) {
             return Err(ChainUnavailable::LayerContext);
         }
-        let canvas = packet.snapshot().project().map(|p| p.project().canvas_dimensions());
-        source.null_pivot_base(canvas).map_err(|_| ChainUnavailable::NullPivot)?;
+        let canvas = packet
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions());
+        source
+            .null_pivot_base(canvas)
+            .map_err(|_| ChainUnavailable::NullPivot)?;
     }
     // Raw packets remain strict. An owner-prepared packet supplies only its own
     // already-retired numeric receipts; the scene never invokes an evaluator.
@@ -445,12 +450,21 @@ impl SceneParentChains {
             .ok_or(ChainUnavailable::MissingLayer)?
         {
             if let Some(mat) = self.samples[&index].mat(index == layer) {
-                let canvas = self.packet.snapshot().project().map(|p| p.project().canvas_dimensions());
-                let base = match self.packet.source_layers()[index].null_pivot_base(canvas)
-                    .map_err(|_| ChainUnavailable::NullPivot)? {
+                let canvas = self
+                    .packet
+                    .snapshot()
+                    .project()
+                    .map(|p| p.project().canvas_dimensions());
+                let base = match self.packet.source_layers()[index]
+                    .null_pivot_base(canvas)
+                    .map_err(|_| ChainUnavailable::NullPivot)?
+                {
                     Some(base) => base,
                     None => {
-                        let rect = self.bounds.get(&index).ok_or(ChainUnavailable::MissingGeometry)?;
+                        let rect = self
+                            .bounds
+                            .get(&index)
+                            .ok_or(ChainUnavailable::MissingGeometry)?;
                         [rect.center().x, rect.center().y]
                     }
                 };

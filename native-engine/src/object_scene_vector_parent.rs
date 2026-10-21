@@ -62,8 +62,12 @@ pub(super) fn chain(
         {
             return Err("ordinary parent Motion must be finite");
         }
-        let canvas = packet.snapshot().project().map(|p| p.project().canvas_dimensions());
-        let null_base = layer.null_pivot_base(canvas)
+        let canvas = packet
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions());
+        let null_base = layer
+            .null_pivot_base(canvas)
             .map_err(|_| "Null parent needs nullPos or retained project canvas")?;
         if let Some(mat) = motion_mat_from_values(
             values.position,
