@@ -36,7 +36,24 @@
   }
   function mapped(p,c,inverse){var m=transform(c,inverse);return {x:m[0]*p.x+m[2]*p.y+m[4],y:m[1]*p.x+m[3]*p.y+m[5]};}
   function matchesView(root,p){if(!p||(p.view?p.view.mode:'canvas')!==(root.state&&root.state.cameraView===true?'stored-camera':'canvas'))return false;var project=root.NemoNativeObjectProject,session=project&&typeof project.desktop==='function'&&project.desktop(root);if(!session||typeof session.readPresentedObjectSession!=='function')return !(p.view&&p.view.navigation&& (p.view.navigation.zoom!==1||p.view.navigation.pan.some(function(n){return n!==0;})));var shown=session.readPresentedObjectSession();return !!shown&&!!shown.presentation&&['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration','frame','workId','viewGeneration'].every(function(k){return shown.presentation[k]===p[k];})&&JSON.stringify(shown.presentation.view)===JSON.stringify(p.view);}
-  function point(e,c){return mapped({x:(e.clientX-c.bounds.left)*c.canvasW/c.bounds.width,y:(e.clientY-c.bounds.top)*c.canvasH/c.bounds.height},c,true);}
+  function point(e,c){
+    var m=transform(c,false),inverse=transform(c,true),nativeDet=m[0]*m[3]-m[1]*m[2];
+    if(!Number.isFinite(nativeDet)||nativeDet===0)throw new Error('Native presented coordinates are unavailable');
+    var expected=[m[3]/nativeDet,-m[1]/nativeDet,-m[2]/nativeDet,m[0]/nativeDet,
+      (m[2]*m[5]-m[3]*m[4])/nativeDet,(m[1]*m[4]-m[0]*m[5])/nativeDet];
+    if(!inverse.every(function(n,i){return n===expected[i];}))throw new Error('Native presented coordinates are unavailable');
+    // Compose the same CSS affine as screen(), then remove its origin before
+    // inversion. Applying a translated composition inverse after rescaling
+    // introduces avoidable cancellation even for exact integer world points.
+    var a=m[0]*c.bounds.width/c.canvasW,b=m[1]*c.bounds.height/c.canvasH,
+      d=m[2]*c.bounds.width/c.canvasW,f=m[3]*c.bounds.height/c.canvasH,
+      tx=m[4]*c.bounds.width/c.canvasW,ty=m[5]*c.bounds.height/c.canvasH,
+      x=e.clientX-c.bounds.left-tx,y=e.clientY-c.bounds.top-ty,det=a*f-b*d;
+    if(![a,b,d,f,tx,ty,x,y,det].every(Number.isFinite)||det===0)throw new Error('Native presented coordinates are unavailable');
+    var result={x:(f*x-d*y)/det,y:(a*y-b*x)/det};
+    if(!Number.isFinite(result.x)||!Number.isFinite(result.y))throw new Error('Native presented coordinates are unavailable');
+    return result;
+  }
   function screen(p,c){var q=mapped(p,c,false);return {x:c.bounds.left+q.x*c.bounds.width/c.canvasW,y:c.bounds.top+q.y*c.bounds.height/c.canvasH};}
   function create(ports) {
     var element = ports.document.documentElement, style = element.style;

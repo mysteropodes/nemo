@@ -20,9 +20,21 @@
   var TEXT_COLOR = 'rgba(236,234,231,.65)';
   var hCanvas, vCanvas, area;
   var lastZoom = null, lastCenterX = null, lastCenterY = null, lastW = null, lastH = null;
+  var lastNativeSignature = null;
   var guideEls = { h: [], v: [] }; // parallel to state.guides.h/.v, index-aligned
 
   function nativeGuides() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+  function nativeCoordinates() {
+    var controller = window.NemoNativeGuideController;
+    return controller && typeof controller.coordinates === 'function' ? controller.coordinates() : null;
+  }
+  function nativeDistance(proof, axis, value, point) {
+    var a = proof.project(axis === 'v' ? { x: value, y: 0 } : { x: 0, y: value });
+    var b = proof.project(axis === 'v' ? { x: value, y: 1 } : { x: 1, y: value });
+    if (!a || !b || !point) return Infinity;
+    var dx = b.x - a.x, dy = b.y - a.y;
+    return Math.abs(dx * (a.y - point.y) - (a.x - point.x) * dy) / Math.hypot(dx, dy);
+  }
   function guideSource() {
     if (nativeGuides()) {
       var controller = window.NemoNativeGuideController, projection = controller && controller.read();
@@ -77,7 +89,8 @@
   function drawRulers() {
     if (!state.rulersOn || !hCanvas || !vCanvas) return;
     var dpr = window.devicePixelRatio || 1;
-    var zoom = view.zoom;
+    var proof = nativeGuides() ? nativeCoordinates() : null;
+    var zoom = nativeGuides() ? null : view.zoom;
     var hctx = hCanvas.getContext('2d'), vctx = vCanvas.getContext('2d');
     hctx.setTransform(dpr, 0, 0, dpr, 0, 0); vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     var hw = hCanvas.width / dpr, vh = vCanvas.height / dpr;
@@ -86,11 +99,12 @@
     hctx.fillRect(0, 0, hw, RULER_SIZE);
     vctx.fillStyle = hctx.fillStyle;
     vctx.fillRect(0, 0, RULER_SIZE, vh);
-    var worldPerPx = 1 / zoom;
-    var step = niceStep(worldPerPx, 55); // ~55px between labeled ticks, comfortable at any zoom
     hctx.font = '9px sans-serif'; vctx.font = '9px sans-serif';
     hctx.textBaseline = 'middle'; vctx.textBaseline = 'middle';
     // Horizontal ruler: iterate world X across the visible width
+    if (nativeGuides()) { if (proof) { nativeTicks(hctx, proof, hw, false); nativeTicks(vctx, proof, vh, true); } return; }
+    var worldPerPx = 1 / zoom;
+    var step = niceStep(worldPerPx, 55); // ~55px between labeled ticks, comfortable at any zoom
     var originH = w2v(0, 0);
     var wx0 = ((0 - originH.x) / zoom) - (((0 - originH.x) / zoom) % step) - step * 2;
     for (var wx = wx0; ; wx += step) {
@@ -121,6 +135,35 @@
     }
   }
 
+  function nativeTicks(ctx, proof, length, vertical) {
+    var area = proof.area, start = { clientX: area.left + RULER_SIZE, clientY: area.top + RULER_SIZE };
+    var end = { clientX: start.clientX + (vertical ? 0 : length), clientY: start.clientY + (vertical ? length : 0) };
+    var a = proof.unproject(start), b = proof.unproject(end), key = vertical ? 'y' : 'x';
+    if (!a || !b || !(length > 0)) return;
+    var delta = b[key] - a[key], step = niceStep(Math.abs(delta) / length, 55);
+    if (!Number.isFinite(step) || !(step > 0) || delta === 0) return;
+    var first = Math.ceil(Math.min(a[key], b[key]) / step), count = Math.floor(Math.max(a[key], b[key]) / step) - first + 1;
+    if (!Number.isSafeInteger(first) || !Number.isSafeInteger(count) || count < 0 || count > 2048) return;
+    for (var i = 0; i < count; i++) {
+      var value = (first + i) * step, at = (value - a[key]) / delta * length;
+      if (!Number.isFinite(at) || at < 0 || at > length) continue;
+      ctx.strokeStyle = TICK_COLOR; ctx.beginPath();
+      if (vertical) { ctx.moveTo(RULER_SIZE, at + .5); ctx.lineTo(RULER_SIZE - 8, at + .5); }
+      else { ctx.moveTo(at + .5, RULER_SIZE); ctx.lineTo(at + .5, RULER_SIZE - 8); }
+      ctx.stroke(); ctx.fillStyle = TEXT_COLOR;
+      if (vertical) { ctx.save(); ctx.translate(RULER_SIZE - 10, at); ctx.rotate(-Math.PI / 2); ctx.fillText(Math.round(value), 0, 0); ctx.restore(); }
+      else ctx.fillText(Math.round(value), at + 3, RULER_SIZE - 10);
+    }
+  }
+  function placeNativeGuide(record, segment) {
+    [record.line, record.hit].forEach(function (el, index) {
+      if (!segment) { el.style.display = 'none'; return; }
+      var a = segment.from, dx = segment.to.x - a.x, dy = segment.to.y - a.y;
+      Object.assign(el.style, { display: '', left: a.x + 'px', top: (a.y - (index ? 3 : 0)) + 'px', right: 'auto', bottom: 'auto',
+        width: Math.hypot(dx, dy) + 'px', height: (index ? 7 : 0) + 'px', borderLeft: '0', borderTop: index ? '0' : '1px dashed var(--accent)',
+        transformOrigin: index ? '0 3px' : '0 0', transform: 'rotate(' + Math.atan2(dy, dx) + 'rad)' });
+    });
+  }
   // ---- Guide DOM elements (visible line + wider invisible hit strip) ----
   function guideContainer() {
     var c = document.getElementById('guide-layer');
@@ -143,10 +186,12 @@
     while (arr.length > count) { var r = arr.pop(); if (r) { r.stop(); r.line.remove(); r.hit.remove(); } }
   }
   function renderGuides() {
-    var guides = guideSource();
+    var guides = guideSource(), proof = nativeGuides() ? nativeCoordinates() : null;
+    if (nativeGuides() && !proof) guides = null;
     if (!guides || !state.rulersOn) { pruneGuideEls('h', 0); pruneGuideEls('v', 0); return; }
     guides.h.forEach(function (wy, i) {
       var r = ensureGuideEl('h', i);
+      if (proof) { placeNativeGuide(r, proof.segment('h', wy)); return; }
       var sy = w2v(0, wy).y;
       r.line.style.top = sy + 'px'; r.hit.style.top = (sy - 3) + 'px';
       r.line.style.display = r.hit.style.display = (sy >= 0 && sy <= area.clientHeight) ? '' : 'none';
@@ -154,6 +199,7 @@
     pruneGuideEls('h', guides.h.length);
     guides.v.forEach(function (wx, i) {
       var r = ensureGuideEl('v', i);
+      if (proof) { placeNativeGuide(r, proof.segment('v', wx)); return; }
       var sx = w2v(wx, 0).x;
       r.line.style.left = sx + 'px'; r.hit.style.left = (sx - 3) + 'px';
       r.line.style.display = r.hit.style.display = (sx >= 0 && sx <= area.clientWidth) ? '' : 'none';
@@ -273,20 +319,22 @@
   // original point unchanged if nothing's close enough / guides are off.
   function snapPoint(worldPt, tolPx) {
     if (!state.rulersOn || !state.guidesSnap) return worldPt;
-    var guides = guideSource();
+    var guides = guideSource(), proof = nativeGuides() ? nativeCoordinates() : null;
+    if (nativeGuides() && !proof) guides = null;
     if (!guides) { var error = new Error('Native guides are unavailable.'); error.code = 'unavailable'; throw error; }
     tolPx = tolPx || 8;
-    var sp = w2v(worldPt.x, worldPt.y);
+    var sp = proof ? proof.project(worldPt) : w2v(worldPt.x, worldPt.y);
     var bestVx = null, bestVdx = tolPx + 1;
     guides.v.forEach(function (wx) {
-      var sx = w2v(wx, 0).x, d = Math.abs(sx - sp.x);
+      var d = proof ? nativeDistance(proof, 'v', wx, sp) : Math.abs(w2v(wx, 0).x - sp.x);
       if (d < bestVdx) { bestVdx = d; bestVx = wx; }
     });
     var bestHy = null, bestHdy = tolPx + 1;
     guides.h.forEach(function (wy) {
-      var sy = w2v(0, wy).y, d = Math.abs(sy - sp.y);
+      var d = proof ? nativeDistance(proof, 'h', wy, sp) : Math.abs(w2v(0, wy).y - sp.y);
       if (d < bestHdy) { bestHdy = d; bestHy = wy; }
     });
+    if (proof && (!sp || !proof.current())) { var stale = new Error('Native guides are unavailable.'); stale.code = 'unavailable'; throw stale; }
     return new Point(bestVx != null ? bestVx : worldPt.x, bestHy != null ? bestHy : worldPt.y);
   }
 
@@ -319,22 +367,27 @@
     });
     if (!b || (!b.width && !b.height)) return null;
     b = b.clone(); b.x += delta.x; b.y += delta.y;
-    var tolWorld = (tolPx || 8) / Math.max(0.0001, view.zoom);
+    var proof = nativeGuides() ? nativeCoordinates() : null;
+    if (nativeGuides() && !proof) return null;
+    var tolWorld = proof ? null : (tolPx || 8) / Math.max(0.0001, view.zoom);
+    var tolX = proof ? (tolPx || 8) / nativeDistance(proof, 'v', 0, proof.project({ x: 1, y: 0 })) : tolWorld;
+    var tolY = proof ? (tolPx || 8) / nativeDistance(proof, 'h', 0, proof.project({ x: 0, y: 1 })) : tolWorld;
+    if (proof && (![tolX, tolY].every(Number.isFinite) || tolX <= 0 || tolY <= 0)) return null;
     if (!_sgTargets) _sgTargets = buildSmartTargets(layer, selPaths);
     var xs = _sgTargets.xs, ys = _sgTargets.ys;
-    function best(edges, targets) {
+    function best(edges, targets, tolerance) {
       var out = null;
       edges.forEach(function (edge) {
         targets.forEach(function (t) {
           var d = t.c - edge;
-          if (Math.abs(d) > tolWorld) return;
+          if (Math.abs(d) > tolerance) return;
           if (!out || Math.abs(d) < Math.abs(out.d)) out = { d: d, t: t, edge: edge };
         });
       });
       return out;
     }
-    var bx = best([b.left, b.center.x, b.right], xs);
-    var by = best([b.top, b.center.y, b.bottom], ys);
+    var bx = best([b.left, b.center.x, b.right], xs, tolX);
+    var by = best([b.top, b.center.y, b.bottom], ys, tolY);
     if (!bx && !by) return null;
     // The line spans BOTH objects, like Figma's own — from the top of
     // whichever is higher to the bottom of whichever is lower — so it reads
@@ -383,6 +436,12 @@
   function loop() {
     requestAnimationFrame(loop);
     if (!state.rulersOn || !area || document.hidden) return;
+    if (nativeGuides()) {
+      var proof = nativeCoordinates(), signature = proof ? proof.signature : 'unavailable';
+      if (signature === lastNativeSignature && lastZoom !== null) return;
+      lastNativeSignature = signature; lastZoom = signature;
+      resizeCanvases(); drawRulers(); renderGuides(); return;
+    }
     var z = view.zoom, c = view.center, w = area.clientWidth, h = area.clientHeight;
     if (z === lastZoom && c.x === lastCenterX && c.y === lastCenterY && w === lastW && h === lastH) return;
     lastZoom = z; lastCenterX = c.x; lastCenterY = c.y; lastW = w; lastH = h;

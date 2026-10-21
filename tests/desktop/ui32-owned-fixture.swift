@@ -325,3 +325,76 @@ func ui32SingleSelection<Node>(_ rows:[Node], _ selection:[Node], _ expected:Nod
 func ui32FinishAfterDismissal(_ windowAbsent:Bool, certificate:() throws -> Void, finish:()->Void) throws {
   try ui32ScopeCheck(windowAbsent,"native-window-present");try certificate();finish()
 }
+
+// Only the acknowledged fixed-fixture Open transition may re-observe this exact busy tuple.
+// The later successful read must still execute the whole original retained identity proof.
+func ui32FixtureOpenBusy(_ error: Error) -> Bool {
+  guard let failure = error as? IdentityRefusal,
+    failure.stage == "application-window-membership" else { return false }
+  let booleans = ["axPidMatches": true, "applicationWindowsReadable": false,
+    "pinnedAXWindowMember": false, "minimizedReadable": false, "minimized": false,
+    "pinnedCGWindowListReadable": true]
+  let numbers = ["axPidQueryError": 0,
+    "applicationWindowsQueryError": Int(AXError.cannotComplete.rawValue),
+    "minimizedQueryError": Int(AXError.cannotComplete.rawValue), "pinnedCGWindowCount": 1]
+  guard Set(failure.facts.keys) == Set(booleans.keys).union(numbers.keys) else { return false }
+  for (key, expected) in booleans {
+    guard let raw = failure.facts[key], type(of: raw) == Bool.self,
+      raw as? Bool == expected else { return false }
+  }
+  for (key, expected) in numbers {
+    guard let raw = failure.facts[key], type(of: raw) == Int.self,
+      raw as? Int == expected else { return false }
+  }
+  return true
+}
+
+func ui32FixtureOpenIdentity(_ command: String, _ attempted: Bool, _ posted: Bool,
+  now: () -> UInt64, pause: (UInt64) -> Void,
+  identity: () throws -> Void) throws -> [String: Any] {
+  var reads = 0, waits = 0, first: [String: Any]?, last: [String: Any]?
+  func proof(_ reason: String) -> [String: Any] {
+    ["purpose": "UI32", "stage": "fixture-open-identity", "reason": reason,
+      "readAttempts": reads, "observationDelays": waits, "budgetMs": 750,
+      "firstReadFailure": (first as Any?) ?? NSNull(),
+      "lastReadFailure": (last as Any?) ?? NSNull(), "oneOpenActionOnly": true]
+  }
+  func failure(_ reason: String) -> ActionRefusal { ActionRefusal(diagnostics: proof(reason)) }
+  guard command == "fixture.open", attempted, posted else { throw failure("scope") }
+  let start = now()
+  let (deadline, overflow) = start.addingReportingOverflow(750_000_000)
+  guard !overflow else { throw failure("deadline-overflow") }
+  var previous = start
+  func tick() throws -> UInt64 {
+    let current = now()
+    guard current >= previous else { throw failure("clock-regression") }
+    previous = current
+    guard current < deadline else { throw failure("deadline") }
+    return current
+  }
+  for slot in 1...2 {
+    _ = try tick()
+    reads += 1
+    let outcome: Result<Void, Error>
+    do { try identity(); outcome = .success(()) }
+    catch {
+      let cause = ui32ActionCause(error)
+      if first == nil { first = cause }
+      last = cause
+      outcome = .failure(error)
+    }
+    _ = try tick()
+    switch outcome {
+    case .success:
+      return proof("full-original-identity")
+    case .failure(let error):
+      guard slot == 1, ui32FixtureOpenBusy(error) else { throw failure("identity") }
+      let waiting = try tick()
+      guard deadline - waiting > 75_000_000 else { throw failure("deadline-before-delay") }
+      waits += 1
+      pause(75_000_000)
+      _ = try tick()
+    }
+  }
+  throw failure("identity")
+}
