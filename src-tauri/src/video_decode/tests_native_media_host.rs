@@ -171,6 +171,26 @@ impl Pins {
     }
 }
 
+/// What the desktop export and preview routes do once their read returns
+/// (`reserve_motion` then `seal_object_motion_diagnostics`, which calls this same
+/// owner finalizer): close the read's Motion batch. A Motion-free document needs
+/// no revision and the commit changes nothing; without this step the next read
+/// at a new source is refused, which the shipped route never leaves behind.
+fn seal_motion(host: &mut NativeObjectHost, pins: &Pins) {
+    let mut frames = host.pending_object_motion_frames();
+    frames.sort_unstable();
+    frames.dedup();
+    if let Some(&first) = frames.first() {
+        assert!(!host.object_motion_requires_revision(), "Motion-free reads");
+        let commit = host
+            .finalize_object_motion_effects(&pins.at(first), &frames)
+            .unwrap()
+            .expect("a pending Motion-free batch is finalized");
+        assert!(!commit.changed(), "a Motion-free seal never edits history");
+    }
+    assert!(host.pending_object_motion_frames().is_empty());
+}
+
 fn output() -> OutputSpec {
     OutputSpec::new("frame", "rgba8", W, H, "srgb", "straight").unwrap()
 }
@@ -224,6 +244,7 @@ fn export(
     );
     assert_eq!(receipt.document_snapshot_id, pins.snapshot);
     assert!(outcome.release.cleanup_complete);
+    seal_motion(host, &pins);
     let files = receipt.artifact.unwrap().files;
     // Frame count from the actual output directory, not only the receipt.
     let published = scratch.0.join("published");
@@ -334,6 +355,7 @@ fn preview(
         &ViewportStatus::Presented,
         "frame {frame}"
     );
+    seal_motion(host, &pins);
     shown.borrow_mut().pop().expect("a presented texture")
 }
 fn viewport() -> (DesktopViewportHost<Capture>, Rc<RefCell<Vec<Vec<u8>>>>) {
