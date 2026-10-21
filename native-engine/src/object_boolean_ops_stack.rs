@@ -243,6 +243,7 @@ pub(crate) fn island_record(
                 is_mask: Presence::Missing,
                 mask_mode: Presence::Missing,
                 mask_feather: Presence::Missing,
+                bitmap_brush: Presence::Missing,
             })
         }
         _ => Presence::Missing,

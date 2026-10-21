@@ -106,11 +106,44 @@ pub(crate) fn drive_object_frames<P: StagedArtifactPort>(
     history: &NativeObjectHistory,
     scheduler: &mut FrameScheduler,
     port: &mut P,
-    mut encoder: FrameEncoder<'_>,
+    encoder: FrameEncoder<'_>,
     request: ObjectHostExportRequest,
     frames: &[u32],
     mut witness_for: impl FnMut(u32) -> Result<ObjectCompositionWitness, String>,
 ) -> ObjectHostExportOutcome {
+    drive_object_frames_with_materializer(history,scheduler,port,encoder,request,frames,
+        |frame,_|witness_for(frame))
+}
+
+/// Materialization borrows the SAME encoder compositor before each scheduler
+/// key is formed. No second renderer/store and no closure alias of GPU authority.
+pub fn export_object_frames_with_materializer<P: StagedArtifactPort>(
+    history: &NativeObjectHistory,
+    scheduler: &mut FrameScheduler,
+    port: &mut P,
+    compositor: &mut Compositor,
+    request: ObjectHostExportRequest,
+    frames: &[u32],
+    mut materialize: impl FnMut(u32, &mut Compositor) -> Result<ObjectCompositionWitness, String>,
+) -> ObjectHostExportOutcome {
+    drive_object_frames_with_materializer(history,scheduler,port,FrameEncoder::Png(compositor),request,frames,
+        |frame,gpu|materialize(frame,gpu.expect("PNG encoder owns compositor")))
+}
+fn drive_object_frames_with_materializer<P: StagedArtifactPort>(
+    history: &NativeObjectHistory,
+    scheduler: &mut FrameScheduler,
+    port: &mut P,
+    mut encoder: FrameEncoder<'_>,
+    request: ObjectHostExportRequest,
+    frames: &[u32],
+    mut witness_for: impl FnMut(u32, Option<&mut Compositor>) -> Result<ObjectCompositionWitness, String>,
+) -> ObjectHostExportOutcome {
+    // Immutable request/range admission precedes the new GPU materializer.
+    // The job revalidates at begin and remains the sole schedule/publish owner.
+    let admitted_source = crate::export_job_lifecycle::validate_object_begin(history, &ObjectExportBegin {
+        request_id:request.request_id.clone(), target:request.target.clone(), pins:request.pins.clone(),
+        output:request.output.clone(), maximum_encoded_bytes:request.maximum_encoded_bytes,
+    }, scheduler);
     let mut job = ObjectExportJob::with_format(port, scheduler, encoder.format());
     let result = (|| {
         if frames.is_empty() || frames.len() > MAX_OBJECT_EXPORT_FRAMES {
@@ -119,8 +152,22 @@ pub(crate) fn drive_object_frames<P: StagedArtifactPort>(
                 "bounded source frame count required",
             ));
         }
-        let first = frames[0]; // Count was admitted before copying or invoking the producer.
-        let witness = invoke(|| witness_for(first)).map_err(|error| {
+        let snapshot=admitted_source?;
+        if request.output.kind()!="frame" || request.output.format()!="rgba8"
+            || request.output.color_interpretation()!="srgb" || request.output.alpha_mode()!="straight" {
+            return Err(ExportJobError::new(crate::export_job::ExportJobErrorKind::InvalidRequest,
+                "native object export output is unavailable"));
+        }
+        if frames.first()!=Some(&request.pins.frame) || frames.windows(2).any(|pair|pair[0]>=pair[1]) {
+            return Err(ExportJobError::new(crate::export_job::ExportJobErrorKind::InvalidRequest,
+                "bounded strictly ascending source frames required"));
+        }
+        if frames.iter().any(|frame|*frame>=snapshot.document().total_frames()) {
+            return Err(ExportJobError::new(crate::export_job::ExportJobErrorKind::InvalidRequest,
+                "source frame is outside the pinned document"));
+        }
+        let first = frames[0]; // Count/source admitted before materialization or staging.
+        let witness = invoke(|| witness_for(first, match &mut encoder { FrameEncoder::Png(gpu)=>Some(&mut **gpu), FrameEncoder::Svg=>None })).map_err(|error| {
             ExportJobError::new(crate::export_job::ExportJobErrorKind::InvalidRequest, error)
         })?;
         let admitted = job.begin_frames(
@@ -140,7 +187,7 @@ pub(crate) fn drive_object_frames<P: StagedArtifactPort>(
         }
         for (index, frame) in frames.iter().enumerate() {
             if index > 0
-                && job.next_frame(invoke(|| witness_for(*frame)))?.status != JobStatus::Running
+                && job.next_frame(invoke(|| witness_for(*frame, match &mut encoder { FrameEncoder::Png(gpu)=>Some(&mut **gpu), FrameEncoder::Svg=>None })))?.status != JobStatus::Running
             {
                 break;
             }
@@ -160,3 +207,7 @@ pub(crate) fn drive_object_frames<P: StagedArtifactPort>(
     let receipt = release.receipts.first().cloned().map(Ok).unwrap_or(result);
     ObjectHostExportOutcome { receipt, release }
 }
+
+#[cfg(all(test,feature="application",feature="project_media_codec"))]
+#[path="../tests/object_brush_export.rs"]
+mod brush_tests;

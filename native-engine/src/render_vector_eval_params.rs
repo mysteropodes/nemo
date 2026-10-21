@@ -245,6 +245,9 @@ fn holders_consumed(document: &ObjectDocument, evaluated: bool) -> bool {
 }
 
 fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
+    if crate::object_document::bitmap_brush::trim_holder_consumed(document, holder) {
+        return true;
+    }
     if let Some(consumed) = crate::evaluation::object_scene_style_kernels::object_scene_producer_component_select::component_holder_consumed(document, holder) {
         return consumed;
     }

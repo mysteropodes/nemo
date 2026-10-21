@@ -159,9 +159,9 @@ pub fn prepare_object_navigated_viewport_composition(
         reference,
         rasters: None,
     };
-    crate::object_render_scene::text_scene::attach(
+    crate::object_render_scene::brush_paint::attach(crate::object_render_scene::text_scene::attach(
         crate::object_render_scene::raster_scene::attach(witness, prior_images)?,
-    )
+    )?)
 }
 
 impl ObjectCompositionWitness {
@@ -192,7 +192,7 @@ impl ObjectCompositionWitness {
             .rasters
             .as_ref()
             .is_none_or(|rasters| rasters.matches(plan));
-        self.has_scene_images() && reference && rasters
+        self.has_scene_images() && reference && rasters && self.plan.brushes_match(plan)
     }
 
     pub(crate) fn reference_image(&self) -> Option<(&ImageData, Affine, f32)> {

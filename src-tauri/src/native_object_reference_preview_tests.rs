@@ -323,7 +323,12 @@ fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
         .unwrap();
     assert!(owner.preview.reference_cache.is_some());
     let count = trace.borrow().acquired;
-    let failed = owner.prepare_reference_preview(&prepared.plan, (64, 64), &mut gpu, |previous| {
+    let plan = owner.preview.brush_runtime.materialize(
+        &prepared.admission,
+        &mut |ids| gpu.retire_object_brush_resources(ids, (64, 64)).is_ok(),
+    )
+    .unwrap();
+    let failed = owner.prepare_reference_preview(&plan, (64, 64), &mut gpu, |previous| {
         assert!(
             previous.is_none(),
             "old host raster must be gone before replacement decode"
@@ -369,11 +374,23 @@ fn camera_choice_has_distinct_native_cache_identity_even_without_active_keys() {
     let camera = owner
         .prepare_object_preview_view(&pins, output(), ObjectPreviewView::StoredCamera, false)
         .unwrap();
-    assert_eq!(canvas.key.quality(), "final");
-    assert_eq!(camera.key.quality(), "final-camera-view");
-    assert_ne!(canvas.key, camera.key);
+    let canvas_plan = owner.preview.brush_runtime.materialize(
+        &canvas.admission,
+        &mut |_| panic!("non-brush Camera fixture cannot retire bitmap resources"),
+    )
+    .unwrap();
+    let camera_plan = owner.preview.brush_runtime.materialize(
+        &camera.admission,
+        &mut |_| panic!("non-brush Camera fixture cannot retire bitmap resources"),
+    )
+    .unwrap();
+    let canvas_key = canvas.materialized_key(&canvas_plan).unwrap();
+    let camera_key = camera.materialized_key(&camera_plan).unwrap();
+    assert_eq!(canvas_key.quality(), "final");
+    assert_eq!(camera_key.quality(), "final-camera-view");
+    assert_ne!(canvas_key, camera_key);
     let witness = native_engine::object_render_scene::prepare_object_camera_viewport_composition(
-        &camera.plan,
+        &camera_plan,
         &pins,
         None,
     )
@@ -397,3 +414,6 @@ fn camera_choice_has_distinct_native_cache_identity_even_without_active_keys() {
     );
     assert_eq!(owner.history.history_depths(), (0, 0));
 }
+
+#[path = "native_object_brush_preview_tests.rs"]
+mod brush_tests;

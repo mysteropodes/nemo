@@ -135,6 +135,10 @@ pub(crate) use parametric_record::{ParamShape, PARAM_SHAPE_KINDS};
 #[allow(dead_code)]
 mod path_effects_record;
 pub(crate) use path_effects_record::{PathFxRecord, PATH_FX_TYPE_IDS};
+#[path = "object_bitmap_brush_record.rs"]
+pub(crate) mod bitmap_brush;
+pub(crate) use bitmap_brush::{BitmapBrushFields, BitmapBrushSpec};
+
 #[path = "object_vector_ext.rs"]
 #[allow(dead_code)]
 mod vector_ext;

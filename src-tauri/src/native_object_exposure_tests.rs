@@ -69,14 +69,14 @@ fn document() -> Value {
 fn host(value: &Value) -> NativeObjectHost {
     NativeObjectHost::from_project_file("held-host".into(), value.to_string().as_bytes()).unwrap()
 }
-struct Scratch(PathBuf);
+pub(super) struct Scratch(pub(super) PathBuf);
 impl Scratch {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let p = std::env::temp_dir().join(format!("nemo-held-{}", uuid::Uuid::new_v4()));
         fs::create_dir(&p).unwrap();
         Self(p.canonicalize().unwrap())
     }
-    fn port(&self) -> DesktopArtifactPort {
+    pub(super) fn port(&self) -> DesktopArtifactPort {
         DesktopArtifactPort::new(
             self.0.join("stage"),
             [("held-output".into(), self.0.join("published"))],
@@ -90,7 +90,7 @@ impl Drop for Scratch {
     }
 }
 #[cfg(target_os = "macos")]
-fn decode_png(bytes: &[u8]) -> Vec<u8> {
+pub(super) fn decode_png(bytes: &[u8]) -> Vec<u8> {
     use objc::runtime::Object;
     use objc::{class, msg_send, sel, sel_impl};
     unsafe {
@@ -319,8 +319,8 @@ fn cpu_canonical_p38_default_preview_selects_authored_sources_at_0_6_7_12_20() {
                     output.clone(),
                     |host| {
                         let prepared = host.preview.prepared.as_ref().unwrap();
-                        let packet = prepared.plan.packet();
-                        assert_eq!(prepared.key.frame(), requested);
+                        let packet = prepared.admission.packet();
+                        assert_eq!(prepared.output, output);
                         assert_eq!(packet.frame(), requested);
                         assert_eq!(packet.content_revision(), source.content_revision());
                         assert_eq!(packet.document_snapshot_id(), source.snapshot_id());
@@ -340,7 +340,7 @@ fn cpu_canonical_p38_default_preview_selects_authored_sources_at_0_6_7_12_20() {
                             record.record(),
                             &source.document().objects()[record.source_object_index()]
                         ));
-                        assert_eq!(prepared.plan.commands().len(), 1);
+                        assert_eq!(prepared.admission.contour_count(), 1);
                         Ok(())
                     },
                 )

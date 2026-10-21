@@ -114,18 +114,7 @@ impl Compositor {
         {
             return Ok(false);
         }
-        let renderer = vello::Renderer::new(
-            &self.device,
-            vello::RendererOptions {
-                antialiasing_support: vello::AaSupport::area_only(),
-                ..Default::default()
-            },
-        )
-        .map_err(|error| CompositorError::new(format!("reset Vello image cache: {error}")))?;
-        self.renderer = renderer;
-        self.scene.reset();
-        self.retained_object_reference = None;
-        self.last_reference_image = None;
+        self.reset_object_image_cache()?;
         Ok(true)
     }
 

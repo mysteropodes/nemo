@@ -138,7 +138,8 @@
         "project_metadata_fields.rs",
         "project_metadata_annotations.rs",
         "project_metadata_presets.rs",
-        "project_camera_state.rs"
+        "project_camera_state.rs",
+        "object_bitmap_brush_record.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -177,7 +178,8 @@
         "project_audio_asset_wire.rs",
         "project_asset_source_wire.rs",
         "object_property_codec.rs",
-        "project_metadata_wire.rs"
+        "project_metadata_wire.rs",
+        "object_bitmap_brush_codec.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -539,7 +541,9 @@
         "object_duplicator_snapshot.rs",
         "object_duplicator_follow_path.rs",
         "object_duplicator_snapshot_sources.rs",
-        "object_duplicator_frame.rs"
+        "object_duplicator_frame.rs",
+        "object_brush_trim_bake.rs",
+        "object_brush_tip_mask.rs"
       ],
       "publicApi": [
         "evaluation.rs",
@@ -617,7 +621,10 @@
         "object_scene_producer_text_animator.rs",
         "object_duplicator_scene.rs",
         "object_mask_inputs.rs",
-        "scene_effect_scene_join_inputs.rs"
+        "scene_effect_scene_join_inputs.rs",
+        "object_brush_scene_join.rs",
+        "object_brush_admission.rs",
+        "object_brush_paint_join.rs"
       ],
       "publicApi": [
         "render_scene.rs",
@@ -743,7 +750,8 @@
         "object_expression_read_bridge.rs",
         "object_expression_read_runtime.rs",
         "object_expression_harden.rs",
-        "object_expression_bake.rs"
+        "object_expression_bake.rs",
+        "object_brush_runtime.rs"
       ],
       "publicApi": [
         "application.rs"
@@ -784,7 +792,8 @@
         "object_project_workspace_read.rs",
         "object_project_metadata_dispatch.rs",
         "object_project_custom_brush_read.rs",
-        "object_project_comments_read.rs"
+        "object_project_comments_read.rs",
+        "object_brush_read.rs"
       ],
       "publicApi": [
         "read_queries.rs",
@@ -1687,7 +1696,14 @@
         "object_mask_storage.rs",
         "object_mask_storage_controls.rs",
         "object_mask_inputs.rs",
-        "object_compositor_masks.rs"
+        "object_compositor_masks.rs",
+        "object_bitmap_brush_codec.rs",
+        "object_bitmap_brush_record.rs",
+        "object_brush_export.rs",
+        "object_brush_runtime.rs",
+        "object_brush_scene_join.rs",
+        "object_brush_trim_bake.rs",
+        "object_bitmap_brush_transition.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2111,7 +2127,8 @@
         "native_perspective_read_dispatch_tests.rs",
         "native_workspace_dispatch_tests.rs",
         "native_custom_brush_dispatch_tests.rs",
-        "native_comments_dispatch_tests.rs"
+        "native_comments_dispatch_tests.rs",
+        "native_object_brush_preview_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2132,7 +2149,8 @@
         "native_object_inactive_requests.rs",
         "native_object_retained_tabs.rs",
         "native_object_font.rs",
-        "native_object_image.rs"
+        "native_object_image.rs",
+        "native_object_preview_prepare.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"

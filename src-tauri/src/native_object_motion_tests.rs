@@ -68,7 +68,12 @@ fn actual_preview_preparation_paints_expression_values_without_touching_history(
     let before = encode_storage_project(snapshot.document()).unwrap();
     owner
         .with_prepared_object_preview(&selector, output(), |h| {
-            let plan = &h.preview.prepared.as_ref().unwrap().plan;
+            let prepared = h.preview.prepared.as_ref().unwrap();
+            let plan = h.preview.brush_runtime.materialize(
+                &prepared.admission,
+                &mut |_| panic!("non-brush motion fixture cannot retire bitmap resources"),
+            )
+            .unwrap();
             assert_eq!(plan.packet().frame(), 1);
             assert_eq!(plan.packet().records().len(), 1); // Only authored provenance.
             assert_eq!(plan.commands().len(), 0); // The seed is replaced by clone paint.

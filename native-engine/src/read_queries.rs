@@ -226,3 +226,7 @@ pub(crate) fn result(
         })).collect::<Vec<_>>(),
     }))
 }
+
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[path = "object_brush_read.rs"]
+pub(crate) mod brush_read;

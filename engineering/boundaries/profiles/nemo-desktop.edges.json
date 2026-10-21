@@ -119,7 +119,7 @@
     }
   },
   "permittedEdges": {
-    "note": "Observed at adoption from `mod \u2026;` declarations in lib.rs (the crate root) and `use super::*;` in task_runtime/tests.rs (analyzer output). Layer rules are the enforced contract; this list documents which edges exist so a new one is a visible diff. Plain function-call references such as `video_decode::VideoSessions::default()` in lib.rs are unqualified sibling-module paths, not `crate::`/`super::`/`self::` paths, so they are outside what this analyzer resolves and add no edges beyond the `mod \u2026;` declarations already listed.",
+    "note": "Observed at adoption from `mod …;` declarations in lib.rs (the crate root) and `use super::*;` in task_runtime/tests.rs (analyzer output). Layer rules are the enforced contract; this list documents which edges exist so a new one is a visible diff. Plain function-call references such as `video_decode::VideoSessions::default()` in lib.rs are unqualified sibling-module paths, not `crate::`/`super::`/`self::` paths, so they are outside what this analyzer resolves and add no edges beyond the `mod …;` declarations already listed.",
     "edges": [
       "rust.desktop.shell -> rust.desktop.mcp.adapter (lib.rs: mod application_mcp;)",
       "rust.desktop.shell -> rust.desktop.native.viewport (lib.rs: mod native_viewport;)",
@@ -467,7 +467,10 @@
           "desktop_viewport::ObjectPreviewNavigation",
           "desktop_viewport::ObjectViewProjection",
           "desktop_viewport::ObjectPresentedFrame",
-          "object_render_scene::prepare_object_navigated_viewport_composition"
+          "object_render_scene::prepare_object_navigated_viewport_composition",
+          "application::ObjectBrushRuntime",
+          "object_render_scene::ObjectBrushAdmission",
+          "export_job::export_object_frames_with_materializer"
         ]
       },
       "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."

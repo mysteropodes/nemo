@@ -118,6 +118,7 @@ pub fn prepare_object_paint_plan(
     let (indices, mixed) = if scene.rasters.is_empty()
         && scene.texts.entries.is_empty()
         && scene.components.scene.is_none()
+        && scene.brush_paints_empty()
     {
         let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
         let indices = join(scene, &sequence)?;

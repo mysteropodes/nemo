@@ -28,7 +28,7 @@ impl Compositor {
             }
             // Vello can replace an image atlas on a solid-only pass. Every live native asset is
             // explicitly restored before use; instances of the same asset share one ImageData ID.
-            for image in prepared.raster_images() {
+            for image in prepared.raster_images().chain(prepared.brush_images()) {
                 self.renderer.mark_override_image_dirty(image);
             }
         }
@@ -61,6 +61,17 @@ impl Compositor {
                 }
                 PaintEntry::Duplicator(source) => {
                     source.prepared.draw(scene, Affine::IDENTITY, &source.path)
+                }
+                #[cfg(all(feature = "application", feature = "project_media_codec"))]
+                PaintEntry::Brush(index) => {
+                    if let Some((image, transform, opacity)) = prepared
+                        .brush_image(index)
+                        .map_err(|_| CompositorError::new("admitted brush image unavailable"))?
+                    {
+                        let brush =
+                            vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
+                        scene.draw_image(&brush, transform);
+                    }
                 }
                 PaintEntry::Raster(index) => {
                     #[cfg(all(feature = "application", feature = "project_media_codec"))]
@@ -107,4 +118,43 @@ pub(super) fn check_layered_camera(
         ));
     }
     Ok(())
+}
+
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+impl Compositor {
+    /// Existing renderer/device/cache authority. Construct first: failure retains
+    /// the previous renderer, scene, witness and charged immutable resources.
+    pub(super) fn reset_object_image_cache(&mut self) -> Result<(), CompositorError> {
+        let renderer = vello::Renderer::new(
+            &self.device,
+            vello::RendererOptions {
+                antialiasing_support: vello::AaSupport::area_only(),
+                ..Default::default()
+            },
+        )
+        .map_err(|error| CompositorError::new(format!("reset Vello image cache: {error}")))?;
+        self.renderer = renderer;
+        self.scene.reset();
+        self.retained_object_reference = None;
+        self.last_reference_image = None;
+        Ok(())
+    }
+    /// Called only on an admitted brush cache miss, before charged replacement
+    /// decode/bake. An absent retained brush witness proves no brush mirrors:
+    /// every normal image draw retains its complete witness until this reset.
+    pub fn retire_object_brush_resources(
+        &mut self,
+        ids: &[String],
+        dimensions: (u32, u32),
+    ) -> Result<(), CompositorError> {
+        crate::compositor::object_compositor::output_budget(dimensions.0, dimensions.1,
+            self.device.limits().max_texture_dimension_2d)?;
+        if ids.is_empty() || ids.iter().any(|id| id.is_empty()) {
+            return Err(CompositorError::new("brush retirement requires actual resource identities"));
+        }
+        if self.retained_object_reference.as_ref().is_some_and(|old| old.plan().has_brushes()) {
+            self.reset_object_image_cache()?;
+        }
+        Ok(())
+    }
 }

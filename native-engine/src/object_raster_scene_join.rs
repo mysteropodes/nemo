@@ -19,8 +19,15 @@ pub(super) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneErro
     }
 }
 pub(super) fn sources(packet: &ObjectFramePacket) -> Result<Vec<RasterSource>, ObjectSceneError> {
+    sources_excluding(packet, &std::collections::BTreeSet::new())
+}
+pub(super) fn sources_excluding(
+    packet: &ObjectFramePacket,
+    claimed: &std::collections::BTreeSet<usize>,
+) -> Result<Vec<RasterSource>, ObjectSceneError> {
     packet
         .raster_records()
+        .filter(|record| !claimed.contains(&record.source_index()))
         .map(|record| {
             let entry = record.entry();
             let item = &entry.item;
@@ -306,10 +313,10 @@ pub(super) fn attach(
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 impl crate::object_render_scene::ObjectCompositionWitness {
     pub fn has_scene_images(&self) -> bool {
-        self.reference.is_some() || self.rasters.is_some()
+        self.reference.is_some() || self.rasters.is_some() || self.plan.has_brushes()
     }
     pub(crate) fn has_raster_images(&self) -> bool {
-        self.rasters.is_some()
+        self.rasters.is_some() || self.plan.has_brushes()
     }
     pub(crate) fn raster_image(
         &self,
