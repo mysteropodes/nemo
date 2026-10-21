@@ -106,7 +106,9 @@ impl Fixture {
         if source["format"] == "nemo.native-project-document" {
             state.install_native_project_file(&bytes).unwrap();
         } else {
-            state.install_native_object(decode_storage_project(&bytes).unwrap()).unwrap();
+            state
+                .install_native_object(decode_storage_project(&bytes).unwrap())
+                .unwrap();
         }
         let mut fixture = Self {
             state,
