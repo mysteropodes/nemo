@@ -412,7 +412,8 @@ test('ordinary Open readonly lifecycle converges and composition recovers after 
   // Capture only complete readbacks through the existing controller repaint ports.
   f.root.SMBpm={refresh(){const value=composition&&composition.read();if(value)compositionPublications.push(value);}};
   f.root.refreshFbAvatars=()=>{const value=comments&&comments.read();if(value){
-    commentPublications.push(value);firstCommentPublication.resolve(value);}};
+    if(commentPublications[commentPublications.length-1]!==value)commentPublications.push(value);
+    firstCommentPublication.resolve(value);}};
   try{
     composition=CompositionUI.install(f.root);comments=CommentsUI.install(f.root);
     await turn(); // Original inactive installation settles before the ordinary user Open.
