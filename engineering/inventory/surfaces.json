@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "0f57811442156c1d576b89a575987af4bc97a4f3",
-  "describe": "v0.7.0-alpha.4-2657-g0f578114"
+  "head": "a0a7d10f33aa66ffd5f81ebaa4bb9692f862b1d9",
+  "describe": "v0.7.0-alpha.4-2668-ga0a7d10f"
  },
- "inputsDigest": "00593c2294a819fe4ba8aeffa45504d3da48cf297bb0db672a1f7c3fde7af9fe",
+ "inputsDigest": "132ba730537c52f17700833652dc5acb91ebaa2a030958d94d34508da4faa739",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 248,
+   "native": 253,
    "export": 5,
    "animation": 445,
    "history": 357,
@@ -186,7 +186,7 @@
   },
   "SMKitsu": {
    "file": "src/js/kitsu.js",
-   "line": 288,
+   "line": 254,
    "members": 3
   },
   "SMLabs": {
@@ -2682,7 +2682,7 @@
    "capability": "kitsu open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:426 initKitsuUI()"
+    "src/js/kitsu.js:392 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -2721,7 +2721,7 @@
    "capability": "kitsu publish",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:452 initKitsuUI()"
+    "src/js/kitsu.js:418 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -5164,7 +5164,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 85,
+    "functionsVisited": 79,
     "via": "helper el()",
     "references": []
    },
@@ -7530,8 +7530,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1955",
@@ -7675,10 +7677,11 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
+    "native": 3,
     "persist": 3,
     "render": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1878",
@@ -8340,7 +8343,7 @@
    "capability": "&larr; Back",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:447 initKitsuUI()"
+    "src/js/kitsu.js:413 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8377,7 +8380,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:428 initKitsuUI()"
+    "src/js/kitsu.js:394 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8414,7 +8417,7 @@
    "capability": "kitsu email",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:430 initKitsuUI()"
+    "src/js/kitsu.js:396 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8438,7 +8441,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:435 initKitsuUI()"
+     "src/js/kitsu.js:401 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8453,7 +8456,7 @@
    "capability": "Log in",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:433 initKitsuUI()"
+    "src/js/kitsu.js:399 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8464,7 +8467,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 2
+    "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -8476,7 +8479,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 44,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -8492,7 +8495,7 @@
    "capability": "Log out",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:449 initKitsuUI()"
+    "src/js/kitsu.js:415 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8529,7 +8532,7 @@
    "capability": "kitsu password",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:430 initKitsuUI()"
+    "src/js/kitsu.js:396 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8553,7 +8556,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:435 initKitsuUI()"
+     "src/js/kitsu.js:401 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8568,7 +8571,7 @@
    "capability": "kitsu url",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:430 initKitsuUI()"
+    "src/js/kitsu.js:396 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8592,7 +8595,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:435 initKitsuUI()"
+     "src/js/kitsu.js:401 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -13300,9 +13303,10 @@
    "consumers": {
     "history": 1,
     "animation": 1,
+    "native": 2,
     "persist": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1127",
@@ -13312,7 +13316,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 61,
+    "functionsVisited": 54,
     "via": "helper el()",
     "references": [
      "src/js/adapters/native-text-animator-desktop.js:43 draw()",
@@ -13954,7 +13958,7 @@
    "capability": "Add",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/p2p-contacts.js:155 init()"
+    "src/js/p2p-contacts.js:99 init()"
    ],
    "events": [
     "click"
@@ -13975,7 +13979,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 22,
     "via": "variable addBtn",
     "references": []
    },
@@ -13991,7 +13995,7 @@
    "capability": "Copy",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/p2p-contacts.js:137 init()"
+    "src/js/p2p-contacts.js:81 init()"
    ],
    "events": [
     "click"
@@ -14032,7 +14036,7 @@
    "capability": "p2p invite input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/p2p-contacts.js:156 init()"
+    "src/js/p2p-contacts.js:100 init()"
    ],
    "events": [
     "keydown"
@@ -14053,7 +14057,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 17,
+    "functionsVisited": 16,
     "via": "variable input",
     "references": []
    },
@@ -14093,7 +14097,7 @@
     "functionsVisited": 0,
     "via": "container delegation #settings-modal",
     "references": [
-     "src/js/p2p-contacts.js:134 init()"
+     "src/js/p2p-contacts.js:78 init()"
     ]
    },
    "fixtures": []
@@ -14677,8 +14681,8 @@
     "persist": 2,
     "animation": 2,
     "render": 2,
-    "selection": 3,
-    "native": 3
+    "native": 3,
+    "selection": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -14690,7 +14694,7 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 205,
+    "functionsVisited": 203,
     "via": "chain",
     "references": [
      "src/js/project.js:644 renderTabBar()",
@@ -17413,8 +17417,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 2
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1820",
@@ -34122,6 +34128,7 @@
    "mcp": "none (R14)",
    "sdk": "SMScript",
    "consumers": {
+    "native": 2,
     "persist": 3
    },
    "platforms": "browser and desktop",
@@ -34129,7 +34136,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:386",
    "meta": {
-    "functionsVisited": 27
+    "functionsVisited": 20
    },
    "fixtures": [
     "media",
