@@ -15,7 +15,8 @@ use serde_json::Number;
 pub(super) enum MaskEdit {
     Mode { mode: String },
     Feather { value: Number },
-    Unset,
+    // An empty struct is intentional: a unit variant ignores trailing map fields.
+    Unset {},
 }
 
 pub(super) fn apply(
@@ -71,7 +72,7 @@ pub(super) fn apply(
                 };
                 ext.mask_feather = Presence::Present(Some(value));
             }
-            MaskEdit::Unset => {
+            MaskEdit::Unset {} => {
                 ext.is_mask = Presence::Missing;
                 ext.mask_mode = Presence::Missing;
                 ext.mask_feather = Presence::Missing;

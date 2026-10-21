@@ -1668,7 +1668,8 @@
         "object_comments_read.rs",
         "object_mask_storage.rs",
         "object_mask_storage_controls.rs",
-        "object_mask_inputs.rs"
+        "object_mask_inputs.rs",
+        "object_compositor_masks.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

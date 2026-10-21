@@ -79,6 +79,15 @@ fn prepare_command(command: ObjectPaintCommand<'_>) -> Result<PreparedItem, Comp
     prepare_item(&style).map_err(|error| CompositorError::new(error.message()))
 }
 
+fn check_flat_masks(witness: &ObjectCompositionWitness) -> Result<(), CompositorError> {
+    if !witness.plan().mask_inputs().layers().is_empty() {
+        return Err(CompositorError::new(
+            "native vector masks require joined layer composition",
+        ));
+    }
+    Ok(())
+}
+
 impl Compositor {
     /// Retire the old image's CPU Blob in Vello's private resolver before the
     /// caller decodes its replacement. The compositor/device/queue stay fixed.
@@ -294,6 +303,7 @@ impl Compositor {
             output.height,
             self.device.limits().max_texture_dimension_2d,
         )?;
+        check_flat_masks(prepared)?;
         // Validate all styles before target allocation or replacing retained scene data.
         for command in plan.commands() {
             prepare_command(command)?;
@@ -509,3 +519,7 @@ mod object_scene_producer_brush_ink_tests;
 #[cfg(test)]
 #[path = "../tests/object_scene_style_emit_gpu.rs"]
 mod object_scene_style_emit_gpu;
+
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_compositor_masks.rs"]
+mod mask_tests;
