@@ -58,6 +58,37 @@ test('native presented camera affine maps both directions after real CSS stretch
  assert.throws(()=>M.point({clientX:100,clientY:90},{...c,presentation:{view:{mode:'stored-camera',compositionToDocument:[1,0,0,NaN,0,0]}}}));
 });
 
+test('native CSS inversion removes translation first and retains literal integer and fractional world coordinates',()=>{
+ const M=require('../src/js/adapters/native-viewport-underlay.js').canvasMapping;
+ function context(bounds,css){
+  const [a,b,c,d,e,f]=css,m=[a*320/bounds.width,b*180/bounds.height,c*320/bounds.width,d*180/bounds.height,e*320/bounds.width,f*180/bounds.height];
+  const [A,B,C,D,E,F]=m,det=A*D-B*C;
+  return {bounds,canvasW:320,canvasH:180,presentation:{view:{mode:'stored-camera',documentToComposition:m,
+   compositionToDocument:[D/det,-B/det,-C/det,A/det,(C*F-D*E)/det,(B*E-A*F)/det]}}};
+ }
+ const cases=[
+  [{left:0,top:0,width:400,height:240},[2,0,0,2,100,100],[40,48],[-30,-26]],
+  [{left:20,top:30,width:400,height:240},[2,0,0,2,100,100],[140,170],[10,20]],
+  [{left:20,top:30,width:400,height:240},[2,0,0,2,100,100],[140.25,171],[10.125,20.5]],
+  [{left:66,top:102,width:1038,height:504},[1,0,0,1,359,162],[500,284],[75,20]],
+  [{left:0,top:0,width:400,height:240},[0,2,-2,0,300,20],[180,100],[40,60]]
+ ];
+ for(const [bounds,css,client,world]of cases)assert.deepEqual(M.point({clientX:client[0],clientY:client[1]},context(bounds,css)),{x:world[0],y:world[1]});
+});
+
+test('native CSS inversion retains inverse-pair, finite and nonzero-determinant refusals',()=>{
+ const M=require('../src/js/adapters/native-viewport-underlay.js').canvasMapping;
+ const c={bounds:{left:20,top:30,width:640,height:360},canvasW:320,canvasH:180,
+  presentation:{view:{mode:'stored-camera',documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}}};
+ const point={clientX:100,clientY:90};
+ assert.throws(()=>M.point(point,{...c,presentation:{view:{...c.presentation.view,compositionToDocument:[.5,0,0,.5,81,45]}}}));
+ assert.throws(()=>M.point(point,{...c,presentation:{view:{...c.presentation.view,documentToComposition:[0,0,0,0,0,0]}}}));
+ assert.throws(()=>M.point(point,{...c,bounds:{...c.bounds,width:Infinity}}));
+ assert.throws(()=>M.point({clientX:NaN,clientY:90},c));
+ assert.throws(()=>M.point({clientX:10,clientY:0},{bounds:{left:0,top:0,width:1e-308,height:1},canvasW:1,canvasH:1,
+  presentation:{view:{mode:'canvas',documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]}}}));
+});
+
 
 function navigationSourceHarness(native=true){
  const fs=require('node:fs'),vm=require('node:vm'),{extractFunction}=require('./fixtures/lib/sandbox.cjs');
