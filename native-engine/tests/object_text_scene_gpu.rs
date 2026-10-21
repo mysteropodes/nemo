@@ -135,6 +135,33 @@ fn render(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
     );
     bytes
 }
+// Diagnose the same real GPU witness before comparing the two consumer witnesses.
+fn assert_repeatable(
+    gpu: &mut Compositor,
+    witness: &ObjectCompositionWitness,
+    label: &str,
+    first: &[u8],
+) {
+    let first_hash = crate::request_receipts::sha256(first);
+    eprintln!("{label} render1 sha256={first_hash:02x?}");
+    for iteration in 2..=8 {
+        let actual = render(gpu, witness);
+        let actual_hash = crate::request_receipts::sha256(&actual);
+        eprintln!("{label} render{iteration} sha256={actual_hash:02x?}");
+        assert_eq!(actual.len(), first.len(), "{label} render{iteration} length");
+        if let Some(index) = first.iter().zip(&actual).position(|(a, b)| a != b) {
+            let (x, y) = ((index / 4) % WIDTH, (index / 4) / WIDTH);
+            panic!(
+                "{label} render1/render{iteration} differ: byte={index} pixel=({x},{y}) \
+                 channel={} first={:?} actual={:?} first_sha256={first_hash:02x?} \
+                 actual_sha256={actual_hash:02x?}",
+                index % 4,
+                pixel(first, x, y),
+                pixel(&actual, x, y),
+            );
+        }
+    }
+}
 fn pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
     bytes[(y * WIDTH + x) * 4..(y * WIDTH + x + 1) * 4]
         .try_into()
@@ -427,6 +454,9 @@ fn gpu_stored_text_animator_and_layer_motion_share_original_glyphs_and_export_pi
     }
     let mut gpu = metal();
     let shown = render(&mut gpu, &view);
+    assert_repeatable(&mut gpu, &view, "same-view", &shown);
+    let exported = render(&mut gpu, &export);
+    assert_repeatable(&mut gpu, &export, "same-export", &exported);
     assert_eq!(shown, render(&mut gpu, &export));
     assert_eq!(pixel(&shown, 39, 29), [17, 34, 51, 255]);
     assert_eq!(pixel(&shown, 57, 51), [17, 34, 51, 255]);
