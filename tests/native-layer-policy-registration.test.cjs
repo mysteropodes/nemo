@@ -140,8 +140,8 @@ test('F06 private children retain exact ordinary ownership and the single declar
     const declaration=branch.allOf[1].properties.operation;return declaration.enum||[declaration.const];
   });
   assert.equal(operations.filter(operation=>operation==='command.document.object.layer.policy.edit').length,1);
-  assert.equal(operations.includes('command.document.object.undo'),false);
-  assert.equal(operations.includes('command.document.object.redo'),false);
+  assert.equal(operations.filter(operation=>operation==='command.document.object.undo').length,1);
+  assert.equal(operations.filter(operation=>operation==='command.document.object.redo').length,1);
 });
 test('F06 full-inventory clone refuses each missing private membership and restores exact bytes',(t)=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'nemo-f06-registration-'));
