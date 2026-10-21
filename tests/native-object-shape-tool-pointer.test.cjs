@@ -64,6 +64,21 @@ async function fixture(tool='rect',native=true){
  // VM global proxies have a different WeakMap identity; resolve the actual cached
  // desktop session explicitly, without substituting any Project/queue method.
  root.NemoNativeObjectProject={...Project,desktop:()=>session};
+ // Controlled immutable native Perspective projection; never read legacy Perspective fields.
+ let perspectiveMode='disabled',perspectiveOwner=session;
+ const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
+ root.NemoNativePerspectiveController=Object.freeze({read(){
+  const owner=perspectiveOwner,info=owner.info(),shown=owner.readPresentedObjectSession();
+  if(perspectiveMode==='unavailable'||!owner.isActive()||!shown||perspectiveKeys.some(k=>shown[k]!==info[k]))return null;
+  const pin=Object.fromEntries(perspectiveKeys.map(k=>[k,info[k]]));
+  if(perspectiveMode==='stale')pin.documentSnapshotId='stale-perspective-snapshot';
+  const value=Object.freeze({info:Object.freeze(pin),perspective:Object.freeze({settings:Object.freeze({perspectiveEnabled:perspectiveMode==='enabled'})})});
+  perspectiveProofs.set(value,typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0);return value;
+ },readForCommand(value){
+  const owner=perspectiveOwner,info=owner.info(),ticket=typeof owner.readSubscriptionGeneration==='function'?owner.readSubscriptionGeneration():0;
+  return perspectiveMode==='disabled'&&owner.isActive()&&value&&perspectiveProofs.has(value)&&perspectiveProofs.get(value)===ticket&&perspectiveKeys.every(k=>value.info[k]===info[k])?value:null;
+ }});
+
  root.NemoNativeObjectProjectFile={...Files,projectionReadyForUI:(_proxy,pin)=>Files.projectionReadyForUI(root,pin)};
  // Baseline Paper defaults are verified separately; Point is geometry-only here.
  root.Point=function(x,y){this.x=x;this.y=y;};
@@ -73,7 +88,7 @@ async function fixture(tool='rect',native=true){
  for(const name of ['constrainSquare','constrainAngle45','applyStrokeStyle'])vm.runInContext(baselineFunction(tools,name),context,{filename:'tools.js:'+name});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-object-shape-tool.js'),'utf8'),context,{filename:'native-object-shape-tool.js'});
  vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/shape-bridge.js'),'utf8'),context,{filename:'shape-bridge.js'});
- return {root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
+ return {perspectiveMode:value=>perspectiveMode=value,root,context,session,area,canvas,zoom,fit,ruler,doc,body,calls,records,log,events,info,setRect:r=>rect=r,refuse:code=>refusal=code,hold:g=>hold=g,mutate:fn=>replyChange=fn,
   async external(g){ack=g;const from=revision;revision++;return events.get('nemo-native-revision')({payload:{instanceId:'instance-A',documentId:info().documentId,lifecycleGeneration:generation,requestId:'external-'+revision,fromRevision:from,toRevision:revision}});},
   async gesture(end={clientX:240,clientY:210}){area.fire('pointerdown');area.fire('pointermove',end);area.fire('pointerup',end);return root.NemoNativeShapeToolController.whenSettled();}};
 }
@@ -111,7 +126,7 @@ test('stale frame, selection, tool, style, owner or viewport cancels without tra
 });
 test('native unavailable modes and unconfirmed presentation are consumed before any legacy writer',async()=>{
  for(const change of [f=>f.root.state.tool='star',f=>f.root.state.symmetryEnabled=true,f=>f.root.state.shadowMode=true,f=>f.root.state.maskMode=true,
-  f=>f.root.state.perspectiveEnabled=true,f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
+  f=>f.perspectiveMode('enabled'),f=>f.root.state.strokeStyle='dashed',f=>f.root.state.layers[0].locked=true,
   f=>f.root.state.strokeEnabled=f.root.state.fillEnabled=false,f=>f.root.document.documentElement.classList.remove('nemo-native-underlay')]){
   const f=await fixture();change(f);assert.equal(f.area.fire('pointerdown').stopped,true);f.area.fire('pointerup',{clientX:240,clientY:210});assert.equal(f.calls.length,0);assert.equal(f.body.children.length,0);
  }
@@ -178,9 +193,18 @@ test('all42 retained bootstrap identities match their explicit amended ordinal l
  assert.deepEqual(paths.map(p=>scripts.find(s=>'src/'+s.src===p).ordinal),expected);
  // Read actual HTML directly: one helper after SDK, before the following consumer.
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
- assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[228,229,232]);
- assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,230);
+ assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[233,234,237]);
+ assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,235);
  assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,116);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,117);
  assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 116/);
  assert.match(fixture,/assert\.deepEqual\(positions, \[13, 15, 16, 17, 18, 19, 20, 22, 23\]/);
+});
+
+test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{
+ for(const mode of ['unavailable','stale','enabled']){
+  const f=await fixture();f.perspectiveMode(mode);
+  Object.defineProperty(f.root.state,'perspectiveEnabled',{get(){throw new Error('legacy Perspective read');},set(){throw new Error('legacy Perspective write');}});
+  f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
+  assert.equal(f.calls.length,0,mode);assert.equal(f.body.children.length,0,mode);
+ }
 });

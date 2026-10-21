@@ -9,7 +9,18 @@
 // so they can't desync from anything. state.bpm / state.bpmOffset /
 // state.bpmShow are the whole model.
 (function () {
+  function native() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+  function projection() { var c = window.NemoNativeCompositionController; return c && c.read(); }
+  function submit(action, origin) {
+    var c = window.NemoNativeCompositionController;
+    if (!c || !origin) { if (window.showToast) showToast('Native BPM settings are unavailable.'); return; }
+    return c.edit(action, origin);
+  }
   function cfg() {
+    if (native()) {
+      var p = projection(), c = p && p.composition;
+      return c ? { bpm: c.effectiveBpm, offset: c.effectiveBpmOffset, on: c.effectiveBpmShow } : { bpm: 120, offset: 0, on: false };
+    }
     if (state.bpm == null) state.bpm = 120;
     if (state.bpmOffset == null) state.bpmOffset = 0;   // frames before the first beat
     return { bpm: state.bpm, offset: state.bpmOffset, on: !!state.bpmShow };
@@ -34,7 +45,7 @@
   // Nearest beat to a frame — the snap used by the layer bars and keyframes
   // when the grid is on and Shift is held.
   function snapFrame(frame) {
-    if (!state.bpmShow) return frame;
+    if (!cfg().on) return frame;
     var fpb = framesPerBeat();
     if (fpb < 0.5) return frame;
     var c = cfg();
@@ -46,7 +57,7 @@
     var grid = document.getElementById('frame-grid');
     if (!grid) return;
     Array.prototype.slice.call(grid.querySelectorAll('.bpm-line')).forEach(function (el) { el.remove(); });
-    if (!state.bpmShow) return;
+    if (!cfg().on) return;
     var beats = beatFrames();
     var frag = document.createDocumentFragment();
     beats.forEach(function (b) {
@@ -61,14 +72,17 @@
     grid.appendChild(frag);
   }
 
-  function openSettings() {
+  function openSettings(origin) {
+    origin = native() ? (arguments.length ? origin : projection()) : null;
     var c = cfg();
+    if (native() && !origin) { submit({}, null); return; }
     var v = prompt('Tempo en BPM (0 pour masquer la grille)', String(c.bpm));
     if (v === null) return;
     var bpm = parseFloat(v);
-    if (isNaN(bpm) || bpm <= 0) { state.bpmShow = false; refresh(); return; }
+    if (isNaN(bpm) || bpm <= 0) { if (native()) { submit({ kind: 'setBpm', bpmShow: false }, origin); return; } state.bpmShow = false; refresh(); return; }
     var o = prompt('Décalage du premier temps, en frames', String(c.offset));
     if (o === null) return;
+    if (native()) return submit({ kind: 'setBpm', bpm: bpm, bpmOffset: Math.max(0, parseInt(o, 10) || 0), bpmShow: true }, origin);
     state.bpm = bpm;
     state.bpmOffset = Math.max(0, parseInt(o, 10) || 0);
     state.bpmShow = true;
@@ -76,6 +90,7 @@
     if (window.showToast) showToast(bpm + ' BPM — ' + framesPerBeat().toFixed(2) + ' frames par temps');
   }
   function toggle() {
+    if (native()) { var p = projection(); return submit({ kind: 'setBpm', bpmShow: !cfg().on }, p); }
     state.bpmShow = !state.bpmShow;
     if (state.bpmShow && !state.bpm) state.bpm = 120;
     refresh();
@@ -84,7 +99,7 @@
   function refresh() {
     render();
     var b = document.getElementById('btn-bpm');
-    if (b) b.classList.toggle('active', !!state.bpmShow);
+    if (b) b.classList.toggle('active', cfg().on);
   }
 
   function init() {

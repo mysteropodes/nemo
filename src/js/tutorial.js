@@ -1469,6 +1469,12 @@
   function renderStep() {
     stopStepListeners();
     var mod = active.module, step = mod.steps[active.stepIdx];
+    if (window.__TAURI__ && window.__TAURI__.core && mod.id === 'perspective' && step === mod.steps[2]) {
+      var run = active, index = active.stepIdx;
+      step = window.NemoTutorialNativePlacement.perspectiveStep(window, step, function () {
+        return active === run && active.stepIdx === index && active.module === mod;
+      });
+    }
     if (step.before) { try { step.before(window); } catch (e) {} }
 
     var sp = $('#tut-spotlight'), tt = $('#tut-tooltip');

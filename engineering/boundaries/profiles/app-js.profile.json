@@ -3255,6 +3255,186 @@
       "publicApi": [
         "native-text-animator-desktop.js"
       ]
+    },
+    {
+      "id": "app.native.composition.contract.adapter",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-composition-contract.js"
+      ],
+      "publicApi": [
+        "native-composition-contract.js"
+      ],
+      "sizeProfile": "Domain/application"
+    },
+    {
+      "id": "app.native.composition.desktop.adapter",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-composition-desktop.js"
+      ],
+      "publicApi": [
+        "native-composition-desktop.js"
+      ],
+      "sizeProfile": "Domain/application"
+    },
+    {
+      "id": "app.native.composition.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-composition-ui.js"
+      ],
+      "publicApi": [
+        "native-composition-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "app.native.palette.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-palette-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.palette.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-palette-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.palette.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-palette-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-guide-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-guide-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-guide-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.shadow.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-shadow-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-shadow-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.shadow.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-shadow-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-shadow-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.shadow.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-shadow-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-shadow-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-perspective-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-perspective-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-perspective-ui.js"
+      ]
     }
   ],
   "layerRules": {

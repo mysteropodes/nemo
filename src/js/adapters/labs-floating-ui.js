@@ -20,6 +20,9 @@
     var iconsWrap = document.getElementById('labs-float-icons');
     var paramsWrap = document.getElementById('labs-float-params');
     if (!panel || !iconsWrap || !paramsWrap || !ports.ready()) return;
+    var perspectiveOrigin = ports.perspectiveToken ? ports.perspectiveToken() : null;
+    var nativePerspective = !!(ports.perspectiveNative && ports.perspectiveNative());
+    var perspectiveReady = !nativePerspective || !!(ports.perspectiveReady && ports.perspectiveReady());
     var registered = {};
     ports.list().forEach(function (p) { registered[p.name] = p.on; });
     // REAL_FEATURES entries override/augment the Labs `on` reading with
@@ -46,6 +49,7 @@
       // requeue already repaints with real titles moments later; this
       // guard just stops that first paint from throwing uncaught.
       btn.title = ports.title(SHORT_NAME[n]) || n;
+      if (n === 'perspective' && nativePerspective) { btn.disabled = !perspectiveReady; btn.setAttribute('aria-busy', String(!perspectiveReady)); }
       btn.innerHTML = ICONS[n] || '';
       btn.addEventListener('click', function () {
         // ACTIONS entries manage their own re-render (BrushMenu.toggle
@@ -54,7 +58,7 @@
         // below for those so a just-opened popover's own button doesn't
         // get redrawn (and re-bound) out from under an in-flight click.
         if (ACTIONS[n]) { ACTIONS[n].onClick(btn); return; }
-        if (REAL_FEATURES[n]) REAL_FEATURES[n].toggle();
+        if (REAL_FEATURES[n]) REAL_FEATURES[n].toggle(perspectiveOrigin);
         else ports.toggle(n);
         renderLabsFloatPanel();
         // Keep Réglages > Labs in sync if it happens to be open at the
@@ -168,7 +172,8 @@
       function cyclePerspMode(dir) {
         var i = PERSP_MODES.indexOf(ports.readField('perspectiveMode'));
         var next = PERSP_MODES[(i + dir + PERSP_MODES.length) % PERSP_MODES.length];
-        ports.setPerspectiveMode(next);
+        ports.setPerspectiveMode(next, perspectiveOrigin);
+        if (nativePerspective) return;
         pModeVal.textContent = ports.translate(PERSP_MODE_LABEL[next]);
       }
       pModeVal.textContent = ports.translate(PERSP_MODE_LABEL[ports.readField('perspectiveMode')]) || ports.readField('perspectiveMode');
@@ -189,7 +194,8 @@
       lockBtn.classList.toggle('on', perspectiveLocked);
       lockBtn.addEventListener('click', function () {
         var locked = !lockBtn.classList.contains('on');
-        ports.lockPerspective(locked);
+        ports.lockPerspective(locked, perspectiveOrigin);
+        if (nativePerspective) return;
         lockBtn.classList.toggle('on', locked);
         ports.renderNow();
       });
@@ -198,9 +204,10 @@
       var perspResetPill = stepperPill('perspective');
       var perspResetBtn = document.createElement('button'); perspResetBtn.className = 'lfs-btn wide';
       perspResetBtn.textContent = ports.labels.lfsBtnReset(); perspResetBtn.title = ports.labels.lfsResetPositionsTitle();
-      perspResetBtn.addEventListener('click', function () { ports.resetPerspectiveVPs(); });
+      perspResetBtn.addEventListener('click', function () { ports.resetPerspectiveVPs(perspectiveOrigin); });
       perspResetPill.appendChild(perspResetBtn);
       paramsWrap.appendChild(perspResetPill);
+      if (nativePerspective) [pModePrev, pModeNext, lockBtn, perspResetBtn].forEach(function (node) { node.disabled = !perspectiveReady; });
     }
     shown.forEach(function (n) {
       if (!registered[n] || !PARAMS[n]) return;
