@@ -262,3 +262,20 @@ test('native freehand capture refuses an absent injected mapping even with the g
  const down=f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});await turn();
  assert.equal(down.prevented,true);assert.equal(f.calls.length,0);assert.equal(f.records.size,0);assert.equal(f.body.children.length,0);
 });
+
+
+test('queued freehand uses the actual action lease while public presentation stays hidden and rejects a changed view',async()=>{
+ for(const changed of [false,true]){
+  const f=await fixture(),vector=f.root.NemoNativeObjectVector;let queued=0;
+  f.root.NemoNativeObjectVector={...vector,create:owner=>vector.create({...owner,runResourceCommand:action=>owner.runResourceCommand(ctx=>{
+   queued++;assert.equal(f.session.readPresentedObjectSession(),null,'public proof stays fenced during the actual resource action');
+   if(changed)f.root.state.cameraView=true;
+   return action(ctx);
+  })})};
+  f.area.fire('pointerdown');f.area.fire('pointerup',{clientX:240,clientY:210});
+  const result=await f.root.NemoNativeFreehandToolController.whenSettled();
+  assert.equal(queued,1);assert.equal(result.status,changed?'unavailable':'applied');
+  assert.equal(f.calls.length,changed?0:1);assert.equal(f.records.size,changed?0:1);assert.equal(f.session.info().contentRevision,changed?0:1);
+  assert.equal(f.body.children.length,0);
+ }
+});

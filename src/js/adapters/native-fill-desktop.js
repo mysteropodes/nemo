@@ -59,13 +59,13 @@
     const owner=current(root),shown=owner&&owner.readPresentedObjectSession&&owner.readPresentedObjectSession(),info=owner&&owner.info();
     const rect=info&&Mapping.bounds(root,info);
     if(!shown||!shown.presentation||!rect||!PIN.every(key=>shown[key]===info[key])||shown.presentation.frame!==state.currentFrame||!Mapping.matchesView(root,shown.presentation)){toast('Native fill coordinates are unavailable');return true;}
-    const captured=shown.presentation;
+    const captured=shown.presentation;let actionReady=null;
     const guarded={info:owner.info,isActive:owner.isActive,requestId:owner.requestId,runResourceCommand:action=>owner.runResourceCommand(ctx=>{
-      const exact=()=>{const p=ctx.readPresentedObjectSession&&ctx.readPresentedObjectSession();return p&&p.presentation===captured&&Mapping.matchesView(root,captured)&&JSON.stringify(Mapping.bounds(root,owner.info()))===JSON.stringify(rect);};
+      const exact=()=>{const p=ctx.readPresentedObjectSession&&ctx.readPresentedObjectSession();return p&&p.presentation===captured&&state.currentFrame===captured.frame&&JSON.stringify(Mapping.bounds(root,owner.info()))===JSON.stringify(rect);};
       if(!exact())throw command.fault('stale_owner','Fill presentation changed');
-      return action({reconcile:ctx.reconcile,dispatch:q=>{if(!exact())throw command.fault('stale_owner','Fill presentation changed');return ctx.dispatch(q);}});
+      actionReady=exact;try{return action({reconcile:ctx.reconcile,dispatch:q=>{if(!exact())throw command.fault('stale_owner','Fill presentation changed');return ctx.dispatch(q);}});}finally{actionReady=null;}
     })};
-    const editor=create({current:()=>current(root)===owner?guarded:current(root),ready:(session,info)=>session===guarded&&current(root)===owner&&Mapping.matchesView(root,captured)
+    const editor=create({current:()=>current(root)===owner?guarded:current(root),ready:(session,info)=>session===guarded&&current(root)===owner&&(actionReady?actionReady():Mapping.matchesView(root,captured))
       &&root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true,
       target:(info)=>{
         const row=info.layers&&info.layers[state.activeLayerIdx];
