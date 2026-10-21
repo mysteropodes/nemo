@@ -157,10 +157,7 @@ fn source_range_static_parent_motion_reaches_real_paint_with_multiplicative_opac
     ] {
         let pins = selector(&snapshot, frame);
         let packet = prepare_object_exposure_frame(&snapshot, &pins).unwrap();
-        assert_eq!(
-            packet.source_frame_for_layer(0),
-            (frame == 3).then_some(0)
-        );
+        assert_eq!(packet.source_frame_for_layer(0), (frame == 3).then_some(0));
         assert_eq!(packet.source_frame_for_layer(1), Some(0));
         let scene = prepare_object_render_scene(&packet, &pins).unwrap();
         let paint = prepare_object_paint_plan(&scene, &pins).unwrap();
@@ -172,7 +169,10 @@ fn source_range_static_parent_motion_reaches_real_paint_with_multiplicative_opac
             assert_eq!(command.contour().segments()[0].handle_out, [3., -1.]);
             assert_eq!(command.paint()[3].as_f64(), Some(alpha));
             assert_eq!(
-                command.source().record().geometry.segments[0].point.x.as_f64(),
+                command.source().record().geometry.segments[0]
+                    .point
+                    .x
+                    .as_f64(),
                 Some(1.)
             );
         }
@@ -225,11 +225,12 @@ fn visibility_and_unconsumed_motion_keep_their_original_publication_guards() {
     let unchanged = paint.commands().nth(1).unwrap();
     assert_eq!(unchanged.source().record().target().stroke_id(), "s1");
     assert_eq!(unchanged.contour().segments()[0].point, [1., 20.]);
-    assert!(paint.commands().all(|command| command.paint()[3].as_f64() == Some(1.)));
+    assert!(paint
+        .commands()
+        .all(|command| command.paint()[3].as_f64() == Some(1.)));
     assert_eq!(encode_storage_project(rotation.document()).unwrap(), bytes);
     // A dormant3D-only field has no2D consumer even when its drawing is outside the range.
-    value["propertyHolders"][0]["properties"][0] =
-        json!({"property":"positionZ","static":[30]});
+    value["propertyHolders"][0]["properties"][0] = json!({"property":"positionZ","static":[30]});
     let unsupported = snapshot(&value);
     let bytes = encode_storage_project(unsupported.document()).unwrap();
     assert_eq!(
@@ -237,5 +238,8 @@ fn visibility_and_unconsumed_motion_keep_their_original_publication_guards() {
         Some(ObjectFrameError::Unavailable),
         "out-of-range selection does not conceal an unconsumed authored property"
     );
-    assert_eq!(encode_storage_project(unsupported.document()).unwrap(), bytes);
+    assert_eq!(
+        encode_storage_project(unsupported.document()).unwrap(),
+        bytes
+    );
 }
