@@ -272,7 +272,7 @@ fn prepare(
         .iter()
         .map(|l| BulkMoveLayer {
             timing: l.timing.value(),
-            locked: l.locked.value().copied().unwrap_or(false),
+            locked: document.layer_is_locked(l.layer_uid()),
         })
         .collect();
     let plan = match payload.command.as_str() {

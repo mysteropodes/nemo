@@ -150,7 +150,7 @@ pub(crate) fn check_scope(document: &ObjectDocument, scope: &Scope) -> Result<()
         .iter()
         .find(|layer| layer.layer_uid == scope.layer_uid)
         .ok_or_else(|| PlanError::UnknownLayer(scope.layer_uid.clone()))?;
-    if layer.locked() {
+    if document.layer_is_locked(layer.layer_uid()) {
         return Err(PlanError::Locked(scope.layer_uid.clone()));
     }
     if !document.valid_target(&scope.target("x")) || scope.frame >= document.total_frames() {

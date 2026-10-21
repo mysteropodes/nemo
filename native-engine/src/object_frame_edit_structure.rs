@@ -17,8 +17,7 @@ use crate::commands::object_fill_owner::object_frame_edit_document::{
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
-    object_deserialize, FrameScopeKind, ObjectDocument, ObjectLayer, ObjectRecord, Presence,
-    TimingEdit,
+    object_deserialize, FrameScopeKind, ObjectDocument, ObjectRecord, Presence, TimingEdit,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -185,10 +184,6 @@ fn refusal(error: FrameEditError) -> DispatchErrorCode {
         | FrameEditError::PreservedOutOfRange => DispatchErrorCode::Unavailable,
     }
 }
-/// Absent reads as the baseline `false`; presence is never authored by an edit that does not change it.
-fn is_locked(layer: &ObjectLayer) -> bool {
-    layer.locked.value().copied().unwrap_or(false)
-}
 fn scene_authored(record: &ObjectRecord) -> bool {
     record.target.context_id == "scene-root"
         && record.target.frame_scope.kind == FrameScopeKind::Authored
@@ -258,7 +253,9 @@ fn insert_targets<'a>(
         document
             .layers
             .iter()
-            .any(|layer| layer.layer_uid.as_str() == *uid && !is_locked(layer))
+            .any(|layer| {
+                layer.layer_uid.as_str() == *uid && !document.layer_is_locked(layer.layer_uid())
+            })
     });
     Ok(targets)
 }
@@ -317,7 +314,7 @@ fn duplicate(
         .position(|layer| layer.layer_uid.as_str() == layer_uid)
         .ok_or(DispatchErrorCode::NotFound)?;
     let layer = &document.layers[index];
-    if is_locked(layer) {
+    if document.layer_is_locked(layer_uid) {
         return Err(DispatchErrorCode::Unavailable);
     }
     let timing = layer.timing.value().ok_or(DispatchErrorCode::Unavailable)?;

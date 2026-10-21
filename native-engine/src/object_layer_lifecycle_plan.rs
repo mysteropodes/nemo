@@ -163,17 +163,18 @@ pub(crate) fn resolve_all(
 
 /// Layers that carry lock or transform-parent facts need a decision; ordinary
 /// layers follow the default edit policy, which the baseline never gates.
-fn needs_decision(layer: &ObjectLayer) -> bool {
-    layer.locked.value() == Some(&true)
+fn needs_decision(document: &ObjectDocument, layer: &ObjectLayer) -> bool {
+    document.layer_is_locked(layer.layer_uid())
         || layer.parent_layer_uid.value().is_some_and(Option::is_some)
 }
 
 pub(crate) fn consult(
+    document: &ObjectDocument,
     policy: &dyn LayerEditPolicy,
     op: LayerOp,
     layer: &ObjectLayer,
 ) -> Result<(), LifecycleError> {
-    if !needs_decision(layer) {
+    if !needs_decision(document, layer) {
         return Ok(());
     }
     policy
@@ -251,7 +252,7 @@ pub(crate) fn plan_reorder(
         return Ok(LifecyclePlan::unchanged(document, Some(stay)));
     }
     for &index in &block {
-        consult(policy, LayerOp::Reorder, &document.layers[index])?;
+        consult(document, policy, LayerOp::Reorder, &document.layers[index])?;
     }
     let kept: Vec<usize> = (0..len).filter(|index| !block.contains(index)).collect();
     let mut sequence: Vec<usize> = Vec::with_capacity(len);

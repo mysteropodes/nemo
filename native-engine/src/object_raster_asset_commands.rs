@@ -185,7 +185,7 @@ pub(crate) fn check_target(
     Ok(())
 }
 
-/// The persisted F06 flag gates item edits exactly as it gates drawing edits; a widget layer holds no items.
+/// The effective Drawing lock gates item edits; a widget layer holds no items.
 pub(crate) fn check_layer(
     document: &ObjectDocument,
     target: &ObjectTarget,
@@ -195,7 +195,7 @@ pub(crate) fn check_layer(
         .iter()
         .find(|layer| layer.layer_uid() == target.layer_uid())
         .ok_or(DispatchErrorCode::NotFound)?;
-    if layer.locked() {
+    if document.layer_is_locked(layer.layer_uid()) {
         return Err(DispatchErrorCode::Unavailable);
     }
     if layer.widget.value().is_some() {

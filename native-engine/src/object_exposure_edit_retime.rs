@@ -72,8 +72,8 @@ fn plan(
     if payload.from == payload.to {
         return Ok(RetimeOutcome::NoChange);
     }
-    // Absent reads as the baseline `false`; presence is never authored by an edit that does not change it.
-    if found.locked.value().copied().unwrap_or(false) {
+    // Read effective policy without authoring the stored lock flag.
+    if document.layer_is_locked(found.layer_uid()) {
         return Err(DispatchErrorCode::Unavailable);
     }
     retime_key_with_active(

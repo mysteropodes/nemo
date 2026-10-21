@@ -29,7 +29,7 @@
 //! - the baseline reset re-deforms the live objects and may throw midway; the record edit is complete
 //!   before any evaluation, so the native reset has no such failure;
 //! - locked layers and layers with an active path effect are refused (`canEditActiveLayer` ->
-//!   `editRefusalReason`: `ObjectLayer::locked`, `layer_has_active_path_fx`), after the baseline's own
+//!   `editRefusalReason`: `ObjectDocument::layer_is_locked`, `layer_has_active_path_fx`), after the baseline's own
 //!   "no rig / no binds" checks, for the reset as well as the commit;
 //! - a commit that would pose a pressure ribbon (`ObjectRecord::is_pressure_ribbon`) is the typed
 //!   `pressure_ribbon_unavailable` refusal: the baseline poses the centreline too (`rigCommitFrame`), which
@@ -202,8 +202,8 @@ fn admit(
 }
 
 /// `canEditActiveLayer()` as far as the document records it: the lock, then an active path effect.
-fn check_editable(layer: &ObjectLayer) -> Result<(), PoseRefusal> {
-    if layer.locked() {
+fn check_editable(document: &ObjectDocument, layer: &ObjectLayer) -> Result<(), PoseRefusal> {
+    if document.layer_is_locked(layer.layer_uid()) {
         return Err(PoseRefusal::Locked);
     }
     if layer_has_active_path_fx(layer) {
@@ -223,7 +223,7 @@ fn plan_reset(
         Some(rig) => rig,
         None => return Ok((document.clone(), PoseReport::default())),
     };
-    check_editable(layer)?;
+    check_editable(document, layer)?;
     let mut candidate = document.clone();
     if let Some(next) = rules::rest_rig(rig) {
         candidate.layers[index].rig = Presence::Present(next);
@@ -272,7 +272,7 @@ fn plan_commit(
     if layer.rig().map_or(true, |rig| rig.binds.is_empty()) {
         return Err(PoseRefusal::NoRiggedStroke);
     }
-    check_editable(layer)?;
+    check_editable(document, layer)?;
     if frame >= document.total_frames() {
         return Err(PoseRefusal::FrameOutOfRange);
     }

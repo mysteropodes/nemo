@@ -28,7 +28,7 @@ pub(super) fn apply(origin: &ObjectSnapshot, p: &ItemPayload) -> Result<ItemEdit
         .iter_mut()
         .find(|l| l.layer_uid() == layer_uid)
         .ok_or(E::NotFound)?;
-    if layer.locked() {
+    if origin.document().layer_is_locked(layer_uid) {
         return Err(E::Unavailable);
     }
     if layer.widget.value().is_some() {
