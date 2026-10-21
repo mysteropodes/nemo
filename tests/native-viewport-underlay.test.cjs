@@ -132,3 +132,94 @@ test('native inverse navigation preserves original absolute zoom clamps and rota
  const owners=Exposure.navigation(()=>'stored-camera');t=owners.begin(p,oldOwner,0,mapping,bounds,'zoom',null);owners.update(t,oldOwner,0,mapping,null,2);
  assert.deepEqual(owners.read(newOwner).navigation,{zoom:1,pan:[0,0]});
 });
+
+
+const CameraDesktop=require('../src/js/adapters/native-object-project-desktop.js');
+function cameraToolbarRoot(){
+ const buttons=Object.fromEntries(['btn-camera','btn-cam-addkey','btn-cam-ease-edit'].map(id=>[id,{
+  hidden:false,setAttribute(k,v){this[k]=v;},addEventListener(kind,fn){this[kind]=fn;}
+ }]));
+ const root={state:{cameraView:false,currentFrame:0},SM:{t:key=>key},
+  document:{readyState:'complete',getElementById:id=>buttons[id]||null},NemoNativeViewportUnderlay:require('../src/js/adapters/native-viewport-underlay.js')};
+ return {root,buttons};
+}
+test('bound camera toolbar uses the real Project preview and refuses legacy actions while a frame is pending',async()=>{
+ const Project=require('../src/js/adapters/native-object-project.js'),{root,buttons}=cameraToolbarRoot(),calls=[];
+ let installed=false,held=null,serial=0;
+ const pin={apiVersion:2,instanceId:'camera-instance',documentId:'camera-document',lifecycleGeneration:1,
+  contentRevision:0,documentSnapshotId:'camera-snapshot',documentDigest:'a'.repeat(64),byteCount:100,
+  canvasW:320,canvasH:180,fps:24,totalFrames:8,layers:[],reference:null};
+ async function invoke(command,args){
+  const r=args&&JSON.parse(args.requestJson);calls.push({command,r});
+  if(command==='nemo_native_object_client_status')return {...pin,available:installed};
+  if(command==='nemo_native_object_bootstrap'){installed=true;return {...pin,requestId:r.requestId,resourceCount:0,viewportAvailable:false};}
+  if(command==='nemo_native_object_reference')return {...pin,requestId:r.requestId};
+  assert.equal(command,'nemo_native_object_preview');if(held)await held;
+  return {status:'presented',workId:'camera-work-'+(++serial),viewGeneration:1,
+   view:{mode:r.viewMode||'canvas',cameraAvailable:true,navigation:{zoom:1,pan:[0,0]},
+    documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]}};
+ }
+ const session=Project.create({invoke,frame:()=>root.state.currentFrame,viewMode:()=>root.state.cameraView?'stored-camera':'canvas',
+  mapping:()=>({cssBounds:{x:0,y:0,width:320,height:180},physicalExtent:{width:320,height:180}}),
+  presented:()=>CameraDesktop.renderCameraViewLock(root)});
+ root.NemoNativeObjectProject={desktop:()=>session};root.__TAURI__={core:{invoke}};
+ Object.defineProperties(root.state,{cameraKeys:{get(){assert.fail('native legacy cameraKeys read');}},cameraLayerOn:{get(){assert.fail('native legacy cameraLayerOn read');}}});
+ CameraDesktop.bindCameraUI(root,{toggle:()=>assert.fail('native legacy toggle'),addKey:()=>assert.fail('native legacy key'),editEase:()=>assert.fail('native legacy easing')});
+ await session.openPath('/camera.json');const info=session.info();
+ assert.equal(buttons['btn-camera'].hidden,false);assert.equal(buttons['btn-camera']['aria-pressed'],'false');
+ root.state.currentFrame=4;let release;held=new Promise(resolve=>release=resolve);
+ const preview=buttons['btn-camera'].click();assert.equal(root.state.cameraView,true);
+ assert.equal(session.readPresentedObjectSession(),null);assert.equal(buttons['btn-camera'].hidden,true);
+ const count=calls.length;buttons['btn-camera'].click();buttons['btn-cam-addkey'].click();buttons['btn-cam-ease-edit'].click();
+ assert.equal(calls.length,count);assert.equal(root.state.cameraView,true);
+ release();await preview;held=null;assert.equal(buttons['btn-camera'].hidden,false);
+ assert.equal(session.readPresentedObjectSession().presentation.view.mode,'stored-camera');
+ assert.equal(buttons['btn-camera']['aria-pressed'],'true');
+ await buttons['btn-camera'].click();assert.equal(root.state.cameraView,false);
+ assert.equal(session.readPresentedObjectSession().presentation.view.mode,'canvas');assert.strictEqual(session.info(),info);
+ const frames=calls.filter(c=>c.command==='nemo_native_object_preview');assert.deepEqual(frames.map(c=>c.r.frame),[0,4,4]);
+ assert.equal(frames[1].r.viewMode,'stored-camera');assert.equal(Object.hasOwn(frames[2].r,'viewMode'),false);
+ assert.ok(calls.every(c=>!c.command.includes('dispatch')));assert.equal(info.contentRevision,0);
+});
+test('native camera toolbar stays unavailable for idle, blocked, missing and unpresented owners without legacy fallback',()=>{
+ for(const [session,tauri] of [[null,true],[{isActive:()=>false,blocksLegacy:()=>false,readPresentedObjectSession:()=>null},true],
+  [{isActive:()=>false,blocksLegacy:()=>true,readPresentedObjectSession:()=>null},false],
+  [{isActive:()=>true,readPresentedObjectSession:()=>({presentation:{view:{cameraAvailable:false}}})},false]]){
+  const {root,buttons}=cameraToolbarRoot();if(tauri)root.__TAURI__={core:{}};root.NemoNativeObjectProject={desktop:()=>session};
+  CameraDesktop.bindCameraUI(root,{toggle:()=>assert.fail('unready legacy toggle'),addKey:()=>assert.fail('unready legacy key'),editEase:()=>assert.fail('unready legacy easing')});
+  assert.equal(CameraDesktop.renderCameraViewLock(root),true);assert.equal(buttons['btn-camera'].hidden,true);
+  for(const button of Object.values(buttons))button.click();assert.equal(root.state.cameraView,false);
+ }
+});
+test('actual legacy camera callbacks preserve toggle, key undo and shared easing editor through the Desktop binding',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),{root,buttons}=cameraToolbarRoot(),calls=[];
+ Object.assign(root.state,{cameraLayerOn:false,cameraKeys:[],canvasW:320,canvasH:180,tool:'select'});
+ root.NemoNativeObjectProjectDesktop=CameraDesktop;root.window=root;
+ Object.assign(root,{pushUndo:()=>calls.push('undo'),renderLayerList:()=>calls.push('layers'),renderTimeline:()=>calls.push('timeline'),
+  showToast:message=>calls.push(message),SMEngineBridge:{renderNow:()=>calls.push('render')},
+  _curveEditor:{editCameraSeg:(segment,label)=>calls.push([segment.frame,label])}});
+ root.SM.setTool=tool=>{root.state.tool=tool;};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/camera.js'),'utf8'),root);
+ buttons['btn-camera'].click();assert.equal(root.state.cameraLayerOn,true);assert.equal(root.state.tool,'camera');
+ assert.deepEqual(JSON.parse(JSON.stringify(root.state.cameraKeys)),[{frame:0,x:160,y:90,w:320,rot:0,hOut:[0,0],hIn:[0,0],ease:[.42,0,.58,1]}]);
+ assert.deepEqual(calls,['undo','layers','timeline','layers','render']);
+ buttons['btn-camera'].click();assert.equal(root.state.tool,'select');assert.equal(calls.filter(c=>c==='undo').length,1);
+ buttons['btn-cam-addkey'].click();assert.equal(root.state.cameraKeys.length,0);
+ root.state.currentFrame=4;buttons['btn-cam-addkey'].click();assert.equal(root.state.cameraKeys[0].frame,4);
+ assert.equal(calls.filter(c=>c==='undo').length,3);
+ root.SMCamera.setKey(12,{x:200,y:90,w:160});buttons['btn-cam-ease-edit'].click();
+ assert.deepEqual(calls.at(-1),[4,'Caméra : clé 5 → 13']);assert.equal(root.state.cameraView,false);
+});
+test('Desktop completion paints its own bound camera lock without calling the legacy camera facade',async()=>{
+ const {root,buttons}=cameraToolbarRoot(),info={},presentation={view:{cameraAvailable:true}},events=[];
+ root.__TAURI__={core:{invoke(){assert.fail('no native request for lock painting');}}};
+ const session={isActive:()=>true,info:()=>info,readSubscriptionGeneration:()=>1,readPresentedObjectSession:()=>({presentation})};
+ root.NemoNativeObjectProject={desktop:()=>session};
+ root.SMCamera={renderNativeViewLock(){assert.fail('completion must use Desktop painter');}};
+ root.NemoNativeProjectSettingsController={presented:value=>events.push(value)};
+ root.NemoNativeObjectUI={refreshPolicy:()=>events.push('policy')};
+ CameraDesktop.bindCameraUI(root,{toggle(){},addKey(){},editEase(){}});
+ CameraDesktop.createPorts(root).presented(info);await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(buttons['btn-camera'].hidden,false);assert.equal(buttons['btn-camera']['aria-pressed'],'false');
+ assert.equal(buttons['btn-camera'].title,'titleCameraViewLockHint');assert.deepEqual(events,[info,'policy']);
+});

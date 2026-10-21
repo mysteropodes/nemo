@@ -350,15 +350,12 @@
 
   // ---- timeline row (layer panel + frame grid, prepended by hooks in
   // renderLayerList()/renderTimeline() so both stay aligned) ----
-  function nativeSession(){var p=window.NemoNativeObjectProject,s=p&&p.desktop(window);return s&&s.isActive()?s:null;}
-  // Reuse the actual camera toolbar button; do not insert an unmatched timeline row.
-  function renderNativeViewLock(){
-    var s=nativeSession(),button=document.getElementById('btn-camera');if(!s||!button)return false;
-    var shown=s.readPresentedObjectSession(),p=shown&&shown.presentation;button.hidden=!(p&&p.view&&p.view.cameraAvailable===true);
-    button.title=window.SM.t('titleCameraViewLockHint');button.setAttribute('aria-pressed',String(state.cameraView===true));return true;
+  function nativeSession(){var p=window.NemoNativeObjectProject,s=p&&p.desktop(window);return s&&(s.isActive()||typeof s.blocksLegacy==='function'&&s.blocksLegacy())?s:null;}
+  function renderNativeViewLock() {
+    return window.NemoNativeObjectProjectDesktop.renderCameraViewLock(window);
   }
   function renderPanelRow(list) {
-    if(nativeSession())return renderNativeViewLock();
+    if(nativeSession()||window.__TAURI__&&window.__TAURI__.core)return renderNativeViewLock();
     ensureState();
     if (!state.cameraLayerOn) return;
     var row = document.createElement('div');
@@ -540,6 +537,7 @@
   }
   function applyCameraView() {
     var native=nativeSession();if(native){native.renderPreview(state.currentFrame);return;}
+    if (window.__TAURI__ && window.__TAURI__.core) return;
     if (!state.cameraView) return;
     var cam = cameraAtFrame(state.currentFrame);
     if (!cam) return;
@@ -624,38 +622,29 @@
   }
 
   function initUI() {
-    var btn = document.getElementById('btn-camera');
-    if (btn) btn.addEventListener('click', function () {
-      if(nativeSession()){var shown=nativeSession().readPresentedObjectSession();if(!shown||!shown.presentation.view||shown.presentation.view.cameraAvailable!==true)return;state.cameraView=!state.cameraView;applyCameraView();renderNativeViewLock();return;}
-      ensureState();
-      if (!state.cameraLayerOn) {
-        state.cameraLayerOn = true;
-        if (!state.cameraKeys.length) { pushUndo(); setKey(0, defaultRect()); }
-        renderLayerList(); renderTimeline();
-      }
-      window.SM.setTool(state.tool === 'camera' ? 'select' : 'camera');
-      renderLayerList();
-      updateCameraPanel();
-      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    window.NemoNativeObjectProjectDesktop.bindCameraUI(window, {
+      toggle: function () {
+        ensureState();
+        if (!state.cameraLayerOn) {
+          state.cameraLayerOn = true;
+          if (!state.cameraKeys.length) { pushUndo(); setKey(0, defaultRect()); }
+          renderLayerList(); renderTimeline();
+        }
+        window.SM.setTool(state.tool === 'camera' ? 'select' : 'camera');
+        renderLayerList();
+        updateCameraPanel();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      },
+      addKey: function () {
+        pushUndo();
+        var f = state.currentFrame;
+        if (keyAt(f)) removeKey(f);
+        else setKey(f, cameraAtFrame(f) || defaultRect());
+        renderCameraRow(); updateCameraPanel();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      },
+      editEase: function () { openCameraEaseEditor(); }
     });
-    // pushUndo() here (2026-07: "récupère des données exploitable pour
-    // résoudre les soucis" — the feedback action log/undo stack was
-    // silently skipping this button entirely, unlike a camera keyframe
-    // added/removed by DRAGGING, which already calls pushUndo() via
-    // onDown further down this file) — cameraKeys IS part of
-    // layersSnapshotNow()'s undo snapshot, so this was a real gap, not a
-    // structural exclusion like StoryBoard/audio below.
-    var addKey = document.getElementById('btn-cam-addkey');
-    if (addKey) addKey.addEventListener('click', function () {
-      pushUndo();
-      var f = state.currentFrame;
-      if (keyAt(f)) removeKey(f);
-      else setKey(f, cameraAtFrame(f) || defaultRect());
-      renderCameraRow(); updateCameraPanel();
-      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    });
-    var editEase = document.getElementById('btn-cam-ease-edit');
-    if (editEase) editEase.addEventListener('click', openCameraEaseEditor);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUI); else initUI();
 

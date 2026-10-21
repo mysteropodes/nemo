@@ -721,7 +721,8 @@ test('actual native camera toolbar click uses current receipt availability and n
  let available=true;const state={cameraView:false,currentFrame:4};
  Object.defineProperties(state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera key read');}}});
  const session={isActive:()=>true,readPresentedObjectSession:()=>({presentation:{view:{cameraAvailable:available}}}),renderPreview:frame=>events.push(frame)};
- const root={state,document:{getElementById:id=>id==='btn-camera'?button:null},SM:{t:k=>k},NemoNativeObjectProject:{desktop:()=>session}};
+ const root={state,document:{getElementById:id=>id==='btn-camera'?button:null},SM:{t:k=>k},NemoNativeObjectProject:{desktop:()=>session},
+  NemoNativeObjectProjectDesktop:require('../src/js/adapters/native-object-project-desktop.js')};
  root.window=root;const context=vm.createContext(root);
  for(const name of ['nativeSession','renderNativeViewLock','applyCameraView','initUI'])vm.runInContext(extractFunction(source,name),context);
  vm.runInContext('initUI();renderNativeViewLock();',context);assert.equal(button.hidden,false);assert.equal(button['aria-pressed'],'false');
