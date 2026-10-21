@@ -11,7 +11,7 @@
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   var entries=['toggleTimeRemap','isTimeRemapped','footageInterpMode','setFootageInterpMode'];
   // Placeholders the legacy owner need not define: rows read their own track there.
-  var optional=['timeRemapKeyFacts','timeRemapKeyIntent'];
+  var optional=['timeRemapKeyFacts','timeRemapKeyIntent','nativeVideoPlacement'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
   function usable(ports,session){
     return !!session&&ports.currentSession()===session&&session.isActive()===true&&session.blocksLegacy()===true&&
@@ -156,6 +156,8 @@
     var own={
       timeRemapKeyFacts:function(li){return known(li,function(p){return remapped(p)?p.timeRemap:null;},null);},
       timeRemapKeyIntent:timeRemapKeyIntent,
+      // The footage panel's source facts: the layer's video placement at the playhead, or null.
+      nativeVideoPlacement:function(li){return known(li,function(p){return p||null;},null);},
       toggleTimeRemap:toggleTimeRemap,
       isTimeRemapped:function(li){return known(li,remapped,false);},
       footageInterpMode:function(li){return known(li,mode,'none');},

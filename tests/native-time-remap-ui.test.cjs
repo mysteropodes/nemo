@@ -150,3 +150,14 @@ test('motion.js routes the native Time Remap row to the key intent before any le
   const intents=src.match(/if \(remapFacts\) \{ window\.SM\.timeRemapKeyIntent\(state\.layers\.indexOf\(holder\), (null|nv)\); return; \}\n\s*pushUndo\(\);/g)||[];
   assert.equal(intents.length,2,'stopwatch and value field both return before pushUndo');
 });
+
+test('the footage panel reads the native video placement and never reaches the legacy relink writer',async()=>{
+  const f=fixture(video());f.api.bindTimeRemapEntries();
+  assert.equal(f.root.SM.nativeVideoPlacement(1),null);await settle();
+  assert.equal(f.root.SM.nativeVideoPlacement(1).placementId,'p1');assert.equal(f.root.SM.nativeVideoPlacement(0),null);
+  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/js/timeline.js'),'utf8');
+  const panel=src.slice(src.indexOf('function updateFootagePanel(){'),src.indexOf('function updateCompInstancePanel(){'));
+  assert.match(panel,/SMLayerKind\.of\(nativePlacement\?\{nativeVideo:true\}:ld\)/);
+  assert.match(panel,/!!\(ld\.nativeVideo\|\|nativePlacement\)&&window\.SM\.isTimeRemapped/);
+  assert.match(panel,/if\(nativePlacement\)\{repBtn\.disabled=true;/,'replace reports unavailable for a native placement');
+});
