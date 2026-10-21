@@ -56,7 +56,8 @@ impl NativeObjectHost {
         let target: native_engine::object_document::PropertyHolderTarget =
             serde_json::from_value(serde_json::json!({
                 "contextId":"scene-root", "layerUid":"L0"
-            })).ok()?;
+            }))
+            .ok()?;
         self.motion_diagnostic_for(&snapshot, &target, "dupOffsetPos", frame)
     }
     #[cfg(test)]
