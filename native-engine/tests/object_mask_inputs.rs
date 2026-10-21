@@ -242,6 +242,42 @@ fn hidden_folder_widget_and_effect_slots_have_no_own_masks() {
         for (key, value) in flags.as_object().unwrap() {
             v["layers"][1][key] = value.clone();
         }
+        if flags["isFolderLayer"].as_bool() == Some(true)
+            || flags["isEffectLayer"].as_bool() == Some(true)
+        {
+            let rejected = decode_storage_project(&serde_json::to_vec(&v).unwrap()).unwrap_err();
+            assert_eq!(
+                rejected.kind(),
+                crate::object_codec::ObjectCodecErrorKind::Invalid
+            );
+            assert_eq!(
+                rejected.message(),
+                "an effect layer or a folder layer carries no objects"
+            );
+            v["objects"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|record| record["target"]["layerUid"] != "L0");
+            for scope in v["compositionOrder"]["contexts"][0]["scopes"]
+                .as_array_mut()
+                .unwrap()
+            {
+                scope["elements"]
+                    .as_array_mut()
+                    .unwrap()
+                    .retain(|element| element["layerUid"] != "L0");
+            }
+        } else {
+            assert_eq!(
+                v["objects"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|record| record["target"]["layerUid"] == "L0")
+                    .count(),
+                3
+            );
+        }
         let o = owner(&v);
         let s = o.acquire_snapshot(0).unwrap();
         let scene = scene(&s);
