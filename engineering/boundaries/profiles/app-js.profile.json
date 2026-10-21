@@ -313,6 +313,18 @@
       ]
     },
     {
+      "id": "app.kitsu.service.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "kitsu-service.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "kitsu-service.js"
+      ]
+    },
+    {
       "id": "app.kitsu",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -418,6 +430,18 @@
       "sizeProfile": "App JS unclassified (pre-R01)",
       "publicApi": [
         "nemo-script.js"
+      ]
+    },
+    {
+      "id": "app.p2p.contact.model.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "p2p-contact-model.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "p2p-contact-model.js"
       ]
     },
     {

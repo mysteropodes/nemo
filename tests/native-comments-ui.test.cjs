@@ -1,4 +1,5 @@
 'use strict';
+const ProjectFile = require('../src/js/adapters/native-object-project-file.js');
 // Actual comment controls, Select capture callbacks, pure mapping, model and SDK.
 // DOM/native metadata/presentation ports are controlled; no installed/native acceptance claim.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
@@ -35,7 +36,8 @@ async function fixture(initial, browser = false) {
     style: { getPropertyValue: name => String(({ left: rect.left, top: rect.top, right: rect.left+rect.width, bottom: rect.top+rect.height })[name.replace('--nemo-native-','')]) } };
   let metadata = copy(initial), revision = 0, ticket = 1, serial = 0, running = 0, tail = Promise.resolve(), gate = null, refuse = false;
   const calls = [], checkpoints = [], notices = [], navigation = []; let select = 0, text = 0, feedback = 0;
-  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0', canvasW: 320, canvasH: 180, totalFrames: 40 };
+  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   let presentation = { ...info, owner: 'native', status: 'presented', frame: 0, contextId: 'scene-root', workId: 'w0' };
   const raw = { document: doc, state: { tool: 'comment', currentFrame: 0, appMode: 'anim2d', userProfile: { id: 'author', name: '', color: '#AbC' } },
     innerWidth: 1200, innerHeight: 900, console, setTimeout, clearTimeout, Promise,
@@ -50,6 +52,8 @@ async function fixture(initial, browser = false) {
   if (!browser) Object.defineProperty(raw.state,'comments',{ get() { throw Error('legacy comments read'); }, set() { throw Error('legacy comments write'); } });
   else raw.state.comments = copy(initial) || [];
   raw.window = raw; const context = vm.createContext(raw), root = vm.runInContext('window',context);
+  function project() { ProjectFile.projectView(root, info); }
+  if (!browser) project();
   let controller;
   const shown = pin => ({ ...pin, presentation });
   async function dispatch(q) {
@@ -84,9 +88,11 @@ async function fixture(initial, browser = false) {
       const pin=info;return fn({dispatch:q=>adapter.dispatch(q),readPresentedObjectSession:()=>pin===info?shown(pin):null,
         reconcile:async next=>{assert.equal(next,revision);info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};
           presentation={...info,owner:'native',status:'presented',frame:root.state.currentFrame,contextId:'scene-root',workId:'w'+revision};
-          controller.willProject();controller.presented();return info;}});
+          controller.willProject();assert.equal(ProjectFile.refreshLayerTable(root,info),true);
+          controller.presented();return info;}});
     }).finally(()=>{running--;});tail=job.catch(()=>{});return job;}}
-  root.NemoNativeObjectProject={desktop:()=>session}; root.NemoNativeObjectProjectFile={projectionReadyForUI:()=>!running};
+  root.NemoNativeObjectProject={desktop:()=>session};
+  root.NemoNativeObjectProjectFile={projectionReadyForUI:(valueRoot,value)=>!running&&ProjectFile.projectionReadyForUI(valueRoot,value)};
   root.NemoNativeTextToolDesktop={handle(_root,method){text++;return root.state.tool==='text';}};
   root.nativePointerIntent={cancel(){},snapshot(){return null;}};
   root.nativePointer=()=>({down(){select++;},move(){select++;},up(){select++;},cancelEvent(){select++;}});
@@ -109,9 +115,12 @@ async function fixture(initial, browser = false) {
   return {root,doc,elements,events,pointer,settled,calls,checkpoints,notices,navigation,metadata:()=>copy(metadata),counts:()=>({select,text,feedback}),
     hold(){let release;gate=new Promise(resolve=>release=resolve);return release;},refuse(value){refuse=value;},
     pan(){presentation={...presentation,workId:presentation.workId+'-pan'};},resize(){rect={...rect,left:rect.left+1};},
-    replace(){info={...info,documentId:'other',lifecycleGeneration:2};ticket++;controller.willProject();},
+    replace(){info={...info,documentId:'other',lifecycleGeneration:2};ticket++;controller.willProject();project();},
     subscription(){ticket++;},
-    revision(){revision++;info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();},controller};
+    fullInfo:()=>info,projectionReady:value=>ProjectFile.projectionReadyForUI(root,value),
+    drift(){root.state.canvasW++;},repairProjection:project,
+    revision(){revision++;info={...info,contentRevision:revision,documentSnapshotId:'s'+revision};controller.willProject();
+      assert.equal(ProjectFile.refreshLayerTable(root,info),true);},controller};
 }
 
 test('actual pointer and original Save/Delete callbacks use native append, empty update, resolve and ordinal identity',async()=>{
@@ -217,4 +226,23 @@ test('pending refusal retires project controls without killing an active debug r
   refused.elements.get('comment-text').value='refused';refused.elements.get('comment-save').fire('click');await refused.settled();
   assert.equal(refused.root._activeComment,null);assert.equal(refused.elements.get('comment-popover').style.display,'none');
   assert.equal(refused.checkpoints.length,0);assert.equal(refused.calls.filter(q=>q.operation===C.EDIT).length,1);
+});
+
+test('comments uses full project readiness and retains narrow immutable authority pins', async () => {
+  const f = await fixture();
+  assert.equal(f.projectionReady(f.fullInfo()), true);
+  const origin = f.controller.read(); assert.ok(origin);
+  assert.deepEqual(Object.keys(origin.info).sort(),
+    ['contentRevision', 'documentId', 'documentSnapshotId', 'instanceId', 'lifecycleGeneration']);
+  assert.equal(Object.isFrozen(origin.info), true);
+  assert.equal(f.projectionReady(origin.info), false, 'identity pins cannot stand in for project metadata');
+  const calls = f.calls.length;
+  f.drift(); assert.equal(f.controller.read(), null);
+  assert.equal(await f.controller.presented(), null); await f.settled();
+  assert.equal(f.controller.read(), null);
+  assert.equal(f.calls.length, calls, 'invalid full projection refuses before dispatch');
+  assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 0);
+  f.repairProjection(); await f.controller.presented(); await f.settled();
+  assert.ok(f.controller.read());
+  assert.equal(f.calls.filter(q => q.operation === C.EDIT).length, 0, 'restoring readiness does not replay a gesture');
 });

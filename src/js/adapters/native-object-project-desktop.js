@@ -70,8 +70,18 @@
     try{return action(lease);}finally{running=false;}
   }
   function createPorts(root){
-    var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
+    var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
     function settingsNotice(kind,info){[root.NemoNativeProjectSettingsController,root.NemoNativeCompositionController,root.NemoNativePaletteController,root.NemoNativeGuideController,root.NemoNativeShadowController,root.NemoNativePerspectiveController,root.NemoNativeWorkspaceController,root.NemoNativeCustomBrushController,root.NemoNativeCommentsController].forEach(function(c){if(c&&typeof c[kind]==='function')c[kind](info);});}
+    function presentationStamp(info){
+      var project=root.NemoNativeObjectProject;
+      if(!project||typeof project.desktop!=='function')return null;
+      var session=project.desktop(root);
+      if(!session||typeof session.info!=='function'||session.info()!==info||!info||
+        typeof session.readSubscriptionGeneration!=='function'||typeof session.readPresentedObjectSession!=='function')return null;
+      var shown=session.readPresentedObjectSession(),presentation=shown===null?null:shown&&shown.presentation;
+      if(presentation!==null&&(!presentation||typeof presentation!=='object'))return null;
+      return {session:session,info:info,ticket:session.readSubscriptionGeneration(),document:root.document,presentation:presentation};
+    }
     function publishRevision(info){
       settingsNotice('willProject',info);
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
@@ -128,8 +138,19 @@
       },
       openDiagnostic:function(event,code){openDiagnostic(root,event,code);},
       presented:function(info){
-        settingsNotice('presented',info);
-        if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
+        var version=++presentationVersion,stamp;
+        try{stamp=presentationStamp(info);}catch(_){return;}
+        if(!stamp)return;
+        // Let the completed resource's promise continuations publish their caches
+        // before another controller enters the same native queue.
+        setTimeout(function(){try{
+          if(version!==presentationVersion)return;
+          var current=presentationStamp(info);
+          if(!current||current.session!==stamp.session||current.info!==stamp.info||current.ticket!==stamp.ticket||
+            current.document!==stamp.document||current.presentation!==stamp.presentation)return;
+          settingsNotice('presented',info);
+          if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
+        }catch(_){}},0);
       },
       changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);
         else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},

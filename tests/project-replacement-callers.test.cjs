@@ -7,6 +7,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
+const kitsuService = require('../src/js/adapters/kitsu-service.js');
 const kitsuSource = fs.readFileSync(path.join(ROOT, 'src/js/kitsu.js'), 'utf8');
 const tutorialSource = fs.readFileSync(path.join(ROOT, 'src/js/tutorial.js'), 'utf8');
 
@@ -83,6 +84,7 @@ function kitsuHarness(mode) {
   const context = {
     console,
     state,
+    NemoKitsuService: kitsuService,
     URLSearchParams,
     sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     document: { readyState: 'loading', addEventListener() {} },

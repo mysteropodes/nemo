@@ -29,12 +29,13 @@ function fixture() {
   function walk(nodes) { return nodes.flatMap(n => [n, ...walk(n.children)]); }
   const document = Object.assign(node('document'), { readyState: 'loading', hidden: false, body: node('body'), documentElement: node(),
     getElementById: id => walk(roots).find(n => n.id === id) || null, createElement: node });
-  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0' };
+  let info = { instanceId: 'i', documentId: 'd', lifecycleGeneration: 1, contentRevision: 0, documentSnapshotId: 's0',
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40, layers: [{ layerUid: 'drawing', visible: true }] };
   let revision = 0, serial = 0, ticket = 1, running = 0, active = true, tail = Promise.resolve(), held = null;
   let metadata = { h: [-12.25], v: [] };
   const calls = [], notices = [], state = { rulersOn: true, guidesLocked: false, guidesSnap: true, smartGuides: false };
   Object.defineProperty(state, 'guides', { get() { throw Error('native caller read legacy guides'); }, set() { throw Error('native caller wrote legacy guides'); } });
-  let root, context, controller;
+  let root, context, controller, browserRoot;
   const presented = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented' } });
   async function dispatch(q) {
     calls.push(clone(q));
@@ -69,7 +70,9 @@ function fixture() {
         return action({ dispatch: q => root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', { dispatch }).dispatch(q),
           readPresentedObjectSession: () => active && running === 1 && info === origin ? presented(origin) : null,
           async reconcile(r) { assert.equal(r, revision); info = { ...info, contentRevision: r, documentSnapshotId: 's' + r };
-            controller.willProject(info); controller.presented(info); return info; } });
+            controller.willProject(info);
+            assert.equal(root.NemoNativeObjectProjectFile.refreshLayerTable(browserRoot, info), true);
+            controller.presented(info); return info; } });
       }).finally(() => { running--; controller.presented(info); });
       tail = work.catch(() => {}); return work;
     }
@@ -78,16 +81,22 @@ function fixture() {
   root = { document, state, Point, __TAURI__: { core: {} }, devicePixelRatio: 1,
     view: { zoom: 2, center: { x: 0, y: 0 }, projectToView: p => new Point(p.x * 2 + 100, p.y * 2 + 100),
       viewToProject: p => new Point((p.x - 100) / 2, (p.y - 100) / 2) },
-    NemoNativeObjectProject: { desktop: () => session }, NemoNativeObjectProjectFile: { projectionReadyForUI: () => active && !running },
+    NemoNativeObjectProject: { desktop: () => session },
     getComputedStyle: () => ({ getPropertyValue: () => '' }), requestAnimationFrame: fn => frames.push(fn),
     localStorage: { getItem: key => key === 'nemo-rulers-on' ? '1' : null, setItem: (key, value) => prefs.push([key, value]) },
     showToast: value => notices.push(value), addEventListener() {} };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
-  const needed = ['js/adapters/native-guide-contract.js', 'js/adapters/native-application.js', 'js/adapters/native-guide-desktop.js',
+  const needed = ['js/adapters/native-object-layer-splice.js', 'js/adapters/native-object-project-file.js',
+    'js/adapters/native-guide-contract.js', 'js/adapters/native-application.js', 'js/adapters/native-guide-desktop.js',
     'js/adapters/native-guide-ui.js', 'js/rulers-bridge.js'];
   const html = fs.readFileSync(require.resolve('../src/index.html'), 'utf8');
   const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)].map(m => ({ src: m[1].match(/\bsrc=["']([^"']+)/)?.[1], tag: m[0] }));
   const actual = scripts.filter(script => needed.includes(script.src));
+  assert.deepEqual(actual.map(script => script.src), [
+    'js/adapters/native-object-layer-splice.js', 'js/adapters/native-object-project-file.js', 'js/rulers-bridge.js',
+    'js/adapters/native-guide-contract.js', 'js/adapters/native-application.js',
+    'js/adapters/native-guide-desktop.js', 'js/adapters/native-guide-ui.js'
+  ]);
   for (const file of needed) {
     const selected = actual.filter(script => script.src === file); assert.equal(selected.length, 1, file);
     assert.equal(selected[0].tag, '<script src="' + file + '">', file + ' must be a synchronous classic script');
@@ -97,18 +106,22 @@ function fixture() {
   assert(at('native-guide-desktop') < at('native-guide-ui'));
   for (const script of actual)
     vm.runInContext(fs.readFileSync(require.resolve('../src/' + script.src), 'utf8'), context, { filename: script.src });
-  controller = root.NemoNativeGuideController; document.fire('DOMContentLoaded');
+  browserRoot = vm.runInContext('globalThis', context);
+  function project() { root.NemoNativeObjectProjectFile.projectView(browserRoot, info); }
+  project(); controller = root.NemoNativeGuideController; document.fire('DOMContentLoaded');
   function tick() { const frame = frames.shift(); if (frame) frame(); }
   async function settled() {
     for (let i = 0; i < 30; i++) { await tail; await new Promise(r => setImmediate(r)); if (!controller.isPending()) { tick(); return; } }
     throw Error('guide caller did not settle');
   }
   return { root, document, area, h, v, controller, calls, notices, prefs, tick, settled,
+    fullInfo: () => info, projectionReady: value => root.NemoNativeObjectProjectFile.projectionReadyForUI(browserRoot, value),
+    drift() { state.canvasW++; }, repairProjection: project,
     async ready() { await controller.presented(); await settled(); assert(controller.read(), 'Actual production guide SDK admission/presentation is required'); },
     edits: () => calls.filter(q => q.operation === C.EDIT), metadata: () => clone(metadata),
     hits: () => walk(roots).filter(n => /^guide-hit /.test(n.className || '')),
     ghosts: () => walk(roots).filter(n => n.style.opacity === '.6'),
-    replace() { info = { ...info, documentId: 'replacement', lifecycleGeneration: 2 }; controller.willProject(info); },
+    replace() { info = { ...info, documentId: 'replacement', lifecycleGeneration: 2 }; controller.willProject(info); project(); },
     resubscribe() { ticket++; }, retire() { active = false; controller.dispose(); tick(); },
     hold() { let entered, release; const started = new Promise(r => entered = r), wait = new Promise(r => release = r);
       held = { entered, wait }; return { started, release }; }
@@ -173,4 +186,27 @@ test('the existing snap consumer reads pinned guide coordinates and refuses unco
   assert.throws(() => f.root.SMRulers.snapPoint(new f.root.Point(0, -10), 8), e => e.code === 'unavailable');
   f.root.SMRulers.toggleOn(false);
   const point = new f.root.Point(0, -10); assert.strictEqual(f.root.SMRulers.snapPoint(point, 8), point);
+});
+
+
+test('actual ProjectFile readiness publishes guides without widening their authority pin', async () => {
+  const f = fixture(); assert.equal(f.projectionReady(f.fullInfo()), true); await f.ready();
+  const shown = f.controller.read();
+  assert.deepEqual(Object.keys(shown.info).sort(), ['contentRevision', 'documentId', 'documentSnapshotId', 'instanceId', 'lifecycleGeneration']);
+  assert.equal(f.projectionReady(shown.info), false, 'five authority pins cannot stand in for full native UI metadata');
+  assert.deepEqual(clone(shown.guides.h), [-12.25]); assert.equal(f.hits().length, 1);
+  const before = f.metadata(); f.drift(); assert.equal(f.controller.read(), null);
+  f.document.fire('pointerdown', { target: f.h }); f.document.fire('pointerup', { clientY: 48 }); await f.settled();
+  assert.equal(f.ghosts().length, 0); assert.equal(f.edits().length, 0); assert.deepEqual(f.metadata(), before);
+  assert.throws(() => f.root.SMRulers.snapPoint(new f.root.Point(0, -10), 8), e => e.code === 'unavailable');
+  f.repairProjection(); await f.ready(); assert.equal(f.edits().length, 0, 'restoring projection does not replay the refused gesture');
+  f.document.fire('pointerdown', { target: f.h }); f.document.fire('pointerup', { clientY: 48 }); await f.settled();
+  assert.equal(f.edits().length, 1); assert.deepEqual(f.edits()[0].payload.action, { kind: 'add', axis: 'h', position: -26 });
+  assert.deepEqual(f.metadata().h, [-12.25, -26]);
+});
+
+test('full UI projection drift during a held guide read prevents publication', async () => {
+  const f = fixture(), held = f.hold(), loading = f.controller.presented(); await held.started;
+  f.drift(); held.release(); assert.equal(await loading, null); await f.settled();
+  assert.equal(f.controller.read(), null); assert.equal(f.edits().length, 0); assert.equal(f.ghosts().length, 0);
 });
