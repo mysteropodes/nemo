@@ -391,7 +391,8 @@ fn legacy_pose_must_match_selected_stored_id_closed_flag_and_topology() {
     let record = packet.records().next().unwrap();
     let poses = super::packet_poses(&packet);
     let pose = &poses[&0].as_ref().unwrap().strokes[0];
-    assert!(super::compile(&packet, record, Some(pose)).is_ok());
+    let batches = Default::default();
+    assert!(super::compile(&packet, record, Some(pose), &batches).is_ok());
     for field in 0..3 {
         let mut wrong = pose.clone();
         match field {
@@ -402,7 +403,7 @@ fn legacy_pose_must_match_selected_stored_id_closed_flag_and_topology() {
             }
         }
         assert!(matches!(
-            super::compile(&packet, record, Some(&wrong)),
+            super::compile(&packet, record, Some(&wrong), &batches),
             Err("rig pose topology differs from the selected stored path")
         ));
     }

@@ -105,6 +105,14 @@ fn stored_camera_svg_uses_original_matrix_and_reopen_without_editing_plan_geomet
 }
 
 fn pixels(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
+    sized_pixels(gpu, witness, 320, 180)
+}
+fn sized_pixels(
+    gpu: &mut Compositor,
+    witness: &ObjectCompositionWitness,
+    width: u32,
+    height: u32,
+) -> Vec<u8> {
     let p = witness.plan().packet();
     let s = p.snapshot();
     let pins = ObjectSchedulePins {
@@ -121,7 +129,7 @@ fn pixels(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
         "scene-root",
         p.frame(),
         "final",
-        OutputSpec::new("frame", "rgba8", 320, 180, "srgb", "straight").unwrap(),
+        OutputSpec::new("frame", "rgba8", width, height, "srgb", "straight").unwrap(),
         witness.plan().scene_resource_versions().unwrap(),
     )
     .unwrap();
@@ -137,7 +145,7 @@ fn pixels(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
         let mut reader = png::Decoder::new(std::io::Cursor::new(encoded.bytes(&live).unwrap()))
             .read_info()
             .unwrap();
-        assert_eq!((reader.info().width, reader.info().height), (320, 180));
+        assert_eq!((reader.info().width, reader.info().height), (width, height));
         let mut decoded = vec![0; reader.output_buffer_size().unwrap()];
         let info = reader.next_frame(&mut decoded).unwrap();
         decoded.truncate(info.buffer_size());
@@ -169,5 +177,47 @@ fn stored_camera_whole_paint_matches_original_literal_pixels_and_canvas_bypass()
     assert_eq!(at(&v, 50, 40), [255; 4]);
     assert_eq!(at(&e, 0, 0), [255; 4]);
     assert_eq!(at(&e, 319, 179), [255; 4]);
+    assert_eq!(o.history_depths(), (0, 0));
+}
+
+#[test]
+fn camera_clip_stays_project_sized_in_larger_real_png_and_svg_outputs() {
+    let mut source = document();
+    for segment in source["drawing"]["objects"][0]["geometry"]["segments"]
+        .as_array_mut()
+        .unwrap()
+    {
+        let x = segment["point"]["x"].as_i64().unwrap();
+        segment["point"]["x"] = json!(x + 220);
+    }
+    let o = owner(&source);
+    let before = saved(&o);
+    let s = snapshot(&o);
+    let p = plan(&s, 0);
+    let pins = selector(&s, 0);
+    let output =
+        serialize_svg_frame(&p, SvgFrameSpec::new(640, 360, 1024 * 1024).unwrap()).unwrap();
+    let parsed = reader::parse(&output.bytes).unwrap();
+    assert_eq!((parsed.width, parsed.height), (640, 360));
+    assert_eq!(parsed.camera_clip, Some([320, 180]));
+    assert_eq!(parsed.paths[0].start, [320., 60.]);
+    let export = prepare_object_composition(&p, &pins).unwrap();
+    let canvas = prepare_object_viewport_composition(&p, &pins, None).unwrap();
+    let mut gpu = Compositor::new().expect("clip acceptance requires actual Metal");
+    assert_eq!(gpu.adapter().get_info().backend, wgpu::Backend::Metal);
+    let e = sized_pixels(&mut gpu, &export, 640, 360);
+    let v = sized_pixels(&mut gpu, &canvas, 640, 360);
+    let outside = (65 * 640 + 325) * 4;
+    assert_eq!(
+        &e[outside..outside + 4],
+        [255; 4],
+        "project clip applies before larger export output"
+    );
+    assert_eq!(
+        &v[outside..outside + 4],
+        [17, 34, 51, 255],
+        "ordinary Canvas keeps the same outside artwork visible"
+    );
+    assert_eq!(saved(&o), before);
     assert_eq!(o.history_depths(), (0, 0));
 }

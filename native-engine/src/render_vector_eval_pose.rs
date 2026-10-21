@@ -94,18 +94,54 @@ pub(crate) fn common_layer_motion_target(
     {
         return false;
     }
-    let Some(layer) = document
-        .layers()
-        .iter()
-        .find(|l| l.layer_uid() == target.layer_uid())
-    else {
+    let Some(context) = document.composition_order.value().and_then(|order| {
+        order
+            .contexts
+            .iter()
+            .find(|c| c.context_id == target.context_id())
+    }) else {
         return false;
     };
+    let mut next = Some(target.layer_uid());
+    let mut seen = std::collections::BTreeSet::new();
+    while let Some(uid) = next {
+        if seen.len() > crate::evaluation::motion_parent_chain::CHAIN_NODE_LIMIT
+            || !seen.insert(uid)
+            || !context.layers.iter().any(|l| l.layer_uid == uid)
+        {
+            return false;
+        }
+        let Some(layer) = document.layers().iter().find(|l| l.layer_uid() == uid) else {
+            return false;
+        };
+        let current = PropertyHolderTarget {
+            context_id: target.context_id().to_owned(),
+            layer_uid: uid.to_owned(),
+            stroke_id: crate::object_document::Presence::Missing,
+        };
+        if !common_layer_content_target(document, &current, layer) {
+            return false;
+        }
+        // Original3D suppresses its single-parent affine; retain that existing boundary.
+        if uid == target.layer_uid() && layer.three_d.value() == Some(&true) {
+            return true;
+        }
+        if layer.three_d.value() == Some(&true) {
+            return false;
+        }
+        next = layer.parent_layer_uid.value().and_then(Option::as_deref);
+    }
+    true
+}
+
+fn common_layer_content_target(
+    document: &ObjectDocument,
+    target: &PropertyHolderTarget,
+    layer: &crate::object_document::ObjectLayer,
+) -> bool {
     if layer.is_effect_layer()
         || layer.is_folder_layer()
         || layer.widget.value().is_some()
-        || (layer.three_d.value() != Some(&true)
-            && layer.parent_layer_uid.value().is_some_and(Option::is_some))
         || document.duplicator_set().is_some_and(|set| {
             set.duplicator(target.context_id(), target.layer_uid())
                 .is_some_and(|d| d.duplicator.effective_clone_count() > 1.)

@@ -151,8 +151,8 @@ fn actual_legacy_svg_serializes_transformed_contours_while_editable_svg_gate_sta
     let o = owner(&drawing(true));
     let s = o.acquire_snapshot(0).unwrap();
     let p = packet(&o, &s, 0);
-    let plan = plan(&p);
-    let text = svg(&plan).unwrap();
+    let legacy_plan = plan(&p);
+    let text = svg(&legacy_plan).unwrap();
     assert!(text.contains("<path d=\"M-155,7 C-155,7 45,7 45,7"));
     assert!(text.contains("<path d=\"M245,7 C245,7 445,7 445,7"));
     assert_eq!(text.matches("fill-opacity=\"0.375\"").count(), 2);
@@ -339,3 +339,6 @@ fn shared_motion_admission_refuses_mask_and_multiple_parent_controls_without_pub
     )
     .is_err());
 }
+
+#[path = "object_scene_vector_parent.rs"]
+mod parent_tests;

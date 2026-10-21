@@ -1,14 +1,17 @@
 //! Actual selected ordinary-vector batch before the existing contour/style compiler.
-//! A retained source is evaluated once, then its whole layer receives exactly one pose.
+//! Retained owner numeric values feed the actual whole-layer geometry and parent stages.
 use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{PosedStroke, RigPoseEvaluation};
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_record_rest_with_pose, has_unjoined_parent_blend, is_vector_record,
     record_layer_has_active_path_fx, EvalSegment, EvaluatedVector,
 };
-use crate::object_document::{Presence, PropertyHolderTarget};
+use crate::object_document::{ObjectRecord, Presence, PropertyHolderTarget};
 use crate::object_frame_packet::projection::{project_layer_3d, transform_layer_2d};
 use crate::object_frame_packet::{MotionValues, ObjectFramePacket, ObjectFrameRecord};
 use std::collections::BTreeMap;
+
+#[path = "object_scene_vector_parent.rs"]
+mod parent;
 
 pub(super) struct PreparedVector {
     pub(super) geometry: EvaluatedVector,
@@ -122,9 +125,11 @@ fn prepare_layer(
         }
         return Ok(None);
     }
-    if !three_d && layer.parent_layer_uid.value().is_some_and(Option::is_some) {
-        return Err("ordinary vector parent chain awaits its actual batch consumer");
-    }
+    let parents = if three_d {
+        Vec::new()
+    } else {
+        parent::chain(packet, index, poses)?
+    };
     // Keep the original no-geometry-Motion route and its per-record refusal/order behavior.
     // New expanded/defaulted holder shapes still need their actual receipt-backed consumer.
     let expanded = packet
@@ -141,7 +146,7 @@ fn prepare_layer(
                     })
             })
         });
-    if !active && !expanded {
+    if !active && !expanded && parents.is_empty() {
         return Ok(None);
     }
     let mixed = sources.iter().any(|s| {
@@ -189,6 +194,19 @@ fn prepare_layer(
                     .is_some_and(|m| (m.scale[0].abs() + m.scale[1].abs()) / 200. != 1.))
             .then_some("scaled vector stroke awaits its actual paint width and dash consumer")
         });
+        let refusal = refusal.or_else(|| {
+            if !parents.is_empty() && record.fill_gradient().is_some() {
+                Some("parented vector gradient awaits its actual paint coordinates consumer")
+            } else if stroke
+                && parents
+                    .iter()
+                    .any(|p| (p.mat.sx.abs() + p.mat.sy.abs()) / 2. != 1.)
+            {
+                Some("scaled parent stroke awaits its actual paint width and dash consumer")
+            } else {
+                None
+            }
+        });
         refusals.push(refusal);
         let pose = match poses.get(&index) {
             Some(Ok(pose)) => pose
@@ -234,7 +252,14 @@ fn prepare_layer(
             .ok_or("ordinary vector Motion receipt is unavailable")?;
         let vectors = transform_layer_2d(&vectors, motion)
             .map_err(|_| "ordinary vector Motion batch refused its numeric inputs")?;
-        (vectors, (motion.opacity / 100.).max(0.))
+        let vectors = parent::apply(&vectors, &parents)?;
+        let opacity = parents
+            .iter()
+            .fold((motion.opacity / 100.).max(0.), |op, p| op * p.mat.op);
+        if !opacity.is_finite() {
+            return Err("parent opacity product is not finite");
+        }
+        (vectors, opacity)
     };
     Ok(Some(
         vectors
@@ -255,12 +280,20 @@ pub(super) fn legacy_rest(
     source: ObjectFrameRecord<'_>,
     pose: Option<&PosedStroke>,
 ) -> Result<EvaluatedVector, &'static str> {
-    if record_layer_has_active_path_fx(packet, source.record()) {
+    legacy_record_rest(packet, source.source_object_index(), source.record(), pose)
+}
+
+fn legacy_record_rest(
+    packet: &ObjectFramePacket,
+    source_index: usize,
+    record: &ObjectRecord,
+    pose: Option<&PosedStroke>,
+) -> Result<EvaluatedVector, &'static str> {
+    if record_layer_has_active_path_fx(packet, record) {
         return Err("layer path effects on a legacy record await the vector join");
     }
     // Field access is confined to the original record returned by the admitted
     // evaluation port. No document lookup or second source authority exists.
-    let record = source.record();
     let geometry = &record.geometry;
     if record.family != "closed-solid-fill-cubic-path"
         || geometry.kind != "cubic-path"
@@ -310,7 +343,7 @@ pub(super) fn legacy_rest(
         None => segments,
     };
     Ok(EvaluatedVector {
-        source_object_index: source.source_object_index(),
+        source_object_index: source_index,
         closed: true,
         segments,
     })

@@ -33,6 +33,13 @@ fn canvas_valid(canvas: [f64; 2]) -> Result<(), ProjectionError> {
     }
 }
 
+/// The same true cubic union used by own-layer Motion and ancestor pivots.
+pub(crate) fn layer_bounds(
+    vectors: &[EvaluatedVector],
+) -> Result<Option<crate::evaluation::property_projection_3d::Bounds>, ProjectionError> {
+    geometry::bounds(vectors)
+}
+
 /// Whole-layer Motion, after the caller's existing pathFX/rebuild/element stages.
 /// Opacity and stroke-scale paint semantics remain with the actual paint producer.
 pub(crate) fn transform_layer_2d(
