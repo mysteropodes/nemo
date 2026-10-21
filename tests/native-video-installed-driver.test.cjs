@@ -84,7 +84,8 @@ test('blocked steps carry source evidence that still exists at the cited lines',
   const drop=fs.readFileSync(path.join(ROOT,'src/js/adapters/native-import-desktop.js'),'utf8');assert.equal(/providers:\s*\{[^}]*video/.test(drop),false);
   const callers=fs.readdirSync(path.join(ROOT,'src/js/adapters')).filter(n=>n.endsWith('.js')&&n!=='native-project-placement-contract.js')
     .filter(n=>/setOffset'|shiftOffset|setTimeRemapKey/.test(fs.readFileSync(path.join(ROOT,'src/js/adapters',n),'utf8').replace(/kind: 'setOffset', index/g,'')));
-  assert.deepEqual(callers,[]);
+  assert.deepEqual(callers,['native-time-remap-ui.js'],'only the Time Remap key intent has a UI caller; offset has none');
+  assert.equal(/setOffset'|shiftOffset/.test(fs.readFileSync(path.join(ROOT,'src/js/adapters/native-time-remap-ui.js'),'utf8')),false);
   assert.deepEqual([...P.COVERED,'preview','replace-source','offset-or-time-remap'].sort(),[...P.STEPS].sort());
 });
 test('authorization refuses other workflows, stale sources and malformed fixtures before effects',t=>{
