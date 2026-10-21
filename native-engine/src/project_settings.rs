@@ -1,6 +1,15 @@
 //! Immutable supplied project settings, not a document owner, wire codec or UI command.
 //! Supplied settings share the existing project revision owner.
 
+#[path = "project_metadata_annotations.rs"]
+mod annotations;
+#[path = "project_metadata_fields.rs"]
+mod visual;
+pub(crate) use annotations::{ProjectCommentRecord, ProjectWorkspaceRecord};
+#[path = "project_metadata_presets.rs"]
+mod presets;
+pub(crate) use presets::ProjectPresetCatalog;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectMetadataError {
     InvalidCanvas,
@@ -8,6 +17,9 @@ pub(crate) enum ProjectMetadataError {
     InvalidCanvasBackground,
     InvalidWorkArea,
     InvalidCompositionMetadata,
+    InvalidVisualMetadata,
+    InvalidAnnotations,
+    InvalidPresets,
 }
 
 /// Exact accepted spelling plus straight sRGB RGBA8, including the source alpha.
@@ -72,6 +84,9 @@ pub(crate) struct ProjectMetadata {
     bpm: Option<f64>,
     bpm_offset: Option<f64>,
     bpm_show: Option<bool>,
+    visual: visual::VisualMetadata,
+    annotations: annotations::Annotations,
+    custom_brush_presets: Option<std::sync::Arc<ProjectPresetCatalog>>,
     camera: crate::object_document::ProjectCameraState,
 }
 impl ProjectMetadata {
@@ -98,6 +113,9 @@ impl ProjectMetadata {
             bpm: None,
             bpm_offset: None,
             bpm_show: None,
+            visual: visual::VisualMetadata::default(),
+            annotations: annotations::Annotations::default(),
+            custom_brush_presets: None,
             camera: crate::object_document::ProjectCameraState::default(),
         })
     }
@@ -186,6 +204,24 @@ impl ProjectMetadata {
     }
     pub(crate) fn composition_bpm(&self) -> (Option<f64>, Option<f64>, Option<bool>) {
         (self.bpm, self.bpm_offset, self.bpm_show)
+    }
+    /// A scalar tempo edit retains the existing shared marker allocation.
+    /// Supplied finite values are storage values; UI clamps belong to intent.
+    pub(crate) fn with_composition_bpm(
+        self,
+        bpm: Option<f64>,
+        bpm_offset: Option<f64>,
+        bpm_show: Option<bool>,
+    ) -> Result<Self, ProjectMetadataError> {
+        if bpm.is_some_and(|v| !v.is_finite()) || bpm_offset.is_some_and(|v| !v.is_finite()) {
+            return Err(ProjectMetadataError::InvalidCompositionMetadata);
+        }
+        Ok(Self {
+            bpm,
+            bpm_offset,
+            bpm_show,
+            ..self
+        })
     }
     pub(crate) fn canvas_dimensions(&self) -> (u32, u32) {
         (self.canvas_width, self.canvas_height)

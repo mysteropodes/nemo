@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-palette",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.palette.read",
+    "command.document.object.project.palette.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectPaletteReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectPaletteEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
+  },
+  "semantics": "Root-scene field-specific palette/color deltas through the existing native metadata, revision and history owner. Ordered imported palette IDs/names/colors, duplicates and color spelling are preserved. One-based ordinals address records; zero-based cursors page complete records1..16 with strict progress or typed refusal inside complete4096-byte messages. Text is at most1024 UTF-8 bytes without NUL. Duplicate copies native data without whole-array upload; exact-case repeated colors are no-op and retain redo. Reads preserve raw active-index absence/finite values and expose the existing effective selection separately. Bare project/nonroot context are unavailable. Source-stage only; no legacy writer fallback or current public/UI/installed acceptance. Ordinary palette management uses the same pinned native API through the desktop SDK/session queue. Object color application/replacement, full metadata consumers and installed acceptance remain separate open gates.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Pinned palette settings without materializing defaults",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "palette-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.palette.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "palette-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "palettesPresent": false,
+            "paletteCount": 0,
+            "effectiveActivePaletteIdx": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "One field-specific palette delta; availability remains gated",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "palette-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.palette.edit",
+        "payload": {
+          "command": "object.project.palette.edit",
+          "action": {
+            "kind": "appendColor",
+            "ordinal": 1,
+            "color": "#AbC"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "palette-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

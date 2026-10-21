@@ -13,6 +13,30 @@
 // 'perspective' tool to be active, same as every other tool-specific
 // interaction in this app.
 (function () {
+  'use strict';
+  var retired = false, target = null;
+  var empty = Object.freeze([]);
+  function native() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+  function controller() { return window.NemoNativePerspectiveController; }
+  function projection() { var c = controller(); return !retired && c && c.read(); }
+  function settings() { var p = projection(); return p && p.perspective.settings; }
+  function enabled() { if (native()) { var s = settings(); return !!(s && s.perspectiveEnabled); } return !!state.perspectiveEnabled; }
+  window.perspectiveIsEnabled = enabled;
+  window.readPerspectiveSettings = function () { return native() ? settings() : { perspectiveEnabled: state.perspectiveEnabled, perspectiveMode: state.perspectiveMode }; };
+  function nativeEdit(action, origin) {
+    var c = controller();
+    if (!origin || !c || c.read() !== origin || c.isPending()) return Promise.resolve({ status: 'unavailable', code: 'unavailable' });
+    return c.edit(action, origin);
+  }
+  window.setPerspectiveEnabled = function (value, expected) {
+    if (native()) return nativeEdit({ kind: 'setEnabled', enabled: value }, arguments.length > 1 ? expected : projection());
+    state.perspectiveEnabled = value; if (value) ensurePerspectiveVPs();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  };
+  window.lockPerspectiveVPs = function (value, expected) {
+    if (native()) return nativeEdit({ kind: 'lockAll', locked: value }, arguments.length > 1 ? expected : projection());
+    ensurePerspectiveVPs().forEach(function (vp) { vp.locked = value; });
+  };
   function engineOn() { return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && !state.playing; }
 
   // Default VP layout per mode — centered on the canvas, spaced wide enough
@@ -41,12 +65,14 @@
     ];
   }
   function ensurePerspectiveVPs() {
+    if (native()) { var p = projection(); return p ? p.perspective.items : empty; }
     if (!state.perspectiveVPs || !state.perspectiveVPs.length) state.perspectiveVPs = defaultVPs(state.perspectiveMode);
     return state.perspectiveVPs;
   }
   window.ensurePerspectiveVPs = ensurePerspectiveVPs;
-  window.resetPerspectiveVPs = function () { state.perspectiveVPs = defaultVPs(state.perspectiveMode); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); };
-  window.setPerspectiveMode = function (mode) {
+  window.resetPerspectiveVPs = function (expected) { if (native()) return nativeEdit({ kind: 'reset' }, arguments.length ? expected : projection()); state.perspectiveVPs = defaultVPs(state.perspectiveMode); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); };
+  window.setPerspectiveMode = function (mode, expected) {
+    if (native()) return nativeEdit({ kind: 'setMode', mode: mode }, arguments.length > 1 ? expected : projection());
     state.perspectiveMode = mode;
     state.perspectiveVPs = defaultVPs(mode);
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -79,10 +105,12 @@
   // don't use a dense fixed-angle fan either, see axisCandidates' own
   // 2026-09 comment.
   function buildPerspectiveGuideItems() {
-    if (!state.perspectiveEnabled) return [];
-    var vps = ensurePerspectiveVPs();
+    if (!enabled()) return [];
+    var c = controller(), ghost = native() && c && c.readGhost();
+    var vps = ghost || ensurePerspectiveVPs();
     var items = [];
-    var reach = Math.max(state.canvasW, state.canvasH) * 2; // long enough to read as a real reference line past the canvas edge, short of the old 4x full-fan reach
+    var shown = native() ? projection() : null;
+    var reach = (native() ? shown ? Math.max(shown.canvas.width, shown.canvas.height) : 0 : Math.max(state.canvasW, state.canvasH)) * 2; // long enough to read as a real reference line past the canvas edge, short of the old 4x full-fan reach
     var repereCol = [255, 200, 80, 130]; // same amber the old horizon line used — "this is a fixed reference," distinct from the VP markers' own orange/coral
     for (var i = 0; i < vps.length; i++) {
       for (var j = i + 1; j < vps.length; j++) {
@@ -148,10 +176,10 @@
   // so it doesn't compete with the static fan for attention.
   var CURSOR_GUIDE_REACH_PX = 46;
   function buildPerspectiveCursorGuideItems() {
-    if (!state.perspectiveEnabled || !cursorWorld) return [];
+    if (!enabled() || !cursorWorld) return [];
     var vps = ensurePerspectiveVPs();
     var items = [];
-    var zs = 1 / Math.max(0.0001, view.zoom);
+    var zs = native() ? nativeScale(projection()) : 1 / Math.max(0.0001, view.zoom);
     var reach = CURSOR_GUIDE_REACH_PX * zs;
     // 2026-09 fix (Cyril, live: "va sur brush perspective guide" showed
     // nothing) — this was pure white [255,255,255,210], invisible against
@@ -213,7 +241,7 @@
   // direction yet.
   var SNAP_DEG = 6;
   function snapToVP(start, end) {
-    if (!state.perspectiveEnabled) return end;
+    if (!enabled()) return end;
     var dx = end.x - start.x, dy = end.y - start.y;
     var dragLen = Math.hypot(dx, dy);
     if (dragLen < 4) return end;
@@ -264,7 +292,7 @@
   // locking onto it outright, so a hand that's merely "roughly aimed at" a
   // VP should still feel the influence.
   function findVPRayByAngle(start, currentPt, toleranceDeg) {
-    if (!state.perspectiveEnabled) return null;
+    if (!enabled()) return null;
     var dx = currentPt.x - start.x, dy = currentPt.y - start.y;
     var dragAngle = Math.atan2(dy, dx);
     var best = null, bestDiff = (toleranceDeg || SNAP_DEG) * Math.PI / 180;
@@ -304,8 +332,9 @@
   // never refreshed" class of bug CLAUDE.md already warns about elsewhere.
   var cursorWorld = null;
   function trackCursor(e) {
-    if (!engineOn() || !state.perspectiveEnabled) { cursorWorld = null; return; }
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    if (!engineOn() || !enabled()) { cursorWorld = null; return; }
+    var w = native() ? nativePoint(e, projection()) : window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    if (!w) { cursorWorld = null; return; }
     cursorWorld = { x: w[0], y: w[1] };
   }
   // Broadened 2026-07 — same reasoning as symmetry-bridge.js's own
@@ -315,7 +344,7 @@
   // tool, just the guide being enabled — safe since onDown only claims an
   // explicit hit-test hit and this file loads before every drawing-tool
   // bridge.
-  function shouldEdit() { return engineOn() && (state.tool === 'perspective' || state.perspectiveEnabled); }
+  function shouldEdit() { return engineOn() && (state.tool === 'perspective' || enabled()); }
   function hitVP(worldPt) {
     var vps = ensurePerspectiveVPs();
     var tol = 12 / view.zoom;
@@ -339,6 +368,7 @@
     return Math.hypot(worldPt.x - projx, worldPt.y - projy) < tol;
   }
   function onDown(e) {
+    if (native()) { nativeDown(e); return; }
     if (!shouldEdit()) return;
     // Only claim the event on an ACTUAL hit — same fix as
     // symmetry-bridge.js's own onDown (see its comment): calling
@@ -357,6 +387,7 @@
     }
   }
   function onMove(e) {
+    if (native()) { trackCursor(e); nativeMove(e); return; }
     // Ungated — see trackCursor's own comment. Runs even when this same
     // move goes on to be ignored (no VP drag active) or later stopped by a
     // DIFFERENT tool's own capture-phase listener further down the chain:
@@ -379,25 +410,48 @@
     window.SMEngineBridge.renderNow();
   }
   function onUp(e) {
+    if (native()) { nativeUp(e); return; }
     if (!shouldEdit() || (!dragging && !draggingWhole)) return;
     e.stopImmediatePropagation(); e.preventDefault();
     dragging = null; draggingWhole = null;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
   }
-  function init() {
-    var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
-    target.addEventListener('pointerdown', onDown, { capture: true });
-    target.addEventListener('pointermove', onMove, { capture: true });
-    target.addEventListener('pointerup', onUp, { capture: true });
-    target.addEventListener('pointercancel', onUp, { capture: true });
-    // Clears the live cursor guide the instant the pointer leaves the
-    // canvas — pointermove alone never fires again once outside, so
-    // without this the crosshair would freeze at its last position
-    // instead of disappearing, the exact "ghost" class of bug a stale
-    // volatile cursor overlay always risks.
-    target.addEventListener('pointerleave', function () { cursorWorld = null; window.SMEngineBridge && window.SMEngineBridge.renderNow(); }, { capture: true });
+  function nativePoint(event, origin) { var c = controller(); return c && c.point(event, origin); }
+  function nativeScale(origin) { var c = controller(); return c ? c.scale(origin) : 1; }
+  function cancelNative() { var c = controller(); if (c) c.cancelPointer(); }
+  window.cancelPerspectiveGesture = cancelNative;
+  function nativeDown(event) { var c = controller(); if (c) c.pointerDown(event); }
+  function nativeMove(event) { var c = controller(); if (c) c.pointerMove(event); }
+  function nativeUp(event) { var c = controller(); if (c) c.pointerUp(event); }
+  function onCancel(event) {
+    if (native()) { var c = controller(); if (c) c.pointerCancel(event); }
+    else onUp(event);
   }
+  function onLeave() {
+    cursorWorld = null; if (native()) cancelNative();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
+  function dispose() {
+    if (retired) return;
+    retired = true; cancelNative(); cursorWorld = null;
+    document.removeEventListener('DOMContentLoaded', init);
+    if (target) {
+      [['pointerdown', onDown], ['pointermove', onMove], ['pointerup', onUp], ['pointercancel', onCancel], ['pointerleave', onLeave]]
+        .forEach(function (entry) { target.removeEventListener(entry[0], entry[1], true); });
+    }
+    window.removeEventListener('pagehide', dispose); window.removeEventListener('blur', cancelNative);
+  }
+  function init() {
+    if (retired || target) return;
+    document.removeEventListener('DOMContentLoaded', init);
+    target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
+    if (!target) return;
+    [['pointerdown', onDown], ['pointermove', onMove], ['pointerup', onUp], ['pointercancel', onCancel], ['pointerleave', onLeave]]
+      .forEach(function (entry) { target.addEventListener(entry[0], entry[1], true); });
+  }
+  window.addEventListener('pagehide', dispose, { once: true }); window.addEventListener('blur', cancelNative);
+  window.disposePerspectiveBridge = dispose;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();

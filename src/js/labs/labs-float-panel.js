@@ -97,8 +97,15 @@
       },
     },
     perspective: {
-      isOn: function () { return !!(window.state && state.perspectiveEnabled); },
-      toggle: function () {
+      isOn: function () {
+        if (window.__TAURI__ && window.__TAURI__.core) return !!(window.perspectiveIsEnabled && window.perspectiveIsEnabled());
+        return !!(window.state && state.perspectiveEnabled);
+      },
+      toggle: function (origin) {
+        if (window.__TAURI__ && window.__TAURI__.core) {
+          if (window.setPerspectiveEnabled) return window.setPerspectiveEnabled(!this.isOn(), origin);
+          return;
+        }
         state.perspectiveEnabled = !state.perspectiveEnabled;
         if (state.perspectiveEnabled) {
           if (window.ensurePerspectiveVPs) window.ensurePerspectiveVPs();
@@ -282,7 +289,16 @@
       document:document,contexts:TOOL_CONTEXT,realFeatures:REAL_FEATURES,actions:ACTIONS,always:ALWAYS,names:SHORT_NAME,icons:ICONS,params:PARAMS,
       symModes:SYM_MODES,perspModes:PERSP_MODES,perspLabels:PERSP_MODE_LABEL,symLabels:SYM_MODE_LABEL,
       ready:function(){return window.SMLabs&&window.state;},list:function(){return SMLabs.list();},
-      readField:function(key){return state[key];},toggle:function(name){return window.SMLabs.toggle(name);},
+      readField:function(key){
+        if (key.indexOf('perspective') === 0 && window.__TAURI__ && window.__TAURI__.core) {
+          var value = window.readPerspectiveSettings && window.readPerspectiveSettings();
+          return value ? key === 'perspectiveMode' && value[key] === undefined ? '2pt' : value[key] : undefined;
+        }
+        return state[key];
+      },
+      perspectiveNative:function(){return !!(window.__TAURI__&&window.__TAURI__.core);},
+      perspectiveToken:function(){var c=window.NemoNativePerspectiveController;return c&&c.read();},
+      perspectiveReady:function(){var c=window.NemoNativePerspectiveController;return !!(c&&c.read()&&!c.isPending());},toggle:function(name){return window.SMLabs.toggle(name);},
       title:function(key){return (window.SM&&SM.t?SM.t(key):null);},translate:function(key){return SM.t(key);},
       refreshSettings:function(){if(window.renderLabsPanel)window.renderLabsPanel();},
       getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){return localStorage.setItem(key,value);},
@@ -290,13 +306,16 @@
       setSectors:function(value){state.symmetryRadialSectors=Math.max(2,Math.min(24,value));},
       toggleExtend:function(){state.symmetryExtend=!state.symmetryExtend;},
       perspectiveLocked:function(){var vps=window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[];return !!(vps.length&&vps.every(function(vp){return vp.locked;}));},
-      lockPerspective:function(locked){(window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[]).forEach(function(vp){vp.locked=locked;});},
+      lockPerspective:function(locked,origin){
+        if(window.__TAURI__&&window.__TAURI__.core){if(window.lockPerspectiveVPs)return window.lockPerspectiveVPs(locked,origin);return;}
+        (window.ensurePerspectiveVPs?window.ensurePerspectiveVPs():[]).forEach(function(vp){vp.locked=locked;});
+      },
       renderNow:function(){if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
       setSymmetryMode:function(value){if(window.setSymmetryMode)return window.setSymmetryMode(value);},
       syncSymmetryPanelVisibility:function(){if(window.syncSymmetryPanelVisibility)return window.syncSymmetryPanelVisibility();},
       resetSymmetryGuide:function(){if(window.resetSymmetryGuide)return window.resetSymmetryGuide();},
-      setPerspectiveMode:function(value){if(window.setPerspectiveMode)return window.setPerspectiveMode(value);},
-      resetPerspectiveVPs:function(){if(window.resetPerspectiveVPs)return window.resetPerspectiveVPs();},
+      setPerspectiveMode:function(value,origin){if(window.setPerspectiveMode)return window.setPerspectiveMode(value,origin);},
+      resetPerspectiveVPs:function(origin){if(window.resetPerspectiveVPs)return window.resetPerspectiveVPs(origin);},
     });
     return floatingUi;
   }

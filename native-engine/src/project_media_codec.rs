@@ -4,7 +4,7 @@ use crate::object_document::ProjectMetadata;
 use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 #[cfg(feature = "project_media_codec")]
 use crate::reference_image_asset::{ImageAssetError, ImageAssetLimits};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::value::RawValue;
 
 #[cfg(feature = "project_media_codec")]

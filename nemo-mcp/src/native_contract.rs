@@ -25,10 +25,20 @@ pub(crate) mod text_read;
 
 #[path = "native_audio_track_contract.rs"]
 pub(crate) mod audio_track;
+#[path = "native_composition_contract.rs"]
+pub(crate) mod composition;
+#[path = "native_guide_contract.rs"]
+pub(crate) mod guide;
+#[path = "native_palette_contract.rs"]
+pub(crate) mod palette;
+#[path = "native_perspective_contract.rs"]
+pub(crate) mod perspective;
 #[path = "native_project_placement_contract.rs"]
 pub(crate) mod placement;
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
+#[path = "native_shadow_contract.rs"]
+pub(crate) mod shadow;
 
 #[path = "native_diagnostics_contract.rs"]
 mod diagnostics;
@@ -105,6 +115,11 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | text_read::OP
             | metadata::OP
             | property_read::OP
+            | composition::READ
+            | palette::READ
+            | guide::READ
+            | shadow::READ
+            | perspective::READ
             | font::QUERY
             | brush::QUERY
             | "query.document.object.layer.timing"
@@ -130,6 +145,11 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
+        composition::READ | composition::EDIT => composition::request(operation, payload),
+        palette::READ | palette::EDIT => palette::request(operation, payload),
+        guide::READ | guide::EDIT => guide::request(operation, payload),
+        shadow::READ | shadow::EDIT => shadow::request(operation, payload),
+        perspective::READ | perspective::EDIT => perspective::request(operation, payload),
         placement::OP => placement::request(payload),
         audio_track::OP => audio_track::request(payload),
         layer_policy::OP => layer_policy::request(payload),
@@ -291,6 +311,21 @@ pub(crate) fn validate_result(
     }
     if operation == property_read::OP {
         return property_read::result(request_document_id, payload, result);
+    }
+    if matches!(operation, composition::READ | composition::EDIT) {
+        return composition::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, palette::READ | palette::EDIT) {
+        return palette::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, perspective::READ | perspective::EDIT) {
+        return perspective::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, shadow::READ | shadow::EDIT) {
+        return shadow::result(operation, request_document_id, payload, result);
+    }
+    if matches!(operation, guide::READ | guide::EDIT) {
+        return guide::result(operation, request_document_id, payload, result);
     }
     if brush::owns(operation) {
         return brush::result(operation, payload, result);

@@ -1918,63 +1918,6 @@ function ensureStrokeId(p){
 // cloning whatever the path's CURRENT — already mutated by the very edit
 // being forked — geometry happened to be, producing a ghost with the wrong
 // (post-edit) shape instead of the original.
-// Shadow Brush (2026-07, shadow-brush-bridge.js) — every state.shadowMode
-// commit site used to just stamp data.channelTag='shadow' and otherwise
-// draw with whatever the normal Stroke/Fill color happened to be. Now that
-// there's a dedicated small palette for this (state.shadowPalette, each
-// swatch with a stable id), the same tag also needs the ACTIVE swatch's
-// color (not the global strokeColor) and its id (data.shadowSwatchId, so a
-// future step can group/recolor "all guide lines for this shadow bucket"
-// even after the swatch's own color is edited). Pure guide lines have no
-// fill — delimiting the eventual fill is the whole point (see the paint-
-// bucket workflow the bridge's header comment describes), so fillColor is
-// explicitly cleared here too.
-function applyShadowBrushTag(p,preferFill){
-  if(!p)return;
-  p.data=p.data||{};
-  p.data.channelTag='shadow';
-  if(window.SMShadowBrush){
-    var sw=window.SMShadowBrush.activeSwatch();
-    // Shadow Brush is construction ink for the fill solver, never a painted
-    // ribbon. Convert pressure/Fill-Brush outlines back to their centreline
-    // while that centreline still exists, then enforce a visible stroke and
-    // no fill for every producer (Draw, Fill Brush, Pen and Shape).
-    if(p.data.isVectorBrush&&p.data.centerSegments&&p.data.centerSegments.length){
-      var shadowCenter=p.data.centerSegments.map(function(s){return{
-        point:[s.point[0],s.point[1]],
-        handleIn:s.handleIn?[s.handleIn[0],s.handleIn[1]]:[0,0],
-        handleOut:s.handleOut?[s.handleOut[0],s.handleOut[1]]:[0,0],
-      };});
-      p.removeSegments();
-      shadowCenter.forEach(function(s){
-        p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));
-      });
-      p.closed=false;
-      delete p.data.isVectorBrush;delete p.data.centerSegments;delete p.data.widthProfile;
-    }
-    // preferFill (2026-07 fix): the "Stroke off / Fill on" vector-brush
-    // commit (draw-bridge.js's shadowPreferFill) never had a stroke to
-    // begin with — its ink lives entirely in fillColor. Forcing the
-    // default stroke-only treatment on it silently overrode the user's
-    // explicit Stroke-eye-OFF choice, turning an intended filled patch
-    // into a near-invisible 1px hairline (strokeWidth falling back to
-    // Paper's own Path default since this branch never sets one).
-    // Confirmed live: drawing with vectorBrush+!strokeEnabled+fillEnabled
-    // and Shadow armed produced fillColor:null, strokeColor:<swatch> —
-    // exactly the parameter this function was documented (but never wired)
-    // to prevent.
-    if(preferFill){
-      p.strokeColor=null;
-      p.fillColor=sw.color;
-    }else{
-      p.fillColor=null;
-      p.strokeColor=sw.color;
-      p.strokeWidth=Math.max(1,p.strokeWidth||state.brushSize||3);
-      p.strokeCap='round';p.strokeJoin='round';
-    }
-    p.data.shadowSwatchId=sw.id;
-  }
-}
 function tagOwner(p){
   if(!p||!p.data)return;
   // Mask mode (2026-08, AE-style "Mask" — see the mask-feature audit):

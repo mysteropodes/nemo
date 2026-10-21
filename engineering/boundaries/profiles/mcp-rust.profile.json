@@ -106,7 +106,17 @@
         "src/native_audio_track_wire_tests.rs",
         "src/native_fill_trace_contract_tests.rs",
         "src/native_fill_trace_wire.rs",
-        "src/native_text_animator_contract.rs"
+        "src/native_text_animator_contract.rs",
+        "src/native_composition_contract.rs",
+        "src/native_composition_contract_tests.rs",
+        "src/native_palette_contract.rs",
+        "src/native_palette_contract_tests.rs",
+        "src/native_guide_contract.rs",
+        "src/native_guide_contract_tests.rs",
+        "src/native_shadow_contract.rs",
+        "src/native_shadow_contract_tests.rs",
+        "src/native_perspective_contract.rs",
+        "src/native_perspective_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",

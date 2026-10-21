@@ -619,7 +619,7 @@
       get enabled() { return !!state.cameraLayerOn; }
     };
 
-    return api;
+    return window.NemoNativeCompositionUI.scripting(window, api, fail);
   }
 
   // ---- runner ----
