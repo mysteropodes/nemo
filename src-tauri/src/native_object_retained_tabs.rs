@@ -2,7 +2,7 @@
 use crate::native_dispatch::object_host::{envelope_identity, export, preview};
 use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{
-    application::{ApplicationReleaseReceipt, ObjectMotionFrameFailure},
+    application::{ApplicationReleaseReceipt, ObjectMotionFrameControl},
     export_job::{
         CleanupStatus, ExportReleaseReconciliation, ExternalEffectDisposition, JobStatus,
         ReconciliationStage,
@@ -16,7 +16,7 @@ pub(super) struct ParkedProject {
     history: NativeObjectHistory,
     export: Option<export::ObjectExportSession>,
     metadata: Value,
-    motion_failure: Option<ObjectMotionFrameFailure>,
+    motion_control: ObjectMotionFrameControl,
 }
 
 /// Immutable plan, consumed only by the caller holding the lifecycle reservation.
@@ -275,7 +275,7 @@ impl NativeObjectHost {
                 .swap_project_history(&plan.origin, target_snapshot, &mut parked.history)
                 .map_err(|_| "native retained activation origin changed")?;
             std::mem::swap(&mut self.object_export, &mut parked.export);
-            std::mem::swap(&mut self.preview.motion_failure, &mut parked.motion_failure);
+            std::mem::swap(&mut self.preview.motion_control, &mut parked.motion_control);
             parked.metadata = plan.outgoing.clone();
         } else {
             let (_, incoming) = self
@@ -290,14 +290,14 @@ impl NativeObjectHost {
                 history: outgoing,
                 export: self.object_export.take(),
                 metadata: plan.outgoing.clone(),
-                motion_failure: self.preview.motion_failure.take(),
+                motion_control: std::mem::take(&mut self.preview.motion_control),
             });
             self.inactive_project = None;
         }
         self.record_inactive_closed(old_token);
-        let motion_failure = self.preview.motion_failure.take();
+        let motion_control = std::mem::take(&mut self.preview.motion_control);
         self.preview = preview::ObjectPreview::default();
-        self.preview.motion_failure = motion_failure;
+        self.preview.motion_control = motion_control;
         self.released = None;
         Ok(RetainedActivation {
             active: plan.target,

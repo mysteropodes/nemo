@@ -26,6 +26,12 @@ mod font_assets;
 #[path = "native_object_image.rs"]
 mod image_import;
 
+#[path = "native_object_expression_state.rs"]
+mod expression_state;
+
+#[path = "native_object_motion_effects.rs"]
+mod motion_effects;
+
 #[path = "native_object_export.rs"]
 mod export;
 #[path = "native_object_preview.rs"]
@@ -302,9 +308,18 @@ impl NativeDispatch for NativeObjectHost {
             .history
             .acquire_snapshot(self.content_revision())
             .ok_or("native object snapshot is unavailable")?;
-        snapshot
-            .dispatch(request)
-            .map_err(|_| "native object read correlation is invalid".into())
+        let expression_state = request.operation() == "query.document.object.property.read"
+            && serde_json::to_value(&request)
+                .ok()
+                .is_some_and(|wire| wire["payload"]["view"]["kind"] == "expressionState");
+        let response = snapshot
+            .dispatch(request.clone())
+            .map_err(|_| "native object read correlation is invalid".to_string())?;
+        if expression_state && response.is_ok() {
+            self.project_expression_state(&request, response)
+        } else {
+            Ok(response)
+        }
     }
     fn replace_document(&mut self, _: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
         Err("native object host replacement is unavailable".into())
@@ -387,3 +402,6 @@ mod export_tests;
 #[cfg(test)]
 #[path = "native_asset_remove_dispatch_tests.rs"]
 mod asset_remove_tests;
+
+#[cfg(test)]
+pub(crate) use preview::motion_tests::{finalizer_fixture, finalizer_svg};

@@ -193,7 +193,22 @@ fn detached_with_effects(
     Result<PropertyCandidate, ExpressionRefusal>,
     Vec<crate::object_expression_pin::PropertyDependencyEffect>,
 ) {
-    let state = ReadState::new(Arc::new(AtomicUsize::new(0)));
+    detached_with_policy(request, limits, false)
+}
+
+fn detached_with_policy(
+    request: &PropertyExpressionRequest,
+    limits: ExpressionLimits,
+    capture_clean: bool,
+) -> (
+    Result<PropertyCandidate, ExpressionRefusal>,
+    Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+) {
+    let state = if capture_clean {
+        ReadState::recording(Arc::new(AtomicUsize::new(0)), true)
+    } else {
+        ReadState::new(Arc::new(AtomicUsize::new(0)))
+    };
     let outcome = evaluate_shared(request, limits, state.clone());
     let effects = state.effects();
     let candidate = outcome.map(|outcome| PropertyCandidate {
@@ -247,13 +262,50 @@ pub(crate) fn evaluate_property_for_owner_with_effects(
     Result<PropertyEvaluation, ExpressionRefusal>,
     Vec<crate::object_expression_pin::PropertyDependencyEffect>,
 ) {
+    evaluate_property_with_policy(
+        owner, snapshot, target, property, frame, depth, limits, false,
+    )
+}
+
+/// The actual owner-control consumer also needs successful nested clears.
+/// No strict E2 caller changes its dependency shape or runs another guest.
+pub(crate) fn evaluate_property_for_owner_with_effect_log(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    target: &PropertyHolderTarget,
+    property: &str,
+    frame: f64,
+    depth: u32,
+    limits: ExpressionLimits,
+) -> (
+    Result<PropertyEvaluation, ExpressionRefusal>,
+    Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+) {
+    evaluate_property_with_policy(
+        owner, snapshot, target, property, frame, depth, limits, true,
+    )
+}
+
+fn evaluate_property_with_policy(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    target: &PropertyHolderTarget,
+    property: &str,
+    frame: f64,
+    depth: u32,
+    limits: ExpressionLimits,
+    capture_clean: bool,
+) -> (
+    Result<PropertyEvaluation, ExpressionRefusal>,
+    Vec<crate::object_expression_pin::PropertyDependencyEffect>,
+) {
     let request = match prepare_property_expression_request(
         owner, snapshot, target, property, frame, depth,
     ) {
         Ok(request) => request,
         Err(error) => return (Err(error.into()), Vec::new()),
     };
-    let (candidate, effects) = detached_with_effects(&request, limits);
+    let (candidate, effects) = detached_with_policy(&request, limits, capture_clean);
     let result = match candidate {
         Ok(candidate) => request.finalize(owner, candidate),
         Err(refusal) => match request.revalidate(owner) {

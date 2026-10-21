@@ -72,7 +72,7 @@ fn actual_preview_preparation_paints_expression_values_without_touching_history(
             assert_eq!(plan.packet().frame(), 1);
             assert_eq!(plan.packet().records().len(), 1); // Only authored provenance.
             assert_eq!(plan.commands().len(), 0); // The seed is replaced by clone paint.
-            assert!(h.preview.motion_failure.is_none());
+            assert!(!h.preview.motion_control.requires_revision());
             Ok(())
         })
         .unwrap();
@@ -112,7 +112,7 @@ fn actual_svg_export_uses_the_same_evaluated_frame_and_existing_job_lifecycle() 
             "original expression placement missing: {svg}"
         );
     }
-    assert!(owner.preview.motion_failure.is_none());
+    assert!(!owner.preview.motion_control.requires_revision());
     assert_eq!(owner.history.history_depths(), (0, 0));
 }
 
@@ -129,7 +129,7 @@ fn actual_timeout_is_retained_at_owner_and_prevents_both_preview_and_export_publ
         .unwrap_err();
     assert!(error.contains("Timeout"));
     assert!(error.contains("dupOffsetPos"));
-    let retained = format!("{:?}", owner.preview.motion_failure.as_ref().unwrap());
+    let retained = format!("{:?}", owner.preview.motion_control);
     let mut port = MemoryPort::default();
     assert!(owner
         .export_pinned_object_svg_frames(
@@ -143,10 +143,7 @@ fn actual_timeout_is_retained_at_owner_and_prevents_both_preview_and_export_publ
         )
         .is_err());
     assert_eq!((port.started, port.frames.len(), port.published), (0, 0, 0));
-    assert_eq!(
-        format!("{:?}", owner.preview.motion_failure.as_ref().unwrap()),
-        retained
-    );
+    assert_eq!(format!("{:?}", owner.preview.motion_control), retained);
     assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
     let saved: Value = serde_json::from_slice(&before).unwrap();
     assert_eq!(
@@ -174,7 +171,7 @@ fn dropping_the_actual_cpu_preparation_on_a_caller_error_keeps_the_owner_clean()
         "caller stopped before surface acquisition"
     );
     assert!(owner.preview.prepared.is_none());
-    assert!(owner.preview.motion_failure.is_none());
+    assert!(!owner.preview.motion_control.requires_revision());
     owner
         .with_prepared_object_preview(&selector, output(), |_| Ok(()))
         .unwrap();
@@ -190,7 +187,7 @@ fn pending_original_effects_follow_the_real_retained_document_across_tab_activat
     assert!(owner
         .with_prepared_object_preview::<()>(&selector, output(), |_| Ok(()))
         .is_err());
-    let receipt = owner.preview.motion_failure.as_ref().unwrap().to_string();
+    let receipt = format!("{:?}", owner.preview.motion_control);
     let incoming =
         NativeObjectHost::new_blank_project("motion-incoming".into(), 64, 64, 24.).unwrap();
     let incoming_snapshot = snapshot(&incoming);
@@ -219,7 +216,7 @@ fn pending_original_effects_follow_the_real_retained_document_across_tab_activat
         .unwrap();
     owner.activate_retained_project(plan, || Ok(())).unwrap();
     assert!(
-        owner.preview.motion_failure.is_none(),
+        !owner.preview.motion_control.has_pending(),
         "the incoming document has no effects"
     );
     let current = snapshot(&owner);
@@ -235,10 +232,136 @@ fn pending_original_effects_follow_the_real_retained_document_across_tab_activat
         )
         .unwrap();
     owner.activate_retained_project(back, || Ok(())).unwrap();
-    assert_eq!(
-        owner.preview.motion_failure.as_ref().unwrap().to_string(),
-        receipt
-    );
+    assert_eq!(format!("{:?}", owner.preview.motion_control), receipt);
     assert_eq!(snapshot(&owner).snapshot_id(), origin.snapshot_id());
     assert_eq!(owner.history.history_depths(), (0, 0));
+    let returned = snapshot(&owner);
+    let commit = owner
+        .finalize_object_motion_effects(&selector(&returned, 1), &[1])
+        .unwrap()
+        .unwrap();
+    assert!(commit.changed());
+    assert_eq!(
+        (owner.content_revision(), owner.history.history_depths()),
+        (1, (1, 0))
+    );
+    assert!(owner
+        .finalize_object_motion_effects(&selector(&returned, 1), &[1])
+        .unwrap()
+        .is_none());
+}
+
+// Same actual owner fixture lent to private RevisionSync lifecycle controls.
+pub(crate) fn finalizer_fixture(
+    code: &str,
+) -> (
+    NativeObjectHost,
+    native_engine::object_snapshot::ObjectSnapshot,
+    native_engine::scheduler::OutputSpec,
+) {
+    let owner = host(code);
+    let origin = snapshot(&owner);
+    (owner, origin, output())
+}
+
+pub(crate) fn finalizer_svg(
+    owner: &mut NativeObjectHost,
+    origin: &native_engine::object_snapshot::ObjectSnapshot,
+) -> String {
+    let mut port = MemoryPort::default();
+    let outcome = owner
+        .export_pinned_object_svg_frames(
+            &selector(origin, 1),
+            &[1],
+            format!("callback-svg/{}", uuid::Uuid::new_v4()),
+            "output".into(),
+            output(),
+            1024 * 1024,
+            &mut port,
+        )
+        .unwrap();
+    assert_eq!(outcome.receipt.unwrap().status, JobStatus::Succeeded);
+    assert!(outcome.release.cleanup_complete);
+    assert_eq!((port.started, port.published), (1, 1));
+    String::from_utf8(port.frames.remove(0)).unwrap()
+}
+
+#[test]
+fn diagnostic_batch_finishes_before_any_export_staging_and_replays_actual_fallback_without_history()
+{
+    let mut owner = host("'wrong dimension'");
+    let origin = snapshot(&owner);
+    let expected = selector(&origin, 0);
+    let mut port = MemoryPort::default();
+    let before = encode_storage_project(origin.document()).unwrap();
+    assert!(owner
+        .export_pinned_object_svg_frames(
+            &expected,
+            &[0, 1],
+            "batch-before-seal".into(),
+            "output".into(),
+            output(),
+            1024 * 1024,
+            &mut port
+        )
+        .is_err());
+    assert_eq!((port.started, port.published), (0, 0));
+    assert_eq!(owner.pending_object_motion_frames(), [0, 1]);
+    let receipt = owner
+        .finalize_object_motion_effects(&expected, &[0, 1])
+        .unwrap()
+        .unwrap();
+    assert!(!receipt.changed());
+    assert!(receipt.frame_ready());
+    let done = owner
+        .export_pinned_object_svg_frames(
+            &expected,
+            &[0, 1],
+            "batch-after-seal".into(),
+            "output".into(),
+            output(),
+            1024 * 1024,
+            &mut port,
+        )
+        .unwrap();
+    assert_eq!(done.receipt.unwrap().status, JobStatus::Succeeded);
+    assert_eq!((port.started, port.frames.len(), port.published), (1, 2, 1));
+    for bytes in &port.frames {
+        let svg = std::str::from_utf8(bytes).unwrap();
+        for x in [4, 14, 24] {
+            assert!(svg.contains(&format!("<path d=\"M{x},4")));
+        }
+    }
+    assert_eq!(
+        encode_storage_project(snapshot(&owner).document()).unwrap(),
+        before
+    );
+    assert_eq!(
+        (owner.content_revision(), owner.history.history_depths()),
+        (0, (0, 0))
+    );
+}
+
+#[test]
+fn actual_owner_teardown_keeps_unsealed_receipts_and_refuses_late_finalization() {
+    let mut owner = host("while(true){}");
+    let origin = snapshot(&owner);
+    let expected = selector(&origin, 1);
+    assert!(owner
+        .with_prepared_object_preview(&expected, output(), |_| Ok(()))
+        .is_err());
+    let retained = format!("{:?}", owner.preview.motion_control);
+    let before = encode_storage_project(origin.document()).unwrap();
+    let released = owner.release_project().unwrap();
+    assert!(released.reconciliation_complete());
+    assert_eq!(format!("{:?}", owner.preview.motion_control), retained);
+    assert!(owner
+        .finalize_object_motion_effects(&expected, &[1])
+        .is_err());
+    assert_eq!(format!("{:?}", owner.preview.motion_control), retained);
+    assert_eq!(owner.history.history_depths(), (0, 0));
+    assert_eq!(
+        encode_storage_project(snapshot(&owner).document()).unwrap(),
+        before
+    );
 }

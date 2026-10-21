@@ -1,7 +1,7 @@
 //! Private original-owner binding to the existing desktop artifact port.
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
-    application::prepare_object_motion_exposure_frame_for_owner,
+    application::prepare_object_motion_exposure_frame_for_control,
     compositor::Compositor,
     export_job::{
         export_object_frames, export_object_svg_frames, CleanupStatus, ExportReleaseReconciliation,
@@ -144,17 +144,17 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object export snapshot is unavailable")?;
-        let (scheduler, motion_failure) = self.preview.export_frame_ports()?;
+        let (scheduler, motion_control) = self.preview.export_frame_ports()?;
         let mut witness_for = |frame| {
             let selector = ObjectFrameSelector {
                 frame,
                 ..expected.clone()
             };
-            let packet = prepare_object_motion_exposure_frame_for_owner(
+            let packet = prepare_object_motion_exposure_frame_for_control(
                 &self.history,
                 &snapshot,
                 &selector,
-                motion_failure,
+                motion_control,
             )
             .map_err(|error| format!("object export selector: {error}"))?;
             let scene = prepare_object_render_scene(&packet, &selector)
@@ -164,16 +164,37 @@ impl NativeObjectHost {
             prepare_object_composition(&plan, &selector)
                 .map_err(|error| format!("object export witness: {error:?}"))
         };
-        // Preserve the single-frame pre-staging selector refusal contract.
-        let mut first = Some(witness_for(expected.frame)?);
-        let witnesses = |frame| {
-            if frame == expected.frame {
-                first
-                    .take()
-                    .ok_or_else(|| "initial object witness already consumed".into())
-            } else {
-                witness_for(frame)
+        // Bound the exact original request before any guest or artifact work.
+        if frames.is_empty()
+            || frames.len() > native_engine::export_job::MAX_OBJECT_EXPORT_FRAMES
+            || frames.first() != Some(&expected.frame)
+            || frames.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err("native object export frames are invalid".into());
+        }
+        // Visit every actual requested frame once before staging. A later
+        // timeout cannot leave an earlier artifact published or lose its effects.
+        let mut prepared = std::collections::BTreeMap::new();
+        let mut refusal = None;
+        for &frame in frames {
+            match witness_for(frame) {
+                Ok(witness) => {
+                    prepared.insert(frame, witness);
+                }
+                Err(error) => {
+                    if refusal.is_none() {
+                        refusal = Some(error);
+                    }
+                }
             }
+        }
+        if let Some(error) = refusal {
+            return Err(error);
+        }
+        let witnesses = |frame| {
+            prepared
+                .remove(&frame)
+                .ok_or_else(|| "object export witness already consumed".into())
         };
         let session_request_id = request_id.clone();
         let request = ObjectHostExportRequest {

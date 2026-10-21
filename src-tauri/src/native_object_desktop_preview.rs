@@ -186,12 +186,17 @@ pub(crate) fn preview_with_target(
             revision_sync,
             |owner| {
                 owner.require_project_output(output.dimensions())?;
-                owner.with_prepared_object_preview(&selector, output, |owner| {
+                let consume = |owner: &mut NativeObjectHost| {
                     Ok(target(ObjectPreviewConsumer {
                         owner,
                         selector: selector.clone(),
                     }))
-                })
+                };
+                if revision_sync.is_some() {
+                    owner.with_prepared_object_preview_for_revision_sync(&selector, output, consume)
+                } else {
+                    owner.with_prepared_object_preview(&selector, output, consume)
+                }
             },
         )
         .map_err(|message| host_error("unavailable", message))??;
@@ -210,23 +215,56 @@ pub(crate) async fn nemo_native_object_preview(
     request_json: String,
 ) -> HostResult<NativePreviewReceipt> {
     require_main(&window)?;
-    let request = admit_request(&request_json, state.instance_id())?;
-    let app_for_main = app.clone();
-    viewport_host::on_main_thread(&app, move || {
-        let state = app_for_main.state::<ApplicationMcp>();
-        preview_with_target(&state, &request, |consumer| {
-            viewport_host::with_object_target(
-                &app_for_main,
-                &request.instance_id,
-                request.lifecycle_generation,
-                request
-                    .viewport
-                    .admit_object(&request.output_spec.admit_object()?)?,
-                consumer,
-            )
-        })
-    })
-    .await
+    let request = std::sync::Arc::new(admit_request(&request_json, state.instance_id())?);
+    for attempt in 0..2 {
+        let app_for_main = app.clone();
+        let for_main = std::sync::Arc::clone(&request);
+        let (result, completion, diagnostic_ready, target_entered) =
+            viewport_host::on_main_thread(&app, move || {
+                let state = app_for_main.state::<ApplicationMcp>();
+                let mut target_entered = false;
+                let result = preview_with_target(&state, &for_main, |consumer| {
+                    target_entered = true;
+                    viewport_host::with_object_target(
+                        &app_for_main,
+                        &for_main.instance_id,
+                        for_main.lifecycle_generation,
+                        for_main
+                            .viewport
+                            .admit_object(&for_main.output_spec.admit_object()?)?,
+                        consumer,
+                    )
+                });
+                // Guards and target borrow are gone. Close diagnostic-only work
+                // before resolving this preview, even while its R1 ACK is pending.
+                let diagnostic_ready = state
+                    .seal_object_motion_diagnostics()
+                    .map_err(|error| host_error("unavailable", error))?;
+                let completion = state.spawn_object_motion_completion(&app_for_main);
+                Ok((result, completion, diagnostic_ready, target_entered))
+            })
+            .await?;
+        if result.is_err() && !target_entered && diagnostic_ready == Some(true) && attempt == 0 {
+            continue;
+        }
+        if let Some((receiver, waits_for_prior)) = completion {
+            // The matching R1 proof must return its cached fallback presentation
+            // before the consumer can ACK R1. Its independent worker waits for
+            // original settle, then notifies/awaits the R2 disable transaction.
+            if waits_for_prior {
+                return result;
+            }
+            let finalized = receiver
+                .await
+                .map_err(|_| host_error("unavailable", "native Motion completion was cancelled"))?
+                .map_err(|error| host_error("unavailable", error))?;
+            if result.is_err() && !target_entered && finalized && attempt == 0 {
+                continue;
+            }
+        }
+        return result;
+    }
+    unreachable!("bounded cached fallback retry")
 }
 
 #[cfg(test)]

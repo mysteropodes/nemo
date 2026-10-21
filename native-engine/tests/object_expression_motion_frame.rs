@@ -364,3 +364,6 @@ fn actual_enabled_effector_local_motion_and_follow_path_compose_before_retained_
     }
     assert!(ce.is_none());
 }
+
+#[path = "object_expression_motion_commit.rs"]
+mod commit_tests;

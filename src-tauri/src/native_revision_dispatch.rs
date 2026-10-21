@@ -156,6 +156,33 @@ impl RevisionSync {
                     retained), notification: None }));
                 }
             }
+            if !request.cancelled_before_dispatch
+                && state.motion_reservation.as_ref().is_some_and(|reserved| {
+                    reserved.matches_owner(
+                        generation,
+                        application.instance_id(),
+                        application.document_id(),
+                        before,
+                    )
+                })
+            {
+                let retained = state
+                    .motion_reservation
+                    .as_ref()
+                    .is_some_and(|reserved| reserved.retains_request(&request.request_id));
+                if retained {
+                    let response = invoke_dispatch(application, &request)?;
+                    if !response.ok {
+                        return Ok(Some(Delivery {
+                            response,
+                            notification: None,
+                        }));
+                    }
+                }
+                return Ok(Some(Delivery { response: unavailable(&request, instance, before,
+                    "native retained Motion effects await trusted completion; command was not dispatched",
+                    retained), notification: None }));
+            }
             if external && state.subscriber.is_none() && !request.cancelled_before_dispatch {
                 return Ok(Some(Delivery {
                     response: unavailable(
@@ -190,14 +217,7 @@ impl RevisionSync {
                 to_revision: after,
                 request_id: request.request_id,
             };
-            let (sender, receiver) = oneshot::channel();
-            state.pending = Some(PendingRevision {
-                event: event.clone(),
-                sender: Some(sender),
-                acknowledged: false,
-                failed: false,
-            });
-            Some((event, receiver))
+            Some(state.begin_event(event))
         } else {
             None
         };

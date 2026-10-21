@@ -1,6 +1,6 @@
 //! Native read callbacks live only inside one interrupted guest context.
 //! Recursive property reads retain the same snapshot and execution budget.
-use crate::evaluation::property_expression_runtime::{evaluate_with_fallback, Outcome};
+use crate::evaluation::property_expression_runtime::{evaluate_with_fallback, Diagnostic, Outcome};
 use crate::object_expression_pin::{
     prepare_retained_property_expression_request, PropertyDependencyEffect,
     PropertyExpressionRequest,
@@ -19,13 +19,18 @@ use std::{
 pub(super) struct ReadState {
     pub(super) polls: Arc<AtomicUsize>,
     effects: Rc<RefCell<Vec<PropertyDependencyEffect>>>,
+    capture_clean: bool,
     refusal: Rc<RefCell<Option<ExpressionRefusal>>>,
 }
 impl ReadState {
     pub(super) fn new(polls: Arc<AtomicUsize>) -> Self {
+        Self::recording(polls, false)
+    }
+    pub(super) fn recording(polls: Arc<AtomicUsize>, capture_clean: bool) -> Self {
         Self {
             polls,
             effects: Rc::default(),
+            capture_clean,
             refusal: Rc::default(),
         }
     }
@@ -69,8 +74,20 @@ fn effective(
             return Err("Native expression read refused");
         }
     };
-    let result = evaluate_with_fallback(request.dim(), request.raw(), outcome);
-    if result.diagnostic.is_some() || result.disable {
+    let mut result = evaluate_with_fallback(request.dim(), request.raw(), outcome);
+    if state.capture_clean
+        && result.diagnostic.is_none()
+        && state.effects.borrow().iter().any(|effect| {
+            effect.target == target
+                && effect.property == property
+                && effect.diagnostic == Some(Diagnostic::TooDeep)
+        })
+    {
+        // The original _depthTripped list prevents a successful outer hop
+        // from clearing the same expression's warning within this evaluation.
+        result.diagnostic = Some(Diagnostic::TooDeep);
+    }
+    if state.capture_clean || result.diagnostic.is_some() || result.disable {
         state.effects.borrow_mut().push(PropertyDependencyEffect {
             target,
             property: property.to_owned(),

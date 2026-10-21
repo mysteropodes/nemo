@@ -1,6 +1,6 @@
 //! Original owner-held Motion -> duplicator frame; all guest values retire first.
-//! Non-clean outcomes remain at the actual host and refuse publication. C02's
-//! diagnostic/timeout-disable committer is still required; a getter never edits history.
+//! Strict reads refuse non-clean outcomes. The owner-control sibling retains
+//! numeric fallback and effects for an explicit callback; no getter edits history.
 use crate::evaluation::motion_parent_chain::motion_mat_from_values;
 use crate::evaluation::object_component_kernels::duplicator_placement_modes::JsNumber;
 use crate::evaluation::object_component_kernels::object_duplicator_evaluate::snapshot::SnapshotMotion;
@@ -13,11 +13,21 @@ use crate::object_document::{Presence, PropertyHolderTarget};
 use crate::object_expression_pin::{
     verify_owner_snapshot, PropertyDependencyEffect, PropertyEvaluation,
 };
-use crate::object_expression_runtime::property::evaluate_property_for_owner_with_effects;
+use crate::object_expression_runtime::property::{
+    evaluate_property_for_owner_with_effect_log, evaluate_property_for_owner_with_effects,
+};
 use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
 use crate::object_frame_packet::{ObjectFrameError, ObjectFramePacket, ObjectFrameSelector};
 use crate::revision::ObjectSnapshot;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+
+#[path = "object_expression_motion_commit.rs"]
+pub(super) mod commit;
+
+#[cfg(test)]
+std::thread_local! {
+    static MOTION_EVALUATIONS: Cell<usize> = Cell::new(0);
+}
 
 /// Rust-only receipts. A success already owns its dependencies; a refused
 /// finalization carries the dependencies separately, never twice.
@@ -74,8 +84,32 @@ struct EvaluatedMotion<'a> {
     raw: SnapshotMotion<'a>,
     effects: RefCell<Vec<MotionEffect>>,
     refusal: RefCell<Option<ExpressionRefusal>>,
+    capture_all: bool,
+    replay: Option<&'a [MotionEffect]>,
+    replay_cursor: Cell<usize>,
 }
-impl EvaluatedMotion<'_> {
+impl<'a> EvaluatedMotion<'a> {
+    fn new(
+        owner: &'a NativeObjectHistory,
+        snapshot: &'a ObjectSnapshot,
+        context: &'a str,
+        frame: f64,
+        limits: ExpressionLimits,
+    ) -> Self {
+        Self {
+            owner,
+            snapshot,
+            context,
+            frame,
+            limits,
+            raw: SnapshotMotion::new(snapshot, context, frame),
+            effects: RefCell::default(),
+            refusal: RefCell::default(),
+            capture_all: false,
+            replay: None,
+            replay_cursor: Cell::new(0),
+        }
+    }
     fn target(&self, uid: &str) -> PropertyHolderTarget {
         PropertyHolderTarget {
             context_id: self.context.to_owned(),
@@ -97,6 +131,23 @@ impl EvaluatedMotion<'_> {
 impl MotionPort for EvaluatedMotion<'_> {
     fn value(&self, uid: &str, key: &'static str) -> Result<Sampled, Unavailable> {
         let target = self.target(uid);
+        if let Some(replay) = self.replay {
+            if let Some(MotionEffect::Evaluated {
+                target: recorded,
+                property,
+                result,
+            }) = replay.get(self.replay_cursor.get())
+            {
+                if recorded == &target && property == key {
+                    self.replay_cursor.set(self.replay_cursor.get() + 1);
+                    return Ok(Some(
+                        result.value.iter().copied().map(JsNumber::Value).collect(),
+                    ));
+                }
+            }
+            // An unrecorded enabled key still refuses through the strict port.
+            return self.raw.value(uid, key);
+        }
         let enabled = self
             .snapshot
             .document()
@@ -109,7 +160,14 @@ impl MotionPort for EvaluatedMotion<'_> {
         if !enabled {
             return self.raw.value(uid, key);
         }
-        let (result, dependencies) = evaluate_property_for_owner_with_effects(
+        #[cfg(test)]
+        MOTION_EVALUATIONS.with(|count| count.set(count.get() + 1));
+        let evaluate = if self.capture_all {
+            evaluate_property_for_owner_with_effect_log
+        } else {
+            evaluate_property_for_owner_with_effects
+        };
+        let (result, dependencies) = evaluate(
             self.owner,
             self.snapshot,
             &target,
@@ -120,20 +178,21 @@ impl MotionPort for EvaluatedMotion<'_> {
         );
         match result {
             Ok(result) => {
-                if result.diagnostic.is_some()
+                let non_clean = result.diagnostic.is_some()
                     || result.disable.is_some()
-                    || !result.dependencies.is_empty()
-                {
+                    || !result.dependencies.is_empty();
+                let value = result.value.clone();
+                if self.capture_all || non_clean {
                     self.effects.borrow_mut().push(MotionEffect::Evaluated {
                         target,
                         property: key.to_owned(),
                         result,
                     });
+                }
+                if non_clean && !self.capture_all {
                     return Err(Unavailable::Property(key));
                 }
-                Ok(Some(
-                    result.value.into_iter().map(JsNumber::Value).collect(),
-                ))
+                Ok(Some(value.into_iter().map(JsNumber::Value).collect()))
             }
             Err(refusal) => {
                 self.refusal.borrow_mut().get_or_insert(refusal);
@@ -192,10 +251,13 @@ pub fn prepare_object_motion_exposure_frame_for_owner(
     selector: &ObjectFrameSelector<'_>,
     retained: &mut Option<ObjectMotionFrameFailure>,
 ) -> Result<ObjectFramePacket, String> {
+    prepare_with_limits(owner, snapshot, selector, retained, motion_limits()?)
+}
+
+fn motion_limits() -> Result<ExpressionLimits, String> {
     // Same already-admitted ORIGINAL39 per-evaluation envelope as property bake.
-    let limits = ExpressionLimits::new(4096, 8_388_608, 262_144, 32)
-        .map_err(|e| format!("Motion expression limits: {e:?}"))?;
-    prepare_with_limits(owner, snapshot, selector, retained, limits)
+    ExpressionLimits::new(4096, 8_388_608, 262_144, 32)
+        .map_err(|e| format!("Motion expression limits: {e:?}"))
 }
 
 fn prepare_with_limits(
@@ -213,16 +275,13 @@ fn prepare_with_limits(
     }
     // Only a verified owner/source can retire an obsolete receipt.
     *retained = None;
-    let motion = EvaluatedMotion {
+    let motion = EvaluatedMotion::new(
         owner,
         snapshot,
-        context: selector.context_id,
-        frame: f64::from(selector.frame),
+        selector.context_id,
+        f64::from(selector.frame),
         limits,
-        raw: SnapshotMotion::new(snapshot, selector.context_id, f64::from(selector.frame)),
-        effects: RefCell::default(),
-        refusal: RefCell::default(),
-    };
+    );
     let prepared =
         crate::object_frame_packet::duplicators::prepare_with_motion(snapshot, selector, &motion);
     let current = verify(owner, snapshot);

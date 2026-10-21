@@ -25,6 +25,12 @@ pub(crate) use property::{
 };
 #[path = "object_expression_motion_frame.rs"]
 mod motion_frame;
+pub use crate::object_expression_runtime::motion_frame::commit::{
+    finalize_object_motion_frame_effects_for_owner,
+    prepare_object_motion_exposure_frame_for_control,
+    prepare_object_motion_fallback_frame_for_control, ObjectMotionEffectsCommit,
+    ObjectMotionFrameControl,
+};
 pub use motion_frame::{prepare_object_motion_exposure_frame_for_owner, ObjectMotionFrameFailure};
 
 /// Bounded values must be chosen explicitly by the caller for its workload.

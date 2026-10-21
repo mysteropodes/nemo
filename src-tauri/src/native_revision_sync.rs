@@ -29,8 +29,11 @@ enum ResourcePhase<'a> {
 #[path = "native_revision_dispatch.rs"]
 mod dispatch_core;
 
+#[path = "native_object_motion_finalize.rs"]
+mod motion_finalize;
 #[path = "native_object_preview_route.rs"]
 mod object_preview_route;
+use motion_finalize::MotionReservation;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -83,10 +86,11 @@ struct RevisionState {
     identity: Option<(u64, String)>,
     subscriber: Option<RevisionBinding>,
     pending: Option<PendingRevision>,
+    motion_reservation: Option<MotionReservation>,
 }
 
 #[derive(Clone, Default)]
-pub(super) struct RevisionSync(Arc<Mutex<RevisionState>>);
+pub(super) struct RevisionSync(Arc<Mutex<RevisionState>>, Arc<tokio::sync::Notify>);
 
 pub(super) struct Delivery {
     pub(super) response: NativeApplicationResponse,
@@ -94,6 +98,18 @@ pub(super) struct Delivery {
 }
 
 impl RevisionState {
+    // The original event construction is shared verbatim by command dispatch
+    // and trusted retained-effects completion. It never releases its own ACK.
+    fn begin_event(&mut self, event: RevisionEvent) -> (RevisionEvent, oneshot::Receiver<()>) {
+        let (sender, receiver) = oneshot::channel();
+        self.pending = Some(PendingRevision {
+            event: event.clone(),
+            sender: Some(sender),
+            acknowledged: false,
+            failed: false,
+        });
+        (event, receiver)
+    }
     fn reconcile(&mut self, generation: u64, document: &str) {
         let identity = (generation, document.to_owned());
         if self.identity.as_ref() != Some(&identity) {
@@ -113,6 +129,7 @@ impl RevisionSync {
             .take()
             .map(|binding| binding.subscription_id);
         *state = RevisionState::default(); // Drops the old waiter before a later generation can register.
+        self.1.notify_waiters();
         subscriber
     }
 
@@ -142,6 +159,7 @@ impl RevisionSync {
                 pending.failed = true;
                 pending.sender = None;
             }
+            self.1.notify_waiters();
             return Ok(serde_json::Value::Null);
         }
         let (generation, application) = authority
@@ -174,6 +192,7 @@ impl RevisionSync {
                     return Err("native revision subscription is occupied or indeterminate; release before re-entry".into());
                 }
                 state.subscriber = Some(binding.clone());
+                self.1.notify_waiters();
                 serde_json::to_value(binding).map_err(|error| error.to_string())
             }
             RevisionControl::Acknowledge {
@@ -210,6 +229,7 @@ impl RevisionSync {
                     .is_err()
                 {
                     pending.failed = true;
+                    self.1.notify_waiters();
                     return Err(
                         "native revision waiter was disconnected; synchronization is indeterminate"
                             .into(),
@@ -263,10 +283,12 @@ impl RevisionSync {
         };
         if live && acknowledged && pending.acknowledged && !pending.failed {
             state.pending = None;
+            self.1.notify_waiters();
             true
         } else {
             pending.failed = true;
             pending.sender = None;
+            self.1.notify_waiters();
             false
         }
     }

@@ -7439,6 +7439,33 @@
                   "maximum": 1.7976931348623157e+308
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "target",
+                "property",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "expressionState"
+                },
+                "target": {
+                  "$ref": "#/$defs/ObjectPropertyReadTarget"
+                },
+                "property": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "frame": {
+                  "type": "number",
+                  "minimum": -1.7976931348623157e+308,
+                  "maximum": 1.7976931348623157e+308
+                }
+              }
             }
           ]
         }
@@ -8144,6 +8171,203 @@
                 "properties": {
                   "compUnavailable": {
                     "type": "null"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "kind",
+            "target",
+            "property",
+            "dimension",
+            "frame",
+            "expression",
+            "evaluation"
+          ],
+          "properties": {
+            "instanceId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "documentId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "atRevision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "documentSnapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "const": "expressionState"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectPropertyReadTarget"
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dimension": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "frame": {
+              "type": "number",
+              "minimum": -1.7976931348623157e+308,
+              "maximum": 1.7976931348623157e+308
+            },
+            "expression": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "present",
+                "enabled"
+              ],
+              "properties": {
+                "present": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "present": {
+                        "const": false
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "enabled": {
+                        "const": false
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "evaluation": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "state",
+                    "reason"
+                  ],
+                  "properties": {
+                    "state": {
+                      "const": "unavailable"
+                    },
+                    "reason": {
+                      "const": "not-evaluated"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "state",
+                    "diagnostic"
+                  ],
+                  "properties": {
+                    "state": {
+                      "const": "evaluated"
+                    },
+                    "diagnostic": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "kind"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "mustReturnNumber",
+                                "mustReturnNumberOrXY",
+                                "tooDeep",
+                                "timeout"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "kind",
+                            "message",
+                            "line"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "runtime",
+                                "syntax"
+                              ]
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "line": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0,
+                              "maximum": 4294967295
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "evaluation": {
+                    "properties": {
+                      "state": {
+                        "const": "evaluated"
+                      }
+                    }
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "expression": {
+                    "properties": {
+                      "present": {
+                        "const": true
+                      }
+                    }
                   }
                 }
               }

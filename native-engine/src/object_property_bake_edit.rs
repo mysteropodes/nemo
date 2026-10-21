@@ -65,3 +65,59 @@ impl ObjectFillOwner {
         })
     }
 }
+
+impl ObjectFillOwner {
+    /// Seal only the timeout flips produced by an already-retired native read.
+    /// The expected drawing lets that exact caller prove a later replay source.
+    pub(crate) fn prepare_expression_disables(
+        origin: ObjectSnapshot,
+        targets: &[(PropertyHolderTarget, String)],
+    ) -> Result<(PreparedPropertyEdit, crate::object_document::ObjectDocument), DispatchErrorCode>
+    {
+        let mut document = origin.document().clone();
+        let mut seen = Vec::new();
+        for (target, property) in targets {
+            if seen.iter().any(|entry| *entry == (target, property)) {
+                continue;
+            }
+            seen.push((target, property));
+            let expression = if property == "order" {
+                &mut document
+                    .property_order_mut(target)
+                    .ok_or(DispatchErrorCode::NotFound)?
+                    .expression
+            } else {
+                let Presence::Present(holders) = &mut document.property_holders else {
+                    return Err(DispatchErrorCode::NotFound);
+                };
+                &mut holders
+                    .iter_mut()
+                    .find(|holder| holder.target() == target)
+                    .ok_or(DispatchErrorCode::NotFound)?
+                    .properties
+                    .iter_mut()
+                    .find(|record| record.property() == property.as_str())
+                    .ok_or(DispatchErrorCode::NotFound)?
+                    .expression
+            };
+            let Presence::Present(expression) = expression else {
+                return Err(DispatchErrorCode::NotFound);
+            };
+            if !expression.enabled {
+                return Err(DispatchErrorCode::StaleRevision);
+            }
+            expression.enabled = false;
+        }
+        ObjectSnapshot::validate_drawing(&document).map_err(|_| DispatchErrorCode::Unavailable)?;
+        let changed = &document != origin.document();
+        let expected = document.clone();
+        Ok((
+            PreparedPropertyEdit {
+                origin,
+                document,
+                changed,
+            },
+            expected,
+        ))
+    }
+}

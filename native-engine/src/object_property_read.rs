@@ -52,6 +52,11 @@ object_deserialize!(ReadSelector {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum ReadFields {
+    ExpressionState {
+        target: PropertyHolderTarget,
+        property: String,
+        frame: f64,
+    },
     ExpressionContext {
         target: PropertyHolderTarget,
         property: String,
@@ -117,6 +122,9 @@ impl ObjectSnapshot {
             return Err(StaleRevision);
         }
         let (kind, target, property) = match &selector.view.0 {
+            ReadFields::ExpressionState {
+                target, property, ..
+            } => ("expressionState", target, property),
             ReadFields::ExpressionContext {
                 target, property, ..
             } => ("expressionContext", target, property),
@@ -146,6 +154,36 @@ impl ObjectSnapshot {
             "atRevision":self.content_revision(),"documentSnapshotId":self.snapshot_id(),
             "kind":kind,"target":target,"property":property,"dimension":dimension});
         match &selector.view.0 {
+            ReadFields::ExpressionState { frame, .. } => {
+                if !frame.is_finite() {
+                    return Err(InvalidRequest);
+                }
+                let (present, enabled) = if property == "order" {
+                    let expression = self
+                        .document()
+                        .property_order(target)
+                        .and_then(|order| order.expression.value());
+                    (
+                        expression.is_some(),
+                        expression.is_some_and(|value| value.enabled),
+                    )
+                } else {
+                    let expression = holder
+                        .properties()
+                        .iter()
+                        .find(|record| record.property() == property)
+                        .and_then(|record| record.expression.value());
+                    (
+                        expression.is_some(),
+                        expression.is_some_and(|value| value.enabled),
+                    )
+                };
+                result["frame"] = json!(frame);
+                result["expression"] = json!({"present":present,"enabled":enabled});
+                // A storage read never evaluates, clears a diagnostic, or infers
+                // success from absence. The actual owner may project a receipt.
+                result["evaluation"] = json!({"state":"unavailable","reason":"not-evaluated"});
+            }
             ReadFields::ExpressionContext { frame, .. } => {
                 if !frame.is_finite() {
                     return Err(InvalidRequest);
@@ -276,5 +314,88 @@ impl ObjectSnapshot {
             ));
         }
         Ok(response)
+    }
+}
+
+impl ObjectSnapshot {
+    /// Attach only a real owner-held evaluation receipt to a successful pinned
+    /// expression-state read. This projection cannot execute or mutate history.
+    pub fn with_expression_state_evaluation(
+        &self,
+        request: &OpacityRequest,
+        mut response: ResponseEnvelope,
+        diagnostic: Value,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        use DispatchErrorCode::{InvalidRequest, Unavailable};
+        if request.operation() != "query.document.object.property.read"
+            || request.payload["view"]["kind"] != "expressionState"
+            || !response.ok
+            || request.api_version != response.api_version
+            || request.request_id != response.request_id
+            || request.instance_id != response.instance_id
+            || request.document_id != response.document_id
+            || request.expected_revision.is_some()
+            || request.cancelled_before_dispatch
+            || response.instance_id != self.instance_id()
+            || response.document_id != self.document_id()
+            || response.content_revision != self.content_revision()
+            || !expression_diagnostic(&diagnostic)
+        {
+            return Err(InvalidRequest);
+        }
+        let result = response.result.as_mut().ok_or(InvalidRequest)?;
+        if result["kind"] != "expressionState"
+            || result["instanceId"] != self.instance_id()
+            || result["documentId"] != self.document_id()
+            || result["atRevision"] != self.content_revision()
+            || result["expression"]["present"] != true
+            || request.payload["atRevision"] != self.content_revision()
+            || request.payload["documentSnapshotId"] != self.snapshot_id()
+            || result["documentSnapshotId"] != self.snapshot_id()
+            || ["target", "property"]
+                .iter()
+                .any(|key| result.get(*key) != request.payload["view"].get(*key))
+            || !matches!(
+                (result.get("frame").and_then(Value::as_f64),
+                 request.payload["view"].get("frame").and_then(Value::as_f64)),
+                (Some(actual), Some(requested))
+                    if actual.is_finite() && requested.is_finite() && actual == requested
+            )
+        {
+            return Err(InvalidRequest);
+        }
+        result["evaluation"] = json!({"state":"evaluated","diagnostic":diagnostic});
+        if serde_json::to_vec(result).map_err(|_| Unavailable)?.len() > 3072
+            || serde_json::to_vec(&response)
+                .map_err(|_| Unavailable)?
+                .len()
+                > crate::object_snapshot::MAX_MESSAGE_BYTES
+        {
+            return Ok(self.read_failure(
+                request,
+                Unavailable,
+                "Expression diagnostic exceeds the bounded read response.",
+            ));
+        }
+        Ok(response)
+    }
+}
+fn expression_diagnostic(value: &Value) -> bool {
+    if value.is_null() {
+        return true;
+    }
+    let Some(map) = value.as_object() else {
+        return false;
+    };
+    match map.get("kind").and_then(Value::as_str) {
+        Some("mustReturnNumber" | "mustReturnNumberOrXY" | "tooDeep" | "timeout") => map.len() == 1,
+        Some("runtime" | "syntax") => {
+            map.len() == 3
+                && map.get("message").is_some_and(Value::is_string)
+                && map.get("line").is_some_and(|line| {
+                    line.is_null() || line.as_u64().is_some_and(|line| line <= u32::MAX as u64)
+                })
+        }
+        _ => false,
     }
 }

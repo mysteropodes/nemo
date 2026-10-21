@@ -24,7 +24,7 @@ pub(super) fn request(value: &Value) -> bool {
         revision(p.get("atRevision")).is_some()
             && text(p.get("documentSnapshotId"))
             && match p["view"].get("kind").and_then(Value::as_str) {
-                Some("rawSample" | "expressionContext") => {
+                Some("rawSample" | "expressionContext" | "expressionState") => {
                     exact(&p["view"], &["kind", "target", "property", "frame"], &[]).is_some_and(
                         |v| target(&v["target"]) && text(v.get("property")) && finite(&v["frame"]),
                     )
@@ -91,6 +91,7 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
     let view = &payload["view"];
     let raw = view["kind"] == "rawSample";
     let context = view["kind"] == "expressionContext";
+    let expression = view["kind"] == "expressionState";
     let mut required = vec![
         "instanceId",
         "documentId",
@@ -105,6 +106,8 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
         vec!["frame", "value"]
     } else if context {
         vec!["frame", "self", "comp", "keyCount", "compUnavailable"]
+    } else if expression {
+        vec!["frame", "expression", "evaluation"]
     } else {
         vec!["trackPresent", "items", "nextOffset"]
     });
@@ -123,7 +126,11 @@ pub(super) fn result(document: &str, payload: &Value, value: &Value) -> bool {
     let Some(dimension) = value["dimension"].as_u64().filter(|d| (1..=4).contains(d)) else {
         return false;
     };
-    let valid = if context {
+    let valid = if expression {
+        finite(&value["frame"])
+            && value["frame"].as_f64() == view["frame"].as_f64()
+            && expression_state(value)
+    } else if context {
         finite(&value["frame"])
             && value["frame"].as_f64() == view["frame"].as_f64()
             && expression_context(value)
@@ -271,3 +278,37 @@ fn mesh_context(value: &Value, target: &Value, property: &Value) -> bool {
 #[cfg(test)]
 #[path = "native_property_read_contract_tests.rs"]
 mod tests;
+
+fn expression_state(value: &Value) -> bool {
+    let expression = &value["expression"];
+    let evaluation = &value["evaluation"];
+    exact(expression, &["present", "enabled"], &[]).is_some()
+        && expression["present"].is_boolean()
+        && expression["enabled"].is_boolean()
+        && (expression["present"] == true || expression["enabled"] == false)
+        && if evaluation["state"] == "unavailable" {
+            exact(evaluation, &["state", "reason"], &[]).is_some()
+                && evaluation["reason"] == "not-evaluated"
+        } else {
+            evaluation["state"] == "evaluated"
+                && expression["present"] == true
+                && exact(evaluation, &["state", "diagnostic"], &[]).is_some()
+                && diagnostic(&evaluation["diagnostic"])
+        }
+}
+fn diagnostic(value: &Value) -> bool {
+    if value.is_null() {
+        return true;
+    }
+    match value.get("kind").and_then(Value::as_str) {
+        Some("mustReturnNumber" | "mustReturnNumberOrXY" | "tooDeep" | "timeout") => {
+            exact(value, &["kind"], &[]).is_some()
+        }
+        Some("runtime" | "syntax") => {
+            exact(value, &["kind", "message", "line"], &[]).is_some()
+                && value["message"].is_string()
+                && (value["line"].is_null() || uint(&value["line"]).is_some())
+        }
+        _ => false,
+    }
+}
