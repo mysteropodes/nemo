@@ -15,7 +15,10 @@ fn fixture(code: &str) -> (ApplicationMcp, ObjectSnapshot, OutputSpec, u64) {
     let (owner, origin, output) = finalizer_fixture(code);
     let mut state = ApplicationMcp::default();
     state.instance_id = origin.instance_id().into();
-    state.install_native(owner).unwrap();
+    let reservation = state.reserve_native_install().unwrap();
+    state
+        .install_dispatch(reservation.generation(), Box::new(owner))
+        .unwrap();
     let generation = state.native.lock().unwrap().active_generation().unwrap();
     (state, origin, output, generation)
 }
