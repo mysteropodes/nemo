@@ -8,9 +8,9 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     common_layer_motion_target, evaluate_record_rest_with_pose, evaluate_vector_rest,
     is_vector_record, EvalSegment, EvaluatedVector,
 };
-use crate::object_frame_packet::{Presence, PropertyHolderTarget};
 use crate::object_frame_packet::projection::layer_bounds;
 use crate::object_frame_packet::ObjectFramePacket;
+use crate::object_frame_packet::{Presence, PropertyHolderTarget};
 use crate::object_render_scene::object_scene_producer_contour::batch::legacy_record_rest;
 use std::collections::{BTreeMap, BTreeSet};
 

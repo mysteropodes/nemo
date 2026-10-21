@@ -1,9 +1,11 @@
 //! Owned numeric Motion values from the exact frame producer; no evaluator escapes.
-use crate::object_frame_packet::{MotionValues, ObjectFrameError, ObjectFramePacket, Presence, PropertyHolderTarget};
 use crate::evaluation::object_component_kernels::duplicator_placement_modes::JsNumber;
 use crate::evaluation::object_component_kernels::object_effector_layers::MotionPort;
 use crate::evaluation::property_projection_3d::Pose3D;
 use crate::object_document::{ObjectDocument, PropertyHolder};
+use crate::object_frame_packet::{
+    MotionValues, ObjectFrameError, ObjectFramePacket, Presence, PropertyHolderTarget,
+};
 
 pub(crate) const KEYS: [&str; 5] = ["position", "anchor", "rotation", "scale", "opacity"];
 #[derive(Debug, Clone)]
