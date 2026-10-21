@@ -455,7 +455,8 @@
           "application::ObjectMotionFrameControl",
           "application::finalize_object_motion_frame_effects_for_owner",
           "application::ObjectMotionEffectsCommit",
-          "object_document::PropertyHolderTarget"
+          "object_document::PropertyHolderTarget",
+          "export_job::MAX_OBJECT_EXPORT_FRAMES"
         ]
       },
       "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."
