@@ -30,6 +30,7 @@ pub(crate) enum ChainUnavailable {
     VectorGeometry,
     RasterGeometry,
     MissingGeometry,
+    NullPivot,
 }
 impl ChainUnavailable {
     pub(crate) fn reason(self) -> &'static str {
@@ -45,6 +46,7 @@ impl ChainUnavailable {
             Self::VectorGeometry => "native parent evaluated vector geometry unavailable",
             Self::RasterGeometry => "native parent raster geometry unavailable",
             Self::MissingGeometry => "native parent real geometry pivot unavailable",
+            Self::NullPivot => "native Null pivot needs nullPos or retained project canvas",
         }
     }
 }
@@ -104,6 +106,13 @@ fn sample(packet: &ObjectFramePacket, layer: usize) -> Result<PoseSample, ChainU
         layer_uid: source.layer_uid().to_owned(),
         stroke_id: Presence::Missing,
     };
+    if source.is_null_layer() {
+        if !crate::evaluation::object_vector_kernels::render_vector_eval::params::null_layer_motion_target(packet.snapshot().document(), &target) {
+            return Err(ChainUnavailable::LayerContext);
+        }
+        let canvas = packet.snapshot().project().map(|p| p.project().canvas_dimensions());
+        source.null_pivot_base(canvas).map_err(|_| ChainUnavailable::NullPivot)?;
+    }
     // Raw packets remain strict. An owner-prepared packet supplies only its own
     // already-retired numeric receipts; the scene never invokes an evaluator.
     let values = packet.sampled_motion_values(&target).map_err(|_| {
@@ -266,7 +275,7 @@ impl SceneParentChains {
         ChainFailure { source_index, kind }
     }
     pub(crate) fn needs_bounds(&self, layer: usize) -> bool {
-        self.needed.contains(&layer)
+        self.needed.contains(&layer) && !self.packet.source_layers()[layer].is_null_layer()
     }
     fn matches(
         &self,
@@ -436,11 +445,16 @@ impl SceneParentChains {
             .ok_or(ChainUnavailable::MissingLayer)?
         {
             if let Some(mat) = self.samples[&index].mat(index == layer) {
-                let rect = self
-                    .bounds
-                    .get(&index)
-                    .ok_or(ChainUnavailable::MissingGeometry)?;
-                let pivot = [rect.center().x + mat.ax, rect.center().y + mat.ay];
+                let canvas = self.packet.snapshot().project().map(|p| p.project().canvas_dimensions());
+                let base = match self.packet.source_layers()[index].null_pivot_base(canvas)
+                    .map_err(|_| ChainUnavailable::NullPivot)? {
+                    Some(base) => base,
+                    None => {
+                        let rect = self.bounds.get(&index).ok_or(ChainUnavailable::MissingGeometry)?;
+                        [rect.center().x, rect.center().y]
+                    }
+                };
+                let pivot = [base[0] + mat.ax, base[1] + mat.ay];
                 if !pivot.iter().all(|v| v.is_finite()) {
                     return Err(ChainUnavailable::MissingGeometry);
                 }

@@ -231,6 +231,11 @@ pub struct ObjectLayer {
     pub(crate) color: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) parent_layer_uid: Presence<Option<String>>,
+    /// Original content-free Null role and rest marker. Missing/null are kept on wire.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) is_null_layer: Presence<Option<bool>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) null_pos: Presence<Option<[serde_json::Number; 2]>>,
     /// Original ld.followPath; absent, explicit null and authored object stay distinct.
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) follow_path: Presence<Option<FollowPathRecord>>,
@@ -321,6 +326,8 @@ object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Pre
     #[serde(default)] key_lock: Presence<Option<KeyLockMode>>,
     #[serde(default)] color: Presence<String>,
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
+    #[serde(default)] is_null_layer: Presence<Option<bool>>,
+    #[serde(default)] null_pos: Presence<Option<[serde_json::Number; 2]>>,
     #[serde(default)] follow_path: Presence<Option<FollowPathRecord>>,
     #[serde(default)] folder_id: Presence<Option<String>>,
     #[serde(default)] shy: Presence<bool>,
@@ -378,6 +385,29 @@ impl ObjectDocument {
     }
 }
 impl ObjectLayer {
+    pub(crate) fn is_null_layer(&self) -> bool {
+        self.is_null_layer.value() == Some(&Some(true))
+    }
+    /// Original Null rest pivot, never content bounds. The caller may supply
+    /// only dimensions read from its retained project, not a drawing default.
+    pub(crate) fn null_pivot_base(
+        &self,
+        canvas: Option<(u32, u32)>,
+    ) -> Result<Option<[f64; 2]>, ()> {
+        if !self.is_null_layer() {
+            return Ok(None);
+        }
+        if let Some(Some(pos)) = self.null_pos.value() {
+            let pair = [pos[0].as_f64().ok_or(())?, pos[1].as_f64().ok_or(())?];
+            return if pair.iter().all(|v| v.is_finite()) {
+                Ok(Some(pair))
+            } else {
+                Err(())
+            };
+        }
+        let (width, height) = canvas.ok_or(())?;
+        Ok(Some([f64::from(width) / 2.0, f64::from(height) / 2.0]))
+    }
     /// UI row filtering only: shy never changes visibility or content ownership.
     pub fn shy(&self) -> bool {
         self.shy.value().copied().unwrap_or(false)
@@ -419,6 +449,8 @@ impl ObjectLayer {
             key_lock: Presence::Missing,
             color: Presence::Missing,
             parent_layer_uid: Presence::Missing,
+            is_null_layer: Presence::Missing,
+            null_pos: Presence::Missing,
             follow_path: Presence::Missing,
             folder_id: Presence::Missing,
             shy: Presence::Missing,

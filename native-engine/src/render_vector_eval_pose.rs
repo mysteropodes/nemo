@@ -150,6 +150,9 @@ fn common_layer_content_target(
     {
         return false;
     }
+    if layer.is_null_layer() {
+        return crate::evaluation::object_vector_kernels::render_vector_eval::params::null_layer_motion_target(document, target);
+    }
     let mut found = false;
     for record in document.objects().iter().filter(|r| {
         r.target.context_id == target.context_id() && r.target.layer_uid == target.layer_uid()

@@ -62,6 +62,9 @@ pub(super) fn chain(
         {
             return Err("ordinary parent Motion must be finite");
         }
+        let canvas = packet.snapshot().project().map(|p| p.project().canvas_dimensions());
+        let null_base = layer.null_pivot_base(canvas)
+            .map_err(|_| "Null parent needs nullPos or retained project canvas")?;
         if let Some(mat) = motion_mat_from_values(
             values.position,
             values.anchor,
@@ -69,14 +72,17 @@ pub(super) fn chain(
             values.scale,
             values.opacity,
         ) {
-            let vectors = rest(packet, index, poses)?;
-            let bounds = layer_bounds(&vectors)
-                .map_err(|_| "ordinary parent cubic bounds are unavailable")?
-                .ok_or("ordinary parent has no retained geometry pivot")?;
-            let pivot = [
-                bounds.x + bounds.width / 2. + mat.ax,
-                bounds.y + bounds.height / 2. + mat.ay,
-            ];
+            let base = match null_base {
+                Some(base) => base,
+                None => {
+                    let vectors = rest(packet, index, poses)?;
+                    let bounds = layer_bounds(&vectors)
+                        .map_err(|_| "ordinary parent cubic bounds are unavailable")?
+                        .ok_or("ordinary parent has no retained geometry pivot")?;
+                    [bounds.x + bounds.width / 2., bounds.y + bounds.height / 2.]
+                }
+            };
+            let pivot = [base[0] + mat.ax, base[1] + mat.ay];
             if !pivot.iter().all(|v| v.is_finite()) {
                 return Err("ordinary parent pivot must be finite");
             }

@@ -329,3 +329,128 @@ fn missing_held_parent_geometry_and_unjoined_parent_paint_stay_explicit() {
         assert_eq!(o.history_depths(), (0, 0));
     }
 }
+
+fn null_parent(legacy: bool, pos: Option<Value>) -> Value {
+    let mut source = drawing(legacy);
+    source["layers"][0]["parentLayerUid"] = json!("N");
+    let mut layer = json!({"layerUid":"N","name":"Null","visible":false,"isNullLayer":true});
+    if let Some(pos) = pos { layer["nullPos"] = pos; }
+    source["layers"].as_array_mut().unwrap().push(layer);
+    source["compositionOrder"]["contexts"][0]["layers"].as_array_mut().unwrap()
+        .push(json!({"layerUid":"N","naturalPosition":1,"order":{}}));
+    source["propertyHolders"].as_array_mut().unwrap().push(json!({
+        "target":{"contextId":"scene-root","layerUid":"N"},"properties":[
+            {"property":"position","static":[3,4]},{"property":"anchor","static":[10,-5]},
+            {"property":"rotation","static":[180]},{"property":"opacity","static":[50]}]}));
+    source
+}
+
+#[test]
+fn real_null_ancestor_pivots_and_svg_use_authored_position_or_actual_project_center() {
+    // Original own-layer points(-155,7)/(245,7), parent180deg around(base+[10,-5]), then+[3,4].
+    for legacy in [false,true] {
+    for (pos, x, y) in [(Some(json!([40,20])),258.0,27.0),
+        (Some(json!([0,0])),178.0,-13.0),(Some(Value::Null),578.0,187.0),(None,578.0,187.0)] {
+        let source = null_parent(legacy, pos);
+        let o = owner(&source);
+        let snapshot = o.acquire_snapshot(0).unwrap();
+        let before = encode_storage_project(snapshot.document()).unwrap();
+        let roundtrip = decode_storage_project(&before).unwrap();
+        assert_eq!(encode_storage_project(&roundtrip).unwrap(), before);
+        for (frame, shift) in [(0,0.0),(2,-2.0),(0,0.0)] {
+            let p = packet(&o, &snapshot, frame);
+            assert_eq!(p.records().len(), 2, "Null has no stand-in content");
+            let paint = plan(&p);
+            for (index, (_, point)) in starts(&paint).iter().enumerate() {
+                near(point[0], x + shift - index as f64 * 400.0);
+                near(point[1], y);
+            }
+            assert!(paint.commands().all(|c| c.paint()[3].as_f64() == Some(if legacy {0.1875} else {0.25})));
+            if legacy {
+            let text = svg(&paint).unwrap();
+            assert_eq!(text.matches("fill-opacity=\"0.1875\"").count(), 2);
+            let coordinates = text.split("<path d=\"").skip(1).map(|path| {
+                path.strip_prefix('M').unwrap().split_whitespace().next().unwrap().split(',')
+                    .map(|n| n.parse::<f64>().unwrap()).collect::<Vec<_>>()
+            }).collect::<Vec<_>>();
+            for (index, point) in coordinates.iter().enumerate() {
+                near(point[0], x + shift - index as f64 * 400.0); near(point[1], y);
+            }
+            }
+        }
+        assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+        assert_eq!((o.content_revision(),o.history_depths()),(0,(0,0)));
+    }
+    }
+}
+
+#[test]
+fn drawing_only_null_requires_actual_position_and_keeps_no_canvas_unavailable() {
+    for (pos, available) in [(None,false),(Some(Value::Null),false),(Some(json!([40,20])),true)] {
+        let mut source = null_parent(true, pos);
+        source["propertyHolders"][0]["properties"][0].as_object_mut().unwrap().remove("expression");
+        source["propertyHolders"][0]["properties"][0]["static"] = json!([5,7]);
+        let o = crate::history::NativeObjectHistory::new("bare-null",
+            decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap()).unwrap();
+        let snapshot = o.acquire_snapshot(0).unwrap();
+        let before = encode_storage_project(snapshot.document()).unwrap();
+        let p = prepare_object_exposure_frame(&snapshot, &pins(&snapshot,0)).unwrap();
+        let scene = prepare_object_render_scene(&p, &pins(&snapshot,0));
+        assert_eq!(scene.is_ok(), available);
+        if let Err(error) = scene { assert!(format!("{error:?}").contains("Null parent needs nullPos or retained project canvas")); }
+        assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+        assert_eq!((o.content_revision(),o.history_depths()),(0,(0,0)));
+    }
+}
+
+#[test]
+fn null_record_presence_roundtrips_and_malformed_or_content_bearing_nulls_refuse() {
+    for flag in [Value::Null,json!(false),json!(true)] {
+        let mut source = null_parent(true, Some(Value::Null)); source["layers"][1]["isNullLayer"] = flag;
+        let decoded = decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap();
+        assert_eq!(serde_json::to_value(decoded).unwrap(), source);
+    }
+    for bad in [json!([1]),json!([1,2,3]),json!(["1",2]),json!(true)] {
+        let mut source = null_parent(true, Some(bad));
+        assert!(decode_storage_project(&serde_json::to_vec(&source).unwrap()).is_err());
+        source["layers"][1]["nullPos"] = Value::Null; source["layers"][1]["isNullLayer"] = json!(1);
+        assert!(decode_storage_project(&serde_json::to_vec(&source).unwrap()).is_err());
+    }
+    let mut source = null_parent(true, Some(json!([0,0])));
+    source["layers"][0]["isNullLayer"] = json!(true);
+    assert!(decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap_err().message().contains("Null layer"));
+    source["layers"][0].as_object_mut().unwrap().remove("isNullLayer");
+    source["items"] = json!({"raster":[{"target":{"contextId":"scene-root","layerUid":"N",
+        "frameScope":{"kind":"authored","frame":0},"strokeId":"forbidden"},
+        "item":{"assetId":"image","x":0,"y":0,"width":2,"height":2,"opacity":1}}]});
+    assert!(decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap_err().message().contains("Null layer"));
+}
+
+#[test]
+fn actual_null_duplicate_undo_redo_and_reopen_preserve_role_and_pivot_presence() {
+    for pos in [None,Some(Value::Null),Some(json!([40,20]))] {
+        let source = null_parent(true, pos);
+        let mut o = owner(&source);
+        let original = o.acquire_snapshot(0).unwrap();
+        let bytes = encode_storage_project(original.document()).unwrap();
+        let candidate = o.prepare_layer_duplicate_json(br#"{"command":"object.layer.duplicate","layerUid":"N"}"#).unwrap();
+        o.commit_layer_lifecycle(candidate).unwrap();
+        let after = o.acquire_snapshot(1).unwrap();
+        let value = serde_json::to_value(after.document()).unwrap();
+        assert_eq!(value["layers"][2]["isNullLayer"], json!(true));
+        assert_eq!(value["layers"][2].get("nullPos"), source["layers"][1].get("nullPos"));
+        let changed = encode_storage_project(after.document()).unwrap();
+        assert_eq!(encode_storage_project(&decode_storage_project(&changed).unwrap()).unwrap(), changed);
+        let file = o.serialize_project_file(1, after.snapshot_id()).unwrap();
+        let reopened = crate::history::NativeObjectHistory::from_project_file("reopened-null", &file).unwrap();
+        let loaded = reopened.acquire_snapshot(0).unwrap();
+        assert_ne!(loaded.document_id(), after.document_id());
+        assert_eq!(encode_storage_project(loaded.document()).unwrap(), changed);
+        assert_eq!(o.undo(1).unwrap(), 2);
+        assert_eq!(encode_storage_project(o.acquire_snapshot(2).unwrap().document()).unwrap(), bytes);
+        assert_eq!(o.redo(2).unwrap(), 3);
+        assert_eq!(encode_storage_project(o.acquire_snapshot(3).unwrap().document()).unwrap(), changed);
+        assert_eq!(encode_storage_project(original.document()).unwrap(), bytes);
+        assert_eq!(o.history_depths(), (1,0));
+    }
+}
