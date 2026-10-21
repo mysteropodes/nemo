@@ -18,6 +18,7 @@ fn revisited_frame_is_cache_accelerated_and_byte_identical() {
             "60",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _frame_count, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
 
     let target = 45i64;
@@ -48,6 +49,7 @@ fn revisited_frame_is_cache_accelerated_and_byte_identical() {
 #[test]
 fn readahead_warms_the_cache_ahead_of_requests() {
     let path = make_test_video();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -81,6 +83,7 @@ fn readahead_warms_backward_on_all_intra() {
         "testsrc2=size=320x240:rate=30:duration=2",
         &["-c:v", "mjpeg", "-q:v", "3", "-pix_fmt", "yuvj420p"],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     assert!(
         is_all_intra_codec(&s.codec),
@@ -138,6 +141,7 @@ fn readahead_backward_fill_does_not_fight_forward_playback() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -201,6 +205,7 @@ fn readahead_settles_even_when_cache_cannot_hold_the_full_window() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
     let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -237,6 +242,7 @@ fn readahead_settles_even_when_cache_cannot_hold_the_full_window() {
 #[test]
 fn backward_scrub_steps_amortize_into_cache_hits() {
     let path = make_test_video(); // 320x240 → prefetch clamps to 6
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let (mut s_ref, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
 
@@ -268,6 +274,7 @@ fn backward_scrub_steps_amortize_into_cache_hits() {
 #[test]
 fn cache_hit_does_not_corrupt_decoder_position() {
     let path = make_test_video();
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (mut s, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let (mut s_ref, _, _) = open_session_core_t(path.to_str().unwrap()).unwrap();
     let truth_46 = decode_frame_core(&mut s_ref, 46).unwrap().0;

@@ -9,6 +9,10 @@
 //!     | {"kind":"audioTrack","trackUid":U}
 //! ```
 //!
+//! T12 adds `"timeRemap":Track,"interpMode":S,"frameBlend":B` on a video
+//! drawing placement, each optional (absent stays distinct, an explicit `null`
+//! is invalid) and refused on any other asset kind.
+//!
 //! Every member is required except `strokeId`, whose absence is the one
 //! spelling of "the whole layer" (an explicit `null` or empty string is
 //! invalid). `offsetFrames` is a plain integer token: the baseline collapses an
@@ -27,7 +31,10 @@
 use crate::object_codec::project::{object, text, ProjectWireError};
 use crate::object_document::media_timing::object_media_link_edit::target_accepts;
 pub(crate) use crate::object_document::media_timing::object_media_link_edit::MAX_PLACEMENTS;
-use crate::object_document::{AssetId, AssetInventory, AssetKind, AssetPlacement, AssetTarget};
+use crate::object_document::placement_offset::{VideoTiming, MAX_INTERP_MODE};
+use crate::object_document::{
+    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetTarget, OrderTrack,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::value::RawValue;
 use std::collections::HashSet;
@@ -43,6 +50,13 @@ struct PlacementIn<'a> {
     target: &'a RawValue,
     #[serde(borrow)]
     offset_frames: &'a RawValue,
+    // T12: the stored timing of a video placement; each member optional.
+    #[serde(borrow, default, deserialize_with = "present")]
+    time_remap: Option<&'a RawValue>,
+    #[serde(borrow, default, deserialize_with = "present")]
+    interp_mode: Option<&'a RawValue>,
+    #[serde(borrow, default, deserialize_with = "present")]
+    frame_blend: Option<&'a RawValue>,
 }
 
 #[derive(Deserialize)]
@@ -123,8 +137,21 @@ pub(crate) fn read(items: Vec<&RawValue>) -> Result<Vec<AssetPlacement>, Project
                     .map_err(|_| ProjectWireError::Invalid)?,
             ),
         };
+        let timing = VideoTiming {
+            time_remap: wire.time_remap.map(object::<OrderTrack>).transpose()?,
+            interp_mode: wire
+                .interp_mode
+                .map(|raw| text(raw, MAX_INTERP_MODE))
+                .transpose()?,
+            frame_blend: wire
+                .frame_blend
+                .map(|raw| serde_json::from_str::<bool>(raw.get()))
+                .transpose()
+                .map_err(|_| ProjectWireError::Invalid)?,
+        };
         placements.push(
             AssetPlacement::new_number(id, asset_id, target, offset)
+                .and_then(|placement| placement.with_timing(timing))
                 .map_err(|_| ProjectWireError::Invalid)?,
         );
     }
@@ -143,6 +170,7 @@ pub(crate) fn validate(
     for placement in placements {
         let kind = kind_of(placement.asset_id().as_str()).ok_or(ProjectWireError::Invalid)?;
         if !target_accepts(placement.target(), kind)
+            || (!placement.timing().is_empty() && kind != AssetKind::Video)
             || !ids.insert(placement.id())
             || !targets.insert(placement.target())
         {
@@ -159,6 +187,12 @@ pub(crate) struct PlacementOutput<'a> {
     asset_id: &'a str,
     target: TargetOutput<'a>,
     offset_frames: &'a serde_json::Number,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_remap: Option<&'a OrderTrack>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interp_mode: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    frame_blend: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -208,6 +242,9 @@ pub(crate) fn outputs(
             asset_id: placement.asset_id().as_str(),
             target,
             offset_frames: placement.offset_frames(),
+            time_remap: placement.timing().time_remap.as_ref(),
+            interp_mode: placement.timing().interp_mode.as_deref(),
+            frame_blend: placement.timing().frame_blend,
         });
     }
     Ok(out)
@@ -220,3 +257,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/object_media_link_track_controls.rs"]
 mod controls;
+
+#[cfg(test)]
+#[path = "../tests/object_media_link_track_timing.rs"]
+mod timing;

@@ -21,7 +21,7 @@ engine_modules! {
     "compositor" => compositor, render_scene, render_geometry, object_render_scene;
     "viewport" => desktop_viewport;
     "export_job" => export_job, export_job_lifecycle, png_output;
-    "application" => application, protocol, read_queries;
+    "application" => application, protocol, read_queries, native_media_frame_export;
 }
 
 #[cfg(feature = "reference_image_asset")]

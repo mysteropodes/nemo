@@ -203,7 +203,10 @@ pub(crate) fn expand_order(
                 .get(i)
                 .map(|e| e.host_layer_index)
                 .ok_or(ObjectPaintPlanError::InvalidOrder),
-            PaintIndex::Duplicator(_) => Err(ObjectPaintPlanError::InvalidOrder),
+            // T12 video slots are inserted after this expansion.
+            PaintIndex::Duplicator(_) | PaintIndex::Video(_) => {
+                Err(ObjectPaintPlanError::InvalidOrder)
+            }
         }
     };
     let mut buckets = BTreeMap::<usize, Vec<PaintIndex>>::new();

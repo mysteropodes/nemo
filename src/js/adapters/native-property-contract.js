@@ -17,6 +17,21 @@
          typeof value.range.hasCustomRange!=='boolean'||typeof value.range.hasTimeLink!=='boolean')throw new TypeError('invalid resolved range');
       return;
     }
+    // T12: the layer's video placement facts, or null; remap keys are counted, never listed.
+    function placementResult(value) {
+      exact(value,['kind','instanceId','documentId','atRevision','documentSnapshotId','contextId','layerUid','frame','placement'],[],'placement result');
+      id(value.instanceId,'instanceId');id(value.documentId,'documentId');revision(value.atRevision,'atRevision');
+      objectUid(value.documentSnapshotId);objectUid(value.layerUid);frame(value.frame);
+      if(value.contextId!=='scene-root')throw new TypeError('invalid placement context');
+      const p=value.placement;if(p===null)return;
+      exact(p,['placementId','assetId','assetKind','offsetFrames','timeRemap','interpMode','frameBlend','sourceFrameCount'],[],'video placement');
+      objectUid(p.placementId);objectUid(p.assetId);
+      const r=p.timeRemap;if(r!==null)exact(r,['keyCount','keyAtFrame'],[],'time remap facts');
+      if(p.assetKind!=='video'||!Number.isFinite(p.offsetFrames)||
+         r!==null&&(!Number.isSafeInteger(r.keyCount)||r.keyCount<0||typeof r.keyAtFrame!=='boolean')||
+         p.interpMode!==null&&(typeof p.interpMode!=='string'||!p.interpMode||p.interpMode.length>32)||
+         p.frameBlend!==null&&typeof p.frameBlend!=='boolean'||p.sourceFrameCount!==null&&(!Number.isSafeInteger(p.sourceFrameCount)||p.sourceFrameCount<1||p.sourceFrameCount>4294967295))throw new TypeError('invalid video placement facts');
+    }
     function metadataPayload(p) {
       exact(p, ['atRevision', 'documentSnapshotId', 'view'], [], 'metadata selector'); revision(p.atRevision, 'atRevision'); objectUid(p.documentSnapshotId);
       const v=p.view, keys=v && v.kind==='targets' ? ['kind','offset','limit'] : v && v.kind==='properties' ? ['kind','target','offset','limit'] : ['kind','target','property'];
@@ -281,7 +296,7 @@
       }
     }
     const readPaths = {has: name => /^(?:payload\.documentSnapshotId|result\.(?:documentSnapshotId|property)|result\.(?:self\.property|mesh\.meshId|evaluation\.diagnostic\.message)|payload\.view\.property|(?:payload\.view\.target|result\.target)\.(?:contextId|layerUid|strokeId))$/.test(name)};
-    return Object.freeze({ rangeResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
+    return Object.freeze({ rangeResult, placementResult, metadataPayload, metadataResult, metadataCorrelated, editPayload, trackPayload, trackResult,
       readPayload, readResult, readCorrelated, readPaths });
   }
   return Object.freeze({ create });

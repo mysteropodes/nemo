@@ -1,6 +1,6 @@
 //! Shared immutable frame construction; caller supplies only its proven Motion port.
 use crate::object_frame_packet::{
-    duplicators, holders_fully_consumed, sources, text, FrameContext, NumericOrderPlan,
+    duplicators, holders_fully_consumed, sources, text, video, FrameContext, NumericOrderPlan,
     ObjectFrameError, ObjectFrameIndices, ObjectFramePacket, ObjectFrameRasterIndex,
     ObjectFrameSelector,
 };
@@ -97,6 +97,7 @@ where
     let mut packet = ObjectFramePacket {
         duplicators: Vec::new(),
         text_records,
+        video_records: video::select(snapshot, selector, context_layers, &source_frames)?,
         raster_records,
         snapshot: snapshot.clone(),
         context_id: selector.context_id.to_owned(),

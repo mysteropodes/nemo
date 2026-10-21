@@ -2615,6 +2615,18 @@
       ]
     },
     {
+      "id": "app.native.time.remap.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-time-remap-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-time-remap-ui.js"
+      ]
+    },
+    {
       "id": "app.native.object.reference.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

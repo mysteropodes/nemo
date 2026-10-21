@@ -315,6 +315,8 @@ impl NativeDispatch for NativeObjectHost {
         let response = snapshot
             .dispatch(request.clone())
             .map_err(|_| "native object read correlation is invalid".to_string())?;
+        // T12: a layerPlacement read gains the decoder's source frame count.
+        let response = crate::native_dispatch::video::with_source_frame_count(response, &snapshot);
         if expression_state && response.is_ok() {
             self.project_expression_state(&request, response)
         } else {

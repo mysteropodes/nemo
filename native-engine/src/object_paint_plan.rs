@@ -131,6 +131,7 @@ pub fn prepare_object_paint_plan(
     // Original producer coverage/order is proved ABOVE before mask extraction.
     let masks = Arc::new(ObjectMaskInputs::from_scene(scene).map_err(ObjectPaintPlanError::Pins)?);
     masks.exclude_mask_paint(scene, &mut indices, &mut mixed);
+    let mixed = crate::object_render_scene::media_scene::insert_slots(scene, mixed)?;
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),
         masks,

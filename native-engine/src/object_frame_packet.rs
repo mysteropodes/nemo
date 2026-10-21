@@ -24,6 +24,8 @@ use prepare::prepare_frame_with_order;
 mod order;
 #[path = "object_text_frame.rs"]
 pub(crate) mod text;
+#[path = "object_frame_video.rs"]
+pub(crate) mod video;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
 #[path = "object_property_sampling.rs"]
 mod property_sampling;
@@ -200,6 +202,7 @@ pub struct ObjectFramePacket {
     records: Vec<ObjectFrameIndices>,
     raster_records: Vec<ObjectFrameRasterIndex>,
     text_records: Vec<text::TextIndex>,
+    video_records: Vec<video::VideoIndex>,
     duplicators: Vec<duplicators::LayerCopies>,
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,

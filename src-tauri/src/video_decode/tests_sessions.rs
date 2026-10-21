@@ -25,6 +25,7 @@ fn concurrent_sessions_decode_in_parallel_not_serialized() {
     );
 
     let sessions = StdArc::new(VideoSessions::default());
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (sa, _, _) = open_session_core_t(path_a.to_str().unwrap()).unwrap();
     let (sb, _, _) = open_session_core_t(path_b.to_str().unwrap()).unwrap();
     let (id_a, id_b) = (1u32, 2u32);
@@ -103,6 +104,7 @@ fn three_simultaneous_sessions_playback_mostly_avoids_respawns() {
             "15",
         ],
     );
+    let _ffmpeg = ffmpeg_shared(); // after fixture generation: never nested
     let (sa, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
     let (sb, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
     let (sc, _, _) = open_session_core_t(pc.to_str().unwrap()).unwrap();

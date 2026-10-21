@@ -1240,6 +1240,25 @@ window.SM={
   // the whole content and all their keyframes — it is the in/out window that
   // splits, which is exactly how AE does it (and why the two halves can be
   // retimed independently afterwards without anything being lost).
+  // Footage interpolation mode of a video layer (native-video-bridge.js). Under
+  // the native owner native-time-remap-ui.js replaces both entries.
+  footageInterpMode:function(li){
+    var nv=(state.layers[li]&&state.layers[li].nativeVideo)||{};
+    // L'ancien booléen reste la valeur de repli : un projet enregistré avant
+    // les trois modes doit rouvrir sur ce qu'il faisait.
+    return nv.interpMode||(nv.frameBlend?'blend':'none');
+  },
+  setFootageInterpMode:function(li,mode){
+    var l=state.layers[li];
+    if(!l||!l.nativeVideo)return false;
+    saveAllLayerFrames();pushUndoLayers(true);
+    l.nativeVideo.interpMode=mode;
+    l.nativeVideo.frameBlend=(mode!=='none');
+    if(window.SMNativeVideo&&SMNativeVideo.invalidate)SMNativeVideo.invalidate();
+    loadFrame(state.currentFrame);
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    return true;
+  },
   splitLayerAtPlayhead:function(li){
     li=(li==null?state.activeLayerIdx:li);
     var ld=state.layers[li];if(!ld){showToast(SM.t('hsNoLayer'));return;}
@@ -7126,26 +7145,14 @@ function updateFootagePanel(){
   // elle agit, c'est-à-dire sur une vidéo effectivement remappée dans le temps.
   var blendRow=document.getElementById('footage-blend-row');
   if(blendRow){
-    var showBlend=kind.key==='video'&&!!ld.nativeVideo&&!!ld.timeRemap;
+    var showBlend=kind.key==='video'&&!!ld.nativeVideo&&window.SM.isTimeRemapped(state.activeLayerIdx);
     blendRow.style.display=showBlend?'flex':'none';
     var sel=document.getElementById('footage-interp-mode');
     if(sel){
-      var nv=ld.nativeVideo||{};
-      // L'ancien booléen reste la valeur de repli : un projet enregistré avant
-      // les trois modes doit rouvrir sur ce qu'il faisait.
-      sel.value=nv.interpMode||(nv.frameBlend?'blend':'none');
+      sel.value=window.SM.footageInterpMode(state.activeLayerIdx);
       if(!sel._wired){
         sel._wired=true;
-        sel.addEventListener('change',function(){
-          var l=state.layers[state.activeLayerIdx];
-          if(!l||!l.nativeVideo)return;
-          saveAllLayerFrames();pushUndoLayers(true);
-          l.nativeVideo.interpMode=sel.value;
-          l.nativeVideo.frameBlend=(sel.value!=='none');
-          if(window.SMNativeVideo&&SMNativeVideo.invalidate)SMNativeVideo.invalidate();
-          loadFrame(state.currentFrame);
-          if(window.SMEngineBridge)SMEngineBridge.renderNow();
-        });
+        sel.addEventListener('change',function(){window.SM.setFootageInterpMode(state.activeLayerIdx,sel.value);});
       }
     }
   }

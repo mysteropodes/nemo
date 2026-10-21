@@ -254,7 +254,7 @@ impl FrameKey {
 
 /// The key rules the property holders apply to a one-dimensional track
 /// (`object_properties.rs`), for the Time Remap track they hand to this owner.
-fn validate_remap(track: &OrderTrack) -> Result<(), ComponentRecordError> {
+pub(crate) fn validate_remap(track: &OrderTrack) -> Result<(), ComponentRecordError> {
     let mut previous: Option<f64> = None;
     for key in &track.keys {
         let frame = key

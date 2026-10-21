@@ -57,7 +57,7 @@ test('adopted desktop graph and actual forbidden host/engine import controls', (
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   assert.equal(result.moduleCount, 17);
-  assert.equal(result.edges.length, 43);
+  assert.equal(result.edges.length, 44);
   assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-save-boundary-'));
   try {

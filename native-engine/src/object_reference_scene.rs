@@ -68,6 +68,7 @@ pub fn prepare_object_viewport_composition(
         viewport: true,
         resources: None,
         scene_effects: None,
+        media: None,
         reference,
         rasters: None,
     };

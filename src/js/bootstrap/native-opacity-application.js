@@ -15,9 +15,11 @@
       return project.bindUIComposition(root, previous.compose);
     }
     var compose = function (base, policy) {
-      var child = root.NemoNativeLayerPlayheadCutUI || CutUI;
+      var child = root.NemoNativeLayerPlayheadCutUI || CutUI, remap = root.NemoNativeTimeRemapUI;
       if (!child || typeof child.compose !== 'function') throw new Error('Native cut UI composition is unavailable');
-      return child.compose(root, base, policy);
+      // Without the Time Remap child its legacy entries stay disconnected writers.
+      var composed = child.compose(root, base, policy);
+      return remap && typeof remap.compose === 'function' ? remap.compose(root, base, composed) : composed;
     };
     project.bindUIComposition(root, compose);
     bindings.set(root, {project:project, document:root.document, compose:compose});return true;

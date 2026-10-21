@@ -6,7 +6,9 @@
 //! This module owns only the lifetime rules the export needs from it:
 //! - a session is opened at most once per asset and closed exactly once;
 //! - a decoded frame is represented by a [`FrameToken`], the opaque
-//!   `SceneResourceRetention` of a scene resource. Dropping the LAST clone of the
+//!   lease inside the `SceneResourceRetention` of a scene resource (the render
+//!   scene's `DecodedVideoFrame`, which owns the pixels and is the drawn image's
+//!   blob). Dropping the LAST clone of the
 //!   scene resource set that holds it parks the frame in the ledger; the gate
 //!   (`native_media_export_job`) later releases it to the port. Drop never calls
 //!   the port: no foreign code runs inside a destructor, and a frame that the
@@ -29,12 +31,22 @@ pub(crate) struct SessionId(pub(crate) u64);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct FrameId(pub(crate) u64);
 
-/// A session and the fixed RGBA8 size of every frame it decodes.
+/// A session, the fixed RGBA8 size of every frame it decodes and the source
+/// frame count its probe reported (the baseline `nativeVideo.frameCount`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SessionInfo {
     pub(crate) id: SessionId,
     pub(crate) width: u32,
     pub(crate) height: u32,
+    pub(crate) frame_count: u32,
+}
+
+/// One decoded source frame: the port's handle and its straight-alpha RGBA8
+/// pixels, `width * height * 4` bytes of the session that decoded it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct DecodedFrame {
+    pub(crate) id: FrameId,
+    pub(crate) rgba: Vec<u8>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,7 +60,7 @@ pub(crate) trait MediaDecodePort {
         &mut self,
         session: SessionId,
         source_frame: u32,
-    ) -> Result<FrameId, DecodeFailure>;
+    ) -> Result<DecodedFrame, DecodeFailure>;
     fn release_frame(&mut self, frame: FrameId) -> Result<(), DecodeFailure>;
     fn close_session(&mut self, session: SessionId) -> Result<(), DecodeFailure>;
 }
@@ -138,9 +150,10 @@ impl Ledger {
     }
 }
 
-/// The retention of one decoded frame inside a scene resource entry. It is not
-/// `Clone`: the scene resource set shares it behind one `Arc`, so its drop is
-/// the moment the LAST holder (job record, pending frame, permit) lets go.
+/// The lease of one decoded frame inside a scene resource entry. It is not
+/// `Clone`: the scene resource set shares it behind one `Arc` (with the frame's
+/// pixels), so its drop is the moment the LAST holder (job record, pending
+/// frame, permit, the drawn image's blob) lets go.
 pub(crate) struct FrameToken {
     frame: FrameId,
     charge: Option<ImageResourceCharge>,

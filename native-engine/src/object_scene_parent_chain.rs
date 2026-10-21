@@ -178,6 +178,12 @@ impl SceneParentChains {
                     .raster_records()
                     .map(|r| (r.layer_index(), r.source_index())),
             )
+            // T12: a video layer has no source record; its layer index names it.
+            .chain(
+                packet
+                    .video_records()
+                    .map(|r| (r.layer_index(), r.layer_index())),
+            )
         {
             result
                 .consumers
@@ -267,6 +273,21 @@ impl SceneParentChains {
         result
             .include_rasters()
             .map_err(|(layer, kind)| result.failure(layer, kind))?;
+        // T12: a contain-fit video is centred on the canvas: its pivot rect is the canvas.
+        let canvas = packet
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions());
+        for layer in packet.video_records().map(|r| r.layer_index()) {
+            if result.needs_bounds(layer) {
+                let (w, h) = canvas
+                    .ok_or_else(|| result.failure(layer, ChainUnavailable::MissingGeometry))?;
+                let rect = Rect::new(0.0, 0.0, f64::from(w), f64::from(h));
+                result
+                    .add(layer, rect)
+                    .map_err(|kind| result.failure(layer, kind))?;
+            }
+        }
         Ok(result)
     }
     fn failure(&self, layer: usize, kind: ChainUnavailable) -> ChainFailure {

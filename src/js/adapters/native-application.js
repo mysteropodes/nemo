@@ -170,7 +170,7 @@
       revision(payload.atRevision, 'atRevision'); objectTarget(payload.stableTarget);
     } else if (operation === 'query.document.object.layer.timing') {
       exact(payload, ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'], ['view'], 'timing selector');
-      if(has(payload,'view')&&payload.view!=='range')throw new TypeError('invalid timing view');
+      if(has(payload,'view')&&!['range','placement'].includes(payload.view))throw new TypeError('invalid timing view');
       revision(payload.atRevision, 'atRevision'); frame(payload.frame);
       ['documentSnapshotId', 'contextId', 'layerUid'].forEach(key => objectUid(payload[key]));
     } else if (operation === 'command.document.object.project.settings.edit') {
@@ -314,7 +314,7 @@
     });
   }
   function validateNativeObjectLayerTimingResult(value) {
-    if(value&&value.kind==='layerRange')return property.rangeResult(value);
+    if(value&&value.kind==='layerRange')return property.rangeResult(value);if(value&&value.kind==='layerPlacement')return property.placementResult(value);
     exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame',
       'cellKind', 'sourceFrame', 'hasContent', 'manualEdit'], [], 'timing result');
     id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId'); revision(value.atRevision, 'atRevision');
@@ -475,7 +475,7 @@
             if (response.ok && outbound.operation==='query.document.object.property.metadata') property.metadataCorrelated(outbound.payload,response.result);
             if (response.ok && outbound.operation === readOperation) property.readCorrelated(outbound.payload, response.result);
             if (response.ok && outbound.operation === 'query.document.object.layer.timing' &&
-                (['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key]) || (outbound.payload.view==='range')!==(response.result.kind==='layerRange'))) throw new TypeError('timing read selector mismatch');
+                (['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key]) || (outbound.payload.view==='range')!==(response.result.kind==='layerRange') || (outbound.payload.view==='placement')!==(response.result.kind==='layerPlacement'))) throw new TypeError('timing read selector mismatch');
             if (response.ok && (objectHistoryOperations.includes(outbound.operation) || outbound.operation === 'command.document.object.layer.create') &&
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError(objectHistoryOperations.includes(outbound.operation) ? 'object history receipt revision mismatch' : 'creation receipt revision mismatch');
             if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit', 'command.document.object.layer.policy.edit', editOperation, trackOperation].includes(outbound.operation) &&
