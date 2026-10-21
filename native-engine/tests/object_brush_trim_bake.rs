@@ -358,9 +358,10 @@ fn closed_square_whole_cycle_offsets_keep_exact_corners_and_zero_seam() {
         assert_eq!(out.segments[20].point, [0., 0.]);
         assert_eq!(out.segments[40].point, [10., 0.]);
         assert!(!out.closed);
-        assert!(out.segments.iter().all(|s| {
-            s.handle_in == Some([0.; 2]) && s.handle_out == Some([0.; 2])
-        }));
+        assert!(out
+            .segments
+            .iter()
+            .all(|s| { s.handle_in == Some([0.; 2]) && s.handle_out == Some([0.; 2]) }));
         assert_eq!(a, before);
     }
 }
@@ -399,9 +400,10 @@ fn translated_scaled_and_reversed_squares_keep_authored_trim_vertices() {
         assert_eq!(out.segments[20].point, expected[1]);
         assert_eq!(out.segments[40].point, expected[2]);
         assert!(!out.closed);
-        assert!(out.segments.iter().all(|s| {
-            s.handle_in == Some([0.; 2]) && s.handle_out == Some([0.; 2])
-        }));
+        assert!(out
+            .segments
+            .iter()
+            .all(|s| { s.handle_in == Some([0.; 2]) && s.handle_out == Some([0.; 2]) }));
         assert_eq!(a, before);
     }
 }
