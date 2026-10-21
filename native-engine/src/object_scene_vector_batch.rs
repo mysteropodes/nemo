@@ -154,7 +154,13 @@ fn prepare_layer(
             || s.record().is_mask()
     }) || packet.raster_records().any(|s| s.layer_index() == index)
         || packet.text_records().any(|s| s.layer_index() == index);
-    if active && mixed {
+    // The original per-record producers already consume raw Position, including
+    // mask curves. A union-bounds transform is unnecessary for translation; keep
+    // that admitted route unless an expanded holder or parent needs this batch.
+    if mixed && !three_d && !expanded && parents.is_empty() {
+        return Ok(None);
+    }
+    if (active || !parents.is_empty()) && mixed {
         return Err(
             "layer Motion on mixed mask, Text or raster geometry awaits one complete batch",
         );
