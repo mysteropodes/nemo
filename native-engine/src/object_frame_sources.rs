@@ -1,7 +1,9 @@
 //! Immutable source-frame selection for the scene packet. The existing sparse exposure
 //! rules and shared D27 range reader run before any content/order is published.
 use crate::object_document::{FrameScopeKind, ObjectLayer, RangeError, RangeEvaluator};
-use crate::object_frame_packet::{ObjectFrameError, ObjectFrameSelector};
+use crate::object_frame_packet::{
+    ObjectFrameError, ObjectFrameSelector, Presence, PropertyHolderTarget,
+};
 use crate::revision::ObjectSnapshot;
 
 impl<'a> RangeEvaluator<'a> {
@@ -39,6 +41,20 @@ pub(super) fn select(
                 })
             {
                 return Err(ObjectFrameError::Unavailable);
+            }
+            // An empty Null contributes only ancestor Motion, not a drawable exposure.
+            // Its pose is sampled at the actual packet frame by the existing consumer.
+            if exposure && layer.is_null_layer() && layer.timing.value().is_none() {
+                let target = PropertyHolderTarget {
+                    context_id: selector.context_id.to_owned(),
+                    layer_uid: layer.layer_uid().to_owned(),
+                    stroke_id: Presence::Missing,
+                };
+                if crate::evaluation::object_vector_kernels::render_vector_eval::params::null_layer_motion_target(
+                    snapshot.document(), &target,
+                ) {
+                    return Ok(None);
+                }
             }
             // Keep the timing provider requirement even outside the visible window.
             let source = if exposure {
