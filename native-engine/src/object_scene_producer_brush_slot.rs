@@ -341,6 +341,17 @@ impl TrimSlots {
         provider: &mut dyn TrimProvider,
         retire: RetirePort<'_>,
     ) -> Result<Resolution, SlotError> {
+        self.resolve_with_bake_bits(store, request, provider, retire, &[])
+    }
+
+    pub(crate) fn resolve_with_bake_bits(
+        &mut self,
+        store: &mut BrushBitmapStore,
+        request: &SlotRequest<'_>,
+        provider: &mut dyn TrimProvider,
+        retire: RetirePort<'_>,
+        bake_bits: &[u64],
+    ) -> Result<Resolution, SlotError> {
         if !request.has_spec {
             return Ok(Resolution::NoTrim);
         }
@@ -350,6 +361,7 @@ impl TrimSlots {
         let key = self.rules.window_key(request.stroke_id, &window)?;
         let mut fingerprint = request.anchor.bits();
         fingerprint.extend_from_slice(request.spec_bits);
+        fingerprint.extend_from_slice(bake_bits);
         if self.rules.cache_hits {
             if let Some(hit) = self.reuse(store, request.anchor_key, &key, &fingerprint) {
                 return Ok(hit);

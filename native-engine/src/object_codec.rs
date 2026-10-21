@@ -399,6 +399,13 @@ fn validate_content_inner(
         if !layers.insert(layer.layer_uid.as_str()) {
             return Err(reject(DuplicateId, "duplicate layerUid"));
         }
+        if layer.is_null_layer()
+            && objects
+                .iter()
+                .any(|record| record.target.layer_uid == layer.layer_uid)
+        {
+            return Err(reject(Invalid, "a Null layer carries no objects"));
+        }
         if let Some(table) = layer.groups.value() {
             object_group_codec::validate_group_table(
                 &layer.layer_uid,

@@ -60,3 +60,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         Ok(application)
     }
 }
+
+#[cfg(feature = "project_media_codec")]
+#[path = "object_brush_runtime.rs"]
+pub(crate) mod brush_runtime;

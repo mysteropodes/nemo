@@ -42,9 +42,10 @@
       var projection = proof || !pending && !loading && model.read();
       if (!projection || !session || !session.isActive() || !same(info, projection.info) || !state || state.playing ||
           state.spaceDown || state.isPanning || state.activeSymbolId || state.tool !== 'comment') return null;
+      if (lease && typeof lease.readPresentedObjectSession !== 'function') return null;
       var frame = state.currentFrame, shown = lease ? lease.readPresentedObjectSession() : session.readPresentedObjectSession();
       if (!Number.isSafeInteger(frame) || frame < 0 || frame >= info.totalFrames || !same(shown, info) ||
-          !shown.presentation || shown.presentation.owner !== 'native' || shown.presentation.status !== 'presented' || shown.presentation.frame !== frame) return null;
+          !shown.presentation || shown.presentation.owner !== 'native' || shown.presentation.status !== 'presented' || shown.presentation.frame !== frame || (lease ? (shown.presentation.view ? shown.presentation.view.mode : 'canvas') !== (state.cameraView === true ? 'stored-camera' : 'canvas') : !Mapping.matchesView(root, shown.presentation))) return null;
       var rect = Mapping.bounds(root, info); if (!rect) return null;
       var edges = [rect.left, rect.top, rect.left + rect.width, rect.top + rect.height];
       return { session: session, projection: projection, presentation: shown.presentation, ticket: session.readSubscriptionGeneration(), frame: frame,

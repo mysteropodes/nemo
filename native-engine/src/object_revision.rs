@@ -177,10 +177,10 @@ impl ObjectRevisionOwner {
     }
     pub(crate) fn publish(&mut self, document: ObjectDocument) -> Result<u64, &'static str> {
         let current = self
-            .snapshots
-            .get(&self.content_revision)
+            .acquire(self.content_revision)
             .ok_or("current revision absent")?;
-        let value = match current.as_ref() {
+        asset_admission::validate_drawing_only(current.document(), &document)?;
+        let value = match current.value.as_ref() {
             ProjectRevisionValue::BareDrawing(_) => ProjectRevisionValue::BareDrawing(document),
             ProjectRevisionValue::Project(project) => {
                 ProjectRevisionValue::Project(project.with_drawing(document))

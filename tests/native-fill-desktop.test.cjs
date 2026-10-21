@@ -84,3 +84,77 @@ test('native pointer capture cannot enter the legacy writer when projection is u
   assert.deepEqual(events.slice(0,2),['stop','prevent']);
   assert.equal(fill.handlePointerDown({state:{tool:'fill'}},{ }),false);
 });
+
+function cameraPointerFixture(hold=false){
+ const f=fixture({hold}),before=f.session.info,run=f.session.runResourceCommand;
+ const rect={left:20,top:30,width:640,height:360},view={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ f.session.info=()=>({...before(),canvasW:320,canvasH:180,layers:[{layerUid:'L',locked:false}]});
+ const presentation={...f.session.info(),owner:'native',status:'presented',frame:3,view};
+ const shown=()=>({...f.session.info(),presentation});f.session.readPresentedObjectSession=shown;
+ f.session.runResourceCommand=action=>run(ctx=>action({...ctx,readPresentedObjectSession:shown}));
+ const root={state:{tool:'fill',playing:false,currentFrame:3,activeLayerIdx:0,cameraView:true,fillColor:'#369',opacity:50},
+  NemoNativeOpacityCutover:{blocksLegacy:()=>true},NemoNativeObjectProject:{desktop:()=>f.session},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>true},
+  document:{getElementById:()=>({getBoundingClientRect:()=>rect}),documentElement:{clientWidth:1200,clientHeight:900,
+   classList:{contains:()=>true},style:{getPropertyValue:k=>String({left:20,top:30,right:660,bottom:390}[k.replace('--nemo-native-','')])}}},
+  SMEngineBridge:{screenToWorld(){assert.fail('legacy Paper/WASM coordinates');}},showToast(){}};
+ const ports={mapping:require('../src/js/adapters/native-viewport-underlay.js').canvasMapping};
+ const pointer=()=>fill.handlePointerDown(root,{clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}},ports);
+ return {...f,root,pointer,ports};
+}
+test('actual Fill pointer uses current native camera proof and its inverse through the existing command queue',async()=>{
+ const f=cameraPointerFixture();assert.equal(f.pointer(),true);await new Promise(setImmediate);await new Promise(setImmediate);
+ assert.equal(f.dispatched.length,1);assert.deepEqual(f.dispatched[0].payload.point,[100,60]);assert.equal(f.executions(),1);
+ const stale=cameraPointerFixture(true);stale.pointer();stale.root.state.cameraView=false;stale.release();await new Promise(setImmediate);
+ assert.equal(stale.dispatched.length,0);assert.equal(stale.executions(),0);
+});
+
+
+test('native Fill refuses missing injected mapping and its bootstrap supplies the real public mapping',async()=>{
+ const f=cameraPointerFixture();f.root.NemoNativeViewportUnderlay={canvasMapping:f.ports.mapping};f.ports.mapping=undefined;
+ assert.equal(f.pointer(),true);await new Promise(setImmediate);assert.equal(f.dispatched.length,0);
+ const ready=cameraPointerFixture(),listeners=new Map(),document=ready.root.document;
+ ready.root.NemoNativeFillDesktop=fill;ready.root.NemoNativeViewportUnderlay={canvasMapping:ready.ports.mapping};
+ const canvas={getBoundingClientRect:()=>({left:20,top:30,width:640,height:360}),addEventListener:(kind,fn)=>listeners.set(kind,fn)};
+ document.readyState='complete';document.addEventListener=()=>{};
+ document.getElementById=id=>['canvas-area','drawing-canvas'].includes(id)?canvas:null;
+ ready.root.window=ready.root;
+ require('node:vm').runInNewContext(require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/js/fill-bridge.js'),'utf8'),ready.root);
+ listeners.get('pointerdown')({clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}});
+ await new Promise(setImmediate);await new Promise(setImmediate);
+ assert.equal(ready.dispatched.length,1);assert.deepEqual(ready.dispatched[0].payload.point,[100,60]);
+});
+
+
+test('ordinary Fill retains the real Project action-local presentation while its public queue getter is fenced',async()=>{
+ const Project=require('../src/js/adapters/native-object-project.js');
+ async function run(change){
+  let revision=0,installed=false,session;const sent=[],rect={left:20,top:30,width:640,height:360};
+  const info=()=>({apiVersion:2,instanceId:'fill-instance',documentId:'fill-document',lifecycleGeneration:1,contentRevision:revision,
+   documentSnapshotId:'fill-snapshot-'+revision,documentDigest:'a'.repeat(64),byteCount:1000,canvasW:320,canvasH:180,totalFrames:8,fps:24,
+   undoDepth:revision,redoDepth:0,reference:null,layers:[{layerUid:'L',locked:false}]});
+  const root={state:{tool:'fill',playing:false,currentFrame:0,activeLayerIdx:0,cameraView:false,fillColor:'#369',opacity:50},
+   NemoNativeOpacityCutover:{blocksLegacy:()=>true},NemoNativeObjectProjectFile:{projectionReadyForUI:()=>true},showToast(){},
+   document:{getElementById:()=>({getBoundingClientRect:()=>rect}),documentElement:{clientWidth:1200,clientHeight:900,
+    classList:{contains:()=>true},style:{getPropertyValue:k=>String({left:20,top:30,right:660,bottom:390}[k.replace('--nemo-native-','')])}}}};
+  session=Project.create({frame:()=>root.state.currentFrame,viewMode:()=>root.state.cameraView?'stored-camera':'canvas',projectionReady:()=>true,
+   mapping:()=>({cssBounds:{x:20,y:30,width:640,height:360},physicalExtent:{width:640,height:360},compositionExtent:{width:320,height:180},reportedDpr:1}),
+   dispatchApplication:async(q)=>{
+    assert.equal(session.readPresentedObjectSession(),null,'public pending fence remains active');
+    assert.equal(q.operation,OP);sent.push(q);revision++;
+    return {apiVersion:2,requestId:q.requestId,instanceId:q.instanceId,documentId:q.documentId,ok:true,contentRevision:revision,result:{applied:true,historyEntriesAdded:1}};
+   },invoke:async(command,args)=>{const q=args&&JSON.parse(args.requestJson);
+    if(command==='nemo_native_object_client_status')return {...info(),available:installed};
+    if(command==='nemo_native_object_bootstrap'){installed=true;return {...info(),requestId:q.requestId,resourceCount:0,viewportAvailable:false};}
+    if(command==='nemo_native_object_reference')return {...info(),requestId:q.requestId};
+    if(command==='nemo_native_object_preview')return {status:'presented',workId:'fill-work-'+revision,viewGeneration:1};
+    assert.fail('Unexpected private command: '+command);
+   }});
+  root.NemoNativeObjectProject={desktop:()=>session};await session.openPath('/fill.json');assert.ok(session.readPresentedObjectSession());
+  fill.handlePointerDown(root,{clientX:100,clientY:90,stopImmediatePropagation(){},preventDefault(){}},{mapping:require('../src/js/adapters/native-viewport-underlay.js').canvasMapping});
+  if(change)root.state.cameraView=true;
+  await new Promise(setImmediate);await new Promise(setImmediate);
+  return {sent,session};
+ }
+ const good=await run(false);assert.equal(good.sent.length,1);assert.deepEqual(good.sent[0].payload.point,[40,30]);assert.equal(good.session.info().contentRevision,1);
+ const changed=await run(true);assert.equal(changed.sent.length,0);assert.equal(changed.session.info().contentRevision,0);
+});

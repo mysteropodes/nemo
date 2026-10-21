@@ -36,7 +36,7 @@ use crate::revision::ObjectSnapshot;
 use serde_json::Number;
 
 #[path = "render_vector_eval_motion.rs"]
-mod motion;
+pub(crate) mod motion;
 
 #[path = "render_vector_eval_params.rs"]
 pub(crate) mod params;
@@ -471,55 +471,12 @@ pub(crate) fn evaluate_record(
     Ok(evaluated)
 }
 
-/// Real scene producer entry for detached stored rig output. Other records use
-/// the unchanged evaluator. Combined rig/path-effect/rebuild ordering has no
-/// original consumer oracle yet; refuse it instead of inventing that order.
-pub(crate) fn evaluate_record_with_pose(
-    packet: &ObjectFramePacket,
-    source: ObjectFrameRecord<'_>,
-    pose: Option<&crate::evaluation::object_image_mesh_kernels::rig_pose_eval::PosedStroke>,
-) -> Result<EvaluatedVector, VectorEvalError> {
-    let Some(pose) = pose else {
-        return evaluate_record(packet, source);
-    };
-    let snapshot = packet.snapshot();
-    let stored = load_packet_stored(packet, source)?;
-    let anchors = stored.stroke.segments.as_deref().unwrap_or(&[]);
-    if pose.stroke_id != stored.record.target.stroke_id
-        || pose.closed != stored.stroke.closed
-        || pose.segments.len() != anchors.len()
-    {
-        return Err(VectorEvalError::MissingRecord);
-    }
-    if stored
-        .record
-        .vector_ext
-        .value()
-        .is_some_and(|ext| ext.pressure.value().is_some())
-        || stored
-            .stack
-            .as_deref()
-            .is_some_and(|stack| has_any(Some(stack)))
-        || run_param_shape(snapshot, stored.record, anchors, packet.frame())?.is_some()
-    {
-        return Err(VectorEvalError::RigCompositionUnavailable);
-    }
-    let segments = pose
-        .segments
-        .iter()
-        .map(|segment| EvalSegment {
-            point: segment.point,
-            handle_in: segment.handle_in,
-            handle_out: segment.handle_out,
-        })
-        .collect();
-    let segments = motion::apply_element_motion(snapshot, stored.record, packet.frame(), segments)?;
-    Ok(EvaluatedVector {
-        source_object_index: source.source_object_index(),
-        closed: pose.closed,
-        segments: motion::apply_layer_position(snapshot, stored.record, packet.frame(), segments)?,
-    })
-}
+#[path = "render_vector_eval_pose.rs"]
+mod pose;
+pub(crate) use pose::{
+    common_layer_motion_target, evaluate_record_rest_with_pose, evaluate_record_with_pose,
+    has_unjoined_parent_blend,
+};
 
 #[cfg(test)]
 #[path = "../tests/render_vector_eval.rs"]

@@ -52,16 +52,19 @@ impl<'a> SnapshotMotion<'a> {
     }
 }
 
-impl MotionPort for SnapshotMotion<'_> {
-    fn value(&self, layer_uid: &str, key: &'static str) -> Result<Sampled, Unavailable> {
-        let target = self.target(layer_uid);
+impl SnapshotMotion<'_> {
+    fn target_value(
+        &self,
+        target: &PropertyHolderTarget,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
         if self
             .snapshot
             .document()
             .property_holders()
             .is_some_and(|holders| {
                 holders.iter().any(|holder| {
-                    holder.target() == &target
+                    holder.target() == target
                         && holder.properties().iter().any(|property| {
                             property.property() == key
                                 && property
@@ -74,11 +77,58 @@ impl MotionPort for SnapshotMotion<'_> {
         {
             return Err(Unavailable::Property(key));
         }
-        let values = sample_property_raw(self.snapshot, &target, key, self.frame)
+        let values = sample_property_raw(self.snapshot, target, key, self.frame)
             .map_err(|_| Unavailable::Property(key))?;
         Ok(Some(values.into_iter().map(JsNumber::Value).collect()))
     }
+}
 
+impl MotionPort for SnapshotMotion<'_> {
+    fn value(&self, layer_uid: &str, key: &'static str) -> Result<Sampled, Unavailable> {
+        let target = self.target(layer_uid);
+        self.target_value(&target, key)
+    }
+
+    fn element_value(
+        &self,
+        layer_uid: &str,
+        stroke_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        let mut target = self.target(layer_uid);
+        target.stroke_id = Presence::Present(stroke_id.to_owned());
+        self.target_value(&target, key)
+    }
+
+    fn selector_value(
+        &self,
+        layer_uid: &str,
+        animator_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        let context=crate::evaluation::object_component_kernels::object_context_resolver::ContextSource::of_document(self.snapshot.document())
+            .context(self.context_id).map_err(|_|Unavailable::Property(key))?;
+        let animator = context
+            .layers()
+            .iter()
+            .find(|l| l.layer_uid() == layer_uid)
+            .and_then(|l| l.text_animators.value())
+            .and_then(|a| a.0.iter().find(|a| a.id == animator_id))
+            .ok_or(Unavailable::Property(key))?;
+        if animator
+            .properties
+            .value()
+            .into_iter()
+            .flatten()
+            .any(|p| p.property() == key && p.expression.value().is_some_and(|e| e.enabled))
+        {
+            return Err(Unavailable::Property(key));
+        }
+        let value = animator
+            .raw_selector_property(key, self.frame)
+            .map_err(|_| Unavailable::Property(key))?;
+        Ok(Some(vec![JsNumber::Value(value)]))
+    }
     fn motion_delta(&self, layer_uid: &str) -> Result<Option<MotionDelta>, Unavailable> {
         let context = crate::evaluation::object_component_kernels::object_context_resolver::ContextSource::of_document(self.snapshot.document())
             .context(self.context_id)

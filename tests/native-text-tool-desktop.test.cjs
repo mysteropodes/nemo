@@ -26,7 +26,26 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  const stage=add('div','canvas-area'),canvas=add('canvas','drawing-canvas',stage),zoom=add('input','zoom-scrub',stage),container=add('div','native-inspector');let rect={left:20,top:30,width:640,height:360};canvas.getBoundingClientRect=()=>({...rect});const published={'--nemo-native-left':'20px','--nemo-native-top':'30px','--nemo-native-right':'660px','--nemo-native-bottom':'390px'};doc.documentElement.style.getPropertyValue=k=>published[k];
  const pop=add('div','text-popover');pop.style.display='none';for(const [tag,id]of [['textarea','text-input'],['input','text-size'],['select','text-font'],['input','text-color'],['select','text-align'],['button','text-apply'],['button','text-cancel']])add(tag,id,pop);
  const root=new Element('window',doc);root.document=doc;doc.parentNode=root;root.state={appMode:'anim2d',tool:'text',activeLayerIdx:0,currentFrame:0,strokeColor:'#123456',layers:[{layerUid:'L0'}]};root._layerSel=[0];root.window=root;
- const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});f.session.readPresentedObjectSession=()=>({...f.session.info(),presentation:{frame:root.state.currentFrame}});
+ const baseInfo=f.session.info;f.session.info=()=>({...baseInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});root.state.cameraView=options.cameraView?.mode==='stored-camera';
+ const pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
+ let running=0,presentation=null,presentationKey=null,lastLease=null;
+ function shown(){const pin=f.session.info(),key=JSON.stringify([pinKeys.map(k=>pin[k]),root.state.currentFrame,root.state.cameraView,options.cameraView]);
+  if(key!==presentationKey){presentationKey=key;presentation={...pin,owner:'native',status:'presented',contextId:'scene-root',frame:root.state.currentFrame,workId:'work-'+pin.contentRevision,viewGeneration:1,...(options.cameraView?{view:options.cameraView}:{})};}
+  return {...pin,presentation};}
+ f.session.readPresentedObjectSession=()=>running?null:shown();
+ const runResource=f.session.runResourceCommand;
+ f.session.runResourceCommand=action=>{const origin=f.session.readPresentedObjectSession();running++;
+  return runResource(async ctx=>{let live=true;const lease={...ctx,readPresentedObjectSession(){
+    if(!live||running!==1||!origin||!f.session.isActive())return null;const next=shown();
+    if(pinKeys.some(k=>origin[k]!==next[k])||origin.presentation!==next.presentation)return null;
+    if(options.actionReader==='refused')return null;
+    if(options.actionReader==='foreign')return {...origin,documentId:'foreign'};
+    if(options.actionReader==='view')return {...origin,presentation:{...origin.presentation,view:{mode:'canvas',navigation:{zoom:2,pan:[0,0]}}}};
+    return origin;}};
+   if(options.actionReader==='missing')delete lease.readPresentedObjectSession;lastLease=lease;
+   try{return await action(lease);}finally{live=false;}
+  }).finally(()=>{running--;});};
+ root.NemoNativeObjectProject={desktop:()=>f.session};
  // Controlled immutable native Perspective projection; never read legacy Perspective fields.
  let perspectiveMode='disabled',perspectiveOwner=f.session;const perspectiveListeners=new Set();
  const perspectiveKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'],perspectiveProofs=new WeakMap();
@@ -49,7 +68,7 @@ async function fixture(selectionIntent=false,desktopModule=Desktop,options={}){
  const script=fs.readFileSync(path.join(__dirname,'../src/js/select-bridge.js'),'utf8');
  vm.runInNewContext(script,{window:root,document:doc,state:root.state,console,selectedPaths:[],userLayers:[],project:{layers:[]},view:{zoom:1},setTimeout,clearTimeout},{filename:'actual-select-bridge.js'});
  const get=id=>doc.getElementById(id);
- return {...f,perspectiveRead:()=>perspectiveListeners.forEach(fn=>fn(root.NemoNativePerspectiveController.read())),perspectiveListenerCount:()=>perspectiveListeners.size,perspectiveMode:value=>perspectiveMode=value,perspectiveOwner:owner=>perspectiveOwner=owner,root,doc,get,binding,canvas,zoom,logs,turn,intent:()=>intent,resize:r=>{rect=r;},input:(id,value)=>{get(id).value=value;get(id).fire('input');},apply:()=>get('text-apply').fire('click'),
+ return {...f,pendingResources:()=>running,actionLease:()=>lastLease,perspectiveRead:()=>perspectiveListeners.forEach(fn=>fn(root.NemoNativePerspectiveController.read())),perspectiveListenerCount:()=>perspectiveListeners.size,perspectiveMode:value=>perspectiveMode=value,perspectiveOwner:owner=>perspectiveOwner=owner,root,doc,get,binding,canvas,zoom,logs,turn,intent:()=>intent,resize:r=>{rect=r;},input:(id,value)=>{get(id).value=value;get(id).fire('input');},apply:()=>get('text-apply').fire('click'),
   click:async(x=100,y=100)=>{canvas.fire('pointerdown',{clientX:x,clientY:y});canvas.fire('pointerup',{clientX:x,clientY:y});await turn();}};
 }
 test('actual select-bridge capture routes ordinary point text to existing editor and suppresses legacy writers',async()=>{
@@ -146,7 +165,7 @@ test('retired queued completion cannot disable a replacement owner editor sharin
  f.binding.retire();
  const next=portsFixture();next.state.document='document-B';next.state.generation++;
  const originalInfo=next.session.info;next.session.info=()=>({...originalInfo(),canvasW:320,canvasH:180,totalFrames:8,layers:[{layerUid:'L0',locked:false}]});next.session.readPresentedObjectSession=()=>({...next.session.info(),presentation:{frame:0}});
- f.perspectiveOwner(next.session);
+ f.perspectiveOwner(next.session);f.root.NemoNativeObjectProject={desktop:()=>next.session};
  const binding=Desktop.mount(f.root,f.binding.container,{currentSession:()=>next.session,fontResources:()=>({list:async()=>[]})});await f.turn();await binding.core.openNew({anchorTopLeft:{x:20,y:20},fixedWidth:null});
  assert.equal(f.get('text-apply').disabled,false,'replacement draft is ready before old queue settles');assert.ok(binding.core.snapshot().draft);
  gate.resolve();await f.turn();
@@ -394,4 +413,38 @@ test('Text command settles once while fresh Perspective read gates post-reconcil
  f.perspectiveMode('disabled');f.perspectiveRead();await f.turn();await f.turn();
  assert.equal(f.binding.core.snapshot().draft,null);assert.equal(f.get('text-popover').style.display,'none');
  assert.equal(f.owner.log.executed.length,1,'publication must never replay the text command');
+});
+
+test('native camera receipt maps actual point Text and area draft while a view change refuses the old draft',async()=>{
+ const cameraView={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ const f=await fixture(false,Desktop,{cameraView});await f.click(100,110);f.input('text-input','Camera text');f.apply();await f.turn();
+ assert.deepEqual(f.owner.log.received[0].payload.block.anchorTopLeft,{x:100,y:65});assert.equal(f.logs.legacy,0);
+ const area=await fixture(false,Desktop,{cameraView});area.canvas.fire('pointerdown',{clientX:100,clientY:110});area.canvas.fire('pointermove',{clientX:300,clientY:190});area.canvas.fire('pointerup',{clientX:300,clientY:190});await area.turn();
+ const draft=area.get('native-text-area-draft');assert.ok(draft);assert.equal(draft.style.width,'50px');assert.equal(draft.style.transform,'matrix(4,0,0,4,0,0)');
+ draft.value='Area camera';draft.fire('input');draft.fire('keydown',{key:'Enter',ctrlKey:true});await area.turn();
+ assert.equal(area.owner.log.received[0].payload.block.fixedWidth,50);
+ const stale=await fixture(false,Desktop,{cameraView});await stale.click();stale.input('text-input','stale');stale.root.state.cameraView=false;stale.apply();await stale.turn();assert.equal(stale.owner.log.executed.length,0);
+});
+
+test('Text Apply uses the real action-local proof while the public getter stays pending-fenced',async()=>{
+ const f=await fixture();await f.click();f.input('text-input','Leased Text');
+ const gate=deferred();f.hold(gate.promise);f.apply();await Promise.resolve();
+ assert.ok(f.pendingResources()>0);assert.equal(f.session.readPresentedObjectSession(),null);assert.equal(f.owner.log.executed.length,0);
+ gate.resolve();await f.turn();assert.equal(f.owner.log.executed.length,1);assert.equal(f.logs.legacy,0);
+ assert.equal(f.owner.log.received[0].payload.block.text,'Leased Text');assert.equal(f.actionLease().readPresentedObjectSession(),null,'action-local proof expires after the action');
+});
+test('queued Text refuses missing, foreign, refused and altered-view action-local readers',async()=>{
+ for(const actionReader of ['missing','foreign','refused','view']){
+  const f=await fixture(false,Desktop,{actionReader});await f.click();f.input('text-input','Must refuse');f.apply();await f.turn();
+  assert.equal(f.owner.log.executed.length,0,actionReader);assert.equal(f.owner.log.received.length,0,actionReader);assert.equal(f.logs.legacy,0);
+ }
+});
+test('navigated Canvas area Text draft uses the actual full affine and commits the same inverse placement',async()=>{
+ const view={mode:'canvas',navigation:{zoom:2,pan:[0,0]},cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ const f=await fixture(false,Desktop,{cameraView:view});
+ f.canvas.fire('pointerdown',{clientX:100,clientY:110});f.canvas.fire('pointermove',{clientX:300,clientY:190});f.canvas.fire('pointerup',{clientX:300,clientY:190});await f.turn();
+ const area=f.get('native-text-area-draft');assert.ok(area);assert.equal(area.style.transform,'matrix(4,0,0,4,0,0)');
+ assert.equal(area.style.width,'50px');assert.equal(area.style.left,'100px');assert.equal(area.style.top,'110px');
+ area.value='Canvas affine';area.fire('input');area.fire('keydown',{key:'Enter',ctrlKey:true});await f.turn();
+ const q=f.owner.log.received[0];assert.equal(f.owner.log.executed.length,1);assert.deepEqual(q.payload.block.anchorTopLeft,{x:100,y:65});assert.equal(q.payload.block.fixedWidth,50);assert.equal(f.root.state.cameraView,false);assert.equal(f.logs.legacy,0);
 });

@@ -36,6 +36,8 @@ pub struct VectorExt {
     pub(crate) mask_mode: Presence<Option<String>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) mask_feather: Presence<Option<Number>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) bitmap_brush: Presence<crate::object_document::BitmapBrushFields>,
 }
 object_deserialize!(VectorExt {
     #[serde(default)] pressure: Presence<PressureFields>,
@@ -45,7 +47,8 @@ object_deserialize!(VectorExt {
     #[serde(default)] fill_trace: Presence<FillTrace>,
     #[serde(default)] is_mask: Presence<Option<bool>>,
     #[serde(default)] mask_mode: Presence<Option<String>>,
-    #[serde(default)] mask_feather: Presence<Option<Number>>
+    #[serde(default)] mask_feather: Presence<Option<Number>>,
+    #[serde(default)] bitmap_brush: Presence<crate::object_document::BitmapBrushFields>
 });
 
 impl VectorExt {
@@ -58,6 +61,7 @@ impl VectorExt {
             && self.is_mask.missing()
             && self.mask_mode.missing()
             && self.mask_feather.missing()
+            && self.bitmap_brush.missing()
     }
 }
 

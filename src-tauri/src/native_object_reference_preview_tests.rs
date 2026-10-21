@@ -323,7 +323,14 @@ fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
         .unwrap();
     assert!(owner.preview.reference_cache.is_some());
     let count = trace.borrow().acquired;
-    let failed = owner.prepare_reference_preview(&prepared.plan, (64, 64), &mut gpu, |previous| {
+    let plan = owner
+        .preview
+        .brush_runtime
+        .materialize(&prepared.admission, &mut |ids| {
+            gpu.retire_object_brush_resources(ids, (64, 64)).is_ok()
+        })
+        .unwrap();
+    let failed = owner.prepare_reference_preview(&plan, (64, 64), &mut gpu, |previous| {
         assert!(
             previous.is_none(),
             "old host raster must be gone before replacement decode"
@@ -352,3 +359,67 @@ fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
 
 #[path = "native_object_exposure_tests.rs"]
 mod exposure_tests;
+
+#[test]
+fn camera_choice_has_distinct_native_cache_identity_even_without_active_keys() {
+    use native_engine::desktop_viewport::ObjectPreviewView;
+    let mut owner = host();
+    let source = snapshot(&owner);
+    let pins = selector(&source, 0);
+    let before = owner
+        .project_file_snapshot(source.content_revision(), source.snapshot_id())
+        .unwrap()
+        .unwrap();
+    let canvas = owner
+        .prepare_object_preview(&pins, output(), false)
+        .unwrap();
+    let camera = owner
+        .prepare_object_preview_view(&pins, output(), ObjectPreviewView::StoredCamera, false)
+        .unwrap();
+    let canvas_plan = owner
+        .preview
+        .brush_runtime
+        .materialize(&canvas.admission, &mut |_| {
+            panic!("non-brush Camera fixture cannot retire bitmap resources")
+        })
+        .unwrap();
+    let camera_plan = owner
+        .preview
+        .brush_runtime
+        .materialize(&camera.admission, &mut |_| {
+            panic!("non-brush Camera fixture cannot retire bitmap resources")
+        })
+        .unwrap();
+    let canvas_key = canvas.materialized_key(&canvas_plan).unwrap();
+    let camera_key = camera.materialized_key(&camera_plan).unwrap();
+    assert_eq!(canvas_key.quality(), "final");
+    assert_eq!(camera_key.quality(), "final-camera-view");
+    assert_ne!(canvas_key, camera_key);
+    let witness = native_engine::object_render_scene::prepare_object_camera_viewport_composition(
+        &camera_plan,
+        &pins,
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        witness.viewport_document_transform(),
+        Some([1., 0., 0., 1., 0., 0.])
+    );
+    assert!(!witness.viewport_stored_camera_available());
+    let mut wrong = pins.clone();
+    wrong.document_snapshot_id = "foreign";
+    assert!(owner
+        .prepare_object_preview_view(&wrong, output(), ObjectPreviewView::StoredCamera, false)
+        .is_err());
+    assert_eq!(
+        owner
+            .project_file_snapshot(source.content_revision(), source.snapshot_id())
+            .unwrap()
+            .unwrap(),
+        before
+    );
+    assert_eq!(owner.history.history_depths(), (0, 0));
+}
+
+#[path = "native_object_brush_preview_tests.rs"]
+mod brush_tests;

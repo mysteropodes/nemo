@@ -13,6 +13,7 @@ func ui32FixedFixture(_ raw:String?) throws -> (name:String,size:Int,hash:String
   if raw == nil || raw == "initial-text" { return ("Initial-text.json",7791,ui32FixtureHash,false) }
   if raw == "f03-original" { return ("candidate.project.json",7744,ui32F03FixtureHash,true) }
   if raw == "f03-initial" { return ("initial.project.json",5721,ui32F03InitialFixtureHash,true) }
+  if raw == "camera-view" {return ui32CameraFixture()}
   throw Refusal(code:"adapter-refused")
 }
 func ui32UsesF03Fixture(_ raw:String?) throws -> Bool {try ui32FixedFixture(raw).f03}
@@ -43,6 +44,7 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
   let entryEnabled=try ui32EntryMode(environment["NEMO_UI32_ENTRY_MODE"]);var entryStage=0,sourceCaptureStage = -1,newSettingsOpen=false
   var fixture:UI32Fixture?, syncPanel:UI32Fixture?
   let f03=try f03Operator(pinned,environment)
+  let camera=UI32CameraOperator(pinned)
   var retainedWebArea:AXUIElement?, latest:UI32ContentCertificate<AXUIElement>?
   func nativeIdentity() throws { try verifyOwnedWindow(pinned) }
   func identity() throws {
@@ -301,6 +303,14 @@ func runUI32(_ args:[String], _ environment:[String:String]) throws {
       try check(request["option"] == nil && request["value"] == nil && fixture?.completed == true && fixture?.confirmed == true)
       _ = try tree()
       result.merge(try ui32ToggleB(pinned,resolve:resolve,visible:enabledVisible)) { _,new in new };try emit(result);continue
+    }
+    if command.hasPrefix("camera.") {
+      try check(request["option"] == nil && request["value"] == nil && !entryEnabled && f03 == nil &&
+        environment["NEMO_UI32_FIXTURE_KIND"] == "camera-view")
+      guard let loaded=fixture,loaded.completed && loaded.confirmed else {throw Refusal(code:"adapter-refused")}
+      result.merge(try camera.perform(command,resolve:resolve,visible:enabledVisible,certificate:{
+        _ = try tree();guard let current=latest else {throw Refusal(code:"adapter-refused")};return current
+      },fixture:{try loaded.fileProof()})) {_,new in new};try emit(result);continue
     }
     if ["motion.focus","motion.shortcut","motion.guard-typing"].contains(command) {
       try check(request["value"] == nil)

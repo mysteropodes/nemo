@@ -352,6 +352,41 @@ fn unsupported_mask_geometry_refuses_instead_of_drawing_an_unmasked_scene() {
 }
 
 #[test]
+fn original_mask_translation_does_not_admit_expanded_or_parent_batch_transforms() {
+    for kind in ["rotation", "scale", "parent"] {
+        let mut v = document();
+        if kind == "parent" {
+            v["layers"][1]["parentLayerUid"] = json!("L1");
+            v["propertyHolders"].as_array_mut().unwrap().push(json!({
+                "target":{"contextId":"scene-root","layerUid":"L1"},
+                "properties":[{"property":"position","static":[1,0]}]}));
+        } else {
+            let value = if kind == "rotation" {
+                json!([30])
+            } else {
+                json!([110, 100])
+            };
+            v["propertyHolders"][0]["properties"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"property":kind,"static":value}));
+        }
+        let o = owner(&v);
+        let s = o.acquire_snapshot(0).unwrap();
+        let before = encode_storage_project(s.document()).unwrap();
+        // These mixed transforms are refused by the original Frame admission,
+        // before a scene can publish an untransformed mask.
+        assert_eq!(
+            prepare_object_frame(&s, &pins(&s, 7)).unwrap_err(),
+            crate::object_frame_packet::ObjectFrameError::Unavailable,
+            "expanded mixed transform must stay unavailable: {kind}"
+        );
+        assert_eq!(encode_storage_project(s.document()).unwrap(), before);
+        assert_eq!(o.history_depths(), (0, 0));
+    }
+}
+
+#[test]
 fn actual_temporal_duplicator_masks_use_derived_paths_and_never_the_extra_host_seed() {
     use crate::object_frame_packet::duplicators::tests::{fixture, selector, snapshot};
     use crate::object_frame_packet::prepare_object_exposure_frame;

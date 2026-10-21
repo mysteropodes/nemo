@@ -350,7 +350,12 @@
 
   // ---- timeline row (layer panel + frame grid, prepended by hooks in
   // renderLayerList()/renderTimeline() so both stay aligned) ----
+  function nativeSession(){var p=window.NemoNativeObjectProject,s=p&&p.desktop(window);return s&&(s.isActive()||typeof s.blocksLegacy==='function'&&s.blocksLegacy())?s:null;}
+  function renderNativeViewLock() {
+    return window.NemoNativeObjectProjectDesktop.renderCameraViewLock(window);
+  }
   function renderPanelRow(list) {
+    if(nativeSession()||window.__TAURI__&&window.__TAURI__.core)return renderNativeViewLock();
     ensureState();
     if (!state.cameraLayerOn) return;
     var row = document.createElement('div');
@@ -531,6 +536,8 @@
     _camViewZoomMult = 1; _camViewPan = { x: 0, y: 0 };
   }
   function applyCameraView() {
+    var native=nativeSession();if(native){native.renderPreview(state.currentFrame);return;}
+    if (window.__TAURI__ && window.__TAURI__.core) return;
     if (!state.cameraView) return;
     var cam = cameraAtFrame(state.currentFrame);
     if (!cam) return;
@@ -615,37 +622,29 @@
   }
 
   function initUI() {
-    var btn = document.getElementById('btn-camera');
-    if (btn) btn.addEventListener('click', function () {
-      ensureState();
-      if (!state.cameraLayerOn) {
-        state.cameraLayerOn = true;
-        if (!state.cameraKeys.length) { pushUndo(); setKey(0, defaultRect()); }
-        renderLayerList(); renderTimeline();
-      }
-      window.SM.setTool(state.tool === 'camera' ? 'select' : 'camera');
-      renderLayerList();
-      updateCameraPanel();
-      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    window.NemoNativeObjectProjectDesktop.bindCameraUI(window, {
+      toggle: function () {
+        ensureState();
+        if (!state.cameraLayerOn) {
+          state.cameraLayerOn = true;
+          if (!state.cameraKeys.length) { pushUndo(); setKey(0, defaultRect()); }
+          renderLayerList(); renderTimeline();
+        }
+        window.SM.setTool(state.tool === 'camera' ? 'select' : 'camera');
+        renderLayerList();
+        updateCameraPanel();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      },
+      addKey: function () {
+        pushUndo();
+        var f = state.currentFrame;
+        if (keyAt(f)) removeKey(f);
+        else setKey(f, cameraAtFrame(f) || defaultRect());
+        renderCameraRow(); updateCameraPanel();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      },
+      editEase: function () { openCameraEaseEditor(); }
     });
-    // pushUndo() here (2026-07: "récupère des données exploitable pour
-    // résoudre les soucis" — the feedback action log/undo stack was
-    // silently skipping this button entirely, unlike a camera keyframe
-    // added/removed by DRAGGING, which already calls pushUndo() via
-    // onDown further down this file) — cameraKeys IS part of
-    // layersSnapshotNow()'s undo snapshot, so this was a real gap, not a
-    // structural exclusion like StoryBoard/audio below.
-    var addKey = document.getElementById('btn-cam-addkey');
-    if (addKey) addKey.addEventListener('click', function () {
-      pushUndo();
-      var f = state.currentFrame;
-      if (keyAt(f)) removeKey(f);
-      else setKey(f, cameraAtFrame(f) || defaultRect());
-      renderCameraRow(); updateCameraPanel();
-      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    });
-    var editEase = document.getElementById('btn-cam-ease-edit');
-    if (editEase) editEase.addEventListener('click', openCameraEaseEditor);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUI); else initUI();
 
@@ -659,6 +658,7 @@
     buildOverlayItems: buildOverlayItems,
     onDown: onDown, onDrag: onDrag, onUp: onUp,
     renderPanelRow: renderPanelRow,
+    renderNativeViewLock: renderNativeViewLock,
     renderGridRow: renderGridRow,
     renderCameraRow: renderCameraRow,
     applyCameraView: applyCameraView,

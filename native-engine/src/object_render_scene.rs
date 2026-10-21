@@ -24,7 +24,10 @@ use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 #[path = "object_reference_scene.rs"]
 mod reference;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
-pub use reference::prepare_object_viewport_composition;
+pub use reference::{
+    object_viewport_quality, prepare_object_camera_viewport_composition,
+    prepare_object_navigated_viewport_composition, prepare_object_viewport_composition,
+};
 
 #[path = "object_scheduled_scene.rs"]
 mod scheduled;
@@ -34,6 +37,17 @@ pub use scheduled::{
     LiveObjectComposition, ScheduledObjectSceneError,
 };
 
+#[path = "object_brush_admission.rs"]
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+mod brush_admission;
+#[path = "object_brush_scene_join.rs"]
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub(crate) mod brush_scene;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub use brush_admission::ObjectBrushAdmission;
+#[path = "object_brush_paint_join.rs"]
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+mod brush_paint;
 #[path = "object_raster_scene_join.rs"]
 pub(crate) mod raster_scene;
 // T12 / T28.media: video placements drawn from decoded source frames.
@@ -95,6 +109,8 @@ pub use paint::{
 pub struct ObjectCompositionWitness {
     plan: ObjectPaintPlan,
     viewport: bool,
+    viewport_quality: Option<String>,
+    camera: Option<[f64; 6]>,
     resources: Option<Arc<ObjectSceneResourceSet>>,
     /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
     scene_effects: Option<Arc<SceneEffectPlan>>,
@@ -111,9 +127,17 @@ pub fn prepare_object_composition(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
+    let camera = plan.packet().stored_camera_matrix().map_err(|_| {
+        ObjectSceneError::UnsupportedGeometry {
+            source_object_index: 0,
+            reason: "stored camera transform unavailable",
+        }
+    })?;
     let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: false,
+        viewport_quality: None,
+        camera,
         resources: None,
         scene_effects: None,
         media: None,
@@ -124,7 +148,7 @@ pub fn prepare_object_composition(
     };
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     {
-        return text_scene::attach(raster_scene::attach(witness, None)?);
+        return brush_paint::attach(text_scene::attach(raster_scene::attach(witness, None)?)?);
     }
     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     {
@@ -140,8 +164,23 @@ pub fn prepare_object_composition(
 
 impl ObjectCompositionWitness {
     /// Viewport content is never an artwork export source, even with no image.
+    pub(crate) fn expected_quality(&self) -> &str {
+        self.viewport_quality.as_deref().unwrap_or("final")
+    }
     pub(crate) fn is_viewport(&self) -> bool {
         self.viewport
+    }
+    /// Artwork-only transform; unlocked Canvas presentation stays untransformed.
+    pub(crate) fn camera_matrix(&self) -> Option<[f64; 6]> {
+        self.camera
+    }
+    pub(crate) fn camera_canvas_dimensions(&self) -> Option<(u32, u32)> {
+        self.camera?;
+        self.plan
+            .packet()
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions())
     }
     /// Read the same retained snapshot used for every painted record.
     pub(crate) fn canvas_background_rgba8(&self) -> [u8; 4] {
@@ -211,6 +250,8 @@ impl ObjectCompositionWitness {
     /// selector/packet types into composition consumers.
     pub fn same_identity_as(&self, other: &Self) -> bool {
         self.viewport == other.viewport
+            && self.viewport_quality == other.viewport_quality
+            && self.camera == other.camera
             && self.instance_id() == other.instance_id()
             && self.document_id() == other.document_id()
             && self.content_revision() == other.content_revision()
@@ -286,9 +327,23 @@ pub struct ObjectRenderScene {
     rasters: Arc<[raster_scene::RasterSource]>,
     texts: text_scene::TextSources,
     components: component_scene::ComponentSources,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    brushes: Option<Arc<brush_scene::BrushSources>>,
     videos: Arc<[media_scene::VideoSlot]>,
 }
 impl ObjectRenderScene {
+    pub(crate) fn brush_paints_empty(&self) -> bool {
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            self.brushes
+                .as_ref()
+                .is_none_or(|sources| sources.paints.is_empty())
+        }
+        #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+        {
+            true
+        }
+    }
     pub fn packet(&self) -> &ObjectFramePacket {
         &self.packet
     }
@@ -323,6 +378,8 @@ pub fn prepare_object_render_scene(
         rasters: raster_scene::sources(packet)?.into(),
         texts: text_scene::prepare(packet)?,
         components: component_scene::prepare(packet, expected)?,
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        brushes: None,
         videos: media_scene::slots(packet)?.into(),
     })
 }

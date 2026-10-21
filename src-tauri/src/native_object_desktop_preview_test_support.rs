@@ -98,12 +98,18 @@ pub(super) struct Fixture {
 }
 impl Fixture {
     pub(super) fn new() -> Self {
+        Self::with_document(document())
+    }
+    pub(super) fn with_document(source: Value) -> Self {
         let state = Arc::new(ApplicationMcp::default());
-        state
-            .install_native_object(
-                decode_storage_project(&serde_json::to_vec(&document()).unwrap()).unwrap(),
-            )
-            .unwrap();
+        let bytes = serde_json::to_vec(&source).unwrap();
+        if source["format"] == "nemo.native-project-document" {
+            state.install_native_project_file(&bytes).unwrap();
+        } else {
+            state
+                .install_native_object(decode_storage_project(&bytes).unwrap())
+                .unwrap();
+        }
         let mut fixture = Self {
             state,
             raw: json!({}),
@@ -137,6 +143,26 @@ impl Fixture {
             "viewport":{"cssBounds":{"x":0,"y":0,"width":320,"height":180},"physicalExtent":{"width":320,"height":180},
                 "compositionExtent":{"width":320,"height":180},"reportedDpr":1}});
     }
+    pub(super) fn retained_project(&self) -> (Value, Option<Vec<u8>>) {
+        let native = self.state.native_state();
+        let mut guard = native.lock().unwrap();
+        let generation = guard.active_generation().unwrap();
+        let owner = guard
+            .active_mut(generation)
+            .unwrap()
+            .as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
+            .unwrap();
+        (
+            owner.project_file_info().unwrap(),
+            owner
+                .project_file_snapshot(
+                    self.raw["contentRevision"].as_u64().unwrap(),
+                    self.raw["documentSnapshotId"].as_str().unwrap(),
+                )
+                .unwrap(),
+        )
+    }
     pub(super) fn request(&self, operation: &str, payload: Value) -> String {
         json!({"apiVersion":2,"requestId":format!("desktop-command-{}",self.raw["contentRevision"]),"instanceId":self.raw["instanceId"],
             "documentId":self.raw["documentId"],"expectedRevision":self.raw["contentRevision"],"operation":operation,"payload":payload}).to_string()
@@ -145,7 +171,7 @@ impl Fixture {
         &self,
         raw: &str,
     ) -> crate::native_application_contract::HostResult<
-        crate::native_application_contract::NativePreviewReceipt,
+        crate::native_object_desktop_preview::ObjectPreviewReceipt,
     > {
         let request = admit_request(raw, self.state.instance_id())?;
         preview_with_target(&self.state, &request, |consumer| {

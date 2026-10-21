@@ -265,3 +265,7 @@ fn component_targets_cannot_borrow_an_opposite_root_layer_3d_flag() {
         );
     }
 }
+
+#[cfg(all(feature = "test-application", feature = "font_asset_wire"))]
+#[path = "object_frame_camera_scene.rs"]
+mod scene;

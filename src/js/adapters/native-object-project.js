@@ -16,7 +16,9 @@
   function same(a,b){return !!a&&!!b&&['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration'].every(function(k){return a[k]===b[k];});}
   var metadata=Metadata&&Metadata.decode;if(typeof metadata!=='function')throw new Error('Native project metadata parser is unavailable');
   function create(ports){
-    var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
+    if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
+    if(!Exposure||typeof Exposure.navigation!=='function')throw new Error('Native project view ports are unavailable');
+    var view=Exposure.navigation(ports.viewMode),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){if(typeof ports.openDiagnostic==='function')try{ports.openDiagnostic(event,code);}catch(_){} }
@@ -226,35 +228,34 @@
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
         viewport:viewport};
     }
-    async function present(frame,pin,revisionSync,exposure){
+    async function present(frame,pin,revisionSync,exposure,allowSuperseded){
       var request;
       try{request=frameRequest(frame,pin);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
+      var selected=view.read(pin||requireActive()),mode=selected.mode;if(mode!=='canvas')request.viewMode=mode;if(!view.identity(selected.navigation))request.navigation=selected.navigation;
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request),allowDeferred);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||view.read(info).mode===mode&&JSON.stringify(view.read(info).navigation)===JSON.stringify(selected.navigation)),allowDeferred,mode,selected.navigation);}
         catch(error){throw previewFailure('receipt-access',error);}}
       try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),false);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
       if(receipt.failure){
         presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented'));
       }
-      presentation=freeze({owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
-        viewGeneration:receipt.viewGeneration,instanceId:request.instanceId,documentId:request.documentId,
-        contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration});
+      presentation=freeze(Exposure.presentedFrame(receipt,request,frame));
       presentationBounds=bounds;if(ports.surfaceChanged)ports.surfaceChanged(presentation,bounds);
       return presentation;
     }
-    function presentPreview(frame){
+    function presentPreview(frame,allowSuperseded){
       if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native project Open or synchronization is in progress'));
-      var submitted=epoch(info);return enqueue(function(){guardEpoch(submitted);return present(frame);});
+      var submitted=epoch(info);return enqueue(function(){guardEpoch(submitted);return present(frame,undefined,undefined,undefined,allowSuperseded);});
     }
     function renderPreview(frame){
-      if(!active()||openingRequested)return Promise.resolve(null);
+      if(!active()||openingRequested)return Promise.resolve(null);view.read(requireActive());
       wantedFrame=frame;
       if(rendering)return rendering;
       rendering=(async function(){var receipt;
-        while(wantedFrame!==null){var latest=wantedFrame;wantedFrame=null;receipt=await presentPreview(latest);}
+        while(wantedFrame!==null){var latest=wantedFrame;wantedFrame=null;receipt=await presentPreview(latest,true);}
         return receipt;
       }()).catch(function(error){wantedFrame=null;if(ports.notice)ports.notice(error.message);return null;}).finally(function(){rendering=null;});
       return rendering;
@@ -282,7 +283,7 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
-    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&origin.presentation===presentation&&same(info,origin)&&ticket===subscriptionTicket&&
+    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
       (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
       typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
     function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
@@ -354,7 +355,7 @@
       return {apiVersion:2,requestId:request.requestId,instanceId:value.instanceId,documentId:value.documentId,contentRevision:value.contentRevision,ok:true,
         result:{atRevision:value.contentRevision,documentSnapshotId:value.documentSnapshotId,documentDigest:value.documentDigest,byteCount:value.byteCount}};
     }
-    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&same(info,presentation)&&pending===0?
+    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&view.matches(presentation,info)&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
     async function readLayerView(layerUid,frame,pin,view){
       async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
@@ -372,19 +373,18 @@
         var result=response.result;
         if(!result||Object.keys(result).length!==(view?9:11)||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
           ['atRevision','documentSnapshotId','contextId','layerUid','frame'].some(function(k){return result[k]!==request.payload[k];}))return null;
-        if(view==='placement')return result.kind==='layerPlacement'&&typeof result.placement==='object'?freeze(JSON.parse(JSON.stringify(result))):null;
+        if(view==='placement'&&!(result.kind==='layerPlacement'&&typeof result.placement==='object'))return null;
         if(view==='range'){
           var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
           if(result.kind!=='layerRange'||!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
             !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return null;
-          return freeze(JSON.parse(JSON.stringify(result)));
         }
-        return freeze(Object.assign({},result));
+        return freeze(view?JSON.parse(JSON.stringify(result)):Object.assign({},result));
       }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
     }
     function readLayerTiming(layerUid,frame,pin){return readLayerView(layerUid,frame,pin);}
-    function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'range');}function readLayerPlacement(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'placement');}
-    if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
+    function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'range');}
+    function readLayerPlacement(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'placement');}
     var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
       dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
       state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
@@ -432,7 +432,7 @@
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?importBatch:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
-      presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
+      beginViewportNavigation:function(kind,point){return active()&&!openingRequested&&!synchronizing&&presentation&&same(info,presentation)&&(!ports.projectionReady||ports.projectionReady(info))&&(!ports.subscriptionActive||ports.subscriptionActive())?view.begin(presentation,info,ports.frame(),ports.mapping(info),presentationBounds,kind,point):null;},updateViewportNavigation:function(token,point,factor,target){try{if(!active()||openingRequested||synchronizing||!presentation||!same(info,presentation)||ports.projectionReady&&!ports.projectionReady(info)||ports.subscriptionActive&&!ports.subscriptionActive())throw new Error('Native navigation owner is unavailable');view.update(token,info,ports.frame(),ports.mapping(info),point,factor,target);return renderPreview(ports.frame());}catch(error){return Promise.reject(error);}},presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
       acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
       identity:requireActive,requestRelease:function(){return false;},releaseCurrent:function(){return false;},
@@ -484,7 +484,7 @@
     var ports=nativeObjectUiPorts(root);
     try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
       throw new Error('Native document UI presentation is unavailable');
-      if(ports.bindPolicyEntries)ports.bindPolicyEntries();}
+      Desktop.didPaintUI(root,ports);}
     catch(error){return uiFailure(root,error);}
     return true;
   }

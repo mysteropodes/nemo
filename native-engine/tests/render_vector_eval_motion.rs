@@ -97,20 +97,13 @@ fn enabled_position_expression_other_motion_holders_and_foreign_pins_fail_closed
     let mut expression = terminal();
     expression["propertyHolders"][0]["properties"][0]["expression"] =
         json!({"enabled":true,"code":"[100,0]"});
-    let mut rotation = terminal();
-    rotation["propertyHolders"][0]["properties"]
-        .as_array_mut()
-        .unwrap()
-        .push(json!({"property":"rotation","static":[15]}));
-    for value in [expression, rotation] {
-        let s = snap(&value);
-        let before = encode_storage_project(s.document()).unwrap();
-        assert_eq!(
-            prepare_object_exposure_frame(&s, &pins(&s, 10)).unwrap_err(),
-            ObjectFrameError::Unavailable
-        );
-        assert_eq!(encode_storage_project(s.document()).unwrap(), before);
-    }
+    let s = snap(&expression);
+    let before = encode_storage_project(s.document()).unwrap();
+    assert_eq!(
+        prepare_object_exposure_frame(&s, &pins(&s, 10)).unwrap_err(),
+        ObjectFrameError::Unavailable
+    );
+    assert_eq!(encode_storage_project(s.document()).unwrap(), before);
     let s = snap(&terminal());
     for which in 0..5 {
         let mut p = pins(&s, 10);
@@ -141,18 +134,61 @@ fn position_does_not_admit_a_nonvector_family_or_element_transform_holder() {
         evaluate_vector(&s, 0, 10),
         Err(VectorEvalError::NotVectorFamily)
     );
-    assert_eq!(
-        prepare_object_exposure_frame(&s, &pins(&s, 10)).unwrap_err(),
-        ObjectFrameError::Unavailable
-    );
+    let before = encode_storage_project(s.document()).unwrap();
+    assert_paint(&s, 10, 84., 0.5);
+    assert_eq!(encode_storage_project(s.document()).unwrap(), before);
     let mut element = terminal();
     element["propertyHolders"][0]["target"]["strokeId"] = json!("r08_curve_rect");
     // Layer opacity is not converted into element opacity by this change.
     let s = snap(&element);
+    let before = encode_storage_project(s.document()).unwrap();
     assert_eq!(
         prepare_object_exposure_frame(&s, &pins(&s, 10)).unwrap_err(),
         ObjectFrameError::Unavailable
     );
+    assert_eq!(encode_storage_project(s.document()).unwrap(), before);
+}
+
+#[test]
+fn admitted_raw_rotation_reaches_real_paint_while_direct_position_evaluator_stays_strict() {
+    let mut value = terminal();
+    value["propertyHolders"][0]["properties"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"property":"rotation","static":[15]}));
+    let s = snap(&value);
+    let before = encode_storage_project(s.document()).unwrap();
+    assert_eq!(
+        evaluate_vector(&s, 0, 10),
+        Err(VectorEvalError::LayerMotionUnavailable)
+    );
+    let p = plan(&s, 10);
+    assert_eq!(p.commands().len(), 1);
+    let c = p.commands().next().unwrap();
+    // Original rectangle pivot [30,70], positive15 degrees, then frame10 Position [64,0].
+    let expected = [
+        [81.75255128608411, 77.07106781186548],
+        [86.92893218813452, 57.75255128608411],
+        [106.24744871391589, 62.928932188134524],
+        [101.07106781186548, 82.24744871391589],
+    ];
+    assert_eq!(c.contour().segments().len(), expected.len());
+    for (segment, point) in c.contour().segments().iter().zip(expected) {
+        close(segment.point[0], point[0]);
+        close(segment.point[1], point[1]);
+        assert_eq!(segment.handle_in, [0., 0.]);
+        assert_eq!(segment.handle_out, [0., 0.]);
+    }
+    close(c.paint()[3].as_f64().unwrap(), 0.5);
+    assert_eq!(
+        c.source().record().geometry.segments[0].point.x.as_f64(),
+        Some(20.)
+    );
+    assert_eq!(
+        c.source().record().geometry.segments[0].point.y.as_f64(),
+        Some(80.)
+    );
+    assert_eq!(encode_storage_project(s.document()).unwrap(), before);
 }
 
 #[cfg(feature = "history")]

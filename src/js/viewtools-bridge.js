@@ -17,7 +17,7 @@
 // first here too, rather than being swallowed by a later bridge's own
 // stopImmediatePropagation for whatever tool happens to be active.
 (function () {
-  var panning = false;
+  var panning = false, nativeNavigation = null, nativeStart = null, nativeMoved = false;
   // Zoom-tool drag state: a click alone still zooms one fixed step (old
   // behavior), but a click-DRAG now ramps the zoom continuously while
   // holding the point under the INITIAL click fixed on screen — the same
@@ -185,6 +185,10 @@
   }
 
   function onDown(e) {
+    if(!state.playing&&(state.tool==='hand'||state.spaceDown||state.tool==='zoom')&&typeof nativeViewportNavigation==='function'){
+      var native=nativeViewportNavigation(state.tool==='zoom'&&!state.spaceDown?'begin-zoom':'begin-pan',e);
+      if(native){e.stopImmediatePropagation();e.preventDefault();nativeNavigation=native;nativeStart={x:e.clientX,y:e.clientY};nativeMoved=false;state.isPanning=state.tool!=='zoom'||state.spaceDown;return;}
+    }
     if (shouldPan()) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -220,6 +224,13 @@
     }
   }
   function onMove(e) {
+    if(nativeNavigation){e.stopImmediatePropagation();e.preventDefault();
+      if(!nativeNavigation.token)return;
+      var delta=e.clientX-nativeStart.x;if(Math.abs(delta)>2)nativeMoved=true;
+      if(nativeNavigation.token.kind==='pan')nativeViewportNavigation('drag',e,nativeNavigation.token);
+      else if(nativeMoved)nativeViewportNavigation('drag',e,nativeNavigation.token,Math.pow(2,delta/120));
+      return;
+    }
     if (rotating) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -277,6 +288,10 @@
     window.SMEngineBridge.renderNow(true);
   }
   function onUp(e) {
+    if(nativeNavigation){e.stopImmediatePropagation();e.preventDefault();
+      if(e.type!=='pointercancel'&&nativeNavigation.token&&nativeNavigation.token.kind==='zoom'&&!nativeMoved)nativeViewportNavigation('drag',e,nativeNavigation.token,e.altKey ? 0.8 : 1.25);
+      nativeNavigation=null;nativeStart=null;state.isPanning=false;return;
+    }
     if (rotating) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -314,6 +329,7 @@
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
+    window.addEventListener('blur',function(){nativeNavigation=null;nativeStart=null;state.isPanning=false;});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

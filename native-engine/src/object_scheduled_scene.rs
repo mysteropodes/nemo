@@ -119,7 +119,7 @@ fn prepare_with<'a>(
         return Err(ScheduledObjectSceneError::RetainedSourceMismatch);
     }
     let output = key.output_spec();
-    if key.quality() != "final"
+    if key.quality() != composition.expected_quality()
         || output.kind() != "frame"
         || output.format() != "rgba8"
         || output.color_interpretation() != "srgb"

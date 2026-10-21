@@ -28,8 +28,16 @@
       var edges=[r.left,r.top,r.left+r.width,r.top+r.height];
       if(typeof html.style.getPropertyValue!=='function'||!['left','top','right','bottom'].every(function(k,i){return parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===edges[i];}))return null;
       return {left:r.left,top:r.top,width:r.width,height:r.height};}
-    function point(e,c){return {x:(e.clientX-c.bounds.left)*c.canvasW/c.bounds.width,y:(e.clientY-c.bounds.top)*c.canvasH/c.bounds.height};}
-    function screen(p,c){return {x:c.bounds.left+p.x*c.bounds.width/c.canvasW,y:c.bounds.top+p.y*c.bounds.height/c.canvasH};}
+  function transform(c,inverse){
+    var v=c.presentation&&c.presentation.view;if(v===undefined)return [1,0,0,1,0,0];
+    var m=v[inverse?'compositionToDocument':'documentToComposition'];
+    if(!['canvas','stored-camera'].includes(v.mode)||!Array.isArray(m)||m.length!==6||!m.every(Number.isFinite))throw new Error('Native presented coordinates are unavailable');
+    return m;
+  }
+  function mapped(p,c,inverse){var m=transform(c,inverse);return {x:m[0]*p.x+m[2]*p.y+m[4],y:m[1]*p.x+m[3]*p.y+m[5]};}
+  function matchesView(root,p){if(!p||(p.view?p.view.mode:'canvas')!==(root.state&&root.state.cameraView===true?'stored-camera':'canvas'))return false;var project=root.NemoNativeObjectProject,session=project&&typeof project.desktop==='function'&&project.desktop(root);if(!session||typeof session.readPresentedObjectSession!=='function')return !(p.view&&p.view.navigation&& (p.view.navigation.zoom!==1||p.view.navigation.pan.some(function(n){return n!==0;})));var shown=session.readPresentedObjectSession();return !!shown&&!!shown.presentation&&['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration','frame','workId','viewGeneration'].every(function(k){return shown.presentation[k]===p[k];})&&JSON.stringify(shown.presentation.view)===JSON.stringify(p.view);}
+  function point(e,c){return mapped({x:(e.clientX-c.bounds.left)*c.canvasW/c.bounds.width,y:(e.clientY-c.bounds.top)*c.canvasH/c.bounds.height},c,true);}
+  function screen(p,c){var q=mapped(p,c,false);return {x:c.bounds.left+q.x*c.bounds.width/c.canvasW,y:c.bounds.top+q.y*c.bounds.height/c.canvasH};}
   function create(ports) {
     var element = ports.document.documentElement, style = element.style;
     if (element.classList.contains(className)) throw new Error('Native underlay already has an owner');
@@ -119,5 +127,5 @@
       }
     });
   }
-  return Object.freeze({ create: create, desktop: desktop, canvasMapping: Object.freeze({bounds:bounds,point:point,screen:screen}) });
+  return Object.freeze({ create: create, desktop: desktop, canvasMapping: Object.freeze({bounds:bounds,point:point,screen:screen,transform:transform,matchesView:matchesView}) });
 }));

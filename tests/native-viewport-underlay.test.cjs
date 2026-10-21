@@ -41,3 +41,185 @@ const desktopBounds={x:40,y:60,width:320,height:180};
 test('desktop hides only the captured stage, repeated presentation is idempotent, clear restores exact prior visibility',()=>{for(const visible of [true,false]){const f=desktopFixture(visible);f.desktop.surfaceChanged(A,desktopBounds);assert.equal(f.stage.visible,false);f.desktop.surfaceChanged(A,desktopBounds);assert.equal(f.stage.visible,false);assert.deepEqual(f.updates,visible?[false]:[]);f.desktop.surfaceChanged(null);assert.equal(f.stage.visible,visible);assert.deepEqual(f.updates,visible?[false,true]:[false]);const count=f.updates.length;f.desktop.surfaceChanged(null);assert.equal(f.updates.length,count);opaque(f);}});
 test('desktop stage identity replacement fails closed and restores the original captured stage without touching the replacement',()=>{const f=desktopFixture();f.desktop.surfaceChanged(A,desktopBounds);const replacement={visible:true};f.root.stageLayer=replacement;assert.throws(()=>f.desktop.surfaceChanged(A,desktopBounds),/stage changed/);assert.equal(f.stage.visible,true);assert.equal(replacement.visible,true);opaque(f);});
 test('desktop refuses missing presentation backdrop without inventing a document or hiding unrelated layers',()=>{const f=desktopFixture();delete f.root.stageLayer;assert.throws(()=>f.desktop.surfaceChanged(A,desktopBounds),/backdrop is unavailable/);assert.equal(f.stage.visible,true);assert.deepEqual(f.updates,[]);opaque(f);});
+
+test('native presented camera affine maps both directions after real CSS stretch without Paper',()=>{
+ const M=require('../src/js/adapters/native-viewport-underlay.js').canvasMapping;
+ const presentation={view:{mode:'stored-camera',documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};
+ const c={bounds:{left:20,top:30,width:640,height:360},canvasW:320,canvasH:180,presentation};
+ assert.deepEqual(M.point({clientX:100,clientY:90},c),{x:100,y:60});
+ assert.deepEqual(M.screen({x:100,y:60},c),{x:100,y:90});
+ const rotated={...c,presentation:{view:{mode:'stored-camera',documentToComposition:[0,2,-2,0,300,-100],compositionToDocument:[0,-.5,.5,0,50,150]}}};
+ assert.deepEqual(M.screen({x:100,y:60},rotated),{x:380,y:230});
+ assert.deepEqual(M.point({clientX:380,clientY:230},rotated),{x:100,y:60});
+ assert.equal(M.matchesView({state:{cameraView:true}},presentation),true);
+ assert.equal(M.matchesView({state:{cameraView:false}},presentation),false);
+ assert.equal(M.matchesView({state:{cameraView:true}},{frame:0}),false);
+ assert.deepEqual(M.point({clientX:100,clientY:90},{...c,presentation:{frame:0}}),{x:40,y:30});
+ assert.throws(()=>M.point({clientX:100,clientY:90},{...c,presentation:{view:{mode:'stored-camera',compositionToDocument:[1,0,0,NaN,0,0]}}}));
+});
+
+
+function navigationSourceHarness(native=true){
+ const fs=require('node:fs'),vm=require('node:vm'),{extractFunction}=require('./fixtures/lib/sandbox.cjs');
+ const calls=[],listeners={},blur={},state={tool:'hand',spaceDown:false,playing:false,isPanning:false};
+ const target={addEventListener(name,fn){listeners[name]=fn;}},document={readyState:'complete',activeElement:null,getElementById:()=>target};
+ const session={blocksLegacy:()=>native,isActive:()=>true,readPresentedObjectSession:()=>null,
+  beginViewportNavigation(kind,point){calls.push(['begin',kind,point]);return {kind};},
+  updateViewportNavigation(token,point,factor,aim){calls.push(['update',token.kind,point,factor,aim]);return Promise.resolve();}};
+ const root={document,state,NemoNativeObjectProject:{desktop:()=>session},addEventListener(name,fn){blur[name]=fn;}};
+ const sandbox={window:root,document,state,canvasEl:target,Promise,Math,Number,showToast(){}};
+ Object.defineProperty(sandbox,'view',{configurable:true,get(){throw Error('native navigation must not read or mutate Paper viewport');}});
+ const context=vm.createContext(sandbox),tools=fs.readFileSync(require.resolve('../src/js/tools.js'),'utf8');
+ vm.runInContext(extractFunction(tools,'nativeViewportNavigation'),context);
+ vm.runInContext(tools.slice(tools.indexOf("canvasEl.addEventListener('wheel',function(e){"),tools.indexOf("},{passive:false});",tools.indexOf("canvasEl.addEventListener('wheel',function(e){"))+19),context);
+ const wheel=listeners.wheel;
+ vm.runInContext(fs.readFileSync(require.resolve('../src/js/viewtools-bridge.js'),'utf8'),context);
+ function event(patch={}){return {type:'pointerdown',clientX:100,clientY:60,movementX:0,movementY:0,preventDefault(){},stopImmediatePropagation(){},...patch};}
+ return {calls,listeners,state,context,root,blur,wheel,event,vm,fs};
+}
+test('actual wheel and capture hand/zoom handlers consume native session coordinates without a Paper fallback',()=>{
+ const f=navigationSourceHarness();
+ f.wheel(f.event({deltaY:100,ctrlKey:false}));assert.equal(f.calls.at(-1)[3],0.9);
+ f.wheel(f.event({deltaY:-25,ctrlKey:false}));assert.equal(f.calls.at(-1)[3],1.025);
+ f.wheel(f.event({deltaY:40,ctrlKey:true}));assert.equal(f.calls.at(-1)[3],0.94);
+ f.listeners.pointerdown(f.event());f.listeners.pointermove(f.event({type:'pointermove',clientX:80,clientY:70}));
+ assert.deepEqual(JSON.parse(JSON.stringify(f.calls.at(-1))),['update','pan',{x:80,y:70},null,null]);
+ f.listeners.pointerup(f.event({type:'pointerup'}));assert.equal(f.state.isPanning,false);
+ f.state.tool='zoom';f.listeners.pointerdown(f.event());f.listeners.pointermove(f.event({type:'pointermove',clientX:220}));
+ assert.equal(f.calls.at(-1)[3],2);f.listeners.pointerup(f.event({type:'pointerup',clientX:220}));
+ f.listeners.pointerdown(f.event());const n=f.calls.length;f.listeners.pointercancel(f.event({type:'pointercancel'}));assert.equal(f.calls.length,n);
+ f.state.tool='hand';f.listeners.pointerdown(f.event());f.blur.blur();assert.equal(f.state.isPanning,false);
+});
+test('actual keyboard, Fit/Reset and zoom scrub route to native navigation while legacy mode retains its original math',()=>{
+ const f=navigationSourceHarness(),timeline=f.fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8');
+ const zoomKeys=timeline.split('\n').filter(line=>line.includes("event.code==='Equal'")||line.includes("event.code==='Minus'")||line.includes("event.code==='Digit0'"));
+ const member=timeline.split('\n').find(line=>line.includes('  fitCanvas:function(){'));
+ f.context.fitCanvas=()=>{throw Error('legacy fit');};f.context.resetView=()=>{throw Error('legacy reset');};
+ f.vm.runInContext('window.SM={'+member.trim()+'};',f.context);
+ f.vm.runInContext('function keys(event){'+zoomKeys.join('\n')+'}',f.context);
+ for(const code of ['Equal','Minus','Digit0']){f.context.event=f.event({metaKey:true,ctrlKey:false,altKey:true,code});f.vm.runInContext('keys(event)',f.context);}
+ assert.deepEqual(f.calls.filter(c=>c[0]==='update').map(c=>[c[3],c[4]]),[[1.1,undefined],[1/1.1,undefined],[undefined,'fit']]);
+ f.root.SM.resetView();assert.equal(f.calls.at(-1)[4],'reset');
+ const marker="document.getElementById('zoom-scrub').addEventListener('input',function(){",start=timeline.indexOf(marker),end=timeline.indexOf('\n});',start)+4;
+ const input={value:'250',addEventListener(name,fn){this.fn=fn;}};f.context.document.getElementById=()=>input;
+ f.vm.runInContext(timeline.slice(start,end),f.context);input.fn.call(input);assert.equal(f.calls.at(-1)[4],2.5);
+});
+
+test('absent native path preserves the existing wheel zoom and Fit/Reset legacy consumers',()=>{
+ const f=navigationSourceHarness(false);let fit=0,reset=0;
+ class P{constructor(x,y){this.x=x;this.y=y;}subtract(p){return new P(this.x-p.x,this.y-p.y);}add(p){return new P(this.x+p.x,this.y+p.y);}}
+ const view={zoom:1,center:new P(160,90),viewToProject(p){return new P(this.center.x+p.x/this.zoom,this.center.y+p.y/this.zoom);}};
+ Object.defineProperty(f.context,'view',{value:view});f.context.Point=P;f.context.updZoom=()=>{};f.context.renderArcs=()=>{};
+ f.wheel(f.event({deltaY:100,ctrlKey:false,offsetX:0,offsetY:0}));assert.equal(view.zoom,.9);assert.equal(f.calls.length,0);
+ const timeline=f.fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8'),member=timeline.split('\n').find(line=>line.includes('  fitCanvas:function(){'));
+ f.context.fitCanvas=()=>++fit;f.context.resetView=()=>++reset;f.vm.runInContext('window.SM={'+member.trim()+'};',f.context);
+ f.root.SM.fitCanvas();f.root.SM.resetView();assert.deepEqual([fit,reset],[1,1]);
+});
+
+test('native inverse navigation preserves original absolute zoom clamps and rotated world-pan directions',()=>{
+ const Exposure=require('../src/js/adapters/native-object-open-exposure.js'),state=Exposure.navigation(()=>'stored-camera');
+ const info={instanceId:'i',documentId:'d',contentRevision:0,documentSnapshotId:'s',lifecycleGeneration:1,canvasW:320,canvasH:180};
+ const bounds={x:0,y:0,width:320,height:180},mapping={cssBounds:bounds};
+ const p={frame:0,view:{mode:'stored-camera',navigation:{zoom:1,pan:[0,0]},documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};
+ let t=state.begin(p,info,0,mapping,bounds,'zoom',null);assert.equal(state.update(t,info,0,mapping,null,100).zoom,10);
+ const fresh=Exposure.navigation(()=>'stored-camera');t=fresh.begin(p,info,0,mapping,bounds,'zoom',null);
+ assert.equal(fresh.update(t,info,0,mapping,null,.001).zoom,.025);
+ const rotated={frame:0,view:{...p.view,documentToComposition:[0,2,-2,0,300,-100],compositionToDocument:[0,-.5,.5,0,50,150]}};
+ const turn=Exposure.navigation(()=>'stored-camera');t=turn.begin(rotated,info,0,mapping,bounds,'pan',{x:100,y:60});
+ assert.deepEqual(turn.update(t,info,0,mapping,{x:120,y:60}).pan,[0,10]);
+ assert.throws(()=>turn.update(t,{...info,documentSnapshotId:'foreign'},0,mapping,{x:120,y:60}),/source changed/);
+ const oldOwner={...info,instanceId:'a/b',documentId:'c'},newOwner={...info,instanceId:'a',documentId:'b/c'};
+ const owners=Exposure.navigation(()=>'stored-camera');t=owners.begin(p,oldOwner,0,mapping,bounds,'zoom',null);owners.update(t,oldOwner,0,mapping,null,2);
+ assert.deepEqual(owners.read(newOwner).navigation,{zoom:1,pan:[0,0]});
+});
+
+
+const CameraDesktop=require('../src/js/adapters/native-object-project-desktop.js');
+function cameraToolbarRoot(){
+ const buttons=Object.fromEntries(['btn-camera','btn-cam-addkey','btn-cam-ease-edit'].map(id=>[id,{
+  hidden:false,setAttribute(k,v){this[k]=v;},addEventListener(kind,fn){this[kind]=fn;}
+ }]));
+ const root={state:{cameraView:false,currentFrame:0},SM:{t:key=>key},
+  document:{readyState:'complete',getElementById:id=>buttons[id]||null},NemoNativeViewportUnderlay:require('../src/js/adapters/native-viewport-underlay.js')};
+ return {root,buttons};
+}
+test('bound camera toolbar uses the real Project preview and refuses legacy actions while a frame is pending',async()=>{
+ const Project=require('../src/js/adapters/native-object-project.js'),{root,buttons}=cameraToolbarRoot(),calls=[];
+ let installed=false,held=null,serial=0;
+ const pin={apiVersion:2,instanceId:'camera-instance',documentId:'camera-document',lifecycleGeneration:1,
+  contentRevision:0,documentSnapshotId:'camera-snapshot',documentDigest:'a'.repeat(64),byteCount:100,
+  canvasW:320,canvasH:180,fps:24,totalFrames:8,layers:[],reference:null};
+ async function invoke(command,args){
+  const r=args&&JSON.parse(args.requestJson);calls.push({command,r});
+  if(command==='nemo_native_object_client_status')return {...pin,available:installed};
+  if(command==='nemo_native_object_bootstrap'){installed=true;return {...pin,requestId:r.requestId,resourceCount:0,viewportAvailable:false};}
+  if(command==='nemo_native_object_reference')return {...pin,requestId:r.requestId};
+  assert.equal(command,'nemo_native_object_preview');if(held)await held;
+  return {status:'presented',workId:'camera-work-'+(++serial),viewGeneration:1,
+   view:{mode:r.viewMode||'canvas',cameraAvailable:true,navigation:{zoom:1,pan:[0,0]},
+    documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]}};
+ }
+ const session=Project.create({invoke,frame:()=>root.state.currentFrame,viewMode:()=>root.state.cameraView?'stored-camera':'canvas',
+  mapping:()=>({cssBounds:{x:0,y:0,width:320,height:180},physicalExtent:{width:320,height:180}}),
+  presented:()=>CameraDesktop.renderCameraViewLock(root)});
+ root.NemoNativeObjectProject={desktop:()=>session};root.__TAURI__={core:{invoke}};
+ Object.defineProperties(root.state,{cameraKeys:{get(){assert.fail('native legacy cameraKeys read');}},cameraLayerOn:{get(){assert.fail('native legacy cameraLayerOn read');}}});
+ CameraDesktop.bindCameraUI(root,{toggle:()=>assert.fail('native legacy toggle'),addKey:()=>assert.fail('native legacy key'),editEase:()=>assert.fail('native legacy easing')});
+ await session.openPath('/camera.json');const info=session.info();
+ assert.equal(buttons['btn-camera'].hidden,false);assert.equal(buttons['btn-camera']['aria-pressed'],'false');
+ root.state.currentFrame=4;let release;held=new Promise(resolve=>release=resolve);
+ const preview=buttons['btn-camera'].click();assert.equal(root.state.cameraView,true);
+ assert.equal(session.readPresentedObjectSession(),null);assert.equal(buttons['btn-camera'].hidden,true);
+ const count=calls.length;buttons['btn-camera'].click();buttons['btn-cam-addkey'].click();buttons['btn-cam-ease-edit'].click();
+ assert.equal(calls.length,count);assert.equal(root.state.cameraView,true);
+ release();await preview;held=null;assert.equal(buttons['btn-camera'].hidden,false);
+ assert.equal(session.readPresentedObjectSession().presentation.view.mode,'stored-camera');
+ assert.equal(buttons['btn-camera']['aria-pressed'],'true');
+ await buttons['btn-camera'].click();assert.equal(root.state.cameraView,false);
+ assert.equal(session.readPresentedObjectSession().presentation.view.mode,'canvas');assert.strictEqual(session.info(),info);
+ const frames=calls.filter(c=>c.command==='nemo_native_object_preview');assert.deepEqual(frames.map(c=>c.r.frame),[0,4,4]);
+ assert.equal(frames[1].r.viewMode,'stored-camera');assert.equal(Object.hasOwn(frames[2].r,'viewMode'),false);
+ assert.ok(calls.every(c=>!c.command.includes('dispatch')));assert.equal(info.contentRevision,0);
+});
+test('native camera toolbar stays unavailable for idle, blocked, missing and unpresented owners without legacy fallback',()=>{
+ for(const [session,tauri] of [[null,true],[{isActive:()=>false,blocksLegacy:()=>false,readPresentedObjectSession:()=>null},true],
+  [{isActive:()=>false,blocksLegacy:()=>true,readPresentedObjectSession:()=>null},false],
+  [{isActive:()=>true,readPresentedObjectSession:()=>({presentation:{view:{cameraAvailable:false}}})},false]]){
+  const {root,buttons}=cameraToolbarRoot();if(tauri)root.__TAURI__={core:{}};root.NemoNativeObjectProject={desktop:()=>session};
+  CameraDesktop.bindCameraUI(root,{toggle:()=>assert.fail('unready legacy toggle'),addKey:()=>assert.fail('unready legacy key'),editEase:()=>assert.fail('unready legacy easing')});
+  assert.equal(CameraDesktop.renderCameraViewLock(root),true);assert.equal(buttons['btn-camera'].hidden,true);
+  for(const button of Object.values(buttons))button.click();assert.equal(root.state.cameraView,false);
+ }
+});
+test('actual legacy camera callbacks preserve toggle, key undo and shared easing editor through the Desktop binding',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),{root,buttons}=cameraToolbarRoot(),calls=[];
+ Object.assign(root.state,{cameraLayerOn:false,cameraKeys:[],canvasW:320,canvasH:180,tool:'select'});
+ root.NemoNativeObjectProjectDesktop=CameraDesktop;root.window=root;
+ Object.assign(root,{pushUndo:()=>calls.push('undo'),renderLayerList:()=>calls.push('layers'),renderTimeline:()=>calls.push('timeline'),
+  showToast:message=>calls.push(message),SMEngineBridge:{renderNow:()=>calls.push('render')},
+  _curveEditor:{editCameraSeg:(segment,label)=>calls.push([segment.frame,label])}});
+ root.SM.setTool=tool=>{root.state.tool=tool;};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/camera.js'),'utf8'),root);
+ buttons['btn-camera'].click();assert.equal(root.state.cameraLayerOn,true);assert.equal(root.state.tool,'camera');
+ assert.deepEqual(JSON.parse(JSON.stringify(root.state.cameraKeys)),[{frame:0,x:160,y:90,w:320,rot:0,hOut:[0,0],hIn:[0,0],ease:[.42,0,.58,1]}]);
+ assert.deepEqual(calls,['undo','layers','timeline','layers','render']);
+ buttons['btn-camera'].click();assert.equal(root.state.tool,'select');assert.equal(calls.filter(c=>c==='undo').length,1);
+ buttons['btn-cam-addkey'].click();assert.equal(root.state.cameraKeys.length,0);
+ root.state.currentFrame=4;buttons['btn-cam-addkey'].click();assert.equal(root.state.cameraKeys[0].frame,4);
+ assert.equal(calls.filter(c=>c==='undo').length,3);
+ root.SMCamera.setKey(12,{x:200,y:90,w:160});buttons['btn-cam-ease-edit'].click();
+ assert.deepEqual(calls.at(-1),[4,'Caméra : clé 5 → 13']);assert.equal(root.state.cameraView,false);
+});
+test('Desktop completion paints its own bound camera lock without calling the legacy camera facade',async()=>{
+ const {root,buttons}=cameraToolbarRoot(),info={},presentation={view:{cameraAvailable:true}},events=[];
+ root.__TAURI__={core:{invoke(){assert.fail('no native request for lock painting');}}};
+ const session={isActive:()=>true,info:()=>info,readSubscriptionGeneration:()=>1,readPresentedObjectSession:()=>({presentation})};
+ root.NemoNativeObjectProject={desktop:()=>session};
+ root.SMCamera={renderNativeViewLock(){assert.fail('completion must use Desktop painter');}};
+ root.NemoNativeProjectSettingsController={presented:value=>events.push(value)};
+ root.NemoNativeObjectUI={refreshPolicy:()=>events.push('policy')};
+ CameraDesktop.bindCameraUI(root,{toggle(){},addKey(){},editEase(){}});
+ CameraDesktop.createPorts(root).presented(info);await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(buttons['btn-camera'].hidden,false);assert.equal(buttons['btn-camera']['aria-pressed'],'false');
+ assert.equal(buttons['btn-camera'].title,'titleCameraViewLockHint');assert.deepEqual(events,[info,'policy']);
+});

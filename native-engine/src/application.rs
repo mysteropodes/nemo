@@ -27,6 +27,8 @@ mod replacement;
 pub use replacement::{ReplacementFailureKind, ReplacementPhase, ReplacementProgress};
 #[path = "application_construction.rs"]
 mod construction;
+#[cfg(feature = "project_media_codec")]
+pub use construction::brush_runtime::ObjectBrushRuntime;
 #[path = "application_diagnostics.rs"]
 mod diagnostics;
 #[path = "application_reproduction.rs"]

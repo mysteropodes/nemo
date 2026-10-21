@@ -14,22 +14,24 @@ const vm=require('node:vm'),fs=require('node:fs');
 const turn=()=>new Promise(setImmediate);
 const timerTurn=()=>new Promise(resolve=>setTimeout(resolve,0));
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
+async function bounded(promise,label,ending='settle'){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{
+  timer=setTimeout(()=>reject(Error(label+' did not '+ending)),1000);})]);}finally{clearTimeout(timer);}}
 function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
   let paletteReplyHold=null,commentsReplyHold=null;
   const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[],notifications=[];
   let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
-  const document={documentElement:{clientWidth:1200,clientHeight:900,
+  const document={addEventListener(){},removeEventListener(){},documentElement:{clientWidth:1200,clientHeight:900,
     classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
     style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}},
     getElementById:id=>{
       if(['palette-grid','palette-tabs','btn-palette-new','btn-palette-add-fill','btn-palette-add-stroke',
-        'btn-palette-replace','btn-palette-swap','palette-replace-scope','fb-avatars-pop'].includes(id))return null;
+        'btn-palette-replace','btn-palette-swap','palette-replace-scope','fb-avatars-pop','zoom-scrub'].includes(id))return null;
       assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId,contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,lifecycleGeneration:generation,
     documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:layerRows.map(row=>({...row})),reference:null});
-  const root={document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
+  const root={addEventListener(){},removeEventListener(){},document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
     NemoNativeObjectProject:Project,
     NemoNativeObjectProjectFile:{...Files,refreshLayerTable:(r,i)=>{log.push('project');return !projectionRefused&&Files.refreshLayerTable(r,i);}},
     NemoNativeApplicationAdapter:Application,NemoNativeObjectUI:{refreshTiming:r=>{assert.equal(r,root);log.push('timing');},refreshPolicy:r=>{assert.equal(r,root);log.push('policy');}},
@@ -47,7 +49,11 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     if(command==='nemo_native_dispatch'){
       log.push(r.operation);const p=r.payload;
       let result;
-      const pin=info();
+      const pin=info(),projectRead=['composition','palette','comments','perspective'].some(kind=>r.operation==='query.document.object.project.'+kind+'.read');
+      if(projectRead){
+        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
+        assert.equal(p.contextId,'scene-root');
+      }
       if(r.operation==='query.document.object.property.metadata'){
         if(held)await held.promise;
         result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
@@ -56,8 +62,6 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
           unavailableCategories:['conditionalMotionRows','pathVerticesTrimStrokeBrushMesh','referenceOnlyElements',
             'expressionDiagnostics','layerEffectMatteReveal','propertyWrites'].map(category=>({category,state:'unavailable',reason:'not-admitted'}))};
       }else if(r.operation==='query.document.object.project.composition.read'||r.operation==='query.document.object.project.palette.read'){
-        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
-        assert.equal(p.contextId,'scene-root');
         const composition=r.operation==='query.document.object.project.composition.read';
         let value;
         if(p.selector.kind==='settings'){
@@ -70,11 +74,9 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
           value=composition?{kind:'markerPage',markersPresent:false,markerCount:0,cursor:0,items:[],nextCursor:null}:
             {kind:'palettePage',palettesPresent:true,paletteCount:0,cursor:0,items:[],nextCursor:null};
         }
-        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
-          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
+        result=value;
       }else if(r.operation==='query.document.object.project.comments.read'){
-        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
-        assert.equal(p.contextId,'scene-root');let value;
+        let value;
         if(p.selector.kind==='settings'){
           if(commentsReplyHold){const own=commentsReplyHold;commentsReplyHold=null;own.entered();await own.promise;}
           value={commentsPresent:false,commentCount:0};
@@ -82,22 +84,19 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
           assert.equal(p.selector.kind,'commentsPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
           value={kind:'projectCommentsPage',commentsPresent:false,commentCount:0,cursor:0,items:[],nextCursor:null};
         }
-        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
-          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result:value};
+        result=value;
       }else if(r.operation==='query.document.object.project.perspective.read'){
-        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
-        assert.equal(p.contextId,'scene-root');
         const settings={perspectiveVPsPresent:false,perspectiveVPsNull:false,perspectiveVPCount:0,effectiveVPCount:2,vpSource:'default'};
         if(p.selector.kind==='settings')result=settings;
         else{
           assert.equal(p.selector.kind,'vpPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
           result={kind:'perspectiveVPPage',...settings,cursor:0,items:[{ordinal:1,x:-48,y:90,locked:false},{ordinal:2,x:368,y:90,locked:false}],nextCursor:null};
         }
-        result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
-          documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result};
       }else if(r.operation==='command.document.object.layer.policy.edit'){
         assert.equal(r.expectedRevision,revision);revision++;result={applied:true,historyEntriesAdded:1};
       }else throw Error('unexpected fake public operation');
+      if(projectRead)result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
+        documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result};
       const reply={apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:pin.documentId,contentRevision:r.operation.startsWith('query.')?pin.contentRevision:revision,ok:true,result};
       if(replyMutation)replyMutation(reply);return reply;
     }
@@ -286,8 +285,7 @@ async function ordinaryBpmEntry(requests){
     hold.resolve();await preview;await timerTurn();await turn();await timerTurn();await turn();
     assert.ok(composition.read(),'the real completion fanout recovered the composition');
     if(waiting){
-      const value=await Promise.race([waiting,new Promise((_,reject)=>{c.timer=setTimeout(()=>reject(Error('duplicate entry waiter did not settle')),1000);})]);
-      clearTimeout(c.timer);assert.strictEqual(value,composition.read(),'duplicate requests must resolve the actual current projection');
+      const value=await bounded(waiting,'duplicate entry waiter');assert.strictEqual(value,composition.read(),'duplicate requests must resolve the actual current projection');
     }
     assert.equal(dom.document.body.children.filter(v=>v.id==='bpm-settings-dialog').length,1,
       'the original settings gesture must open once after its unchanged owner is presented');
@@ -320,8 +318,7 @@ test('deferred ordinary BPM entry cannot survive a real revision, owner, subscri
     await timerTurn();await turn();await timerTurn();await turn();
     // Exercise late publication through the replaced controller's real callback; the current slot remains replaced.
     if(mode==='controller')await composition.presented();
-    const resolved=await Promise.race([waiting,new Promise((_,reject)=>{c.timer=setTimeout(()=>reject(Error(mode+' waiter did not retire')),1000);})]);
-    clearTimeout(c.timer);if(mode!=='controller')assert.equal(resolved,null,mode);
+    const resolved=await bounded(waiting,mode+' waiter','retire');if(mode!=='controller')assert.equal(resolved,null,mode);
     assert.equal(dom.dialogs().length,0,mode+' must not replay the old ordinary entry');
     assert.equal(dom.document.body.children.length,0,mode);
     assert.ok(f.calls.filter(call=>call.command==='nemo_native_dispatch').every(call=>call.r.operation.startsWith('query.')),mode);
@@ -522,11 +519,7 @@ test('ordinary Open readonly lifecycle converges and composition recovers after 
   const f=fixture(),compositionPublications=[],commentPublications=[],refusals=[];
   let composition=null,comments=null;
   function readGate(){const held=gate(),started=gate();return {...held,started:started.promise,entered:started.resolve};}
-  async function bounded(promise,label){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{
-    timer=setTimeout(()=>reject(Error(label+' did not settle')),1000);})]);}finally{clearTimeout(timer);}}
   const first=readGate(),second=readGate(),firstCommentPublication=gate();
-  f.root.document.addEventListener=()=>{};f.root.document.removeEventListener=()=>{};
-  f.root.addEventListener=()=>{};f.root.removeEventListener=()=>{};
   // Capture only complete readbacks through the existing controller repaint ports.
   f.root.SMBpm={refresh(){const value=composition&&composition.read();if(value)compositionPublications.push(value);}};
   f.root.refreshFbAvatars=()=>{const value=comments&&comments.read();if(value){
@@ -576,8 +569,6 @@ test('ordinary Open readonly lifecycle converges and composition recovers after 
 test('ordinary Open metadata settles when Perspective repaint re-enters the actual coalescing native preview queue',async()=>{
   const f=fixture(),published=gate(),renders=new Set(),seen=new Set();
   let composition=null,comments=null,perspective=null,repaints=0,timer,off=null,opening=null;
-  f.root.document.addEventListener=()=>{};f.root.document.removeEventListener=()=>{};
-  f.root.addEventListener=()=>{};f.root.removeEventListener=()=>{};
   function observed(kind,value){if(value){seen.add(kind);if(seen.size===3)published.resolve();}}
   f.root.SMBpm={refresh(){observed('composition',composition&&composition.read());}};
   f.root.refreshFbAvatars=()=>observed('comments',comments&&comments.read());
@@ -612,4 +603,13 @@ test('ordinary Open metadata settles when Perspective repaint re-enters the actu
     if(off)off();if(perspective)perspective.dispose();if(composition)composition.dispose();if(comments)comments.dispose();
     await Promise.allSettled([...renders,opening]);await timerTurn();await turn();
   }
+});
+
+test('desktop reads only existing session Camera View choice and keeps the native UI lock hook',()=>{
+ const seen=[],root={state:{cameraView:false},__TAURI__:{core:{invoke(){throw Error('no host request');}}},NemoNativeViewportUnderlay:Underlay,
+  SMCamera:{renderNativeViewLock(){seen.push('lock');}}};
+ const ports=Ports.createPorts(root);assert.equal(ports.viewMode(),'canvas');root.state.cameraView=true;assert.equal(ports.viewMode(),'stored-camera');
+ Ports.didPaintUI(root,{bindPolicyEntries(){seen.push('policy');}});assert.deepEqual(seen,['policy','lock']);
+ Object.defineProperties(root.state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera keys read');}}});
+ assert.equal(ports.viewMode(),'stored-camera');
 });

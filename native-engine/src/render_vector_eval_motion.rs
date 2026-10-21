@@ -135,7 +135,10 @@ fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHold
 /// True only for a real Text/raster consumer or one of its actual same-context
 /// ancestors. This admits sampled inputs; the scene provider still proves the
 /// complete chain, real bounds, cycle/depth/expressions and exact frame.
-fn scene_consumer_uses_layer(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+pub(crate) fn scene_consumer_uses_layer(
+    document: &ObjectDocument,
+    target: &PropertyHolderTarget,
+) -> bool {
     if document.format_version() != 2
         || target.context_id() != "scene-root"
         || target.stroke_id().is_some()
@@ -226,12 +229,15 @@ pub(super) fn layer_holder_consumed(document: &ObjectDocument, holder: &Property
     })
 }
 
-/// Static parenting on visible contour/vector content has no consumer in this
-/// slice. Refuse the whole frame even with no Motion holder to trigger a guard.
+/// Static parenting is consumed only by the exact ordinary common-layer batch.
+/// Other visible contour/vector parents still refuse without a Motion holder.
 pub(super) fn visible_vector_parents_supported(document: &ObjectDocument) -> bool {
     !document.layers().iter().any(|layer| {
         layer.visible()
             && layer.parent_layer_uid.value().is_some_and(Option::is_some)
+            && !crate::evaluation::object_vector_kernels::render_vector_eval::common_layer_motion_target(document, &PropertyHolderTarget {
+                context_id: "scene-root".into(), layer_uid: layer.layer_uid().to_owned(), stroke_id: Presence::Missing,
+            })
             && document
                 .objects()
                 .iter()

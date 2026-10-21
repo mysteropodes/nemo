@@ -19,12 +19,51 @@ impl AnimatorRecord {
             "wiggleMin":s.wiggle_min.unwrap_or(-50.0),"wiggleMax":s.wiggle_max.unwrap_or(50.0),"wigglesPerSec":s.wiggles_per_sec.unwrap_or(2.0),"correlation":s.correlation.unwrap_or(50.0),"seed":s.seed}),
         )
     }
+    pub(crate) fn raw_selector_property(&self, key: &str, at: f64) -> Result<f64, &'static str> {
+        if !at.is_finite() {
+            return Err("nonfinite selector frame");
+        }
+        let s = self.selector.resolve()?;
+        let fallback = match key {
+            "start" => s.start,
+            "end" => s.end.unwrap_or(100.),
+            "offset" => s.offset,
+            "amount" => s.amount.unwrap_or(100.),
+            "easeHigh" => s.ease_high,
+            "easeLow" => s.ease_low,
+            "smooth" => s.smooth.unwrap_or(100.),
+            "wiggleMin" => s.wiggle_min.unwrap_or(-50.),
+            "wiggleMax" => s.wiggle_max.unwrap_or(50.),
+            "wigglesPerSec" => s.wiggles_per_sec.unwrap_or(2.),
+            "correlation" => s.correlation.unwrap_or(50.),
+            _ => return Err("invalid selector property"),
+        };
+        self.properties
+            .value()
+            .into_iter()
+            .flatten()
+            .find(|p| p.property() == key)
+            .map(|p| {
+                p.sample_scalar_raw(fallback, at)
+                    .map_err(|_| "selector sampling unavailable")
+            })
+            .unwrap_or(Ok(fallback))
+    }
     /// Missing producer support is explicit, never a fallback to raw selector values.
     #[cfg(feature = "evaluation")]
     pub(crate) fn resolve(&self, at: f64) -> Result<TextAnimator, &'static str> {
+        self.resolve_with(at, &mut |_| {
+            Err("text selector expression evaluation is unavailable")
+        })
+    }
+    pub(crate) fn resolve_with(
+        &self,
+        at: f64,
+        read: &mut impl FnMut(&str) -> Result<f64, &'static str>,
+    ) -> Result<TextAnimator, &'static str> {
         let enabled = self.enabled.value().copied().unwrap_or(true);
         let selector = if enabled {
-            self.selector_at(at)?
+            self.selector_at_with(at, read)?
         } else {
             self.selector.resolve()?
         };
@@ -42,15 +81,33 @@ impl AnimatorRecord {
         crate::object_document::object_text_layout_kernels::text_glyph_selector::Selector,
         &'static str,
     > {
+        self.selector_at_with(at, &mut |_| {
+            Err("text selector expression evaluation is unavailable")
+        })
+    }
+    fn selector_at_with(
+        &self,
+        at: f64,
+        read: &mut impl FnMut(&str) -> Result<f64, &'static str>,
+    ) -> Result<
+        crate::object_document::object_text_layout_kernels::text_glyph_selector::Selector,
+        &'static str,
+    > {
         if !at.is_finite() {
             return Err("nonfinite selector frame");
         }
         let mut selector = self.selector.resolve()?;
 
         for property in self.properties.value().into_iter().flatten() {
-            if property.expression.value().is_some_and(|e| e.enabled) {
-                return Err("text selector expression evaluation is unavailable");
-            }
+            let evaluated = if property.expression.value().is_some_and(|e| e.enabled) {
+                let value = read(property.property())?;
+                if !value.is_finite() {
+                    return Err("nonfinite selector result");
+                }
+                Some(value)
+            } else {
+                None
+            };
             let slot = match property.property() {
                 "start" => &mut selector.start,
                 "offset" => &mut selector.offset,
@@ -67,7 +124,9 @@ impl AnimatorRecord {
                         "correlation" => &mut selector.correlation,
                         _ => return Err("invalid selector property"),
                     };
-                    *slot = Some(
+                    *slot = Some(if let Some(value) = evaluated {
+                        value
+                    } else {
                         property
                             .sample_scalar_raw(
                                 slot.unwrap_or(match key {
@@ -79,14 +138,18 @@ impl AnimatorRecord {
                                 }),
                                 at,
                             )
-                            .map_err(|_| "selector sampling unavailable")?,
-                    );
+                            .map_err(|_| "selector sampling unavailable")?
+                    });
                     continue;
                 }
             };
-            *slot = property
-                .sample_scalar_raw(*slot, at)
-                .map_err(|_| "selector sampling unavailable")?;
+            *slot = if let Some(value) = evaluated {
+                value
+            } else {
+                property
+                    .sample_scalar_raw(*slot, at)
+                    .map_err(|_| "selector sampling unavailable")?
+            };
         }
 
         Ok(selector)

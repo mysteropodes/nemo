@@ -4,7 +4,7 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
 };
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
-use crate::object_render_scene::mask_inputs::{ObjectMaskInput, ObjectMaskInputs};
+use crate::object_render_scene::mask_inputs::ObjectMaskInputs;
 use crate::object_render_scene::object_scene_producer_contour;
 use crate::object_render_scene::{
     validate_pins, ObjectRenderEntry, ObjectRenderScene, ObjectSceneError,
@@ -78,13 +78,6 @@ pub struct ObjectPaintPlan {
     mixed: Arc<[PaintIndex]>,
 }
 impl ObjectPaintPlan {
-    pub(crate) fn mask_inputs(&self) -> &ObjectMaskInputs {
-        &self.masks
-    }
-    pub(crate) fn mask_path(&self, mask: &ObjectMaskInput) -> Option<&BezPath> {
-        self.masks.path_in_scene(&self.scene, mask)
-    }
-
     pub fn packet(&self) -> &ObjectFramePacket {
         self.scene.packet()
     }
@@ -118,6 +111,7 @@ pub fn prepare_object_paint_plan(
     let (indices, mixed) = if scene.rasters.is_empty()
         && scene.texts.entries.is_empty()
         && scene.components.scene.is_none()
+        && scene.brush_paints_empty()
     {
         let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
         let indices = join(scene, &sequence)?;

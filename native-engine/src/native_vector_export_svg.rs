@@ -22,6 +22,8 @@ pub(crate) const XML_PREAMBLE: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?
 pub(crate) const MAX_SVG_BYTES: usize = 64 * 1024 * 1024;
 const DOCUMENT_TAIL: &str = "\n</svg>";
 const FAMILY: &str = "closed-solid-fill-cubic-path";
+#[path = "native_vector_export_camera.rs"]
+mod camera;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SvgExportError {
@@ -208,6 +210,7 @@ struct Sink {
     cap: usize,
     len: usize,
     out: Option<Vec<u8>>,
+    camera: Option<camera::Camera>,
 }
 
 impl Sink {
@@ -226,6 +229,7 @@ impl Sink {
         self.put(&format_number(value))
     }
     fn point(&mut self, point: [f64; 2]) -> Result<(), SvgExportError> {
+        let point = camera::point(self.camera, point)?;
         self.number(point[0])?;
         self.put(",")?;
         self.number(point[1])
@@ -334,6 +338,13 @@ fn emit_frame(
     spec: &SvgFrameSpec,
     sink: &mut Sink,
 ) -> Result<usize, SvgExportError> {
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    if let Some(source_object_index) = plan.first_brush_source() {
+        return Err(SvgExportError::Unsupported {
+            source_object_index,
+            reason: "retained bitmap brush paint has no SVG representation",
+        });
+    }
     // Unsupported mixed content must refuse the whole frame before even the
     // document header is counted, never disappear behind a successful subset.
     if let Some(index) = ordered_entries(plan).find_map(|entry| match entry {
@@ -377,7 +388,16 @@ fn emit_frame(
             reason: "native vector masks have no SVG representation",
         });
     }
-    sink.put(&document_head(spec.width, spec.height))?;
+    let head = document_head(spec.width, spec.height);
+    let head = if sink.camera.is_some() {
+        head.replacen(" viewBox=", " overflow=\"hidden\" viewBox=", 1)
+    } else {
+        head
+    };
+    sink.put(&head)?;
+    if let Some(camera) = sink.camera {
+        camera::begin(sink, camera)?;
+    }
     let mut count = 0;
     for entry in ordered_entries(plan) {
         match entry {
@@ -427,8 +447,18 @@ fn emit_frame(
                 count += 1;
             }
             PaintEntry::Raster(index) => return Err(unsupported_raster(plan, index)),
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintEntry::Brush(_) => {
+                return Err(SvgExportError::Unsupported {
+                    source_object_index: plan.first_brush_source().expect("admitted brush paint"),
+                    reason: "retained bitmap brush paint has no SVG representation",
+                })
+            }
             PaintEntry::Video(index) => return Err(unsupported_video(plan, index)),
         }
+    }
+    if sink.camera.is_some() {
+        sink.put("\n</g>")?;
     }
     sink.put(DOCUMENT_TAIL)?;
     Ok(count)
@@ -443,6 +473,7 @@ pub(crate) fn measure_svg_frame(
         cap: spec.max_bytes,
         len: 0,
         out: None,
+        camera: camera::for_plan(plan)?,
     };
     emit_frame(plan, &spec, &mut sink)?;
     Ok(sink.len)
@@ -457,6 +488,7 @@ pub(crate) fn serialize_svg_frame(
         cap: spec.max_bytes,
         len: 0,
         out: Some(Vec::with_capacity(exact)),
+        camera: camera::for_plan(plan)?,
     };
     let path_count = emit_frame(plan, &spec, &mut sink)?;
     debug_assert_eq!(sink.len, exact);

@@ -311,6 +311,13 @@ pub(crate) fn insert_slots(
             PaintIndex::Component(i) => scene.components.paints[*i].host_layer_index,
             PaintIndex::Video(i) => scene.videos[*i].layer_index,
             PaintIndex::Duplicator(i) => scene.duplicators.paints[*i].layer_index,
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintIndex::Brush(i) => scene
+                .brushes
+                .as_ref()
+                .and_then(|sources| sources.paints.get(*i))
+                .map(|paint| paint.layer_index)
+                .ok_or(ObjectPaintPlanError::InvalidOrder)?,
         })
     };
     for (slot, video) in scene.videos.iter().enumerate() {

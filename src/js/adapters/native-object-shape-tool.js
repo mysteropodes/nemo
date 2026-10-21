@@ -10,6 +10,7 @@
   function fail(message){throw new Error(message);}
   function consume(e){if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();if(e&&e.preventDefault)e.preventDefault();}
   function create(root,ports){
+    var Mapping=ports.mapping;
     var admitted=ports.freehand?['draw']:tools,handled=ports.freehand?['draw','fillbrush']:shapeTools;
     var drag=null,pending=null,uncertain=null,overlay=null,retired=false,settled=Promise.resolve({status:'idle'});
     function session(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
@@ -24,10 +25,10 @@
       if(!['left','top','right','bottom'].every(function(k,i){return parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===edges[i];}))fail('Native canvas presentation changed.');
       return {left:r.left,top:r.top,width:r.width,height:r.height};
     }
-    // Exactly desktop_viewport::ViewportMapping::pointer_to_composition. Native
-    // StretchToSurface uses these confirmed CSS bounds, not Paper's pan/zoom view.
+    // Confirmed CSS -> native composition pixels -> the painted receipt's inverse.
+    // Canvas uses identity; Paper pan/zoom never supplies a native coordinate proof.
     function point(e,t){if(!Number.isFinite(e.clientX)||!Number.isFinite(e.clientY))fail('Pointer position is unavailable.');
-      return [(e.clientX-t.bounds.left)*t.pin.canvasW/t.bounds.width,(e.clientY-t.bounds.top)*t.pin.canvasH/t.bounds.height];}
+      var p=Mapping.point(e,{bounds:t.bounds,canvasW:t.pin.canvasW,canvasH:t.pin.canvasH,presentation:t.presentation});return [p.x,p.y];}
     function style(tool,proof){
       var s=root.state,current=session(),ownerInfo=current&&current.info(),port=root.NemoNativePerspectiveController;
       var perspective=port&&(proof?typeof port.readForCommand==='function'&&port.readForCommand(proof):port.read());
@@ -54,20 +55,23 @@
       return row.layerUid;
     }
     function capture(e){
+      if(!Mapping||['point','transform','matchesView'].some(function(key){return typeof Mapping[key]!=='function';}))fail('Native canvas mapping is unavailable.');
       var s=session(),pin=s&&s.info(),state=root.state,frame=state.currentFrame,shown=s&&s.readPresentedObjectSession();
       if(!s||!s.isActive()||!pin||typeof s.runResourceCommand!=='function'||!shown||!same(pin,shown)||!same(pin,shown.presentation)||shown.presentation.owner!=='native'||shown.presentation.status!=='presented'||
-          shown.presentation.contextId!=='scene-root'||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=pin.totalFrames||
+          !Mapping.matchesView(root,shown.presentation)||shown.presentation.contextId!=='scene-root'||shown.presentation.frame!==frame||!Number.isSafeInteger(frame)||frame<0||frame>=pin.totalFrames||
           !root.NemoNativeObjectProjectFile||root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||!root.NemoNativeObjectVector)fail('Native Drawing is not ready.');
       var perspective=root.NemoNativePerspectiveController&&root.NemoNativePerspectiveController.read();
       var t={perspective:perspective,session:s,pin:pin,presentation:shown.presentation,frame:frame,tool:state.tool,layerUid:selection(pin),style:style(state.tool,perspective),bounds:bounds(pin),pointer:e.pointerId,cancelled:false};
       t.start=point(e,t);if(ports.freehand)t.samples=ports.begin(t.start,e,t);return t;
     }
-    function current(t,requirePresentation){
+    function current(t,requirePresentation,lease){
       try{var s=session(),pin=s&&s.info();
-        if(retired||t.cancelled||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||root.state.tool!==t.tool||selection(pin)!==t.layerUid||
+        if(retired||t.cancelled||requirePresentation&&!Mapping.matchesView(root,t.presentation)||s!==t.session||!s.isActive()||!s.blocksLegacy()||!same(pin,t.pin)||root.state.currentFrame!==t.frame||root.state.tool!==t.tool||selection(pin)!==t.layerUid||
             root.NemoNativeObjectProjectFile.projectionReadyForUI(root,pin)!==true||JSON.stringify(style(t.tool,requirePresentation?undefined:t.perspective))!==JSON.stringify(t.style)||JSON.stringify(bounds(pin))!==JSON.stringify(t.bounds))return false;
-        var shown=requirePresentation&&s.readPresentedObjectSession();
-        return !requirePresentation||!!shown&&same(shown,t.pin)&&shown.presentation===t.presentation;
+        // Public presentation is hidden by this action's own pending entry.
+        // Its existing lease still verifies the exact origin, view and subscription.
+        var shown=requirePresentation?s.readPresentedObjectSession():lease&&typeof lease.readPresentedObjectSession==='function'&&lease.readPresentedObjectSession();
+        return !!shown&&same(shown,t.pin)&&shown.presentation===t.presentation;
       }catch(_){return false;}
     }
     function clear(){if(overlay){overlay.remove();overlay=null;}}
@@ -87,7 +91,7 @@
         Object.assign(overlay.style,{position:'fixed',pointerEvents:'none',zIndex:'20',left:t.bounds.left+'px',top:t.bounds.top+'px',width:t.bounds.width+'px',height:t.bounds.height+'px'});
         overlay.setAttribute('viewBox','0 0 '+t.pin.canvasW+' '+t.pin.canvasH);overlay.setAttribute('preserveAspectRatio','none');
         overlay.appendChild(d.createElementNS('http://www.w3.org/2000/svg','path'));d.body.appendChild(overlay);}
-      var path=overlay.firstChild,start=segments[0].point,text='M '+start[0]+' '+start[1],count=segments.length+(dict.closed?1:0);
+      var path=overlay.firstChild;path.setAttribute('transform','matrix('+Mapping.transform({presentation:t.presentation},false).join(' ')+')');var start=segments[0].point,text='M '+start[0]+' '+start[1],count=segments.length+(dict.closed?1:0);
       for(var i=1;i<count;i++){var a=segments[i-1],b=segments[i%segments.length];text+=' C '+(a.point[0]+a.handleOut[0])+' '+(a.point[1]+a.handleOut[1])+' '+(b.point[0]+b.handleIn[0])+' '+(b.point[1]+b.handleIn[1])+' '+b.point[0]+' '+b.point[1];}
       if(dict.closed)text+=' Z';path.setAttribute('d',text);path.setAttribute('fill',dict.fillColor||'none');path.setAttribute('stroke',dict.strokeColor||'none');
       path.setAttribute('stroke-width',dict.strokeWidth);path.setAttribute('stroke-linecap',dict.strokeCap);path.setAttribute('stroke-linejoin',dict.strokeJoin);path.setAttribute('opacity',dict.opacity);
@@ -101,8 +105,8 @@
       // No second queue: only add a current-intent check to the real Project
       // resource action. While that action runs, its own pending count hides presentation.
       var guarded={info:s.info,isActive:s.isActive,requestId:s.requestId,runResourceCommand:function(action){return s.runResourceCommand(function(ctx){
-        if(!current(t,false))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
-        return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
+        if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});
+        return action({reconcile:ctx.reconcile,dispatch:function(q){if(!current(t,false,ctx))throw Object.assign(new Error('Native shape intent changed'),{code:'unavailable',reason:'intent_changed'});return ctx.dispatch(q);}});
       });}};
       return root.NemoNativeObjectVector.create(guarded).createStroke(t.layerUid,t.frame,dict,{origin:t.pin});
     }

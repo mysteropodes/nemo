@@ -7,7 +7,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_vector_rest, is_vector_record, record_layer_has_active_path_fx,
 };
 use crate::object_frame_packet::text::{ObjectLayer, Presence, PropertyHolderTarget};
-use crate::object_frame_packet::{sample_property_raw, ObjectFramePacket};
+use crate::object_frame_packet::ObjectFramePacket;
 use crate::object_render_scene::object_scene_producer_text::TextSceneItem;
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::collections::{BTreeMap, BTreeSet};
@@ -30,6 +30,7 @@ pub(crate) enum ChainUnavailable {
     VectorGeometry,
     RasterGeometry,
     MissingGeometry,
+    NullPivot,
 }
 impl ChainUnavailable {
     pub(crate) fn reason(self) -> &'static str {
@@ -45,6 +46,7 @@ impl ChainUnavailable {
             Self::VectorGeometry => "native parent evaluated vector geometry unavailable",
             Self::RasterGeometry => "native parent raster geometry unavailable",
             Self::MissingGeometry => "native parent real geometry pivot unavailable",
+            Self::NullPivot => "native Null pivot needs nullPos or retained project canvas",
         }
     }
 }
@@ -104,50 +106,47 @@ fn sample(packet: &ObjectFramePacket, layer: usize) -> Result<PoseSample, ChainU
         layer_uid: source.layer_uid().to_owned(),
         stroke_id: Presence::Missing,
     };
-    let keys = ["position", "anchor", "rotation", "scale", "opacity"];
-    if packet
-        .snapshot()
-        .document()
-        .property_holders()
-        .unwrap_or(&[])
-        .iter()
-        .filter(|h| h.target() == &target)
-        .flat_map(|h| h.properties())
-        .any(|r| keys.contains(&r.property()) && r.expression.value().is_some_and(|e| e.enabled))
-    {
-        return Err(ChainUnavailable::Expression);
-    }
-    let read = |key| {
-        sample_property_raw(packet.snapshot(), &target, key, packet.frame() as f64)
-            .map_err(|_| ChainUnavailable::Sample)
-    };
-    let position = read("position")?;
-    let anchor = read("anchor")?;
-    let rotation = read("rotation")?;
-    let scale = read("scale")?;
-    let opacity = read("opacity")?;
-    match (
-        position.as_slice(),
-        anchor.as_slice(),
-        rotation.as_slice(),
-        scale.as_slice(),
-        opacity.as_slice(),
-    ) {
-        ([x, y], [ax, ay], [rotation], [sx, sy], [opacity])
-            if [x, y, ax, ay, rotation, sx, sy, opacity]
-                .iter()
-                .all(|v| v.is_finite()) =>
-        {
-            Ok(PoseSample {
-                position: [*x, *y],
-                anchor: [*ax, *ay],
-                rotation: *rotation,
-                scale: [*sx, *sy],
-                opacity: *opacity,
-            })
+    if source.is_null_layer() {
+        if !crate::evaluation::object_vector_kernels::render_vector_eval::params::null_layer_motion_target(packet.snapshot().document(), &target) {
+            return Err(ChainUnavailable::LayerContext);
         }
-        _ => Err(ChainUnavailable::Sample),
+        let canvas = packet
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions());
+        source
+            .null_pivot_base(canvas)
+            .map_err(|_| ChainUnavailable::NullPivot)?;
     }
+    // Raw packets remain strict. An owner-prepared packet supplies only its own
+    // already-retired numeric receipts; the scene never invokes an evaluator.
+    let values = packet.sampled_motion_values(&target).map_err(|_| {
+        let keys = ["position", "anchor", "rotation", "scale", "opacity"];
+        if packet
+            .snapshot()
+            .document()
+            .property_holders()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|holder| holder.target() == &target)
+            .flat_map(|holder| holder.properties())
+            .any(|property| {
+                keys.contains(&property.property())
+                    && property.expression.value().is_some_and(|code| code.enabled)
+            })
+        {
+            ChainUnavailable::Expression
+        } else {
+            ChainUnavailable::Sample
+        }
+    })?;
+    Ok(PoseSample {
+        position: values.position,
+        anchor: values.anchor,
+        rotation: values.rotation,
+        scale: values.scale,
+        opacity: values.opacity,
+    })
 }
 /// Same retained snapshot/context/evaluation frame through construction and both consumers.
 /// `bounds` is only construction-local native derived geometry, never authored state.
@@ -302,7 +301,7 @@ impl SceneParentChains {
         ChainFailure { source_index, kind }
     }
     pub(crate) fn needs_bounds(&self, layer: usize) -> bool {
-        self.needed.contains(&layer)
+        self.needed.contains(&layer) && !self.packet.source_layers()[layer].is_null_layer()
     }
     fn matches(
         &self,
@@ -312,21 +311,6 @@ impl SceneParentChains {
         target.context_id() == self.packet.context_id()
             && target.scope_kind() == self.packet.scope_kind()
             && self.packet.source_frame_for_layer(layer) == Some(target.frame())
-    }
-    fn add(&mut self, layer: usize, rect: Rect) -> Result<(), ChainUnavailable> {
-        if ![rect.x0, rect.y0, rect.x1, rect.y1]
-            .iter()
-            .all(|v| v.is_finite())
-            || rect.x0 > rect.x1
-            || rect.y0 > rect.y1
-        {
-            return Err(ChainUnavailable::MissingGeometry);
-        }
-        self.bounds
-            .entry(layer)
-            .and_modify(|old| *old = old.union(rect))
-            .or_insert(rect);
-        Ok(())
     }
     fn include_vectors(&mut self) -> Result<(), (usize, ChainUnavailable)> {
         // The real rest evaluator owns pathFX/paramShape ordering, before layer pose.
@@ -472,11 +456,25 @@ impl SceneParentChains {
             .ok_or(ChainUnavailable::MissingLayer)?
         {
             if let Some(mat) = self.samples[&index].mat(index == layer) {
-                let rect = self
-                    .bounds
-                    .get(&index)
-                    .ok_or(ChainUnavailable::MissingGeometry)?;
-                let pivot = [rect.center().x + mat.ax, rect.center().y + mat.ay];
+                let canvas = self
+                    .packet
+                    .snapshot()
+                    .project()
+                    .map(|p| p.project().canvas_dimensions());
+                let base = match self.packet.source_layers()[index]
+                    .null_pivot_base(canvas)
+                    .map_err(|_| ChainUnavailable::NullPivot)?
+                {
+                    Some(base) => base,
+                    None => {
+                        let rect = self
+                            .bounds
+                            .get(&index)
+                            .ok_or(ChainUnavailable::MissingGeometry)?;
+                        [rect.center().x, rect.center().y]
+                    }
+                };
+                let pivot = [base[0] + mat.ax, base[1] + mat.ay];
                 if !pivot.iter().all(|v| v.is_finite()) {
                     return Err(ChainUnavailable::MissingGeometry);
                 }

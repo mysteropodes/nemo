@@ -361,3 +361,34 @@ fn text_animator_field_numeric_noops_keep_original_bytes_revision_and_redo() {
     }
     assert_eq!(o.history_depths(), (0, 1));
 }
+
+#[test]
+fn text_animator_unconsumed_layer_does_not_refuse_selected_text() {
+    let mut doc = drawing();
+    let original = owner(&doc);
+    let base = plan(&support::head(&original), 2);
+    doc["layers"].as_array_mut().unwrap().push(json!({
+        "layerUid":"unused", "visible":false,
+        "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+            "contextId":"scene-root","keys":[{"frame":0}],"samples":[]},
+        "textAnimators":[{"id":"unused-selector","selector":{},"props":{},
+            "properties":[{"property":"amount","expression":{"enabled":true,"code":"50"}}]}]
+    }));
+    doc["compositionOrder"]["contexts"][0]["layers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"layerUid":"unused","naturalPosition":1,"order":{}}));
+    let o = owner(&doc);
+    let before = support::state(&o);
+    let selected = plan(&support::head(&o), 2);
+    assert_eq!(text_item(&selected), text_item(&base));
+    assert_eq!(support::state(&o), before);
+    // The same unsupported expression must still refuse when its layer owns Text.
+    doc["layers"][0]["textAnimators"] = doc["layers"][1]["textAnimators"].clone();
+    let o = owner(&doc);
+    let snapshot = support::head(&o);
+    let pins = super::tests::selector(&snapshot, 2);
+    let packet =
+        crate::object_frame_packet::prepare_object_exposure_frame(&snapshot, &pins).unwrap();
+    assert!(crate::object_render_scene::prepare_object_render_scene(&packet, &pins).is_err());
+}
