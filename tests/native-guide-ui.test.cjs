@@ -250,7 +250,7 @@ function projectFixture() {
       style: { getPropertyValue: key => styles.get(key) || '', getPropertyPriority: () => '',
         setProperty: (key, value) => styles.set(key, value), removeProperty: key => styles.delete(key) } },
     getElementById(id) {
-      if (id === 'fb-avatars-pop') return null;
+      if (id === 'fb-avatars-pop' || id === 'zoom-scrub') return null;
       assert.equal(id, 'drawing-canvas');
       return { getBoundingClientRect: () => ({ left: 20.5, top: 30.25, width: 320.5, height: 180.25 }) };
     }
