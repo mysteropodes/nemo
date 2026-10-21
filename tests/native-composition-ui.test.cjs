@@ -301,6 +301,9 @@ test('native BPM form exposes two focused text stages without window prompt or b
   const first=bpmDialog(h);
   assert.equal(first.form.getAttribute('role'),'dialog');assert.equal(first.form.getAttribute('aria-modal'),'true');
   assert.equal(first.form.getAttribute('aria-labelledby'),first.label.id);assert.equal(first.label.htmlFor,first.input.id);
+  assert.equal(h.document.getElementById('bpm-settings-confirm').type,'submit');
+  assert.equal(h.document.getElementById('bpm-settings-cancel').type,'button');
+  assert.equal(h.document.getElementById('bpm-settings-close').type,'button');
   assert.equal(first.label.textContent,'Tempo en BPM (0 pour masquer la grille)');assert.equal(first.input.value,'120');
   assert.equal(first.input.type,'text');assert.equal(first.input.inputMode,'decimal');
   assert.strictEqual(h.document.activeElement,first.input);assert.equal(first.input.selectCalls,1);
