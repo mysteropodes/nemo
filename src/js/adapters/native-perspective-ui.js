@@ -50,7 +50,7 @@
     function shown(origin) { return !busy() && !!origin && model.read() === origin; }
     function repaint() {
       if (typeof root.renderLabsFloatPanel === 'function') root.renderLabsFloatPanel();
-      if (root.SMEngineBridge) root.SMEngineBridge.renderNow();
+      if (!native() && root.SMEngineBridge) root.SMEngineBridge.renderNow();
     }
     function cancelGesture() { if (typeof root.cancelPerspectiveGesture === 'function') root.cancelPerspectiveGesture(); }
     async function edit(action, origin) {
