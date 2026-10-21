@@ -137,3 +137,31 @@ fn an_ordinary_layer_retains_its_original_lock_and_unlock_history() {
     assert_eq!(owner.undo(3), Ok(4));
     assert_eq!(state(&owner).3, before.3);
 }
+
+#[cfg(feature = "project_media_codec")]
+#[test]
+fn project_info_reports_effective_lock_and_save_reopen_preserves_authored_flags() {
+    for locked in [None, Some(false), Some(true)] {
+        let source = fixture(locked);
+        let wire = json!({"format":"nemo.native-project-document","formatVersion":1,
+            "project":{"canvasW":320,"canvasH":180,"fps":24},"drawing":source,
+            "viewportReference":null,"assets":[]});
+        let owner = NativeObjectHistory::from_project_file(
+            "dup-project",
+            wire.to_string().as_bytes(),
+        )
+        .unwrap();
+        let before = state(&owner);
+        let info = owner.project_file_info().unwrap();
+        assert_eq!(info["layers"][0]["locked"], true);
+        assert_eq!(info["layers"][1].get("locked"), None);
+        let bytes = owner.serialize_project_file(0, &before.2).unwrap();
+        let stored: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(stored["drawing"], source);
+        assert_eq!(state(&owner), before);
+        let reopened = NativeObjectHistory::from_project_file("reopened", &bytes).unwrap();
+        assert_eq!(reopened.project_file_info().unwrap()["layers"][0]["locked"], true);
+        assert_eq!(state(&reopened).3, before.3);
+        assert_eq!(reopened.history_depths(), (0, 0));
+    }
+}
