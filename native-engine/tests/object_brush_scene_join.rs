@@ -418,32 +418,29 @@ fn bitmap_mask_anchor_refuses_a_plan_instead_of_colour_painting_its_companion() 
 
 #[test]
 fn real_duplicator_on_another_layer_keeps_brush_ink_but_same_layer_copies_refuse() {
-    use crate::object_render_scene::{ObjectBrushAdmission, ObjectSceneError};
+    use crate::object_frame_packet::ObjectFrameError;
+    use crate::object_render_scene::ObjectBrushAdmission;
     for same_layer in [false, true] {
         let owner = owner(brush_with_real_duplicator(same_layer));
         let pin = owner.acquire_snapshot(0).unwrap();
         let before = owner.serialize_project_file(0, pin.snapshot_id()).unwrap();
         let selected = selector(&pin);
-        let packet = prepare_object_frame(&pin, &selected).unwrap();
-        assert_eq!(packet.duplicator_outputs().len(), 1);
-        assert_eq!(packet.duplicator_outputs()[0].output.copies.len(), 3);
-        assert_eq!(
-            packet.duplicator_outputs()[0].layer_index,
-            if same_layer { 0 } else { 1 }
-        );
-        let admitted = ObjectBrushAdmission::prepare(&packet, &selected).unwrap();
-        let mut services = runtime();
-        let result = admitted.materialize(&mut services, None);
+        let prepared = prepare_object_frame(&pin, &selected);
         if same_layer {
-            assert!(matches!(
-                result,
-                Err(ObjectSceneError::UnsupportedGeometry {
-                    reason: "native materialized brush paint unavailable",
-                    ..
-                })
-            ));
+            // The existing raw duplicator provider refuses a source layer with
+            // item records; the retained Brush companion makes this explicit.
+            assert!(matches!(prepared, Err(ObjectFrameError::Unavailable)));
         } else {
-            let plan = result.unwrap();
+            let packet = prepared.unwrap();
+            assert_eq!(packet.duplicator_outputs().len(), 1);
+            assert_eq!(packet.duplicator_outputs()[0].output.copies.len(), 3);
+            assert_eq!(
+                packet.duplicator_outputs()[0].layer_index,
+                if same_layer { 0 } else { 1 }
+            );
+            let admitted = ObjectBrushAdmission::prepare(&packet, &selected).unwrap();
+            let mut services = runtime();
+            let plan = admitted.materialize(&mut services, None).unwrap();
             let entries: Vec<_> = ordered_entries(&plan).collect();
             assert_eq!(
                 entries
