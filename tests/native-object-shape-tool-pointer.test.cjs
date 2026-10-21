@@ -197,7 +197,7 @@ test('all42 retained bootstrap identities match their explicit amended ordinal l
  assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,241);
  assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,119);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,120);
  assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 119/);
- assert.match(fixture,/assert\.deepEqual\(positions, \[13, 15, 16, 17, 18, 19, 20, 22, 23\]/);
+ assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 23, 24\]/);
 });
 
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{

@@ -626,6 +626,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     _motionColumnPreset = localStorage.getItem('nemo-motion-columns') || '3d';
     _motionSnapEnabled = localStorage.getItem('nemo-motion-snap') !== '0';
   } catch (e) {}
+  if(typeof NemoNativeWorkspaceUI!=='undefined'&&NemoNativeWorkspaceUI&&typeof NemoNativeWorkspaceUI.bindMotion==='function')
   NemoNativeWorkspaceUI.bindMotion(window, {
     read:function(){return _motionColumnPreset;},
     apply:function(value){_motionColumnPreset=value;var panel=document.getElementById('layer-panel');if(panel)panel.dataset.motionColumns=value;}
