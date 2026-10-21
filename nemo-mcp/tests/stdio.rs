@@ -371,7 +371,9 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         object["operations"],
         json!([
             "query.document.object",
-            "command.document.object.layer.visibility.set"
+            "command.document.object.layer.visibility.set",
+            "command.document.object.undo",
+            "command.document.object.redo"
         ])
     );
     let visibility = json!({
