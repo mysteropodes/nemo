@@ -204,7 +204,8 @@ pub(crate) fn prepare_object_render_scene_with_brush(
     retire: RetirePort<'_>,
 ) -> Result<crate::object_render_scene::ObjectRenderScene, ObjectSceneError> {
     use crate::object_render_scene::{
-        component_scene, duplicator_scene, media_scene, object_scene_producer_contour, raster_scene, text_scene,
+        component_scene, duplicator_scene, media_scene, object_scene_producer_contour,
+        raster_scene, text_scene,
     };
     crate::object_render_scene::validate_pins(packet, expected)?;
     let brushes = prepare(packet, runtime, previous, limits, retire)?;

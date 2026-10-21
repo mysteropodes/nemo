@@ -3,10 +3,12 @@ use crate::evaluation::object_scene_style_kernels::object_scene_producer_pin::{
     join_scene, ProducerOutput, SceneOutcome, ScenePin,
 };
 use crate::object_frame_packet::ObjectFrameSelector;
+use crate::object_render_scene::mask_inputs::{ObjectMaskInput, ObjectMaskInputs};
 use crate::object_render_scene::raster_scene::RasterSource;
 use crate::object_render_scene::{
     ObjectPaintCommand, ObjectPaintPlan, ObjectPaintPlanError, ObjectRenderScene,
 };
+use vello::kurbo::BezPath;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PaintIndex {
@@ -30,6 +32,12 @@ pub(crate) enum PaintEntry<'a> {
     Brush(usize),
 }
 impl ObjectPaintPlan {
+    pub(crate) fn mask_inputs(&self) -> &ObjectMaskInputs {
+        &self.masks
+    }
+    pub(crate) fn mask_path(&self, mask: &ObjectMaskInput) -> Option<&BezPath> {
+        self.masks.path_in_scene(&self.scene, mask)
+    }
     pub(crate) fn has_duplicators(&self) -> bool {
         !self.scene.packet().duplicator_outputs().is_empty()
     }
