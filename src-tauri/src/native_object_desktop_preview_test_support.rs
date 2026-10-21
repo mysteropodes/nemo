@@ -102,11 +102,12 @@ impl Fixture {
     }
     pub(super) fn with_document(source: Value) -> Self {
         let state = Arc::new(ApplicationMcp::default());
-        state
-            .install_native_object(
-                decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap(),
-            )
-            .unwrap();
+        let bytes = serde_json::to_vec(&source).unwrap();
+        if source["format"] == "nemo.native-project-document" {
+            state.install_native_project_file(&bytes).unwrap();
+        } else {
+            state.install_native_object(decode_storage_project(&bytes).unwrap()).unwrap();
+        }
         let mut fixture = Self {
             state,
             raw: json!({}),
