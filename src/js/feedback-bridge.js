@@ -15,40 +15,41 @@
 //     'pending' until you explicitly approve them (see approveFeedback).
 // Only 'approved' entries are meant to be read/acted on downstream.
 (function () {
-  var LOCAL_MAX = 500; // local entries pruned oldest-first past this count
   var ACTION_LOG_MAX = 150; // mirrors state.actionLog's own cap in app.js
   var CLICK_LOG_MAX = 200;
 
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
   function projectKey() { return (window.SMProject && window.SMProject.getProjectKey()) || 'untitled-autosave'; }
 
-  // Transport for both GitHub calls (issue + attachment) — see
-  // worker-feedback/ (repo root). Both desktop and web post through this
-  // same Worker, so they share its spam filter (looksLikeSpam) and neither
-  // ever holds the write-scoped GitHub token itself.
-  //
-  // On Tauri, use tauri_plugin_http's fetch (window.__TAURI__.http.fetch)
-  // instead of plain window.fetch: the app's CSP connect-src doesn't list
-  // this Worker, and the Worker's own CORS allowlist holds the web origins,
-  // not tauri://localhost — a plain fetch() would be blocked twice over.
-  // The plugin issues the request from Rust, so neither guard applies and
-  // neither has to be widened just for this one call.
-  var FEEDBACK_WORKER_URL = 'https://nemo-feedback.mysteropodes-auth.workers.dev';
-  function workerFetch() {
-    var t = window.__TAURI__;
-    return (t && t.http && t.http.fetch) ? t.http.fetch : fetch;
-  }
-  async function workerPost(path, payload) {
-    var resp = await workerFetch()(FEEDBACK_WORKER_URL + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    var data = null;
-    try { data = await resp.json(); } catch (e) {}
-    if (!resp.ok) throw new Error((data && data.error) || ('feedback worker error ' + resp.status));
-    return data;
-  }
+  var local = NemoFeedbackLocal.create({
+    available: tauriOk,
+    tauri: function () { return window.__TAURI__; },
+    project: function () { return window.SMProject; },
+    profile: function () { return state.userProfile; },
+    projectKey: projectKey,
+    storage: function () { return localStorage; },
+    hostname: function () { return location.hostname; },
+    fetch: function (url, options) { return fetch(url, options); },
+    warn: function () { console.warn.apply(console, arguments); },
+  });
+  var remote = NemoFeedbackRemote.create({
+    available: tauriOk,
+    // Worker only uses the desktop HTTP plugin; public/triage GitHub keeps plain fetch.
+    workerFetch: function () {
+      var t = window.__TAURI__;
+      return (t && t.http && t.http.fetch) ? t.http.fetch : fetch;
+    },
+    fetch: function (url, options) { return fetch(url, options); },
+    storage: function () { return localStorage; },
+    title: function () { return document.title; },
+    userAgent: function () { return navigator.userAgent; },
+    onLine: function () { return navigator.onLine; },
+    width: function () { return window.innerWidth; },
+    height: function () { return window.innerHeight; },
+    screenWidth: function () { return screen.width; },
+    screenHeight: function () { return screen.height; },
+    warn: function () { console.warn.apply(console, arguments); },
+  });
 
   // ---- Action log (session-only trail feeding actionTrail below) ----
   // Called once per pushUndoLayers() (app.js/tweens.js's single choke point
@@ -156,124 +157,6 @@
   function actionTrailSince(idx) { return (state.actionLog || []).slice(idx || 0); }
   function clickTrailSince(idx) { return _clickLog.slice(idx || 0); }
 
-  // ---- Storage tiers, tried in order: Tauri fs (real app, real OS folder)
-  // -> local dev server (scripts/dev_server.py's /__feedback/* endpoints —
-  // a real file too, just reachable over fetch() instead of Tauri's fs
-  // plugin, for the ordinary `python3 -m http.server`-replacement dev
-  // preview) -> localStorage (last resort — a live browser tab only, not
-  // reachable outside an active eval session, but keeps this working even
-  // if the plain http.server is what's actually running). ----
-  async function localDir() {
-    var base = await window.__TAURI__.path.appDataDir();
-    return base.replace(/[\\/]+$/, '') + '/feedback/' + projectKey();
-  }
-  function lsKey() { return 'nemo-feedback-' + projectKey(); }
-  function lsReadAll() { try { return JSON.parse(localStorage.getItem(lsKey()) || '[]'); } catch (e) { return []; } }
-  // No try/catch here (unlike lsReadAll) — a write failure (most likely
-  // QuotaExceededError: a screenshot-bearing entry list can genuinely blow
-  // past the ~5-10MB per-origin localStorage limit, since this is the ONLY
-  // durable store in a browser-preview session with no dev server reachable)
-  // must propagate up through writeLocal()'s unwrapped `await` to
-  // submitFeedback's caller, so the UI's existing .catch shows "Échec de
-  // l'enregistrement du feedback" instead of the false-positive success
-  // toast — a report entered, "saved", then silently gone with the tab.
-  function lsWriteAll(list) { localStorage.setItem(lsKey(), JSON.stringify(list)); }
-
-  var _devServerChecked = null;
-  // Only scripts/dev_server.py implements /__feedback/* — a plain
-  // `python -m http.server` (every other local preview in this codebase)
-  // and any REAL deployment (feedback #33: nemo-editor.mysteropodes-auth.
-  // workers.dev, a Cloudflare Worker with no such route) both 404 on it.
-  // fetch() only REJECTS on a network-level failure, not on a non-2xx
-  // status — the try/catch below already handled the 404 fine logically
-  // (r.ok=false → same fallback to localStorage), but Chrome logs any
-  // non-2xx request to the console regardless of whether JS catches it,
-  // which is what actually got reported ("j'ai cette erreur dans la
-  // console"). Cheapest fix: never issue the probe outside an actual
-  // local-dev hostname, where dev_server.py is the only thing that could
-  // possibly be listening.
-  function isLocalDevHost() {
-    var h = location.hostname;
-    return h === 'localhost' || h === '127.0.0.1' || h === '';
-  }
-  async function devServerAvailable() {
-    if (tauriOk()) return false; // Tauri always wins when present, dev server is browser-preview-only
-    if (!isLocalDevHost()) return false;
-    if (_devServerChecked !== null) return _devServerChecked;
-    try {
-      var r = await fetch('/__feedback/ping');
-      _devServerChecked = r.ok;
-    } catch (e) { _devServerChecked = false; }
-    return _devServerChecked;
-  }
-
-  async function readAllLocal() {
-    if (tauriOk()) {
-      try {
-        var dir = await localDir();
-        var entries = await window.__TAURI__.fs.readDir(dir);
-        var files = entries.filter(function (e) { return /\.json$/.test(e.name); });
-        var out = [];
-        for (var i = 0; i < files.length; i++) {
-          try { out.push(JSON.parse(await window.__TAURI__.fs.readTextFile(dir + '/' + files[i].name))); } catch (e) {}
-        }
-        return out.sort(function (a, b) { return b.createdAt - a.createdAt; });
-      } catch (e) { return []; }
-    }
-    if (await devServerAvailable()) {
-      try {
-        var res = await fetch('/__feedback/list?projectKey=' + encodeURIComponent(projectKey()));
-        if (res.ok) return await res.json();
-      } catch (e) { console.warn('[feedback] dev-server list failed, falling back to localStorage', e); }
-    }
-    return lsReadAll();
-  }
-  async function writeLocal(entry) {
-    if (tauriOk()) {
-      var dir = await localDir();
-      await window.__TAURI__.fs.mkdir(dir, { recursive: true });
-      await window.__TAURI__.fs.writeTextFile(dir + '/' + entry.id + '.json', JSON.stringify(entry));
-      // Prune oldest past LOCAL_MAX, same convention as history/sync pruning
-      // elsewhere in this app (pushVersionSnapshot, publishToShared).
-      var entries = await window.__TAURI__.fs.readDir(dir);
-      var files = entries.filter(function (e) { return /\.json$/.test(e.name); });
-      if (files.length > LOCAL_MAX) {
-        var withTimes = [];
-        for (var i = 0; i < files.length; i++) {
-          try { var d = JSON.parse(await window.__TAURI__.fs.readTextFile(dir + '/' + files[i].name)); withTimes.push({ name: files[i].name, createdAt: d.createdAt || 0 }); } catch (e) {}
-        }
-        withTimes.sort(function (a, b) { return a.createdAt - b.createdAt; });
-        var toRemove = withTimes.slice(0, withTimes.length - LOCAL_MAX);
-        for (var j = 0; j < toRemove.length; j++) { try { await window.__TAURI__.fs.remove(dir + '/' + toRemove[j].name); } catch (e) {} }
-      }
-      return;
-    }
-    if (await devServerAvailable()) {
-      try {
-        var res = await fetch('/__feedback/save', { method: 'POST', body: JSON.stringify(entry) });
-        if (res.ok) return;
-      } catch (e) { console.warn('[feedback] dev-server save failed, falling back to localStorage', e); }
-    }
-    var list = lsReadAll();
-    var idx = list.findIndex(function (e) { return e.id === entry.id; });
-    if (idx >= 0) list[idx] = entry; else list.unshift(entry);
-    if (list.length > LOCAL_MAX) list = list.slice(0, LOCAL_MAX);
-    lsWriteAll(list);
-  }
-  async function deleteLocal(id) {
-    if (tauriOk()) {
-      try { await window.__TAURI__.fs.remove((await localDir()) + '/' + id + '.json'); } catch (e) {}
-      return;
-    }
-    if (await devServerAvailable()) {
-      try {
-        var res = await fetch('/__feedback/delete', { method: 'POST', body: JSON.stringify({ id: id, projectKey: projectKey() }) });
-        if (res.ok) return;
-      } catch (e) { console.warn('[feedback] dev-server delete failed, falling back to localStorage', e); }
-    }
-    lsWriteAll(lsReadAll().filter(function (e) { return e.id !== id; }));
-  }
-
   function genId() { return 'fb_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6); }
 
   // ---- Submit (always YOUR OWN — auto-approved, per this module's own
@@ -310,7 +193,7 @@
       // timeline.js's popover re-open) checks both shapes.
       screenshotDataUrls: opts.screenshotDataUrls || (opts.screenshotDataUrl ? [opts.screenshotDataUrl] : []),
     };
-    await writeLocal(entry);
+    await local.writeLocal(entry);
     // Best-effort: also publish to the shared team-sync folder (if
     // configured) so the project owner can pull it — reuses the EXACT
     // same root/<profileId>/ convention publishToShared() already writes
@@ -318,11 +201,7 @@
     // the project-snapshot files, so the two never collide.
     if (tauriOk() && window.SMProject && window.SMProject.getSyncFolder && window.SMProject.getSyncFolder()) {
       try {
-        var root = window.SMProject.getSyncFolder();
-        var dir = window.SMProject.profileDir(root, state.userProfile.id) + '/feedback';
-        await window.__TAURI__.fs.mkdir(dir, { recursive: true });
-        await window.__TAURI__.fs.writeTextFile(dir + '/_profile.json', JSON.stringify(state.userProfile));
-        await window.__TAURI__.fs.writeTextFile(dir + '/' + entry.id + '.json', JSON.stringify(entry));
+        await local.publishShared(entry);
       } catch (e) { console.warn('[feedback] publish to shared folder failed', e); }
     }
     // Best-effort: beta testers have no shared Sync folder (that's a local/
@@ -335,203 +214,12 @@
     // tester's feedback looked "saved" but never reached anyone, see
     // worker-feedback/README for the fix.
     try {
-      await publishToGitHubIssue(entry);
+      await remote.publishToGitHubIssue(entry);
     } catch (e) { console.warn('[feedback] GitHub publish failed', e); }
     return entry;
   }
 
-  function fbTagLabelPlain(tag) {
-    return { bug: 'bug', perf: 'perf', idee: 'idée', polish: 'polish' }[tag] || tag;
-  }
-  // Commits each screenshot into strokemotion-feedback's attachments/
-  // folder via the Worker's /attachment endpoint (GitHub Contents API
-  // under the hood) and returns an array of raw.githubusercontent.com
-  // URLs that render inline in the issue body via normal Markdown image
-  // syntax — GFM does NOT render data: URIs, so each file has to actually
-  // land in the repo, not just be inlined as base64 in the issue text.
-  //
-  // feedback #208: was one screenshot per entry (uploadScreenshotIfAny,
-  // singular) — now uploads however many were attached, sequentially (not
-  // Promise.all: the Worker writes via the GitHub Contents API, which
-  // 409s on two concurrent commits to the same repo — a real risk once
-  // this is more than one file per submission). filename includes an
-  // index (entry.id + '-' + i) so multiple images from the SAME entry
-  // never collide on the single-screenshot naming the old code used
-  // unconditionally. Compat: an older stored entry may only have the
-  // singular screenshotDataUrl field.
-  async function uploadScreenshotsIfAny(entry) {
-    var dataUrls = entry.screenshotDataUrls && entry.screenshotDataUrls.length ? entry.screenshotDataUrls
-      : (entry.screenshotDataUrl ? [entry.screenshotDataUrl] : []);
-    var urls = [];
-    for (var i = 0; i < dataUrls.length; i++) {
-      var m = /^data:image\/(\w+);base64,(.+)$/.exec(dataUrls[i]);
-      if (!m) continue;
-      var ext = m[1] === 'jpeg' ? 'jpg' : m[1];
-      var filename = entry.id + (dataUrls.length > 1 ? '-' + (i + 1) : '') + '.' + ext;
-      var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
-      if (data && data.url) urls.push(data.url);
-    }
-    return urls;
-  }
-  async function publishToGitHubIssue(entry) {
-    var title = (entry.blocking ? '[BLOQUANT] ' : '') + (entry.note || '(sans titre)').slice(0, 80);
-    var labels = ['pending'].concat((entry.tags || []).map(fbTagLabelPlain));
-    if (entry.blocking) labels.push('blocking');
-    var shotUrls = [];
-    try { shotUrls = await uploadScreenshotsIfAny(entry); } catch (e) { console.warn('[feedback] screenshot upload failed', e); }
-    // One heading, one image per URL — GFM renders each ![]() on its own
-    // line as a separate inline image, so N screenshots just means N lines
-    // here instead of the single line the old code always produced.
-    var shotsBlock = shotUrls.length
-      ? ('**Capture' + (shotUrls.length > 1 ? 's d\'écran' : ' d\'écran') + '**\n'
-        + shotUrls.map(function (u, i) { return '![capture ' + (i + 1) + '](' + u + ')'; }).join('\n') + '\n')
-      : '';
-    var body = [
-      '**Note**', entry.note || '(vide)', '',
-      shotsBlock,
-      '**Contexte**',
-      '- Frame: ' + entry.frame,
-      '- Auteur: ' + (entry.author ? entry.author.name + ' (' + entry.author.role + ')' : 'inconnu'),
-      (entry.author && entry.author.email) ? ('- Email: ' + entry.author.email) : '',
-      '- Projet: ' + entry.projectKey,
-      '- Enregistré précisément: ' + (entry.recorded ? 'oui' : 'non (dernières actions)'),
-      '',
-      // Feedback #115 ("des infos non intrusive pour le debugguage et des
-      // rapports de connexion simple") — only values already sitting in
-      // the page (navigator/screen/document.title, the same source
-      // updater-bridge.js's showVersion() keeps in sync — CLAUDE.md §7's
-      // single-source-of-truth version display, so no new version-tracking
-      // needed here). No IP, no geolocation, no analytics SDK — this is
-      // the same privacy profile the click/action trail below already has.
-      '**Infos techniques**',
-      '- Plateforme: ' + (tauriOk() ? 'App bureau' : 'Navigateur web'),
-      '- Version: ' + (document.title.match(/v[\d.]+/) || ['inconnue'])[0],
-      '- Navigateur: ' + navigator.userAgent,
-      '- Fenêtre: ' + window.innerWidth + '×' + window.innerHeight + ' (écran ' + screen.width + '×' + screen.height + ')',
-      '- Connexion: ' + (navigator.onLine ? 'en ligne' : 'hors ligne'),
-      '',
-      '**Trail d\'actions**',
-      '```json', JSON.stringify(entry.actionTrail || [], null, 2), '```',
-      '',
-      '**Trail de clics**',
-      '```json', JSON.stringify(entry.clickTrail || [], null, 2), '```',
-      '',
-      '<!-- sm-feedback-id: ' + entry.id + ' -->',
-    ].join('\n');
-    await workerPost('/issue', { title: title, body: body, labels: labels });
-  }
-
-  // ---- Dev-side triage over the GitHub feedback repo (Cyril only — a
-  // beta tester's shipped copy of this app has these functions too, since
-  // it's all one codebase, but they're useless to them without CYRIL'S OWN
-  // GitHub token, which is never embedded/shipped — see setGithubTriageToken
-  // below). Reading issues needs no auth at all (public repo); only
-  // labeling/closing/commenting needs Cyril's token, entered once in
-  // Réglages → Feedback and kept in localStorage on his own machine only. ----
-  var GH_REPO = 'mysteropodes/nemo';
-  var GH_TOKEN_KEY = 'nemo-github-triage-token';
-  function githubTriageToken() { try { return localStorage.getItem(GH_TOKEN_KEY) || ''; } catch (e) { return ''; } }
-  function setGithubTriageToken(token) { try { localStorage.setItem(GH_TOKEN_KEY, token || ''); } catch (e) {} }
-
-  // Uses the Search API rather than /issues, because GH_REPO is now the code
-  // repo: /issues returns pull requests too, and with 700+ PRs the newest 100
-  // items would be almost entirely PRs, so the real reports would fall off the
-  // end and simply not show up. `is:issue` excludes them server-side, so all
-  // 100 slots hold actual feedback. The pull_request filter below is kept as a
-  // belt-and-braces guard.
-  async function fetchGithubIssues() {
-    var q = encodeURIComponent('repo:' + GH_REPO + ' is:issue');
-    var res = await fetch('https://api.github.com/search/issues?q=' + q + '&per_page=100&sort=created&order=desc', {
-      headers: { 'Accept': 'application/vnd.github+json' },
-    });
-    if (!res.ok) throw new Error('GitHub list failed: ' + res.status);
-    var payload = await res.json();
-    var issues = payload.items || [];
-    return issues.filter(function (i) { return !i.pull_request; }).map(function (i) {
-      var m = /sm-feedback-id:\s*(\S+)\s*-->/.exec(i.body || '');
-      return {
-        number: i.number, id: m ? m[1] : ('gh_' + i.number), nodeId: i.node_id,
-        title: i.title, body: i.body, url: i.html_url,
-        labels: (i.labels || []).map(function (l) { return l.name; }),
-        state: i.state, createdAt: i.created_at,
-      };
-    });
-  }
-  function ghAuthHeaders() {
-    var token = githubTriageToken();
-    if (!token) throw new Error('Aucun token GitHub configuré (Réglages → Feedback)');
-    return { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
-  }
-  async function patchGithubIssue(number, payload) {
-    var res = await fetch('https://api.github.com/repos/' + GH_REPO + '/issues/' + number, {
-      method: 'PATCH', headers: ghAuthHeaders(), body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error('GitHub update failed: ' + res.status + ' ' + await res.text());
-    return res.json();
-  }
-  async function approveGithubIssue(number, currentLabels) {
-    var labels = (currentLabels || []).filter(function (l) { return l !== 'pending'; });
-    return patchGithubIssue(number, { labels: labels });
-  }
-  async function resolveGithubIssue(number, currentLabels, resolutionText) {
-    if (resolutionText) {
-      await fetch('https://api.github.com/repos/' + GH_REPO + '/issues/' + number + '/comments', {
-        method: 'POST', headers: ghAuthHeaders(), body: JSON.stringify({ body: resolutionText }),
-      });
-    }
-    var labels = (currentLabels || []).filter(function (l) { return l !== 'pending'; });
-    if (labels.indexOf('resolved') < 0) labels.push('resolved');
-    return patchGithubIssue(number, { labels: labels, state: 'closed' });
-  }
-  async function editGithubIssueBody(number, newBody) {
-    return patchGithubIssue(number, { body: newBody });
-  }
-  // Actual deletion (not just close) — REST has no DELETE for issues, this
-  // needs the GraphQL deleteIssue mutation + the issue's node_id (captured
-  // by fetchGithubIssues above). Requires the token's user to have admin
-  // rights on the repo (verified: works for the repo owner even with a
-  // fine-grained PAT scoped to just "Issues" — the permission check is on
-  // the acting user's role, not the token's own granularity).
-  async function deleteGithubIssue(nodeId) {
-    var res = await fetch('https://api.github.com/graphql', {
-      method: 'POST', headers: ghAuthHeaders(),
-      body: JSON.stringify({ query: 'mutation($id:ID!){deleteIssue(input:{issueId:$id}){clientMutationId}}', variables: { id: nodeId } }),
-    });
-    var json = await res.json();
-    if (!res.ok || json.errors) throw new Error('GitHub delete failed: ' + (json.errors ? json.errors.map(function (e) { return e.message; }).join(', ') : res.status));
-    return true;
-  }
-
   // ---- Pull from teammates (mirrors checkSharedUpdates/pullAndMerge) ----
-  async function checkIncomingFeedback() {
-    if (!tauriOk() || !window.SMProject || !window.SMProject.getSyncFolder) return [];
-    var root = window.SMProject.getSyncFolder();
-    if (!root) return [];
-    var localIds = (await readAllLocal()).map(function (e) { return e.id; });
-    var out = [];
-    try {
-      var entries = await window.__TAURI__.fs.readDir(root);
-      for (var i = 0; i < entries.length; i++) {
-        var e = entries[i];
-        if (e.name === state.userProfile.id) continue; // your own — already local
-        var fbDir = root.replace(/[\\/]+$/, '') + '/' + e.name + '/feedback';
-        try {
-          var sub = await window.__TAURI__.fs.readDir(fbDir);
-          var files = sub.filter(function (x) { return /^fb_.*\.json$/.test(x.name); });
-          for (var j = 0; j < files.length; j++) {
-            var id = files[j].name.replace(/\.json$/, '');
-            if (localIds.indexOf(id) >= 0) continue; // already imported
-            try {
-              var data = JSON.parse(await window.__TAURI__.fs.readTextFile(fbDir + '/' + files[j].name));
-              if (data.projectKey !== projectKey()) continue; // feedback for a DIFFERENT project sharing the same folder
-              out.push(data);
-            } catch (e2) {}
-          }
-        } catch (e3) {}
-      }
-    } catch (e4) { console.warn('[feedback] check incoming failed', e4); }
-    return out;
-  }
   // Copies a remote-checked entry into the LOCAL store as 'pending' — never
   // 'approved' directly, no matter what the remote entry's own status says
   // (a teammate's local auto-approval means nothing on YOUR machine; only
@@ -540,35 +228,35 @@
     var copy = JSON.parse(JSON.stringify(entry));
     copy.status = 'pending';
     copy.origin = entry.author ? entry.author.id : 'remote';
-    await writeLocal(copy);
+    await local.writeLocal(copy);
     return copy;
   }
   async function pullAllIncoming() {
-    var incoming = await checkIncomingFeedback();
+    var incoming = await local.checkIncomingFeedback();
     var imported = [];
     for (var i = 0; i < incoming.length; i++) imported.push(await importIncoming(incoming[i]));
     return imported;
   }
 
   async function approveFeedback(id) {
-    var all = await readAllLocal();
+    var all = await local.readAllLocal();
     var entry = all.find(function (e) { return e.id === id; });
     if (!entry) return null;
     entry.status = 'approved';
-    await writeLocal(entry);
+    await local.writeLocal(entry);
     return entry;
   }
   async function resolveFeedback(id, resolutionText) {
-    var all = await readAllLocal();
+    var all = await local.readAllLocal();
     var entry = all.find(function (e) { return e.id === id; });
     if (!entry) return null;
     entry.status = 'resolved';
     entry.resolution = resolutionText || '';
     entry.resolvedAt = Date.now();
-    await writeLocal(entry);
+    await local.writeLocal(entry);
     return entry;
   }
-  async function deleteFeedback(id) { await deleteLocal(id); }
+  async function deleteFeedback(id) { await local.deleteLocal(id); }
 
   window.SMFeedback = {
     logAction: logAction,
@@ -578,19 +266,19 @@
     actionTrailSince: actionTrailSince,
     clickTrailSince: clickTrailSince,
     submitFeedback: submitFeedback,
-    readAllLocal: readAllLocal,
-    checkIncomingFeedback: checkIncomingFeedback,
+    readAllLocal: local.readAllLocal,
+    checkIncomingFeedback: local.checkIncomingFeedback,
     importIncoming: importIncoming,
     pullAllIncoming: pullAllIncoming,
     approveFeedback: approveFeedback,
     resolveFeedback: resolveFeedback,
     deleteFeedback: deleteFeedback,
-    githubTriageToken: githubTriageToken,
-    setGithubTriageToken: setGithubTriageToken,
-    fetchGithubIssues: fetchGithubIssues,
-    approveGithubIssue: approveGithubIssue,
-    resolveGithubIssue: resolveGithubIssue,
-    editGithubIssueBody: editGithubIssueBody,
-    deleteGithubIssue: deleteGithubIssue,
+    githubTriageToken: remote.githubTriageToken,
+    setGithubTriageToken: remote.setGithubTriageToken,
+    fetchGithubIssues: remote.fetchGithubIssues,
+    approveGithubIssue: remote.approveGithubIssue,
+    resolveGithubIssue: remote.resolveGithubIssue,
+    editGithubIssueBody: remote.editGithubIssueBody,
+    deleteGithubIssue: remote.deleteGithubIssue,
   };
 })();

@@ -27,7 +27,7 @@
       }catch(error){notice();return {status:'unconfirmed',code:error&&error.code||'unavailable'};}
       finally{pending=false;}
     }
-    var controller=Object.freeze({read:function(){return model.read();},edit:edit,presented:presented,
+    var controller=Object.freeze({read:function(onRefusal){return model.read(onRefusal);},edit:edit,presented:presented,
       willProject:function(){if(!pending)model.invalidate();},isPending:function(){return pending||!!loading;},
       dispose:function(){retired=true;model.dispose();repaint();}});
     installed.set(root,controller);root.NemoNativeCompositionController=controller;

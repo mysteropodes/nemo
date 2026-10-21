@@ -6,7 +6,8 @@ const vm = require('node:vm');
 
 function referenceLesson() {
   const window = {};
-  vm.runInNewContext(fs.readFileSync('src/js/tutorial.js', 'utf8'), {
+  vm.runInNewContext(fs.readFileSync('src/js/adapters/tutorial-presentation.js', 'utf8') + '\n' +
+    fs.readFileSync('src/js/tutorial.js', 'utf8'), {
     window, document: { addEventListener() {} },
   });
   return window.SMTutorial.MODULES.find(m => m.id === 'reference');

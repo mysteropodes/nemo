@@ -193,6 +193,30 @@
       ]
     },
     {
+      "id": "app.feedback.local.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "feedback-local.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "feedback-local.js"
+      ]
+    },
+    {
+      "id": "app.feedback.remote.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "feedback-remote.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "feedback-remote.js"
+      ]
+    },
+    {
       "id": "app.feedback.bridge",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -529,6 +553,18 @@
       ]
     },
     {
+      "id": "app.shader.effect.catalog.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "shader-effect-catalog.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "shader-effect-catalog.js"
+      ]
+    },
+    {
       "id": "app.shader.effects.library",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -610,6 +646,18 @@
       "sizeProfile": "App JS unclassified (pre-R01)",
       "publicApi": [
         "transplant.js"
+      ]
+    },
+    {
+      "id": "app.tutorial.presentation.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "tutorial-presentation.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "tutorial-presentation.js"
       ]
     },
     {
@@ -3644,15 +3692,6 @@
   },
   "exceptions": [
     {
-      "path": "src/js/feedback-bridge.js",
-      "rule": "size",
-      "ceiling": 581,
-      "owner": "ivg-design",
-      "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
-      "expires": "2026-12-05"
-    },
-    {
       "path": "src/js/group-bridge.js",
       "rule": "size",
       "ceiling": 842,
@@ -3664,10 +3703,10 @@
     {
       "path": "src/js/i18n.js",
       "rule": "size",
-      "ceiling": 4241,
+      "ceiling": 4186,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Translation table embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'); ceiling captured as an exact no-growth baseline, not an application-code review.",
+      "reason": "Four authored translation dictionaries plus explicit install call only; handwritten locale switching/DOM/storage behavior is already isolated in app.i18n.runtime.adapter. Preserve whole catalog rather than arbitrary chunking. Existing tests/i18n-runtime.test.cjs verifies exact dictionary bytes/key counts and real runtime/caller behavior. No generated/vendor exemption or size-profile increase.",
       "expires": "2026-12-05"
     },
     {
@@ -3709,10 +3748,10 @@
     {
       "path": "src/js/shader-effects-library.js",
       "rule": "size",
-      "ceiling": 1312,
+      "ceiling": 1285,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Shader effect catalog embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'). Confirmed by direct read: lines 20-28 are two small builder helpers (param(), fx(), 9 lines combined), lines 30-1306 are the `effects` array \u2014 roughly 80 WGSL-fragment-body entries built via those helpers \u2014 and lines 1308-1313 are the window.SMSHADER_EFFECTS/SMSHADER_EFFECT_CATEGORIES assignments plus a 4-line window.SMShaderEffectDef lookup helper. Data catalog, not undisciplined control-flow growth; ceiling captured as an exact no-growth baseline, not an application-code review.",
+      "reason": "Authored WGSL fragment bodies, parameter/default/spatial descriptors and category order are preserved as one catalog, not split to meet a code budget. T15 moves all existing constructor/install/lookup control into the ordinary bounded app.shader.effect.catalog.adapter. Exact authored block integrity and real public lookup are enforced by tests/shader-effect-catalog.test.cjs; no generated/vendor exemption or size-profile increase.",
       "expires": "2026-12-05"
     },
     {
@@ -3727,10 +3766,10 @@
     {
       "path": "src/js/tutorial.js",
       "rule": "size",
-      "ceiling": 1864,
+      "ceiling": 1410,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
+      "reason": "Original handwritten tutorial curriculum: exact lesson definitions, translations, SVG and executable setup/check predicates are preserved together under this reduced no-growth ceiling; not generated or inert data. Independent presentation/placement/lifecycle/search/help now belongs to bounded app.tutorial.presentation.adapter. Original P37 prefix integrity and all behavioral oracles remain. Broader structural R22 remains open.",
       "expires": "2026-12-05"
     },
     {
