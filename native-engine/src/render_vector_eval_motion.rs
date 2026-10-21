@@ -135,7 +135,10 @@ fn vector_layer_holder_consumed(document: &ObjectDocument, holder: &PropertyHold
 /// True only for a real Text/raster consumer or one of its actual same-context
 /// ancestors. This admits sampled inputs; the scene provider still proves the
 /// complete chain, real bounds, cycle/depth/expressions and exact frame.
-fn scene_consumer_uses_layer(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+pub(crate) fn scene_consumer_uses_layer(
+    document: &ObjectDocument,
+    target: &PropertyHolderTarget,
+) -> bool {
     if document.format_version() != 2
         || target.context_id() != "scene-root"
         || target.stroke_id().is_some()

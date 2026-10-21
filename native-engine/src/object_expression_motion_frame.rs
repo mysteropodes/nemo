@@ -128,9 +128,12 @@ impl<'a> EvaluatedMotion<'a> {
             .collect()
     }
 }
-impl MotionPort for EvaluatedMotion<'_> {
-    fn value(&self, uid: &str, key: &'static str) -> Result<Sampled, Unavailable> {
-        let target = self.target(uid);
+impl EvaluatedMotion<'_> {
+    fn target_value(
+        &self,
+        target: PropertyHolderTarget,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
         if let Some(replay) = self.replay {
             if let Some(MotionEffect::Evaluated {
                 target: recorded,
@@ -146,7 +149,10 @@ impl MotionPort for EvaluatedMotion<'_> {
                 }
             }
             // An unrecorded enabled key still refuses through the strict port.
-            return self.raw.value(uid, key);
+            return match target.stroke_id() {
+                Some(stroke) => self.raw.element_value(target.layer_uid(), stroke, key),
+                None => self.raw.value(target.layer_uid(), key),
+            };
         }
         let enabled = self
             .snapshot
@@ -158,7 +164,10 @@ impl MotionPort for EvaluatedMotion<'_> {
             .flat_map(|h| h.properties())
             .any(|p| p.property() == key && p.expression.value().is_some_and(|e| e.enabled));
         if !enabled {
-            return self.raw.value(uid, key);
+            return match target.stroke_id() {
+                Some(stroke) => self.raw.element_value(target.layer_uid(), stroke, key),
+                None => self.raw.value(target.layer_uid(), key),
+            };
         }
         #[cfg(test)]
         MOTION_EVALUATIONS.with(|count| count.set(count.get() + 1));
@@ -206,6 +215,24 @@ impl MotionPort for EvaluatedMotion<'_> {
             }
         }
     }
+}
+
+impl MotionPort for EvaluatedMotion<'_> {
+    fn value(&self, uid: &str, key: &'static str) -> Result<Sampled, Unavailable> {
+        let target = self.target(uid);
+        self.target_value(target, key)
+    }
+    fn element_value(
+        &self,
+        uid: &str,
+        stroke_id: &str,
+        key: &'static str,
+    ) -> Result<Sampled, Unavailable> {
+        let mut target = self.target(uid);
+        target.stroke_id = Presence::Present(stroke_id.to_owned());
+        self.target_value(target, key)
+    }
+
     fn motion_delta(&self, uid: &str) -> Result<Option<MotionDelta>, Unavailable> {
         // Same local computeMotionMat order as the original. No parent pose is
         // added here, and all five consumed fields use the evaluated provider.

@@ -96,6 +96,7 @@ where
     let text_records = text::select(snapshot, selector, context_layers, &source_frames)?;
     let mut packet = ObjectFramePacket {
         duplicators: Vec::new(),
+        motion_receipts: Vec::new(),
         text_records,
         raster_records,
         snapshot: snapshot.clone(),
@@ -107,6 +108,10 @@ where
         source_frames,
         numeric_order,
     };
+    if let Some(motion) = motion {
+        packet.motion_receipts =
+            crate::object_frame_packet::motion_receipts::capture(&packet, motion)?;
+    }
     packet.duplicators = duplicators::prepare(&packet, exposure, motion)?;
     Ok(packet)
 }

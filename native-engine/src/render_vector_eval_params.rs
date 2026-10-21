@@ -172,6 +172,15 @@ fn holders_consumed(document: &ObjectDocument, evaluated: bool) -> bool {
             } else {
                 crate::object_frame_packet::duplicators::remaining_holder(document, holder)
             };
+            let remaining = if evaluated {
+                crate::object_frame_packet::motion_receipts::remaining_holder(
+                    document,
+                    remaining.as_ref().unwrap_or(holder),
+                )
+                .or(remaining)
+            } else {
+                remaining
+            };
             match remaining {
                 Some(ref remaining) if remaining.properties().is_empty() => remaining
                     .controls
@@ -199,6 +208,12 @@ fn holder_consumed(document: &ObjectDocument, holder: &PropertyHolder) -> bool {
     let Some(stroke_id) = target.stroke_id() else {
         return crate::evaluation::object_vector_kernels::render_vector_eval::motion::layer_holder_consumed(document, holder);
     };
+    if crate::object_frame_packet::motion_receipts::text_element(document, target) {
+        return holder.properties().iter().all(|p| {
+            crate::object_frame_packet::motion_receipts::KEYS.contains(&p.property())
+                && !p.expression.value().is_some_and(|e| e.enabled)
+        });
+    }
     let mut matched = false;
     for record in document.objects() {
         let owner = &record.target;

@@ -7,6 +7,7 @@ use crate::revision::ObjectSnapshot;
 
 pub(crate) const MOTION_2D_KEYS: [&str; 5] = ["position", "anchor", "rotation", "scale", "opacity"];
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct MotionValues {
     pub(crate) position: [f64; 2],
     pub(crate) anchor: [f64; 2],

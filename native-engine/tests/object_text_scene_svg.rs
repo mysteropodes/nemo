@@ -390,3 +390,6 @@ fn svg_vector_only_real_control_still_reparses_exact_contour_paint() {
         .contains("<path d="));
     assert_eq!(support::state(&owner), before);
 }
+
+#[path = "object_text_animator_scene.rs"]
+mod animator;

@@ -7,7 +7,7 @@ use crate::evaluation::object_vector_kernels::render_vector_eval::{
     evaluate_vector_rest, is_vector_record, record_layer_has_active_path_fx,
 };
 use crate::object_frame_packet::text::{ObjectLayer, Presence, PropertyHolderTarget};
-use crate::object_frame_packet::{sample_property_raw, ObjectFramePacket};
+use crate::object_frame_packet::ObjectFramePacket;
 use crate::object_render_scene::object_scene_producer_text::TextSceneItem;
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::collections::{BTreeMap, BTreeSet};
@@ -104,50 +104,35 @@ fn sample(packet: &ObjectFramePacket, layer: usize) -> Result<PoseSample, ChainU
         layer_uid: source.layer_uid().to_owned(),
         stroke_id: Presence::Missing,
     };
-    let keys = ["position", "anchor", "rotation", "scale", "opacity"];
-    if packet
-        .snapshot()
-        .document()
-        .property_holders()
-        .unwrap_or(&[])
-        .iter()
-        .filter(|h| h.target() == &target)
-        .flat_map(|h| h.properties())
-        .any(|r| keys.contains(&r.property()) && r.expression.value().is_some_and(|e| e.enabled))
-    {
-        return Err(ChainUnavailable::Expression);
-    }
-    let read = |key| {
-        sample_property_raw(packet.snapshot(), &target, key, packet.frame() as f64)
-            .map_err(|_| ChainUnavailable::Sample)
-    };
-    let position = read("position")?;
-    let anchor = read("anchor")?;
-    let rotation = read("rotation")?;
-    let scale = read("scale")?;
-    let opacity = read("opacity")?;
-    match (
-        position.as_slice(),
-        anchor.as_slice(),
-        rotation.as_slice(),
-        scale.as_slice(),
-        opacity.as_slice(),
-    ) {
-        ([x, y], [ax, ay], [rotation], [sx, sy], [opacity])
-            if [x, y, ax, ay, rotation, sx, sy, opacity]
-                .iter()
-                .all(|v| v.is_finite()) =>
-        {
-            Ok(PoseSample {
-                position: [*x, *y],
-                anchor: [*ax, *ay],
-                rotation: *rotation,
-                scale: [*sx, *sy],
-                opacity: *opacity,
+    // Raw packets remain strict. An owner-prepared packet supplies only its own
+    // already-retired numeric receipts; the scene never invokes an evaluator.
+    let values = packet.sampled_motion_values(&target).map_err(|_| {
+        let keys = ["position", "anchor", "rotation", "scale", "opacity"];
+        if packet
+            .snapshot()
+            .document()
+            .property_holders()
+            .unwrap_or(&[])
+            .iter()
+            .filter(|holder| holder.target() == &target)
+            .flat_map(|holder| holder.properties())
+            .any(|property| {
+                keys.contains(&property.property())
+                    && property.expression.value().is_some_and(|code| code.enabled)
             })
+        {
+            ChainUnavailable::Expression
+        } else {
+            ChainUnavailable::Sample
         }
-        _ => Err(ChainUnavailable::Sample),
-    }
+    })?;
+    Ok(PoseSample {
+        position: values.position,
+        anchor: values.anchor,
+        rotation: values.rotation,
+        scale: values.scale,
+        opacity: values.opacity,
+    })
 }
 /// Same retained snapshot/context/evaluation frame through construction and both consumers.
 /// `bounds` is only construction-local native derived geometry, never authored state.

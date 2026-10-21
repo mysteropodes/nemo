@@ -370,3 +370,71 @@ fn gpu_retained_document_font_and_raster_survive_owner_drop_with_original_pixels
         "last raster Blob/charge holder released"
     );
 }
+
+#[test]
+fn gpu_stored_text_animator_and_layer_motion_share_original_glyphs_and_export_pixels() {
+    let case: Value = GLYPH_ORACLE
+        .lines()
+        .filter_map(|line| line.strip_prefix("CASE "))
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|row| row["name"] == "hello_roboto_100")
+        .unwrap();
+    let mut doc = document();
+    doc["items"]["text"][0]["block"] = json!({"text":case["text"],
+        "font":{"kind":"bundled","fontKey":case["font"]}, "size":case["size"],
+        "color":"#112233", "align":case["align"],
+        "anchorTopLeft":{"x":case["tl"][0],"y":case["tl"][1]}});
+    doc["layers"][0]["textAnimators"] = json!([{"id":"retained", "selector":{},
+        "props":{"position":[20,0]}, "properties":[{"property":"amount","track":{"keys":[
+            {"frame":0,"v":[0]},{"frame":4,"v":[100]}]}}]}]);
+    doc["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
+        "properties":[{"property":"position","static":[7,9]}]}]);
+    let o = owner(&doc);
+    let before = support::state(&o);
+    let snapshot = support::head(&o);
+    let (view, export) = witnesses(&snapshot);
+    versions(&view, "font:Roboto-Regular");
+    versions(&export, "font:Roboto-Regular");
+    let text = ordered_entries(export.plan())
+        .find_map(|entry| match entry {
+            PaintEntry::Text(text) => Some(text),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(text.item.scene().contours().len(), 7);
+    for (contour, expected) in text
+        .item
+        .scene()
+        .contours()
+        .iter()
+        .take(3)
+        .zip(case["glyphs"][0]["paths"].as_array().unwrap())
+    {
+        let oracle = expected["segs"].as_array().unwrap();
+        assert_eq!(contour.contour.segments().len(), oracle.len());
+        for (segment, row) in contour.contour.segments().iter().zip(oracle) {
+            let numbers = row
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|n| n.as_f64().unwrap())
+                .collect::<Vec<_>>();
+            // Original literal H geometry, TA +20 then own layer +7,+9 exactly once.
+            assert_eq!(segment.point, [numbers[0] + 27.0, numbers[1] + 9.0]);
+            assert_eq!(segment.handle_in, [numbers[2], numbers[3]]);
+            assert_eq!(segment.handle_out, [numbers[4], numbers[5]]);
+        }
+    }
+    let mut gpu = metal();
+    let shown = render(&mut gpu, &view);
+    assert_eq!(shown, render(&mut gpu, &export));
+    assert_eq!(pixel(&shown, 39, 29), [17, 34, 51, 255]);
+    assert_eq!(pixel(&shown, 57, 51), [17, 34, 51, 255]);
+    assert_eq!(pixel(&shown, 57, 29), [255; 4]);
+    assert_eq!(pixel(&shown, 12, 20), [255; 4]);
+    assert_eq!(pixel(&shown, 319, 179), [255; 4]);
+    assert_eq!(support::state(&o), before);
+    drop(snapshot);
+    drop(o);
+    assert_eq!(shown, render(&mut gpu, &export));
+}

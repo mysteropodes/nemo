@@ -36,7 +36,7 @@ use crate::revision::ObjectSnapshot;
 use serde_json::Number;
 
 #[path = "render_vector_eval_motion.rs"]
-mod motion;
+pub(crate) mod motion;
 
 #[path = "render_vector_eval_params.rs"]
 pub(crate) mod params;

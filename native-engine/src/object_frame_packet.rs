@@ -6,6 +6,9 @@ pub(crate) use crate::object_document::{
     PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
+pub(crate) use property_sampling::frame_motion::MotionValues;
+#[path = "object_frame_motion_receipts.rs"]
+pub(crate) mod motion_receipts;
 
 #[path = "object_frame_context.rs"]
 mod context;
@@ -203,6 +206,7 @@ pub struct ObjectFramePacket {
     duplicators: Vec<duplicators::LayerCopies>,
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
+    motion_receipts: Vec<motion_receipts::MotionReceipt>,
 }
 
 impl ObjectFramePacket {
@@ -285,12 +289,8 @@ impl ObjectFramePacket {
             layer_uid: layer.layer_uid().to_owned(),
             stroke_id: Presence::Missing,
         };
-        let values = sample_property_raw(&self.snapshot, &target, "opacity", self.frame as f64)
-            .map_err(|_| ObjectFrameError::Unavailable)?;
-        match values.as_slice() {
-            [value] if value.is_finite() => Ok((value / 100.0).max(0.0)),
-            _ => Err(ObjectFrameError::Unavailable),
-        }
+        let values = self.sampled_motion_values(&target)?;
+        Ok((values.opacity / 100.0).max(0.0))
     }
     /// Selected authored source for this layer; packet.frame() remains evaluation time.
     /// An unexposed layer (or invalid index) has no selected source.

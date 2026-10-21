@@ -214,12 +214,42 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
         pending.push((input, raw));
     }
     for (layer_index, layer) in packet.source_layers().iter().enumerate() {
-        let Some(records) = layer.text_animators.value().filter(|v| !v.0.is_empty()) else {
-            continue;
-        };
-        let animators = records
-            .0
+        let bases = pending
             .iter()
+            .filter(|(input, _)| input.layer_index == layer_index)
+            .map(|(input, _)| {
+                let target = crate::object_frame_packet::text::PropertyHolderTarget {
+                    context_id: input.entry.target.context_id().to_owned(),
+                    layer_uid: input.entry.target.layer_uid().to_owned(),
+                    stroke_id: crate::object_frame_packet::text::Presence::Present(
+                        input.entry.target.stroke_id().to_owned(),
+                    ),
+                };
+                let m = packet.sampled_motion_values(&target).map_err(|_| {
+                    unavailable(input.source_index, "Text element Motion is unavailable")
+                })?;
+                Ok(
+                    crate::evaluation::motion_parent_chain::motion_mat_from_values(
+                        m.position, m.anchor, m.rotation, m.scale, m.opacity,
+                    ),
+                )
+            })
+            .collect::<Result<Vec<_>, ObjectSceneError>>()?;
+        let mut blocks = pending
+            .iter_mut()
+            .filter(|(input, _)| input.layer_index == layer_index)
+            .map(|(_, item)| item)
+            .collect::<Vec<_>>();
+        // Only the actual selected Text (or retained ancestor pivot Text) consumes
+        // this selector. Unrelated/unexposed layers cannot refuse its geometry.
+        if blocks.is_empty() {
+            continue;
+        }
+        let animators = layer
+            .text_animators
+            .value()
+            .into_iter()
+            .flat_map(|records| &records.0)
             .map(|r| r.resolve(f64::from(packet.frame())))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| unavailable(0, "native Text selector evaluation unavailable"))?;
@@ -227,14 +257,10 @@ pub(super) fn prepare(packet: &ObjectFramePacket) -> Result<TextSources, ObjectS
             .snapshot()
             .project()
             .map_or(24.0, |p| p.project().fps());
-        let mut blocks = pending
-            .iter_mut()
-            .filter(|(input, _)| input.layer_index == layer_index)
-            .map(|(_, item)| item)
-            .collect::<Vec<_>>();
-        crate::object_render_scene::object_scene_producer_text::animator::apply_layer(
+        crate::object_render_scene::object_scene_producer_text::animator::apply_layer_with_bases(
             &mut blocks,
             &animators,
+            &bases,
             f64::from(packet.frame()),
             fps,
         )

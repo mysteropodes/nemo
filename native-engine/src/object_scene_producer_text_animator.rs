@@ -35,9 +35,41 @@ pub(crate) fn apply_layer(
     frame: f64,
     fps: f64,
 ) -> Result<(), TextProducerError> {
-    if animators.is_empty() {
+    let bases = vec![None; items.len()];
+    apply_layer_with_bases(items, animators, &bases, frame, fps)
+}
+/// The block's actual element holder is folded BEFORE the layer/ancestor chain.
+/// A base is repeated per real contour, preserving each path's own pivot and key.
+pub(crate) fn apply_layer_with_bases(
+    items: &mut [&mut TextSceneItem],
+    animators: &[TextAnimator],
+    bases: &[Option<MotionMat>],
+    frame: f64,
+    fps: f64,
+) -> Result<(), TextProducerError> {
+    if bases.len() != items.len() {
+        return Err(TextProducerError::Animator);
+    }
+    if animators.is_empty() && bases.iter().all(Option::is_none) {
         return Ok(());
     }
+    let bases = items
+        .iter()
+        .zip(bases)
+        .flat_map(|(item, base)| {
+            let base = base.map(|m| kernel::ElementMotion {
+                dx: m.dx,
+                dy: m.dy,
+                rot: m.rot,
+                sx: m.sx,
+                sy: m.sy,
+                op: m.op,
+                ax: m.ax,
+                ay: m.ay,
+            });
+            std::iter::repeat(base).take(item.scene.contours().len())
+        })
+        .collect::<Vec<_>>();
     let strokes = items
         .iter()
         .flat_map(|item| {
@@ -58,7 +90,7 @@ pub(crate) fn apply_layer(
             frame_idx: frame,
             fps,
         },
-        &vec![None; strokes.len()],
+        &bases,
     )
     .map_err(|_| TextProducerError::Animator)?;
     let mut offset = 0;
