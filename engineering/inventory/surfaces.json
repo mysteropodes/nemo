@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "7635fcc09c6e70745e35ba0c46e9eebcfdff774d",
-  "describe": "v0.7.0-alpha.4-2598-g7635fcc0"
+  "head": "a9003995aace70266f4c14e04925e93906247e3d",
+  "describe": "v0.7.0-alpha.4-2602-ga9003995"
  },
- "inputsDigest": "444600a5e52619a699037d56db1e24f777599a00880fb92f3b266ffbe8c0401c",
+ "inputsDigest": "8ad873ceaf82a25854870fcde784c0c3f275e780a8d186f35b55a53f84357c55",
  "states": [
   "inventoried",
   "characterized",
@@ -376,7 +376,7 @@
   },
   "SMTutorial": {
    "file": "src/js/tutorial.js",
-   "line": 1869,
+   "line": 1872,
    "members": 0
   },
   "SMWorkspace": {
@@ -3457,7 +3457,7 @@
    "capability": "Discover Nemo — interactive tutorial",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/tutorial.js:1860"
+    "src/js/tutorial.js:1863"
    ],
    "events": [
     "click"
@@ -5850,7 +5850,7 @@
      "src/js/timeline.js:7854 openCommentPopover()",
      "src/js/timeline.js:7913 initCommentPopover()",
      "src/js/timeline.js:7936 initCommentPopover()",
-     "src/js/tutorial.js:1124 measure()"
+     "src/js/tutorial.js:1121 measure()"
     ]
    },
    "fixtures": [
@@ -7232,7 +7232,7 @@
     "functionsVisited": 2,
     "via": "variable fmtSel",
     "references": [
-     "src/js/tutorial.js:1160 measure()"
+     "src/js/tutorial.js:1157 measure()"
     ]
    },
    "fixtures": [
@@ -9603,7 +9603,7 @@
     "functionsVisited": 72,
     "via": "variable addBtn",
     "references": [
-     "src/js/tutorial.js:1313 check()"
+     "src/js/tutorial.js:1310 check()"
     ]
    },
    "fixtures": [
@@ -10874,7 +10874,7 @@
      "src/js/gradient-bridge.js:63 renderGradientPanel()",
      "src/js/timeline.js:8914 initFillGradientButton()",
      "src/js/timeline.js:8936 syncFillGradientButton()",
-     "src/js/tutorial.js:1272 check()"
+     "src/js/tutorial.js:1269 check()"
     ]
    },
    "fixtures": [
@@ -14546,7 +14546,7 @@
     "via": "variable nameEl",
     "references": [
      "src/js/adapters/settings-preferences-ui.js:40 syncProfileFields()",
-     "src/js/tutorial.js:1098 measure()"
+     "src/js/tutorial.js:1095 measure()"
     ]
    },
    "fixtures": []
