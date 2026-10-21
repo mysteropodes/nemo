@@ -668,6 +668,11 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "T08 Workspace/custom-brush/comments: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 155a1407a2c1d9afe831440327b84d10022039e8. Report SHA256 a2a67b703c295aa7f38f4a6700074bf7c3e025069bd4393fb409422a8baa3a2e. All existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_mask_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "T26/#2238 mask contract controls: derived only by the original buildBaseline from the complete actual cargo-llvm-cov report at 664958928e8a2f5962080434941172f025b3fed1. Report SHA256 df9ecde2f549df75c1ecf7b64cc1b62416f977d7a7c26d71c0780fdbbb2666e1. Every existing record, floor, aggregate total, exclusion and recorded provenance is preserved. No owner/installed/GPU acceptance is implied."
     }
   },
   "nativeObjectContractRegistration": {

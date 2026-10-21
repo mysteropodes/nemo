@@ -179,6 +179,9 @@ fn compile(
     source: ObjectFrameRecord<'_>,
     pose: Option<&PosedStroke>,
 ) -> Result<CompiledContour, &'static str> {
+    if source.record().is_mask() {
+        return crate::object_render_scene::mask_inputs::compile_mask(packet, source, pose);
+    }
     if source.record().has_enabled_effects() {
         return Err("per-element effect evaluation awaits its native scene consumer");
     }

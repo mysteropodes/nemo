@@ -138,6 +138,31 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectRecord {
+    /// Only the original true Path tag removes a vector from ordinary paint.
+    pub(crate) fn is_mask(&self) -> bool {
+        self.vector_ext
+            .value()
+            .and_then(|ext| ext.is_mask.value())
+            .copied()
+            .flatten()
+            == Some(true)
+    }
+    /// Authored spelling; add/subtract/intersect reduction belongs to rendering.
+    pub(crate) fn mask_mode(&self) -> Option<&str> {
+        self.vector_ext
+            .value()
+            .and_then(|ext| ext.mask_mode.value())
+            .and_then(Option::as_deref)
+    }
+    /// Authored finite value, including zero/negative; rendering takes max positive.
+    pub(crate) fn mask_feather(&self) -> Option<f64> {
+        self.vector_ext
+            .value()
+            .and_then(|ext| ext.mask_feather.value())
+            .and_then(Option::as_ref)
+            .and_then(Number::as_f64)
+    }
+
     pub(crate) fn effects(&self) -> Option<&[LayerEffect]> {
         self.effects.value().and_then(Option::as_deref)
     }

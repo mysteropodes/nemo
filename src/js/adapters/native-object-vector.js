@@ -83,6 +83,12 @@
       const at = target || {};
       return send(Contract.VECTOR, { command: 'object.vector.delete', stableTarget: stableTarget(at.layerUid, at.frame, at.strokeId) }, options, strokeFields);
     }
+    function editMask(target, maskEdit, options) {
+      const at = target || {};
+      return send(Contract.VECTOR, {
+        command: 'object.vector.mask.edit', stableTarget: stableTarget(at.layerUid, at.frame, at.strokeId), maskEdit,
+      }, options, strokeFields);
+    }
     function parametricSend(command, target, body, options) {
       const at = target || {};
       return send(Contract.PARAMETRIC, Object.assign({ command, stableTarget: stableTarget(at.layerUid, at.frame, at.strokeId) }, body), options);
@@ -97,7 +103,7 @@
       if (!map.ok) return Promise.resolve(mapped(map));
       return send(Contract.EFFECTS, { command: 'object.path.effects.set', layerUid, stack: map.stack }, options);
     }
-    return Object.freeze({ createStroke, replaceStroke, deleteStroke, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
+    return Object.freeze({ createStroke, replaceStroke, deleteStroke, editMask, setParametric, translateParametric, scaleParametric, setPathEffects, defaultEffect: Stroke.defaultsFor });
   }
 
   // Read-back validator: the record the owner returns for a target equals what was sent (numbers by value, the allocated

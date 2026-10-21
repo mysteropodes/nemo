@@ -75,7 +75,7 @@ pub(crate) fn document_text_v2(layers: &[(&str, String)]) -> String {
 pub(crate) fn layer_from(value: &Value) -> ObjectLayer {
     let mut layer = ObjectLayer::identified(value["layerUid"].as_str().unwrap().to_string());
     if let Some(mode) = value["matteMode"].as_str() {
-        layer.matte_mode = Presence::Present(mode.to_string());
+        layer.matte_mode = Presence::Present(Some(mode.to_string()));
     }
     if let Some(uid) = value["matteSourceLayerUid"].as_str() {
         layer.matte_source_layer_uid = Presence::Present(uid.to_string());

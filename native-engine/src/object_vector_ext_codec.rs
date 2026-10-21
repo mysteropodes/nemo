@@ -37,13 +37,17 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
             "vectorExt requires the editable-vector-path family",
         ));
     }
-    if ext.pressure.missing()
-        && ext.param_shape.missing()
-        && ext.box_angle.missing()
-        && ext.fill_gradient.missing()
-        && ext.fill_trace.missing()
-    {
+    if ext.is_empty() {
         return Err(invalid("an empty vectorExt must be omitted"));
+    }
+    // Keep authored null/default/unknown mode spelling under existing ingress limits.
+    if ext
+        .mask_feather
+        .value()
+        .and_then(Option::as_ref)
+        .is_some_and(|feather| finite(feather).is_none())
+    {
+        return Err(invalid("maskFeather must be finite"));
     }
     if ext.fill_trace.value().is_some_and(|trace| !trace.valid()) {
         return Err(invalid("invalid fill trace provenance"));

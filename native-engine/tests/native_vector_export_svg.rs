@@ -280,3 +280,65 @@ fn empty_plan_is_the_bare_wrapper() {
     assert!(parse(&frame.bytes).unwrap().paths.is_empty());
     verify(&parse(&frame.bytes).unwrap(), &input, (64, 48)).unwrap();
 }
+
+#[test]
+fn actual_stored_masks_refuse_svg_measurement_and_serialization_before_subset_output() {
+    use crate::object_codec::encode_storage_project;
+    let mut value = default_document();
+    for record in value["objects"].as_array_mut().unwrap() {
+        if record["target"]["layerUid"] != "L0" {
+            continue;
+        }
+        record["family"] = json!("editable-vector-path");
+        record["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":1,
+            "strokeCap":"butt","strokeJoin":"miter","miterLimit":10,"dashOffset":0,"opacity":0});
+        record["vectorExt"] = json!({"isMask":true,"maskMode":"intersect"});
+    }
+    let original = owner("svg-real-mask-exit", &value);
+    let snapshot = original.acquire_snapshot(0).unwrap();
+    let before = encode_storage_project(snapshot.document()).unwrap();
+    let input = plan(&snapshot, 7);
+    assert_eq!(input.mask_inputs().layer(1).unwrap().masks().len(), 3);
+    assert_eq!(
+        input.commands().len(),
+        2,
+        "never serialize the remaining unmasked subset"
+    );
+    let expected = SvgExportError::Unsupported {
+        source_object_index: 2,
+        reason: "native vector masks have no SVG representation",
+    };
+    assert_eq!(measure_svg_frame(&input, size(64, 48)), Err(expected));
+    assert_eq!(
+        serialize_svg_frame(&input, size(64, 48)).unwrap_err(),
+        expected
+    );
+    // Even a one-byte cap must see mask admission before counting any header.
+    let tiny = SvgFrameSpec::new(64, 48, 1).unwrap();
+    assert_eq!(measure_svg_frame(&input, tiny), Err(expected));
+    assert_eq!(serialize_svg_frame(&input, tiny).unwrap_err(), expected);
+    assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+    assert_eq!(
+        (original.content_revision(), original.history_depths()),
+        (0, (0, 0))
+    );
+}
+
+#[test]
+fn actual_zero_mask_document_keeps_the_original_svg_bytes_and_measurement() {
+    let original = owner("svg-zero-mask-exit", &single_curve_document());
+    let snapshot = original.acquire_snapshot(0).unwrap();
+    let input = plan(&snapshot, 7);
+    assert!(input.mask_inputs().layers().is_empty());
+    assert_eq!(
+        measure_svg_frame(&input, size(64, 48)),
+        Ok(SINGLE_CURVE_LEN)
+    );
+    let frame = serialize_svg_frame(&input, size(64, 48)).unwrap();
+    assert_eq!(frame.bytes.as_slice(), SINGLE_CURVE_DOC.as_bytes());
+    assert_eq!(frame.path_count, 1);
+    assert_eq!(
+        (original.content_revision(), original.history_depths()),
+        (0, (0, 0))
+    );
+}

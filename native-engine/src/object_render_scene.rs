@@ -38,6 +38,8 @@ pub use scheduled::{
 pub(crate) mod raster_scene;
 pub(crate) use paint::raster::{ordered_entries, PaintEntry, PaintIndex};
 pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
+#[path = "object_mask_inputs.rs"]
+pub(crate) mod mask_inputs;
 #[path = "object_paint_plan.rs"]
 mod paint;
 // L07-F (#2113): contour scene producer joined through the L07-C pin registry.

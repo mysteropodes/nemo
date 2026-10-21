@@ -174,13 +174,19 @@ fn every_baseline_import_row_has_its_pinned_native_disposition() {
 fn absent_default_null_and_explicit_values_stay_distinct_through_the_codec() {
     let text = document_text(&[
         layer_text("A", "{}"),
+        layer_text("N", r#"{"blendMode":null,"matteMode":null}"#),
         layer_text(
             "B",
             r#"{"blendMode":"normal","matteMode":"none","isEffectLayer":false,"effects":[{"type":"blur","enabled":true,"p1":0,"p2":null}]}"#,
         ),
     ]);
     let doc = decode_project(text.as_bytes()).unwrap();
-    let (a, b) = (&doc.layers[0], &doc.layers[1]);
+    let (a, n, b) = (&doc.layers[0], &doc.layers[1], &doc.layers[2]);
+    assert!(a.blend_mode.missing() && a.matte_mode.missing());
+    assert_eq!(n.blend_mode.value(), Some(&None));
+    assert_eq!(n.matte_mode.value(), Some(&None));
+    assert_eq!((n.blend_mode(), n.matte_mode()), (None, None));
+    assert!(!n.matte_on());
     assert_eq!((a.blend_mode(), b.blend_mode()), (None, Some("normal")));
     assert_eq!((a.matte_mode(), b.matte_mode()), (None, Some("none")));
     assert!(a.is_effect_layer.missing() && !b.is_effect_layer.missing());
@@ -261,8 +267,8 @@ fn admission_refusals_have_typed_kinds_and_nothing_is_rewritten() {
         (r#""isEffectLayer":true,"isFolderLayer":true"#, Invalid),
         (r#""folderCollapsed":false"#, Invalid),
         (r#""isFolderLayer":false,"folderCollapsed":false"#, Invalid),
-        (r#""blendMode":null"#, Invalid),
-        (r#""matteMode":null"#, Invalid),
+        (r#""blendMode":4"#, Invalid),
+        (r#""matteMode":false"#, Invalid),
         (r#""effects":null"#, Invalid),
         (r#""isEffectLayer":null"#, Invalid),
         (r#""blendMode":"a","blendMode":"b""#, Invalid),
