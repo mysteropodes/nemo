@@ -247,6 +247,7 @@ impl Compositor {
                 "native duplicator layered effects await their shared paint join",
             ));
         }
+        raster::refuse_layered_video(plan)?;
         if !stack.covers_plan(plan) {
             return Err(CompositorError::new(
                 "layer stack does not cover the composition plan",
@@ -325,7 +326,7 @@ impl Compositor {
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         if let Some((image, transform, opacity)) = prepared.reference_image() {
             // Retain identity before fallible rendering, including error/unwind.
-            self.retained_object_reference = Some(prepared.clone());
+            self.retained_object_reference = Some(prepared.without_media());
             // Vello 0.9's solid-only resolve replaces the atlas with a 1x1
             // texture but retains image residency. Restore each image when it
             // becomes active after export, hiding or another image; undo may

@@ -291,6 +291,9 @@ mod tests_decode;
 mod tests_export_port;
 #[cfg(test)]
 mod tests_indexed;
+// T12 / #2232 point 6: real sources through the native host (Metal + sidecar).
+#[cfg(all(test, target_os = "macos"))]
+mod tests_native_media_host;
 #[cfg(test)]
 mod tests_perf;
 #[cfg(test)]

@@ -148,6 +148,14 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object export snapshot is unavailable")?;
+        // Bound the exact original request before any media, guest or artifact work.
+        if frames.is_empty()
+            || frames.len() > native_engine::export_job::MAX_OBJECT_EXPORT_FRAMES
+            || frames.first() != Some(&expected.frame)
+            || frames.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err("native object export frames are invalid".into());
+        }
         // T12: every drawn video is preflighted (typed MissingLink) before
         // staging; its decoded frames are released once the witnesses are gone.
         let mut decoder = crate::native_dispatch::video::video_decoder();
@@ -183,14 +191,6 @@ impl NativeObjectHost {
                 .map_err(|error| format!("object export witness: {error:?}"))?;
             media.witness(frame, base)
         };
-        // Bound the exact original request before any guest or artifact work.
-        if frames.is_empty()
-            || frames.len() > native_engine::export_job::MAX_OBJECT_EXPORT_FRAMES
-            || frames.first() != Some(&expected.frame)
-            || frames.windows(2).any(|pair| pair[0] >= pair[1])
-        {
-            return Err("native object export frames are invalid".into());
-        }
         // Visit every actual requested frame once before staging. A later
         // timeout cannot leave an earlier artifact published or lose its effects.
         let mut prepared = std::collections::BTreeMap::new();

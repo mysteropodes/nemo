@@ -514,5 +514,8 @@ pub fn declared_scene_resources(witness: &ObjectCompositionWitness) -> Vec<(Stri
 mod tests;
 
 #[cfg(test)]
+#[path = "../tests/native_media_retained_witness.rs"]
+mod retained_witness_tests;
+#[cfg(test)]
 #[path = "../tests/native_media_frame_export_timing.rs"]
 mod timing_tests;

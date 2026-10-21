@@ -370,4 +370,35 @@ impl crate::object_render_scene::ObjectCompositionWitness {
     pub(crate) fn video_image(&self, index: usize) -> Option<(&ImageData, Affine, f32)> {
         self.media.as_ref()?.draw(index)
     }
+
+    /// This witness without its decoded video, for a cache that outlives the frame
+    /// (the compositor's retained raster/reference identity). Its readers compare
+    /// only reference and raster identity, and a decoder lease held there would keep
+    /// the media gate from finishing, blocking every later preview and export.
+    pub(crate) fn without_media(&self) -> Self {
+        let mut retained = self.clone();
+        if retained.media.take().is_some() {
+            retained.resources = retained.resources.take().and_then(|set| {
+                let kept: Vec<_> = set
+                    .entries()
+                    .iter()
+                    .filter(|entry| entry.kind() != SceneResourceKind::Media)
+                    .map(|entry| {
+                        crate::object_render_scene::scene_effect_kernels::object_scene_resource_set::SceneResourceEntry::new(
+                            entry.resource_id(),
+                            entry.version(),
+                            entry.kind(),
+                            entry.charged_bytes(),
+                            Arc::clone(entry.retention()),
+                        )
+                    })
+                    .collect();
+                // A subset of a valid set stays valid; an empty one is no set.
+                (!kept.is_empty())
+                    .then(|| ObjectSceneResourceSet::new(kept).ok().map(Arc::new))
+                    .flatten()
+            });
+        }
+        retained
+    }
 }
