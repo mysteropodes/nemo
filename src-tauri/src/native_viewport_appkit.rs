@@ -172,18 +172,34 @@ fn create_surface(
     .map_err(|error| NativeViewportError::new(format!("create AppKit surface: {error}")))
 }
 
+// The retained compositor output and the final attachment share this selector.
+impl NativeViewport {
+    pub(crate) fn select_surface_format(
+        formats: &[wgpu::TextureFormat],
+    ) -> Result<wgpu::TextureFormat, NativeViewportError> {
+        // The retained Rgba8Unorm target already contains encoded sRGB bytes.
+        // TextureBlitter samples them unchanged; an sRGB attachment would encode
+        // those values a second time. Keep an 8-bit normalized attachment.
+        [
+            wgpu::TextureFormat::Bgra8Unorm,
+            wgpu::TextureFormat::Rgba8Unorm,
+        ]
+        .into_iter()
+        .find(|format| formats.contains(format))
+        .ok_or_else(|| {
+            NativeViewportError::new(
+                "native surface has no byte-preserving 8-bit unorm texture format",
+            )
+        })
+    }
+}
+
 fn surface_contract(
     surface: &wgpu::Surface<'_>,
     adapter: &wgpu::Adapter,
 ) -> Result<(wgpu::TextureFormat, wgpu::CompositeAlphaMode), NativeViewportError> {
     let capabilities = surface.get_capabilities(adapter);
-    let format = capabilities
-        .formats
-        .iter()
-        .copied()
-        .find(wgpu::TextureFormat::is_srgb)
-        .or_else(|| capabilities.formats.first().copied())
-        .ok_or_else(|| NativeViewportError::new("native surface has no texture format"))?;
+    let format = NativeViewport::select_surface_format(&capabilities.formats)?;
     let alpha_mode = capabilities
         .alpha_modes
         .iter()
