@@ -259,7 +259,7 @@ function fixture(previewFixtures = PREVIEWS) {
 
 function installOrdinaryOpen(f, context) {
   const { root, state, nodes } = f;
-  const effects = [], diagnostics = [];
+  const effects = [], diagnostics = [], cameraObservations = [];
   const meta = { tabId: null, path: null, name: 'Untitled' };
   // These are the lower project.js tab/recents/start-screen DOM boundaries.
   // Actual SavedUI.bindProjectUI -> Files.bind -> File.create/enter owns Open,
@@ -281,7 +281,9 @@ function installOrdinaryOpen(f, context) {
     markSaved: forbidden('legacy saved marker'), remember: forbidden('legacy autosave'),
     isDirty: () => true, invalidate: forbidden('unexpected save invalidation')
   });
-  root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__ = (event, code) => diagnostics.push([event, code]);
+  root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__ = (event, code) => {
+    (event === 'camera-control' || event === 'camera-presented' ? cameraObservations : diagnostics).push([event, code]);
+  };
   root.nativeInactiveTabs = { openPath: forbidden('inactive project branch') };
   root.inactiveEntry = { openPath: forbidden('inactive opacity branch') };
   const project = read('project.js');
@@ -290,7 +292,7 @@ function installOrdinaryOpen(f, context) {
     extractFunction(project, 'tauriOk') + '\nasync ' + extractFunction(project, 'openPath'),
   context, { filename: 'src/js/project.js:ordinary-openPath' });
   root.SMProject.openPath = root.openPath;
-  return { effects, diagnostics, meta };
+  return { effects, diagnostics, cameraObservations, meta };
 }
 
 function installActualCutoverRouter(root, session) {
@@ -338,6 +340,8 @@ test('composed native Camera initialization keeps one lock through actual Next n
     assert.equal(nodes['btn-camera'].hidden, false);
     assert.equal(nodes['btn-camera'].getAttribute('aria-pressed'), 'false');
     f.record('opened-canvas-zero');
+    assert.deepEqual(opened.cameraObservations.filter(([event]) => event === 'camera-control'), []);
+    assert.deepEqual(opened.cameraObservations.at(-1), ['camera-presented', 'canvas']);
 
     // Once ordinary Open has projected UI, legacy persistent camera writes fail.
     for (const key of ['cameraKeys', 'cameraLayerOn']) {
@@ -365,6 +369,11 @@ test('composed native Camera initialization keeps one lock through actual Next n
     await lockPaint;
     assert.equal(nodes['btn-camera'].hidden, false);
     f.record('locked-zero');
+    // Selection witnesses the completed synchronous assignment path; presented
+    // reports correlated completion mode, without proving native pixels or frame.
+    assert.deepEqual(opened.cameraObservations.filter(([event]) => event === 'camera-control'),
+      [['camera-control', 'selected-stored-camera']]);
+    assert.deepEqual(opened.cameraObservations.at(-1), ['camera-presented', 'stored-camera']);
     for (let frame = 1; frame <= 4; frame++) {
       const navigationPaint = f.waitForNavigationPaint(), policyPaint = f.waitForPolicyPaint();
       nodes['btn-nf'].dispatch('click'); // actual listener -> goToFrame -> cutover -> Project
@@ -383,6 +392,7 @@ test('composed native Camera initialization keeps one lock through actual Next n
       assert.equal(shown.presentation.frame, frame);
       assert.equal(shown.presentation.view.mode, 'stored-camera');
       f.record('locked-next-' + frame);
+      assert.deepEqual(opened.cameraObservations.at(-1), ['camera-presented', 'stored-camera']);
     }
     const final = session.readPresentedObjectSession().presentation;
     assert.deepEqual(plain(final.view.documentToComposition), [2, 0, 0, 2, -160, -90]);
@@ -416,7 +426,7 @@ for (const [label, replies] of [['false', UNAVAILABLE_PREVIEWS], ['absent', ABSE
       assert.notEqual(before.presentation.view.cameraAvailable, true);
       assert.equal(nodes['btn-camera'].hidden, true);
       assert.equal(nodes['btn-camera'].getAttribute('aria-pressed'), 'false');
-      const calls = f.calls.length;
+      const calls = f.calls.length, completed = opened.cameraObservations.slice();
       // Programmatically dispatch to test the actual handler's refusal too;
       // a real hidden DOM control is not asserted to be user-clickable.
       assert.deepEqual(nodes['btn-camera'].dispatch('click'), [undefined]);
@@ -424,6 +434,7 @@ for (const [label, replies] of [['false', UNAVAILABLE_PREVIEWS], ['absent', ABSE
       assert.equal(state.cameraView, false);
       assert.equal(nodes['btn-camera'].getAttribute('aria-pressed'), 'false');
       assert.equal(f.calls.length, calls, 'refusal must request no preview or mutation');
+      assert.deepEqual(opened.cameraObservations, [...completed, ['camera-control', 'native-refused']]);
       assert.equal(f.previewCount(), 2);
       assert.strictEqual(session.info().contentRevision, 0);
       assert.deepEqual(plain(session.readPresentedObjectSession()), plain(before));
