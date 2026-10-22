@@ -12,7 +12,10 @@
 //! the no-op: it publishes nothing and reports the unchanged head. No history, receipt or id state
 //! lives here.
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{ObjectDocument, ProjectEnvelope};
+use crate::object_document::{
+    AuthoredOrder, FrameScopeKind, ObjectDocument, ObjectTarget, OrderContext, OrderElement,
+    OrderLayer, OrderPlan, OrderScope, Presence, ProjectEnvelope,
+};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::{json, Value};
@@ -200,5 +203,206 @@ impl ObjectFillOwner {
                 .publish(document)
                 .map_err(|_| DispatchErrorCode::Unavailable),
         }
+    }
+}
+
+// Materialize only the admitted origin's natural stack, never a read default.
+#[cfg(feature = "project_media_codec")]
+fn natural_import_order(document: &ObjectDocument) -> Result<OrderPlan, DispatchErrorCode> {
+    let empty = || AuthoredOrder {
+        static_value: Presence::Missing,
+        track: Presence::Missing,
+        expression: Presence::Missing,
+    };
+    let layers = document
+        .layers
+        .iter()
+        .enumerate()
+        .map(|(index, layer)| {
+            Ok(OrderLayer {
+                layer_uid: layer.layer_uid().to_owned(),
+                natural_position: u32::try_from(index)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?,
+                order: empty(),
+            })
+        })
+        .collect::<Result<Vec<_>, DispatchErrorCode>>()?;
+    let mut plan = OrderPlan {
+        format: "nemo.native-object-order-plan".into(),
+        format_version: 1,
+        document_format_version: 2,
+        migration: "explicit-plan-required".into(),
+        reference_policy: "unresolved".into(),
+        contexts: vec![OrderContext {
+            context_id: "scene-root".into(),
+            layers: layers.clone(),
+            scopes: Vec::new(),
+        }],
+    };
+    let targets = document
+        .objects
+        .iter()
+        .map(|record| &record.target)
+        .chain(
+            document
+                .item_records()
+                .into_iter()
+                .flat_map(|items| items.targets()),
+        )
+        .filter(|target| target.frame_scope.kind == FrameScopeKind::Authored);
+    for target in targets {
+        if !plan
+            .contexts
+            .iter()
+            .any(|context| context.context_id == target.context_id)
+        {
+            plan.contexts.push(OrderContext {
+                context_id: target.context_id.clone(),
+                layers: layers.clone(),
+                scopes: Vec::new(),
+            });
+        }
+        append_import_order(&mut plan, target)?;
+    }
+    Ok(plan)
+}
+
+#[cfg(feature = "project_media_codec")]
+fn append_import_order(
+    plan: &mut OrderPlan,
+    target: &ObjectTarget,
+) -> Result<(), DispatchErrorCode> {
+    let invalid = DispatchErrorCode::InvalidRequest;
+    let context = plan
+        .contexts
+        .iter_mut()
+        .find(|context| context.context_id == target.context_id)
+        .ok_or(invalid)?;
+    let index = match context
+        .scopes
+        .iter()
+        .position(|scope| scope.frame_scope == target.frame_scope)
+    {
+        Some(index) => index,
+        None => {
+            let index = context
+                .scopes
+                .iter()
+                .position(|scope| scope.frame_scope.frame > target.frame_scope.frame)
+                .unwrap_or(context.scopes.len());
+            context.scopes.insert(
+                index,
+                OrderScope {
+                    frame_scope: target.frame_scope.clone(),
+                    elements: Vec::new(),
+                },
+            );
+            index
+        }
+    };
+    let scope = &mut context.scopes[index];
+    let position = scope
+        .elements
+        .iter()
+        .filter(|element| element.layer_uid == target.layer_uid)
+        .count();
+    scope.elements.push(OrderElement {
+        layer_uid: target.layer_uid.clone(),
+        stroke_id: target.stroke_id.clone(),
+        natural_position: u32::try_from(position).map_err(|_| invalid)?,
+        order: AuthoredOrder {
+            static_value: Presence::Missing,
+            track: Presence::Missing,
+            expression: Presence::Missing,
+        },
+    });
+    Ok(())
+}
+
+impl ObjectFillOwner {
+    /// Existing validated v1-to-v2 migration, confined to explicit import order.
+    /// The origin's natural records precede all new records; layer order is exact.
+    #[cfg(feature = "project_media_codec")]
+    fn migrate_import_object_order(
+        origin: &ObjectSnapshot,
+        mut document: ObjectDocument,
+        targets: &[ObjectTarget],
+    ) -> Result<ObjectDocument, DispatchErrorCode> {
+        let invalid = DispatchErrorCode::InvalidRequest;
+        let before = origin.document();
+        if before.format_version != 1
+            || document.format_version != 1
+            || !before.composition_order.missing()
+            || !document.composition_order.missing()
+        {
+            return Err(invalid);
+        }
+        let mut plan = natural_import_order(before)?;
+        for context in &mut plan.contexts {
+            for (index, layer) in document.layers.iter().enumerate().skip(before.layers.len()) {
+                context.layers.push(OrderLayer {
+                    layer_uid: layer.layer_uid().to_owned(),
+                    natural_position: u32::try_from(index).map_err(|_| invalid)?,
+                    order: AuthoredOrder {
+                        static_value: Presence::Missing,
+                        track: Presence::Missing,
+                        expression: Presence::Missing,
+                    },
+                });
+            }
+        }
+        for target in targets {
+            append_import_order(&mut plan, target)?;
+        }
+        // Keep both sides of the explicit v1-to-v2 transition on the existing
+        // immutable drawing admission path. The command owner builds the plan;
+        // the read query validates each detached document without owning it.
+        ObjectSnapshot::validate_drawing(&document)
+            .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        document.format_version = 2;
+        document.composition_order = Presence::Present(plan);
+        ObjectSnapshot::validate_drawing(&document)
+            .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        Ok(document)
+    }
+
+    /// Sealing permits only the same natural origin prefix during explicit migration.
+    #[cfg(feature = "project_media_codec")]
+    fn import_order_migration_preserves_origin(
+        origin: &ObjectSnapshot,
+        after: &ObjectDocument,
+    ) -> bool {
+        let before = origin.document();
+        if before.format_version != 1
+            || after.format_version != 2
+            || !before.composition_order.missing()
+        {
+            return false;
+        }
+        let (Ok(expected), Presence::Present(actual)) =
+            (natural_import_order(before), &after.composition_order)
+        else {
+            return false;
+        };
+        actual.format == expected.format
+            && actual.format_version == expected.format_version
+            && actual.document_format_version == expected.document_format_version
+            && actual.migration == expected.migration
+            && actual.reference_policy == expected.reference_policy
+            && expected.contexts.iter().all(|context| {
+                actual
+                    .contexts
+                    .iter()
+                    .find(|next| next.context_id == context.context_id)
+                    .is_some_and(|next| {
+                        next.layers.starts_with(&context.layers)
+                            && context.scopes.iter().all(|scope| {
+                                next.scopes
+                                    .iter()
+                                    .find(|next| next.frame_scope == scope.frame_scope)
+                                    .is_some_and(|next| next.elements.starts_with(&scope.elements))
+                            })
+                    })
+            })
     }
 }

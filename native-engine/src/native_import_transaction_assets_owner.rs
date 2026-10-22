@@ -46,7 +46,7 @@ pub(super) fn order_preserved(
         (Presence::Present(_), Presence::Missing) if explicit_order => {
             #[cfg(feature = "project_media_codec")]
             {
-                origin.import_order_migration_preserves_origin(after)
+                ObjectFillOwner::import_order_migration_preserves_origin(origin, after)
             }
             #[cfg(not(feature = "project_media_codec"))]
             {
@@ -116,7 +116,7 @@ impl ObjectFillOwner {
         if document.composition_order.missing() {
             #[cfg(feature = "project_media_codec")]
             {
-                return origin.migrate_import_object_order(document, targets);
+                return Self::migrate_import_object_order(origin, document, targets);
             }
             #[cfg(not(feature = "project_media_codec"))]
             {

@@ -61,6 +61,8 @@
         "src/native_brush_resource_contract_tests.rs",
         "src/native_media_export_contract.rs",
         "src/native_media_export_contract_tests.rs",
+        "src/native_import_asset_contract.rs",
+        "src/native_import_asset_contract_tests.rs",
         "src/native_import_contract.rs",
         "src/native_import_contract_tests.rs",
         "src/native_object_edit_contract.rs",
