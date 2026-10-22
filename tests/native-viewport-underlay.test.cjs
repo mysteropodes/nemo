@@ -254,3 +254,94 @@ test('Desktop completion paints its own bound camera lock without calling the le
  assert.equal(buttons['btn-camera'].hidden,false);assert.equal(buttons['btn-camera']['aria-pressed'],'false');
  assert.equal(buttons['btn-camera'].title,'titleCameraViewLockHint');assert.deepEqual(events,[info,'policy']);
 });
+
+
+test('actual no-move Zoom click after a real frame4 Canvas relock presents the original 1.25 affine once',async()=>{
+ const Project=require('../src/js/adapters/native-object-project.js'),f=navigationSourceHarness();
+ const toolbar=cameraToolbarRoot(),buttons=toolbar.buttons,root=f.root,calls=[],errors=[];
+ const canvas=root.document.getElementById('canvas-area'),pill={value:'500'};
+ canvas.getBoundingClientRect=()=>({left:66,top:102,right:866,bottom:552,width:800,height:450});
+ const nodes={...buttons,'drawing-canvas':canvas,'canvas-area':canvas,'zoom-scrub':pill};
+ root.document.getElementById=id=>nodes[id]||null;
+ Object.assign(root,{SM:toolbar.root.SM,NemoNativeViewportUnderlay:toolbar.root.NemoNativeViewportUnderlay,devicePixelRatio:2});
+ Object.assign(root.state,{cameraView:false,currentFrame:4,tool:'zoom'});
+ Object.defineProperty(root,'paper',{get(){assert.fail('native click must not read or mutate Paper');}});
+ f.context.showToast=message=>errors.push(message);
+ function frozen(value){
+  if(value&&typeof value==='object'){Object.values(value).forEach(frozen);Object.freeze(value);}
+  return value;
+ }
+ const pin=frozen({apiVersion:2,instanceId:'click-instance',documentId:'click-document',lifecycleGeneration:1,
+  contentRevision:0,documentSnapshotId:'click-snapshot',documentDigest:'a'.repeat(64),byteCount:4269,
+  canvasW:320,canvasH:180,fps:24,totalFrames:21,layers:[],reference:null,undoDepth:0,redoDepth:0});
+ const canvasView=frozen({mode:'canvas',cameraAvailable:true,navigation:{zoom:1,pan:[0,0]},
+  documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]});
+ const lockedView=frozen({mode:'stored-camera',cameraAvailable:true,navigation:{zoom:1,pan:[0,0]},
+  documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]});
+ const zoomedView=frozen({mode:'stored-camera',cameraAvailable:true,navigation:{zoom:1.25,pan:[0,0]},
+  documentToComposition:[2.5,0,0,2.5,-240,-135],compositionToDocument:[.4,0,0,.4,96,54]});
+ // Closed literal native receipts: no matrix or navigation is derived from a request.
+ const replies=frozen([
+  {status:'presented',workId:'click-open',viewGeneration:1,view:canvasView},
+  {status:'presented',workId:'click-initial-lock',viewGeneration:1,view:lockedView},
+  {status:'presented',workId:'click-canvas',viewGeneration:1,view:canvasView},
+  {status:'presented',workId:'click-relock',viewGeneration:1,view:lockedView},
+  {status:'presented',workId:'click-zoom',viewGeneration:1,view:zoomedView}
+ ]);
+ let installed=false,previewIndex=0;
+ async function invoke(command,args){
+  const request=args&&JSON.parse(args.requestJson);calls.push({command,request});
+  if(command==='nemo_native_object_client_status')return {...pin,available:installed};
+  if(command==='nemo_native_object_bootstrap'){
+   assert.equal(request.sourcePath,'/Camera-view.json');assert.equal(request.projectOnly,true);
+   installed=true;return {...pin,requestId:request.requestId,resourceCount:0,viewportAvailable:false};
+  }
+  if(command==='nemo_native_object_reference'){
+   assert.deepEqual(request.action,{kind:'inspect'});return {...pin,requestId:request.requestId};
+  }
+  assert.equal(command,'nemo_native_object_preview');
+  assert.equal(request.frame,4);assert.equal(request.contentRevision,0);
+  assert.equal(request.documentSnapshotId,'click-snapshot');assert.equal(request.lifecycleGeneration,1);
+  assert.equal(request.instanceId,'click-instance');assert.equal(request.documentId,'click-document');
+  assert.deepEqual(request.viewport,{cssBounds:{x:66,y:102,width:800,height:450},
+   physicalExtent:{width:1600,height:900},compositionExtent:{width:320,height:180},reportedDpr:2});
+  const reply=replies[previewIndex++];assert.ok(reply,'only the five original preview intents are admitted');
+  assert.equal(request.viewMode||'canvas',reply.view.mode);
+  if(previewIndex===5)assert.deepEqual(request.navigation,{zoom:1.25,pan:[0,0]});
+  else assert.equal(Object.hasOwn(request,'navigation'),false);
+  return reply;
+ }
+ const underlay=desktop(root),session=Project.create({invoke,frame:()=>root.state.currentFrame,
+  mapping:info=>underlay.mapping(info),viewMode:()=>root.state.cameraView?'stored-camera':'canvas',
+  presented:()=>CameraDesktop.renderCameraViewLock(root)});
+ root.NemoNativeObjectProject={desktop:()=>session};root.__TAURI__={core:{invoke}};
+ CameraDesktop.bindCameraUI(root,{toggle:()=>assert.fail('legacy camera toggle'),
+  addKey:()=>assert.fail('legacy camera key'),editEase:()=>assert.fail('legacy camera easing')});
+ await session.openPath('/Camera-view.json');
+ assert.equal(session.readPresentedObjectSession().presentation.frame,4);
+ assert.equal(session.readPresentedObjectSession().presentation.view.mode,'canvas');
+ await buttons['btn-camera'].click();
+ assert.equal(session.readPresentedObjectSession().presentation.view.mode,'stored-camera');
+ await buttons['btn-camera'].click();
+ assert.equal(session.readPresentedObjectSession().presentation.view.mode,'canvas');
+ await buttons['btn-camera'].click();
+ assert.equal(buttons['btn-camera']['aria-pressed'],'true');assert.equal(previewIndex,4);
+ assert.deepEqual(session.readPresentedObjectSession().presentation.view,lockedView);
+ const info=session.info(),source=JSON.stringify(info);
+ f.listeners.pointerdown(f.event({clientX:466,clientY:327}));
+ assert.equal(previewIndex,4,'pointerdown alone does not apply the click step');
+ f.listeners.pointerup(f.event({type:'pointerup',clientX:466,clientY:327}));
+ assert.equal(session.readPresentedObjectSession(),null,'the real pending frame hides the old public proof');
+ // Drain completion of this one real session request, without another gesture or preview.
+ await new Promise(resolve=>setImmediate(resolve));
+ const shown=session.readPresentedObjectSession();assert.ok(shown);
+ assert.equal(previewIndex,5);assert.equal(shown.presentation.frame,4);
+ assert.deepEqual(shown.presentation.view,zoomedView);
+ assert.deepEqual(shown.presentation.view.documentToComposition,[2.5,0,0,2.5,-240,-135]);
+ assert.equal(pill.value,625);assert.equal(root.state.isPanning,false);
+ assert.strictEqual(session.info(),info);assert.equal(JSON.stringify(session.info()),source);
+ assert.deepEqual([info.contentRevision,info.undoDepth,info.redoDepth],[0,0,0]);
+ assert.deepEqual(errors,[]);assert.deepEqual(f.calls,[],'no stub navigation provider was used');
+ assert.equal(calls.filter(call=>call.command==='nemo_native_object_preview').length,5);
+ assert.equal(calls.some(call=>call.command.includes('dispatch')||call.command.includes('export')),false);
+});
