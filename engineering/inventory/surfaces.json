@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "459da93f49f0ff3b44771abe2be0f0c271be7917",
-  "describe": "v0.7.0-alpha.4-2888-g459da93f-dirty"
+  "head": "567597f5567192821a0e9aff787dc9ed20982c31",
+  "describe": "v0.7.0-alpha.4-2891-g567597f5-dirty"
  },
- "inputsDigest": "d9748842a99645549b877f7b04a5d6fc9fb66610ed9c3b749a32cabd5e46d331",
+ "inputsDigest": "0234d08f6f4d4d366ac164bad2a3e31f897f081046e64cc7d7ecfa4163c0b280",
  "states": [
   "inventoried",
   "characterized",
@@ -376,7 +376,7 @@
   },
   "SMVectorText": {
    "file": "src/js/vector-text-bridge.js",
-   "line": 417,
+   "line": 421,
    "members": 3
   }
  },
@@ -584,7 +584,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 137,
+    "functionsVisited": 142,
     "via": "variable input",
     "references": []
    },
@@ -11914,7 +11914,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 17,
+    "functionsVisited": 18,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6340 paintFillSwatches()"
@@ -23112,7 +23112,7 @@
    "source": "src/js/labs/command-palette.js:35",
    "meta": {
     "i18n": "labsCmdUndo",
-    "functionsVisited": 13
+    "functionsVisited": 14
    },
    "fixtures": []
   },
@@ -23142,7 +23142,7 @@
    "source": "src/js/labs/command-palette.js:36",
    "meta": {
     "i18n": "labsCmdRedo",
-    "functionsVisited": 13
+    "functionsVisited": 14
    },
    "fixtures": []
   },
