@@ -2512,6 +2512,18 @@
       ]
     },
     {
+      "id": "app.native.import.diagnostic.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-diagnostic.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-diagnostic.js"
+      ]
+    },
+    {
       "id": "app.native.import.desktop.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
