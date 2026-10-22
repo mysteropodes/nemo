@@ -205,7 +205,9 @@ pub(super) fn animated_duplicate_drawing() -> Value {
 
 pub(super) fn component_timed_drawing() -> Value {
     let mut value = component_drawing();
+    // Timing records retain the drawing family's local scene-root marker inside components;
+    // the containing component and frame selector supply the actual context identity.
     value["componentTables"]["components"]["components"][0]["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
-            "contextId":"component-A","keys":[{"frame":0},{"frame":1},{"frame":2}],"samples":[]});
+            "contextId":"scene-root","keys":[{"frame":0},{"frame":1},{"frame":2}],"samples":[]});
     value
 }
