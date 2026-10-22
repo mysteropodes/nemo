@@ -2,7 +2,6 @@
 //! Resolve native mixed slots and full targets here; the parent owns strict request parsing,
 //! detached transaction preparation and writeback. Only narrow member projections cross the
 //! read-queries port; no document, snapshot or owner crosses that boundary.
-use super::ROOT;
 use crate::object_document::{
     FrameScopeKind, ImageMeshStore, MeshIdSequence, ObjectDocument, ObjectLayer, ObjectRecord,
     ObjectTarget,
@@ -12,6 +11,8 @@ use crate::object_snapshot::object_image_mesh_edit_read::{
 };
 use crate::request_receipts::DispatchErrorCode;
 use std::collections::{BTreeMap, HashMap, HashSet};
+
+const ROOT: &str = "scene-root";
 
 struct Context<'a> {
     id: &'a str,

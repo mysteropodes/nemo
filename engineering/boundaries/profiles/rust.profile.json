@@ -1503,6 +1503,7 @@
         "object_image_mesh_edit_retopology.rs",
         "object_image_mesh_edit_controls.rs",
         "object_image_mesh_binding_history.rs",
+        "object_image_mesh_binding_transactions.rs",
         "object_image_mesh_binding_fixtures.rs",
         "object_image_mesh_binding_provenance.rs",
         "object_raster_asset_placement.rs",

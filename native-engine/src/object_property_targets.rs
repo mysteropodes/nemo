@@ -97,13 +97,15 @@ impl PropertyHolder {
         {
             return false;
         }
-        self.mesh_source = crate::object_document::Presence::Present(super::MeshSource {
-            mesh_id: self
-                .target
-                .stroke_id()
-                .expect("actual bound mesh")
-                .to_owned(),
-        });
+        self.mesh_source = crate::object_document::Presence::Present(
+            crate::object_document::properties::MeshSource {
+                mesh_id: self
+                    .target
+                    .stroke_id()
+                    .expect("actual bound mesh")
+                    .to_owned(),
+            },
+        );
         true
     }
 

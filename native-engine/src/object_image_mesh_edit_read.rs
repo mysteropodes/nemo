@@ -19,8 +19,7 @@
 //! Binding transactions use the plain member projections below to reach the existing binding
 //! kernel. They carry actual raster records, a mesh store and the caller's lifetime sequence;
 //! no document, snapshot, command owner or publication authority enters this facade.
-use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
-use crate::object_document::{ImageMesh, ImageMeshStore, MeshIdSequence};
+use crate::object_codec::{ImageMesh, ImageMeshStore, MeshIdSequence, RasterItem};
 
 /// One mesh in normalized `(0,0)..(1,1)` image space. `verts[0..outline.len())` ARE the outline;
 /// `offsets` is a separate array of the same length as `verts`; `cols`/`rows` are the integer grid
