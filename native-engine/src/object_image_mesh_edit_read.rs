@@ -237,8 +237,11 @@ impl BindingState {
 
 #[cfg(feature = "evaluation")]
 mod binding_adapter {
-    use super::*;
     use crate::evaluation::object_image_mesh_kernels::object_image_mesh_binding as kernel;
+    use crate::object_snapshot::object_image_mesh_edit_read::{
+        BindingLayer, BindingOperation, BindingRefusal, BindingReport, BindingSlot, BindingState,
+        BindingTarget,
+    };
 
     impl From<BindingTarget> for kernel::SlotTarget {
         fn from(target: BindingTarget) -> Self {

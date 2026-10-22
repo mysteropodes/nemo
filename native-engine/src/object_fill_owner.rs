@@ -194,6 +194,9 @@ impl PreparedLayerCreate {
     }
 }
 
+#[path = "object_image_mesh_identity.rs"]
+mod mesh_identity;
+
 #[derive(Debug)]
 pub(crate) struct ObjectFillOwner {
     revisions: ObjectRevisionOwner,
@@ -202,11 +205,6 @@ pub(crate) struct ObjectFillOwner {
 }
 
 impl ObjectFillOwner {
-    #[cfg(feature = "project_media_codec")]
-    pub(crate) fn replace_admitted_snapshot(&mut self, snapshot: ObjectSnapshot) {
-        self.revisions = ObjectRevisionOwner::from_admitted(snapshot);
-    }
-
     #[cfg(feature = "font_asset_wire")]
     pub(crate) fn commit_font_asset(
         &mut self,
@@ -238,10 +236,7 @@ impl ObjectFillOwner {
         if snapshot.content_revision() != 0 || snapshot.project().is_none() {
             return Err(DispatchErrorCode::Unavailable);
         }
-        Ok(Self {
-            revisions: ObjectRevisionOwner::from_admitted(snapshot),
-            mesh_id_sequence: MeshIdSequence::default(),
-        })
+        Self::from_identity_snapshot(snapshot)
     }
 
     #[cfg(feature = "project_media_codec")]
@@ -250,10 +245,7 @@ impl ObjectFillOwner {
         bytes: &[u8],
     ) -> Result<Self, DispatchErrorCode> {
         let snapshot = ObjectSnapshot::admit_project_file(instance, bytes)?;
-        Ok(Self {
-            revisions: ObjectRevisionOwner::from_admitted(snapshot),
-            mesh_id_sequence: MeshIdSequence::default(),
-        })
+        Self::from_identity_snapshot(snapshot)
     }
     #[cfg(feature = "project_media_codec")]
     pub(crate) fn commit_reference_attachment(
@@ -348,10 +340,7 @@ impl ObjectFillOwner {
         ObjectSnapshot::validate_drawing(project.drawing())
             .map_err(|_| "project drawing admission failed")?;
         let snapshot = ObjectSnapshot::from_admitted_project(instance_id, project)?;
-        Ok(Self {
-            revisions: ObjectRevisionOwner::from_admitted(snapshot),
-            mesh_id_sequence: MeshIdSequence::default(),
-        })
+        Self::from_identity_snapshot(snapshot).map_err(|_| "mesh identity admission failed")
     }
     pub(crate) fn new(
         instance_id: impl Into<String>,
@@ -359,10 +348,7 @@ impl ObjectFillOwner {
     ) -> Result<Self, &'static str> {
         let snapshot = ObjectSnapshot::new(instance_id, document)
             .map_err(|_| "object document admission failed")?;
-        Ok(Self {
-            revisions: ObjectRevisionOwner::from_admitted(snapshot),
-            mesh_id_sequence: MeshIdSequence::default(),
-        })
+        Self::from_identity_snapshot(snapshot).map_err(|_| "mesh identity admission failed")
     }
     pub(crate) fn instance_id(&self) -> &str {
         self.revisions.instance_id()

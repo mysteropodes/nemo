@@ -182,6 +182,16 @@ pub(crate) fn check_target(
     if target.frame_scope.kind == FrameScopeKind::Reference {
         return Err(DispatchErrorCode::Unavailable);
     }
+    // Opaque v2 contexts are preserved storage, not executable item targets. A real
+    // declared component still follows its existing target/layer checks below.
+    if target.context_id() != "scene-root"
+        && document
+            .component_set()
+            .and_then(|set| set.component(target.context_id()))
+            .is_none()
+    {
+        return Err(DispatchErrorCode::Unavailable);
+    }
     Ok(())
 }
 

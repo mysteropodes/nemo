@@ -82,14 +82,14 @@ pub(crate) fn validate_item_parts(
         if !valid {
             return Err(invalid("invalid scoped item target or frame"));
         }
-        let (local_layers, local_frames) = if target.context_id == "scene-root" {
-            (layers, total_frames)
-        } else {
-            let component = components
-                .get(target.context_id.as_str())
-                .ok_or_else(|| invalid("item context reference is unresolved"))?;
-            (component.layers(), component.total_frames())
-        };
+        // Declared components always use their own layers and frame bounds. Other v2
+        // contexts retain the protected storage-only contract against the root tables;
+        // executable context resolution remains separate and refuses opaque identities.
+        let (local_layers, local_frames) = components
+            .get(target.context_id.as_str())
+            .map_or((layers, total_frames), |component| {
+                (component.layers(), component.total_frames())
+            });
         if target.frame_scope.frame >= local_frames {
             return Err(invalid("invalid scoped item target or frame"));
         }

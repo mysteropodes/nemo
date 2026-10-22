@@ -183,11 +183,13 @@ pub(super) fn project(
                 } else if document.format_version() == 2 && context.id == ROOT {
                     // An admitted v2 root must cover every item/object; never guess a missing scope.
                     return Err(DispatchErrorCode::Unavailable);
-                } else if slots.iter().any(|(_, r)| r.is_some())
+                } else if context.id == ROOT
+                    && slots.iter().any(|(_, r)| r.is_some())
                     && slots.iter().any(|(_, r)| r.is_none())
                 {
-                    // No cross-table order exists for this context. Never guess a mixed slot
-                    // or project only its paths while silently omitting real item positions.
+                    // Only declared components have an admitted implicit encounter order:
+                    // local paths, global rasters, then global text, as natural_component reads.
+                    // The grouping above preserves that order; root mixed slots still need a plan.
                     return Err(DispatchErrorCode::Unavailable);
                 }
                 let frame_index = projected_frames.len();
@@ -295,3 +297,12 @@ pub(super) fn slot_target(
         .map(|location| location.at)
         .ok_or(DispatchErrorCode::NotFound)
 }
+
+#[cfg(all(
+    test,
+    feature = "history",
+    feature = "evaluation",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_image_mesh_binding_contexts.rs"]
+mod contexts_tests;
