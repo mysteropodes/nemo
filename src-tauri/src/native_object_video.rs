@@ -16,7 +16,7 @@ pub(crate) fn install_video_decoder(factory: fn() -> Box<dyn NativeVideoDecoder>
 }
 
 /// A fresh decoder, owned by one export or one preview frame.
-pub(super) fn video_decoder() -> Box<dyn NativeVideoDecoder> {
+pub(crate) fn video_decoder() -> Box<dyn NativeVideoDecoder> {
     FACTORY
         .get()
         .map_or_else(|| Box::new(Uninstalled) as _, |factory| factory())

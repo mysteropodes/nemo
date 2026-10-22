@@ -20,10 +20,14 @@ use font_dispatch::{invoke_font, FontPhase};
 #[path = "native_raster_image_dispatch.rs"]
 mod image_dispatch;
 use image_dispatch::{invoke_image, is_image_import, ImagePhase};
+#[path = "native_video_link_dispatch.rs"]
+mod video_dispatch;
+use video_dispatch::{invoke_video, is_video_link, VideoPhase};
 enum ResourcePhase<'a> {
     Regular,
     Font(FontPhase<'a>),
     Image(ImagePhase<'a>),
+    Video(VideoPhase<'a>),
 }
 
 #[path = "native_revision_dispatch.rs"]
@@ -301,6 +305,10 @@ fn invoke_dispatch(
     if is_image_import(request) {
         return invoke_image(application, request, ImagePhase::Regular)?
             .ok_or_else(|| "native image source requires async scoped dispatch".into());
+    }
+    if is_video_link(request) {
+        return invoke_video(application, request, VideoPhase::Regular)?
+            .ok_or_else(|| "native video source requires async scoped dispatch".into());
     }
     if request.operation == "command.document.object.asset.attach" {
         return Ok(unavailable(

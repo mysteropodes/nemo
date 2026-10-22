@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.asset.video",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.asset.video.link"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectVideoLinkPayload"
+  },
+  "output": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectVideoLinkResult"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; the request names only a file path and no video bytes or frames cross in either direction."
+  },
+  "semantics": "Link one desktop video file as a new layer, or relink an existing drawing video placement, through the existing native transaction/history owner as one revision and one history entry. The host canonicalizes the absolute path inside the request's filesystem scope, requires a regular UTF-8 file, opens the installed native video decoder once for width, height and frame count, always closes that session, and refuses zero facts; the canonical path is the stored locator and the deduplication identity. Exact replay and refusals that need no file are answered before any file access. A replace keeps the placement id, target, offset and stored timing (including time-remap keys) and keeps the previous record; relinking the same file is invalid. Image codecs, sequences, embedded video bytes, DOM drop handles and browser/WASM routes remain unavailable.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": []
+}

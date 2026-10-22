@@ -73,6 +73,8 @@ pub(crate) mod property_read;
 pub(crate) mod property_track;
 #[path = "native_vector_contract.rs"]
 pub(crate) mod vector;
+#[path = "native_video_link_contract.rs"]
+pub(crate) mod video_link;
 use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
@@ -182,6 +184,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         }
         "command.document.object.layer.create" => object::create_request(payload),
         import::OP => import::request(payload),
+        video_link::OP => video_link::request(payload),
         operation if export::owns(operation) => export::request(operation, payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -411,6 +414,9 @@ pub(crate) fn validate_result(
     }
     if operation == import::OP {
         return import::result(result);
+    }
+    if operation == video_link::OP {
+        return video_link::result(result);
     }
     if operation == "command.document.object.layer.visibility.set" {
         return object::visibility_result(result);
