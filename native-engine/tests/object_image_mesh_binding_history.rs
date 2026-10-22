@@ -21,6 +21,10 @@ use fixtures::*;
 #[path = "object_image_mesh_binding_transactions.rs"]
 mod transactions_tests;
 
+#[cfg(feature = "application")]
+#[path = "object_image_mesh_binding_application.rs"]
+mod application_tests;
+
 fn wire(owner: &NativeObjectHistory) -> Value {
     serde_json::from_slice(&support::bytes(owner)).unwrap()
 }
