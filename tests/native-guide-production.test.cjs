@@ -363,3 +363,47 @@ test('real completion fanout converges after one refused Composition read while 
     await f.settle(); assert.equal(queries().length, before + 1);
   } finally { if (refusal) refusal.release(); if (preview) preview.release(); await f.dispose(); }
 });
+
+test('real completion fanout converges after one refused Shadow read while preserving the loaded Guide owner', async () => {
+  const f = fixture({ shadow: true }); let preview, refusal;
+  try {
+    await f.prepare(); f.diagnostics.length = 0;
+    const guide = f.root.NemoNativeGuideController, shadow = f.root.NemoNativeShadowController;
+    const origin = guide.read(), info = f.session.info(), ticket = f.session.readSubscriptionGeneration();
+    assert(origin && shadow.read()); assert(guide.coordinates().current());
+    const state = JSON.stringify(f.root.state);
+    const reads = operation => f.calls.filter(call => call.request && call.request.operation === operation).length;
+    const shadowOperation = 'query.document.object.project.shadow.read', guideOperation = 'query.document.object.project.guide.read';
+    const previews = () => f.calls.filter(call => call.command === 'nemo_native_object_preview').length;
+    const before = reads(shadowOperation), beforeGuide = reads(guideOperation), beforePreview = previews();
+    preview = f.holdPreview(); f.dispatch(f.root, 'resize'); await preview.started;
+    assert.equal(previews(), beforePreview + 1, 'The registered same-bounds window callback starts the real preview');
+    assert.strictEqual(f.session.info(), info); assert.equal(f.session.readPresentedObjectSession(), null);
+    // Explicit public read boundary: the actual Shadow palette/active-swatch caller uses this controller.read.
+    assert.equal(shadow.read(), null);
+    assert.equal(guide.read(), null, 'A loaded Guide cache cannot authorize input during genuine pending work');
+    refusal = f.refuseNextShadowRead(); preview.release(); await refusal.started;
+    assert.equal(reads(shadowOperation), before + 1);
+    assert.equal(f.calls.at(-1).request.payload.selector.kind, 'settings');
+    assert.equal(f.session.readPresentedObjectSession(), null);
+    f.dispatch(f.h, 'pointerdown');
+    assert.deepEqual(f.diagnostics, [['guide-entry-refused', 'presentation-missing']]);
+    assert.equal(f.notices.length, 1); assert.equal(f.ghosts().length, 0); assert.equal(f.edits().length, 0);
+    refusal.release(); await f.settle();
+    assert.equal(reads(shadowOperation), before + 1,
+      'Unchanged readonly completion must not issue another unsolicited same-pin Shadow read');
+    assert.equal(previews(), beforePreview + 1, 'A metadata refusal must not manufacture a native presentation');
+    assert.equal(shadow.read(), null, 'Unavailable Shadow metadata remains unavailable');
+    assert.strictEqual(guide.read(), origin); assert(guide.coordinates().current());
+    assert.equal(reads(guideOperation), beforeGuide); assert.strictEqual(f.session.info(), info);
+    assert.equal(f.session.readSubscriptionGeneration(), ticket); assert.equal(info.contentRevision, 0);
+    const noticeCount = f.notices.length;
+    f.dispatch(f.h, 'pointerdown'); assert.equal(f.ghosts().length, 1);
+    f.dispatch(f.h, 'pointermove', { clientX: 516, clientY: 111 });
+    f.dispatch(f.h, 'pointerup', { clientX: 566, clientY: 111 });
+    assert.equal(f.notices.length, noticeCount); assert.equal(f.ghosts().length, 0);
+    assert.equal(f.edits().length, 0); assert.equal(f.saved(), f.originalDocument);
+    assert.equal(JSON.stringify(f.root.state), state, 'Readonly refusal and ruler cancellation preserve all UI state');
+    await f.settle(); assert.equal(reads(shadowOperation), before + 1);
+  } finally { if (refusal) refusal.release(); if (preview) preview.release(); await f.dispose(); }
+});

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8391543cc3d19f52358d3b977bc83984ecdd98fd",
-  "describe": "v0.7.0-alpha.4-2857-g8391543c"
+  "head": "5539885eb6a8f544503fc692f1a938aabf92b246",
+  "describe": "v0.7.0-alpha.4-2862-g5539885e"
  },
- "inputsDigest": "94d2f766630e280e7438764bc69a14dbf597c1773ff6a471129c731a3ebe2f17",
+ "inputsDigest": "7734e8e6997a321c1f1aaeab116dd24d3ba15e2029912d05f58898ca7e2a3139",
  "states": [
   "inventoried",
   "characterized",
@@ -12468,8 +12468,8 @@
     "via": "chain",
     "references": [
      "src/js/adapters/native-shadow-ui.js:27 disarm()",
-     "src/js/adapters/native-shadow-ui.js:67 edit()",
-     "src/js/adapters/native-shadow-ui.js:88 install()",
+     "src/js/adapters/native-shadow-ui.js:82 edit()",
+     "src/js/adapters/native-shadow-ui.js:114 install()",
      "src/js/shadow-brush-bridge.js:84 arm()",
      "src/js/shadow-brush-bridge.js:88 disarm()"
     ]

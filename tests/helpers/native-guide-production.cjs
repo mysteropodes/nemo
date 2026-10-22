@@ -5,11 +5,12 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const clone = value => JSON.parse(JSON.stringify(value));
 
-function fixture({ composition = false } = {}) {
+function fixture({ composition = false, shadow = false } = {}) {
   const events = new WeakMap(), trace = [], calls = [], notices = [], diagnostics = [], labels = [], timers = new Set(), frames = [];
   const nativeListeners = new Map(), observers = new Set(), previewReleases = new Set();
   let source = 'fixture', context, root, disposed = false, installed = false, generation = 0, serial = 0, previewHold = null;
   let compositionReadHold = null, compositionUnavailable = false;
+  let shadowReadHold = null, shadowUnavailable = false;
   let canonicalPorts = null;
   let rect = { left: 66, top: 102, width: 1038, height: 504 };
   const nativeDocument = { canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40 };
@@ -137,12 +138,14 @@ function fixture({ composition = false } = {}) {
     }
     if (command === 'nemo_native_dispatch') {
       const guideRead = request.operation === 'query.document.object.project.guide.read';
-      assert(guideRead || composition && request.operation === 'query.document.object.project.composition.read',
+      const compositionRead = request.operation === 'query.document.object.project.composition.read';
+      const shadowRead = request.operation === 'query.document.object.project.shadow.read';
+      assert(guideRead || composition && compositionRead || shadow && shadowRead,
         'Cancellation must never dispatch an edit');
       const pin = info(), payload = request.payload, selector = payload.selector;
       assert.equal(payload.atRevision, 0); assert.equal(payload.documentSnapshotId, pin.documentSnapshotId);
       assert.equal(payload.contextId, 'scene-root');
-      if (!guideRead && selector.kind === 'settings') {
+      if (compositionRead && selector.kind === 'settings') {
         if (compositionReadHold) {
           const held = compositionReadHold; compositionReadHold = null; held.entered(); await held.wait;
         }
@@ -150,8 +153,23 @@ function fixture({ composition = false } = {}) {
           instanceId: pin.instanceId, documentId: pin.documentId, contentRevision: 0, ok: false,
           error: { code: 'unavailable', message: 'Controlled native Composition read refusal' } });
       }
+      if (shadowRead && selector.kind === 'settings') {
+        if (shadowReadHold) {
+          const held = shadowReadHold; shadowReadHold = null; held.entered(); await held.wait;
+        }
+        if (shadowUnavailable) return realm({ apiVersion: 2, requestId: request.requestId,
+          instanceId: pin.instanceId, documentId: pin.documentId, contentRevision: 0, ok: false,
+          error: { code: 'unavailable', message: 'Controlled native Shadow read refusal' } });
+      }
       let result;
-      if (!guideRead) {
+      if (shadowRead) {
+        if (selector.kind === 'settings') result = { shadowPalettePresent: false, shadowColorCount: 0 };
+        else {
+          assert.equal(selector.kind, 'palettePage'); assert.equal(selector.cursor, 0); assert.equal(selector.limit, 16);
+          result = { kind: 'shadowPalettePage', shadowPalettePresent: false, shadowColorCount: 0,
+            cursor: 0, items: [], nextCursor: null };
+        }
+      } else if (compositionRead) {
         if (selector.kind === 'settings') result = { markersPresent: false, markerCount: 0, bpm: 120, bpmOffset: 0, bpmShow: false,
           effectiveBpm: 120, effectiveBpmOffset: 0, effectiveBpmShow: false };
         else {
@@ -177,7 +195,7 @@ function fixture({ composition = false } = {}) {
   }
   root = node('window');
   Object.assign(root, { document, state: { currentFrame: 0, tool: 'draw', cameraView: false, rulersOn: false,
-    guidesLocked: false, guidesSnap: true }, devicePixelRatio: 2, stageLayer: { visible: true },
+    guidesLocked: false, guidesSnap: true, ...(shadow ? { shadowMode: false } : {}) }, devicePixelRatio: 2, stageLayer: { visible: true },
     paper: { view: { update() {} } }, performance, setTimeout: timeout,
     clearTimeout(timer) { timers.delete(timer); clearTimeout(timer); },
     requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
@@ -214,9 +232,14 @@ function fixture({ composition = false } = {}) {
     'js/application/native-opacity-operations.js', 'js/adapters/native-opacity-legacy-surface.js',
     'js/draw-bridge.js', 'js/adapters/native-object-shape-tool.js', 'js/rulers-bridge.js',
     ...(composition ? ['js/adapters/native-composition-contract.js'] : []),
-    'js/adapters/native-guide-contract.js', 'js/adapters/native-application.js',
+    'js/adapters/native-guide-contract.js',
+    ...(shadow ? ['js/adapters/native-shadow-contract.js'] : []),
+    'js/adapters/native-application.js',
     ...(composition ? ['js/adapters/native-composition-desktop.js', 'js/adapters/native-composition-ui.js'] : []),
-    'js/adapters/native-guide-desktop.js', 'js/adapters/native-guide-ui.js',
+    'js/adapters/native-guide-desktop.js',
+    ...(shadow ? ['js/adapters/native-shadow-desktop.js'] : []),
+    'js/adapters/native-guide-ui.js',
+    ...(shadow ? ['js/adapters/native-shadow-ui.js'] : []),
     'js/application/native-edit-guard.js', 'js/adapters/application-mcp.js'
   ];
   const htmlSource = fs.readFileSync(require.resolve('../../src/index.html'), 'utf8');
@@ -270,7 +293,8 @@ function fixture({ composition = false } = {}) {
     for (let attempt = 0; attempt < 80; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 0)); tick();
       if (session.readPresentedObjectSession() && !browser.NemoNativeGuideController.isPending() &&
-          (!composition || !browser.NemoNativeCompositionController.isPending()) && timers.size === 0) return;
+          (!composition || !browser.NemoNativeCompositionController.isPending()) &&
+          (!shadow || !browser.NemoNativeShadowController.isPending()) && timers.size === 0) return;
     }
     assert.fail('Production Guide did not settle: ' + JSON.stringify({ calls, notices }));
   }
@@ -316,6 +340,15 @@ function fixture({ composition = false } = {}) {
       const wait = new Promise(resolve => { release = () => { previewReleases.delete(release); resolve(); }; });
       // This is a typed native response boundary, not a controller, cache or queue replacement.
       compositionUnavailable = true; previewReleases.add(release); compositionReadHold = { entered, wait };
+      return { started, release };
+    },
+    refuseNextShadowRead() {
+      assert(shadow && !shadowReadHold);
+      let entered, release;
+      const started = new Promise(resolve => { entered = resolve; });
+      const wait = new Promise(resolve => { release = () => { previewReleases.delete(release); resolve(); }; });
+      // Every later settings request also refuses; the fixture never suppresses a retry.
+      shadowUnavailable = true; previewReleases.add(release); shadowReadHold = { entered, wait };
       return { started, release };
     },
     async notifyWhilePending() {
