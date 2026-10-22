@@ -68,11 +68,12 @@ test('disable and the footage mode edit the existing placement; an unchanged mod
   assert.equal(f.effects.includes('legacy'),false);
 });
 
-test('an unknown source frame count keeps Enable unavailable and a layer without video only explains',async()=>{
+test('an unknown source frame count keeps Enable unavailable with a localized notice and a layer without video only explains',async()=>{
   for(const count of [null,0]){
     const f=fixture(video({sourceFrameCount:count}));f.api.bindTimeRemapEntries();
     assert.equal(await f.root.SM.toggleTimeRemap(1),false);
     assert.equal(f.calls.length,0);assert.equal(f.reads.some(r=>r[0]==='range'),false);
+    assert.deepEqual(f.effects.filter(e=>Array.isArray(e)),[['toast','toastNativeTimeRemapNotApplied']],'an unknown count is reported, not silent');
   }
   const f=fixture(video());f.api.bindTimeRemapEntries();
   assert.equal(await f.root.SM.toggleTimeRemap(0),false);

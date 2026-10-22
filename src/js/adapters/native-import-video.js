@@ -2,7 +2,8 @@
  * the footage panel's Replace control reach ONE native linked-video command through
  * native-video-asset.js. DOM Files have no admitted native handle, so drops stay unavailable.
  * An unknown outcome latches the exact owner/request until it is resolved by the exact replay,
- * by presentation, or by a reopened owner. UI intent only: there is no legacy relink fallback. */
+ * by presentation of the receipt's revision chain (checked on every status read), or by a reopened
+ * owner. UI intent only: there is no legacy relink fallback. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -20,6 +21,7 @@
     const declared = ports.declared === undefined || ports.declared === true;
     let pending = false, retired = false, uncertain = null;
     const projected = (info) => root.NemoNativeObjectProjectFile && root.NemoNativeObjectProjectFile.projectionReadyForUI(root, info) === true;
+    const settled = () => { try { return !!(uncertain && uncertain.receipt && !pending && confirmed(uncertain.ctx, uncertain.state, uncertain.receipt)); } catch (_) { return false; } };
     function status() {
       if (!uncertain) return null;
       try {
@@ -28,6 +30,8 @@
         if (session && session.isActive() && now && typeof now.instanceId === 'string' && now.instanceId.length > 0 && typeof now.documentId === 'string' && now.documentId.length > 0 &&
           Number.isSafeInteger(now.lifecycleGeneration) && now.lifecycleGeneration > 0 && !sameOwner(now, uncertain.ctx.before)) uncertain = null;
       } catch (_) { /* preserve the unresolved native disposition */ }
+      // A known receipt resolves itself as soon as the same owner presents its revision or a later one with the target in place.
+      if (settled()) uncertain = null;
       if (!uncertain) return null;
       const { ctx, error, receipt, lastFailure } = uncertain;
       return { status: 'unconfirmed', code: error && error.code || 'video_presentation_unconfirmed', intent: ctx.intent.kind,
@@ -43,15 +47,21 @@
         error && error.reason === 'reconcile_failed' || !code || !!(disposition &&
           !(details.disposition === 'notDispatched' && details.committed === false));
     }
-    function finish(ctx, state, receipt, recovering) {
+    // The receipt's revision is in the presented chain: same owner, at or past that revision, presented at the CURRENT frame (the
+    // playhead is presentation, not document state), and the target still present. Returns the presented info or null.
+    function confirmed(ctx, state, receipt) {
       const after = ctx.session.info(), replace = ctx.intent.kind === 'replace';
       const shown = !retired && current() === ctx.session && ctx.session.isActive() && sameOwner(after, ctx.before) &&
-        after.contentRevision === receipt.contentRevision && receipt.contentRevision === ctx.before.contentRevision + 1 &&
-        root.state === state && state.currentFrame === ctx.frame && projected(after) && ports.presented(ctx.session, after, ctx.frame);
+        receipt.contentRevision === ctx.before.contentRevision + 1 && Number.isSafeInteger(after.contentRevision) && after.contentRevision >= receipt.contentRevision &&
+        root.state === state && projected(after) && ports.presented(ctx.session, after, state.currentFrame);
       // A replace must name the exact target the pinned placement read presented.
       const placed = Array.isArray(after.layers) && after.layers.some((row) => row.layerUid === receipt.target.layerUid) &&
         (!replace || receipt.target.layerUid === ctx.intent.layerUid && receipt.target.contextId === ctx.intent.contextId);
-      if (!shown || !placed) {
+      return shown && placed ? after : null;
+    }
+    function finish(ctx, state, receipt, recovering) {
+      const replace = ctx.intent.kind === 'replace', after = confirmed(ctx, state, receipt), frame = state.currentFrame;
+      if (!after) {
         uncertain = { ctx, state, receipt, error: null };
         return status() || { status: 'unconfirmed', code: 'video_owner_changed', receipt };
       }
@@ -61,14 +71,15 @@
       if (!replace && !recovering && sameSelection(selection(), ctx.selection)) {
         const index = after.layers.findIndex((row) => row.layerUid === receipt.target.layerUid);
         const consumed = root.NemoNativeObjectProject.selectLayerUI(root, index, false, receipt.target.layerUid, after) === true;
-        out.selected = consumed && current() === ctx.session && samePins(ctx.session.info(), after) && state.currentFrame === ctx.frame &&
-          sameSelection(selection(), [receipt.target.layerUid]) && ports.presented(ctx.session, after, ctx.frame);
+        out.selected = consumed && current() === ctx.session && samePins(ctx.session.info(), after) && state.currentFrame === frame &&
+          sameSelection(selection(), [receipt.target.layerUid]) && ports.presented(ctx.session, after, frame);
       }
       return out;
     }
     async function recover() {
       if (retired) return { status: 'unavailable', reason: 'retired' };
       if (pending) return { status: 'busy' };
+      if (settled()) return finish(uncertain.ctx, uncertain.state, uncertain.receipt, true);
       const unresolved = status();
       if (!unresolved) return { status: 'nothing' };
       const held = uncertain;

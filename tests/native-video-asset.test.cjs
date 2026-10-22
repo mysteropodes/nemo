@@ -44,7 +44,7 @@ function fixture(options={}){
     return structuredClone(response);
    }}).dispatch(q),
    readPresentedObjectSession:()=>session.readPresentedObjectSession(),
-   reconcile:async revision=>{if(revision!==undefined)assert.equal(revision,pin.contentRevision);if(options.unconfirmed)projected=false;return pin;},
+   reconcile:async revision=>{if(revision!==undefined)assert.equal(revision,pin.contentRevision);if(options.unconfirmed)projected=false;if(options.afterCommit)options.afterCommit();return pin;},
   }));serial=result.catch(()=>{});return result;},
  };}
  session=makeSession();
@@ -70,7 +70,7 @@ function fixture(options={}){
   localStorage:{getItem:()=>null},setTimeout,clearTimeout}));
  return {root,state,controller,requests,picks,toasts,events,nodes,node,placements,
   menu:()=>events.get('btn-import-video:click')(),
-  change:next=>{pin={...pin,...next};},deactivate:()=>{active=false;},show:()=>{projected=true;},
+  change:next=>{pin={...pin,...next};},bump:()=>{pin={...pin,contentRevision:pin.contentRevision+1,documentSnapshotId:'native-object:document:'+(pin.contentRevision+1)};},deactivate:()=>{active=false;},show:()=>{projected=true;},
   reopen:()=>{pin={...pin,lifecycleGeneration:pin.lifecycleGeneration+1};session=makeSession();},
  };
 }
@@ -197,4 +197,20 @@ test('importing a new layer inside a component is unavailable before the picker;
 test('a replace receipt naming another target context than the pinned read is not confirmed',async()=>{
  const h=fixture({context:'sym_comp'});const r=await h.controller.video.replaceActive('p1');
  assert.equal(r.status,'unconfirmed');assert.equal(r.recovery,'presentation');assert.equal(r.receipt.target.contextId,'sym_comp');assert.equal(h.requests.length,1);
+});
+test('a moved playhead or a later revision during the probe still confirms the receipt from the presented chain',async()=>{
+ let h;h=fixture({afterCommit:()=>{h.state.currentFrame=7;}});const moved=await h.menu();
+ assert.equal(moved.status,'imported',JSON.stringify(moved));assert.equal(moved.readback,'confirmed');assert.equal(h.controller.video.status(),null);
+ let later;later=fixture({afterCommit:()=>later.bump()});const r=await later.menu();
+ assert.equal(r.status,'imported',JSON.stringify(r));assert.equal(r.receipt.contentRevision,1);assert.equal(later.root.NemoNativeObjectProject.desktop().info().contentRevision,2);
+ let gone;gone=fixture({afterCommit:()=>{gone.change({layers:[gone.root.NemoNativeObjectProject.desktop().info().layers[0]]});}});
+ assert.equal((await gone.menu()).status,'unconfirmed');
+});
+test('a presentation latch clears on the next status read once the chain presents the receipt, without a recover() caller',async()=>{
+ const h=fixture({unconfirmed:true});const r=await h.menu();assert.equal(r.status,'unconfirmed');assert.equal(r.recovery,'presentation');
+ assert.equal((await h.menu()).status,'unconfirmed');assert.equal(h.requests.length,1);
+ h.show();h.bump();h.state.currentFrame=3;assert.equal(h.controller.video.status(),null);
+ const next=await h.menu();assert.equal(next.requestId,'video-2');assert.equal(h.requests.length,2);
+ const ctxFixture=fixture({context:'sym_comp'});await ctxFixture.controller.video.replaceActive('p1');ctxFixture.bump();
+ assert.equal(ctxFixture.controller.video.status().status,'unconfirmed');
 });

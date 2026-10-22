@@ -143,9 +143,9 @@
           if(!await edit(ctx,{kind:'disableTimeRemap',placementId:p.placementId}))return false;
           toast('toastTimeRemapDisabled');return true;
         }
-        // The decoder's own count, bound by the desktop host; unknown stays unavailable.
+        // The decoder's own count, bound by the desktop host; unknown stays unavailable and is reported.
         var count=p.sourceFrameCount;
-        if(!Number.isSafeInteger(count)||count<1)return false;
+        if(!Number.isSafeInteger(count)||count<1){toast('toastNativeTimeRemapNotApplied');return false;}
         var range=await ctx.session.readLayerRange(ctx.uid,ctx.frame,ctx.info),r=range&&range.range;
         if(!r||range.documentSnapshotId!==ctx.pin.documentSnapshotId||range.layerUid!==ctx.uid||
           !Number.isFinite(r.inPoint)||!Number.isFinite(r.outPoint))return false;
