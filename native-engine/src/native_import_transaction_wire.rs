@@ -17,7 +17,9 @@ use crate::history::object_history::object_shot_kernels::native_import_transacti
     ImportAsset, ImportBatch, ImportError, ImportRaster, ImportRecord, ImportSkip, ImportText,
     MissingProvider, NewLayer, SkipKind, UnavailableElement,
 };
-use crate::object_document::{object_deserialize, AssetId, ObjectRecord, RasterEntry, TextEntry};
+use crate::object_document::{
+    object_deserialize, AssetId, ObjectRecord, Presence, RasterEntry, TextEntry,
+};
 use crate::revision::ObjectSnapshot;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -108,6 +110,7 @@ struct BatchWire {
     assets: Vec<AssetWire>,
     raster: Vec<RasterWire>,
     text: Vec<TextWire>,
+    object_order: Presence<Vec<String>>,
     skipped: Vec<SkipWire>,
     unavailable: Vec<UnavailableWire>,
 }
@@ -118,6 +121,7 @@ object_deserialize!(BatchWire {
     #[serde(default)] assets: Vec<AssetWire>,
     #[serde(default)] raster: Vec<RasterWire>,
     #[serde(default)] text: Vec<TextWire>,
+    #[serde(default)] object_order: Presence<Vec<String>>,
     #[serde(default)] skipped: Vec<SkipWire>,
     #[serde(default)] unavailable: Vec<UnavailableWire>
 });
@@ -231,6 +235,10 @@ fn parse(origin: Option<&ObjectSnapshot>, bytes: &[u8]) -> Result<ImportBatch, I
                 entry: item.entry,
             })
             .collect(),
+        object_order: match wire.object_order {
+            Presence::Missing => None,
+            Presence::Present(order) => Some(order),
+        },
         skipped,
         unavailable,
     })

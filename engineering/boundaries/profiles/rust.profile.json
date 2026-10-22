@@ -1445,6 +1445,7 @@
         "native_import_transaction_chain.rs",
         "native_import_transaction_controls.rs",
         "native_import_transaction_dispatch.rs",
+        "native_import_transaction_order.rs",
         "native_import_transaction_rows.rs",
         "native_import_transaction_support.rs",
         "native_import_transaction_svg.rs",

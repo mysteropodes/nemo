@@ -4141,6 +4141,14 @@
             "$ref": "#/$defs/ObjectImportText"
           }
         },
+        "objectOrder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectImportSourceId"
+          },
+          "description": "Exact permutation of every new records/raster/text sourceId only. Excludes layers, assets, skips and origin objects. Absence preserves canonical family ordering; receipt order remains records then raster then text. Native owner validates coverage before one publication."
+        },
         "sources": {
           "type": "array",
           "minItems": 1,

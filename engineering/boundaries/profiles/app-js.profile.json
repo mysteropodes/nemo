@@ -2416,6 +2416,18 @@
       ]
     },
     {
+      "id": "app.native.import.png.stage.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-png-stage.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-png-stage.js"
+      ]
+    },
+    {
       "id": "app.native.import.svg",
       "layer": "application",
       "dir": "src/js/adapters",

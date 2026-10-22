@@ -287,3 +287,49 @@ fn a_receipt_that_would_not_fit_the_response_is_refused_before_anything_publishe
     assert_eq!(small["ok"], true, "{small}");
     assert_eq!(small["result"]["layers"].as_array().unwrap().len(), 3);
 }
+
+#[test]
+fn object_order_wire_presence_is_strict_and_invalid_permutations_preserve_redo() {
+    let mut owner = history(2);
+    prime_redo(&mut owner);
+    let before = frozen(&owner);
+    for (index, order) in [
+        Value::Null,
+        json!({}),
+        json!("w:0"),
+        json!([null]),
+        json!([]),
+        json!(["w:0", "w:1"]),
+        json!(["w:0", "w:1", "w:1"]),
+        json!(["w:0", "w:1", "e:0", "extra"]),
+        json!(["w:0", "w:1", "w"]),
+        json!(["w:0", "w:1", "s0"]),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut payload = wire();
+        payload["objectOrder"] = order;
+        let req = request(&owner, &format!("bad-object-order-{index}"), payload);
+        let response = dispatch(&mut owner, &req);
+        assert_eq!(code(&response), "invalid_request", "{response}");
+        assert_eq!(frozen(&owner), before);
+    }
+    let mut payload = wire();
+    payload["objectOrder"] = json!(["e:0", "w:1", "w:0"]);
+    let parsed = parse_batch(&serde_json::to_vec(&payload).unwrap()).unwrap();
+    assert_eq!(parsed.object_order.unwrap(), ["e:0", "w:1", "w:0"]);
+    let original = wire().to_string();
+    let duplicate = format!(
+        "{},\"objectOrder\":[],\"objectOrder\":[]}}",
+        &original[..original.len() - 1]
+    );
+    assert_eq!(
+        parse_batch(duplicate.as_bytes()).unwrap_err(),
+        ImportError::Payload
+    );
+    assert!(parse_batch(&serde_json::to_vec(&wire()).unwrap())
+        .unwrap()
+        .object_order
+        .is_none());
+}

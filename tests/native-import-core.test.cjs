@@ -374,3 +374,106 @@ test('explicit empty or malformed sources refuses a valid vector batch before di
     assert.equal(core.isPending(), false);
   }
 });
+
+// A staging marker records the private invocation boundary; it never changes the wire.
+test('the optional synchronous invocation marker runs after local admission and before the single write', async () => {
+  const h = makeSession(), core = coreModule.create(makePorts(h).ports), ctx = core.begin().ctx;
+  let marked = 0;
+  const result = await core.submit(ctx, mixed(), () => {
+    marked++;
+    assert.equal(core.isPending(), true);
+    assert.equal(h.calls.length, 0);
+  });
+  assert.equal(result.status, 'imported');
+  assert.equal(marked, 1);
+  assert.equal(h.calls.length, 1);
+  assert.equal(Object.hasOwn(h.calls[0], 'beforeInvoke'), false);
+});
+
+test('invalid and oversized batches never enter the invocation marker', async () => {
+  for (const [batch, extraPorts, status] of [[{ ...mixed(), sources: [] }, {}, 'invalid'], [mixed(), { maxRequestBytes: 1 }, 'too_large']]) {
+    const h = makeSession(), core = coreModule.create(makePorts(h, extraPorts).ports);
+    let marked = 0;
+    const result = await core.submit(core.begin().ctx, batch, () => { marked++; });
+    assert.equal(result.status, status);
+    assert.equal(marked, 0);
+    assert.equal(h.calls.length, 0);
+  }
+});
+
+test('throwing and non-synchronous invocation markers refuse before dispatch and release pending', async () => {
+  for (const marker of [() => { throw new Error('journal refused'); }, () => new Promise(() => {}), () => Promise.reject(new Error('async marker')), true]) {
+    const h = makeSession(), core = coreModule.create(makePorts(h).ports);
+    const result = await core.submit(core.begin().ctx, mixed(), marker);
+    assert.equal(result.status, 'invalid');
+    assert.equal(h.calls.length, 0);
+    assert.equal(core.isPending(), false);
+    assert.equal(h.state.contentRevision, 7);
+  }
+});
+
+test('invocation markers cannot dispose or move captured pins and still dispatch', async () => {
+  for (const change of ['revision', 'frame', 'retire']) {
+    const h = makeSession(), core = coreModule.create(makePorts(h).ports);
+    const ctx = core.begin().ctx;
+    const result = await core.submit(ctx, mixed(), () => {
+      if (change === 'revision') h.state.contentRevision++;
+      if (change === 'frame') h.frame.value++;
+      if (change === 'retire') core.dispose();
+    });
+    assert.equal(result.status, change === 'retire' ? 'unavailable' : 'stale');
+    assert.equal(h.calls.length, 0);
+    assert.equal(core.isPending(), false);
+  }
+});
+
+test('optional imported object order is forwarded exactly, including explicit invalid presence', () => {
+  for (const objectOrder of [['w:0', 'e:0', 'w:1'], [], null]) {
+    const value = coreModule.wire({ ...mixed(), objectOrder });
+    assert.equal(Object.hasOwn(value, 'objectOrder'), true);
+    assert.deepEqual(value.objectOrder, objectOrder);
+  }
+  assert.equal(Object.hasOwn(coreModule.wire(mixed()), 'objectOrder'), false);
+});
+
+test('optional markers refuse moved selection, availability, presentation and write identity before marking', async () => {
+  for (const change of ['selection', 'available', 'presentation', 'write']) {
+    const h = makeSession();
+    let available = true;
+    const made = makePorts(h, { available: () => available });
+    const core = coreModule.create(made.ports), ctx = core.begin().ctx;
+    if (change === 'selection') made.selection.value = ['L9'];
+    if (change === 'available') available = false;
+    if (change === 'presentation') h.session.readPresentedObjectSession = () => null;
+    if (change === 'write') h.setDeclared(false);
+    let marked = 0;
+    const result = await core.submit(ctx, mixed(), () => { marked++; });
+    assert.equal(result.status, ['selection', 'write'].includes(change) ? 'stale' : 'unavailable', change);
+    assert.equal(marked, 0, change);
+    assert.equal(h.calls.length, 0, change);
+    assert.equal(h.state.contentRevision, 7, change);
+    assert.equal(core.isPending(), false, change);
+  }
+});
+
+test('optional markers cannot change selection, availability, presentation or the write getter and dispatch', async () => {
+  for (const change of ['selection', 'available', 'presentation', 'write']) {
+    const h = makeSession();
+    let available = true;
+    const made = makePorts(h, { available: () => available });
+    const core = coreModule.create(made.ports), ctx = core.begin().ctx;
+    let marked = 0;
+    const result = await core.submit(ctx, mixed(), () => {
+      marked++;
+      if (change === 'selection') made.selection.value = ['L9'];
+      if (change === 'available') available = false;
+      if (change === 'presentation') h.session.readPresentedObjectSession = () => null;
+      if (change === 'write') h.setDeclared(false);
+    });
+    assert.equal(result.status, ['selection', 'write'].includes(change) ? 'stale' : 'unavailable', change);
+    assert.equal(marked, 1, change);
+    assert.equal(h.calls.length, 0, change);
+    assert.equal(h.state.contentRevision, 7, change);
+    assert.equal(core.isPending(), false, change);
+  }
+});

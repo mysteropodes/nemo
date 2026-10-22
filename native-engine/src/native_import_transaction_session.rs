@@ -119,7 +119,12 @@ impl NativeObjectHistory {
         let plan = plan_import_batch(&origin, batch)?;
         let sealed = self
             .owner
-            .seal_import_batch_with_assets(origin, plan.document, plan.asset_inventory)
+            .seal_import_batch_with_assets_ordered(
+                origin,
+                plan.document,
+                plan.asset_inventory,
+                batch.object_order.is_some(),
+            )
             .map_err(ImportError::Dispatch)?;
         Ok(PreparedImport {
             sealed,

@@ -28,6 +28,7 @@
       command: contract.COMMAND,
       layers: batch.layers || [], records: batch.records || [], skipped: batch.skipped || [], unavailable: batch.unavailable || [],
     };
+    if (Object.prototype.hasOwnProperty.call(batch, 'objectOrder')) value.objectOrder = batch.objectOrder;
     for (const key of ['assets', 'raster', 'text', 'sources']) {
       if (Object.prototype.hasOwnProperty.call(batch, key) && (key === 'sources' || !(Array.isArray(batch[key]) && batch[key].length === 0))) value[key] = batch[key];
     }
@@ -78,7 +79,24 @@
       return { ok: true, ctx: Object.freeze({ session, before, frame, write, selection: selection.slice() }) };
     }
 
-    async function submit(ctx, batch) {
+    // Only the opt-in invocation marker path may cross an awaited staging boundary.
+    function markerCurrency(ctx) {
+      if (retired) return { status: 'unavailable', reason: 'retired' };
+      try {
+        const session = ports.currentSession(), info = session && session.info(), frame = ports.frame(), selection = ports.selection();
+        if (session !== ctx.session || !same(info, ctx.before) || frame !== ctx.frame || !sameIds(selection, ctx.selection)) {
+          return { status: 'stale', reason: 'context_changed' };
+        }
+        if (!Array.isArray(info.layers) || !Number.isSafeInteger(frame) || frame < 0 || frame >= info.totalFrames ||
+            ports.available(session, info) !== true || !presented(session, info, frame)) {
+          return { status: 'unavailable', reason: 'no_presented_native_session' };
+        }
+        if (session.importBatch !== ctx.write) return { status: 'stale', reason: 'context_changed' };
+      } catch (_) { return { status: 'unavailable', reason: 'no_presented_native_session' }; }
+      return null;
+    }
+
+    async function submit(ctx, batch, beforeInvoke) {
       if (retired) return { status: 'unavailable', reason: 'retired' };
       if (pending) return { status: 'busy' };
       const { session, before, frame, write } = ctx;
@@ -98,6 +116,24 @@
       pending = true;
       let receipt;
       try {
+        if (beforeInvoke !== undefined) {
+          if (typeof beforeInvoke !== 'function') return { status: 'invalid', reason: 'invocation_marker_invalid' };
+          const beforeMarker = markerCurrency(ctx);
+          if (beforeMarker) return beforeMarker;
+          try {
+            const marked = beforeInvoke();
+            if (marked !== undefined) {
+              // Refuse async markers without awaiting; consume only a genuine Promise rejection.
+              if (marked && typeof marked === 'object') {
+                try { Promise.prototype.then.call(marked, undefined, () => {}); } catch (_) { /* not a Promise */ }
+              }
+              return { status: 'invalid', reason: 'invocation_marker_not_synchronous' };
+            }
+          } catch (_) { return { status: 'invalid', reason: 'invocation_marker_refused' }; }
+          // Marker code cannot dispose or move the captured intent and still dispatch.
+          const afterMarker = markerCurrency(ctx);
+          if (afterMarker) return afterMarker;
+        }
         receipt = await write.call(session, payload, before);
       } catch (error) {
         const message = String(error && error.message || error), refused = REFUSED.exec(message);
@@ -147,7 +183,7 @@
     }
 
     return Object.freeze({
-      begin, submit,
+      begin, submit, supportsInvocationMarker: true,
       dispose() { retired = true; generation++; },
       isPending() { return pending; },
     });

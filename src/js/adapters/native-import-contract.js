@@ -184,7 +184,7 @@
 
   function payload(operation, value) {
     if (operation !== OP) fail('native import operation is not declared');
-    exact(value, ['command', 'layers', 'records'], ['skipped', 'unavailable', 'assets', 'raster', 'text', 'sources', 'documentSnapshotId', 'lifecycleGeneration'], OP);
+    exact(value, ['command', 'layers', 'records'], ['skipped', 'unavailable', 'assets', 'raster', 'text', 'sources', 'documentSnapshotId', 'lifecycleGeneration', 'objectOrder'], OP);
     if (value.command !== COMMAND) fail(`${OP} command is invalid`);
     list(value.layers, `${OP}.layers`, (layer, at) => { exact(layer, ['sourceId', 'name'], [], at); sourceId(layer.sourceId, `${at}.sourceId`); if (typeof layer.name !== 'string' || !layer.name.length) fail(`${at}.name must be a non-empty string`); });
     list(value.records, `${OP}.records`, (item, at) => { exact(item, ['sourceId', 'record'], [], at); sourceId(item.sourceId, `${at}.sourceId`); vectorRecord(item.record, `${at}.record`); });
@@ -211,6 +211,12 @@
     dup(objectRows(value).map((r) => r.sourceId).concat(skipped.filter((s) => s.kind === 'element').map((s) => s.sourceId)), 'records and element skips');
     dup(skipped.filter((s) => s.kind === 'layer').map((s) => s.sourceId), 'layer skips');
     dup(assetRows(value).map(r => r.sourceId).concat(skipped.filter((s) => s.kind === 'asset').map((s) => s.sourceId)), 'assets and asset skips');
+    if (has(value, 'objectOrder')) {
+      list(value.objectOrder, `${OP}.objectOrder`, sourceId);
+      const ids = objectRows(value).map(row => row.sourceId);
+      if (value.objectOrder.length !== ids.length || new Set(value.objectOrder).size !== ids.length ||
+          value.objectOrder.some(id => !ids.includes(id))) fail('objectOrder must be an exact permutation of new object source ids');
+    }
   }
 
   function receiptArrays(value) {

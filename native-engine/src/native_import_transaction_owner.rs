@@ -96,8 +96,21 @@ impl PreparedImportBatch {
 /// True when `candidate` is `origin` plus appended layers/records: same format, version, length and
 /// untouched folders/holders, every origin layer and record preserved in order as a prefix.
 fn derives_from(candidate: &ObjectDocument, origin: &ObjectDocument) -> bool {
+    derives_from_ordered(candidate, origin, false)
+}
+
+fn derives_from_ordered(
+    candidate: &ObjectDocument,
+    origin: &ObjectDocument,
+    explicit_order: bool,
+) -> bool {
     candidate.format == origin.format
-        && candidate.format_version == origin.format_version
+        && (candidate.format_version == origin.format_version
+            || (explicit_order
+                && origin.format_version == 1
+                && candidate.format_version == 2
+                && origin.composition_order.missing()
+                && !candidate.composition_order.missing()))
         && candidate.total_frames == origin.total_frames
         && candidate.property_holders == origin.property_holders
         && candidate.layer_folders == origin.layer_folders
@@ -133,13 +146,32 @@ impl ObjectFillOwner {
         origin: ObjectSnapshot,
         document: Option<ObjectDocument>,
     ) -> Result<PreparedImportBatch, DispatchErrorCode> {
+        self.seal_import_batch_ordered(origin, document, false)
+    }
+
+    fn seal_import_batch_ordered(
+        &self,
+        origin: ObjectSnapshot,
+        document: Option<ObjectDocument>,
+        explicit_order: bool,
+    ) -> Result<PreparedImportBatch, DispatchErrorCode> {
         self.check_import_pins(&origin)?;
         if let Some(candidate) = &document {
-            if !derives_from(candidate, origin.document()) {
+            if !derives_from_ordered(candidate, origin.document(), explicit_order)
+                || !assets::order_preserved(candidate, &origin, explicit_order)
+            {
                 return Err(DispatchErrorCode::InvalidRequest);
             }
             ObjectSnapshot::validate_drawing(candidate)
                 .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+            #[cfg(feature = "project_media_codec")]
+            if explicit_order {
+                if let Some(project) = origin.project() {
+                    ObjectSnapshot::check_candidate_saveable(
+                        &project.with_drawing(candidate.clone()),
+                    )?;
+                }
+            }
         }
         Ok(PreparedImportBatch {
             origin,

@@ -240,6 +240,26 @@ fn new_examples_and_closed_resource_negatives_validate_against_the_actual_transp
         let mut bad = example["response"].clone();
         bad["result"]["assets"] = json!([{"sourceId":"x","assetId":"native","record":{}}]);
         assert!(!validator.is_valid(&bad));
+        let mut ordered = example["request"].clone();
+        let mut order: Vec<_> = ["records", "raster", "text"]
+            .iter()
+            .flat_map(|key| ordered["payload"][*key].as_array().into_iter().flatten())
+            .map(|row| row["sourceId"].clone())
+            .collect();
+        order.reverse();
+        ordered["payload"]["objectOrder"] = json!(order);
+        assert!(validator.is_valid(&ordered));
+        assert!(request(&ordered["payload"]));
+        for invalid in [
+            Value::Null,
+            json!({}),
+            json!([null]),
+            json!(["duplicate", "duplicate"]),
+        ] {
+            ordered["payload"]["objectOrder"] = invalid;
+            assert!(!validator.is_valid(&ordered));
+            assert!(!request(&ordered["payload"]));
+        }
     }
 }
 
@@ -379,4 +399,35 @@ fn source_assets_share_retained_and_skip_ids_and_asset_only_sources_are_changing
         8,
         &asset_only["response"]["result"]
     ));
+}
+
+#[test]
+fn object_order_is_closed_exact_and_independent_of_canonical_receipts() {
+    let mut payload = mixed();
+    assert!(request(&payload));
+    payload["objectOrder"] = json!(["text-source", "raster-source"]);
+    assert!(request(&payload));
+    assert!(receipt_matches(&payload, &mixed_receipt()));
+    for invalid in [
+        Value::Null,
+        json!({}),
+        json!("text-source"),
+        json!([]),
+        json!([null]),
+        json!(["text-source"]),
+        json!(["text-source", "raster-source", "extra"]),
+        json!(["text-source", "text-source"]),
+        json!(["image-source", "raster-source"]),
+        json!(["origin-object", "raster-source"]),
+    ] {
+        payload["objectOrder"] = invalid;
+        assert!(!request(&payload), "{payload}");
+    }
+    assert!(request(
+        &json!({"command":"object.import.batch","layers":[],"records":[],"objectOrder":[]})
+    ));
+    payload["objectOrder"] = json!(["raster-source", "text-source"]);
+    let mut reordered = mixed_receipt();
+    reordered["objects"].as_array_mut().unwrap().reverse();
+    assert!(!receipt_matches(&payload, &reordered));
 }

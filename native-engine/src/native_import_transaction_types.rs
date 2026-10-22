@@ -113,6 +113,8 @@ pub(crate) struct ImportBatch {
     pub(crate) assets: Vec<ImportAsset>,
     pub(crate) raster: Vec<ImportRaster>,
     pub(crate) text: Vec<ImportText>,
+    /// Explicit new-object stack; absence retains canonical family ordering.
+    pub(crate) object_order: Option<Vec<String>>,
     pub(crate) skipped: Vec<ImportSkip>,
     pub(crate) unavailable: Vec<UnavailableElement>,
 }

@@ -325,3 +325,29 @@ test('retained assets, source assets and skips share one ID space and complete r
   }
   assert.doesNotThrow(() => contract.correlate(sourceExamples()[2].request, sourceExamples()[2].response));
 });
+
+
+test('objectOrder is an exact new-object permutation and never changes canonical receipt order', () => {
+  const payload = familyPayload();
+  payload.records = [{ sourceId: 'vector-source', record: record('L0', 0) }];
+  const order = ['text-source', 'vector-source', 'raster-source'];
+  ok(payload);
+  ok({ ...payload, objectOrder: order });
+  for (const value of [null, {}, 'text-source', [null], [], order.slice(1), [...order, 'extra'],
+    ['text-source', 'text-source', 'raster-source'], ['image-source', ...order.slice(1)],
+    ['L0', ...order.slice(1)], ['existing-origin', ...order.slice(1)]]) {
+    bad({ ...payload, objectOrder: value });
+  }
+  ok({ command: contract.COMMAND, layers: [], records: [], objectOrder: [] });
+  const example = structuredClone(itemExamples()[0]);
+  example.request.payload = { ...payload, objectOrder: order };
+  example.response.result = { applied: true, historyEntriesAdded: 1, layers: [], skipped: [],
+    objects: ['vector-source', 'raster-source', 'text-source'].map((sourceId, i) => ({ sourceId, strokeId: `object:${i}` })),
+    assets: ['image-source', 'font-source'].map((sourceId, i) => ({ sourceId, assetId: `asset:${i}` })) };
+  assert.doesNotThrow(() => contract.correlate(example.request, example.response));
+  const reordered = structuredClone(example.response);
+  reordered.result.objects.reverse();
+  assert.throws(() => contract.correlate(example.request, reordered));
+  example.request.payload.objectOrder.reverse();
+  assert.doesNotThrow(() => contract.correlate(example.request, example.response));
+});

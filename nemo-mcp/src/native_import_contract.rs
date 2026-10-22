@@ -231,6 +231,25 @@ fn skip_ids<'a>(
         .map(|row| row.get("sourceId").and_then(Value::as_str))
 }
 
+fn object_order(payload: &Value, records: &[Value], raster: &[Value], text: &[Value]) -> bool {
+    let Some(order) = payload.get("objectOrder") else {
+        return true;
+    };
+    let Some(order) = order.as_array() else {
+        return false;
+    };
+    let expected: HashSet<_> = source_ids(records)
+        .chain(source_ids(raster))
+        .chain(source_ids(text))
+        .flatten()
+        .collect();
+    order.len() == records.len() + raster.len() + text.len()
+        && distinct(order.iter().map(|value| source_id(Some(value))))
+        && order
+            .iter()
+            .all(|value| value.as_str().is_some_and(|id| expected.contains(id)))
+}
+
 pub(crate) fn request(payload: &Value) -> bool {
     let Some(o) = exact(
         payload,
@@ -244,6 +263,7 @@ pub(crate) fn request(payload: &Value) -> bool {
             "sources",
             "documentSnapshotId",
             "lifecycleGeneration",
+            "objectOrder",
         ],
     ) else {
         return false;
@@ -270,6 +290,7 @@ pub(crate) fn request(payload: &Value) -> bool {
         return false;
     };
     o.get("command").and_then(Value::as_str) == Some(COMMAND)
+        && object_order(payload, records, raster, text)
         && (o.get("unavailable").is_none() || rows(o.get("unavailable"), unavailable_row).is_some())
         && distinct(source_ids(layers))
         && distinct(

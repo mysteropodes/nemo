@@ -25,7 +25,9 @@
 //! - a missing project envelope or required asset/font provider refuses the whole batch;
 //!   no item is dropped, no provider is faked and no empty project is synthesized.
 
-use crate::commands::{insert_order_element, ImportBatchResult, ImportSkipReport, OrderEditError};
+use crate::commands::{
+    insert_order_element, ImportBatchResult, ImportSkipReport, ObjectFillOwner, OrderEditError,
+};
 use crate::history::object_history::object_shot_kernels::object_import_remap_ids::{
     build_remap_table, OriginIds, RemapError, RemapKind, RemapTable, Resolved, SourceEntry,
 };
@@ -62,6 +64,9 @@ mod controls;
 #[cfg(test)]
 #[path = "../tests/native_import_transaction_dispatch.rs"]
 mod dispatch_tests;
+#[cfg(test)]
+#[path = "../tests/native_import_transaction_order.rs"]
+mod order_tests;
 #[cfg(test)]
 #[path = "../tests/native_import_transaction_rows.rs"]
 mod rows;
@@ -260,6 +265,22 @@ pub(crate) fn plan_import_batch(
     origin: &ObjectSnapshot,
     batch: &ImportBatch,
 ) -> Result<ImportPlan, ImportError> {
+    if let Some(order) = &batch.object_order {
+        let expected: std::collections::BTreeSet<_> = batch
+            .records
+            .iter()
+            .map(|item| item.source_id.as_str())
+            .chain(batch.raster.iter().map(|item| item.source_id.as_str()))
+            .chain(batch.text.iter().map(|item| item.source_id.as_str()))
+            .collect();
+        let supplied: std::collections::BTreeSet<_> = order.iter().map(String::as_str).collect();
+        if order.len() != batch.records.len() + batch.raster.len() + batch.text.len()
+            || supplied.len() != order.len()
+            || supplied != expected
+        {
+            return Err(ImportError::Payload);
+        }
+    }
     if let Some(missing) = batch.unavailable.first() {
         return Err(ImportError::ProviderUnavailable {
             source_id: missing.source_id.clone(),
@@ -343,6 +364,35 @@ pub(crate) fn plan_import_batch(
             .and_then(|project| project.asset_inventory())
     });
     assets::append_items(&mut document, batch, &ids, &table, inventory, &mut objects)?;
+    if let Some(order) = batch
+        .object_order
+        .as_ref()
+        .filter(|order| !order.is_empty())
+    {
+        let targets = order
+            .iter()
+            .map(|source| {
+                let native = table
+                    .native_id(RemapKind::Stroke, source)
+                    .ok_or(ImportError::Internal)?;
+                document
+                    .objects
+                    .iter()
+                    .map(|record| &record.target)
+                    .chain(
+                        document
+                            .item_records()
+                            .into_iter()
+                            .flat_map(|items| items.targets()),
+                    )
+                    .find(|target| target.stroke_id == native)
+                    .cloned()
+                    .ok_or(ImportError::Internal)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        document = ObjectFillOwner::prepare_import_object_order(origin, document, &targets)
+            .map_err(ImportError::Dispatch)?;
+    }
     if let Some(inventory) = inventory {
         crate::object_document::media_timing::object_media_link_edit::check_inventory(
             &document, inventory,

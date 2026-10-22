@@ -14,6 +14,9 @@
   // The user-visible line for a typed status that is not a success (success wording is the baseline's own toast, raised by the adapters).
   function noticeFor(result) {
     if (!result) return null;
+    if (result.reason === 'native_mixed_import_batch_unavailable') return 'Import PNG images separately from other file groups. Nothing was imported.';
+    if (result.reason === 'native_sequence_unavailable') return 'Image sequences are unavailable. Nothing was imported.';
+    if (result.reason === 'native_png_only') return 'Only PNG images can be imported here. Nothing was imported.';
     if (result.blocked) {
       // The native PNG-only reference group already raised the baseline toast; every other blocked group needs a provider.
       const groups = result.blocked.filter((b) => b.reason !== 'use-import-reference').map((b) => b.group);
@@ -62,7 +65,21 @@
     });
     const t = (key) => (root.SM && typeof root.SM.t === 'function' ? root.SM.t(key) : key);
     const notify = (message) => { try { if (typeof root.showToast === 'function') root.showToast(message); } catch (_) { /* a toast never fails an import */ } };
-    const surface = (result) => { const line = noticeFor(result); if (line) notify(line); return result; };
+    const surface = (result) => {
+      const retained = result && result.staging && result.staging.status === 'retained' ? result : null;
+      if (retained) notify(retained.status === 'imported'
+        ? 'The import is confirmed, but temporary resources still need cleanup.'
+        : 'Temporary import resources remain retained until the outcome is confirmed.');
+      if (result && result.staging && result.status === 'imported' && result.readback !== 'confirmed') notify('The import committed, but its view is not confirmed. Wait for synchronization before importing again.');
+      const line = noticeFor(result); if (line) notify(line); return result;
+    };
+    let stage = null;
+    try {
+      const module = root.NemoNativeImportPngStage, tauri = root.__TAURI__;
+      if (module && typeof module.create === 'function' && tauri && root.crypto && typeof root.crypto.randomUUID === 'function') {
+        stage = module.create({ core, fs: tauri.fs, path: tauri.path, uuid: () => root.crypto.randomUUID() });
+      }
+    } catch (_) { /* Missing staging ports are explicit unavailability, never a legacy writer. */ }
     const paper = () => { const P = root.paper; return { get project() { return P.project; }, Matrix: P.Matrix, Path: P.Path, CompoundPath: P.CompoundPath, Segment: P.Segment, Point: P.Point }; };
     const readText = overrides.readText || ((file) => (typeof file.text === 'function' ? file.text() : new Promise((resolve, reject) => {
       const r = new root.FileReader();
@@ -97,7 +114,7 @@
       importText: (text, opts) => svgRaw.importText(text, opts).then(surface), importFiles: (files, opts) => svgRaw.importFiles(files, opts).then(surface),
       importTexts: (items, opts) => svgRaw.importTexts(items, opts).then(surface), openFile: (opts) => svgRaw.openFile(opts).then(surface),
     });
-    // L06-M2: the ordinary image menu has a native path picker. DOM Files have no admitted native handle.
+    // The ordinary image menu keeps its native picker; DOM PNGs use owned staging for one batch.
     // PNG placement uses the declared native route; tests may explicitly disable it.
     const imageDeclared = overrides.imageRoute === undefined || overrides.imageRoute === true;
     let imagePending = false, imageRetired = false, imageUncertain = null;
@@ -149,9 +166,89 @@
       }
       return out;
     }
+    // The original images.js numeric-sequence classifier; unsupported temporal imports never become stills.
+    function baseName(path){var parts=path.split(/[\\/]/);return parts[parts.length-1];}
+    function detectSequence(paths) {
+      var re=/^(.*?)(\d+)(\.[^.]+)$/;
+      var buckets={};
+      paths.forEach(function(p){
+        var name=baseName(p);var m=re.exec(name);
+        if(!m)return;
+        var key=m[1]+'||'+m[3].toLowerCase();
+        (buckets[key]=buckets[key]||[]).push({path:p,num:parseInt(m[2],10),prefix:m[1]});
+      });
+      var bestKey=null;
+      Object.keys(buckets).forEach(function(k){if(buckets[k].length>=2&&(!bestKey||buckets[k].length>buckets[bestKey].length))bestKey=k;});
+      if(bestKey&&buckets[bestKey].length===paths.length){
+        var items=buckets[bestKey].slice().sort(function(a,b){return a.num-b.num;});
+        var prefix=items[0].prefix.replace(/[\s_\-]+$/,'')||'Sequence';
+        return{isSeq:true,items:items,prefix:prefix};
+      }
+      return{isSeq:false};
+    }
+    async function importPngFiles(fileList) {
+      if (!stage) return { status: 'unavailable', reason: 'native_drop_handle_absent' };
+      if (imageRetired || !imageDeclared) return { status: 'unavailable', reason: 'native_image_route_absent' };
+      if (imagePending) return { status: 'busy' };
+      const unresolved = uncertainImageStatus();
+      if (unresolved) return unresolved;
+      const files = Array.prototype.slice.call(fileList || []);
+      if (!files.length) return { status: 'nothing' };
+      if (files.some(file => !file || typeof file.name !== 'string' || !file.name ||
+          !(file.type === 'image/png' || /\.png$/i.test(file.name)))) return { status: 'unavailable', reason: 'native_png_only' };
+      if (detectSequence(files.map(file => file.name)).isSeq) return { status: 'unavailable', reason: 'native_sequence_unavailable' };
+      const started = core.begin();
+      if (!started.ok) return { status: started.status, reason: started.reason };
+      const ctx = started.ctx, state = root.state, symbol = state.activeSymbolId, activeLayer = state.activeLayerIdx;
+      const uid = activeLayerUid(), layer = ctx.before.layers.find(row => row.layerUid === uid);
+      if (!layer) return { status: 'unavailable', reason: 'native_active_layer_absent' };
+      if (layer.locked) { notify(t('toastInvalidLockedLayer')); return { status: 'refused', reason: 'layer' }; }
+      const hasSubscription = typeof ctx.session.readSubscriptionGeneration === 'function';
+      const subscription = hasSubscription ? ctx.session.readSubscriptionGeneration() : null;
+      const currentIntent = () => !imageRetired && current() === ctx.session && ctx.session.isActive() && root.state === state &&
+        state.currentFrame === ctx.frame && state.activeSymbolId === symbol && state.activeLayerIdx === activeLayer &&
+        activeLayerUid() === uid && samePins(ctx.session.info(), ctx.before) && sameSelection(selection(), ctx.selection) &&
+        (!hasSubscription || typeof ctx.session.readSubscriptionGeneration === 'function' && ctx.session.readSubscriptionGeneration() === subscription) &&
+        ctx.session.importBatch === ctx.write && root.NemoNativeObjectProjectFile.projectionReadyForUI(root, ctx.before) === true &&
+        m.core.presented(ctx.session, ctx.before, ctx.frame);
+      let attempt;
+      function outcome(value) {
+        if (value.status === 'unconfirmed' || value.indeterminate === true || value.status === 'imported' && value.readback !== 'confirmed') {
+          imageUncertain = { ctx, state, receipt: null, error: { code: 'image_batch_unconfirmed' } };
+        }
+        return value;
+      }
+      imagePending = true;
+      try {
+        attempt = stage.createAttempt(ctx, { current: currentIntent });
+        const batch = { layers: [], records: [], raster: [], sources: [], skipped: [], unavailable: [] };
+        for (const [index, file] of files.entries()) {
+          const source = await attempt.stageFile(`image:${index}:pixels`, file.name, file);
+          const size = attempt.dimensions(source.sourceId);
+          const fit = Math.min(1, ctx.before.canvasW / size.width, ctx.before.canvasH / size.height), offset = index * 24;
+          batch.sources.push(source);
+          batch.raster.push({ sourceId: `image:${index}:raster`, entry: {
+            target: { contextId: 'scene-root', frameScope: { kind: 'authored', frame: ctx.frame }, layerUid: uid, strokeId: '' },
+            item: { assetId: source.sourceId, x: ctx.before.canvasW / 2 + offset, y: ctx.before.canvasH / 2 + offset,
+              width: size.width * fit, height: size.height * fit, opacity: 1, rotation: 0 },
+          } });
+        }
+        const result = outcome(await attempt.submit(batch));
+        if (result.status === 'imported' && result.readback === 'confirmed') {
+          notify(files.length > 1 ? files.length + t('toastImagesImportedSuffix') : t('toastImageImported'));
+        }
+        return result;
+      } catch (error) {
+        const staging = attempt ? await attempt.abort() : { status: 'cleaned' };
+        const code = error && error.code;
+        const status = staging.reason === 'dispatch_may_have_started' ? 'unconfirmed'
+          : code === 'staging_stale' ? 'stale' : code === 'staging_cancelled' ? 'cancelled' : 'invalid';
+        return outcome({ status, reason: code || 'native_png_stage_failed', staging });
+      } finally { imagePending = false; }
+    }
     const image = Object.freeze({
-      available: () => false,
-      importFiles: async () => ({ status: 'unavailable', reason: 'native_drop_handle_absent' }),
+      available: () => !!stage && imageDeclared && !imageRetired,
+      importFiles: stage ? files => importPngFiles(files).then(surface) : importPngFiles,
       status: uncertainImageStatus,
       async recover() {
         if (imageRetired) return { status: 'unavailable', reason: 'retired' };
@@ -207,14 +304,15 @@
     });
     const drop = m.drop.create({
       svg, svgAvailable: () => core.begin().ok === true, providers: { image }, notify, surface,
+      admitDrop: (_files, plan) => !plan.groups.some(row => row.group === 'image') || plan.groups.length === 1,
       cancelPasteFallback: () => { if (root._svgPasteFallback) { root.clearTimeout(root._svgPasteFallback); root._svgPasteFallback = null; } },
     });
-    const figma = m.figma.create({ paper: paper(), core, t, notify, resizeCanvas, fetch: (...a) => root.fetch(...a) });
+    const figma = m.figma.create({ paper: paper(), core, stage, t, notify, resizeCanvas, fetch: (...a) => root.fetch(...a) });
     // ag-psd stays an unprofiled vendor module: its one literal dynamic import lives in the retained legacy loader psd-import-bridge.js
     // (patch 13), which hands the cached module promise over as `window.SMAgPsdLoader.load`. This profiled adapter carries no dynamic import.
     const loadAgPsd = () => (root.SMAgPsdLoader && typeof root.SMAgPsdLoader.load === 'function'
       ? root.SMAgPsdLoader.load() : Promise.reject(new Error('The ag-psd loader is unavailable')));
-    const psd = m.psd.create({ core, t, notify, readPsd: overrides.readPsd || m.psd.readerFor(loadAgPsd) });
+    const psd = m.psd.create({ core, stage, t, notify, readPsd: overrides.readPsd || m.psd.readerFor(loadAgPsd) });
     const montage = m.montage.create({ declared: () => false });
 
     // The panel wiring of the baseline psd-import-bridge.js and figma-import.js `init()` (same ids, same strings).
