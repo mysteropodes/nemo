@@ -36,9 +36,10 @@ function fixture(options = {}) {
   ], activePaletteIdx: 0, ...options.metadata };
   for (const key of Object.keys(metadata)) if (metadata[key] === undefined) delete metadata[key];
   let revision = 0, ticket = 1, serial = 0, active = true, running = 0, tail = Promise.resolve(), block = null;
-  let unavailable = options.unavailable === true;
+  let unavailable = options.unavailable === true, publicPresentation = true;
+  let presentation = { ...info, owner: 'native', status: 'presented' };
   const calls = [], prompts = [], notices = [], menus = [];
-  const projected = pin => ({ ...pin, presentation: { ...pin, owner: 'native', status: 'presented' } });
+  const projected = pin => ({ ...pin, presentation });
   let context, controller;
   function read(selector) {
     const list = metadata.palettes || [];
@@ -90,13 +91,14 @@ function fixture(options = {}) {
     return vm.runInContext('JSON.parse(' + JSON.stringify(JSON.stringify(response)) + ')', context);
   }
   const session = { info: () => info, isActive: () => active, requestId: () => 'palette-' + (++serial),
-    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: () => active && !running ? projected(info) : null,
+    readSubscriptionGeneration: () => ticket, readPresentedObjectSession: () => active && !running && publicPresentation ? projected(info) : null,
     runResourceCommand(action) {
       running++;
       const work = tail.then(() => { const origin = info;
         return action({ dispatch: q => root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', { dispatch }).dispatch(q),
           readPresentedObjectSession: () => active && running === 1 && info === origin ? projected(origin) : null,
           async reconcile(next) { assert.equal(next, revision); info = { ...info, contentRevision: revision, documentSnapshotId: 's' + revision };
+            presentation = { ...info, owner: 'native', status: 'presented' };
             controller.willProject(info); assert.equal(ProjectFile.refreshLayerTable(browserRoot, info), true);
             controller.presented(info); return info; } });
       }).finally(() => { running--; controller.presented(info); });
@@ -116,7 +118,7 @@ function fixture(options = {}) {
     localStorage: { getItem: () => null, setItem() {} }, pushUndo() { throw Error('legacy history'); } };
   root.window = root; root.globalThis = root; context = vm.createContext(root);
   const browserRoot = vm.runInContext('globalThis', context);
-  function project() { ProjectFile.projectView(browserRoot, info); }
+  function project() { presentation = { ...info, owner: 'native', status: 'presented' }; ProjectFile.projectView(browserRoot, info); }
   project();
   // The ordinary panel loads first, as it does in src/index.html.
   for (const file of ['palette-panel.js', 'adapters/native-palette-contract.js', 'adapters/native-application.js',
@@ -133,9 +135,14 @@ function fixture(options = {}) {
     async ready() { await controller.presented(); await settled(); },
     fullInfo: () => info, projectionReady: value => ProjectFile.projectionReadyForUI(browserRoot, value),
     drift() { root.state.canvasW++; }, repairProjection: project,
-    replace() { info = { ...info, documentId: 'replacement', lifecycleGeneration: 2 }; controller.willProject(info); project(); },
+    replace(next = { documentId: 'replacement', lifecycleGeneration: 2 }) {
+      info = { ...info, ...next }; revision = info.contentRevision; controller.willProject(info); project();
+    },
     resubscribe() { ticket++; }, retire() { active = false; controller.dispose(); },
-    refuse() { unavailable = true; },
+    refuse(value = true) { unavailable = value; },
+    renewPresentation() { presentation = { ...presentation }; },
+    present(value) { publicPresentation = value; },
+    rebind() { const replacement = { ...session }; root.NemoNativeObjectProject.desktop = () => replacement; },
     hold() { let entered, release; const started = new Promise(r => entered = r), wait = new Promise(r => release = r);
       block = { entered, wait }; return { started, release }; }
   };
@@ -243,6 +250,39 @@ test('unavailable read does not retry itself and a new presentation after pendin
   assert.equal(h.controller.read().info.documentId, 'replacement');
   assert.equal(h.edits().length, 1); assert.equal(h.elements['btn-palette-new'].disabled, false);
   assert.deepEqual(h.metadata(), before);
+});
+
+test('an unchanged failed Palette presentation stays unavailable across passive callbacks and temporary public fences', async () => {
+  const h = fixture({ unavailable: true });
+  h.present(false); await h.ready(); assert.equal(h.calls.length, 0, 'No real public presentation means no read attempt');
+  h.present(true); await h.ready(); assert.equal(h.calls.length, 1);
+  h.refuse(false);
+  await h.ready(); await h.ready(); assert.equal(h.calls.length, 1, 'A healthy transport alone does not authorize a retry');
+  h.present(false); await h.ready(); h.present(true); await h.ready();
+  assert.equal(h.calls.length, 1, 'A busy fence must preserve the prior failed-presentation stamp');
+  assert.equal(h.controller.read(), null); assert.equal(h.elements['btn-palette-new'].disabled, true);
+  assert.equal(h.edits().length, 0); assert.deepEqual(h.notices, []);
+  h.retire(); h.renewPresentation(); await h.ready(); assert.equal(h.calls.length, 1);
+});
+
+test('Palette read refusal permits recovery for a new presentation, owner, revision, subscription or projection epoch', async () => {
+  for (const change of ['presentation', 'session', 'document', 'revision', 'subscription', 'projection']) {
+    const h = fixture({ unavailable: true }); await h.ready();
+    const before = h.metadata(); assert.equal(h.calls.length, 1, change);
+    h.refuse(false); await h.ready(); assert.equal(h.calls.length, 1, change);
+    if (change === 'presentation') h.renewPresentation();
+    if (change === 'session') h.rebind();
+    if (change === 'document') h.replace();
+    if (change === 'revision') h.replace({ contentRevision: 1, documentSnapshotId: 's1' });
+    if (change === 'subscription') h.resubscribe();
+    if (change === 'projection') h.controller.willProject(h.fullInfo());
+    await h.ready();
+    assert.equal(h.calls.filter(q => q.payload.selector && q.payload.selector.kind === 'settings').length, 2, change);
+    assert.ok(h.controller.read(), change); assert.equal(h.elements['btn-palette-new'].disabled, false, change);
+    assert.deepEqual(h.metadata(), before, change); assert.equal(h.edits().length, 0, change);
+    const calls = h.calls.length; await h.ready(); assert.equal(h.calls.length, calls, change);
+    h.retire();
+  }
 });
 
 test('palette UI installation leaves browser palette DOM and button state unchanged', async () => {
