@@ -21,12 +21,18 @@ const J = (v) => JSON.stringify(v);
 
 function load(edits, host) {
   let source = fs.readFileSync(ADAPTER, 'utf8');
+  let plan = fs.readFileSync(path.join(path.dirname(ADAPTER), 'native-import-figma-plan.js'), 'utf8');
   for (const [from, to] of edits || []) {
-    assert.equal(source.split(from).length, 2, `mutation anchor must occur exactly once: ${from}`);
-    source = source.replace(from, to);
+    assert.equal((source + plan).split(from).length, 2, `mutation anchor must occur exactly once: ${from}`);
+    if (source.includes(from)) source = source.replace(from, to); else plan = plan.replace(from, to);
   }
+  const prepared = { exports: {} };
+  new Function('module', 'exports', plan)(prepared, prepared.exports);
   const m = { exports: {} };
-  new Function('module', 'exports', 'require', 'globalThis', source)(m, m.exports, (name) => (name === './native-import-svg.js' ? svg : require(name)), host || globalThis);
+  new Function('module', 'exports', 'require', 'globalThis', source)(m, m.exports, name => {
+    if (name === './native-import-svg.js') return svg;
+    assert.equal(name, './native-import-figma-plan.js'); return prepared.exports;
+  }, host || globalThis);
   return m.exports;
 }
 // Everything the oracle row records, rebuilt from the plan (the font key is a provider answer the plan does not hold).
@@ -275,8 +281,14 @@ function catalogHost(extra) {
   const start = source.indexOf('var VECTOR_FONTS = {'), end = source.indexOf('var _vectorFontAssets =', start);
   assert.ok(start >= 0 && end > start);
   const fonts = new Function(source.slice(start, end) + ';return VECTOR_FONTS;')();
+  const sources = new Map(Object.keys(fonts).map(key => [key, { kind: 'bundled', fontKey: key }]));
   Object.assign(fonts, extra);
-  return { SMVectorText: { VECTOR_FONTS: fonts, addGoogleFont() { assert.fail('no individual font import'); } } };
+  if (extra) {
+    assert.deepEqual(Object.keys(extra), ['Google:Poppins-Regular']);
+    sources.set('Google:Poppins-Regular', { kind: 'google', family: 'Poppins', weight: 400, italic: false });
+  }
+  return { SMVectorText: { VECTOR_FONTS: fonts, addGoogleFont() { assert.fail('no individual font import'); },
+    readCatalog: () => Object.keys(fonts).map(key => ({ key, label: fonts[key].label, source: sources.get(key) || null })) } };
 }
 function textCase(families) {
   const value = structuredClone(flowOf('text-variants'));
@@ -312,6 +324,8 @@ function textPort(host, options) {
   } });
   const boundary = makePorts(h), core = coreModule.create(boundary.ports);
   const adapter = load([], host).create({ paper: helper.port(paper, miniSvg), core, t: k => TEMPLATES.en[k],
+    // Explicit controlled readonly owner port; the production adapter never reads this legacy fixture object.
+    readCatalog: () => host.SMVectorText && host.SMVectorText.readCatalog(),
     notify: m => notifications.push(m), resizeCanvas: async (w, hh) => { resized.push([w, hh]); return 'applied'; } });
   return { h, calls, core, adapter, notifications, resized, selection: boundary.selection };
 }
@@ -417,7 +431,7 @@ test('unconfirmed family is explicit unavailable; catalog registration is read a
 function readonlyHost(reply) {
   const host = catalogHost(), lookups = [];
   host.atob = globalThis.atob;
-  host.opentype = require('../src/opentype.min.js');
+  host.opentype = require('../src/js/opentype.min.js');
   host.__TAURI__ = { core: { invoke: async (command, args) => {
     assert.equal(command, 'fetch_google_font');
     lookups.push(structuredClone(args));

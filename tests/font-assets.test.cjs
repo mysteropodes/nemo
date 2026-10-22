@@ -232,3 +232,72 @@ test('actual native Bold caller imports only on explicit request and awaits pars
 });
 
 test('retained non-native bridge keeps its four original warmups',async()=>{const b=bridge(s=>{delete s.__TAURI__;});await settle();assert.deepEqual(b.reads,['fonts/Roboto-Regular.ttf','fonts/Roboto-Bold.ttf','fonts/DejaVuSans.ttf','fonts/DejaVuSerif.ttf']);assert.deepEqual(b.nativeImports,[]);});
+
+
+test('genuine bootstrap binds copied frozen catalog metadata without any readonly IO or publication', async () => {
+  const b = bridge(), owner = b.sandbox.NemoFontAssets;
+  const first = owner.readCatalog();
+  assert.equal(first.length, 8);
+  assert.deepEqual(JSON.parse(JSON.stringify(first[0])), { key: 'Roboto-Regular', label: 'Roboto',
+    source: { kind: 'bundled', fontKey: 'Roboto-Regular' } });
+  assert.equal(Object.isFrozen(first), true);
+  assert.equal(Object.isFrozen(first[0]), true);
+  assert.equal(Object.isFrozen(first[0].source), true);
+  assert.notEqual(owner.readCatalog(), first);
+  await b.api.addGoogleFont('Catalog Family');
+  const calls = b.nativeImports.length, current = owner.readCatalog();
+  assert.deepEqual(JSON.parse(JSON.stringify(current.find(row => row.key === 'Google:Catalog Family-Regular').source)),
+    { kind: 'google', family: 'Catalog Family', weight: 400, italic: false });
+  assert.equal(first.length, 8, 'earlier snapshots never acquire a later registration');
+  b.api.VECTOR_FONTS.External = { label: 'External', url: 'external.ttf' };
+  assert.equal(owner.readCatalog().find(row => row.key === 'External').source, null, 'unknown entries cannot fabricate native source metadata');
+  assert.equal(b.nativeImports.length, calls);
+  assert.deepEqual(b.reads, []);
+  assert.deepEqual(b.invocations, []);
+});
+
+test('catalog binding disposal is owner-specific and never retires a newer actual instance', () => {
+  const b = bridge(), owner = b.sandbox.NemoFontAssets;
+  const first = b.sandbox._vectorFontAssets;
+  const next = owner.create({ fonts: { 'Inter-Regular': { label: 'Inter', url: 'fonts/Inter-Regular.ttf' } },
+    initialSources: { 'Inter-Regular': { kind: 'bundled', fontKey: 'Inter-Regular' } } });
+  next.bindCatalog();
+  first.dispose();
+  assert.deepEqual(JSON.parse(JSON.stringify(owner.readCatalog())), [
+    { key: 'Inter-Regular', label: 'Inter', source: { kind: 'bundled', fontKey: 'Inter-Regular' } },
+  ]);
+  assert.equal(first.readCatalog(), null);
+  next.dispose();
+  assert.equal(next.readCatalog(), null);
+  assert.equal(owner.readCatalog(), null);
+  assert.throws(() => next.bindCatalog(), /disposed/);
+  assert.deepEqual(b.nativeImports, []);
+  assert.deepEqual(b.reads, []);
+  assert.deepEqual(b.invocations, []);
+});
+
+
+test('generic initial catalog keys never fabricate source metadata and explicit provenance is copied', () => {
+  const b = bridge(), owner = b.sandbox.NemoFontAssets;
+  const fonts = { A: { label: 'External A', url: 'external.ttf' },
+    'Google:Looks-Regular': { label: 'Looks', url: null },
+    'Inter-Regular': { label: 'Custom Inter', url: 'fonts/Inter-Regular.ttf' } };
+  const generic = owner.create({ fonts });
+  assert.deepEqual(JSON.parse(JSON.stringify(generic.readCatalog().map(row => row.source))), [null, null, null]);
+  const actual = owner.readCatalog().find(row => row.key === 'Inter-Regular');
+  const supplied = { 'Inter-Regular': { ...actual.source } };
+  const explicit = owner.create({ fonts, initialSources: supplied });
+  supplied['Inter-Regular'].fontKey = 'mutated';
+  const metadata = explicit.readCatalog();
+  assert.deepEqual(JSON.parse(JSON.stringify(metadata.map(row => row.source))),
+    [null, null, { kind: 'bundled', fontKey: 'Inter-Regular' }]);
+  assert.equal(Object.isFrozen(metadata), true);
+  assert.equal(Object.isFrozen(metadata[2]), true);
+  assert.equal(Object.isFrozen(metadata[2].source), true);
+  assert.notEqual(explicit.readCatalog(), metadata);
+  generic.dispose(); explicit.dispose();
+  assert.equal(owner.readCatalog().length, 8, 'unbound custom instances never replace the genuine reader');
+  assert.deepEqual(b.nativeImports, []);
+  assert.deepEqual(b.reads, []);
+  assert.deepEqual(b.invocations, []);
+});

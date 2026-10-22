@@ -110,9 +110,15 @@ function figmaCaller(f, fetchImage) {
     addGoogleFont() { assert.fail('no individual font publication'); } } };
   const module = { exports: {} };
   new Function('module', 'exports', 'require', 'globalThis', fs.readFileSync(path.join(project, 'src/js/adapters/native-import-figma.js'), 'utf8'))
-    (module, module.exports, name => { assert.equal(name, './native-import-svg.js'); return Svg; }, host);
+    (module, module.exports, name => {
+      if (name === './native-import-svg.js') return Svg;
+      assert.equal(name, './native-import-figma-plan.js');
+      return require('../src/js/adapters/native-import-figma-plan.js');
+    }, host);
   const fetches = [], resized = [];
   const api = module.exports.create({ core: f.core, stage: f.stage, paper: Paper.port(paper, miniSvg), t: key => key,
+    readCatalog: () => Object.entries(host.SMVectorText.VECTOR_FONTS).map(([key, row]) =>
+      ({ key, label: row.label, source: { kind: 'bundled', fontKey: key } })),
     fetch: async url => {
       fetches.push(url);
       const response = fetchImage ? await fetchImage(url) : new Response(PNG, { headers: { 'Content-Length': String(PNG.length) } });

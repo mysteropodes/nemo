@@ -7,6 +7,9 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
+  var catalogReader = null;
+  function readCatalog() { return catalogReader ? catalogReader() : null; }
+
   function decodeBase64(base64) {
     var binary = atob(base64);
     var bytes = new Uint8Array(binary.length);
@@ -18,6 +21,27 @@
   // This cache is an asset cache, not native font persistence (D01/G27).
   function create(options) {
     var fonts = options.fonts;
+    var sources = new Map();
+    Object.keys(options.initialSources || {}).forEach(function(key) {
+      if (!Object.prototype.hasOwnProperty.call(fonts, key)) return;
+      var source = options.initialSources[key];
+      if (!source || typeof source !== 'object' || Array.isArray(source)) return;
+      var keys = Object.keys(source);
+      var bundled = source.kind === 'bundled' && keys.length === 2 &&
+        keys.every(function(k) { return ['kind','fontKey'].includes(k); }) && typeof source.fontKey === 'string';
+      var google = source.kind === 'google' && keys.length === 4 &&
+        keys.every(function(k) { return ['kind','family','weight','italic'].includes(k); }) && typeof source.family === 'string' &&
+        Number.isInteger(source.weight) && source.weight >= 1 && source.weight <= 1000 && typeof source.italic === 'boolean';
+      if (bundled || google) sources.set(key, Object.assign({}, source));
+    });
+    function catalog() {
+      if (!active) return null;
+      return Object.freeze(Object.keys(fonts).map(function(key) {
+        var source = sources.get(key);
+        return Object.freeze({key:key,label:fonts[key].label,source:source ? Object.freeze(Object.assign({},source)) : null});
+      }));
+    }
+    function bindCatalog() { requireActive(); catalogReader = catalog; }
     var cache = new Map();
     var active = true;
     var nativeResources = null;
@@ -31,7 +55,7 @@
         if(nativePending.has(token))return nativeReuse(nativePending.get(token),pin,signal);
         var pending=resources.importSource(source,signal).then(function(value){
           requireActive();if(resources.ownerKey()!==pin||signal&&signal.aborted)throw new Error('Native font selection changed');
-          if(spec)fonts[key]=spec;return value;
+          if(spec){fonts[key]=spec;sources.set(key,Object.assign({},source));}return value;
         }).catch(function(error){if(error.code!=='font_import_indeterminate'&&nativePending.get(token)===pending)nativePending.delete(token);throw error;});
         nativePending.set(token,pending);return pending.then(function(value){return value.font;});
       });
@@ -48,7 +72,7 @@
       if (!active) throw new Error('font assets disposed');
     }
 
-    function request(key, readBytes, acceptedSpec) {
+    function request(key, readBytes, acceptedSpec, source) {
       if (!active) return Promise.reject(new Error('font assets disposed'));
       if (cache.has(key)) return cache.get(key);
       var pending = Promise.resolve().then(function () {
@@ -61,7 +85,7 @@
         requireActive();
         if (!font) throw new Error('font parser returned no font');
         // A failed or disposed load must never advertise an accepted font.
-        if (acceptedSpec) fonts[key] = acceptedSpec;
+        if (acceptedSpec) { fonts[key] = acceptedSpec; sources.set(key, Object.assign({}, source)); }
         return font;
       }).catch(function (error) {
         if (cache.get(key) === pending) cache.delete(key);
@@ -112,7 +136,7 @@
           if (!response.ok) throw new Error('Google Fonts: family not found or fetch failed');
           return response.arrayBuffer();
         });
-      }, { url: null, label: family + (weight >= 600 ? ' Bold' : '') });
+      }, { url: null, label: family + (weight >= 600 ? ' Bold' : '') }, {kind:'google',family:family,weight:weight,italic:!!italic});
     }
 
     function addGoogle(family) {
@@ -127,6 +151,8 @@
 
     function dispose() {
       active = false;
+      if (catalogReader === catalog) catalogReader = null;
+      sources.clear();
       cache.clear();
       nativePending.clear();
       if(nativeResources)nativeResources.dispose();
@@ -141,12 +167,12 @@
       return active && cache.has(key);
     }
 
-    return Object.freeze({ fonts: fonts, load: load, googleWeight: googleWeight,
+    return Object.freeze({ fonts: fonts, readCatalog: catalog, bindCatalog: bindCatalog, load: load, googleWeight: googleWeight,
       addGoogle: addGoogle, hasLoad: hasLoad,
       importNativeSource: function(source, signal){if(!active)return Promise.reject(new Error('font assets disposed'));if(!options.nativeResources)return Promise.reject(new Error('Native font resources unavailable'));return native().importSource(source,signal);},
       discoverNative: function(){return native().discover();},
       loadNativeAsset: function(assetId){return native().loadAsset(assetId);}, dispose: dispose });
   }
 
-  return Object.freeze({ create: create });
+  return Object.freeze({ create: create, readCatalog: readCatalog });
 }));

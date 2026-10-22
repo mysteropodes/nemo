@@ -93,6 +93,7 @@ function fixture(options) {
         objects: payload.raster.map((row, i) => ({ sourceId: row.sourceId, strokeId: 'native-image:' + revision + ':' + i })),
         assets: payload.sources.map((row, i) => ({ sourceId: row.sourceId, assetId: 'native-asset:' + revision + ':' + i })) } };
   } });
+  root.NemoNativeImportPngProvider = require('../src/js/adapters/native-import-png-provider.js');
   const controller = Desktop.install(root);
   async function drop(list) {
     let prevented = false;
