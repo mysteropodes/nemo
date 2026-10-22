@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 #[path = "object_media_video_link_wire.rs"]
 pub(crate) mod wire;
-use wire::{VideoIntent, VideoLink, MAX_PATH_BYTES};
+use wire::{VideoIntent, VideoLink, MAX_LOCATOR_BYTES};
 
 /// What the host's probe-then-close established about the canonical file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,7 +115,7 @@ impl ObjectFillOwner {
             return Err(refusal());
         }
         let source =
-            AssetSource::linked(facts.locator.clone(), MAX_PATH_BYTES).map_err(|_| refusal())?;
+            AssetSource::linked(facts.locator.clone(), MAX_LOCATOR_BYTES).map_err(|_| refusal())?;
         let project = origin.project().ok_or_else(refusal)?;
         let mut records = project
             .asset_inventory()

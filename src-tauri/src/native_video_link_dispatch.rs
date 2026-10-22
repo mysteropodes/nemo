@@ -50,26 +50,17 @@ pub(super) fn invoke_video(
         .transpose()
 }
 
-fn not_published(
-    request: &NativeApplicationRequest,
-    instance: &str,
-    message: &str,
-    indeterminate: bool,
-) -> Delivery {
-    let mut response = unavailable(
-        request,
-        instance,
-        request.expected_revision.unwrap_or(0),
-        message,
-        false,
-    );
-    if indeterminate {
-        response.error.as_mut().unwrap().details = Some(
-            serde_json::json!({"disposition":"indeterminate","committed":null,"retryExecution":false}),
-        );
-    }
+/// Nothing can have committed: the commit only runs in this call after a successful probe,
+/// and the owner was re-checked after the failure. Typed `notDispatched`, retryable.
+fn not_published(request: &NativeApplicationRequest, instance: &str, message: &str) -> Delivery {
     Delivery {
-        response,
+        response: unavailable(
+            request,
+            instance,
+            request.expected_revision.unwrap_or(0),
+            message,
+            false,
+        ),
         notification: None,
     }
 }
@@ -155,13 +146,11 @@ impl RevisionSync {
                         &request,
                         instance,
                         "native video source probe timed out before publication",
-                        true,
                     ),
                     _ => not_published(
                         &request,
                         instance,
                         "native video source refused before publication",
-                        false,
                     ),
                 });
             }

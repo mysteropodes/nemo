@@ -25,19 +25,20 @@ test('the operation is the T12 link op and the SDK admits it through the compose
 });
 test('closed payload: exact members, file source, bounded path and two intents only',()=>{
  assert.doesNotThrow(()=>Contract.payload(LINK,payload()));assert.doesNotThrow(()=>Contract.payload(LINK,payload({kind:'replace',placementId:'placement-video-1'})));
- const long='/'+'a'.repeat(4095);assert.doesNotThrow(()=>Contract.payload(LINK,{...payload(),source:{kind:'file',path:long}}));
+ const long='/'+'a'.repeat(2047);assert.doesNotThrow(()=>Contract.payload(LINK,{...payload(),source:{kind:'file',path:long}}));
  for(const mutate of [p=>delete p.lifecycleGeneration,p=>p.lifecycleGeneration=0,p=>p.lifecycleGeneration=1.5,p=>p.documentSnapshotId='',p=>p.documentSnapshotId='x'.repeat(129),
-  p=>p.extra=1,p=>p.source.bytes='AAAA',p=>p.source.kind='url',p=>p.source.path='',p=>p.source.path='/a\u0000b.mov',p=>p.source.path='/'+'a'.repeat(4096),
+  p=>p.extra=1,p=>p.source.bytes='AAAA',p=>p.source.kind='url',p=>p.source.path='',p=>p.source.path='/a\u0000b.mov',p=>p.source.path='/'+'a'.repeat(2048),
   p=>p.intent={kind:'replace'},p=>p.intent={kind:'replace',placementId:'  '},p=>p.intent={kind:'replace',placementId:'x'.repeat(256)},
   p=>p.intent={kind:'newLayer',placementId:'p1'},p=>p.intent={kind:'authoredFrame'},p=>p.intent=null,p=>p.source=null]){
   const p=payload();mutate(p);assert.throws(()=>Contract.payload(LINK,p),JSON.stringify(p).slice(0,120));assert.throws(()=>SDK.validateRequest(request(p)));
  }
  assert.throws(()=>Contract.payload('command.document.object.asset.attach',payload()));
 });
-test('closed result: applied once, positive source facts, scene-root target and no extra members',()=>{
+test('closed result: applied once, positive source facts, a bounded target context and no extra members',()=>{
  const q=request();assert.doesNotThrow(()=>Contract.result(LINK,response(q).result));
+ assert.doesNotThrow(()=>Contract.result(LINK,{...response(q).result,target:{contextId:'sym_comp',layerUid:'V'}}));
  for(const mutate of [r=>r.applied=false,r=>r.historyEntriesAdded=0,r=>delete r.sourceFrameCount,r=>r.sourceWidth=0,r=>r.sourceHeight=-1,r=>r.sourceFrameCount=1.5,
-  r=>r.extra=true,r=>r.target.contextId='symbol',r=>r.target.strokeId='s',r=>r.newLayer='yes',r=>r.assetId='',r=>r.placementId=null]){
+  r=>r.extra=true,r=>r.target.contextId='',r=>r.target.contextId='  ',r=>r.target.contextId='c'.repeat(256),r=>r.target.contextId='a\u0000b',r=>r.target.contextId=7,r=>r.target.strokeId='s',r=>r.newLayer='yes',r=>r.assetId='',r=>r.placementId=null]){
   const r=response(q).result;mutate(r);assert.throws(()=>Contract.result(LINK,r),JSON.stringify(r));
  }
 });
@@ -68,4 +69,20 @@ test('composition keeps another contract reachable and the video op first',()=>{
  const base={admitted:op=>op==='other',requiresRevision:()=>false,payload:()=>'base',result:()=>'base',correlate:()=>'base',paths:()=>new Set(['x'])};
  const joined=Contract.compose(base);assert.equal(joined.admitted('other'),true);assert.equal(joined.admitted(LINK),true);
  assert.equal(joined.payload('other',{}),'base');assert.throws(()=>joined.payload(LINK,{}));assert.equal(joined.requiresRevision('other'),false);
+});
+test('a replace inside a component correlates with its own context; a new layer must land in the scene root',async()=>{
+ const replace=request(payload({kind:'replace',placementId:'p1'})),fresh=request();
+ const inside=response(replace);inside.result.target.contextId='sym_comp';
+ assert.doesNotThrow(()=>Contract.correlate(replace,inside));
+ assert.equal((await SDK.createNativeApplicationAdapter('ui',{dispatch:async()=>inside}).dispatch(replace)).result.target.contextId,'sym_comp');
+ const moved=response(fresh);moved.result.target.contextId='sym_comp';
+ assert.throws(()=>Contract.correlate(fresh,moved),/video layer target mismatch/);
+});
+test('the advertised path bound fits the 4096-byte request with every other field at its maximum',()=>{
+ const id=n=>'a'.repeat(n),at=n=>({apiVersion:2,requestId:id(128),instanceId:id(128),documentId:id(128),expectedRevision:Number.MAX_SAFE_INTEGER,operation:LINK,
+  payload:{documentSnapshotId:id(128),lifecycleGeneration:Number.MAX_SAFE_INTEGER,source:{kind:'file',path:'/'+id(n-1)},intent:{kind:'replace',placementId:id(255)}}});
+ assert.equal(Contract.MAX_PATH_BYTES,2048);
+ assert.ok(Buffer.byteLength(JSON.stringify(at(2048)))<=4096);
+ assert.doesNotThrow(()=>SDK.validateRequest(at(2048)));
+ assert.throws(()=>SDK.validateRequest(at(2049)));
 });

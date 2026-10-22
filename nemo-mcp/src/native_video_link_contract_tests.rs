@@ -89,12 +89,14 @@ fn closed_payload_refuses_unknown_members_bad_paths_ids_and_a_missing_revision()
             "{pointer} = {value}"
         );
     }
-    // A 4097-byte path also breaks the 4096-byte request budget; both refuse it.
-    assert!(!crate::native_contract::video_link::request(
-        &json!({"documentSnapshotId":"s",
-        "lifecycleGeneration":1,"source":{"kind":"file","path":format!("/{}", "a".repeat(4096))},
+    // The advertised bound is the last accepted length; one byte more is refused.
+    let path = |n: usize| {
+        json!({"documentSnapshotId":"s",
+        "lifecycleGeneration":1,"source":{"kind":"file","path":format!("/{}", "a".repeat(n - 1))},
         "intent":{"kind":"newLayer"}})
-    ));
+    };
+    assert!(crate::native_contract::video_link::request(&path(2048)));
+    assert!(!crate::native_contract::video_link::request(&path(2049)));
     let mut missing = q;
     missing.expected_revision = None;
     assert!(missing.validate_input().is_err());
@@ -150,9 +152,17 @@ fn changed_owner_revision_intent_and_facts_do_not_correlate() {
             altered.result.as_mut().unwrap()[field] = value;
             assert!(validate_native_response(&altered, &q).is_err(), "{field}");
         }
-        let mut altered = r.clone();
-        altered.result.as_mut().unwrap()["target"]["contextId"] = json!("component");
-        assert!(!result(altered.result.as_ref().unwrap()));
+        for context in [
+            json!(""),
+            json!("  "),
+            json!("a\u{0}b"),
+            json!("c".repeat(256)),
+            json!(7),
+        ] {
+            let mut altered = r.clone();
+            altered.result.as_mut().unwrap()["target"]["contextId"] = context;
+            assert!(!result(altered.result.as_ref().unwrap()));
+        }
         let value = r.result.as_ref().unwrap();
         assert!(result(value) && revision_matches(&q, 8, value));
         assert!(!revision_matches(&q, 7, value));
@@ -205,4 +215,45 @@ fn ordinary_refusals_from_the_owner_correlate_without_a_result() {
         let r = refusal(&q, code, &q.instance_id, &q.document_id);
         assert!(validate_native_response(&r, &q).is_ok(), "{code}");
     }
+    // The host's probe timeout: typed notDispatched, relayed as an ordinary retryable refusal.
+    let mut timeout = refusal(&q, "unavailable", &q.instance_id, &q.document_id);
+    timeout.error.as_mut().unwrap().details =
+        Some(json!({"disposition":"notDispatched","committed":false,"retryExecution":false}));
+    assert!(validate_native_response(&timeout, &q).is_ok());
+}
+
+#[test]
+fn a_replace_inside_a_component_correlates_but_a_new_layer_stays_in_the_scene_root() {
+    let (q, r) = pair(json!({"kind":"replace","placementId":"p-comp"}));
+    let mut inside = r.clone();
+    inside.result.as_mut().unwrap()["target"]["contextId"] = json!("sym_comp");
+    assert!(result(inside.result.as_ref().unwrap()));
+    assert!(revision_matches(&q, 8, inside.result.as_ref().unwrap()));
+    assert!(validate_native_response(&inside, &q).is_ok());
+    let (q, r) = pair(json!({"kind":"newLayer"}));
+    let mut elsewhere = r.clone();
+    elsewhere.result.as_mut().unwrap()["target"]["contextId"] = json!("sym_comp");
+    assert!(result(elsewhere.result.as_ref().unwrap()));
+    assert!(!revision_matches(&q, 8, elsewhere.result.as_ref().unwrap()));
+    assert!(validate_native_response(&elsewhere, &q).is_err());
+}
+
+#[test]
+fn the_path_bound_fits_the_whole_request_with_every_other_field_at_its_maximum() {
+    let id = |n: usize| "a".repeat(n);
+    let at = |n: usize| -> NativeApplicationRequest {
+        serde_json::from_value(
+            json!({"apiVersion":2,"requestId":id(128),"instanceId":id(128),
+            "documentId":id(128),"expectedRevision":9_007_199_254_740_991_u64,"operation":OP,
+            "payload":{"documentSnapshotId":id(128),"lifecycleGeneration":9_007_199_254_740_991_u64,
+                "source":{"kind":"file","path":format!("/{}", id(n - 1))},
+                "intent":{"kind":"replace","placementId":id(255)}}}),
+        )
+        .unwrap()
+    };
+    let limit = serde_json::to_vec(&at(2048)).unwrap();
+    assert!(limit.len() <= 4096, "{}", limit.len());
+    let parsed = decode_native_request(&limit).unwrap();
+    assert!(parsed.validate().is_ok());
+    assert!(at(2049).validate_input().is_err());
 }

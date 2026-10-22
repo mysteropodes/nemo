@@ -8,7 +8,8 @@ use crate::native_contract::{bounded_identifier, exact};
 use serde_json::Value;
 
 pub(crate) const OP: &str = "command.document.object.asset.video.link";
-const MAX_PATH_BYTES: usize = 4096;
+/// Fits the 4096-byte request with every other field at its own maximum (1107 bytes).
+pub(crate) const MAX_PATH_BYTES: usize = 2048;
 const MAX_SAFE: u64 = 9_007_199_254_740_991;
 
 fn opaque(value: &Value) -> bool {
@@ -85,7 +86,8 @@ pub(crate) fn result(value: &Value) -> bool {
         && opaque(&value["assetId"])
         && opaque(&value["placementId"])
         && exact(&value["target"], &["contextId", "layerUid"], &[]).is_some()
-        && value["target"]["contextId"] == "scene-root"
+        // A replace names its placement's own context, which may be a component.
+        && opaque(&value["target"]["contextId"])
         && opaque(&value["target"]["layerUid"])
         && value["newLayer"].is_boolean()
         && ["sourceWidth", "sourceHeight", "sourceFrameCount"]
@@ -94,7 +96,8 @@ pub(crate) fn result(value: &Value) -> bool {
 }
 
 /// A receipt advances exactly one revision and names the placement its intent addressed:
-/// the request's own minted id for a new layer, the unchanged id for a replace.
+/// the request's own minted id in the scene root for a new layer, the unchanged id for a
+/// replace (whose target is the placement's own, echoed by the owner).
 pub(crate) fn revision_matches(
     request: &NativeApplicationRequest,
     revision: u64,
@@ -111,6 +114,7 @@ pub(crate) fn revision_matches(
         && if new_layer {
             value["placementId"].as_str()
                 == Some(format!("placement-{}", request.request_id).as_str())
+                && value["target"]["contextId"] == "scene-root"
         } else {
             value["placementId"] == intent["placementId"]
         }

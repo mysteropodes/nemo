@@ -6,7 +6,8 @@
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
   const LINK='command.document.object.asset.video.link';
-  const MAX_PATH_BYTES=4096,MAX_FACT=4294967295;
+  // The path bound fits the 4096-byte request with every other field at its maximum (1107 bytes).
+  const MAX_PATH_BYTES=2048,MAX_FACT=4294967295;
   function fail(message){throw new TypeError(message);}
   function plain(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function own(v,k){return Object.prototype.hasOwnProperty.call(v,k);}
@@ -40,7 +41,8 @@
     if(v.applied!==true||v.historyEntriesAdded!==1)fail('video link must apply once');
     opaque(v.assetId,'assetId');opaque(v.placementId,'placementId');
     exact(v.target,['contextId','layerUid'],'video target');
-    if(v.target.contextId!=='scene-root')fail('video target context invalid');opaque(v.target.layerUid,'layerUid');
+    // A replace names its placement's own context, which may be a component.
+    opaque(v.target.contextId,'contextId');opaque(v.target.layerUid,'layerUid');
     if(typeof v.newLayer!=='boolean')fail('newLayer invalid');
     int(v.sourceWidth,1,MAX_FACT);int(v.sourceHeight,1,MAX_FACT);int(v.sourceFrameCount,1,MAX_FACT);
   }
@@ -58,11 +60,11 @@
     if(res.newLayer!==(want.kind==='newLayer'))fail('video intent disposition mismatch');
     if(want.kind==='newLayer'){
       // The owner mints the placement from the request id and creates the layer at the published revision.
-      if(res.placementId!=='placement-'+q.requestId||!res.target.layerUid.startsWith('native-layer:'+next+':'))fail('video layer target mismatch');
+      if(res.placementId!=='placement-'+q.requestId||res.target.contextId!=='scene-root'||!res.target.layerUid.startsWith('native-layer:'+next+':'))fail('video layer target mismatch');
     }else if(res.placementId!==want.placementId)fail('video replace target mismatch');
   }
   function paths(op){
-    return op===LINK?new Set(['payload.source.path','payload.intent.placementId','result.assetId','result.placementId','result.target.layerUid']):new Set();
+    return op===LINK?new Set(['payload.source.path','payload.intent.placementId','result.assetId','result.placementId','result.target.contextId','result.target.layerUid']):new Set();
   }
   const api={admitted:op=>op===LINK,requiresRevision:op=>op===LINK,payload:payload,result:result,correlate:correlate,paths:paths};
   // The common SDK consumes one contract object; this joins it in front of another contract of the same interface

@@ -43,17 +43,32 @@ fn counts(owner: &NativeObjectHistory) -> (usize, usize, usize) {
     )
 }
 fn timed_project() -> NativeObjectHistory {
+    timed_project_in("scene-root")
+}
+/// The same timed placement, targeting `context` of an explicit two-context order plan
+/// when it is not the scene root (a placement inside a component).
+fn timed_project_in(context: &str) -> NativeObjectHistory {
     let linear = json!([{"x":0,"y":0},{"x":1,"y":1}]);
+    let mut drawing = json!({"format":"nemo.native-object-document","formatVersion":1,
+        "totalFrames":120,"layers":[{"layerUid":"L"}],"objects":[]});
+    if context != "scene-root" {
+        let layers = json!([{"layerUid":"L","naturalPosition":0,"order":{}}]);
+        drawing["formatVersion"] = json!(2);
+        drawing["compositionOrder"] = json!({"format":"nemo.native-object-order-plan",
+            "formatVersion":1,"documentFormatVersion":2,"migration":"explicit-plan-required",
+            "referencePolicy":"unresolved","contexts":[
+                {"contextId":"scene-root","layers":layers,"scopes":[]},
+                {"contextId":context,"layers":layers,"scopes":[]}]});
+    }
     let wire = json!({"format":"nemo.native-project-document","formatVersion":2,
         "project":{"canvasW":320,"canvasH":180,"fps":24},
-        "drawing":{"format":"nemo.native-object-document","formatVersion":1,
-            "totalFrames":120,"layers":[{"layerUid":"L"}],"objects":[]},
+        "drawing":drawing,
         "viewportReference":null,
         "assets":[
             {"id":"v1","name":"take","kind":"video","source":{"kind":"linked","locator":"/clips/old.mov"}},
             {"id":"a1","name":"score","kind":"audio","source":{"kind":"linked","locator":"score.wav"}}],
         "assetInventory":{"assetIds":["v1","a1"],"placements":[
-            {"id":"p1","assetId":"v1","target":{"kind":"drawing","contextId":"scene-root","layerUid":"L"},
+            {"id":"p1","assetId":"v1","target":{"kind":"drawing","contextId":context,"layerUid":"L"},
              "offsetFrames":5,"interpMode":"blend","frameBlend":true,"timeRemap":{"keys":[
                 {"frame":0,"v":[0],"curvePoints":linear,"hIn":[0,0],"hOut":[0,0]},
                 {"frame":10,"v":[19],"curvePoints":linear,"hIn":[0,0],"hOut":[0,0]}]}}]}});
@@ -372,4 +387,75 @@ fn wire_rejects_unknown_duplicate_positional_and_unbounded_members() {
             String::from_utf8_lossy(&bytes)
         );
     }
+}
+
+#[test]
+fn replace_inside_a_component_context_publishes_and_the_receipt_names_that_context() {
+    let mut owner = timed_project_in("sym_comp");
+    let input = request(
+        &owner,
+        "in-comp",
+        json!({"kind":"replace","placementId":"p1"}),
+    );
+    assert_eq!(owner.video_link_status(&input).unwrap(), None);
+    let reply = owner
+        .dispatch_video_link(&input, &facts("/clips/new.mov"))
+        .unwrap();
+    assert!(reply.is_ok(), "{reply:?}");
+    let receipt = result(&reply);
+    assert_eq!(
+        receipt["target"],
+        json!({"contextId":"sym_comp","layerUid":"L"})
+    );
+    assert_eq!(receipt["newLayer"], false);
+    assert_eq!(owner.history_depths(), (1, 0));
+    let file = saved(&owner);
+    assert_eq!(
+        file["assetInventory"]["placements"][0]["target"],
+        json!({"kind":"drawing","contextId":"sym_comp","layerUid":"L"})
+    );
+    assert_eq!(
+        file["assetInventory"]["placements"][0]["assetId"],
+        "asset-in-comp"
+    );
+    // A new layer is always created in the scene root, whatever context holds others.
+    let fresh = request(&owner, "comp-new", json!({"kind":"newLayer"}));
+    let reply = owner
+        .dispatch_video_link(&fresh, &facts("/clips/other.mov"))
+        .unwrap();
+    assert_eq!(result(&reply)["target"]["contextId"], "scene-root");
+}
+
+#[test]
+fn the_advertised_path_bound_fits_the_request_budget_with_every_other_field_at_its_maximum() {
+    use crate::commands::VideoLink;
+    let id = |n: usize| "a".repeat(n);
+    let at = |path_bytes: usize| {
+        json!({"apiVersion":2,"requestId":id(128),"instanceId":id(128),"documentId":id(128),
+            "expectedRevision":9_007_199_254_740_991_u64,
+            "operation":"command.document.object.asset.video.link",
+            "payload":{"documentSnapshotId":id(128),"lifecycleGeneration":9_007_199_254_740_991_u64,
+                "source":{"kind":"file","path":format!("/{}", id(path_bytes - 1))},
+                "intent":{"kind":"replace","placementId":id(255)}},
+            "cancelledBeforeDispatch":true})
+    };
+    let limit: OpacityRequest = serde_json::from_value(at(2048)).unwrap();
+    assert!(serde_json::to_vec(&limit).unwrap().len() <= 4096);
+    assert!(VideoLink::parse(&serde_json::to_vec(&limit.payload).unwrap()).is_ok());
+    let over: OpacityRequest = serde_json::from_value(at(2049)).unwrap();
+    assert!(VideoLink::parse(&serde_json::to_vec(&over.payload).unwrap()).is_err());
+    // Through the owner: the bound passes admission, one byte more is refused.
+    let mut owner = open_history();
+    let mut input = request(&owner, &id(128), json!({"kind":"newLayer"}));
+    input.payload["source"]["path"] = json!(format!("/{}", id(2047)));
+    assert_eq!(owner.video_link_status(&input).unwrap(), None);
+    assert!(owner
+        .dispatch_video_link(&input, &facts("/clips/take.mov"))
+        .unwrap()
+        .is_ok());
+    let mut longer = request(&owner, "longer", json!({"kind":"newLayer"}));
+    longer.payload["source"]["path"] = json!(format!("/{}", id(2048)));
+    let refused = owner.video_link_status(&longer).unwrap().unwrap();
+    assert_eq!(code(&refused), DispatchErrorCode::InvalidRequest);
+    assert_eq!(owner.history_depths(), (1, 0));
 }

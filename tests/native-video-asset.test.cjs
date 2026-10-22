@@ -19,12 +19,12 @@ function fixture(options={}){
  const root={state,_layerSel:[0],SM:{t:k=>k,nativeVideoPlacement:li=>{const uid=state.layers[li]&&state.layers[li].layerUid;return placements.has(uid)?{placementId:placements.get(uid),assetKind:'video'}:null;}},
   showToast:s=>toasts.push(s)};
  function answer(req){
-  if(options.refuse)return {apiVersion:2,requestId:req.requestId,instanceId:req.instanceId,documentId:req.documentId,contentRevision:pin.contentRevision,ok:false,error:{code:options.refuse,message:'Native video link refused.'}};
+  if(options.refuse)return {apiVersion:2,requestId:req.requestId,instanceId:req.instanceId,documentId:req.documentId,contentRevision:pin.contentRevision,ok:false,error:{code:options.refuse,message:'Native video link refused.',...(options.details?{details:options.details}:{})}};
   const next=req.expectedRevision+1,intent=req.payload.intent,fresh=intent.kind==='newLayer';
   const layerUid=fresh?'native-layer:'+next+':0':[...placements].find(([,id])=>id===intent.placementId)[0];
   const response={apiVersion:2,requestId:req.requestId,instanceId:req.instanceId,documentId:req.documentId,contentRevision:next,ok:true,
    result:{applied:true,historyEntriesAdded:1,assetId:'asset-'+req.requestId,placementId:fresh?'placement-'+req.requestId:intent.placementId,
-    target:{contextId:'scene-root',layerUid},newLayer:fresh,sourceWidth:32,sourceHeight:16,sourceFrameCount:12}};
+    target:{contextId:!fresh&&options.context||'scene-root',layerUid},newLayer:fresh,sourceWidth:32,sourceHeight:16,sourceFrameCount:12}};
   pin={...pin,contentRevision:next,documentSnapshotId:'native-object:document:'+next,layers:fresh?[...pin.layers,{layerUid,name:'B',visible:true,locked:false}]:pin.layers};
   if(fresh)placements.set(layerUid,response.result.placementId);
   state.layers=pin.layers.map(r=>({layerUid:r.layerUid}));
@@ -107,7 +107,9 @@ test('client refuses locally: no route, bad path, no picker, stale origin; cance
  await assert.rejects(Video.create(session,{videoRoute:true}).importPicked(),e=>e.code==='unavailable'&&e.reason==='picker_unavailable');
  await assert.rejects(client.importPath('/a.mov',{current:()=>false}),e=>e.code==='stale_revision');
  assert.equal(await client.importPicked(),null);assert.equal(h.requests.length,0);
- const long='/'+'a'.repeat(4000)+'.mov';await assert.rejects(client.importPath(long),e=>e.code==='invalid_request'&&e.reason==='request_size');assert.equal(h.requests.length,0);
+ // The advertised path bound is reachable; one byte more is refused locally before any request.
+ const over='/'+'a'.repeat(2044)+'.mov';await assert.rejects(client.importPath(over),e=>e.code==='invalid_request');assert.equal(h.requests.length,0);
+ const limit='/'+'a'.repeat(2043)+'.mov';assert.equal((await client.importPath(limit)).newLayer,true);assert.equal(h.requests[0].payload.source.path,limit);
 });
 test('ambiguous outcome replays the SAME request id and body; a later replay returns the stored receipt once',async()=>{
  const lost=fixture({lostAck:true}),client=Video.create(lost.root.NemoNativeObjectProject.desktop(lost.root),{videoRoute:true});
@@ -194,4 +196,27 @@ test('Replace refuses a placement the pinned read no longer names, and never rea
  assert.equal((await h.controller.video.replaceActive(null)).status,'invalid');
  const absent=fixture();footagePanel(absent);absent.root.NemoNativeImportController=null;
  assert.equal((await absent.replaceClick()).status,'unavailable');assert.equal(absent.requests.length,0);
+});
+test('a failing picker is an ordinary unavailable outcome that dispatches nothing and latches nothing',async()=>{
+ let calls=0;const h=fixture({pick:()=>{if(++calls===1)throw new Error('dialog plugin rejected');return '/footage/Take B.mov';}});
+ const failed=await h.menu();assert.equal(failed.status,'unavailable');assert.equal(failed.reason,'picker_failed');
+ assert.equal(h.requests.length,0);assert.equal(h.controller.video.status(),null);
+ assert.equal((await h.menu()).status,'imported');assert.equal(h.requests.length,1);
+});
+test('a host probe timeout reported notDispatched stays retryable and is never latched',async()=>{
+ const h=fixture({refuse:'unavailable',details:{disposition:'notDispatched',committed:false,retryExecution:false}});
+ const r=await h.menu();assert.equal(r.status,'unavailable');assert.equal(h.controller.video.status(),null);
+ assert.equal((await h.menu()).status,'unavailable');assert.equal(h.requests.length,2);assert.equal(h.picks.length,2);
+ const unknown=fixture({refuse:'unavailable',details:{disposition:'indeterminate',committed:null,retryExecution:false}});
+ assert.equal((await unknown.menu()).status,'unconfirmed');
+});
+test('importing a new layer inside a component is unavailable before the picker; Replace there still relinks',async()=>{
+ const h=fixture();h.state.activeSymbolId='sym_comp';
+ const r=await h.menu();assert.equal(r.status,'unavailable');assert.equal(r.reason,'component_context_import_unavailable');
+ assert.equal(h.picks.length,0);assert.equal(h.requests.length,0);assert.equal(h.controller.video.status(),null);
+ const replaced=await h.controller.video.replaceActive('p1');assert.equal(replaced.status,'replaced',JSON.stringify(replaced));assert.equal(h.requests.length,1);
+});
+test('a replace receipt naming another target context than the pinned read is not confirmed',async()=>{
+ const h=fixture({context:'sym_comp'});const r=await h.controller.video.replaceActive('p1');
+ assert.equal(r.status,'unconfirmed');assert.equal(r.recovery,'presentation');assert.equal(r.receipt.target.contextId,'sym_comp');assert.equal(h.requests.length,1);
 });

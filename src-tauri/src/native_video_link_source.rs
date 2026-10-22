@@ -29,7 +29,7 @@ pub(crate) fn probe(
     if path.contains('\0') || !Path::new(&path).is_absolute() {
         return Err("invalid native video source path".into());
     }
-    let resolved = PathBuf::from(path)
+    let resolved = PathBuf::from(&path)
         .canonicalize()
         .map_err(|_| "native video source unavailable")?;
     if !allowed(&resolved) {
@@ -47,7 +47,15 @@ pub(crate) fn probe(
     let info = decoder
         .open(&locator)
         .map_err(|_| "native video source could not be decoded")?;
+    // The decoder opened by path: the file it read must still be the one admitted above.
+    let unchanged = PathBuf::from(&path)
+        .canonicalize()
+        .is_ok_and(|again| again == resolved && allowed(&again))
+        && std::fs::metadata(&resolved).is_ok_and(|after| same_file(&metadata, &after));
     let closed = decoder.close(info.session);
+    if !unchanged {
+        return Err("native video source changed while it was probed".into());
+    }
     if info.width == 0 || info.height == 0 || info.frame_count == 0 {
         return Err("native video source reports no frames or dimensions".into());
     }
@@ -58,6 +66,19 @@ pub(crate) fn probe(
         height: info.height,
         frame_count: info.frame_count,
     })
+}
+
+/// The same file object: device and inode where the platform has them, else size and mtime.
+#[cfg(unix)]
+fn same_file(before: &std::fs::Metadata, after: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    after.is_file() && before.dev() == after.dev() && before.ino() == after.ino()
+}
+#[cfg(not(unix))]
+fn same_file(before: &std::fs::Metadata, after: &std::fs::Metadata) -> bool {
+    after.is_file()
+        && before.len() == after.len()
+        && before.modified().ok() == after.modified().ok()
 }
 
 /// Off-lock probe with the decoder the shell installed.
@@ -96,6 +117,8 @@ pub(crate) mod tests {
         pub(crate) info: Result<NativeVideoInfo, String>,
         pub(crate) opened: Vec<String>,
         pub(crate) closed: Vec<u64>,
+        /// Runs inside `open`: models the file changing between admission and decode.
+        pub(crate) during_open: Option<Box<dyn FnMut() + Send>>,
     }
     impl FakeDecoder {
         pub(crate) fn frames(frame_count: u32) -> Self {
@@ -108,12 +131,16 @@ pub(crate) mod tests {
                 }),
                 opened: Vec::new(),
                 closed: Vec::new(),
+                during_open: None,
             }
         }
     }
     impl NativeVideoDecoder for FakeDecoder {
         fn open(&mut self, path: &str) -> Result<NativeVideoInfo, String> {
             self.opened.push(path.to_owned());
+            if let Some(change) = self.during_open.as_mut() {
+                change();
+            }
             self.info.clone()
         }
         fn decode(&mut self, _: u64, _: u32) -> Result<Vec<u8>, String> {
@@ -209,6 +236,45 @@ pub(crate) mod tests {
             assert!(probe(file(&path), &|_| true, &mut decoder).is_err());
             assert_eq!(decoder.closed, vec![7], "{zeroed}");
         }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn a_file_replaced_or_retargeted_while_the_decoder_opens_is_refused_and_closed() {
+        let (directory, path) = fixture();
+        // Same path, another file object: a rename over the admitted file.
+        let swap = (path.clone(), directory.join("other.mov"));
+        let mut decoder = FakeDecoder::frames(48);
+        decoder.during_open = Some(Box::new(move || {
+            std::fs::write(&swap.1, b"other container").unwrap();
+            std::fs::rename(&swap.1, &swap.0).unwrap();
+        }));
+        assert!(probe(file(&path), &|_| true, &mut decoder).is_err());
+        assert_eq!(decoder.opened.len(), 1);
+        assert_eq!(decoder.closed, vec![7]);
+        #[cfg(unix)]
+        {
+            // A symlink retargeted to a file outside the scope after admission.
+            let inside = directory.join("inside.mov");
+            let outside = directory.join("outside.mov");
+            std::fs::write(&inside, b"inside").unwrap();
+            std::fs::write(&outside, b"outside").unwrap();
+            let link = directory.join("link.mov");
+            std::os::unix::fs::symlink(&inside, &link).unwrap();
+            let admitted = inside.canonicalize().unwrap();
+            let retarget = (link.clone(), outside.clone());
+            let mut decoder = FakeDecoder::frames(48);
+            decoder.during_open = Some(Box::new(move || {
+                std::fs::remove_file(&retarget.0).unwrap();
+                std::os::unix::fs::symlink(&retarget.1, &retarget.0).unwrap();
+            }));
+            assert!(probe(file(&link), &|seen| seen == admitted, &mut decoder).is_err());
+            assert_eq!(decoder.closed, vec![7]);
+        }
+        // Unchanged, the same probe still succeeds.
+        let mut decoder = FakeDecoder::frames(48);
+        decoder.during_open = Some(Box::new(|| {}));
+        assert!(probe(file(&path), &|_| true, &mut decoder).is_ok());
         std::fs::remove_dir_all(directory).unwrap();
     }
 }

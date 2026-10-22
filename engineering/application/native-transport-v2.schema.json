@@ -14396,7 +14396,7 @@
         "source",
         "intent"
       ],
-      "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract.",
+      "description": "T12: link one desktop video file. The host canonicalizes the path inside the request filesystem scope and probes width, height and frame count; the owner publishes one revision. Whitespace-only or NUL-bearing ids and paths are refused by the contract. The path bound (2048 bytes) fits the 4096-byte request with every other field at its maximum.",
       "properties": {
         "documentSnapshotId": {
           "$ref": "#/$defs/Identifier"
@@ -14420,7 +14420,7 @@
             "path": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 4096
+              "maxLength": 2048
             }
           }
         },
@@ -14474,7 +14474,7 @@
         "sourceHeight",
         "sourceFrameCount"
       ],
-      "description": "T12: one applied linked-video revision. A new layer names the placement minted from its request id; a replace names the unchanged placement id.",
+      "description": "T12: one applied linked-video revision. A new layer names the placement minted from its request id in the scene root; a replace names the unchanged placement id and its own target, whose context may be a component.",
       "properties": {
         "applied": {
           "const": true
@@ -14501,7 +14501,9 @@
           ],
           "properties": {
             "contextId": {
-              "const": "scene-root"
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
             },
             "layerUid": {
               "type": "string",

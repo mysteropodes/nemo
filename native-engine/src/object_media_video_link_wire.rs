@@ -4,8 +4,11 @@ use crate::commands::object_fill_owner::image_import::wire::closed_map;
 use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 
-/// Path and request budgets of the public descriptor.
-pub(crate) const MAX_PATH_BYTES: usize = 4096;
+/// The request path bound of the public descriptor: it fits the 4096-byte request with
+/// every other field at its own maximum (1107 bytes), so the advertised bound is reachable.
+pub(crate) const MAX_PATH_BYTES: usize = 2048;
+/// The stored canonical locator may be longer than the request path (symlinks resolve).
+pub(crate) const MAX_LOCATOR_BYTES: usize = 4096;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]

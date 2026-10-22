@@ -311,7 +311,7 @@ async fn scope_relative_directory_decoder_failure_and_zero_frames_publish_nothin
 }
 
 #[tokio::test]
-async fn a_probe_that_outlives_its_limit_is_indeterminate_and_publishes_nothing() {
+async fn a_probe_that_outlives_its_limit_is_not_dispatched_and_a_retry_still_publishes() {
     let state = state();
     let original = save(&state);
     let reply = state
@@ -331,8 +331,23 @@ async fn a_probe_that_outlives_its_limit_is_indeterminate_and_publishes_nothing(
         .unwrap()
         .response;
     let details = refused_before_publication(&reply);
-    assert_eq!(details["disposition"], "indeterminate");
+    assert_eq!(details["disposition"], "notDispatched");
+    assert_eq!(details["committed"], false);
     assert_eq!(save(&state), original);
+    // The refusal was not retained: the exact same request still publishes once.
+    let retried = state
+        .revisions
+        .dispatch_video_using(
+            state.instance_id(),
+            &state.native_state(),
+            input(&state, "slow", json!({"kind":"newLayer"})),
+            false,
+            |_| async { Ok(facts("/canonical/clip.mov", 48)) },
+        )
+        .await
+        .unwrap()
+        .response;
+    assert!(retried.ok, "{retried:?}");
 }
 
 #[tokio::test]

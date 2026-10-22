@@ -48,8 +48,9 @@
       const shown = !retired && current() === ctx.session && ctx.session.isActive() && sameOwner(after, ctx.before) &&
         after.contentRevision === receipt.contentRevision && receipt.contentRevision === ctx.before.contentRevision + 1 &&
         root.state === state && state.currentFrame === ctx.frame && projected(after) && ports.presented(ctx.session, after, ctx.frame);
+      // A replace must name the exact target the pinned placement read presented.
       const placed = Array.isArray(after.layers) && after.layers.some((row) => row.layerUid === receipt.target.layerUid) &&
-        (!replace || receipt.target.layerUid === ctx.intent.layerUid);
+        (!replace || receipt.target.layerUid === ctx.intent.layerUid && receipt.target.contextId === ctx.intent.contextId);
       if (!shown || !placed) {
         uncertain = { ctx, state, receipt, error: null };
         return status() || { status: 'unconfirmed', code: 'video_owner_changed', receipt };
@@ -88,6 +89,8 @@
       if (pending) return { status: 'busy' };
       const unresolved = status();
       if (unresolved) return unresolved;
+      // The owner creates every new linked layer in the scene root, which a component editor does not present.
+      if (placementId === undefined && root.state && root.state.activeSymbolId) return { status: 'unavailable', reason: 'component_context_import_unavailable' };
       const started = core.begin();
       if (!started.ok) return { status: started.status, reason: started.reason };
       const base = started.ctx, state = root.state, symbol = state.activeSymbolId, activeLayer = state.activeLayerIdx;
@@ -98,7 +101,8 @@
         // The pinned placement read must still name this placement on the active layer of the presented snapshot.
         if (!row || !state.layers[activeLayer] || state.layers[activeLayer].layerUid !== row.layerUid || !read || read.placementId !== placementId)
           return { status: 'stale', reason: 'placement_changed' };
-        intent = { kind: 'replace', placementId, layerUid: row.layerUid };
+        // The pinned read is the layer timing view of the scene-root context (native-object-project readLayerView).
+        intent = { kind: 'replace', placementId, layerUid: row.layerUid, contextId: 'scene-root' };
       }
       const ctx = Object.freeze(Object.assign({}, base, { intent: Object.freeze(intent) }));
       if (typeof ctx.session.readSubscriptionGeneration !== 'function') return { status: 'unavailable', reason: 'native_subscription_identity_absent' };

@@ -50,7 +50,8 @@
       var blocked=gate();if(blocked)return blocked;
       options=Object.assign({},options||{});options.origin=options.origin||originPin();
       if(typeof pick!=='function')throw fault('unavailable','picker_unavailable','Video import is unavailable');
-      var path=await pick();
+      // A picker failure dispatched nothing: it is an ordinary unavailable outcome, never an unknown commit.
+      var path;try{path=await pick();}catch(error){throw fault('unavailable','picker_failed','Video picker failed: '+(error&&error.message||error));}
       return path==null?null:send(path,options);
     }
     // null when the picker was cancelled; a receipt otherwise.
