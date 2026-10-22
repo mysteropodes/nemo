@@ -102,7 +102,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'object_document::ObjectDocument', 'object_frame_packet::ObjectFrameSelector',
       'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::StagedArtifactPort',
       'protocol::OP_JOB_EXPORT_PNG_BEGIN', 'scheduler::OutputSpec', 'object_document::FrameScopeKind',
-      'export_job::MAX_OBJECT_EXPORT_FRAMES', 'history::ImportAssetSource'],
+      'export_job::MAX_OBJECT_EXPORT_FRAMES', 'commands::LinkedVideoFacts', 'native_media_frame_export::NativeVideoDecoder', 'native_media_frame_export::NativeVideoInfo', 'history::ImportAssetSource'],
     'rust.desktop.mcp.adapter.tests': [
       'application::REPRODUCTION_FIXTURE',
       'application::ResourceResolutionError', 'application::ResourceResolutionErrorKind',
@@ -179,7 +179,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'object_frame_packet::ObjectFrameSelector', 'object_snapshot::ObjectSnapshot',
       'render_scene::ScheduledFrameIdentity', 'resource_leases::WorkId', 'scheduler::OutputSpec',
       'object_codec::encode_storage_project', 'desktop_viewport::ObjectPreviewView',
-      'object_render_scene::prepare_object_camera_viewport_composition'],
+      'object_render_scene::prepare_object_camera_viewport_composition', 'commands::LinkedVideoFacts', 'native_media_frame_export::NativeVideoDecoder'],
     'rust.desktop.native.dispatch': [
       'application::ApplicationReleaseReceipt', 'application::ExportResourceResolver',
       'application::NativeApplication', 'commands::DispatchErrorCode', 'commands::OpacityRequest',
@@ -210,7 +210,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'desktop_viewport::ObjectPreviewView', 'desktop_viewport::ObjectPreviewNavigation',
       'desktop_viewport::ObjectViewProjection', 'desktop_viewport::ObjectPresentedFrame',
       'object_render_scene::prepare_object_navigated_viewport_composition', 'application::ObjectBrushRuntime',
-      'object_render_scene::ObjectBrushAdmission', 'export_job::export_object_frames_with_materializer',
+      'object_render_scene::ObjectBrushAdmission', 'export_job::export_object_frames_with_materializer', 'commands::LinkedVideoFacts',
       'history::ImportAssetSource'],
     'rust.desktop.media': [
       'native_media_frame_export::NativeVideoDecoder', 'native_media_frame_export::NativeVideoInfo'],
