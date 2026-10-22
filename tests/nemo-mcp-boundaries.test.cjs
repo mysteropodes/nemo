@@ -31,6 +31,9 @@ test('all MCP transport and desktop-host Rust modules have actual size enforceme
     'src-tauri/src/native_raster_image_source.rs',
     'src-tauri/src/native_revision_sync.rs',
     'src-tauri/src/native_revision_sync_tests.rs',
+    'src-tauri/src/native_video_link_dispatch.rs',
+    'src-tauri/src/native_video_link_dispatch_tests.rs',
+    'src-tauri/src/native_video_link_source.rs',
   ].sort();
   assert.deepEqual(declared, discovered);
   assert.deepEqual(rustProfile.exceptions, []);
