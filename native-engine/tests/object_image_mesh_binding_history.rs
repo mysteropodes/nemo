@@ -22,22 +22,6 @@ fn wire(owner: &NativeObjectHistory) -> Value {
     serde_json::from_slice(&support::bytes(owner)).unwrap()
 }
 
-fn payload(action: Value) -> Value {
-    json!({"command":"object.image.mesh.edit","action":action})
-}
-
-fn attach(target: Value) -> Value {
-    payload(json!({"kind":"attach","target":target,"mesh":mesh()}))
-}
-
-fn detach(target: Value) -> Value {
-    payload(json!({"kind":"detach","target":target}))
-}
-
-fn duplicate(layer: &str) -> Value {
-    payload(json!({"kind":"duplicate","contextId":"scene-root","layerUid":layer}))
-}
-
 fn request(owner: &NativeObjectHistory, id: &str, body: Value) -> Value {
     json!({"apiVersion":2,"requestId":id,"instanceId":owner.instance_id(),
         "documentId":owner.document_id(),"expectedRevision":owner.content_revision(),
@@ -186,6 +170,35 @@ fn assert_component_frames(owner: &NativeObjectHistory, mesh_id: Option<&str>) {
             std::ptr::eq(entry, source),
             "the packet borrows its retained raster"
         );
+        let targets: Vec<_> = snapshot
+            .document()
+            .item_records()
+            .unwrap()
+            .targets()
+            .collect();
+        let expected: Vec<_> = targets
+            .iter()
+            .enumerate()
+            .filter(|(_, target)| target.context_id() == "component-A" && target.frame() == frame)
+            .map(|(index, _)| index)
+            .collect();
+        let order = packet.numeric_order().unwrap();
+        let actual: Vec<_> = order.layers()[0]
+            .elements()
+            .iter()
+            .map(|element| element.source_object_index())
+            .collect();
+        assert_eq!(
+            actual, expected,
+            "component item order uses global retained target ordinals"
+        );
+        assert_eq!(packet.text_records().len(), expected.len() - 1);
+        for text in packet.text_records() {
+            assert!(std::ptr::eq(
+                &text.entry().target,
+                targets[text.source_index()]
+            ));
+        }
     }
 }
 
@@ -329,16 +342,7 @@ fn preparation_is_detached_and_discarded_stale_or_foreign_candidates_publish_not
 fn replay_cancellation_stale_and_malformed_payloads_cannot_publish_or_erase_redo() {
     let mut owner = support::owner(&drawing(24, None));
     let initial = support::state(&owner);
-    for (id, field, value, code) in [
-        (
-            "cancel",
-            "cancelledBeforeDispatch",
-            json!(true),
-            "cancelled_before_dispatch",
-        ),
-        ("stale", "expectedRevision", json!(99), "stale_revision"),
-        ("foreign", "documentId", json!("foreign"), "wrong_document"),
-    ] {
+    for (id, field, value, code) in refused_envelopes() {
         let mut request = request(&owner, id, attach(at(0)));
         request[field] = value;
         assert_error(&mut owner, &request, code);
@@ -389,16 +393,7 @@ fn real_save_reload_keeps_all_frame_tags_and_the_mesh_store() {
 fn absent_video_provider_is_typed_unavailable_and_preserves_the_owner() {
     let mut owner = support::owner(&drawing(24, None));
     let initial = support::state(&owner);
-    for (id, action) in [
-        (
-            "video-attach",
-            json!({"kind":"attachVideo","contextId":"scene-root","layerUid":"L0","mesh":mesh()}),
-        ),
-        (
-            "video-detach",
-            json!({"kind":"detachVideo","contextId":"scene-root","layerUid":"L0"}),
-        ),
-    ] {
+    for (id, action) in video_actions() {
         let request = request(&owner, id, payload(action));
         assert_error(&mut owner, &request, "unavailable");
         assert_eq!(support::state(&owner), initial);
@@ -492,6 +487,8 @@ fn required_component_references_survive_root_detach_and_component_writes_use_lo
     assert_component_frames(&owner, Some("im_2"));
     assert_tag(&owner, at(0), None);
     assert_tag(&owner, at(1), None);
+    let implicit = support::owner(&implicit_component_drawing());
+    assert_component_frames(&implicit, Some("im_1"));
 }
 
 #[test]

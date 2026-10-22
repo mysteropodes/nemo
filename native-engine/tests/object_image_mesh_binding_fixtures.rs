@@ -211,3 +211,62 @@ pub(super) fn component_timed_drawing() -> Value {
             "contextId":"scene-root","keys":[{"frame":0},{"frame":1},{"frame":2}],"samples":[]});
     value
 }
+
+pub(super) fn payload(action: Value) -> Value {
+    json!({"command":"object.image.mesh.edit","action":action})
+}
+
+pub(super) fn attach(target: Value) -> Value {
+    payload(json!({"kind":"attach","target":target,"mesh":mesh()}))
+}
+
+pub(super) fn detach(target: Value) -> Value {
+    payload(json!({"kind":"detach","target":target}))
+}
+
+pub(super) fn duplicate(layer: &str) -> Value {
+    payload(json!({"kind":"duplicate","contextId":"scene-root","layerUid":layer}))
+}
+
+pub(super) fn implicit_component_drawing() -> Value {
+    let mut value = component_timed_drawing();
+    value["compositionOrder"]["contexts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|context| context["contextId"] != "component-A");
+    value["items"]["text"] = json!((0..3)
+        .map(|frame| text(target(
+            "component-A",
+            "inner-only",
+            frame,
+            &format!("inner-text-{frame}")
+        )))
+        .collect::<Vec<_>>());
+    value
+}
+
+pub(super) fn video_actions() -> [(&'static str, Value); 2] {
+    [
+        (
+            "video-attach",
+            json!({"kind":"attachVideo","contextId":"scene-root","layerUid":"L0","mesh":mesh()}),
+        ),
+        (
+            "video-detach",
+            json!({"kind":"detachVideo","contextId":"scene-root","layerUid":"L0"}),
+        ),
+    ]
+}
+
+pub(super) fn refused_envelopes() -> [(&'static str, &'static str, Value, &'static str); 3] {
+    [
+        (
+            "cancel",
+            "cancelledBeforeDispatch",
+            json!(true),
+            "cancelled_before_dispatch",
+        ),
+        ("stale", "expectedRevision", json!(99), "stale_revision"),
+        ("foreign", "documentId", json!("foreign"), "wrong_document"),
+    ]
+}
