@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2388eadb90a75929ab0f4ba45a4fd1d4fed2c2b8",
-  "describe": "v0.7.0-alpha.4-2886-g2388eadb-dirty"
+  "head": "459da93f49f0ff3b44771abe2be0f0c271be7917",
+  "describe": "v0.7.0-alpha.4-2888-g459da93f-dirty"
  },
- "inputsDigest": "bf6a6577e49f3177e72ff8c99972a15426419145413f4427e1da354ed29e77aa",
+ "inputsDigest": "d9748842a99645549b877f7b04a5d6fc9fb66610ed9c3b749a32cabd5e46d331",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 248,
+   "native": 249,
    "export": 5,
    "animation": 443,
    "history": 355,
@@ -571,8 +571,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 2
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2221",
@@ -582,7 +584,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 56,
+    "functionsVisited": 137,
     "via": "variable input",
     "references": []
    },
@@ -979,7 +981,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 77,
+    "functionsVisited": 79,
     "via": "variable b",
     "references": [
      "src/js/bpm-grid.js:196 refresh()"
@@ -23843,7 +23845,7 @@
    "source": "src/js/markers.js:244",
    "meta": {
     "i18n": null,
-    "functionsVisited": 66
+    "functionsVisited": 68
    },
    "fixtures": [
     "static-props",
