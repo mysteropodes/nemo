@@ -35,15 +35,19 @@ fn request(state: &ApplicationMcp, id: &str) -> NativeApplicationRequest {
             "sources":[{"sourceId":"font","name":"Body","mediaType":"font/ttf",
                 "source":{"kind":"bundled","fontKey":"Roboto-Regular"}}]
         }
-    })).unwrap()
+    }))
+    .unwrap()
 }
 
 fn mixed(state: &ApplicationMcp, id: &str, path: &str) -> NativeApplicationRequest {
     let mut command = request(state, id);
-    command.payload["sources"].as_array_mut().unwrap().insert(0, json!({
-        "sourceId":"pixels","name":"Pixels","mediaType":"image/png",
-        "source":{"kind":"file","path":path}
-    }));
+    command.payload["sources"].as_array_mut().unwrap().insert(
+        0,
+        json!({
+            "sourceId":"pixels","name":"Pixels","mediaType":"image/png",
+            "source":{"kind":"file","path":path}
+        }),
+    );
     command.payload["layers"] = json!([{"sourceId":"page","name":"Imported"}]);
     let target = json!({"contextId":"scene-root","layerUid":"page","strokeId":"",
         "frameScope":{"kind":"authored","frame":0}});
@@ -60,14 +64,19 @@ fn mixed(state: &ApplicationMcp, id: &str, path: &str) -> NativeApplicationReque
 }
 
 fn png() -> Vec<u8> {
-    let corpus = include_str!("../../native-engine/tests/fixtures/object-raster-asset-attach/oracle.txt");
-    let row = corpus.lines()
+    let corpus =
+        include_str!("../../native-engine/tests/fixtures/object-raster-asset-attach/oracle.txt");
+    let row = corpus
+        .lines()
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
-        .find(|row| row["name"] == "blue-2x1").unwrap();
+        .find(|row| row["name"] == "blue-2x1")
+        .unwrap();
     let hex = row["hex"].as_str().unwrap();
-    (0..hex.len()).step_by(2)
-        .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).unwrap()).collect()
+    (0..hex.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).unwrap())
+        .collect()
 }
 
 struct ScopedPng(PathBuf);
@@ -85,10 +94,19 @@ impl Drop for ScopedPng {
 }
 
 fn subscribe(state: &ApplicationMcp) -> Value {
-    let binding = state.revisions.control(&state.native_state(), RevisionControl::Binding).unwrap();
-    state.revisions.control(&state.native_state(), RevisionControl::Subscribe {
-        binding: serde_json::from_value(binding.clone()).unwrap(),
-    }).unwrap();
+    let binding = state
+        .revisions
+        .control(&state.native_state(), RevisionControl::Binding)
+        .unwrap();
+    state
+        .revisions
+        .control(
+            &state.native_state(),
+            RevisionControl::Subscribe {
+                binding: serde_json::from_value(binding.clone()).unwrap(),
+            },
+        )
+        .unwrap();
     binding
 }
 
@@ -103,10 +121,18 @@ async fn scoped_file_and_actual_bundled_font_join_items_once_and_survive_history
     command.validate().unwrap();
     assert!(serde_json::to_vec(&command).unwrap().len() <= 4096);
     let allowed = file.0.canonicalize().unwrap();
-    let first = state.revisions.dispatch_scoped(
-        state.instance_id(), &state.native_state(), command.clone(), false,
-        Some(Arc::new(move |path| path == allowed.as_path())),
-    ).await.unwrap().response;
+    let first = state
+        .revisions
+        .dispatch_scoped(
+            state.instance_id(),
+            &state.native_state(),
+            command.clone(),
+            false,
+            Some(Arc::new(move |path| path == allowed.as_path())),
+        )
+        .await
+        .unwrap()
+        .response;
     assert!(first.ok, "{first:?}");
     assert_eq!(first.content_revision, 1);
     let result = first.result.as_ref().unwrap();
@@ -120,16 +146,31 @@ async fn scoped_file_and_actual_bundled_font_join_items_once_and_survive_history
     assert_eq!(document["project"], original["project"]);
     assert_eq!(document["assets"][0]["name"], "Pixels");
     assert_eq!(document["assets"][1]["name"], "Body");
-    assert_eq!(document["drawing"]["items"]["raster"][0]["item"]["assetId"], document["assets"][0]["id"]);
-    assert_eq!(document["drawing"]["items"]["text"][0]["block"]["font"]["assetId"], document["assets"][1]["id"]);
+    assert_eq!(
+        document["drawing"]["items"]["raster"][0]["item"]["assetId"],
+        document["assets"][0]["id"]
+    );
+    assert_eq!(
+        document["drawing"]["items"]["text"][0]["block"]["font"]["assetId"],
+        document["assets"][1]["id"]
+    );
     let reopened = ApplicationMcp::default();
     let (reopened_id, _, _) = reopened.install_native_project_file(&changed).unwrap();
     assert_eq!(saved(&reopened, &reopened_id), changed);
     drop(file);
     // Replay needs neither a live file nor a new filesystem permission.
-    let replay = state.revisions.dispatch_scoped(
-        state.instance_id(), &state.native_state(), command, false, None,
-    ).await.unwrap().response;
+    let replay = state
+        .revisions
+        .dispatch_scoped(
+            state.instance_id(),
+            &state.native_state(),
+            command,
+            false,
+            None,
+        )
+        .await
+        .unwrap()
+        .response;
     assert_eq!(replay, first);
     assert!(history(&state, id, "undo-batch", 1, false).ok);
     assert_eq!(saved(&state, id), initial);
@@ -138,7 +179,8 @@ async fn scoped_file_and_actual_bundled_font_join_items_once_and_survive_history
 }
 
 #[tokio::test]
-async fn real_authenticated_batch_requires_subscription_and_one_correlated_ack_then_replays_without_io() {
+async fn real_authenticated_batch_requires_subscription_and_one_correlated_ack_then_replays_without_io(
+) {
     let state = state();
     let command = request(&state, "wire-batch");
     let id = command.document_id.clone();
@@ -167,13 +209,24 @@ async fn real_authenticated_batch_requires_subscription_and_one_correlated_ack_t
     assert_eq!(saved(&state, &id), changed);
     assert!(history(&state, &id, "wire-undo", 1, false).ok);
     assert_eq!(saved(&state, &id), initial);
-    let replay = state.revisions.dispatch_import_batch_using(
-        state.instance_id(), &state.native_state(), command, false, |_| async {
-            panic!("retained source batch must not resolve again");
-            #[allow(unreachable_code)]
-            Ok(SourceBytes::Font(crate::application_mcp::font_source::FontBytes::Bundled(FONT)))
-        },
-    ).await.unwrap().response;
+    let replay = state
+        .revisions
+        .dispatch_import_batch_using(
+            state.instance_id(),
+            &state.native_state(),
+            command,
+            false,
+            |_| async {
+                panic!("retained source batch must not resolve again");
+                #[allow(unreachable_code)]
+                Ok(SourceBytes::Font(
+                    crate::application_mcp::font_source::FontBytes::Bundled(FONT),
+                ))
+            },
+        )
+        .await
+        .unwrap()
+        .response;
     assert_eq!(replay, first);
     assert!(history(&state, &id, "wire-redo", 2, true).ok);
     assert_eq!(saved(&state, &id), changed);
@@ -187,34 +240,55 @@ async fn all_sources_resolve_outside_locks_and_later_failure_or_invalid_bytes_pu
         let initial = saved(&state, &command.document_id);
         let native = state.native_state();
         let calls = Cell::new(0);
-        let response = state.revisions.dispatch_import_batch_using(
-            state.instance_id(), &native, command.clone(), false, |source| {
-                assert!(native.try_lock().is_ok());
-                assert!(state.revisions.0.try_lock().is_ok());
-                calls.set(calls.get() + 1);
-                let result = match source {
-                    BatchSource::Image(_) => Ok(SourceBytes::Image(png())),
-                    BatchSource::Font(_) if corrupt => Ok(SourceBytes::Font(
-                        crate::application_mcp::font_source::FontBytes::Downloaded(b"not-font".to_vec()),
-                    )),
-                    BatchSource::Font(_) => Err("second source failed".into()),
-                };
-                async move { result }
-            },
-        ).await.unwrap().response;
+        let response = state
+            .revisions
+            .dispatch_import_batch_using(
+                state.instance_id(),
+                &native,
+                command.clone(),
+                false,
+                |source| {
+                    assert!(native.try_lock().is_ok());
+                    assert!(state.revisions.0.try_lock().is_ok());
+                    calls.set(calls.get() + 1);
+                    let result = match source {
+                        BatchSource::Image(_) => Ok(SourceBytes::Image(png())),
+                        BatchSource::Font(_) if corrupt => Ok(SourceBytes::Font(
+                            crate::application_mcp::font_source::FontBytes::Downloaded(
+                                b"not-font".to_vec(),
+                            ),
+                        )),
+                        BatchSource::Font(_) => Err("second source failed".into()),
+                    };
+                    async move { result }
+                },
+            )
+            .await
+            .unwrap()
+            .response;
         assert!(!response.ok);
         assert_eq!(calls.get(), 2);
         assert_eq!(info(&state)["contentRevision"], 0);
         assert_eq!(saved(&state, &command.document_id), initial);
         if !corrupt {
-            assert_eq!(response.error.unwrap().details.unwrap()["disposition"], "indeterminate");
+            assert_eq!(
+                response.error.unwrap().details.unwrap()["disposition"],
+                "indeterminate"
+            );
         }
     }
 }
 
 #[tokio::test]
 async fn stale_cancel_lifecycle_and_foreign_identity_refuse_before_any_source_resolution() {
-    for mode in ["stale", "cancel", "lifecycle", "instance", "document", "snapshot"] {
+    for mode in [
+        "stale",
+        "cancel",
+        "lifecycle",
+        "instance",
+        "document",
+        "snapshot",
+    ] {
         let state = state();
         let mut command = request(&state, mode);
         let id = command.document_id.clone();
@@ -228,13 +302,24 @@ async fn stale_cancel_lifecycle_and_foreign_identity_refuse_before_any_source_re
             "snapshot" => command.payload["documentSnapshotId"] = json!("foreign"),
             _ => unreachable!(),
         }
-        let response = state.revisions.dispatch_import_batch_using(
-            state.instance_id(), &state.native_state(), command, false, |_| async {
-                panic!("preflight must stop source resolution");
-                #[allow(unreachable_code)]
-                Ok(SourceBytes::Font(crate::application_mcp::font_source::FontBytes::Bundled(FONT)))
-            },
-        ).await.unwrap().response;
+        let response = state
+            .revisions
+            .dispatch_import_batch_using(
+                state.instance_id(),
+                &state.native_state(),
+                command,
+                false,
+                |_| async {
+                    panic!("preflight must stop source resolution");
+                    #[allow(unreachable_code)]
+                    Ok(SourceBytes::Font(
+                        crate::application_mcp::font_source::FontBytes::Bundled(FONT),
+                    ))
+                },
+            )
+            .await
+            .unwrap()
+            .response;
         assert!(!response.ok, "{mode}");
         if mode == "instance" {
             assert_eq!(response.error.unwrap().code, "wrong_instance");
@@ -247,48 +332,81 @@ async fn stale_cancel_lifecycle_and_foreign_identity_refuse_before_any_source_re
 }
 
 #[tokio::test]
-async fn actual_scoped_source_denial_and_present_malformed_sources_never_fall_back_to_vector_import() {
+async fn actual_scoped_source_denial_and_present_malformed_sources_never_fall_back_to_vector_import(
+) {
     let state = state();
     let file = ScopedPng::new();
     let command = mixed(&state, "denied", file.0.to_str().unwrap());
     let initial = saved(&state, &command.document_id);
-    let response = state.revisions.dispatch_scoped(
-        state.instance_id(), &state.native_state(), command.clone(), false,
-        Some(Arc::new(|_| false)),
-    ).await.unwrap().response;
+    let response = state
+        .revisions
+        .dispatch_scoped(
+            state.instance_id(),
+            &state.native_state(),
+            command.clone(),
+            false,
+            Some(Arc::new(|_| false)),
+        )
+        .await
+        .unwrap()
+        .response;
     assert!(!response.ok);
     assert_eq!(saved(&state, &command.document_id), initial);
-    for malformed in [Value::Null, json!([]), json!({}), json!([{"sourceId":"partial"}])] {
+    for malformed in [
+        Value::Null,
+        json!([]),
+        json!({}),
+        json!([{"sourceId":"partial"}]),
+    ] {
         let mut invalid = request(&state, "malformed");
         invalid.payload["sources"] = malformed;
         assert!(is_import_batch_sources(&invalid));
         assert!(invalid.validate().is_err());
-        assert!(state.revisions.dispatch_scoped(
-            state.instance_id(), &state.native_state(), invalid, false, None,
-        ).await.is_err());
+        assert!(state
+            .revisions
+            .dispatch_scoped(
+                state.instance_id(),
+                &state.native_state(),
+                invalid,
+                false,
+                None,
+            )
+            .await
+            .is_err());
         assert_eq!(saved(&state, &command.document_id), initial);
     }
 }
 
 #[tokio::test]
 async fn actual_owner_release_during_source_resolution_prevents_late_batch_publication() {
-    use crate::{native_application::admit_release_request, native_application_contract::NativeReleaseRequest};
+    use crate::{
+        native_application::admit_release_request,
+        native_application_contract::NativeReleaseRequest,
+    };
     let state = state();
     let pin = info(&state);
     let command = request(&state, "late-batch");
     let native = state.native_state();
-    let response = state.revisions.dispatch_import_batch_using(
-        state.instance_id(), &native, command, false, |_| {
+    let response = state
+        .revisions
+        .dispatch_import_batch_using(state.instance_id(), &native, command, false, |_| {
             assert!(native.try_lock().is_ok());
             assert!(state.revisions.0.try_lock().is_ok());
             let release: NativeReleaseRequest = serde_json::from_value(json!({
                 "apiVersion":2,"requestId":"close-batch","instanceId":state.instance_id(),
                 "documentId":pin["documentId"],"expectedRevision":0
-            })).unwrap();
+            }))
+            .unwrap();
             admit_release_request(&native, &release).unwrap();
-            async { Ok(SourceBytes::Font(crate::application_mcp::font_source::FontBytes::Bundled(FONT))) }
-        },
-    ).await.unwrap().response;
+            async {
+                Ok(SourceBytes::Font(
+                    crate::application_mcp::font_source::FontBytes::Bundled(FONT),
+                ))
+            }
+        })
+        .await
+        .unwrap()
+        .response;
     assert!(!response.ok);
     assert!(native.lock().unwrap().active().is_none());
 }

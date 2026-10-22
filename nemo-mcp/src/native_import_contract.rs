@@ -235,8 +235,16 @@ pub(crate) fn request(payload: &Value) -> bool {
     let Some(o) = exact(
         payload,
         &["command", "layers", "records"],
-        &["skipped", "unavailable", "assets", "raster", "text", "sources",
-            "documentSnapshotId", "lifecycleGeneration"],
+        &[
+            "skipped",
+            "unavailable",
+            "assets",
+            "raster",
+            "text",
+            "sources",
+            "documentSnapshotId",
+            "lifecycleGeneration",
+        ],
     ) else {
         return false;
     };
@@ -271,7 +279,11 @@ pub(crate) fn request(payload: &Value) -> bool {
                 .chain(skip_ids(skipped, "element")),
         )
         && distinct(skip_ids(skipped, "layer"))
-        && distinct(source_ids(assets).chain(source_ids(sources)).chain(skip_ids(skipped, "asset")))
+        && distinct(
+            source_ids(assets)
+                .chain(source_ids(sources))
+                .chain(skip_ids(skipped, "asset")),
+        )
 }
 
 pub(crate) fn result(value: &Value) -> bool {
@@ -343,7 +355,10 @@ fn receipt_matches(payload: &Value, value: &Value) -> bool {
         .collect::<Vec<_>>();
     let mapped_assets = optional_rows(value, "assets", asset_row).unwrap();
     let ordered_items = ["raster", "text"].iter().any(|key| {
-        payload.get(*key).and_then(Value::as_array).is_some_and(|rows| !rows.is_empty())
+        payload
+            .get(*key)
+            .and_then(Value::as_array)
+            .is_some_and(|rows| !rows.is_empty())
     });
     let empty = Vec::new();
     let skipped = payload
@@ -358,11 +373,16 @@ fn receipt_matches(payload: &Value, value: &Value) -> bool {
             == Some(!layers.is_empty() || !records.is_empty() || !assets.is_empty())
         && mapped_rows_match(layers, value["layers"].as_array().unwrap(), "layerUid")
         && mapped_rows_match(&records, value["objects"].as_array().unwrap(), "strokeId")
-        && (!ordered_items || records.iter().zip(value["objects"].as_array().unwrap()).all(|(a, b)| {
-            a["sourceId"] == b["sourceId"]
-        }))
+        && (!ordered_items
+            || records
+                .iter()
+                .zip(value["objects"].as_array().unwrap())
+                .all(|(a, b)| a["sourceId"] == b["sourceId"]))
         && mapped_rows_match(&assets, mapped_assets, "assetId")
-        && assets.iter().zip(mapped_assets).all(|(a, b)| a["sourceId"] == b["sourceId"])
+        && assets
+            .iter()
+            .zip(mapped_assets)
+            .all(|(a, b)| a["sourceId"] == b["sourceId"])
         && value["skipped"].as_array() == Some(skipped)
 }
 

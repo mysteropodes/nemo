@@ -31,8 +31,12 @@ fn raster(value: &Value) -> bool {
         value,
         &["assetId", "x", "y", "width", "height"],
         &[
-            "opacity", "rotation", "isBitmapBrush", "brushGroupId",
-            "isBrushTextureCopy", "meshId",
+            "opacity",
+            "rotation",
+            "isBitmapBrush",
+            "brushGroupId",
+            "isBrushTextureCopy",
+            "meshId",
         ],
     )
     .is_some_and(|o| {
@@ -43,19 +47,24 @@ fn raster(value: &Value) -> bool {
             && positive(o.get("height"))
             && o.get("rotation").is_none_or(|n| finite(Some(n)))
             && o.get("opacity").is_none_or(|n| {
-                n.as_f64().is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n))
+                n.as_f64()
+                    .is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n))
             })
-            && ["isBitmapBrush", "isBrushTextureCopy"].iter().all(|k| {
-                o.get(*k).is_none_or(Value::is_boolean)
-            })
-            && ["brushGroupId", "meshId"].iter().all(|k| o.get(*k).is_none_or(tag))
+            && ["isBitmapBrush", "isBrushTextureCopy"]
+                .iter()
+                .all(|k| o.get(*k).is_none_or(Value::is_boolean))
+            && ["brushGroupId", "meshId"]
+                .iter()
+                .all(|k| o.get(*k).is_none_or(tag))
     })
 }
 
 fn font(value: &Value) -> bool {
     match value["kind"].as_str() {
         Some("bundled") => exact(value, &["kind", "fontKey"], &[]).is_some_and(|o| {
-            o.get("fontKey").and_then(Value::as_str).is_some_and(|key| FONTS.contains(&key))
+            o.get("fontKey")
+                .and_then(Value::as_str)
+                .is_some_and(|key| FONTS.contains(&key))
         }),
         Some("asset") => exact(value, &["kind", "assetId"], &[])
             .is_some_and(|o| source_id(o.get("assetId")).is_some()),
@@ -77,15 +86,25 @@ fn text(value: &Value) -> bool {
     exact(
         value,
         &["text", "font", "size", "color", "align", "anchorTopLeft"],
-        &["fixedWidth", "fixedHeight", "bold", "italic", "underline", "strike",
-            "letterSpacing", "wordSpacing", "lineHeightMult", "textCase"],
+        &[
+            "fixedWidth",
+            "fixedHeight",
+            "bold",
+            "italic",
+            "underline",
+            "strike",
+            "letterSpacing",
+            "wordSpacing",
+            "lineHeightMult",
+            "textCase",
+        ],
     )
     .is_some_and(|o| {
         o["text"].as_str().is_some_and(|s| {
-            !s.contains('\0') && s.encode_utf16().count() <= 65536
+            !s.contains('\0')
+                && s.encode_utf16().count() <= 65536
                 && s.chars().any(|c| !trim_space(c))
-        })
-            && font(&o["font"])
+        }) && font(&o["font"])
             && positive(o.get("size"))
             && o["color"].as_str().is_some_and(|s| {
                 s.strip_prefix('#').is_some_and(|hex| {
@@ -94,16 +113,16 @@ fn text(value: &Value) -> bool {
             })
             && matches!(o["align"].as_str(), Some("left" | "center" | "right"))
             && point(o.get("anchorTopLeft"))
-            && ["fixedWidth", "fixedHeight"].iter().all(|k| {
-                o.get(*k).is_none_or(|n| n.is_null() || positive(Some(n)))
-            })
+            && ["fixedWidth", "fixedHeight"]
+                .iter()
+                .all(|k| o.get(*k).is_none_or(|n| n.is_null() || positive(Some(n))))
             && o.get("lineHeightMult").is_none_or(|n| positive(Some(n)))
-            && ["letterSpacing", "wordSpacing"].iter().all(|k| {
-                o.get(*k).is_none_or(|n| finite(Some(n)))
-            })
-            && ["bold", "italic", "underline", "strike"].iter().all(|k| {
-                o.get(*k).is_none_or(Value::is_boolean)
-            })
+            && ["letterSpacing", "wordSpacing"]
+                .iter()
+                .all(|k| o.get(*k).is_none_or(|n| finite(Some(n))))
+            && ["bold", "italic", "underline", "strike"]
+                .iter()
+                .all(|k| o.get(*k).is_none_or(Value::is_boolean))
             && o.get("textCase").is_none_or(|v| {
                 matches!(v.as_str(), Some("none" | "upper" | "lower" | "capitalize"))
             })
@@ -119,9 +138,8 @@ pub(super) fn asset_row(value: &Value) -> bool {
 fn item_row(value: &Value, member: &str, check: fn(&Value) -> bool) -> bool {
     exact(value, &["sourceId", "entry"], &[]).is_some_and(|o| {
         source_id(o.get("sourceId")).is_some()
-            && exact(&o["entry"], &["target", member], &[]).is_some_and(|entry| {
-                target(entry.get("target")) && check(&entry[member])
-            })
+            && exact(&o["entry"], &["target", member], &[])
+                .is_some_and(|entry| target(entry.get("target")) && check(&entry[member]))
     })
 }
 
@@ -154,21 +172,26 @@ fn source_row(value: &Value) -> bool {
             && source_id(o.get("name")).is_some()
             && match o["mediaType"].as_str() {
                 Some("image/png") => exact(&o["source"], &["kind", "path"], &[]).is_some_and(|s| {
-                    s["kind"] == "file" && s["path"].as_str().is_some_and(|path| {
-                        !path.contains('\0') && std::path::Path::new(path).is_absolute()
-                    })
+                    s["kind"] == "file"
+                        && s["path"].as_str().is_some_and(|path| {
+                            !path.contains('\0') && std::path::Path::new(path).is_absolute()
+                        })
                 }),
                 Some("font/ttf") => {
                     let source = &o["source"];
                     if source["kind"] == "bundled" {
                         font(source)
                     } else {
-                        exact(source, &["kind", "family", "weight", "italic"], &[]).is_some_and(|s| {
-                            s["kind"] == "google"
-                                && source_id(s.get("family")).is_some()
-                                && s["weight"].as_u64().is_some_and(|n| (1..=1000).contains(&n))
-                                && s["italic"].is_boolean()
-                        })
+                        exact(source, &["kind", "family", "weight", "italic"], &[]).is_some_and(
+                            |s| {
+                                s["kind"] == "google"
+                                    && source_id(s.get("family")).is_some()
+                                    && s["weight"]
+                                        .as_u64()
+                                        .is_some_and(|n| (1..=1000).contains(&n))
+                                    && s["italic"].is_boolean()
+                            },
+                        )
                     }
                 }
                 _ => false,
@@ -179,11 +202,14 @@ fn source_row(value: &Value) -> bool {
 pub(super) fn source_rows(payload: &Value) -> Option<&[Value]> {
     if payload.get("sources").is_none() {
         return (payload.get("documentSnapshotId").is_none()
-            && payload.get("lifecycleGeneration").is_none()).then_some(&[]);
+            && payload.get("lifecycleGeneration").is_none())
+        .then_some(&[]);
     }
     let rows = optional_rows(payload, "sources", source_row)?;
     let snapshot = payload["documentSnapshotId"].as_str()?;
     let lifecycle = payload["lifecycleGeneration"].as_u64()?;
-    ((1..=1024).contains(&rows.len()) && crate::contract::bounded_identifier(snapshot)
-        && (1..=9_007_199_254_740_991).contains(&lifecycle)).then_some(rows)
+    ((1..=1024).contains(&rows.len())
+        && crate::contract::bounded_identifier(snapshot)
+        && (1..=9_007_199_254_740_991).contains(&lifecycle))
+    .then_some(rows)
 }

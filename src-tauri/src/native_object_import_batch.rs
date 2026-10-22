@@ -13,7 +13,8 @@ impl NativeObjectHost {
         if self.released.is_some() {
             return Err("native import batch owner released".into());
         }
-        self.history.import_batch_sources_status(request)
+        self.history
+            .import_batch_sources_status(request)
             .map_err(|_| "native import batch request refused".into())
     }
 
@@ -26,7 +27,9 @@ impl NativeObjectHost {
             return Err("native import batch owner released".into());
         }
         let before = self.content_revision();
-        let response = self.history.dispatch_import_batch_sources(request, sources)
+        let response = self
+            .history
+            .dispatch_import_batch_sources(request, sources)
             .map_err(|_| "native import batch request refused".to_owned())?;
         if self.content_revision() != before {
             self.preview.invalidate();

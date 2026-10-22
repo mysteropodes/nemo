@@ -1,7 +1,7 @@
 //! Negative controls use the actual project, provider, planner and dispatcher.
 //! A refusal or abandoned candidate must preserve the entire saved envelope and redo.
 use super::asset_tests::{new_png, png_batch, project_bytes, project_history, raster, text};
-use super::{ImportAsset, ImportBatch, ImportError, ImportSkip, SkipKind};
+use super::{ImportAsset, ImportBatch, ImportError, ImportRaster, ImportRecord, ImportSkip, SkipKind};
 use crate::object_document::{AssetId, AssetKind, AssetRecord, AssetSource};
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::json;
@@ -376,25 +376,41 @@ fn project_item_import_cannot_bypass_the_shared_compound_refusal_or_consume_redo
     let mut owner = project_history(2);
     let resource = new_png(&owner, "pixels", "compound-retained-png");
     let allocation = Arc::clone(resource.record.source().encoded_allocation().unwrap());
-    let retained = owner.prepare_import_batch(&ImportBatch {
-        assets: vec![resource],
-        ..ImportBatch::default()
-    }).unwrap();
+    let retained = owner
+        .prepare_import_batch(&ImportBatch {
+            assets: vec![resource],
+            ..ImportBatch::default()
+        })
+        .unwrap();
     let (_, receipt) = owner.commit_import_batch(retained).unwrap();
     let asset_id = AssetId::new(receipt.assets[0].1.clone()).unwrap();
-    let visibility = owner.prepare_layer_visibility_json(
-        br#"{"command":"object.layer.visibility.set","layerUid":"L1","visible":false}"#,
-    ).unwrap();
+    let visibility = owner
+        .prepare_layer_visibility_json(
+            br#"{"command":"object.layer.visibility.set","layerUid":"L1","visible":false}"#,
+        )
+        .unwrap();
     assert_eq!(owner.commit_layer_visibility(visibility), Ok(2));
     let changed = project_bytes(&owner);
     assert_eq!(owner.undo(2), Ok(3));
     assert_eq!(owner.history_depths(), (1, 1));
     let before = frozen(&owner);
     let origin = owner.acquire_snapshot(3).unwrap();
-    let catalog_record = Arc::clone(origin.project().unwrap().asset_inventory().unwrap().get(&asset_id).unwrap());
+    let catalog_record = Arc::clone(
+        origin
+            .project()
+            .unwrap()
+            .asset_inventory()
+            .unwrap()
+            .get(&asset_id)
+            .unwrap(),
+    );
     assert!(origin.document().item_records().is_none());
     assert!(origin.document().objects().iter().all(|record| {
-        record.vector_ext.value().and_then(|ext| ext.bitmap_brush.value()).is_none()
+        record
+            .vector_ext
+            .value()
+            .and_then(|ext| ext.bitmap_brush.value())
+            .is_none()
     }));
     let source = BitmapBrushFields::test_drawing();
     let mut anchor = source["objects"][0].clone();
@@ -416,17 +432,43 @@ fn project_item_import_cannot_bypass_the_shared_compound_refusal_or_consume_redo
         ..ImportBatch::default()
     };
     let prepared = owner.prepare_import_batch(&batch).unwrap();
-    assert!(prepared.changed(), "valid preparation must reach publication");
+    assert!(
+        prepared.changed(),
+        "valid preparation must reach publication"
+    );
     assert_eq!(prepared.result().objects.len(), 2);
-    assert!(prepared.result().assets.is_empty(), "the PNG is genuinely retained");
+    assert!(
+        prepared.result().assets.is_empty(),
+        "the PNG is genuinely retained"
+    );
     assert_eq!(frozen(&owner), before, "preparation does not publish");
-    assert_eq!(owner.commit_import_batch(prepared), Err(DispatchErrorCode::Unavailable));
-    assert_eq!(frozen(&owner), before, "refusal preserves revision, full save, history and redo");
+    assert_eq!(
+        owner.commit_import_batch(prepared),
+        Err(DispatchErrorCode::Unavailable)
+    );
+    assert_eq!(
+        frozen(&owner),
+        before,
+        "refusal preserves revision, full save, history and redo"
+    );
     assert_eq!(origin.serialize_project_file().unwrap(), before.1);
     let current = owner.acquire_snapshot(3).unwrap();
-    let current_record = current.project().unwrap().asset_inventory().unwrap().get(&asset_id).unwrap();
+    let current_record = current
+        .project()
+        .unwrap()
+        .asset_inventory()
+        .unwrap()
+        .get(&asset_id)
+        .unwrap();
     assert!(Arc::ptr_eq(current_record, &catalog_record));
-    assert!(Arc::ptr_eq(current_record.source().encoded_allocation().unwrap(), &allocation));
-    assert_eq!(owner.redo(3), Ok(4), "the failed import cannot consume redo");
+    assert!(Arc::ptr_eq(
+        current_record.source().encoded_allocation().unwrap(),
+        &allocation
+    ));
+    assert_eq!(
+        owner.redo(3),
+        Ok(4),
+        "the failed import cannot consume redo"
+    );
     assert_eq!(project_bytes(&owner), changed);
 }

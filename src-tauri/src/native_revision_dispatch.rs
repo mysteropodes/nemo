@@ -11,9 +11,16 @@ impl RevisionSync {
         object_client: bool,
     ) -> Result<Delivery, String> {
         if is_import_batch_sources(&request) {
-            return self.dispatch_import_batch_step(
-                instance, native, request, external, object_client, ImportBatchPhase::Probe,
-            )?.ok_or_else(|| "import batch sources require async application dispatch".into());
+            return self
+                .dispatch_import_batch_step(
+                    instance,
+                    native,
+                    request,
+                    external,
+                    object_client,
+                    ImportBatchPhase::Probe,
+                )?
+                .ok_or_else(|| "import batch sources require async application dispatch".into());
         }
         self.dispatch_font_step(
             instance,
@@ -213,10 +220,12 @@ impl RevisionSync {
                 Some(response) => response,
                 None => return Ok(None),
             },
-            ResourcePhase::ImportBatch(phase) => match invoke_import_batch(application, &request, phase)? {
-                Some(response) => response,
-                None => return Ok(None),
-            },
+            ResourcePhase::ImportBatch(phase) => {
+                match invoke_import_batch(application, &request, phase)? {
+                    Some(response) => response,
+                    None => return Ok(None),
+                }
+            }
             ResourcePhase::Regular => invoke_dispatch(application, &request)?,
         };
         let after = application.content_revision();
