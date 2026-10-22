@@ -73,17 +73,17 @@ test('offset mapping mirrors the host test clamps; the reachable plan is A at of
 test('blocked steps carry source evidence that still exists at the cited lines',()=>{
   assert.deepEqual(P.BLOCKED.map(x=>x.step),['import-video','preview','replace-source','offset','time-remap']);
   const cite=/^([\w./-]+):(\d+)(?:-(\d+))?/;
-  const probes={'src/js/images.js:611':'async function importVideo','src/js/adapters/native-import-desktop.js:212':'providers: { image, video }','src/js/timeline.js:7185':'nativeVideo.declared()',
-    'src/js/images.js:759':'c.video.replaceActive(id)','tests/desktop/video-installed-policy.cjs:189':'function witnessAction',
+  const probes={'src/js/images.js:611':'async function importVideo','src/js/adapters/native-import-desktop.js:212':'providers: { image, video }','src/js/adapters/native-time-remap-ui.js:285':'replace.disabled=!routed',
+    'src/js/adapters/native-time-remap-ui.js:272':'c.video.replaceActive(p.placementId)','tests/desktop/video-installed-policy.cjs:189':'function witnessAction',
     'src/js/layer-kind.js:110':'ld.nativeVideo','src/js/motion.js:2805':"n20AllowLegacyWrite('motion-toggle-animated')",
-    'src/js/motion.js:7342':'ctxEnableTimeRemap','src/js/adapters/native-project-placement-contract.js:39':'setTimeRemapKey',
+    'src/js/adapters/native-time-remap-ui.js:262':'own.toggleTimeRemap(active())','src/js/adapters/native-time-remap-ui.js:168':'function timeRemapKeyIntent','src/js/adapters/native-project-placement-contract.js:39':'setTimeRemapKey',
     'tests/desktop/p38-owned-window.swift:282':'let actions: Set<String>','src/js/native-video-bridge.js:1378':'async function replaceNativeVideoSource'};
   for(const [where,text] of Object.entries(probes)){const [file,line]=where.split(':');
     assert.ok(fs.readFileSync(path.join(ROOT,file),'utf8').split('\n')[Number(line)-1].includes(text),where);}
   for(const item of P.BLOCKED)for(const e of item.evidence){const m=cite.exec(e);assert.ok(m&&fs.existsSync(path.join(ROOT,m[1])),e);}
   const owned=fs.readFileSync(path.join(ROOT,'tests/desktop/p38-owned-projection.swift'),'utf8');assert.equal(owned.includes('Enable time remapping'),false);
-  // The JS route exists; the installed driver still does not drive it, so both steps stay blocked as not driven.
-  assert.deepEqual(P.BLOCKED.filter(x=>x.finding==='installed-step-not-driven').map(x=>x.step),['import-video','replace-source']);
+  // The JS routes exist; the installed driver still does not drive them, so these steps stay blocked as not driven.
+  assert.deepEqual(P.BLOCKED.filter(x=>x.finding==='installed-step-not-driven').map(x=>x.step),['import-video','replace-source','time-remap']);
   const callers=fs.readdirSync(path.join(ROOT,'src/js/adapters')).filter(n=>n.endsWith('.js')&&n!=='native-project-placement-contract.js')
     .filter(n=>/setOffset'|shiftOffset|setTimeRemapKey/.test(fs.readFileSync(path.join(ROOT,'src/js/adapters',n),'utf8').replace(/kind: 'setOffset', index/g,'')));
   assert.deepEqual(callers,['native-time-remap-ui.js'],'only the Time Remap key intent has a UI caller; offset has none');

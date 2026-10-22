@@ -177,86 +177,95 @@ test('the key entries are optional on the legacy owner and are removed again on 
   assert.equal('timeRemapKeyFacts' in f.root.SM,false);assert.equal('timeRemapKeyIntent' in f.root.SM,false);
 });
 
-test('motion.js routes the native Time Remap row to the key intent before any legacy writer',()=>{
-  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/js/motion.js'),'utf8');
-  assert.match(src,/holder\.timeRemap \|\| nativeRemapFacts\(holder\)/);
-  const intents=src.match(/if \(remapFacts\) \{ window\.SM\.timeRemapKeyIntent\(state\.layers\.indexOf\(holder\), (null|nv)\); return; \}\n\s*pushUndo\(\);/g)||[];
-  assert.equal(intents.length,2,'stopwatch and value field both return before pushUndo');
-});
-
-test('the footage panel reads the native video placement and never reaches the legacy relink writer',async()=>{
-  const f=fixture(video());f.api.bindTimeRemapEntries();
-  assert.equal(f.root.SM.nativeVideoPlacement(1),null);await settle();
-  assert.equal(f.root.SM.nativeVideoPlacement(1).placementId,'p1');assert.equal(f.root.SM.nativeVideoPlacement(0),null);
-  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/js/timeline.js'),'utf8');
-  const panel=src.slice(src.indexOf('function updateFootagePanel(){'),src.indexOf('function updateCompInstancePanel(){'));
-  assert.match(panel,/SMLayerKind\.of\(nativePlacement\?\{nativeVideo:true\}:ld\)/);
-  assert.match(panel,/!!\(ld\.nativeVideo\|\|nativePlacement\)&&window\.SM\.isTimeRemapped/);
-  assert.match(panel,/if\(nativePlacement\)\{repBtn\.disabled=true;/,'replace reports unavailable for a native placement');
-});
-
-// Production motion.js panel and grid over the real binding; DOM nodes are modelled.
-function motionHarness(placement){
-  const {loadMotion,defaultState}=require('./fixtures/lib/sandbox.cjs');
-  const nodes=[];
-  function element(tag){
-    const node={tag,children:[],dataset:{},style:{setProperty(){},removeProperty(){}},attributes:{},listeners:{},className:'',insertBefore(c){return this.appendChild(c);},
-      classList:{add(c){node.className=(node.className+' '+c).trim();},remove(c){node.className=String(node.className).split(/\s+/).filter(x=>x!==c).join(' ');},
-        toggle(){},contains(c){return String(node.className).split(/\s+/).includes(c);}},
-      addEventListener(type,listener){(this.listeners[type]||=[]).push(listener);},
-      appendChild(child){child.parentElement=this;this.children.push(child);return child;},
-      setAttribute(name,value){this.attributes[name]=value;},removeAttribute(name){delete this.attributes[name];},
-      closest(){return null;},querySelector(){return null;},querySelectorAll(){return [];},
-      getBoundingClientRect(){return {height:24,width:24,left:0,right:24,top:0,bottom:24};}};
-    nodes.push(node);return node;
-  }
-  const state={...defaultState(),appMode:'motion'};
-  const motion=loadMotion(state,{beforeMotion(sb){
-    sb.document.createElement=element;sb.document.createElementNS=(_ns,tag)=>element(tag);
-    sb.document.readyState='complete';sb._layerIndexByUid=()=>-1;sb.FC=20;
-    for(const k of ['ICO_3D','ICO_DUP','ICO_EYE','ICO_EYE_CLOSED','ICO_LOCK','ICO_UNLOCK'])sb[k]='';
-    for(const k of ['getEffectiveStrokes'])sb[k]=()=>[];
-    sb.pushUndo=()=>{throw new Error('a native Time Remap row must not push JS undo');};sb.NemoNativeTimeRemapUI=Remap;
-  }});
-  const f=fixture(placement,motion.sandbox);f.api.bindTimeRemapEntries();
-  const sb=motion.sandbox;sb.state.appMode='motion';sb.state.activeLayerIdx=1;sb._layerSel=[1];sb._motionExpandedLayer=1;
-  const panel=element('panel'),grid=element('grid'),wrap=element('wrap');
-  Object.defineProperty(panel,'innerHTML',{set(){this.children.length=0;}});
-  sb.document.getElementById=id=>id==='motion-props-body'?panel:id==='fg-wrap'?wrap:null;
-  const all=node=>[node].concat(node.children.flatMap(all));
-  function render(){
-    panel.children.length=0;grid.children.length=0;
-    motion.SMMotion.renderLayerListMotion(panel);motion.SMMotion.renderTimelineMotion(grid);
-    const rows=all(panel).filter(n=>n._smProp&&String(n.className).includes('motion-prop-row'));
-    const tracks=all(grid).filter(n=>String(n.className).includes('motion-track-row'));
-    const remapRow=rows.find(n=>n._smProp==='timeRemap');
-    return {rows,tracks,remapRow,field:remapRow&&all(remapRow).find(n=>n.tag==='input'),
-      diamonds:all(grid).filter(n=>n.className==='native-remap-diamond')};
-  }
-  return {f,sb,motion,render};
+// A modelled DOM for the native inspector mount; the inspector code itself is production.
+function dom(){
+  const doc={activeElement:null,createElement(tag){
+    const n={tag,children:[],parentNode:null,dataset:{},style:{},attributes:{},listeners:{},hidden:false,disabled:false,title:'',value:'',_cls:new Set(),textContent:'',
+      get className(){return [...this._cls].join(' ');},set className(v){this._cls=new Set(String(v).split(/\s+/).filter(Boolean));},
+      appendChild(c){c.parentNode=this;this.children.push(c);return c;},removeChild(c){this.children.splice(this.children.indexOf(c),1);c.parentNode=null;return c;},
+      setAttribute(k,v){this.attributes[k]=String(v);},removeAttribute(k){delete this.attributes[k];if(k==='title')this.title='';},
+      addEventListener(t,l){(this.listeners[t]||=[]).push(l);},dispatchEvent(e){return (this.listeners[e.type]||[]).map(l=>l(e))[0];},
+      closest(sel){return sel==='input.scrub'&&this._cls.has('scrub')?this:null;},setPointerCapture(){},focus(){},select(){},min:'',max:''};
+    n.classList={add:c=>n._cls.add(c),remove:c=>n._cls.delete(c),contains:c=>n._cls.has(c),toggle:(c,on)=>{if(on===undefined?!n._cls.has(c):on)n._cls.add(c);else n._cls.delete(c);}};
+    return n;}};
+  return doc;
+}
+function inspector(placement,opts={}){
+  const doc=dom(),f=fixture(placement,{state:{},document:doc});f.api.bindTimeRemapEntries();f.root.state.activeLayerIdx=opts.active===undefined?1:opts.active;
+  const replaced=[],surfaced=[];
+  if(opts.controller!==false)f.root.NemoNativeImportController={video:{declared:()=>opts.declared!==false,replaceActive:id=>{replaced.push(id);return Promise.resolve({status:'replaced'});}},
+    surface:r=>{surfaced.push(r);return r;}};
+  const container=doc.createElement('div'),ports={currentSession:()=>null};
+  const all=n=>[n].concat(n.children.flatMap(all));
+  const mount=()=>Remap.mountInspector(f.root,container,ports);
+  const q=()=>{const section=container.children.find(n=>n.id==='native-footage-inspector'),nodes=section?all(section):[],buttons=nodes.filter(n=>n.tag==='button');
+    return {section,source:nodes.filter(n=>n._cls.has('psel'))[0],count:nodes.filter(n=>n._cls.has('psel'))[1],mode:nodes.find(n=>n.tag==='select'),
+      toggle:buttons[0],key:buttons[1],replace:buttons[2],value:nodes.find(n=>n.tag==='input')};};
+  return {f,doc,container,mount,q,replaced,surfaced};
 }
 
-test('the production panel and grid keep one aligned Time Remap row across a frame change, with the read value and diamonds',async()=>{
-  const h=motionHarness(video({timeRemap:remap(KEYS,10,19.6)}));
-  h.h=h.render();await settle();
-  const a=h.render();
-  assert.ok(a.remapRow,'the Time Remap row is listed for the remapped native placement');
-  assert.equal(a.rows.length,a.tracks.length,'panel and grid rows stay identical');
-  assert.equal(String(a.field.value),'19.6');assert.equal(a.field.dataset.nativeScrub,'commit');
-  assert.equal(a.diamonds.length,2);
-  h.f.frame(24);h.f.setFacts(video({timeRemap:remap(KEYS,24,47)}));
-  const pending=h.render();
-  assert.ok(pending.remapRow,'the row stays while the frame is read');
-  assert.equal(pending.rows.length,pending.tracks.length);assert.equal(pending.rows.length,a.rows.length);
-  assert.equal(String(pending.field.value),'',"an unread value is shown as unknown");
-  assert.equal(pending.field.classList.contains('scrub'),false,'an unread value cannot be dragged');
-  await settle();
-  const b=h.render();
-  assert.equal(b.rows.length,a.rows.length);assert.equal(b.tracks.length,a.tracks.length);
-  assert.equal(String(b.field.value),'47');assert.equal(b.diamonds.length,2);
+test('the native Footage inspector appears only for the active native video layer, from the read',async()=>{
+  const ink=inspector(video(),{active:0});ink.mount();await settle();ink.mount();
+  assert.equal(ink.q().section.hidden,true,'a layer without a video placement shows no Footage section');
+  const h=inspector(video());const b=h.mount();
+  assert.equal(h.q().section.hidden,true,'hidden while the placement is read');
+  await settle();assert.strictEqual(h.mount(),b,'a repaint refreshes the mounted section');
+  const v=h.q();assert.equal(v.section.hidden,false);assert.equal(v.source.textContent,'v1');assert.equal(v.count.textContent,'48');
+  assert.equal(v.toggle.attributes['aria-pressed'],'false');assert.equal(v.key.hidden,true);assert.equal(v.value.hidden,true);
+  assert.equal(v.replace.disabled,false);assert.equal(h.container.children.length,1);
+  const off=inspector(video(),{declared:false});off.mount();await settle();off.mount();
+  assert.equal(off.q().replace.disabled,true);assert.equal(off.q().replace.title,'titleNativeVideoReplaceUnavailable','localized unavailable reason');
+  const none=inspector(video(),{controller:false});none.mount();await settle();none.mount();assert.equal(none.q().replace.disabled,true);
   assert.equal(h.f.calls.length,0,'rendering dispatches nothing');
 });
 
+test('Replace calls replaceActive with the read placement id once and surfaces the outcome',async()=>{
+  const h=inspector(video());h.mount();await settle();h.mount();
+  await h.q().replace.dispatchEvent({type:'click'});
+  assert.deepEqual(h.replaced,['p1']);assert.deepEqual(h.surfaced,[{status:'replaced'}]);
+  const off=inspector(video(),{declared:false});off.mount();await settle();off.mount();
+  await off.q().replace.dispatchEvent({type:'click'});assert.deepEqual(off.replaced,[]);
+});
+
+test('the Time Remap block reads value and keys natively; key toggle and value commit call the intents once',async()=>{
+  const h=inspector(video({timeRemap:remap(KEYS,10,19.6)}));h.mount();await settle();h.mount();
+  let v=h.q();
+  assert.equal(v.toggle.attributes['aria-pressed'],'true');assert.equal(v.key.hidden,false);
+  assert.equal(String(v.value.value),'19.6');assert.equal(v.value.dataset.nativeScrub,'commit');assert.ok(v.value.classList.contains('scrub'));
+  assert.equal(v.key.attributes['aria-pressed'],'false','no key at the playhead');
+  await v.key.dispatchEvent({type:'click'});
+  assert.equal(h.f.calls.length,1);assert.deepEqual(h.f.calls[0].payload,{kind:'setTimeRemapKey',placementId:'p1',frame:10,value:19.6});
+  h.f.setFacts(video({timeRemap:remap(KEYS,10,19.6)}));
+  v.value.value='12.5';await v.value.dispatchEvent({type:'change'});
+  assert.equal(h.f.calls.length,2);assert.deepEqual(h.f.calls[1].payload,{kind:'setTimeRemapKey',placementId:'p1',frame:10,value:12.5});
+  v.value.value='';await v.value.dispatchEvent({type:'change'});assert.equal(h.f.calls.length,2,'an empty field sends nothing');
+  await v.mode.dispatchEvent({type:'change'});assert.equal(h.f.calls.length,2,'the stored mode is not re-sent');
+  v.mode.value='blend';await v.mode.dispatchEvent({type:'change'});
+  assert.deepEqual(h.f.calls[2].payload,{kind:'setInterpMode',placementId:'p1',interpMode:'blend'});
+  assert.equal(h.f.effects.includes('legacy'),false);
+});
+
+test('a frame change updates the mounted inspector in place; an unread value is blank and cannot be dragged',async()=>{
+  const h=inspector(video({timeRemap:remap(KEYS,10,19.6)}));h.mount();await settle();h.mount();
+  const before=h.q();h.f.effects.length=0;
+  h.f.frame(24);h.f.setFacts(video({timeRemap:remap(KEYS,24,47)}));h.mount();
+  let v=h.q();assert.strictEqual(v.section,before.section);assert.strictEqual(v.value,before.value);
+  assert.equal(String(v.value.value),'');assert.equal(v.value.classList.contains('scrub'),false);
+  assert.equal(v.key.attributes['aria-pressed'],'true','the read keys name a key here');
+  await settle();assert.deepEqual(h.f.effects.filter(e=>/^updateUI/.test(e)),['updateUI:frame'],'a new value is a frame-only paint');
+  h.mount();v=h.q();assert.equal(String(v.value.value),'47');assert.ok(v.value.classList.contains('scrub'));
+});
+
+test('a refused edit toasts and the field shows the read value again; retire removes the section',async()=>{
+  const h=inspector(video({timeRemap:remap(KEYS,10,19.6)}));h.mount();await settle();h.mount();
+  h.f.control.receipt=r=>({apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:7,ok:true,result:{applied:false,historyEntriesAdded:0}});
+  const v=h.q();v.value.value='30';await v.value.dispatchEvent({type:'change'});await settle();
+  assert.ok(h.f.effects.some(e=>Array.isArray(e)&&e[1]==='toastNativeTimeRemapNotApplied'));
+  assert.equal(String(v.value.value),'19.6','readback, never the typed shadow');
+  Remap.retire(h.f.root);assert.equal(h.container.children.length,0);
+  await v.key.dispatchEvent({type:'click'});assert.equal(h.f.calls.length,1,'a retired inspector dispatches nothing');
+  const again=h.mount();assert.equal(h.container.children.length,1);again.retire();assert.equal(h.container.children.length,0);
+});
 function scrubHarness(){
   const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
   const source=fs.readFileSync(path.join(__dirname,'../src/js/ui.js'),'utf8');
@@ -268,13 +277,10 @@ function scrubHarness(){
   return (type,input,clientX)=>listeners.get(type)({type,target:input,pointerId:3,clientX,preventDefault(){}});
 }
 
+
 test('dragging the native Time Remap value commits once on release from the read value',async()=>{
-  const h=motionHarness(video({timeRemap:remap(KEYS,10,19.6)}));
-  h.render();await settle();
-  const {field}=h.render(),fire=scrubHarness();
-  field.closest=sel=>sel==='input.scrub'&&field.classList.contains('scrub')?field:null;
-  field.setPointerCapture=()=>{};field.focus=()=>{};field.select=()=>{};field.min='';field.max='';
-  field.dispatchEvent=event=>{for(const l of field.listeners[event.type]||[])l(event);};
+  const h=inspector(video({timeRemap:remap(KEYS,10,19.6)}));h.mount();await settle();h.mount();
+  const field=h.q().value,fire=scrubHarness();
   fire('pointerdown',field,100);
   for(const x of [120,140,160,180])fire('pointermove',field,x);
   assert.equal(h.f.calls.length,0,'no edit while dragging');
@@ -282,8 +288,14 @@ test('dragging the native Time Remap value commits once on release from the read
   await settle();
   assert.equal(h.f.calls.length,1,'one release, one native edit');
   assert.deepEqual(h.f.calls[0].payload,{kind:'setTimeRemapKey',placementId:'p1',frame:10,value:40},'20 whole steps from the read 19.6');
-  assert.equal(String(field.value),'19.6','the tentative field rolls back until the native projection publishes');
+  h.mount();assert.equal(String(field.value),'19.6','the field shows the native read, never the dragged shadow');
   assert.equal(h.f.effects.includes('legacy'),false);
+});
+
+test('the native object inspector mounts the Footage section and retires it with the inspector',()=>{
+  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../src/js/adapters/native-object-ui.js'),'utf8');
+  assert.match(src,/prior\.footage=root\.NemoNativeTimeRemapUI\.mountInspector\(root,prior\.section,/);
+  assert.match(src,/if\(prior\.footage\)prior\.footage\.retire\(\);/);
 });
 
 test('the native Time Remap and replace notices are localized in all four locales',()=>{

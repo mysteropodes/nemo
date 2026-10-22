@@ -1,5 +1,7 @@
 /* T12 Time Remap and footage mode entries under the native owner: they read the
-   layer's video placement and edit it through the existing placement command. */
+   layer's video placement and edit it through the existing placement command.
+   mountInspector is their native session surface (the legacy Footage panel and
+   Motion row are unreachable there); the range grid draws the read keys inert. */
 (function(root,factory){
   var placement=typeof module==='object'&&module.exports?require('./native-project-placement-contract.js'):root.NemoNativeProjectPlacementContract;
   var api=factory(placement);
@@ -10,7 +12,7 @@
   var bindings=new WeakMap();
   var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
   var entries=['toggleTimeRemap','isTimeRemapped','footageInterpMode','setFootageInterpMode'];
-  // Placeholders the legacy owner need not define: rows read their own track there.
+  // Native-only reads/intents the legacy owner does not define.
   var optional=['timeRemapKeyFacts','timeRemapKeyIntent','nativeVideoPlacement'];
   function same(a,b){return !!a&&!!b&&pinKeys.every(function(k){return a[k]===b[k];});}
   function usable(ports,session){
@@ -157,7 +159,7 @@
         var ctx=context(li);if(!ctx)return false;
         var p=await read(ctx);
         if(!p||!context(li))return false;
-        if(p.interpMode===value)return true;
+        if(mode(p)===value)return true;
         return edit(ctx,{kind:'setInterpMode',placementId:p.placementId,interpMode:value});
       });
     }
@@ -192,7 +194,7 @@
         return r;
       },
       timeRemapKeyIntent:timeRemapKeyIntent,
-      // The footage panel's source facts: the layer's video placement at the playhead, or null.
+      // The Footage inspector's source facts: the layer's video placement at the playhead, or null.
       nativeVideoPlacement:function(li){return known(li,function(p){return p||null;},null);},
       toggleTimeRemap:toggleTimeRemap,
       isTimeRemapped:function(li){return known(li,remapped,false);},
@@ -226,33 +228,72 @@
       disposePolicyEntries:function(){own.disposeTimeRemapEntries();policy.disposePolicyEntries();}
     }));
   }
-  // The Time Remap grid row from the read keys, inert display data like native opacity
-  // (keys null past the read bound: no diamonds). g: fc, rowH, totalFrames, currentFrame, label.
-  function trackRow(doc,rowEl,facts,g){
-    rowEl.style.pointerEvents='none';
-    var keys=facts.keys||[],svg=doc.createElementNS('http://www.w3.org/2000/svg','svg');
-    svg.setAttribute('width',g.totalFrames*g.fc);svg.setAttribute('height',g.rowH);
-    svg.style.cssText='position:absolute;left:0;top:0;pointer-events:none;';
-    for(var i=0;i+1<keys.length;i++){
-      if(keys[i].value===keys[i+1].value)continue;
-      var conn=doc.createElementNS('http://www.w3.org/2000/svg','rect');
-      conn.setAttribute('class','native-remap-connector');
-      conn.setAttribute('x',keys[i].frame*g.fc+g.fc/2);conn.setAttribute('y',Math.round((g.rowH-5)/2));
-      conn.setAttribute('width',(keys[i+1].frame-keys[i].frame)*g.fc);conn.setAttribute('height',5);conn.setAttribute('rx',2);
-      conn.style.cssText='fill:#2E6B60;pointer-events:none;';svg.appendChild(conn);
-    }
-    rowEl.appendChild(svg);
-    for(var frame=0;frame<g.totalFrames;frame++){
-      var cell=doc.createElement('div'),here=frame===g.currentFrame;
-      cell.className='fc motion-fc'+(here?' cur':'');cell.dataset.frame=frame;
-      if(keys.some(function(key){return key.frame===frame;})){
-        var diamond=doc.createElement('div');diamond.className='native-remap-diamond';
-        diamond.style.cssText='position:relative;z-index:2;width:7px;height:7px;border-radius:2px;background:'+(here?'#ffaa28':'transparent')+
-          ';border:1.5px solid '+(here?'#ffaa28':'#cfcfcf')+';transform:rotate(45deg);pointer-events:none;';
-        diamond.title=g.label+' · '+(frame+1);cell.appendChild(diamond);
-      }
-      rowEl.appendChild(cell);
-    }
+  // The Footage section of the native inspector for the ACTIVE layer's video placement.
+  // Every value is the binding's native read; edits go through its intents only, and
+  // refresh() updates the mounted nodes in place (frame-only paints rebuild nothing).
+  var inspectors=new WeakMap();
+  function mountInspector(root,container,ports){
+    var old=inspectors.get(root);
+    if(old&&old.container===container&&!old.retired){old.ports=ports;old.refresh();return old;}
+    if(old)old.retire();
+    var doc=root.document,b={container:container,ports:ports,retired:false};
+    function tr(key,fallback){var t=root.SM&&root.SM.t,v=typeof t==='function'?t(key):null;return typeof v==='string'&&v?v:fallback;}
+    function el(tag,text,cls){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
+    function line(label,control){var row=el('div',undefined,'pr');row.appendChild(el('span',label,'pl'));row.appendChild(control);return row;}
+    var section=el('section',undefined,'psec'),source=el('div','—','psel'),count=el('div','—','psel'),mode=el('select',undefined,'psel');
+    var replace=el('button',tr('footageReplace','Replace source…'),'pbtn'),toggle=el('button','','pbtn'),key=el('button','','pbtn'),value=el('input',undefined,'pi scrub');
+    var remapBox=el('div'),interpRow;
+    section.id='native-footage-inspector';section.hidden=true;
+    [replace,toggle,key].forEach(function(n){n.type='button';});
+    [['none','footageInterpNone','None (nearest frame)'],['blend','footageInterpBlend','Cross dissolve'],['motion','footageInterpMotion','Motion compensated']].forEach(function(o){
+      var opt=el('option',tr(o[1],o[2]));opt.value=o[0];mode.appendChild(opt);});
+    value.type='number';value.id='native-time-remap-value';value.dataset.step='1';value.dataset.nativeScrub='commit';
+    value.setAttribute('aria-label',tr('propTimeRemap','Time Remap'));
+    section.appendChild(el('div',tr('hdrFootage','Footage'),'phdr'));
+    section.appendChild(line(tr('fieldSource','Source'),source));section.appendChild(line(tr('fieldFrames','Frames'),count));
+    remapBox.appendChild(el('div',tr('propTimeRemap','Time Remap'),'pl'));remapBox.appendChild(toggle);
+    remapBox.appendChild(interpRow=line(tr('footageInterp','Interpolation'),mode));remapBox.appendChild(key);remapBox.appendChild(value);
+    section.appendChild(remapBox);section.appendChild(replace);container.appendChild(section);
+    function binding(){return b.retired||inspectors.get(root)!==b?null:bindings.get(root)||null;}
+    function active(){var s=root.state;return s&&Number.isInteger(s.activeLayerIdx)?s.activeLayerIdx:-1;}
+    function video(){var c=root.NemoNativeImportController;return c&&c.video?c:null;}
+    var shown=null;
+    function after(run){return Promise.resolve(run).catch(function(){return false;}).then(function(r){b.refresh();return r;});}
+    toggle.addEventListener('click',function(){var own=binding();if(own)return after(own.toggleTimeRemap(active()));});
+    key.addEventListener('click',function(){var own=binding();if(own)return after(own.timeRemapKeyIntent(active(),null));});
+    mode.addEventListener('change',function(){var own=binding();if(own)return after(own.setFootageInterpMode(active(),mode.value));});
+    value.addEventListener('change',function(){
+      var own=binding(),n=Number(value.value);if(!own)return;
+      if(value.value===''||!Number.isFinite(n)){b.refresh();return;}
+      return after(own.timeRemapKeyIntent(active(),n));
+    });
+    replace.addEventListener('click',function(){
+      var c=video(),p=shown;if(!c||!p||c.video.declared()!==true)return;
+      return Promise.resolve(c.video.replaceActive(p.placementId)).then(function(r){return typeof c.surface==='function'?c.surface(r):r;});
+    });
+    b.refresh=function(){
+      var own=binding(),li=active(),p=own&&li>=0?own.nativeVideoPlacement(li):null;
+      shown=p||null;section.hidden=!p;section.style.display=p?'':'none';if(!p)return;
+      source.textContent=p.assetId||p.placementId;
+      count.textContent=Number.isSafeInteger(p.sourceFrameCount)&&p.sourceFrameCount>0?String(p.sourceFrameCount):'—';
+      var facts=own.timeRemapKeyFacts(li),on=!!facts;
+      toggle.textContent=tr(on?'ctxDisableTimeRemap':'ctxEnableTimeRemap',on?'Disable time remapping':'Enable time remapping');
+      toggle.setAttribute('aria-pressed',String(on));
+      interpRow.hidden=!on;key.hidden=!on;value.hidden=!on;
+      if(doc.activeElement!==mode)mode.value=own.footageInterpMode(li);
+      var c=video(),routed=!!c&&c.video.declared()===true;
+      replace.disabled=!routed;if(routed)replace.removeAttribute('title');else replace.title=tr('titleNativeVideoReplaceUnavailable','');
+      if(!on)return;
+      key.textContent=tr(facts.keyAtFrame?'ctxClearKeyframe':'ctxInsertKeyframe',facts.keyAtFrame?'Clear the keyframe':'Insert a keyframe');
+      key.setAttribute('aria-pressed',String(!!facts.keyAtFrame));
+      // The eased source frame the native read evaluated; blank (typing only) until it is read.
+      var known=typeof facts.value==='number'&&Number.isFinite(facts.value);
+      value.classList.toggle('scrub',known);
+      if(doc.activeElement!==value&&!value.classList.contains('scrubbing'))value.value=known?String(facts.value):'';
+    };
+    b.retire=function(){if(b.retired)return;b.retired=true;if(section.parentNode)section.parentNode.removeChild(section);if(inspectors.get(root)===b)inspectors.delete(root);};
+    inspectors.set(root,b);b.refresh();return b;
   }
-  return Object.freeze({bind:bind,createPorts:createPorts,compose:compose,trackRow:trackRow});
+  function retireInspector(root){var b=inspectors.get(root);if(b)b.retire();}
+  return Object.freeze({bind:bind,createPorts:createPorts,compose:compose,mountInspector:mountInspector,retire:retireInspector});
 }));

@@ -31,15 +31,15 @@ const BLOCKED=Object.freeze([
     evidence:['tests/desktop/p38-owned-window.swift:282 helper actions; capture is a scaled window screenshot, not a pixel readback'],
     substitute:'captures are retained as evidence only; pixels are proven by export'}),
   Object.freeze({step:'replace-source',finding:'installed-step-not-driven',
-    evidence:['src/js/timeline.js:7185 the native footage panel enables Replace only for a declared native video route',
-      'src/js/images.js:759 Replace -> NemoNativeImportController.video.replaceActive(placementId)',
+    evidence:['src/js/adapters/native-time-remap-ui.js:285 the native Footage inspector enables Replace only for a declared native video route',
+      'src/js/adapters/native-time-remap-ui.js:272 Replace -> NemoNativeImportController.video.replaceActive(placementId)',
       'tests/desktop/video-installed-policy.cjs:189 witnessAction has no replace witness; PLAN stays source A']}),
   Object.freeze({step:'offset',finding:'missing-required-local-consumer',
     evidence:['src/js/adapters/native-project-placement-contract.js:33-34 setOffset/shiftOffset have no UI caller']}),
-  Object.freeze({step:'time-remap',finding:'missing-required-local-consumer',
-    evidence:['src/js/adapters/native-time-remap-ui.js:139 timeRemapKeyIntent sets/removes keys only on a remapped Motion row',
-      'src/js/motion.js:7342-7343 enable is only in the layer-row context menu; the Time Remap row exists only once enabled',
-      'tests/desktop/p38-owned-window.swift:282 has no context-menu action; tests/desktop/p38-owned-projection.swift:146-152 omits "Enable time remapping"']}),
+  // The native Footage inspector now carries enable/key/value; the driver does not drive it yet.
+  Object.freeze({step:'time-remap',finding:'installed-step-not-driven',
+    evidence:['src/js/adapters/native-time-remap-ui.js:262 the native Footage inspector toggles Time Remap; its key/value controls call timeRemapKeyIntent (:168)',
+      'tests/desktop/p38-owned-window.swift:282 has no inspector witness; tests/desktop/p38-owned-projection.swift:146-152 omits "Enable time remapping"']}),
 ]);
 const actions=new Set(['inspect','press','set','select','raise','capture','check','pin-sheet','sheet-dismissed','go-to-folder','location-dismissed','stop','artifacts']);
 const state=new WeakMap();

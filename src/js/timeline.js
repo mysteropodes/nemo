@@ -7123,9 +7123,7 @@ function updateFootagePanel(){
   var sec=document.getElementById('footage-sec');
   if(!sec)return;
   var ld=state.layers[state.activeLayerIdx];
-  // A native video placement has no legacy ld.nativeVideo; only the native binding defines this entry.
-  var nativePlacement=ld&&!ld.nativeVideo&&window.SM&&window.SM.nativeVideoPlacement?window.SM.nativeVideoPlacement(state.activeLayerIdx):null;
-  var kind=!window.SMLayerKind||!ld?null:SMLayerKind.of(nativePlacement?{nativeVideo:true}:ld);
+  var kind=(ld&&window.SMLayerKind)?SMLayerKind.of(ld):null;
   var isFootage=kind&&(kind.key==='image'||kind.key==='sequence'||kind.key==='video');
   if(!isFootage||!window._layerActiveExplicit){sec.style.display='none';return;}
   sec.style.display='block';
@@ -7147,7 +7145,7 @@ function updateFootagePanel(){
   // elle agit, c'est-à-dire sur une vidéo effectivement remappée dans le temps.
   var blendRow=document.getElementById('footage-blend-row');
   if(blendRow){
-    var showBlend=kind.key==='video'&&!!(ld.nativeVideo||nativePlacement)&&window.SM.isTimeRemapped(state.activeLayerIdx);
+    var showBlend=kind.key==='video'&&!!ld.nativeVideo&&window.SM.isTimeRemapped(state.activeLayerIdx);
     blendRow.style.display=showBlend?'flex':'none';
     var sel=document.getElementById('footage-interp-mode');
     if(sel){
@@ -7180,11 +7178,6 @@ function updateFootagePanel(){
   // A web-imported (non-Tauri) video session has no real path to relink —
   // same limitation replaceNativeVideoSource itself guards on with a toast.
   repBtn.disabled=(kind.key==='video'&&ld.nativeVideo&&ld.nativeVideo.isWeb);
-  // A native placement relinks through the native video provider only (images.js reads data-placement-id); never the legacy relink writer.
-  var nativeVideo=window.NemoNativeImportController&&window.NemoNativeImportController.video;
-  var routed=!!nativePlacement&&!!nativeVideo&&nativeVideo.declared()===true;
-  if(routed){repBtn.disabled=false;repBtn.dataset.placementId=nativePlacement.placementId;repBtn.removeAttribute('title');}
-  else{delete repBtn.dataset.placementId;if(nativePlacement){repBtn.disabled=true;repBtn.title=window.SM.t('titleNativeVideoReplaceUnavailable');}else repBtn.removeAttribute('title');}
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');

@@ -1,6 +1,6 @@
 'use strict';
-// T12 point 8 linked-video import/replace client and UI: the actual images.js menu/Replace handler, the footage panel of
-// timeline.js, the drop router, the desktop composition, the video provider, the video client, the command module and the
+// T12 point 8 linked-video import/replace client and UI: the actual images.js menu handler (Replace is the native
+// Footage inspector, tests/native-time-remap-ui.test.cjs), the drop router, the desktop composition, the video provider, the video client, the command module and the
 // full SDK. Controlled dialog, transport and native projection boundary: no native probe, decode, GPU or installed proof.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const Desktop=require('../src/js/adapters/native-import-desktop.js'),Drop=require('../src/js/adapters/native-import-drop.js');
@@ -70,24 +70,10 @@ function fixture(options={}){
   localStorage:{getItem:()=>null},setTimeout,clearTimeout}));
  return {root,state,controller,requests,picks,toasts,events,nodes,node,placements,
   menu:()=>events.get('btn-import-video:click')(),
-  replaceClick:()=>{const btn=nodes.get('btn-footage-replace');return events.get('btn-footage-replace:click').call(btn);},
   change:next=>{pin={...pin,...next};},deactivate:()=>{active=false;},show:()=>{projected=true;},
   reopen:()=>{pin={...pin,lifecycleGeneration:pin.lifecycleGeneration+1};session=makeSession();},
  };
 }
-// The footage panel exactly as timeline.js defines it, run against the fixture's DOM and native placement read.
-function footagePanel(h){
- const source=fs.readFileSync(path.join(__dirname,'../src/js/timeline.js'),'utf8');
- const start=source.indexOf('function updateFootagePanel(){'),end=source.indexOf('\nfunction updateCompInstancePanel(');
- assert.ok(start>0&&end>start,'updateFootagePanel is defined in timeline.js');
- ['footage-sec','footage-kind','footage-name','footage-w','footage-h','footage-count-row','footage-count'].forEach(h.node);
- h.root._layerActiveExplicit=true;h.state.layers[h.state.activeLayerIdx].frames=[];
- h.root.SMLayerKind={of:ld=>ld.nativeVideo?{key:'video',label:'Video'}:{key:'drawing',label:'Drawing'}};
- const context=vm.createContext({window:h.root,document:h.root.document,state:h.state,SMLayerKind:h.root.SMLayerKind});
- vm.runInContext(source.slice(start,end)+'\nthis.updateFootagePanel=updateFootagePanel;',context);
- context.updateFootagePanel();return h.nodes.get('btn-footage-replace');
-}
-
 test('client sends ONE closed link command per intent with the pinned snapshot and lifecycle',async()=>{
  const h=fixture(),session=h.root.NemoNativeObjectProject.desktop(h.root),client=Video.create(session,{videoRoute:true});
  const fresh=await client.importPath('/footage/Take A.mov');
@@ -174,28 +160,20 @@ test('a reopened owner clears the latch; a known receipt without presentation wa
  const shown=fixture({unconfirmed:true});const r=await shown.menu();assert.equal(r.status,'unconfirmed');assert.equal(r.recovery,'presentation');
  shown.show();const done=await shown.controller.video.recover();assert.equal(done.status,'imported');assert.equal(shown.requests.length,1);
 });
-test('footage panel enables Replace for a native placement only when the video route is declared',()=>{
- const h=fixture();const btn=footagePanel(h);
- assert.equal(btn.disabled,false);assert.equal(btn.dataset.placementId,'p1');assert.equal(btn.dataset.kind,'video');assert.equal(btn.title,'');
- const off=fixture({declared:false});const disabled=footagePanel(off);
- assert.equal(disabled.disabled,true);assert.equal(disabled.dataset.placementId,undefined);assert.equal(disabled.title,'titleNativeVideoReplaceUnavailable','the localized unavailable title');
-});
 test('Replace calls replaceActive with the pinned placement id and relinks in place (replace intent)',async()=>{
- const h=fixture();footagePanel(h);
+ const h=fixture();
  const calls=[];const original=h.controller.video.replaceActive;
  const spy=Object.freeze(Object.assign({},h.controller.video,{replaceActive:id=>{calls.push(id);return original(id);}}));
  h.root.NemoNativeImportController=Object.freeze(Object.assign({},h.controller,{video:spy}));
- const result=await h.replaceClick();assert.deepEqual(calls,['p1']);
+ const result=await h.root.NemoNativeImportController.video.replaceActive('p1');assert.deepEqual(calls,['p1']);
  assert.equal(result.status,'replaced',JSON.stringify(result));assert.equal(result.readback,'confirmed');assert.equal(result.selected,false);
  assert.equal(h.requests.length,1);assert.deepEqual(h.requests[0].payload.intent,{kind:'replace',placementId:'p1'});
  assert.deepEqual(h.picks,[{title:'Relink / replace video file',multiple:false,filters:FILTER}]);assert.deepEqual(h.root._layerSel,[0]);assert.equal(h.state.layers.length,1);
 });
-test('Replace refuses a placement the pinned read no longer names, and never reaches the legacy relink writer',async()=>{
- const h=fixture();footagePanel(h);h.placements.set('V','p2');
- const result=await h.replaceClick();assert.equal(result.status,'stale');assert.equal(result.reason,'placement_changed');assert.equal(h.picks.length,0);assert.equal(h.requests.length,0);
+test('Replace refuses a placement the pinned read no longer names',async()=>{
+ const h=fixture();h.placements.set('V','p2');
+ const result=await h.controller.video.replaceActive('p1');assert.equal(result.status,'stale');assert.equal(result.reason,'placement_changed');assert.equal(h.picks.length,0);assert.equal(h.requests.length,0);
  assert.equal((await h.controller.video.replaceActive(null)).status,'invalid');
- const absent=fixture();footagePanel(absent);absent.root.NemoNativeImportController=null;
- assert.equal((await absent.replaceClick()).status,'unavailable');assert.equal(absent.requests.length,0);
 });
 test('a failing picker is an ordinary unavailable outcome that dispatches nothing and latches nothing',async()=>{
  let calls=0;const h=fixture({pick:()=>{if(++calls===1)throw new Error('dialog plugin rejected');return '/footage/Take B.mov';}});

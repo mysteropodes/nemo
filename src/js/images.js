@@ -756,7 +756,7 @@
   // knows how to swap raster bytes (2026-07-31, updateFootagePanel sets
   // data-kind on this same button each time the panel refreshes).
   document.getElementById('btn-footage-replace')&&document.getElementById('btn-footage-replace').addEventListener('click',function(){
-    if(this.dataset.kind==='video'){var c=window.NemoNativeImportController,id=this.dataset.placementId;if(id)return (c&&c.video?c.video.replaceActive(id):Promise.resolve({status:'unavailable',reason:'native_video_route_absent'})).then(function(r){return c&&c.surface?c.surface(r):r;});if(window.SMNativeVideo)SMNativeVideo.replaceNativeVideoSource(state.activeLayerIdx);return;}
+    if(this.dataset.kind==='video'){if(window.SMNativeVideo)SMNativeVideo.replaceNativeVideoSource(state.activeLayerIdx);return;}
     replaceFootageSource();
   });
 

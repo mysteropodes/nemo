@@ -283,3 +283,14 @@ test('frame drift during queued lease validation refuses before a native range d
  assert.ok(h.queuedPublic.length>0);assert.ok(h.queuedPublic.every(value=>value===null));assert.equal(h.commands().length,0);
  assert.equal(h.s.info().contentRevision,0);assert.equal(h.legacy(),0);
 });
+
+test('a native video placement\'s Time Remap keys draw as one inert lane from its read, beside the property keys',async()=>{
+ const h=await harness();
+ h.root.SM={timeRemapKeyFacts:li=>li===1?{keyCount:2,keyAtFrame:true,value:3,keys:[{frame:2,value:0},{frame:6,value:10}]}:li===0?{keyCount:0,keys:null}:null};
+ Range.refreshKeys(h.root);
+ const nodes=h.keyNodes();assert.equal(nodes.length,2);
+ assert.deepEqual(nodes.map(n=>n.dataset.frame),['2','6']);assert.ok(nodes.every(n=>n.parentNode===h.rows()[1]&&n.disabled===true&&n.style.pointerEvents==='none'));
+ assert.ok(nodes.every(n=>(n.events.get('mousedown')||[]).length===0),'no move-key op exists: the lane is inert');
+ h.root.SM={};Range.refreshKeys(h.root);assert.equal(h.keyNodes().length,0);
+ assert.equal(h.commands().length,0);assert.equal(h.legacy(),0);
+});
