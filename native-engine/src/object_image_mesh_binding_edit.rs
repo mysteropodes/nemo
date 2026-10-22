@@ -31,6 +31,7 @@
 //! Video layer records remain unavailable until their actual provider joins.
 use crate::object_document::{
     object_deserialize, ImageMesh, MeshIdSequence, ObjectDocument, ObjectTarget, Presence,
+    PropertyHolder,
 };
 pub(crate) use crate::object_snapshot::object_image_mesh_edit_read::BindingReport;
 use crate::object_snapshot::object_image_mesh_edit_read::{
@@ -240,6 +241,24 @@ pub(crate) fn plan_binding_edit_json(
     if document.image_meshes().is_some() || !state.store.entries().is_empty() {
         next.image_meshes = Presence::Present(state.store);
     }
+    // Preserve proven mesh provenance only when this transition loses the actual source.
+    // Comparing the two retained documents avoids changing holders or history on a no-op.
+    let losing_sources: Vec<_> = document
+        .property_holders()
+        .unwrap_or(&[])
+        .iter()
+        .enumerate()
+        .filter(|(_, holder)| {
+            PropertyHolder::bound_mesh(document, holder.target()).is_some()
+                && PropertyHolder::bound_mesh(&next, holder.target()).is_none()
+        })
+        .map(|(index, _)| index)
+        .collect();
+    if let Presence::Present(holders) = &mut next.property_holders {
+        for index in losing_sources {
+            holders[index].retain_bound_mesh_source(document);
+        }
+    }
     if let (Some((context_id, layer)), BindingReport::Duplicated { pairs, .. }) =
         (duplicated_layer, &report)
     {
@@ -259,6 +278,7 @@ pub(crate) fn plan_binding_edit_json(
             for holder in holders.iter_mut().filter(|holder| {
                 holder.target.context_id() == context_id && holder.target.layer_uid() == uid
             }) {
+                holder.remap_mesh_source(pairs);
                 remap_id(&mut holder.target.stroke_id, pairs);
             }
         }
@@ -302,3 +322,12 @@ pub(crate) fn plan_binding_edit_json(
 ))]
 #[path = "../tests/object_image_mesh_binding_history.rs"]
 mod history_tests;
+
+#[cfg(all(
+    test,
+    feature = "history",
+    feature = "project_media_codec",
+    feature = "evaluation"
+))]
+#[path = "../tests/object_image_mesh_binding_provenance.rs"]
+mod provenance_tests;

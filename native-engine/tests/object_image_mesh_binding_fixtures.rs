@@ -165,6 +165,13 @@ pub(super) fn vertex_holder(layer: &str) -> Value {
             {"frame":0,"v":[0.1,0.2]},{"frame":23,"v":[0.3,0.4]}]}}]})
 }
 
+pub(super) fn retained_vertex_holder(layer: &str, id: &str) -> Value {
+    let mut holder = vertex_holder(layer);
+    holder["target"]["strokeId"] = json!(id);
+    holder["meshSource"] = json!({"meshId":id});
+    holder
+}
+
 pub(super) fn tagged_copy_drawing() -> Value {
     let mut value = drawing(24, Some("im_1"));
     push_raster(

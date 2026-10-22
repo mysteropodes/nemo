@@ -540,8 +540,7 @@ fn duplicate_remaps_real_mesh_vertex_holder_and_rig_bind_without_rewriting_the_o
     run(&mut owner, "duplicate-animated", duplicate("L2"));
     let after = wire(&owner);
     assert_eq!(after["propertyHolders"][0], value["propertyHolders"][0]);
-    let mut copied = vertex_holder("L2");
-    copied["target"]["strokeId"] = json!("im_2");
+    let copied = retained_vertex_holder("L2", "im_2");
     assert_eq!(after["propertyHolders"][1], copied);
     assert_eq!(after["layers"][0]["rig"], value["layers"][0]["rig"]);
     let mut copied_rig = value["layers"][1]["rig"].clone();
@@ -552,13 +551,14 @@ fn duplicate_remaps_real_mesh_vertex_holder_and_rig_bind_without_rewriting_the_o
 #[test]
 fn required_animated_binding_replacement_and_detach_preserve_authored_tracks() {
     let value = animated_drawing();
+    let retained = json!([retained_vertex_holder("L0", "im_1")]);
     let mut owner = support::owner(&value);
     // Required positive gate: current holder admission rejects the now unbound old identity.
     run(&mut owner, "replace-animated", attach(at(0)));
-    assert_eq!(wire(&owner)["propertyHolders"], value["propertyHolders"]);
+    assert_eq!(wire(&owner)["propertyHolders"], retained);
     owner.undo(owner.content_revision()).unwrap();
     run(&mut owner, "detach-animated", detach(at(0)));
-    assert_eq!(wire(&owner)["propertyHolders"], value["propertyHolders"]);
+    assert_eq!(wire(&owner)["propertyHolders"], retained);
 }
 
 #[test]
