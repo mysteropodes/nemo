@@ -1,6 +1,8 @@
 //! Private bridge from codec admission and sealed fill origins to revision storage.
 use crate::commands::{prepare_object_fill_json, PreparedObjectFill};
-use crate::object_document::{ObjectDocument, ProjectEnvelope, ProjectReferenceState};
+use crate::object_document::{
+    MeshIdSequence, ObjectDocument, ProjectEnvelope, ProjectReferenceState,
+};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectRevisionOwner;
@@ -195,6 +197,8 @@ impl PreparedLayerCreate {
 #[derive(Debug)]
 pub(crate) struct ObjectFillOwner {
     revisions: ObjectRevisionOwner,
+    // Lifetime state: history and project replacement must never rewind issued mesh ids.
+    mesh_id_sequence: MeshIdSequence,
 }
 
 impl ObjectFillOwner {
@@ -236,6 +240,7 @@ impl ObjectFillOwner {
         }
         Ok(Self {
             revisions: ObjectRevisionOwner::from_admitted(snapshot),
+            mesh_id_sequence: MeshIdSequence::default(),
         })
     }
 
@@ -247,6 +252,7 @@ impl ObjectFillOwner {
         let snapshot = ObjectSnapshot::admit_project_file(instance, bytes)?;
         Ok(Self {
             revisions: ObjectRevisionOwner::from_admitted(snapshot),
+            mesh_id_sequence: MeshIdSequence::default(),
         })
     }
     #[cfg(feature = "project_media_codec")]
@@ -344,6 +350,7 @@ impl ObjectFillOwner {
         let snapshot = ObjectSnapshot::from_admitted_project(instance_id, project)?;
         Ok(Self {
             revisions: ObjectRevisionOwner::from_admitted(snapshot),
+            mesh_id_sequence: MeshIdSequence::default(),
         })
     }
     pub(crate) fn new(
@@ -354,6 +361,7 @@ impl ObjectFillOwner {
             .map_err(|_| "object document admission failed")?;
         Ok(Self {
             revisions: ObjectRevisionOwner::from_admitted(snapshot),
+            mesh_id_sequence: MeshIdSequence::default(),
         })
     }
     pub(crate) fn instance_id(&self) -> &str {

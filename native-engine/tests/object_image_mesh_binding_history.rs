@@ -37,7 +37,12 @@ fn at(frame: u32) -> Value {
 }
 
 fn inner(frame: u32) -> Value {
-    target("component-A", "inner-only", frame, &format!("inner-{frame}"))
+    target(
+        "component-A",
+        "inner-only",
+        frame,
+        &format!("inner-{frame}"),
+    )
 }
 
 fn entry(target: Value, tag: Option<&str>) -> Value {
@@ -49,7 +54,10 @@ fn entry(target: Value, tag: Option<&str>) -> Value {
 }
 
 fn push_raster(doc: &mut Value, target: Value, tag: Option<&str>) {
-    doc["items"]["raster"].as_array_mut().unwrap().push(entry(target, tag));
+    doc["items"]["raster"]
+        .as_array_mut()
+        .unwrap()
+        .push(entry(target, tag));
 }
 
 fn fixture_path(context: &str, layer: &str, frame: u32, stroke: &str) -> Value {
@@ -104,7 +112,10 @@ fn request(owner: &NativeObjectHistory, id: &str, body: Value) -> Value {
 
 fn dispatch(owner: &mut NativeObjectHistory, value: &Value) -> Value {
     let request: OpacityRequest = serde_json::from_value(value.clone()).unwrap();
-    let reply = owner.try_dispatch_object_command(&request).unwrap().unwrap();
+    let reply = owner
+        .try_dispatch_object_command(&request)
+        .unwrap()
+        .unwrap();
     serde_json::to_value(reply).unwrap()
 }
 
@@ -118,8 +129,52 @@ fn run(owner: &mut NativeObjectHistory, id: &str, body: Value) -> Value {
 fn assert_tag(owner: &NativeObjectHistory, target: Value, expected: Option<&str>) {
     let doc = wire(owner);
     let entries = doc["items"]["raster"].as_array().unwrap();
-    let entry = entries.iter().find(|entry| entry["target"] == target).unwrap();
+    let entry = entries
+        .iter()
+        .find(|entry| entry["target"] == target)
+        .unwrap();
     assert_eq!(entry["item"]["meshId"].as_str(), expected, "{target}");
+}
+
+fn assert_tags(
+    owner: &NativeObjectHistory,
+    targets: impl IntoIterator<Item = Value>,
+    id: Option<&str>,
+) {
+    for target in targets {
+        assert_tag(owner, target, id);
+    }
+}
+
+fn raster_targets(doc: &Value) -> Vec<Value> {
+    doc["items"]["raster"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["target"].clone())
+        .collect()
+}
+
+fn assert_binding_only(before: &Value, after: &Value) {
+    for member in ["layers", "objects", "componentTables", "compositionOrder"] {
+        assert_eq!(after[member], before[member], "{member}");
+    }
+    assert_eq!(after["items"]["text"], before["items"]["text"]);
+    assert_eq!(
+        raster_targets(after),
+        raster_targets(before),
+        "full native identities stay stable"
+    );
+}
+
+fn undo_to(owner: &mut NativeObjectHistory, expected: &[u8]) {
+    owner.undo(owner.content_revision()).unwrap();
+    assert_eq!(support::bytes(owner), expected);
+}
+
+fn redo_to(owner: &mut NativeObjectHistory, expected: &[u8]) {
+    owner.redo(owner.content_revision()).unwrap();
+    assert_eq!(support::bytes(owner), expected);
 }
 
 fn plan(owner: &NativeObjectHistory, sequence: MeshIdSequence, body: Value) -> BindingEditPlan {
@@ -128,7 +183,9 @@ fn plan(owner: &NativeObjectHistory, sequence: MeshIdSequence, body: Value) -> B
 
 fn project_file(owner: &NativeObjectHistory) -> Vec<u8> {
     let pin = support::head(owner).snapshot_id().to_owned();
-    owner.serialize_project_file(owner.content_revision(), &pin).unwrap()
+    owner
+        .serialize_project_file(owner.content_revision(), &pin)
+        .unwrap()
 }
 
 fn replace_file(owner: &mut NativeObjectHistory, file: &[u8]) {
@@ -139,14 +196,19 @@ fn replace_file(owner: &mut NativeObjectHistory, file: &[u8]) {
 
 fn assert_attach_counts(report: &BindingReport, expected: (usize, usize)) {
     let actual = match report {
-        BindingReport::Attach { written, skipped, .. } => (*written, *skipped),
+        BindingReport::Attach {
+            written, skipped, ..
+        } => (*written, *skipped),
         _ => panic!("expected attachment report"),
     };
     assert_eq!(actual, expected);
 }
 
 fn assert_applied(reply: &Value, applied: bool) {
-    assert_eq!(reply["result"], json!({"applied":applied,"historyEntriesAdded":u64::from(applied)}));
+    assert_eq!(
+        reply["result"],
+        json!({"applied":applied,"historyEntriesAdded":u64::from(applied)})
+    );
 }
 
 fn assert_error(owner: &mut NativeObjectHistory, request: &Value, code: &str) {
@@ -166,11 +228,19 @@ fn mixed() -> Value {
     value["formatVersion"] = json!(2);
     // Raster-array indices disagree with authored mixed slots; frame 2 has a path at slot 1,
     // and frame 3 has only slot 0. Different stroke IDs across frames must not prevent propagation.
-    value["items"]["raster"] = json!([entry(at(0),None),entry(at(1),None),
-        entry(target("scene-root","L0",0,"other-0"),None)]);
-    value["objects"] = json!([(0,"path-0"),(2,"path-2-first"),(2,"path-2"),(3,"path-3")]
-        .map(|(frame,stroke)| fixture_path("scene-root","L0",frame,stroke)));
-    value["items"]["text"] = json!([text(target("scene-root","L0",1,"text-1"))]);
+    value["items"]["raster"] = json!([
+        entry(at(0), None),
+        entry(at(1), None),
+        entry(target("scene-root", "L0", 0, "other-0"), None)
+    ]);
+    value["objects"] = json!([
+        (0, "path-0"),
+        (2, "path-2-first"),
+        (2, "path-2"),
+        (3, "path-3")
+    ]
+    .map(|(frame, stroke)| fixture_path("scene-root", "L0", frame, stroke)));
+    value["items"]["text"] = json!([text(target("scene-root", "L0", 1, "text-1"))]);
     let e = |stroke, position| element("L0", stroke, position);
     value["compositionOrder"] = json!({"format":"nemo.native-object-order-plan","formatVersion":1,
         "documentFormatVersion":2,"migration":"explicit-plan-required","referencePolicy":"unresolved",
@@ -187,30 +257,21 @@ fn mixed() -> Value {
 fn all_24_frames_and_store_publish_as_one_history_entry_and_scrub_identity_survives() {
     let mut owner = support::owner(&drawing(24, None));
     let initial = support::bytes(&owner);
-    let targets: Vec<_> = wire(&owner)["items"]["raster"].as_array().unwrap().iter()
-        .map(|entry| entry["target"].clone()).collect();
+    let targets = raster_targets(&wire(&owner));
     assert_applied(&run(&mut owner, "attach", attach(at(13))), true);
     assert_eq!(owner.history_depths(), (1, 0));
-    for target in &targets {
-        assert_tag(&owner, target.clone(), Some("im_1"));
-    }
+    assert_tags(&owner, targets.clone(), Some("im_1"));
     let attached = support::bytes(&owner);
     assert_eq!(wire(&owner)["imageMeshes"]["im_1"], mesh());
     assert_applied(&run(&mut owner, "detach", detach(at(7))), true);
     assert_eq!(owner.history_depths(), (2, 0));
-    for target in targets {
-        assert_tag(&owner, target, None);
-    }
+    assert_tags(&owner, targets, None);
     assert!(wire(&owner)["imageMeshes"].get("im_1").is_none());
     let detached = support::bytes(&owner);
-    owner.undo(owner.content_revision()).unwrap();
-    assert_eq!(support::bytes(&owner), attached);
-    owner.undo(owner.content_revision()).unwrap();
-    assert_eq!(support::bytes(&owner), initial);
-    owner.redo(owner.content_revision()).unwrap();
-    assert_eq!(support::bytes(&owner), attached);
-    owner.redo(owner.content_revision()).unwrap();
-    assert_eq!(support::bytes(&owner), detached);
+    undo_to(&mut owner, &attached);
+    undo_to(&mut owner, &initial);
+    redo_to(&mut owner, &attached);
+    redo_to(&mut owner, &detached);
 }
 
 #[test]
@@ -220,14 +281,13 @@ fn real_mixed_slots_count_non_rasters_and_missing_slots_without_touching_other_r
     let proposal = plan(&owner, MeshIdSequence::default(), attach(at(0)));
     assert_attach_counts(proposal.report(), (2, 2));
     assert_eq!(wire(&owner), before, "planning never publishes");
-    let projected: Value = serde_json::from_slice(&encode_storage_project(proposal.document()).unwrap()).unwrap();
-    assert_eq!(projected["objects"], before["objects"]);
-    assert_eq!(projected["items"]["text"], before["items"]["text"]);
-    assert_eq!(projected["compositionOrder"], before["compositionOrder"]);
+    let projected: Value =
+        serde_json::from_slice(&encode_storage_project(proposal.document()).unwrap()).unwrap();
+    assert_binding_only(&before, &projected);
     run(&mut owner, "mixed", attach(at(0)));
     assert_tag(&owner, at(0), Some("im_1"));
     assert_tag(&owner, at(1), Some("im_1"));
-    assert_tag(&owner, target("scene-root","L0",0,"other-0"), None);
+    assert_tag(&owner, target("scene-root", "L0", 0, "other-0"), None);
     assert_eq!(wire(&owner), projected);
 }
 
@@ -257,16 +317,34 @@ fn duplicated_layer_shares_one_fresh_deep_copy_across_its_frames_and_editing_is_
     run(&mut owner, "duplicate", duplicate("L2"));
     for frame in 0..24 {
         assert_tag(&owner, at(frame), Some("im_1"));
-        assert_tag(&owner, target("scene-root","L2",frame,&format!("copy-{frame}")), Some("im_2"));
+        assert_tag(
+            &owner,
+            target("scene-root", "L2", frame, &format!("copy-{frame}")),
+            Some("im_2"),
+        );
     }
-    assert_eq!(wire(&owner)["imageMeshes"]["im_1"], wire(&owner)["imageMeshes"]["im_2"]);
-    run(&mut owner, "drag-copy", json!({"command":"object.image.mesh.edit","meshId":"im_2",
-        "action":{"kind":"setOffset","index":8,"du":0.25,"dv":-0.5}}));
+    assert_eq!(
+        wire(&owner)["imageMeshes"]["im_1"],
+        wire(&owner)["imageMeshes"]["im_2"]
+    );
+    run(
+        &mut owner,
+        "drag-copy",
+        json!({"command":"object.image.mesh.edit","meshId":"im_2",
+        "action":{"kind":"setOffset","index":8,"du":0.25,"dv":-0.5}}),
+    );
     assert_eq!(wire(&owner)["imageMeshes"]["im_1"], mesh());
-    assert_eq!(wire(&owner)["imageMeshes"]["im_2"]["offsets"][8], json!([0.25,-0.5]));
+    assert_eq!(
+        wire(&owner)["imageMeshes"]["im_2"]["offsets"][8],
+        json!([0.25, -0.5])
+    );
     owner.undo(owner.content_revision()).unwrap();
     owner.undo(owner.content_revision()).unwrap();
-    assert_eq!(wire(&owner), value, "duplicate and sculpt are separate atomic edits");
+    assert_eq!(
+        wire(&owner),
+        value,
+        "duplicate and sculpt are separate atomic edits"
+    );
 }
 
 #[test]
@@ -300,12 +378,18 @@ fn preparation_is_detached_and_discarded_stale_or_foreign_candidates_publish_not
     let candidate = owner.prepare_image_mesh_edit_json(body.as_bytes()).unwrap();
     let mut foreign = support::owner(&drawing(24, None));
     let foreign_before = support::state(&foreign);
-    assert_eq!(foreign.commit_image_mesh_edit(candidate).unwrap_err(), DispatchErrorCode::WrongDocument);
+    assert_eq!(
+        foreign.commit_image_mesh_edit(candidate).unwrap_err(),
+        DispatchErrorCode::WrongDocument
+    );
     assert_eq!(support::state(&foreign), foreign_before);
     run(&mut owner, "commit", attach(at(0)));
     assert_tag(&owner, at(0), Some("im_1")); // discarded preparation spends no id
     let committed = support::state(&owner);
-    assert_eq!(owner.commit_image_mesh_edit(stale).unwrap_err(), DispatchErrorCode::StaleRevision);
+    assert_eq!(
+        owner.commit_image_mesh_edit(stale).unwrap_err(),
+        DispatchErrorCode::StaleRevision
+    );
     assert_eq!(support::state(&owner), committed);
 }
 
@@ -314,9 +398,14 @@ fn replay_cancellation_stale_and_malformed_payloads_cannot_publish_or_erase_redo
     let mut owner = support::owner(&drawing(24, None));
     let initial = support::state(&owner);
     for (id, field, value, code) in [
-        ("cancel","cancelledBeforeDispatch",json!(true),"cancelled_before_dispatch"),
-        ("stale","expectedRevision",json!(99),"stale_revision"),
-        ("foreign","documentId",json!("foreign"),"wrong_document"),
+        (
+            "cancel",
+            "cancelledBeforeDispatch",
+            json!(true),
+            "cancelled_before_dispatch",
+        ),
+        ("stale", "expectedRevision", json!(99), "stale_revision"),
+        ("foreign", "documentId", json!("foreign"), "wrong_document"),
     ] {
         let mut request = request(&owner, id, attach(at(0)));
         request[field] = value;
@@ -335,7 +424,7 @@ fn replay_cancellation_stale_and_malformed_payloads_cannot_publish_or_erase_redo
     assert_eq!(dispatch(&mut owner, &original), reply);
     assert_eq!(support::state(&owner), applied);
     let mut conflict = original.clone();
-    conflict["payload"]["action"]["mesh"]["offsets"][0] = json!([0.2,0]);
+    conflict["payload"]["action"]["mesh"]["offsets"][0] = json!([0.2, 0]);
     assert_error(&mut owner, &conflict, "invalid_request");
     assert_eq!(support::state(&owner), applied);
     owner.undo(owner.content_revision()).unwrap();
@@ -343,7 +432,11 @@ fn replay_cancellation_stale_and_malformed_payloads_cannot_publish_or_erase_redo
     assert_eq!(dispatch(&mut owner, &original), reply);
     assert_eq!(support::state(&owner), undone);
     assert_applied(&run(&mut owner, "noop", detach(at(0))), false);
-    assert_eq!(support::state(&owner), undone, "a no-op keeps the pending redo");
+    assert_eq!(
+        support::state(&owner),
+        undone,
+        "a no-op keeps the pending redo"
+    );
     run(&mut owner, "fresh", attach(at(0)));
     assert_tag(&owner, at(0), Some("im_2"));
 }
@@ -353,12 +446,11 @@ fn real_save_reload_keeps_all_frame_tags_and_the_mesh_store() {
     let mut owner = support::owner(&drawing(24, None));
     run(&mut owner, "attach", attach(at(9)));
     let saved_drawing = support::bytes(&owner);
-    let reopened = NativeObjectHistory::from_project_file("reopened", &project_file(&owner)).unwrap();
+    let reopened =
+        NativeObjectHistory::from_project_file("reopened", &project_file(&owner)).unwrap();
     assert_eq!(support::bytes(&reopened), saved_drawing);
     assert_eq!(reopened.history_depths(), (0, 0));
-    for frame in 0..24 {
-        assert_tag(&reopened, at(frame), Some("im_1"));
-    }
+    assert_tags(&reopened, (0..24).map(at), Some("im_1"));
 }
 
 #[test]
@@ -366,8 +458,14 @@ fn absent_video_provider_is_typed_unavailable_and_preserves_the_owner() {
     let mut owner = support::owner(&drawing(24, None));
     let initial = support::state(&owner);
     for (id, action) in [
-        ("video-attach",json!({"kind":"attachVideo","contextId":"scene-root","layerUid":"L0","mesh":mesh()})),
-        ("video-detach",json!({"kind":"detachVideo","contextId":"scene-root","layerUid":"L0"})),
+        (
+            "video-attach",
+            json!({"kind":"attachVideo","contextId":"scene-root","layerUid":"L0","mesh":mesh()}),
+        ),
+        (
+            "video-detach",
+            json!({"kind":"detachVideo","contextId":"scene-root","layerUid":"L0"}),
+        ),
     ] {
         let request = request(&owner, id, payload(action));
         assert_error(&mut owner, &request, "unavailable");
@@ -389,10 +487,21 @@ fn direct_propagate_and_release_use_the_kernel_without_spending_an_id_or_publish
     assert_eq!(retained.sequence().last(), 73);
     let clear = payload(json!({"kind":"propagate","target":at(8),"meshId":null}));
     let cleared = plan(&owner, sequence, clear.clone());
-    assert!(matches!(cleared.report(), BindingReport::Propagate { written:24, skipped:0 }));
+    assert!(matches!(
+        cleared.report(),
+        BindingReport::Propagate {
+            written: 24,
+            skipped: 0
+        }
+    ));
     assert!(cleared.changed());
     assert_eq!(cleared.sequence().last(), 73);
-    assert!(cleared.document().image_meshes().unwrap().get("im_1").is_some());
+    assert!(cleared
+        .document()
+        .image_meshes()
+        .unwrap()
+        .get("im_1")
+        .is_some());
     assert_eq!(support::state(&owner), before);
     run(&mut owner, "clear-tags", clear);
     let cleared_state = support::state(&owner);
@@ -410,12 +519,16 @@ fn v2_mixed_order_save_reload_preserves_every_target_slot_and_authored_order() {
     let mut owner = support::owner(&mixed());
     run(&mut owner, "mixed-save", attach(at(0)));
     let expected = support::bytes(&owner);
-    let mut reopened = NativeObjectHistory::from_project_file("v2-reopened", &project_file(&owner)).unwrap();
+    let mut reopened =
+        NativeObjectHistory::from_project_file("v2-reopened", &project_file(&owner)).unwrap();
     assert_eq!(support::bytes(&reopened), expected);
     run(&mut reopened, "mixed-detach", detach(at(1)));
     assert_tag(&reopened, at(0), None);
     assert_tag(&reopened, at(1), None);
-    assert_eq!(wire(&reopened)["compositionOrder"], mixed()["compositionOrder"]);
+    assert_eq!(
+        wire(&reopened)["compositionOrder"],
+        mixed()["compositionOrder"]
+    );
 }
 
 #[test]
@@ -440,10 +553,17 @@ fn component_drawing() -> Value {
     value["componentTables"] = json!({"components":{"format":"nemo.native-component-set",
         "formatVersion":1,"components":[{"symbolId":"component-A","totalFrames":3,
             "layers":[{"layerUid":"inner-only"}],"objects":[]}],"instances":[]}});
-    let root_scopes: Vec<_> = (0..2).map(|frame|
-        scope(frame,vec![element("L0",&format!("raster-{frame}"),0)])).collect();
-    let inner_scopes: Vec<_> = (0..3).map(|frame|
-        scope(frame,vec![element("inner-only",&format!("inner-{frame}"),0)])).collect();
+    let root_scopes: Vec<_> = (0..2)
+        .map(|frame| scope(frame, vec![element("L0", &format!("raster-{frame}"), 0)]))
+        .collect();
+    let inner_scopes: Vec<_> = (0..3)
+        .map(|frame| {
+            scope(
+                frame,
+                vec![element("inner-only", &format!("inner-{frame}"), 0)],
+            )
+        })
+        .collect();
     value["compositionOrder"] = json!({"format":"nemo.native-object-order-plan","formatVersion":1,
         "documentFormatVersion":2,"migration":"explicit-plan-required","referencePolicy":"unresolved",
         "contexts":[{"contextId":"scene-root","layers":[
@@ -460,15 +580,11 @@ fn required_component_references_survive_root_detach_and_component_writes_use_lo
     let mut owner = support::owner(&component_drawing());
     run(&mut owner, "root-off", detach(at(0)));
     assert_eq!(wire(&owner)["imageMeshes"]["im_1"], mesh());
-    for frame in 0..3 {
-        assert_tag(&owner, inner(frame), Some("im_1"));
-    }
+    assert_tags(&owner, (0..3).map(inner), Some("im_1"));
     run(&mut owner, "component-off", detach(inner(2)));
     assert!(wire(&owner)["imageMeshes"].get("im_1").is_none());
     run(&mut owner, "component-on", attach(inner(2)));
-    for frame in 0..3 {
-        assert_tag(&owner, inner(frame), Some("im_2"));
-    }
+    assert_tags(&owner, (0..3).map(inner), Some("im_2"));
     assert_tag(&owner, at(0), None);
     assert_tag(&owner, at(1), None);
 }
@@ -476,7 +592,9 @@ fn required_component_references_survive_root_detach_and_component_writes_use_lo
 #[test]
 fn required_component_tags_and_meshes_survive_real_project_save_reload() {
     let owner = support::owner(&component_drawing());
-    let reopened = NativeObjectHistory::from_project_file("component-reopened", &project_file(&owner)).unwrap();
+    let reopened =
+        NativeObjectHistory::from_project_file("component-reopened", &project_file(&owner))
+            .unwrap();
     assert_eq!(support::bytes(&reopened), support::bytes(&owner));
 }
 
@@ -485,50 +603,50 @@ fn required_component_mixed_slots_use_local_order_and_leave_root_and_other_slots
     let mut value = component_drawing();
     let other = target("component-A", "inner-only", 2, "other-inner");
     push_raster(&mut value, other.clone(), Some("im_1"));
-    value["componentTables"]["components"]["components"][0]["objects"] = json!([0,2]
-        .map(|frame| fixture_path("component-A","inner-only",frame,&format!("inner-path-{frame}"))));
-    value["items"]["text"] = json!([text(target("component-A","inner-only",1,"inner-text"))]);
+    value["componentTables"]["components"]["components"][0]["objects"] =
+        json!([0, 2].map(|frame| fixture_path(
+            "component-A",
+            "inner-only",
+            frame,
+            &format!("inner-path-{frame}")
+        )));
+    value["items"]["text"] = json!([text(target("component-A", "inner-only", 1, "inner-text"))]);
     let e = |stroke, position| element("inner-only", stroke, position);
     value["compositionOrder"]["contexts"][1]["scopes"] = json!([
-        scope(0,vec![e("inner-path-0",0),e("inner-0",1)]),
-        scope(1,vec![e("inner-1",0),e("inner-text",1)]),
-        scope(2,vec![e("inner-path-2",0),e("inner-2",1),e("other-inner",2)])]);
+        scope(0, vec![e("inner-path-0", 0), e("inner-0", 1)]),
+        scope(1, vec![e("inner-1", 0), e("inner-text", 1)]),
+        scope(
+            2,
+            vec![e("inner-path-2", 0), e("inner-2", 1), e("other-inner", 2)]
+        )
+    ]);
     // Required positive gate: inner-only and component frame 2 must pass the real admission path.
     let mut owner = support::owner(&value);
     let before = wire(&owner);
     let initial = support::bytes(&owner);
     let proposal = plan(&owner, MeshIdSequence::default(), attach(inner(2)));
     assert_attach_counts(proposal.report(), (2, 1));
-    assert_eq!(support::bytes(&owner), initial, "component planning publishes nothing");
+    assert_eq!(
+        support::bytes(&owner),
+        initial,
+        "component planning publishes nothing"
+    );
     run(&mut owner, "mixed-component-on", attach(inner(2)));
     assert_eq!(owner.history_depths(), (1, 0));
-    for frame in [0, 2] {
-        assert_tag(&owner, inner(frame), Some("im_2"));
-    }
-    for target in [inner(1), other, at(0), at(1)] {
-        assert_tag(&owner, target, Some("im_1"));
-    }
+    assert_tags(&owner, [0, 2].map(inner), Some("im_2"));
+    assert_tags(&owner, [inner(1), other, at(0), at(1)], Some("im_1"));
     let after = wire(&owner);
-    for member in ["layers", "objects", "componentTables", "compositionOrder"] {
-        assert_eq!(after[member], before[member], "{member}");
-    }
-    assert_eq!(after["items"]["text"], before["items"]["text"]);
-    let targets = |doc: &Value| doc["items"]["raster"].as_array().unwrap().iter()
-        .map(|entry| entry["target"].clone()).collect::<Vec<_>>();
-    assert_eq!(targets(&after), targets(&before), "full component and root identities stay stable");
+    assert_binding_only(&before, &after);
     run(&mut owner, "mixed-component-off", detach(inner(2)));
     assert_tag(&owner, inner(0), None);
     assert_tag(&owner, inner(2), None);
     assert_tag(&owner, inner(1), Some("im_1"));
-    for frame in 0..2 {
-        assert_tag(&owner, at(frame), Some("im_1"));
-    }
+    assert_tags(&owner, (0..2).map(at), Some("im_1"));
     assert!(wire(&owner)["imageMeshes"].get("im_2").is_none());
     assert_eq!(wire(&owner)["imageMeshes"]["im_1"], mesh());
     owner.undo(owner.content_revision()).unwrap();
     assert_eq!(wire(&owner), after);
-    owner.undo(owner.content_revision()).unwrap();
-    assert_eq!(support::bytes(&owner), initial);
+    undo_to(&mut owner, &initial);
 }
 
 fn vertex_holder(layer: &str) -> Value {
@@ -540,10 +658,16 @@ fn vertex_holder(layer: &str) -> Value {
 #[test]
 fn duplicate_remaps_real_mesh_vertex_holder_and_rig_bind_without_rewriting_the_original() {
     let mut value = drawing(24, Some("im_1"));
-    push_raster(&mut value, target("scene-root","L2",0,"copy"), Some("im_1"));
-    value["propertyHolders"] = json!([vertex_holder("L0"),vertex_holder("L2")]);
-    let row = include_str!("fixtures/object-rig-record/oracle.txt").lines()
-        .find(|line| line.starts_with("rig\tmesh_bind_two_bones_rebind_replaces\t")).unwrap();
+    push_raster(
+        &mut value,
+        target("scene-root", "L2", 0, "copy"),
+        Some("im_1"),
+    );
+    value["propertyHolders"] = json!([vertex_holder("L0"), vertex_holder("L2")]);
+    let row = include_str!("fixtures/object-rig-record/oracle.txt")
+        .lines()
+        .find(|line| line.starts_with("rig\tmesh_bind_two_bones_rebind_replaces\t"))
+        .unwrap();
     let rig: Value = serde_json::from_str(row.split('\t').nth(2).unwrap()).unwrap();
     value["layers"][0]["rig"] = rig.clone();
     value["layers"][1]["rig"] = rig;

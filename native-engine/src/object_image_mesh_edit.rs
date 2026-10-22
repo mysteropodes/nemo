@@ -29,7 +29,9 @@
 //! hold (the baseline ignores a falsy value and keeps a fraction), an index must be a non-negative
 //! integer, and fewer than three outline points is `invalid_request` instead of `null`.
 use crate::commands::{ObjectFillOwner, MAX_VECTOR_REQUEST_BYTES};
-use crate::object_document::{object_deserialize, ImageMeshStore, ObjectDocument, Presence};
+use crate::object_document::{
+    object_deserialize, ImageMeshStore, MeshIdSequence, ObjectDocument, Presence,
+};
 use crate::object_snapshot::object_image_mesh_edit_read::{
     retopologize, Retopology, RetopologyRefusal,
 };
@@ -38,6 +40,8 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_image_mesh_binding_edit.rs"]
+mod object_image_mesh_binding_edit;
 #[path = "object_image_mesh_edit_rules.rs"]
 mod rules;
 
@@ -102,6 +106,7 @@ pub(crate) struct PreparedImageMeshEdit {
     origin: ObjectSnapshot,
     document: ObjectDocument,
     changed: bool,
+    binding_sequence: Option<(MeshIdSequence, MeshIdSequence)>,
 }
 
 fn bad<T>() -> Result<T, DispatchErrorCode> {
@@ -241,6 +246,30 @@ impl ObjectFillOwner {
         if bytes.len() > MAX_VECTOR_REQUEST_BYTES {
             return bad();
         }
+        let shape: serde_json::Value =
+            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        if shape
+            .get("action")
+            .and_then(|action| action.get("kind"))
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(object_image_mesh_binding_edit::binding_action_kind)
+        {
+            let origin = self.current_snapshot();
+            let plan = object_image_mesh_binding_edit::plan_binding_edit_json(
+                &origin,
+                self.mesh_id_sequence,
+                bytes,
+            )?;
+            let changed = plan.changed();
+            let before_sequence = plan.origin_sequence();
+            let (document, after_sequence, _) = plan.into_parts();
+            return Ok(PreparedImageMeshEdit {
+                origin,
+                document,
+                changed,
+                binding_sequence: Some((before_sequence, after_sequence)),
+            });
+        }
         let payload: EditPayload = match serde_json::from_slice(bytes) {
             Ok(payload) => payload,
             Err(_) => return bad(),
@@ -303,6 +332,7 @@ impl ObjectFillOwner {
             origin,
             document,
             changed,
+            binding_sequence: None,
         })
     }
 
@@ -320,15 +350,24 @@ impl ObjectFillOwner {
         }
         if candidate.origin.snapshot_id() != current.snapshot_id()
             || candidate.origin.content_revision() != current.content_revision()
+            || candidate
+                .binding_sequence
+                .is_some_and(|(before, _)| before != self.mesh_id_sequence)
         {
             return Err(DispatchErrorCode::StaleRevision);
         }
-        if !candidate.changed {
-            return Ok(current.content_revision());
+        let revision = if candidate.changed {
+            self.revisions
+                .publish(candidate.document)
+                .map_err(|_| DispatchErrorCode::Unavailable)?
+        } else {
+            current.content_revision()
+        };
+        // Publish before advancing the lifetime counter. A refused/stale candidate spends no id.
+        if let Some((_, after)) = candidate.binding_sequence {
+            self.mesh_id_sequence = after;
         }
-        self.revisions
-            .publish(candidate.document)
-            .map_err(|_| DispatchErrorCode::Unavailable)
+        Ok(revision)
     }
 }
 
