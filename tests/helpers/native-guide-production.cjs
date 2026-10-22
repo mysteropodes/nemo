@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const clone = value => JSON.parse(JSON.stringify(value));
 
 function fixture({ composition = false } = {}) {
-  const events = new WeakMap(), trace = [], calls = [], notices = [], labels = [], timers = new Set(), frames = [];
+  const events = new WeakMap(), trace = [], calls = [], notices = [], diagnostics = [], labels = [], timers = new Set(), frames = [];
   const nativeListeners = new Map(), observers = new Set(), previewReleases = new Set();
   let source = 'fixture', context, root, disposed = false, installed = false, generation = 0, serial = 0, previewHold = null;
   let canonicalPorts = null;
@@ -174,6 +174,7 @@ function fixture({ composition = false } = {}) {
     requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
     localStorage: { getItem: () => '0', setItem() {} }, showToast: text => notices.push(text),
+    __NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__: (event, code) => diagnostics.push([event, code]),
     Point: function Point(x, y) { this.x = x; this.y = y; },
     updateUI() {}, SMReference: { refreshNative() {} }, SMProject: { refreshActiveTabDirtyDot() {} },
     // Unused legacy service ports are explicit; no legacy document operation is admitted by this fixture.
@@ -288,7 +289,7 @@ function fixture({ composition = false } = {}) {
     disposed = true; for (const timer of timers) clearTimeout(timer); timers.clear(); frames.length = 0;
     await new Promise(setImmediate);
   }
-  return { root: browser, document, area, h, v, session, calls, trace, notices, labels, prepare, settle, open, tick, dispose,
+  return { root: browser, document, area, h, v, session, calls, trace, notices, diagnostics, labels, prepare, settle, open, tick, dispose,
     dispatch, saved: () => JSON.stringify(nativeDocument), originalDocument,
     ghosts: () => descendants(document).filter(element => element.style.opacity === '.6'),
     edits: () => calls.filter(call => call.request && String(call.request.operation).startsWith('command.')),
