@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "5539885eb6a8f544503fc692f1a938aabf92b246",
-  "describe": "v0.7.0-alpha.4-2862-g5539885e"
+  "head": "2388eadb90a75929ab0f4ba45a4fd1d4fed2c2b8",
+  "describe": "v0.7.0-alpha.4-2886-g2388eadb-dirty"
  },
- "inputsDigest": "7734e8e6997a321c1f1aaeab116dd24d3ba15e2029912d05f58898ca7e2a3139",
+ "inputsDigest": "bf6a6577e49f3177e72ff8c99972a15426419145413f4427e1da354ed29e77aa",
  "states": [
   "inventoried",
   "characterized",
@@ -1001,7 +1001,7 @@
    "capability": "Add a key",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:131 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:139 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1045,7 +1045,7 @@
    "capability": "Edit easing curve…",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:135 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:143 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1087,7 +1087,7 @@
    "capability": "Camera layer — framing keys (zoom/pan) interpolated with Bézier curves",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:111 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:119 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1113,7 +1113,7 @@
     "functionsVisited": 53,
     "via": "variable button",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:100 renderCameraViewLock()",
+     "src/js/adapters/native-object-project-desktop.js:108 renderCameraViewLock()",
      "src/js/motion.js:7282 action()"
     ]
    },
@@ -17444,10 +17444,10 @@
     "container": "canvas-zoom-pills",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 278,
+    "functionsVisited": 279,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:223 presented()",
+     "src/js/adapters/native-object-project-desktop.js:231 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7109 show()"
     ]

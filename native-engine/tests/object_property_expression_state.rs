@@ -62,14 +62,18 @@ fn expression_state_view(frame: f64) -> Value {
 fn expression_state_reads_actual_presence_without_executing_or_claiming_success() {
     for (expression, present, enabled) in [
         (
-            json!({"enabled":true,"code":"throw Error('must not run')"}),
+            Some(json!({"enabled":true,"code":"throw Error('must not run')"})),
             true,
             true,
         ),
-        (json!({"enabled":false,"code":"0"}), true, false),
-        (Value::Null, false, false),
+        (Some(json!({"enabled":false,"code":"0"})), true, false),
+        (None, false, false),
     ] {
-        let snapshot = pin(json!([{"property":"opacity","expression":expression}]));
+        let mut record = json!({"property":"opacity"});
+        if let Some(expression) = expression {
+            record["expression"] = expression;
+        }
+        let snapshot = pin(json!([record]));
         let saved = encode_storage_project(snapshot.document()).unwrap();
         let result = read(&snapshot, expression_state_view(2.5)).unwrap();
         assert_eq!(

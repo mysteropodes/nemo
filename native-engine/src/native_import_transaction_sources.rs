@@ -1,7 +1,9 @@
 //! Source-aware request entry on the existing history/replay owner. Bytes resolve
 //! outside the owner; neither a Prepared value nor mutable authority escapes.
-use super::{ImportAssetSource, OP_IMPORT_BATCH};
 use crate::commands::ImportBatchResult;
+use crate::history::object_history::object_shot_kernels::native_import_transaction::session::{
+    ImportAssetSource, OP_IMPORT_BATCH,
+};
 use crate::history::object_history::NativeObjectHistory;
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,

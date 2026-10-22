@@ -1,7 +1,7 @@
 //! Sealed import of drawing and retained resources through the existing owner.
-use super::{derives_from, PreparedImportBatch};
+use crate::commands::object_fill_owner::import_batch::{derives_from, PreparedImportBatch};
 use crate::commands::ObjectFillOwner;
-use crate::object_document::{AssetInventory, ObjectDocument, Presence};
+use crate::object_document::{AssetInventory, AssetKind, AssetRecord, ObjectDocument, Presence};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use std::sync::Arc;
@@ -58,6 +58,89 @@ fn items_preserved(after: &ObjectDocument, before: &ObjectDocument) -> bool {
 }
 
 impl ObjectFillOwner {
+    /// Validate retained provider identity before the history planner remaps it.
+    pub(crate) fn validate_import_asset(
+        origin: &ObjectSnapshot,
+        record: &AssetRecord,
+    ) -> Result<(), DispatchErrorCode> {
+        match record.kind() {
+            AssetKind::Image => {
+                #[cfg(feature = "project_media_codec")]
+                {
+                    let source = record.source();
+                    let bytes = source.encoded_allocation().ok_or_else(invalid)?;
+                    if source.media_type() != Some("image/png") {
+                        return Err(invalid());
+                    }
+                    origin.validate_import_png(bytes)
+                }
+                #[cfg(not(feature = "project_media_codec"))]
+                {
+                    let _ = origin;
+                    Err(DispatchErrorCode::Unavailable)
+                }
+            }
+            AssetKind::Font => {
+                if record.source().has_font_admission() {
+                    Ok(())
+                } else {
+                    Err(DispatchErrorCode::Unavailable)
+                }
+            }
+            _ => Err(invalid()),
+        }
+    }
+
+    /// Prepare one real provider record without attaching or publishing it.
+    #[cfg(feature = "project_media_codec")]
+    pub(crate) fn prepare_import_asset_source(
+        origin: &ObjectSnapshot,
+        id: &str,
+        name: &str,
+        media_type: &str,
+        bytes: &[u8],
+    ) -> Result<Arc<AssetRecord>, DispatchErrorCode> {
+        let project = origin.project().ok_or(DispatchErrorCode::Unavailable)?;
+        match media_type {
+            "image/png" => {
+                let prepared = origin
+                    .prepare_asset_attachment(id, name, media_type, bytes)
+                    .map_err(|error| error.code())?;
+                match prepared.into_edit() {
+                    crate::object_snapshot::AssetEdit::Add(record) => Ok(record),
+                    crate::object_snapshot::AssetEdit::Unchanged => project
+                        .asset_inventory()
+                        .and_then(|catalog| {
+                            catalog.records().iter().find(|record| {
+                                record.kind() == AssetKind::Image
+                                    && record.source().media_type() == Some("image/png")
+                                    && record
+                                        .source()
+                                        .encoded_allocation()
+                                        .is_some_and(|held| held.as_slice() == bytes)
+                            })
+                        })
+                        .cloned()
+                        .ok_or(DispatchErrorCode::Internal),
+                    crate::object_snapshot::AssetEdit::Remove(_) => {
+                        Err(DispatchErrorCode::Internal)
+                    }
+                }
+            }
+            "font/ttf" => {
+                #[cfg(feature = "font_asset_wire")]
+                {
+                    origin.admit_font_asset(format!("asset-{id}"), name.into(), bytes)
+                }
+                #[cfg(not(feature = "font_asset_wire"))]
+                {
+                    Err(DispatchErrorCode::Unavailable)
+                }
+            }
+            _ => Err(DispatchErrorCode::Unavailable),
+        }
+    }
+
     pub(crate) fn seal_import_batch_with_assets(
         &self,
         origin: ObjectSnapshot,
@@ -105,8 +188,9 @@ impl ObjectFillOwner {
                 }
             }
             ObjectSnapshot::validate_drawing(&document).map_err(|_| invalid())?;
-            crate::object_codec::validate_item_assets(&document, inventory.as_ref())
-                .map_err(|_| invalid())?;
+            if crate::object_document::item_asset_issue(&document, inventory.as_ref()).is_some() {
+                return Err(invalid());
+            }
             let project = current
                 .with_drawing(document.clone())
                 .with_asset_inventory(inventory);

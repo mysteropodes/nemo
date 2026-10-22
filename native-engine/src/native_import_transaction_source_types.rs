@@ -1,10 +1,9 @@
 //! Closed source descriptors of the existing atomic import operation; no source I/O.
-use super::ImportAssetSource;
 use crate::history::object_history::object_shot_kernels::native_import_transaction::{
-    wire, ImportBatch,
+    session::ImportAssetSource, wire, ImportBatch,
 };
-use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
+use crate::revision::ObjectSnapshot;
 use serde_json::Value;
 use std::collections::BTreeSet;
 

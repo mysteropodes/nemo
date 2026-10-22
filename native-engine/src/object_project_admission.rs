@@ -69,6 +69,25 @@ impl PreparedReferenceAttachment {
 }
 
 impl ObjectSnapshot {
+    /// Validate borrowed import PNG bytes with the shared charged workspace.
+    /// No encoded allocation is copied or retained by this immutable read.
+    pub(crate) fn validate_import_png(&self, source: &[u8]) -> Result<(), DispatchErrorCode> {
+        let limits = ImageAssetLimits::new(
+            ENCODED_BYTES,
+            RGBA_BYTES,
+            DECODER_BYTES,
+            DIMENSION,
+            DIMENSION,
+        )
+        .map_err(|_| DispatchErrorCode::Internal)?;
+        validate_png_in_domain(source, limits, shared_image_resource_budget()).map_err(|error| {
+            match error {
+                ProjectWireError::Budget => DispatchErrorCode::Unavailable,
+                _ => DispatchErrorCode::InvalidRequest,
+            }
+        })
+    }
+
     /// Trusted host supplies bytes separately from the bounded scalar request.
     /// This value is not a public DTO, identity publisher or another owner.
     #[cfg(feature = "font_asset_wire")]

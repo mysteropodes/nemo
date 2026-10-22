@@ -1,13 +1,17 @@
 //! Actual asset and item half of the batch planner. No publisher or encoded-byte copy.
 //! Provider-admitted allocations are retained, remapped and checked with the native
 //! codecs; the origin catalog and item lists remain unchanged prefixes.
-use super::{ImportBatch, ImportError, MissingProvider};
+use crate::commands::ObjectFillOwner;
+use crate::history::object_history::object_shot_kernels::native_import_transaction::{
+    ImportBatch, ImportError, MissingProvider,
+};
 use crate::history::object_history::object_shot_kernels::object_import_remap_ids::{
     OriginIds, RemapKind, RemapTable,
 };
 use crate::object_document::{
     AssetId, AssetInventory, AssetKind, AssetRecord, ItemRecords, ObjectDocument,
 };
+use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 use serde_json::Value;
 use std::sync::Arc;
@@ -23,74 +27,30 @@ fn unavailable(source: &str, need: MissingProvider) -> ImportError {
     }
 }
 
-/// The same PNG limits and charged temporary workspace as project admission.
-/// This validates a borrowed retained allocation; it never copies encoded bytes.
-#[cfg(feature = "project_media_codec")]
-fn validate_png(record: &AssetRecord, index: usize) -> Result<(), ImportError> {
-    use crate::object_codec::raster_asset_admission::{
-        MAX_DIMENSION, MAX_ENCODED_BYTES, MAX_RGBA_BYTES,
-    };
-    use crate::object_codec::raster_asset_png_port::MAX_DECODER_BYTES;
-    use crate::object_codec::{ImageAssetLimits, PngWorkspace, ProjectWireError};
-    use crate::object_snapshot::charged_png_workspace;
-    use crate::revision::shared_image_resource_budget;
-    let source = record.source();
-    let bytes = source
-        .encoded_allocation()
-        .ok_or(ImportError::InvalidAsset { index })?;
-    if source.media_type() != Some("image/png") {
-        return Err(ImportError::InvalidAsset { index });
-    }
-    let limits = ImageAssetLimits::new(
-        MAX_ENCODED_BYTES,
-        MAX_RGBA_BYTES,
-        MAX_DECODER_BYTES,
-        MAX_DIMENSION,
-        MAX_DIMENSION,
-    )
-    .map_err(|_| ImportError::Internal)?;
-    let budget = shared_image_resource_budget();
-    crate::object_codec::validate_png_with_buffers(
-        bytes,
-        limits,
-        || {
-            charged_png_workspace(budget, || Ok(PngWorkspace::new()))
-                .map_err(|_| ProjectWireError::Budget)
+fn validate_asset(
+    origin: &ObjectSnapshot,
+    record: &AssetRecord,
+    source: &str,
+    index: usize,
+) -> Result<(), ImportError> {
+    ObjectFillOwner::validate_import_asset(origin, record).map_err(|code| match code {
+        DispatchErrorCode::Internal => ImportError::Internal,
+        DispatchErrorCode::Unavailable => match record.kind() {
+            AssetKind::Image => {
+                #[cfg(feature = "project_media_codec")]
+                {
+                    ImportError::Overflow
+                }
+                #[cfg(not(feature = "project_media_codec"))]
+                {
+                    unavailable(source, MissingProvider::RasterAsset)
+                }
+            }
+            AssetKind::Font => unavailable(source, MissingProvider::Font),
+            _ => ImportError::InvalidAsset { index },
         },
-        |n| {
-            budget
-                .allocate_bytes(n)
-                .map_err(|_| ProjectWireError::Budget)
-        },
-    )
-    .map_err(|error| match error {
-        ProjectWireError::Budget => ImportError::Overflow,
         _ => ImportError::InvalidAsset { index },
-    })?;
-    Ok(())
-}
-
-fn validate_asset(record: &AssetRecord, source: &str, index: usize) -> Result<(), ImportError> {
-    match record.kind() {
-        AssetKind::Image => {
-            #[cfg(feature = "project_media_codec")]
-            {
-                validate_png(record, index)
-            }
-            #[cfg(not(feature = "project_media_codec"))]
-            {
-                Err(unavailable(source, MissingProvider::RasterAsset))
-            }
-        }
-        AssetKind::Font => {
-            if record.source().has_font_admission() {
-                Ok(())
-            } else {
-                Err(unavailable(source, MissingProvider::Font))
-            }
-        }
-        _ => Err(ImportError::InvalidAsset { index }),
-    }
+    })
 }
 
 /// None means retain the original catalog, never remove it. An appended catalog
@@ -113,7 +73,7 @@ pub(super) fn catalog(
     let placements = previous.map_or_else(Vec::new, |inventory| inventory.placements().to_vec());
     let mut mappings = Vec::with_capacity(batch.assets.len());
     for (index, item) in batch.assets.iter().enumerate() {
-        validate_asset(&item.record, &item.source_id, index)?;
+        validate_asset(origin, &item.record, &item.source_id, index)?;
         let native = table
             .native_id(RemapKind::Asset, &item.source_id)
             .ok_or(ImportError::Internal)?
@@ -166,7 +126,7 @@ pub(super) fn append_items(
     for (offset, item) in batch.raster.iter().enumerate() {
         let index = batch.records.len() + offset;
         let mut placed = item.entry.clone();
-        super::place_target(
+        crate::history::object_history::object_shot_kernels::native_import_transaction::place_target(
             document,
             &mut placed.target,
             &item.source_id,
@@ -188,7 +148,7 @@ pub(super) fn append_items(
     for (offset, item) in batch.text.iter().enumerate() {
         let index = batch.records.len() + batch.raster.len() + offset;
         let mut placed = item.entry.clone();
-        super::place_target(
+        crate::history::object_history::object_shot_kernels::native_import_transaction::place_target(
             document,
             &mut placed.target,
             &item.source_id,
@@ -218,10 +178,10 @@ pub(super) fn append_items(
         text.push(placed);
     }
     document.items = ItemRecords::normalized(raster, text);
-    crate::object_codec::validate_item_assets(document, inventory).map_err(|_| {
-        ImportError::InvalidAsset {
+    if crate::object_document::item_asset_issue(document, inventory).is_some() {
+        return Err(ImportError::InvalidAsset {
             index: batch.records.len(),
-        }
-    })?;
+        });
+    }
     Ok(())
 }

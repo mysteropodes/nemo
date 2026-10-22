@@ -9,6 +9,8 @@
 //! nor the revision owner are exposed. The dispatcher bounds the whole request and the whole response at 4096 bytes,
 //! so a receipt that would not fit is refused BEFORE commit (`ReceiptTooLarge`): a published batch
 //! whose reply failed would be the worst outcome.
+#[cfg(feature = "project_media_codec")]
+use crate::commands::ObjectFillOwner;
 use crate::commands::{ImportBatchResult, PreparedImportBatch};
 use crate::history::object_history::object_shot_kernels::native_import_transaction::wire::parse_batch_at;
 use crate::history::object_history::object_shot_kernels::native_import_transaction::{
@@ -64,8 +66,6 @@ impl NativeObjectHistory {
         sources: &[ImportAssetSource<'_>],
     ) -> Result<PreparedImport, ImportError> {
         use crate::history::object_history::object_shot_kernels::native_import_transaction::ImportAsset;
-        use crate::object_document::AssetKind;
-        use crate::object_snapshot::AssetEdit;
         if request_id.trim().is_empty() {
             return Err(ImportError::Payload);
         }
@@ -75,54 +75,23 @@ impl NativeObjectHistory {
         let origin = self
             .acquire_snapshot(self.content_revision())
             .ok_or(ImportError::Internal)?;
-        let project = origin
+        origin
             .project()
             .ok_or(ImportError::Dispatch(DispatchErrorCode::Unavailable))?;
         let mut joined = batch.clone();
         for (index, source) in sources.iter().enumerate() {
             let id = format!("{request_id}-{index}");
-            let record = match source.media_type {
-                "image/png" => {
-                    let prepared = origin
-                        .prepare_asset_attachment(&id, source.name, source.media_type, source.bytes)
-                        .map_err(|error| ImportError::Dispatch(error.code()))?;
-                    match prepared.into_edit() {
-                        AssetEdit::Add(record) => record,
-                        AssetEdit::Unchanged => project
-                            .asset_inventory()
-                            .and_then(|catalog| {
-                                catalog.records().iter().find(|record| {
-                                    record.kind() == AssetKind::Image
-                                        && record.source().media_type() == Some("image/png")
-                                        && record
-                                            .source()
-                                            .encoded_allocation()
-                                            .is_some_and(|bytes| bytes.as_slice() == source.bytes)
-                                })
-                            })
-                            .cloned()
-                            .ok_or(ImportError::Internal)?,
-                        AssetEdit::Remove(_) => return Err(ImportError::Internal),
-                    }
-                }
-                "font/ttf" => {
-                    #[cfg(feature = "font_asset_wire")]
-                    {
-                        origin
-                            .admit_font_asset(
-                                format!("asset-{id}"),
-                                source.name.into(),
-                                source.bytes,
-                            )
-                            .map_err(ImportError::Dispatch)?
-                    }
-                    #[cfg(not(feature = "font_asset_wire"))]
-                    {
-                        return Err(ImportError::Dispatch(DispatchErrorCode::Unavailable));
-                    }
-                }
-                _ => return Err(ImportError::Dispatch(DispatchErrorCode::Unavailable)),
-            };
+            let record = ObjectFillOwner::prepare_import_asset_source(
+                &origin,
+                &id,
+                source.name,
+                source.media_type,
+                source.bytes,
+            )
+            .map_err(|code| match code {
+                DispatchErrorCode::Internal => ImportError::Internal,
+                code => ImportError::Dispatch(code),
+            })?;
             joined.assets.push(ImportAsset {
                 source_id: source.source_id.into(),
                 record,

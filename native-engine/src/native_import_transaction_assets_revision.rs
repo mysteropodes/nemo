@@ -1,9 +1,9 @@
 //! Batch publication uses the existing revision store and encoded-retention ledger.
-use super::{
+use crate::object_document::ProjectEnvelope;
+use crate::revision::object_revision::{
     asset_admission, encoded_retention_budget, ObjectRevisionOwner, ProjectRevisionValue,
     MAX_CONTENT_REVISION,
 };
-use crate::object_document::ProjectEnvelope;
 use std::sync::Arc;
 
 impl ObjectRevisionOwner {
