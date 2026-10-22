@@ -40,12 +40,14 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.native.application.viewport->rust.desktop.native.application.contract',
     'rust.desktop.native.application.viewport->rust.desktop.native.viewport',
     'rust.desktop.native.host.release.tests->rust.desktop.mcp.adapter',
+    'rust.desktop.native.host.release.tests->rust.desktop.media',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application.commands',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application.contract',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application.ports',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application.viewport',
     'rust.desktop.native.host.release.tests->rust.desktop.native.dispatch',
+    'rust.desktop.native.host.release.tests->rust.desktop.shell',
     'rust.desktop.shell->rust.desktop.mcp.adapter', 'rust.desktop.shell->rust.desktop.media',
     'rust.desktop.shell->rust.desktop.native.application',
     'rust.desktop.shell->rust.desktop.native.application.commands',
@@ -217,20 +219,23 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
   }
 });
 
-test('temporal preview and export require the precise exposure port, not an exact-frame fallback grant', () => {
+test('temporal preview and export require the precise owner-controlled exposure port, not an exact-frame fallback grant', () => {
   const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
   const moduleId = 'rust.desktop.native.dispatch';
-  const item = 'object_frame_packet::prepare_object_exposure_frame';
+  const item = 'application::prepare_object_motion_exposure_frame_for_control';
   const items = policy.externalCratePorts.native_engine.moduleItems[moduleId];
   assert.equal(items.filter((value) => value === item).length, 1);
   assert.equal(items.includes('object_frame_packet::prepare_object_frame'), false);
+  const admitted = R.checkRustCrate(profile, policy, { root: ROOT });
+  assert.equal(admitted.ok, true, JSON.stringify(admitted.violations));
   const denied = structuredClone(policy);
-  denied.externalCratePorts.native_engine.moduleItems[moduleId] = items.filter((value) => value !== item);
+  denied.externalCratePorts.native_engine.moduleItems[moduleId] = items.filter((value) => value !== item)
+    .concat('object_frame_packet::prepare_object_frame');
   const result = R.checkRustCrate(profile, denied, { root: ROOT });
   assert.equal(result.ok, false);
   assert.equal(result.violations.length, 2, JSON.stringify(result.violations));
   assert.ok(result.violations.every((violation) => violation.rule === 'private-port-access'
     && violation.module === moduleId && violation.detail.path === item));
   assert.deepEqual(result.violations.map((violation) => violation.file).sort(),
-    ['src-tauri/src/native_object_export.rs', 'src-tauri/src/native_object_preview.rs']);
+    ['src-tauri/src/native_object_export.rs', 'src-tauri/src/native_object_preview_prepare.rs']);
 });
