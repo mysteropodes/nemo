@@ -226,5 +226,33 @@
       disposePolicyEntries:function(){own.disposeTimeRemapEntries();policy.disposePolicyEntries();}
     }));
   }
-  return Object.freeze({bind:bind,createPorts:createPorts,compose:compose});
+  // The Time Remap grid row from the read keys, inert display data like native opacity
+  // (keys null past the read bound: no diamonds). g: fc, rowH, totalFrames, currentFrame, label.
+  function trackRow(doc,rowEl,facts,g){
+    rowEl.style.pointerEvents='none';
+    var keys=facts.keys||[],svg=doc.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('width',g.totalFrames*g.fc);svg.setAttribute('height',g.rowH);
+    svg.style.cssText='position:absolute;left:0;top:0;pointer-events:none;';
+    for(var i=0;i+1<keys.length;i++){
+      if(keys[i].value===keys[i+1].value)continue;
+      var conn=doc.createElementNS('http://www.w3.org/2000/svg','rect');
+      conn.setAttribute('class','native-remap-connector');
+      conn.setAttribute('x',keys[i].frame*g.fc+g.fc/2);conn.setAttribute('y',Math.round((g.rowH-5)/2));
+      conn.setAttribute('width',(keys[i+1].frame-keys[i].frame)*g.fc);conn.setAttribute('height',5);conn.setAttribute('rx',2);
+      conn.style.cssText='fill:#2E6B60;pointer-events:none;';svg.appendChild(conn);
+    }
+    rowEl.appendChild(svg);
+    for(var frame=0;frame<g.totalFrames;frame++){
+      var cell=doc.createElement('div'),here=frame===g.currentFrame;
+      cell.className='fc motion-fc'+(here?' cur':'');cell.dataset.frame=frame;
+      if(keys.some(function(key){return key.frame===frame;})){
+        var diamond=doc.createElement('div');diamond.className='native-remap-diamond';
+        diamond.style.cssText='position:relative;z-index:2;width:7px;height:7px;border-radius:2px;background:'+(here?'#ffaa28':'transparent')+
+          ';border:1.5px solid '+(here?'#ffaa28':'#cfcfcf')+';transform:rotate(45deg);pointer-events:none;';
+        diamond.title=g.label+' · '+(frame+1);cell.appendChild(diamond);
+      }
+      rowEl.appendChild(cell);
+    }
+  }
+  return Object.freeze({bind:bind,createPorts:createPorts,compose:compose,trackRow:trackRow});
 }));

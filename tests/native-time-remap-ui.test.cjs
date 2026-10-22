@@ -216,7 +216,7 @@ function motionHarness(placement){
     sb.document.readyState='complete';sb._layerIndexByUid=()=>-1;sb.FC=20;
     for(const k of ['ICO_3D','ICO_DUP','ICO_EYE','ICO_EYE_CLOSED','ICO_LOCK','ICO_UNLOCK'])sb[k]='';
     for(const k of ['getEffectiveStrokes'])sb[k]=()=>[];
-    sb.pushUndo=()=>{throw new Error('a native Time Remap row must not push JS undo');};
+    sb.pushUndo=()=>{throw new Error('a native Time Remap row must not push JS undo');};sb.NemoNativeTimeRemapUI=Remap;
   }});
   const f=fixture(placement,motion.sandbox);f.api.bindTimeRemapEntries();
   const sb=motion.sandbox;sb.state.appMode='motion';sb.state.activeLayerIdx=1;sb._layerSel=[1];sb._motionExpandedLayer=1;

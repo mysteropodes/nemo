@@ -14,8 +14,7 @@
 // adding a data-i18n attribute + a key in each language block.
 (function(){
   var I18N={
-    en:{
-      toastNativeTimeRemapNotApplied:'The native document did not apply the Time Remap change.',toastNativeTimeRemapValueUnavailable:'The remapped source frame at the playhead is not available from the native document. Type the source frame in the Time Remap field to add a key.',titleNativeVideoReplaceUnavailable:'Replacing a native video source is unavailable: the native video link route is not declared.',
+    en:{toastNativeTimeRemapNotApplied:'The native document did not apply the Time Remap change.',toastNativeTimeRemapValueUnavailable:'The remapped source frame at the playhead is not available from the native document. Type the source frame in the Time Remap field to add a key.',titleNativeVideoReplaceUnavailable:'Replacing a native video source is unavailable: the native video link route is not declared.',
       expAppOnly:"app only",
       hsLayerNotFound:"Layer not found",
       hsMontageEmpty:"Empty montage — snap instances against its block first",
@@ -1071,8 +1070,7 @@
       exprExControl:'Read a control on this layer',
       mgraphModeValue:'value',mgraphModeSpeed:'speed',mgraphFrozen:'frozen',mgraphExprLegend:'solid = expression, dashed = keyframes',
     },
-    fr:{
-      toastNativeTimeRemapNotApplied:'Le document natif n’a pas appliqué la modification du remappage temporel.',toastNativeTimeRemapValueUnavailable:'L’image source remappée à la tête de lecture n’est pas disponible dans le document natif. Saisissez l’image source dans le champ Remappage temporel pour ajouter une clé.',titleNativeVideoReplaceUnavailable:'Remplacer la source d’une vidéo native est indisponible : la route de liaison vidéo native n’est pas déclarée.',
+    fr:{toastNativeTimeRemapNotApplied:'Le document natif n’a pas appliqué la modification du remappage temporel.',toastNativeTimeRemapValueUnavailable:'L’image source remappée à la tête de lecture n’est pas disponible dans le document natif. Saisissez l’image source dans le champ Remappage temporel pour ajouter une clé.',titleNativeVideoReplaceUnavailable:'Remplacer la source d’une vidéo native est indisponible : la route de liaison vidéo native n’est pas déclarée.',
       expAppOnly:"app seulement",
       hsLayerNotFound:"Calque introuvable",
       hsMontageEmpty:"Montage vide — accrochez des instances contre son bloc d'abord",
@@ -2127,8 +2125,7 @@
       exprExControl:'Lire un contrôle de ce calque',
       mgraphModeValue:'valeur',mgraphModeSpeed:'vitesse',mgraphFrozen:'figé',mgraphExprLegend:'plein = expression, pointillés = clés',
     },
-    ja:{
-      toastNativeTimeRemapNotApplied:'ネイティブドキュメントはタイムリマップの変更を適用しませんでした。',toastNativeTimeRemapValueUnavailable:'再生ヘッドでのリマップ後のソースフレームをネイティブドキュメントから取得できません。キーを追加するには、タイムリマップ欄にソースフレームを入力してください。',titleNativeVideoReplaceUnavailable:'ネイティブ動画のソースは置き換えられません：ネイティブ動画リンクのルートが宣言されていません。',
+    ja:{toastNativeTimeRemapNotApplied:'ネイティブドキュメントはタイムリマップの変更を適用しませんでした。',toastNativeTimeRemapValueUnavailable:'再生ヘッドでのリマップ後のソースフレームをネイティブドキュメントから取得できません。キーを追加するには、タイムリマップ欄にソースフレームを入力してください。',titleNativeVideoReplaceUnavailable:'ネイティブ動画のソースは置き換えられません：ネイティブ動画リンクのルートが宣言されていません。',
       expAppOnly:"アプリのみ",
       linkedMediaBannerBtn:"アクセスを許可",
       mediaMissingFileBadge:"見つかりません",
@@ -3154,8 +3151,7 @@
       exprExControl:'このレイヤーのコントロールを読み取る',
       mgraphModeValue:'値',mgraphModeSpeed:'速度',mgraphFrozen:'固定',mgraphExprLegend:'実線 = 式、破線 = キーフレーム',
     },
-    es:{
-      toastNativeTimeRemapNotApplied:'El documento nativo no aplicó el cambio de remapeo de tiempo.',toastNativeTimeRemapValueUnavailable:'El fotograma de origen remapeado en el cabezal no está disponible en el documento nativo. Escribe el fotograma de origen en el campo Remapeo de tiempo para añadir una clave.',titleNativeVideoReplaceUnavailable:'No se puede reemplazar la fuente de un vídeo nativo: la ruta de enlace de vídeo nativo no está declarada.',
+    es:{toastNativeTimeRemapNotApplied:'El documento nativo no aplicó el cambio de remapeo de tiempo.',toastNativeTimeRemapValueUnavailable:'El fotograma de origen remapeado en el cabezal no está disponible en el documento nativo. Escribe el fotograma de origen en el campo Remapeo de tiempo para añadir una clave.',titleNativeVideoReplaceUnavailable:'No se puede reemplazar la fuente de un vídeo nativo: la ruta de enlace de vídeo nativo no está declarada.',
       expAppOnly:"solo en la app",
       linkedMediaBannerBtn:"Permitir acceso",
       mediaMissingFileBadge:"No encontrado",
