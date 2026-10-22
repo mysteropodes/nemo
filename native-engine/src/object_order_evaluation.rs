@@ -308,8 +308,9 @@ where
         .collect();
     // Snapshot admission already rejects duplicate full scoped targets. Borrow
     // their immutable identities once; per-element lookup never scans geometry.
+    let records = selected.objects();
     let mut sources = SourceIndices::new();
-    for (index, record) in selected.objects().iter().enumerate() {
+    for (index, record) in records.iter().enumerate() {
         let target = &record.target;
         let key = (
             target.context_id.as_str(),
@@ -330,7 +331,7 @@ where
                 target.stroke_id.as_str(),
             );
             if sources
-                .insert(key, selected.objects().len() + index)
+                .insert(key, records.len() + index)
                 .is_some()
             {
                 return Err(ObjectFrameError::InvalidSource.into());
@@ -409,25 +410,34 @@ fn natural_component(
     if sources.len() != context.layers().len() {
         return Err(ObjectFrameError::InvalidSource);
     }
+    let layer_indices: HashMap<_, _> = context
+        .layers()
+        .iter()
+        .enumerate()
+        .map(|(index, layer)| (layer.layer_uid(), index))
+        .collect();
+    let mut layer_elements: Vec<Vec<NumericElementOrder>> =
+        context.layers().iter().map(|_| Vec::new()).collect();
+    // Traverse retained geometry once, preserving each layer's encounter order.
+    for (source_object_index, record) in context.objects().iter().enumerate() {
+        let Some(index) = layer_indices.get(record.target().layer_uid()).copied() else {
+            continue;
+        };
+        if record.target().scope_kind() == &FrameScopeKind::Authored
+            && sources[index] == Some(record.target().frame())
+        {
+            layer_elements[index].push(NumericElementOrder {
+                source_object_index,
+                value: 0.0,
+            });
+        }
+    }
     let layers = context
         .layers()
         .iter()
         .enumerate()
-        .map(|(index, layer)| {
-            let elements = context
-                .objects()
-                .iter()
-                .enumerate()
-                .filter(|(_, record)| {
-                    record.target().layer_uid() == layer.layer_uid()
-                        && record.target().scope_kind() == &FrameScopeKind::Authored
-                        && sources[index] == Some(record.target().frame())
-                })
-                .map(|(source_object_index, _)| NumericElementOrder {
-                    source_object_index,
-                    value: 0.0,
-                })
-                .collect();
+        .map(|(index, _)| {
+            let elements = std::mem::take(&mut layer_elements[index]);
             Ok(NumericLayerOrder {
                 source_layer_index: index,
                 natural_position: index
