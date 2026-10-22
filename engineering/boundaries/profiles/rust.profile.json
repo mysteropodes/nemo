@@ -296,6 +296,8 @@
         "object_path_effects_edit.rs",
         "object_raster_image_import_owner.rs",
         "object_raster_image_import_wire.rs",
+        "object_media_video_link_owner.rs",
+        "object_media_video_link_wire.rs",
         "object_blank_key_edit.rs",
         "object_effect_key_shift.rs",
         "object_frame_bulk_move.rs",
@@ -382,6 +384,7 @@
         "object_frame_clipboard_tracks_history.rs",
         "object_parametric_edit_history.rs",
         "object_raster_image_import_history.rs",
+        "object_media_video_link_history.rs",
         "object_frame_bulk_move_history.rs",
         "object_layer_shift_history.rs",
         "object_media_link_command.rs",
@@ -1610,6 +1613,7 @@
         "object_parametric_transform_controls.rs",
         "object_text_read.rs",
         "object_raster_image_import.rs",
+        "object_media_video_link.rs",
         "object_raster_scene_join.rs",
         "object_layer_opacity_scene.rs",
         "object_layer_opacity_gpu.rs",
@@ -1819,6 +1823,8 @@
         "src/native_object_edit_receipt_tests.rs",
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
+        "src/native_video_link_contract.rs",
+        "src/native_video_link_contract_tests.rs",
         "src/native_vector_contract.rs",
         "src/native_vector_contract_shapes.rs",
         "src/native_vector_contract_tests.rs",
@@ -1932,7 +1938,9 @@
         "native_font_dispatch.rs",
         "native_font_source.rs",
         "native_raster_image_source.rs",
-        "native_raster_image_dispatch.rs"
+        "native_raster_image_dispatch.rs",
+        "native_video_link_source.rs",
+        "native_video_link_dispatch.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -2137,6 +2145,7 @@
         "native_composition_dispatch_tests.rs",
         "native_raster_image_dispatch_tests.rs",
         "native_raster_image_preview_tests.rs",
+        "native_video_link_dispatch_tests.rs",
         "native_asset_remove_dispatch_tests.rs",
         "native_frame_clipboard_transport_tests.rs",
         "native_project_placement_public_tests.rs",
@@ -2172,7 +2181,8 @@
         "native_object_font.rs",
         "native_object_image.rs",
         "native_object_preview_prepare.rs",
-        "native_object_video.rs"
+        "native_object_video.rs",
+        "native_object_video_link.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"
