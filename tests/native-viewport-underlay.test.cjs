@@ -376,3 +376,15 @@ test('navigation diagnostic storage and fixture observation retain only the clos
  for(const [event,code]of cases)CameraDesktop.openDiagnostic(root,event,code);
  assert.deepEqual(observed,cases.map(([event,,expected])=>[event,expected]));
 });
+
+test('a throwing diagnostic getter cannot change native navigation refusal or read guarded state',async()=>{
+ const Project=require('../src/js/adapters/native-object-project.js');let reads=0;
+ const ports={invoke(){assert.fail('inactive navigation cannot invoke native');},
+  frame(){assert.fail('inactive navigation cannot read frame');},mapping(){assert.fail('inactive navigation cannot read mapping');}};
+ Object.defineProperty(ports,'openDiagnostic',{get(){reads++;throw Error('diagnostic getter failed');}});
+ const session=Project.create(ports);
+ assert.equal(session.beginViewportNavigation('zoom',{x:466,y:327}),null);
+ await assert.rejects(session.updateViewportNavigation(null,{x:466,y:327},1.25),
+  error=>error.message==='Native navigation owner is unavailable');
+ assert.equal(reads,2);
+});
