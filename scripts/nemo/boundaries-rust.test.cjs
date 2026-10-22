@@ -473,12 +473,14 @@ test('N25F3D3B2D2 original desktop preview registers only its private modules an
   assert.match(shell, /mod native_object_desktop_preview;/);
   assert.match(shell, /native_object_desktop_preview::nemo_native_object_preview,/);
   const ports = policy.externalCratePorts.native_engine.moduleItems;
-  const commandItems = ['desktop_viewport::DesktopViewportHost', 'desktop_viewport::PresentationReceipt',
+  const commandItems = ['desktop_viewport::DesktopViewportHost', 'desktop_viewport::ObjectPresentedFrame',
     'desktop_viewport::SurfacePort', 'object_document::FrameScopeKind',
     'object_frame_packet::ObjectFrameSelector', 'scheduler::OutputSpec'];
   for (const item of commandItems) assert.ok(ports[command].includes(item));
+  assert.equal(ports[command].includes('desktop_viewport::PresentationReceipt'), false);
   assert.ok(ports[seam].includes('object_render_scene::ObjectPaintPlan'));
   for (const [id, item] of [[command, 'desktop_viewport::SurfacePort'],
+    [command, 'desktop_viewport::ObjectPresentedFrame'],
     [seam, 'object_render_scene::ObjectPaintPlan']]) {
     const denied = structuredClone(policy);
     denied.externalCratePorts.native_engine.moduleItems[id] = ports[id].filter((entry) => entry !== item);

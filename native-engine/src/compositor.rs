@@ -134,6 +134,8 @@ impl CompositorInstance {
             &device,
             RendererOptions {
                 antialiasing_support: AaSupport::area_only(),
+                // Keep preparation serial; fine Area rasterization stays on the GPU.
+                use_cpu: true,
                 ..Default::default()
             },
         )
