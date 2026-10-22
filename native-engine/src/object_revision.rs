@@ -25,6 +25,10 @@ mod reference_attachment;
 #[path = "object_raster_image_import_revision.rs"]
 mod image_import;
 
+#[cfg(feature = "history")]
+#[path = "native_import_transaction_assets_revision.rs"]
+mod import_assets;
+
 static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]
 const MAX_CONTENT_REVISION: u64 = 9_007_199_254_740_991;

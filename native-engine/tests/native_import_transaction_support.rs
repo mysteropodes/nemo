@@ -128,6 +128,7 @@ pub(super) fn mixed_batch() -> ImportBatch {
         ],
         skipped: vec![],
         unavailable: vec![],
+        ..ImportBatch::default()
     }
 }
 

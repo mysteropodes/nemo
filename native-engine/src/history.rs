@@ -4,6 +4,8 @@
 mod object_history;
 pub use object_history::NativeObjectHistory;
 #[cfg(feature = "project_media_codec")]
+pub use object_history::object_shot_kernels::native_import_transaction::session::ImportAssetSource;
+#[cfg(feature = "project_media_codec")]
 pub use object_history::{InactiveProject, PreparedProjectReplacement};
 
 use crate::commands::{

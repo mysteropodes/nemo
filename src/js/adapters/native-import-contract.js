@@ -59,17 +59,11 @@
     if (value.kind !== 'solid') fail(`${label}.kind must be solid`);
     for (const key of ['r', 'g', 'b', 'a']) { finite(value[key], `${label}.${key}`); if (value[key] < 0 || value[key] > 1) fail(`${label}.${key} is outside 0..1`); }
   }
-  // Structural pre-check of the one record family the importers create (schema 1 `editable-vector-path`, no stroke id, authored scope).
+  // Structural pre-check of the vector record family (schema 1 `editable-vector-path`, no stroke id, authored scope).
   function vectorRecord(value, label) {
     exact(value, ['schemaVersion', 'family', 'target', 'geometry'], ['fill', 'vector'], label);
     if (value.schemaVersion !== 1 || value.family !== 'editable-vector-path') fail(`${label} is not a schema-1 editable-vector-path`);
-    exact(value.target, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], `${label}.target`);
-    if (typeof value.target.contextId !== 'string' || !value.target.contextId) fail(`${label}.target.contextId must be a non-empty string`);
-    if (typeof value.target.layerUid !== 'string' || !value.target.layerUid) fail(`${label}.target.layerUid must be a non-empty string`);
-    if (value.target.strokeId !== '') fail(`${label}.target.strokeId must be empty: the owner mints it`);
-    exact(value.target.frameScope, ['kind', 'frame'], [], `${label}.target.frameScope`);
-    if (value.target.frameScope.kind !== 'authored') fail(`${label}.target.frameScope.kind must be authored`);
-    if (!Number.isSafeInteger(value.target.frameScope.frame) || value.target.frameScope.frame < 0 || value.target.frameScope.frame > MAX_FRAME) fail(`${label}.target.frameScope.frame must be a native u32 frame`);
+    importTarget(value.target, `${label}.target`);
     const g = exact(value.geometry, ['kind', 'closed', 'coordinateSpace', 'handleSpace', 'segments'], [], `${label}.geometry`);
     if (g.kind !== 'cubic-path' || g.coordinateSpace !== 'document-world' || g.handleSpace !== 'relative' || typeof g.closed !== 'boolean') fail(`${label}.geometry is not a relative cubic path in document-world`);
     if (!Array.isArray(g.segments) || g.segments.length < MIN_ANCHORS || g.segments.length > MAX_ANCHORS) fail(`${label}.geometry.segments must hold ${MIN_ANCHORS}..${MAX_ANCHORS} anchors`);
@@ -90,12 +84,117 @@
     }
   }
 
+  // The native target is remapped by the planner; no caller chooses its new stroke identity.
+  function importTarget(value, label) {
+    exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], `${label}`);
+    if (typeof value.contextId !== 'string' || !value.contextId) fail(`${label}.contextId must be a non-empty string`);
+    if (typeof value.layerUid !== 'string' || !value.layerUid) fail(`${label}.layerUid must be a non-empty string`);
+    if (value.strokeId !== '') fail(`${label}.strokeId must be empty: the owner mints it`);
+    exact(value.frameScope, ['kind', 'frame'], [], `${label}.frameScope`);
+    if (value.frameScope.kind !== 'authored') fail(`${label}.frameScope.kind must be authored`);
+    if (!Number.isSafeInteger(value.frameScope.frame) || value.frameScope.frame < 0 || value.frameScope.frame > MAX_FRAME) fail(`${label}.frameScope.frame must be a native u32 frame`);
+  }
+  function boundedTag(value, label) {
+    if (typeof value !== 'string' || !value.length || bytes(value) > MAX_ID_BYTES || value.includes('\u0000')) fail(`${label} is not a native tag`);
+  }
+  function positive(value, label) {
+    if (finite(value, label) <= 0) fail(`${label} must be positive`);
+  }
+  function rasterItem(value, label) {
+    exact(value, ['assetId', 'x', 'y', 'width', 'height'], ['opacity', 'rotation', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], label);
+    sourceId(value.assetId, `${label}.assetId`);
+    xy({ x: value.x, y: value.y }, label);
+    for (const key of ['width', 'height']) positive(value[key], `${label}.${key}`);
+    if (has(value, 'rotation')) finite(value.rotation, `${label}.rotation`);
+    if (has(value, 'opacity') && (finite(value.opacity, `${label}.opacity`) < 0 || value.opacity > 1)) fail(`${label}.opacity is outside 0..1`);
+    for (const key of ['isBitmapBrush', 'isBrushTextureCopy']) if (has(value, key) && typeof value[key] !== 'boolean') fail(`${label}.${key} must be boolean`);
+    for (const key of ['brushGroupId', 'meshId']) if (has(value, key)) boundedTag(value[key], `${label}.${key}`);
+  }
+  const FONTS = ['Roboto-Regular', 'Roboto-Bold', 'DejaVuSans-Regular', 'DejaVuSans-Bold', 'DejaVuSerif-Regular', 'DejaVuSerif-Bold', 'Manrope-Regular', 'Inter-Regular'];
+  function fontRef(value, label) {
+    if (plain(value) && value.kind === 'bundled') {
+      exact(value, ['kind', 'fontKey'], [], label);
+      if (!FONTS.includes(value.fontKey)) fail(`${label} is not a bundled face`);
+    } else {
+      exact(value, ['kind', 'assetId'], [], label);
+      if (value.kind !== 'asset') fail(`${label} is not a font reference`);
+      sourceId(value.assetId, `${label}.assetId`);
+    }
+  }
+  function malformedUtf16(text) {
+    return Array.from(text).some(character => {
+      const code = character.codePointAt(0);
+      return code >= 0xD800 && code <= 0xDFFF;
+    });
+  }
+  function textBlock(value, label) {
+    exact(value, ['text', 'font', 'size', 'color', 'align', 'anchorTopLeft'], ['fixedWidth', 'fixedHeight', 'bold', 'italic', 'underline', 'strike', 'letterSpacing', 'wordSpacing', 'lineHeightMult', 'textCase'], label);
+    if (typeof value.text !== 'string' || !value.text.trim() || value.text.includes('\u0000') || value.text.length > 65536 || malformedUtf16(value.text)) fail(`${label}.text is not visible native text`);
+    fontRef(value.font, `${label}.font`);
+    positive(value.size, `${label}.size`);
+    if (typeof value.color !== 'string' || !/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value.color)) fail(`${label}.color is invalid`);
+    if (!['left', 'center', 'right'].includes(value.align)) fail(`${label}.align is invalid`);
+    xy(value.anchorTopLeft, `${label}.anchorTopLeft`);
+    for (const key of ['fixedWidth', 'fixedHeight']) if (has(value, key) && value[key] !== null) positive(value[key], `${label}.${key}`);
+    if (has(value, 'lineHeightMult')) positive(value.lineHeightMult, `${label}.lineHeightMult`);
+    for (const key of ['letterSpacing', 'wordSpacing']) if (has(value, key)) finite(value[key], `${label}.${key}`);
+    for (const key of ['bold', 'italic', 'underline', 'strike']) if (has(value, key) && typeof value[key] !== 'boolean') fail(`${label}.${key} must be boolean`);
+    if (has(value, 'textCase') && !['none', 'upper', 'lower', 'capitalize'].includes(value.textCase)) fail(`${label}.textCase is invalid`);
+  }
+  function itemRows(value, key, member, check) {
+    if (!has(value, key)) return;
+    list(value[key], `${OP}.${key}`, (row, at) => {
+      exact(row, ['sourceId', 'entry'], [], at);
+      sourceId(row.sourceId, `${at}.sourceId`);
+      exact(row.entry, ['target', member], [], `${at}.entry`);
+      importTarget(row.entry.target, `${at}.entry.target`);
+      check(row.entry[member], `${at}.entry.${member}`);
+    });
+  }
+  const objectRows = value => value.records.concat(value.raster || [], value.text || []);
+  const assetRows = value => (value.assets || []).concat(value.sources || []);
+  function sourceRow(value, label) {
+    exact(value, ['sourceId', 'name', 'mediaType', 'source'], [], label);
+    sourceId(value.sourceId, `${label}.sourceId`);
+    sourceId(value.name, `${label}.name`);
+    const source = value.source;
+    if (value.mediaType === 'image/png') {
+      exact(source, ['kind', 'path'], [], `${label}.source`);
+      if (source.kind !== 'file' || typeof source.path !== 'string' || source.path.includes('\u0000') ||
+          !/^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(source.path)) fail(`${label} is not an absolute native file source`);
+    } else if (value.mediaType === 'font/ttf' && plain(source) && source.kind === 'bundled') {
+      fontRef(source, `${label}.source`);
+    } else if (value.mediaType === 'font/ttf') {
+      exact(source, ['kind', 'family', 'weight', 'italic'], [], `${label}.source`);
+      if (source.kind !== 'google' || !Number.isInteger(source.weight) || source.weight < 1 || source.weight > 1000 || typeof source.italic !== 'boolean') fail(`${label} is not a native Google font source`);
+      sourceId(source.family, `${label}.source.family`);
+    } else fail(`${label}.mediaType is not a native import source`);
+  }
+  function sourcePins(value) {
+    if (!has(value, 'sources')) {
+      if (has(value, 'documentSnapshotId') || has(value, 'lifecycleGeneration')) fail('source pins require sources');
+      return;
+    }
+    if (!Array.isArray(value.sources) || value.sources.length < 1 || value.sources.length > 1024) fail('sources must hold 1..1024 descriptors');
+    if (typeof value.documentSnapshotId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(value.documentSnapshotId) ||
+        !Number.isSafeInteger(value.lifecycleGeneration) || value.lifecycleGeneration < 1) fail('native source pins are invalid');
+    list(value.sources, `${OP}.sources`, sourceRow);
+  }
+
+
   function payload(operation, value) {
     if (operation !== OP) fail('native import operation is not declared');
-    exact(value, ['command', 'layers', 'records'], ['skipped', 'unavailable'], OP);
+    exact(value, ['command', 'layers', 'records'], ['skipped', 'unavailable', 'assets', 'raster', 'text', 'sources', 'documentSnapshotId', 'lifecycleGeneration'], OP);
     if (value.command !== COMMAND) fail(`${OP} command is invalid`);
     list(value.layers, `${OP}.layers`, (layer, at) => { exact(layer, ['sourceId', 'name'], [], at); sourceId(layer.sourceId, `${at}.sourceId`); if (typeof layer.name !== 'string' || !layer.name.length) fail(`${at}.name must be a non-empty string`); });
     list(value.records, `${OP}.records`, (item, at) => { exact(item, ['sourceId', 'record'], [], at); sourceId(item.sourceId, `${at}.sourceId`); vectorRecord(item.record, `${at}.record`); });
+    if (has(value, 'assets')) list(value.assets, `${OP}.assets`, (row, at) => {
+      exact(row, ['sourceId', 'assetId'], [], at);
+      sourceId(row.sourceId, `${at}.sourceId`); sourceId(row.assetId, `${at}.assetId`);
+    });
+    itemRows(value, 'raster', 'item', rasterItem);
+    itemRows(value, 'text', 'block', textBlock);
+    sourcePins(value);
     if (has(value, 'skipped')) list(value.skipped, `${OP}.skipped`, (skip, at) => {
       exact(skip, ['kind', 'sourceId', 'reason'], [], at); sourceId(skip.sourceId, `${at}.sourceId`);
       if (!SKIP_KINDS.includes(skip.kind)) fail(`${at}.kind is not admitted`);
@@ -109,14 +208,18 @@
     const dup = (ids, label) => { if (new Set(ids).size !== ids.length) fail(`${label} repeats a source id`); };
     dup(value.layers.map((l) => l.sourceId), 'layers');
     const skipped = value.skipped || [];
-    dup(value.records.map((r) => r.sourceId).concat(skipped.filter((s) => s.kind === 'element').map((s) => s.sourceId)), 'records and element skips');
+    dup(objectRows(value).map((r) => r.sourceId).concat(skipped.filter((s) => s.kind === 'element').map((s) => s.sourceId)), 'records and element skips');
     dup(skipped.filter((s) => s.kind === 'layer').map((s) => s.sourceId), 'layer skips');
-    dup(skipped.filter((s) => s.kind === 'asset').map((s) => s.sourceId), 'asset skips');
+    dup(assetRows(value).map(r => r.sourceId).concat(skipped.filter((s) => s.kind === 'asset').map((s) => s.sourceId)), 'assets and asset skips');
   }
 
   function receiptArrays(value) {
     list(value.layers, 'result.layers', (row, at) => { exact(row, ['sourceId', 'layerUid'], [], at); sourceId(row.sourceId, `${at}.sourceId`); if (typeof row.layerUid !== 'string' || !row.layerUid) fail(`${at}.layerUid must be a non-empty string`); });
     list(value.objects, 'result.objects', (row, at) => { exact(row, ['sourceId', 'strokeId'], [], at); sourceId(row.sourceId, `${at}.sourceId`); if (typeof row.strokeId !== 'string' || !row.strokeId) fail(`${at}.strokeId must be a non-empty string`); });
+    if (has(value, 'assets')) list(value.assets, 'result.assets', (row, at) => {
+      exact(row, ['sourceId', 'assetId'], [], at);
+      sourceId(row.sourceId, `${at}.sourceId`); sourceId(row.assetId, `${at}.assetId`);
+    });
     list(value.skipped, 'result.skipped', (row, at) => {
       exact(row, ['kind', 'sourceId', 'reason'], [], at); sourceId(row.sourceId, `${at}.sourceId`);
       if (!SKIP_KINDS.includes(row.kind) || typeof row.reason !== 'string' || !row.reason.length) fail(`${at} is not a skip report`);
@@ -124,7 +227,7 @@
   }
   function result(operation, value) {
     if (operation !== OP) fail('native import operation is not declared');
-    exact(value, ['applied', 'historyEntriesAdded', 'layers', 'objects', 'skipped'], [], 'import result');
+    exact(value, ['applied', 'historyEntriesAdded', 'layers', 'objects', 'skipped'], ['assets'], 'import result');
     if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid import disposition');
     receiptArrays(value);
     if (bytes(JSON.stringify(value)) > MAX_RECEIPT_BYTES) fail('import receipt exceeds its bound');
@@ -132,14 +235,15 @@
   function correlateBatch(request, value) {
     payload(OP, request.payload); result(OP, value);
     const input = request.payload, skipped = input.skipped || [];
-    function mapped(wanted, actual, key) {
+    function mapped(wanted, actual, key, ordered) {
       return wanted.length === actual.length && new Set(actual.map(r => r.sourceId)).size === actual.length &&
-        new Set(actual.map(r => r[key])).size === actual.length && wanted.every(r => actual.some(m => m.sourceId === r.sourceId));
+        new Set(actual.map(r => r[key])).size === actual.length && wanted.every((r, i) => ordered ? actual[i].sourceId === r.sourceId : actual.some(m => m.sourceId === r.sourceId));
     }
     const layerIds = input.layers.map(r => r.sourceId).concat(skipped.filter(r => r.kind === 'layer').map(r => r.sourceId));
     if ((input.unavailable || []).length || new Set(layerIds).size !== layerIds.length ||
-        value.applied !== !!(input.layers.length || input.records.length) ||
-        !mapped(input.layers, value.layers, 'layerUid') || !mapped(input.records, value.objects, 'strokeId') ||
+        value.applied !== !!(input.layers.length || objectRows(input).length || assetRows(input).length) ||
+        !mapped(input.layers, value.layers, 'layerUid') || !mapped(objectRows(input), value.objects, 'strokeId', !!((input.raster || []).length || (input.text || []).length)) ||
+        !mapped(assetRows(input), value.assets || [], 'assetId', true) ||
         skipped.length !== value.skipped.length || skipped.some((r,i) => ['kind','sourceId','reason'].some(k => r[k] !== value.skipped[i][k]))) {
       fail('import receipt does not match declared batch');
     }

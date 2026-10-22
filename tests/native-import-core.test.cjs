@@ -235,3 +235,142 @@ test('an absent or unpresented native session is typed unavailable; a disposed r
   assert.deepEqual(live.begin(), { ok: false, status: 'unavailable', reason: 'retired' });
   assert.equal(contract.MAX_REQUEST_BYTES, 4096);
 });
+
+// Controlled receipt-only port: exercises the real Core; it is not an asset provider or native owner.
+function sourceBatch() {
+  return { layers: [], records: [], assets: [{ sourceId: 'retained', assetId: 'existing-image' }],
+    sources: [{ sourceId: 'new-image', name: 'Artwork', mediaType: 'image/png', source: { kind: 'file', path: '/imports/artwork.png' } }],
+    raster: [{ sourceId: 'raster', entry: { target: { contextId: 'scene-root', frameScope: { kind: 'authored', frame: 0 }, layerUid: 'L0', strokeId: '' },
+      item: { assetId: 'new-image', x: 20, y: 30, width: 32, height: 16 } } }],
+    text: [{ sourceId: 'text', entry: { target: { contextId: 'scene-root', frameScope: { kind: 'authored', frame: 0 }, layerUid: 'L0', strokeId: '' },
+      block: { text: 'Label', font: { kind: 'bundled', fontKey: 'Roboto-Regular' }, size: 24, color: '#123456', align: 'left', anchorTopLeft: { x: 10, y: 20 } } } }],
+    skipped: [], unavailable: [] };
+}
+function sourceReceipt() {
+  return { apiVersion: 2, requestId: 'project-import-batch-1', instanceId: 'instance-A', documentId: 'document-A', contentRevision: 8, ok: true,
+    result: { applied: true, historyEntriesAdded: 1, layers: [],
+      objects: [{ sourceId: 'raster', strokeId: 'native-raster' }, { sourceId: 'text', strokeId: 'native-text' }],
+      assets: [{ sourceId: 'retained', assetId: 'native-retained' }, { sourceId: 'new-image', assetId: 'native-image' }], skipped: [] } };
+}
+function receiptPort(reply) {
+  const h = makeSession();
+  const calls = [];
+  Object.defineProperty(h.session, 'importBatch', { value: async (payload, before) => {
+    calls.push({ payload, before });
+    return reply ? reply(payload, before) : sourceReceipt();
+  } });
+  const core = coreModule.create(makePorts(h).ports);
+  return { h, calls, core };
+}
+
+test('the ordinary import core forwards genuine descriptor shapes with captured native source pins once', async () => {
+  const f = receiptPort();
+  const begun = f.core.begin();
+  const batch = sourceBatch();
+  const result = await f.core.submit(begun.ctx, batch);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].before, begun.ctx.before);
+  assert.equal(f.calls[0].payload.documentSnapshotId, 'snapshot-7');
+  assert.equal(f.calls[0].payload.lifecycleGeneration, 1);
+  assert.deepEqual(f.calls[0].payload.sources, batch.sources);
+  assert.deepEqual(f.calls[0].payload.assets, batch.assets);
+  assert.deepEqual(f.calls[0].payload.raster, batch.raster);
+  assert.deepEqual(f.calls[0].payload.text, batch.text);
+  assert.notEqual(f.calls[0].payload.sources, batch.sources);
+  assert.equal(Object.hasOwn(batch, 'documentSnapshotId'), false);
+  assert.equal(Object.hasOwn(batch, 'lifecycleGeneration'), false);
+  assert.deepEqual([result.status, result.revision, result.historyEntriesAdded], ['imported', 8, 1]);
+  assert.deepEqual(result.assets, sourceReceipt().result.assets);
+  assert.deepEqual([result.readback, result.selected], ['unconfirmed', false], 'this receipt-only port did not publish native state');
+  assert.equal(f.h.state.contentRevision, 7);
+});
+
+test('source-free ordinary wire is byte compatible and never invents source pins', () => {
+  const legacy = coreModule.wire(mixed());
+  const expected = { command: 'object.import.batch', layers: mixed().layers, records: mixed().records, skipped: mixed().skipped, unavailable: [] };
+  assert.equal(JSON.stringify(legacy), JSON.stringify(expected));
+  const empty = coreModule.wire({ ...mixed(), assets: [], raster: [], text: [] });
+  assert.equal(JSON.stringify(empty), JSON.stringify(expected));
+  assert.throws(() => coreModule.wire(sourceBatch()), /captured import context/);
+  assert.throws(() => coreModule.wire({ ...mixed(), documentSnapshotId: 'snapshot-7' }), /pins require sources/);
+});
+
+test('conflicting caller pins, invalid descriptors and moved native origins send no source IO command', async () => {
+  for (const change of [b => { b.documentSnapshotId = 'foreign'; }, b => { b.lifecycleGeneration = 2; }, b => { b.sources[0].source.bytes = []; }, b => { b.sources[0].source.path = 'relative.png'; }, b => { b.sources[0].mediaType = 'image/jpeg'; }]) {
+    const f = receiptPort();
+    const batch = sourceBatch();
+    change(batch);
+    assert.equal((await f.core.submit(f.core.begin().ctx, batch)).status, 'invalid');
+    assert.equal(f.calls.length, 0);
+  }
+  for (const key of ['documentSnapshotId', 'lifecycleGeneration', 'contentRevision']) {
+    const f = receiptPort();
+    const begun = f.core.begin();
+    f.h.state[key] = key === 'documentSnapshotId' ? 'snapshot-other' : f.h.state[key] + 1;
+    assert.equal((await f.core.submit(begun.ctx, sourceBatch())).status, 'stale');
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('source accounting retains exact asset and item order and refuses omitted or extra mappings', () => {
+  const batch = sourceBatch(), result = sourceReceipt().result;
+  assert.equal(coreModule.accounting(true, result, batch), true);
+  for (const change of [r => r.assets.reverse(), r => r.assets.pop(), r => { r.assets[1].assetId = r.assets[0].assetId; }, r => r.objects.reverse(), r => r.objects.pop(), r => { r.assets.push({ sourceId: 'foreign', assetId: 'native-foreign' }); }]) {
+    const copy = structuredClone(result);
+    change(copy);
+    assert.equal(coreModule.accounting(true, copy, batch), false);
+  }
+  const onlyAssets = { layers: [], records: [], sources: batch.sources, skipped: [] };
+  const onlyReceipt = { applied: true, historyEntriesAdded: 1, layers: [], objects: [], assets: [result.assets[1]], skipped: [] };
+  assert.equal(coreModule.accounting(true, onlyReceipt, onlyAssets), true);
+  assert.equal(coreModule.accounting(false, { layers: [], objects: [], skipped: [] }, onlyAssets), false);
+});
+
+test('an in-flight source body remains sealed and disposal or replacement cannot select or confirm it', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const f = receiptPort(() => gate.then(() => sourceReceipt()));
+  const batch = sourceBatch();
+  const pending = f.core.submit(f.core.begin().ctx, batch);
+  batch.sources[0].sourceId = 'changed-after-dispatch';
+  batch.raster[0].sourceId = 'changed-raster';
+  assert.equal(f.core.isPending(), true);
+  assert.deepEqual(f.core.begin(), { ok: false, status: 'busy' });
+  f.core.dispose();
+  release();
+  const result = await pending;
+  assert.equal(result.status, 'imported', 'receipt correlation uses the dispatched clone');
+  assert.deepEqual([result.readback, result.selected], ['unconfirmed', false]);
+  assert.equal(f.calls.length, 1);
+  assert.deepEqual(f.core.begin(), { ok: false, status: 'unavailable', reason: 'retired' });
+});
+
+test('source refusal and uncertain dispatch remain typed and never retry or select', async () => {
+  for (const [message, expected] of [['Native command refused: unavailable', 'unavailable'], ['Native command refused: stale_revision', 'stale'], ['transport lost after dispatch', 'unconfirmed']]) {
+    const f = receiptPort(() => { throw new Error(message); });
+    const result = await f.core.submit(f.core.begin().ctx, sourceBatch());
+    assert.equal(result.status, expected);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.h.state.contentRevision, 7);
+  }
+});
+
+
+test('explicit empty or malformed sources refuses a valid vector batch before dispatch', async () => {
+  for (const sources of [[], null, {}]) {
+    const h = makeSession();
+    const core = coreModule.create(makePorts(h).ports);
+    const begun = core.begin();
+    const batch = { ...mixed(), sources };
+    const payload = coreModule.wire(batch, begun.ctx.before);
+    assert.equal(Object.hasOwn(payload, 'sources'), true);
+    assert.deepEqual(payload.sources, sources);
+    assert.throws(() => contract.payload(contract.OP, payload));
+    const result = await core.submit(begun.ctx, batch);
+    assert.equal(result.status, 'invalid');
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.state.contentRevision, 7);
+    assert.deepEqual(h.state.layers.map(row => row.layerUid), ['L0']);
+    assert.equal(core.isPending(), false);
+  }
+});

@@ -1,7 +1,7 @@
 //! Atomic batch import transaction (L10-H; G35, G36, G37, I46): the planner that turns one
 //! typed import batch into ONE new `ObjectDocument` sealed to one `ObjectSnapshot` origin.
 //!
-//! A batch is N new layers, M vector records and the importers' own skip reports. The planner
+//! A batch is new layers, vector/raster/Text records, admitted assets and explicit skips. The planner
 //! is pure: it reads the origin snapshot, allocates every native id through the L10-G remap table
 //! (so a refused, stale or cancelled preparation consumed nothing), resolves every record's layer
 //! reference through that table (a batch layer is rewritten, an existing layer is preserved byte
@@ -22,19 +22,21 @@
 //! - an import into an EXISTING layer at a frame that is not already a key is refused
 //!   (`KeyframeRequired`): the baseline copies the held strokes into the new key, which is the
 //!   lane-5 keyframe transaction, not this one;
-//! - an element whose provider is absent (raster, text, font) refuses the whole batch with the
-//!   named provider; it is never dropped and never faked.
+//! - a missing project envelope or required asset/font provider refuses the whole batch;
+//!   no item is dropped, no provider is faked and no empty project is synthesized.
 
 use crate::commands::{insert_order_element, ImportBatchResult, ImportSkipReport, OrderEditError};
 use crate::history::object_history::object_shot_kernels::object_import_remap_ids::{
-    build_remap_table, OriginIds, RemapError, RemapKind, Resolved, SourceEntry,
+    build_remap_table, OriginIds, RemapError, RemapKind, RemapTable, Resolved, SourceEntry,
 };
 use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ObjectDocument, ObjectLayer, OrderLayer, Presence, TimingEdit,
-    VECTOR_FAMILY,
+    AssetInventory, AuthoredOrder, FrameScopeKind, ObjectDocument, ObjectLayer, ObjectTarget,
+    OrderLayer, Presence, TimingEdit, VECTOR_FAMILY,
 };
 use crate::revision::ObjectSnapshot;
 
+#[path = "native_import_transaction_assets.rs"]
+mod assets;
 #[path = "native_import_transaction_session.rs"]
 pub(crate) mod session;
 #[path = "native_import_transaction_svg.rs"]
@@ -42,8 +44,8 @@ pub(crate) mod svg;
 #[path = "native_import_transaction_types.rs"]
 mod types;
 pub(crate) use types::{
-    ImportBatch, ImportError, ImportRecord, ImportSkip, MissingProvider, NewLayer, SkipKind,
-    UnavailableElement,
+    ImportAsset, ImportBatch, ImportError, ImportRaster, ImportRecord, ImportSkip, ImportText,
+    MissingProvider, NewLayer, SkipKind, UnavailableElement,
 };
 #[path = "native_import_transaction_wire.rs"]
 pub(crate) mod wire;
@@ -73,11 +75,19 @@ mod svg_tests;
 #[path = "../tests/native_import_transaction.rs"]
 mod tests;
 
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/native_import_transaction_asset_controls.rs"]
+mod asset_controls;
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/native_import_transaction_assets.rs"]
+mod asset_tests;
+
 /// The after-document (absent for a no-op) and the receipt the commit will report.
 #[derive(Debug)]
 pub(crate) struct ImportPlan {
     pub(crate) document: Option<ObjectDocument>,
     pub(crate) result: ImportBatchResult,
+    pub(crate) asset_inventory: Option<AssetInventory>,
 }
 
 /// Every id the origin already holds, per kind, with its content revision.
@@ -93,7 +103,23 @@ pub(crate) fn origin_ids(origin: &ObjectSnapshot) -> OriginIds {
             document
                 .objects
                 .iter()
-                .map(|record| record.target.stroke_id.as_str()),
+                .map(|record| record.target.stroke_id.as_str())
+                .chain(
+                    document
+                        .item_records()
+                        .into_iter()
+                        .flat_map(|items| items.targets())
+                        .map(|target| target.stroke_id.as_str()),
+                ),
+        )
+        .with_ids(
+            RemapKind::Asset,
+            origin
+                .project()
+                .and_then(|project| project.asset_inventory())
+                .into_iter()
+                .flat_map(|inventory| inventory.records())
+                .map(|record| record.id().as_str()),
         )
 }
 
@@ -182,6 +208,53 @@ fn expose_frame(
     Ok(())
 }
 
+/// Shared native target placement for each admitted record family.
+fn place_target(
+    document: &mut ObjectDocument,
+    target: &mut ObjectTarget,
+    source_id: &str,
+    ids: &OriginIds,
+    table: &RemapTable,
+    index: usize,
+) -> Result<(), ImportError> {
+    if !target.stroke_id.is_empty() {
+        return Err(ImportError::StrokeIdPreset { index });
+    }
+    if target.frame_scope.kind != FrameScopeKind::Authored {
+        return Err(ImportError::ReferenceScope { index });
+    }
+    let reference = target.layer_uid.as_str();
+    let layer = match table.resolve(ids, RemapKind::Layer, reference) {
+        Ok(resolved) => resolved,
+        Err(RemapError::DanglingReference { reference, .. }) => {
+            return Err(ImportError::UnknownLayer { index, reference })
+        }
+        Err(RemapError::ReferenceToSkipped { reference, .. }) => {
+            return Err(ImportError::SkippedLayer { index, reference })
+        }
+        Err(other) => return Err(ImportError::Remap(other)),
+    };
+    target.layer_uid = layer.as_str().to_owned();
+    target.stroke_id = table
+        .native_id(RemapKind::Stroke, source_id)
+        .ok_or(ImportError::Internal)?
+        .to_owned();
+    if !document.valid_target(target) || target.frame() >= document.total_frames {
+        return Err(ImportError::InvalidTarget { index });
+    }
+    expose_frame(
+        document,
+        &target.layer_uid,
+        target.frame(),
+        matches!(layer, Resolved::Batch(_)),
+        index,
+    )?;
+    if let Presence::Present(plan) = &mut document.composition_order {
+        insert_order_element(plan, target).map_err(|error| order_error(index, error))?;
+    }
+    Ok(())
+}
+
 /// Plans one batch against `origin`. Pure: the origin is never touched and nothing is published.
 pub(crate) fn plan_import_batch(
     origin: &ObjectSnapshot,
@@ -201,6 +274,15 @@ pub(crate) fn plan_import_batch(
     for item in &batch.records {
         sources.push(SourceEntry::mapped(RemapKind::Stroke, &item.source_id));
     }
+    for item in &batch.raster {
+        sources.push(SourceEntry::mapped(RemapKind::Stroke, &item.source_id));
+    }
+    for item in &batch.text {
+        sources.push(SourceEntry::mapped(RemapKind::Stroke, &item.source_id));
+    }
+    for item in &batch.assets {
+        sources.push(SourceEntry::mapped(RemapKind::Asset, &item.source_id));
+    }
     for skip in &batch.skipped {
         sources.push(SourceEntry::skipped(
             skip.kind.remap_kind(),
@@ -218,13 +300,16 @@ pub(crate) fn plan_import_batch(
             reason: skip.reason.clone(),
         })
         .collect();
-    if batch.layers.is_empty() && batch.records.is_empty() {
+    let (asset_inventory, asset_mappings) = assets::catalog(origin, batch, &table)?;
+    if batch.layers.is_empty() && batch.records.is_empty() && !assets::needs_project(batch) {
         return Ok(ImportPlan {
             document: None,
+            asset_inventory: None,
             result: ImportBatchResult {
                 applied: false,
                 layers: Vec::new(),
                 objects: Vec::new(),
+                assets: Vec::new(),
                 skipped,
             },
         });
@@ -239,58 +324,42 @@ pub(crate) fn plan_import_batch(
         if record.schema_version != 1 || record.family != VECTOR_FAMILY {
             return Err(ImportError::NotVector { index });
         }
-        if !record.target.stroke_id.is_empty() {
-            return Err(ImportError::StrokeIdPreset { index });
-        }
-        if record.target.frame_scope.kind != FrameScopeKind::Authored {
-            return Err(ImportError::ReferenceScope { index });
-        }
-        let reference = record.target.layer_uid.as_str();
-        let layer = match table.resolve(&ids, RemapKind::Layer, reference) {
-            Ok(resolved) => resolved,
-            Err(RemapError::DanglingReference { reference, .. }) => {
-                return Err(ImportError::UnknownLayer { index, reference })
-            }
-            Err(RemapError::ReferenceToSkipped { reference, .. }) => {
-                return Err(ImportError::SkippedLayer { index, reference })
-            }
-            Err(other) => return Err(ImportError::Remap(other)),
-        };
-        let stroke = table
-            .native_id(RemapKind::Stroke, &item.source_id)
-            .ok_or(ImportError::Internal)?
-            .to_owned();
         let mut placed = record.clone();
-        placed.target.layer_uid = layer.as_str().to_owned();
-        placed.target.stroke_id = stroke.clone();
-        if !document.valid_target(&placed.target) || placed.target.frame() >= document.total_frames
-        {
-            return Err(ImportError::InvalidTarget { index });
-        }
-        let batch_layer = matches!(layer, Resolved::Batch(_));
-        expose_frame(
+        place_target(
             &mut document,
-            &placed.target.layer_uid,
-            placed.target.frame(),
-            batch_layer,
+            &mut placed.target,
+            &item.source_id,
+            &ids,
+            &table,
             index,
         )?;
-        if let Presence::Present(plan) = &mut document.composition_order {
-            insert_order_element(plan, &placed.target)
-                .map_err(|error| order_error(index, error))?;
-        }
+        let stroke = placed.target.stroke_id.clone();
         document.objects.push(placed);
         objects.push((item.source_id.clone(), stroke));
     }
-    if layers.len() + objects.len() + skipped.len() != table.source_count() {
+    let inventory = asset_inventory.as_ref().or_else(|| {
+        origin
+            .project()
+            .and_then(|project| project.asset_inventory())
+    });
+    assets::append_items(&mut document, batch, &ids, &table, inventory, &mut objects)?;
+    if let Some(inventory) = inventory {
+        crate::object_document::media_timing::object_media_link_edit::check_inventory(
+            &document, inventory,
+        )
+        .map_err(|_| ImportError::InvalidAsset { index: 0 })?;
+    }
+    if layers.len() + objects.len() + asset_mappings.len() + skipped.len() != table.source_count() {
         return Err(ImportError::Internal);
     }
     Ok(ImportPlan {
         document: Some(document),
+        asset_inventory,
         result: ImportBatchResult {
             applied: true,
             layers,
             objects,
+            assets: asset_mappings,
             skipped,
         },
     })

@@ -50,6 +50,9 @@ impl RevisionSync {
         external: bool,
         allowed: Option<ImageReadPermission>,
     ) -> Result<Delivery, String> {
+        if super::is_import_batch_sources(&request) {
+            return self.dispatch_import_batch_scoped(instance, native, request, external, allowed).await;
+        }
         if !is_image_import(&request) {
             return self
                 .dispatch_async(instance, native, request, external)

@@ -231,7 +231,8 @@
           "protocol::OP_JOB_EXPORT_PNG_BEGIN",
           "scheduler::OutputSpec",
           "object_document::FrameScopeKind",
-          "export_job::MAX_OBJECT_EXPORT_FRAMES"
+          "export_job::MAX_OBJECT_EXPORT_FRAMES",
+          "history::ImportAssetSource"
         ],
         "rust.desktop.mcp.adapter.tests": [
           "application::REPRODUCTION_FIXTURE",
@@ -473,7 +474,8 @@
           "object_render_scene::prepare_object_navigated_viewport_composition",
           "application::ObjectBrushRuntime",
           "object_render_scene::ObjectBrushAdmission",
-          "export_job::export_object_frames_with_materializer"
+          "export_job::export_object_frames_with_materializer",
+          "history::ImportAssetSource"
         ],
         "rust.desktop.media": [
           "native_media_frame_export::NativeVideoDecoder",

@@ -14,11 +14,13 @@
 //! envelope bound of the dispatcher (4096 bytes) applies to the whole request; this module adds no
 //! limit of its own beyond the same bound for the raw entry.
 use crate::history::object_history::object_shot_kernels::native_import_transaction::{
-    ImportBatch, ImportError, ImportRecord, ImportSkip, MissingProvider, NewLayer, SkipKind,
-    UnavailableElement,
+    ImportAsset, ImportBatch, ImportError, ImportRaster, ImportRecord, ImportSkip, ImportText,
+    MissingProvider, NewLayer, SkipKind, UnavailableElement,
 };
-use crate::object_document::{object_deserialize, ObjectRecord};
+use crate::object_document::{object_deserialize, AssetId, ObjectRecord, RasterEntry, TextEntry};
+use crate::revision::ObjectSnapshot;
 use serde::Deserialize;
+use std::sync::Arc;
 
 pub(crate) const COMMAND: &str = "object.import.batch";
 /// Same bound as every other object operation except the vector edit (whose 64 KiB bound is open).
@@ -42,6 +44,38 @@ struct RecordWire {
 object_deserialize!(RecordWire {
     source_id: String,
     record: ObjectRecord
+});
+
+/// Reuse of an origin-retained record only. New bytes use the real native
+/// provider's typed ImportAsset port; this is not a byte admission protocol.
+#[derive(Debug)]
+struct AssetWire {
+    source_id: String,
+    asset_id: String,
+}
+object_deserialize!(AssetWire {
+    source_id: String,
+    asset_id: String
+});
+
+#[derive(Debug)]
+struct RasterWire {
+    source_id: String,
+    entry: RasterEntry,
+}
+object_deserialize!(RasterWire {
+    source_id: String,
+    entry: RasterEntry
+});
+
+#[derive(Debug)]
+struct TextWire {
+    source_id: String,
+    entry: TextEntry,
+}
+object_deserialize!(TextWire {
+    source_id: String,
+    entry: TextEntry
 });
 
 #[derive(Debug)]
@@ -71,6 +105,9 @@ struct BatchWire {
     command: String,
     layers: Vec<LayerWire>,
     records: Vec<RecordWire>,
+    assets: Vec<AssetWire>,
+    raster: Vec<RasterWire>,
+    text: Vec<TextWire>,
     skipped: Vec<SkipWire>,
     unavailable: Vec<UnavailableWire>,
 }
@@ -78,6 +115,9 @@ object_deserialize!(BatchWire {
     command: String,
     layers: Vec<LayerWire>,
     records: Vec<RecordWire>,
+    #[serde(default)] assets: Vec<AssetWire>,
+    #[serde(default)] raster: Vec<RasterWire>,
+    #[serde(default)] text: Vec<TextWire>,
     #[serde(default)] skipped: Vec<SkipWire>,
     #[serde(default)] unavailable: Vec<UnavailableWire>
 });
@@ -102,12 +142,39 @@ fn provider(label: &str) -> Result<MissingProvider, ImportError> {
 
 /// Strict decode of the raw bytes into a typed batch.
 pub(crate) fn parse_batch(bytes: &[u8]) -> Result<ImportBatch, ImportError> {
+    parse(None, bytes)
+}
+
+/// The actual session supplies its pinned snapshot for existing asset lookup.
+pub(crate) fn parse_batch_at(
+    origin: &ObjectSnapshot,
+    bytes: &[u8],
+) -> Result<ImportBatch, ImportError> {
+    parse(Some(origin), bytes)
+}
+
+fn parse(origin: Option<&ObjectSnapshot>, bytes: &[u8]) -> Result<ImportBatch, ImportError> {
     if bytes.len() > MAX_PAYLOAD_BYTES {
         return Err(ImportError::Payload);
     }
     let wire: BatchWire = serde_json::from_slice(bytes).map_err(|_| ImportError::Payload)?;
     if wire.command != COMMAND {
         return Err(ImportError::Payload);
+    }
+    let mut assets = Vec::with_capacity(wire.assets.len());
+    for (index, item) in wire.assets.into_iter().enumerate() {
+        let inventory = origin
+            .and_then(|origin| origin.project())
+            .and_then(|project| project.asset_inventory())
+            .ok_or(ImportError::ProjectRequired)?;
+        let id = AssetId::new(item.asset_id).map_err(|_| ImportError::Payload)?;
+        let record = inventory
+            .get(&id)
+            .ok_or(ImportError::InvalidAsset { index })?;
+        assets.push(ImportAsset {
+            source_id: item.source_id,
+            record: Arc::clone(record),
+        });
     }
     let skipped = wire
         .skipped
@@ -145,6 +212,23 @@ pub(crate) fn parse_batch(bytes: &[u8]) -> Result<ImportBatch, ImportError> {
             .map(|item| ImportRecord {
                 source_id: item.source_id,
                 record: item.record,
+            })
+            .collect(),
+        assets,
+        raster: wire
+            .raster
+            .into_iter()
+            .map(|item| ImportRaster {
+                source_id: item.source_id,
+                entry: item.entry,
+            })
+            .collect(),
+        text: wire
+            .text
+            .into_iter()
+            .map(|item| ImportText {
+                source_id: item.source_id,
+                entry: item.entry,
             })
             .collect(),
         skipped,

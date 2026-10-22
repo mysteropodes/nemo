@@ -3,8 +3,9 @@
 use crate::history::object_history::object_shot_kernels::object_import_remap_ids::{
     RemapError, RemapKind,
 };
-use crate::object_document::ObjectRecord;
+use crate::object_document::{AssetRecord, ObjectRecord, RasterEntry, TextEntry};
 use crate::request_receipts::DispatchErrorCode;
+use std::sync::Arc;
 
 /// A layer the import creates; its `source_id` is the importer's own handle (Figma frame id,
 /// PSD layer index) and is what records name as their layer.
@@ -21,6 +22,26 @@ pub(crate) struct NewLayer {
 pub(crate) struct ImportRecord {
     pub(crate) source_id: String,
     pub(crate) record: ObjectRecord,
+}
+
+/// An immutable asset admitted by the real native provider. The record's old id is
+/// not authoritative here: items name `source_id` and the batch mints the native id.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ImportAsset {
+    pub(crate) source_id: String,
+    pub(crate) record: Arc<AssetRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ImportRaster {
+    pub(crate) source_id: String,
+    pub(crate) entry: RasterEntry,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ImportText {
+    pub(crate) source_id: String,
+    pub(crate) entry: TextEntry,
 }
 
 /// What the importer's own plan dropped on purpose.
@@ -89,6 +110,9 @@ pub(crate) struct UnavailableElement {
 pub(crate) struct ImportBatch {
     pub(crate) layers: Vec<NewLayer>,
     pub(crate) records: Vec<ImportRecord>,
+    pub(crate) assets: Vec<ImportAsset>,
+    pub(crate) raster: Vec<ImportRaster>,
+    pub(crate) text: Vec<ImportText>,
     pub(crate) skipped: Vec<ImportSkip>,
     pub(crate) unavailable: Vec<UnavailableElement>,
 }
@@ -98,6 +122,10 @@ pub(crate) struct ImportBatch {
 pub(crate) enum ImportError {
     /// The wire payload is not a strict batch.
     Payload,
+    /// New resources/items require the original project envelope.
+    ProjectRequired,
+    /// An asset lacks codec admission, has the wrong kind or cannot be retained.
+    InvalidAsset { index: usize },
     /// The id table refused the batch (invalid, duplicate or colliding source ids...).
     Remap(RemapError),
     /// An element needs a provider that is absent.
@@ -140,6 +168,7 @@ impl ImportError {
     pub(crate) fn code(&self) -> DispatchErrorCode {
         match self {
             ImportError::Payload
+            | ImportError::InvalidAsset { .. }
             | ImportError::NotVector { .. }
             | ImportError::StrokeIdPreset { .. }
             | ImportError::SkippedLayer { .. }
@@ -155,7 +184,8 @@ impl ImportError {
             ImportError::UnknownLayer { .. } | ImportError::ContextAbsent { .. } => {
                 DispatchErrorCode::NotFound
             }
-            ImportError::ProviderUnavailable { .. }
+            ImportError::ProjectRequired
+            | ImportError::ProviderUnavailable { .. }
             | ImportError::ReferenceScope { .. }
             | ImportError::LayerLocked { .. }
             | ImportError::KeyframeRequired { .. }
@@ -168,6 +198,8 @@ impl ImportError {
     pub(crate) fn message(&self) -> &'static str {
         match self {
             ImportError::Payload => "Import batch payload is invalid.",
+            ImportError::ProjectRequired => "Import items require an admitted project envelope.",
+            ImportError::InvalidAsset { .. } => "Import asset is invalid or not admitted.",
             ImportError::Remap(_) => "Import batch ids are invalid or unavailable.",
             ImportError::ProviderUnavailable { .. } => {
                 "Import needs a provider that is unavailable."

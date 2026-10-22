@@ -12,10 +12,13 @@
 //! the no-op: it publishes nothing and reports the unchanged head. No history, receipt or id state
 //! lives here.
 use crate::commands::ObjectFillOwner;
-use crate::object_document::ObjectDocument;
+use crate::object_document::{ObjectDocument, ProjectEnvelope};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::{json, Value};
+
+#[path = "native_import_transaction_assets_owner.rs"]
+mod assets;
 
 /// One element the importer skipped, as the receipt reports it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +35,7 @@ pub(crate) struct ImportBatchResult {
     pub(crate) applied: bool,
     pub(crate) layers: Vec<(String, String)>,
     pub(crate) objects: Vec<(String, String)>,
+    pub(crate) assets: Vec<(String, String)>,
     pub(crate) skipped: Vec<ImportSkipReport>,
 }
 
@@ -53,13 +57,23 @@ impl ImportBatchResult {
             .iter()
             .map(|skip| json!({"kind": skip.kind, "sourceId": skip.source_id, "reason": skip.reason}))
             .collect();
-        json!({
+        let mut result = json!({
             "applied": self.applied,
             "historyEntriesAdded": u64::from(self.applied),
             "layers": layers,
             "objects": objects,
             "skipped": skipped,
-        })
+        });
+        // Preserve the existing vector-only receipt, including its bounded size.
+        if !self.assets.is_empty() {
+            result["assets"] = Value::Array(
+                self.assets
+                    .iter()
+                    .map(|(source, native)| json!({"sourceId": source, "assetId": native}))
+                    .collect(),
+            );
+        }
+        result
     }
 }
 
@@ -69,6 +83,7 @@ impl ImportBatchResult {
 pub(crate) struct PreparedImportBatch {
     origin: ObjectSnapshot,
     document: Option<ObjectDocument>,
+    project: Option<ProjectEnvelope>,
 }
 
 impl PreparedImportBatch {
@@ -126,7 +141,11 @@ impl ObjectFillOwner {
             ObjectSnapshot::validate_drawing(candidate)
                 .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         }
-        Ok(PreparedImportBatch { origin, document })
+        Ok(PreparedImportBatch {
+            origin,
+            document,
+            project: None,
+        })
     }
 
     /// Publishes the whole batch if and only if the origin pins still match the current head.
@@ -136,6 +155,12 @@ impl ObjectFillOwner {
         candidate: PreparedImportBatch,
     ) -> Result<u64, DispatchErrorCode> {
         self.check_import_pins(&candidate.origin)?;
+        if let Some(project) = candidate.project {
+            return self
+                .revisions
+                .publish_import_project(project)
+                .map_err(|_| DispatchErrorCode::Unavailable);
+        }
         match candidate.document {
             None => Ok(self.content_revision()),
             Some(document) => self

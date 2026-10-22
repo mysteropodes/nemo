@@ -23,20 +23,38 @@
     return !!value && value.available === true && same(info, value) && same(info, value.presentation) &&
       value.presentation.owner === 'native' && value.presentation.status === 'presented' && value.presentation.frame === frame;
   }
-  function wire(batch) {
-    return JSON.parse(JSON.stringify({
+  function wire(batch, before) {
+    const value = {
       command: contract.COMMAND,
       layers: batch.layers || [], records: batch.records || [], skipped: batch.skipped || [], unavailable: batch.unavailable || [],
-    }));
+    };
+    for (const key of ['assets', 'raster', 'text', 'sources']) {
+      if (Object.prototype.hasOwnProperty.call(batch, key) && (key === 'sources' || !(Array.isArray(batch[key]) && batch[key].length === 0))) value[key] = batch[key];
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'sources')) {
+      if (!before || ['documentSnapshotId', 'lifecycleGeneration'].some(key =>
+          Object.prototype.hasOwnProperty.call(batch, key) && batch[key] !== before[key])) throw new TypeError('native source pins do not match captured import context');
+      value.documentSnapshotId = before.documentSnapshotId;
+      value.lifecycleGeneration = before.lifecycleGeneration;
+    } else if (['documentSnapshotId', 'lifecycleGeneration'].some(key => Object.prototype.hasOwnProperty.call(batch, key))) {
+      throw new TypeError('source pins require sources');
+    }
+    return JSON.parse(JSON.stringify(value));
   }
+  const objects = batch => (batch.records || []).concat(batch.raster || [], batch.text || []);
+  const assets = batch => (batch.assets || []).concat(batch.sources || []);
   // The receipt must account for exactly what the batch declared: created + skipped = declared source entries.
   function accounting(applied, result, batch) {
-    if (!applied) return result.layers.length === 0 && result.objects.length === 0 && batch.layers.length === 0 && batch.records.length === 0 &&
+    const declaredObjects = objects(batch), declaredAssets = assets(batch), mappedAssets = result.assets || [];
+    if (!applied) return result.layers.length === 0 && result.objects.length === 0 && mappedAssets.length === 0 &&
+      batch.layers.length === 0 && declaredObjects.length === 0 && declaredAssets.length === 0 &&
       sameIds(triple(result.skipped), triple(batch.skipped));
     return sameIds(result.layers.map((r) => r.sourceId), batch.layers.map((l) => l.sourceId)) &&
-      sameIds(result.objects.map((r) => r.sourceId), batch.records.map((r) => r.sourceId)) &&
+      sameIds(result.objects.map((r) => r.sourceId), declaredObjects.map((r) => r.sourceId)) &&
+      sameIds(mappedAssets.map((r) => r.sourceId), declaredAssets.map((r) => r.sourceId)) &&
       new Set(result.layers.map((r) => r.layerUid)).size === result.layers.length &&
       new Set(result.objects.map((r) => r.strokeId)).size === result.objects.length &&
+      new Set(mappedAssets.map((r) => r.assetId)).size === mappedAssets.length &&
       sameIds(triple(result.skipped), triple(batch.skipped));
   }
 
@@ -66,7 +84,7 @@
       const { session, before, frame, write } = ctx;
       let payload;
       try {
-        payload = wire(batch);
+        payload = wire(batch, before);
         contract.payload(contract.OP, payload);
       } catch (error) { return { status: 'invalid', reason: String(error && error.message || error) }; }
       const probe = { apiVersion: 2, requestId: 'project-import-batch-999999999', instanceId: before.instanceId, documentId: before.documentId,
@@ -91,7 +109,7 @@
         if (/intent is stale or invalid/.test(message)) return { status: 'stale', reason: 'intent_stale' };
         return { status: 'unconfirmed', indeterminate: true, message };
       } finally { pending = false; }
-      return settle(ctx, batch, receipt, ticket);
+      return settle(ctx, payload, receipt, ticket);
     }
 
     function settle(ctx, batch, receipt, ticket) {
@@ -107,6 +125,7 @@
         status: 'imported', applied: result.applied, revision: receipt.contentRevision, historyEntriesAdded: result.historyEntriesAdded,
         layers: result.layers, objects: result.objects, skipped: result.skipped, readback: 'unconfirmed', selected: false,
       };
+      if (result.assets && result.assets.length) out.assets = result.assets;
       try {
         if (ticket !== generation || ports.currentSession() !== session) return out;
         const after = session.info(), rows = after && after.layers, made = result.layers;
