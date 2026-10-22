@@ -258,7 +258,7 @@ test('Desktop completion paints its own bound camera lock without calling the le
 
 test('actual no-move Zoom click after a real frame4 Canvas relock presents the original 1.25 affine once',async()=>{
  const Project=require('../src/js/adapters/native-object-project.js'),f=navigationSourceHarness();
- const toolbar=cameraToolbarRoot(),buttons=toolbar.buttons,root=f.root,calls=[],errors=[];
+ const toolbar=cameraToolbarRoot(),buttons=toolbar.buttons,root=f.root,calls=[],errors=[],observations=[];
  const canvas=root.document.getElementById('canvas-area'),pill={value:'500'};
  canvas.getBoundingClientRect=()=>({left:66,top:102,right:866,bottom:552,width:800,height:450});
  const nodes={...buttons,'drawing-canvas':canvas,'canvas-area':canvas,'zoom-scrub':pill};
@@ -267,6 +267,7 @@ test('actual no-move Zoom click after a real frame4 Canvas relock presents the o
  Object.assign(root.state,{cameraView:false,currentFrame:4,tool:'zoom'});
  Object.defineProperty(root,'paper',{get(){assert.fail('native click must not read or mutate Paper');}});
  f.context.showToast=message=>errors.push(message);
+ root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>observations.push([event,code]);
  function frozen(value){
   if(value&&typeof value==='object'){Object.values(value).forEach(frozen);Object.freeze(value);}
   return value;
@@ -313,6 +314,7 @@ test('actual no-move Zoom click after a real frame4 Canvas relock presents the o
  }
  const underlay=desktop(root),session=Project.create({invoke,frame:()=>root.state.currentFrame,
   mapping:info=>underlay.mapping(info),viewMode:()=>root.state.cameraView?'stored-camera':'canvas',
+  openDiagnostic:(event,code)=>CameraDesktop.openDiagnostic(root,event,code),
   presented:()=>CameraDesktop.renderCameraViewLock(root)});
  root.NemoNativeObjectProject={desktop:()=>session};root.__TAURI__={core:{invoke}};
  CameraDesktop.bindCameraUI(root,{toggle:()=>assert.fail('legacy camera toggle'),
@@ -342,6 +344,35 @@ test('actual no-move Zoom click after a real frame4 Canvas relock presents the o
  assert.strictEqual(session.info(),info);assert.equal(JSON.stringify(session.info()),source);
  assert.deepEqual([info.contentRevision,info.undoDepth,info.redoDepth],[0,0,0]);
  assert.deepEqual(errors,[]);assert.deepEqual(f.calls,[],'no stub navigation provider was used');
+ assert.deepEqual(observations.filter(([event])=>event.startsWith('navigation-')),
+  [['navigation-begin','zoom:admitted'],['navigation-update','view-updated']]);
  assert.equal(calls.filter(call=>call.command==='nemo_native_object_preview').length,5);
  assert.equal(calls.some(call=>call.command.includes('dispatch')||call.command.includes('export')),false);
+});
+
+test('navigation observation preserves inactive guard order and callback failures cannot change refusal',async()=>{
+ const Project=require('../src/js/adapters/native-object-project.js'),observations=[],reads=[];
+ const session=Project.create({invoke(){assert.fail('inactive observation cannot invoke native');},
+  frame(){reads.push('frame');return 4;},mapping(){reads.push('mapping');return null;},
+  projectionReady(){reads.push('projection');return true;},subscriptionActive(){reads.push('subscription');return true;},
+  openDiagnostic(event,code){observations.push([event,code]);throw Error('observer failed');}});
+ assert.equal(session.beginViewportNavigation('zoom',{x:466,y:327}),null);
+ assert.equal(session.beginViewportNavigation('/private/document-name',{x:466,y:327}),null);
+ const token=Object.defineProperty({},'kind',{get(){assert.fail('refused navigation must not add a token read');}});
+ await assert.rejects(session.updateViewportNavigation(token,{x:466,y:327},1.25),
+  error=>error.message==='Native navigation owner is unavailable');
+ assert.deepEqual(reads,[]);
+ assert.deepEqual(observations,[['navigation-begin','owner-unavailable'],['navigation-begin','owner-unavailable'],
+  ['navigation-update','rejected']]);
+});
+
+test('navigation diagnostic storage and fixture observation retain only the closed vocabulary',()=>{
+ const observed=[],root={__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code){observed.push([event,code]);throw Error('ignored observer');}};
+ const hostile=Object.defineProperty({},'toString',{get(){assert.fail('diagnostics must not coerce untrusted data');}});
+ const cases=[['navigation-begin','zoom:admitted','zoom:admitted'],['navigation-begin','pan:view-refused','pan:view-refused'],
+  ['navigation-begin','/private/document-name','unknown'],['navigation-begin','zoom:admitted:private','unknown'],
+  ['navigation-begin',hostile,'unknown'],['navigation-update','view-updated','view-updated'],
+  ['navigation-update','/private/source-path','unknown'],['navigation-update',hostile,'unknown']];
+ for(const [event,code]of cases)CameraDesktop.openDiagnostic(root,event,code);
+ assert.deepEqual(observed,cases.map(([event,,expected])=>[event,expected]));
 });
