@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "94732d68d2fbc30de09a7fe7fbb00f1e8744f352",
-  "describe": "v0.7.0-alpha.4-2845-g94732d68"
+  "head": "f277bb6c23db015b8a5bf8d3151f49ec309c6d87",
+  "describe": "v0.7.0-alpha.4-2851-gf277bb6c"
  },
- "inputsDigest": "086403cf15a33b554087f13d76b516e5f1e42dd03361fb72c63a5436f66159d8",
+ "inputsDigest": "2d55e564fc58e64ec79412b89bb4781da8f0109fd22d28aaedb44713ba2b48e3",
  "states": [
   "inventoried",
   "characterized",
@@ -1001,7 +1001,7 @@
    "capability": "Add a key",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:120 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:131 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1045,7 +1045,7 @@
    "capability": "Edit easing curve…",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:124 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:135 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1087,7 +1087,7 @@
    "capability": "Camera layer — framing keys (zoom/pan) interpolated with Bézier curves",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:100 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:111 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1113,7 +1113,7 @@
     "functionsVisited": 53,
     "via": "variable button",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:89 renderCameraViewLock()",
+     "src/js/adapters/native-object-project-desktop.js:100 renderCameraViewLock()",
      "src/js/motion.js:7282 action()"
     ]
    },
@@ -17447,7 +17447,7 @@
     "functionsVisited": 278,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:212 presented()",
+     "src/js/adapters/native-object-project-desktop.js:223 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7109 show()"
     ]
@@ -22071,7 +22071,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-markers.js:82",
    "meta": {
-    "functionsVisited": 27
+    "functionsVisited": 15
    },
    "fixtures": []
   },
@@ -22201,7 +22201,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/xsheet-panel.js:74",
    "meta": {
-    "functionsVisited": 21
+    "functionsVisited": 9
    },
    "fixtures": []
   },
@@ -22229,7 +22229,7 @@
    "source": "src/js/adapters/native-palette-ui.js:106",
    "meta": {
     "i18n": null,
-    "functionsVisited": 28
+    "functionsVisited": 29
    },
    "fixtures": [
     "static-props",
