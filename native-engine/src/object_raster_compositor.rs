@@ -149,6 +149,7 @@ impl Compositor {
             &self.device,
             vello::RendererOptions {
                 antialiasing_support: vello::AaSupport::area_only(),
+                use_cpu: true,
                 ..Default::default()
             },
         )
