@@ -202,3 +202,74 @@ test('a mismatched held-navigation First receipt refuses publication, restores f
     assertOutput(f, 0, HELD_ZERO); await assertTiming(f, 0);
     assert.deepEqual(f.calls.filter(call => call.command === 'nemo_native_object_preview').slice(-3).map(call => call.request.frame), [0, 4, 0]);
   });
+
+// Additive minimum-correction controls. The original three cases above remain
+// byte-for-byte unchanged, including the independently observed stale-tail RED.
+test('an invalid direct frame cannot discard a valid already coalesced Camera render intent',
+  { timeout: 3000 }, async () => {
+    const entered = gate(), release = gate();
+    const rows = [...H.PREVIEWS, held(4, HELD_FOUR, { entered, release }), held(4, HELD_FOUR)];
+    const { f } = await opened(rows, [timing(4)]), input = installInputs(f);
+    await toFour(f, input);
+    input.keyboardZoom(); await entered.promise;
+    const coalesced = f.session.renderPreview(4);
+    const refused = assert.rejects(f.session.presentPreview(-1), /Frame is outside the native project/);
+    await turn(); release.resolve(); await refused; await coalesced; await turn();
+    assertOutput(f, 4, HELD_FOUR); await assertTiming(f, 4);
+    assert.equal(f.previewCount(), 9, 'invalid direct frame does not erase the second valid render');
+    assert.deepEqual(f.calls.filter(call => call.command === 'nemo_native_object_preview').slice(-2)
+      .map(call => call.request.frame), [4, 4]);
+    assert.equal(lastPreview(f).frame, 4);
+  });
+test('a refused direct Camera receipt cannot discard a valid already coalesced render intent',
+  { timeout: 3000 }, async () => {
+    const entered = gate(), release = gate();
+    // The direct frame0 reply deliberately has default navigation, while the
+    // requested/retained override is1.1. This is a transport-boundary refusal.
+    const rows = [...H.PREVIEWS, held(4, HELD_FOUR, { entered, release }), held(0, H.LOCKED_FOUR), held(4, HELD_FOUR)];
+    const { f } = await opened(rows, [timing(4)]), input = installInputs(f);
+    await toFour(f, input);
+    input.keyboardZoom(); await entered.promise;
+    const coalesced = f.session.renderPreview(4);
+    const refused = assert.rejects(f.session.presentPreview(0), /Native project frame was not presented/);
+    await turn(); release.resolve(); await refused; await coalesced; await turn();
+    assertOutput(f, 4, HELD_FOUR); await assertTiming(f, 4);
+    assert.equal(f.previewCount(), 10, 'valid coalesced rendering remains deliverable after direct refusal');
+    assert.deepEqual(f.calls.filter(call => call.command === 'nemo_native_object_preview').slice(-3)
+      .map(call => call.request.frame), [4, 0, 4]);
+    assert.equal(f.notices.filter(message => message === 'Could not display this frame').length, 0,
+      'direct API refusal is not a fabricated navigator failure');
+  });
+test('a genuinely later render request made while direct First is pending remains deliverable',
+  { timeout: 3000 }, async () => {
+    const zoomEntered = gate(), zoomRelease = gate(), firstEntered = gate(), firstRelease = gate();
+    // Frame1 uses a fixed supplied projection, not a native interpolation oracle.
+    const rows = [...H.PREVIEWS,
+      held(4, HELD_FOUR, { entered: zoomEntered, release: zoomRelease }),
+      held(0, HELD_ZERO, { entered: firstEntered, release: firstRelease }), held(1, HELD_ZERO), held(1, HELD_ZERO)];
+    const { f } = await opened(rows, [timing(1)]), input = installInputs(f);
+    await toFour(f, input);
+    input.keyboardZoom(); await zoomEntered.promise;
+    const oldCoalesced = f.session.renderPreview(4);
+    const first = input.navigate('btn-ff', 0);
+    await turn(); zoomRelease.resolve(); await firstEntered.promise;
+    // Arrival is after the actual direct First transport entry, not inferred
+    // from a label, timer, fabricated owner or rewritten navigation function.
+    const later = f.session.renderPreview(1);
+    firstRelease.resolve(); assert.equal(await first, true);
+    await oldCoalesced; await later; await turn();
+    const shown = f.session.readPresentedObjectSession(); assert.ok(shown);
+    assert.equal(shown.presentation.frame, 1, 'genuinely later distinct frame intent is delivered');
+    assert.equal(shown.presentation.view.mode, 'stored-camera');
+    assert.deepEqual(plain(shown.presentation.view.navigation), { zoom: 1.1, pan: [0, 0] });
+    assert.deepEqual(plain(shown.presentation.view.documentToComposition), HELD_ZERO.documentToComposition);
+    assert.equal(f.state.currentFrame, 0, 'renderPreview does not own navigator UI publication');
+    assert.equal(lastPreview(f).frame, 1);
+    assert.equal(f.previewCount(), 10, 'newer distinct render survives retirement of older coalesced work');
+    assert.deepEqual(f.calls.filter(call => call.command === 'nemo_native_object_preview').slice(-3)
+      .map(call => call.request.frame), [4, 0, 1]);
+    // The ordinary next navigation can then publish that same frame coherently.
+    assert.equal(await input.navigate('btn-nf', 1), true); await turn();
+    assertOutput(f, 1, HELD_ZERO); await assertTiming(f, 1);
+    assert.equal(f.previewCount(), 11);
+  });

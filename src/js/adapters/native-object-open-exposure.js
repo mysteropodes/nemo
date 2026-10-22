@@ -1,4 +1,4 @@
-/* Provisional Open only: exposure hints wake retained native work, never publish it. */
+/* Native session view navigation, preview scheduling and provisional Open exposure. */
 (function(root,factory){
   var api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -90,6 +90,61 @@
     }
     return Object.freeze({read:read,matches:matches,begin:begin,update:update,identity:function(value){return equalNav(value,nav());}});
   }
+  // One coalesced render loop shares the owner's queue with direct navigation.
+  // A successful direct presentation retires only render intents older than its
+  // submission. Refused direct requests and genuinely later renders stay live.
+  function previewScheduling(ports) {
+    var rendering = null, wanted = null, renderSerial = 0, retiredThrough = 0;
+    function submit(frame, allowSuperseded, renderIntent) {
+      if (ports.opening() || ports.synchronizing() || !ports.active()) {
+        return Promise.reject(new Error('Native project Open or synchronization is in progress'));
+      }
+      var submitted = ports.owner();
+      var retire = renderIntent === null ? renderSerial : null;
+      return ports.enqueue(async function () {
+        // Supersession never bypasses an owner-epoch refusal.
+        ports.guardEpoch(submitted);
+        if (renderIntent !== null && renderIntent <= retiredThrough) {
+          return ports.presented();
+        }
+        var receipt = await ports.present(frame, undefined, undefined, undefined, allowSuperseded);
+        // The owner has already validated the receipt, view and matrix here.
+        // A rejection above must not consume any valid pending render intent.
+        if (retire !== null) retiredThrough = Math.max(retiredThrough, retire);
+        return receipt;
+      });
+    }
+    function presentPreview(frame, allowSuperseded) {
+      return submit(frame, allowSuperseded, null);
+    }
+    function renderPreview(frame) {
+      if (!ports.active() || ports.opening()) return Promise.resolve(null);
+      ports.readView();
+      wanted = { frame: frame, serial: ++renderSerial };
+      if (rendering) return rendering;
+      rendering = (async function () {
+        var receipt;
+        while (wanted !== null) {
+          var latest = wanted;
+          wanted = null;
+          receipt = await submit(latest.frame, true, latest.serial);
+        }
+        return receipt;
+      }()).catch(function (error) {
+        wanted = null;
+        ports.notice(error);
+        return null;
+      }).finally(function () {
+        rendering = null;
+      });
+      return rendering;
+    }
+    return Object.freeze({
+      presentPreview: presentPreview,
+      renderPreview: renderPreview,
+      clearWanted: function () { wanted = null; }
+    });
+  }
   function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation){
     if(!ownerMatches)return {failure:'owner'};
     if(!receipt)return {failure:'receipt'};
@@ -169,5 +224,5 @@
     return Object.freeze({connect:connect,join:join,run:run,cancel:cancel,detach:detach,close:close,
       assertActive:assertActive,isStopped:function(){return !active;}});
   }
-  return Object.freeze({create:create,inspectReceipt:inspectReceipt,presentedFrame:presentedFrame,viewMode:viewMode,matchesView:matchesView,navigation:navigation});
+  return Object.freeze({create:create,inspectReceipt:inspectReceipt,presentedFrame:presentedFrame,viewMode:viewMode,matchesView:matchesView,navigation:navigation,previewScheduling:previewScheduling});
 }));
