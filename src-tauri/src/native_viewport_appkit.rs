@@ -177,12 +177,20 @@ impl NativeViewport {
     pub(crate) fn select_surface_format(
         formats: &[wgpu::TextureFormat],
     ) -> Result<wgpu::TextureFormat, NativeViewportError> {
-        formats
-            .iter()
-            .copied()
-            .find(wgpu::TextureFormat::is_srgb)
-            .or_else(|| formats.first().copied())
-            .ok_or_else(|| NativeViewportError::new("native surface has no texture format"))
+        // The retained Rgba8Unorm target already contains encoded sRGB bytes.
+        // TextureBlitter samples them unchanged; an sRGB attachment would encode
+        // those values a second time. Keep an 8-bit normalized attachment.
+        [
+            wgpu::TextureFormat::Bgra8Unorm,
+            wgpu::TextureFormat::Rgba8Unorm,
+        ]
+        .into_iter()
+        .find(|format| formats.contains(format))
+        .ok_or_else(|| {
+            NativeViewportError::new(
+                "native surface has no byte-preserving 8-bit unorm texture format",
+            )
+        })
     }
 }
 

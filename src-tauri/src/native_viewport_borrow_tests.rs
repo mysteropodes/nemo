@@ -371,3 +371,38 @@ fn gpu_selected_surface_blit_preserves_encoded_rgba8_bytes() {
         assert_eq!(actual, encoded, "selected native attachment {format:?}");
     }
 }
+
+#[cfg(target_os = "macos")]
+#[test]
+fn surface_format_requires_byte_preserving_unorm_and_prefers_bgra_then_rgba() {
+    use crate::native_viewport::NativeViewport;
+    use wgpu::TextureFormat::{
+        Bgra8Unorm, Bgra8UnormSrgb, Rgb10a2Unorm, Rgba16Float, Rgba8Unorm, Rgba8UnormSrgb,
+    };
+
+    for (formats, expected) in [
+        (vec![Bgra8Unorm], Bgra8Unorm),
+        (vec![Rgba8Unorm], Rgba8Unorm),
+        (vec![Rgba8Unorm, Bgra8Unorm], Bgra8Unorm),
+        (vec![Bgra8Unorm, Rgba8Unorm], Bgra8Unorm),
+        (vec![Rgba8UnormSrgb, Rgba16Float, Rgba8Unorm], Rgba8Unorm),
+        (vec![Bgra8UnormSrgb, Rgba8Unorm, Bgra8Unorm], Bgra8Unorm),
+    ] {
+        assert_eq!(
+            NativeViewport::select_surface_format(&formats).unwrap(),
+            expected
+        );
+    }
+    for formats in [
+        vec![],
+        vec![Bgra8UnormSrgb],
+        vec![Rgba8UnormSrgb],
+        vec![Rgba16Float, Rgb10a2Unorm],
+        vec![Bgra8UnormSrgb, Rgba16Float, Rgba8UnormSrgb],
+    ] {
+        assert!(NativeViewport::select_surface_format(&formats)
+            .unwrap_err()
+            .to_string()
+            .contains("no byte-preserving 8-bit unorm texture format"));
+    }
+}
