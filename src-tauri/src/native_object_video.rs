@@ -67,7 +67,12 @@ fn count_key(path: &str) -> Option<CountKey> {
     let canonical = std::fs::canonicalize(path).ok()?;
     let metadata = std::fs::metadata(&canonical).ok()?;
     let modified = metadata.modified().ok()?;
-    Some((canonical, file_identity(&metadata), metadata.len(), modified))
+    Some((
+        canonical,
+        file_identity(&metadata),
+        metadata.len(),
+        modified,
+    ))
 }
 
 /// A same-size, same-mtime file copied over the source is a new source version.
