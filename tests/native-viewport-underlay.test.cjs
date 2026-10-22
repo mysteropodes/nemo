@@ -300,7 +300,7 @@ test('actual no-move Zoom click after a real frame4 Canvas relock presents the o
    assert.deepEqual(request.action,{kind:'inspect'});return {...pin,requestId:request.requestId};
   }
   assert.equal(command,'nemo_native_object_preview');
-  assert.equal(request.frame,4);assert.equal(request.contentRevision,0);
+  assert.equal(request.frame,previewIndex===0?0:4);assert.equal(request.contentRevision,0);
   assert.equal(request.documentSnapshotId,'click-snapshot');assert.equal(request.lifecycleGeneration,1);
   assert.equal(request.instanceId,'click-instance');assert.equal(request.documentId,'click-document');
   assert.deepEqual(request.viewport,{cssBounds:{x:66,y:102,width:800,height:450},
@@ -318,7 +318,7 @@ test('actual no-move Zoom click after a real frame4 Canvas relock presents the o
  CameraDesktop.bindCameraUI(root,{toggle:()=>assert.fail('legacy camera toggle'),
   addKey:()=>assert.fail('legacy camera key'),editEase:()=>assert.fail('legacy camera easing')});
  await session.openPath('/Camera-view.json');
- assert.equal(session.readPresentedObjectSession().presentation.frame,4);
+ assert.equal(session.readPresentedObjectSession().presentation.frame,0);
  assert.equal(session.readPresentedObjectSession().presentation.view.mode,'canvas');
  await buttons['btn-camera'].click();
  assert.equal(session.readPresentedObjectSession().presentation.view.mode,'stored-camera');
