@@ -117,6 +117,11 @@
         if (routed.blocked.some((b) => b.reason === 'use-import-reference')) notify(NATIVE_REFERENCE_DROP_TOAST);
         return { status: 'unavailable', blocked: routed.blocked, applied: [] };
       }
+      if (typeof ports.admitDrop === 'function') {
+        let admitted = false;
+        try { admitted = ports.admitDrop(files, routed.plan) === true; } catch (_) { /* pure admission failure dispatches nothing */ }
+        if (!admitted) return { status: 'unavailable', reason: 'native_mixed_import_batch_unavailable', applied: [] };
+      }
       notify(toastText(routed.plan));
       return { status: 'routed', plan: routed.plan, applied: await run(files, routed.plan) };
     }

@@ -23,9 +23,9 @@
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained import receipt or typed refusal. The caller sends source ids only: the owner mints every layer and stroke identity. Raster pixels, text and fonts are never carried; an element that needs them is an unavailable row and refuses the whole batch."
+    "policy": "Complete correlated import receipt or typed refusal. Whole request 4096 bytes; serialized result 3072 within the 4096-byte response. Retained assets use scalar origin assetId lookups. Optional sources admits only existing native scoped PNG files or bundled/Google font descriptors, with captured snapshot/lifecycle pins; never inline bytes, base64, URL, AssetRecord or provider claims. Existing resolver and shared resource budgets remain authoritative."
   },
-  "semantics": "Import one parsed artwork batch atomically: N new layers, M complete editable-vector-path records and the importer's own skip report. Each record names its layer by the source id of a batch layer or by an existing layer uid, an empty stroke id and an authored frame scope; the owner allocates native-layer:<revision>:<n> and native-stroke:<revision>:<n> deterministically from the origin revision. A changing batch adds exactly one revision and one undo entry for the WHOLE batch; a batch that creates nothing preserves presence, bytes, history and redo and returns its skip report. Every layer, record and skip entry is accounted for in the receipt (created plus skipped equals declared). An unavailable row (raster-asset, text, font) or a locked existing layer refuses the whole batch before anything publishes; there is no partial import and no JS/Paper writer or optimistic mutation. The importers (SVG, Figma, PSD, drop/paste) parse with Paper.js, the Figma REST API and ag-psd and only submit this plan.",
+  "semantics": "Import layers, vector/raster/Text records, retained asset descriptors and optional native source descriptors in one atomic batch. Source-free wire remains byte compatible. Nonempty sources requires the captured documentSnapshotId and lifecycleGeneration; the actual host probes the original request before source IO outside owner locks, then commits the exact ordered resolved sourceId/name/mediaType bytes bijection only against the same lifecycle/owner. Original request fingerprint/replay/cancel semantics remain; there is no separate asset attach/font publication. Source declarations are assets even without an item. Retained assets then sources share one unique source-ID space and assets receipt order; objects order is vector, raster then Text. Owner admission validates real PNG/font provenance, item references, order and project saveability before one revision/history checkpoint. Any unavailable row or invalid/stale source refuses the whole batch; no partial publication, JS/Paper writer or optimistic result. Actual host/new-byte, UI/installed and original importer consumer acceptance remain pending; no PSD canvas or Figma URL transport is introduced.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",
@@ -172,6 +172,449 @@
               "kind": "element",
               "sourceId": "figma:0:skip:0",
               "reason": "STAR (Star)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Retained image reuse with a native RasterItem; origin inventory must already contain retained-image",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "import-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.import.batch",
+        "payload": {
+          "command": "object.import.batch",
+          "layers": [],
+          "records": [],
+          "assets": [
+            {
+              "sourceId": "image-source",
+              "assetId": "retained-image"
+            }
+          ],
+          "raster": [
+            {
+              "sourceId": "raster-source",
+              "entry": {
+                "target": {
+                  "contextId": "scene-root",
+                  "frameScope": {
+                    "kind": "authored",
+                    "frame": 0
+                  },
+                  "layerUid": "L0",
+                  "strokeId": ""
+                },
+                "item": {
+                  "assetId": "image-source",
+                  "x": 20,
+                  "y": 30,
+                  "width": 32,
+                  "height": 16,
+                  "opacity": 1,
+                  "rotation": 0
+                }
+              }
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "import-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layers": [],
+          "objects": [
+            {
+              "sourceId": "raster-source",
+              "strokeId": "native-stroke:8:0"
+            }
+          ],
+          "skipped": [],
+          "assets": [
+            {
+              "sourceId": "image-source",
+              "assetId": "native-asset:8:0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Retained admitted font reuse with a native TextBlock; no font bytes or provenance are supplied",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "import-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.import.batch",
+        "payload": {
+          "command": "object.import.batch",
+          "layers": [],
+          "records": [],
+          "assets": [
+            {
+              "sourceId": "font-source",
+              "assetId": "retained-font"
+            }
+          ],
+          "text": [
+            {
+              "sourceId": "text-source",
+              "entry": {
+                "target": {
+                  "contextId": "scene-root",
+                  "frameScope": {
+                    "kind": "authored",
+                    "frame": 0
+                  },
+                  "layerUid": "L0",
+                  "strokeId": ""
+                },
+                "block": {
+                  "text": "Imported text",
+                  "font": {
+                    "kind": "asset",
+                    "assetId": "font-source"
+                  },
+                  "size": 24,
+                  "color": "#123456",
+                  "align": "left",
+                  "anchorTopLeft": {
+                    "x": 10,
+                    "y": 20
+                  },
+                  "fixedWidth": null,
+                  "bold": false,
+                  "letterSpacing": 0
+                }
+              }
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "import-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layers": [],
+          "objects": [
+            {
+              "sourceId": "text-source",
+              "strokeId": "native-stroke:8:0"
+            }
+          ],
+          "skipped": [],
+          "assets": [
+            {
+              "sourceId": "font-source",
+              "assetId": "native-asset:8:0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Bundled native TextBlock with omitted asset descriptors; project envelope still required",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "import-3",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.import.batch",
+        "payload": {
+          "command": "object.import.batch",
+          "layers": [],
+          "records": [],
+          "text": [
+            {
+              "sourceId": "bundled-text",
+              "entry": {
+                "target": {
+                  "contextId": "scene-root",
+                  "frameScope": {
+                    "kind": "authored",
+                    "frame": 0
+                  },
+                  "layerUid": "L0",
+                  "strokeId": ""
+                },
+                "block": {
+                  "text": "Imported text",
+                  "font": {
+                    "kind": "bundled",
+                    "fontKey": "Roboto-Regular"
+                  },
+                  "size": 24,
+                  "color": "#123456",
+                  "align": "left",
+                  "anchorTopLeft": {
+                    "x": 10,
+                    "y": 20
+                  },
+                  "fixedWidth": null,
+                  "bold": false,
+                  "letterSpacing": 0
+                }
+              }
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "import-3",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layers": [],
+          "objects": [
+            {
+              "sourceId": "bundled-text",
+              "strokeId": "native-stroke:8:0"
+            }
+          ],
+          "skipped": []
+        }
+      }
+    },
+    {
+      "label": "Existing scoped PNG file source with native RasterItem; host IO/provider validation pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "import-source-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.import.batch",
+        "payload": {
+          "command": "object.import.batch",
+          "layers": [],
+          "records": [],
+          "raster": [
+            {
+              "sourceId": "raster-source",
+              "entry": {
+                "target": {
+                  "contextId": "scene-root",
+                  "frameScope": {
+                    "kind": "authored",
+                    "frame": 0
+                  },
+                  "layerUid": "L0",
+                  "strokeId": ""
+                },
+                "item": {
+                  "assetId": "image-source",
+                  "x": 20,
+                  "y": 30,
+                  "width": 32,
+                  "height": 16,
+                  "opacity": 1,
+                  "rotation": 0
+                }
+              }
+            }
+          ],
+          "sources": [
+            {
+              "sourceId": "image-source",
+              "name": "Artwork",
+              "mediaType": "image/png",
+              "source": {
+                "kind": "file",
+                "path": "/imports/artwork.png"
+              }
+            }
+          ],
+          "documentSnapshotId": "snapshot-7",
+          "lifecycleGeneration": 1
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "import-source-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layers": [],
+          "objects": [
+            {
+              "sourceId": "raster-source",
+              "strokeId": "native-stroke:8:0"
+            }
+          ],
+          "skipped": [],
+          "assets": [
+            {
+              "sourceId": "image-source",
+              "assetId": "native-asset:8:0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Existing bundled font source with native TextBlock; single atomic commit required",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "import-source-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.import.batch",
+        "payload": {
+          "command": "object.import.batch",
+          "layers": [],
+          "records": [],
+          "text": [
+            {
+              "sourceId": "text-source",
+              "entry": {
+                "target": {
+                  "contextId": "scene-root",
+                  "frameScope": {
+                    "kind": "authored",
+                    "frame": 0
+                  },
+                  "layerUid": "L0",
+                  "strokeId": ""
+                },
+                "block": {
+                  "text": "Imported text",
+                  "font": {
+                    "kind": "asset",
+                    "assetId": "font-source"
+                  },
+                  "size": 24,
+                  "color": "#123456",
+                  "align": "left",
+                  "anchorTopLeft": {
+                    "x": 10,
+                    "y": 20
+                  },
+                  "fixedWidth": null,
+                  "bold": false,
+                  "letterSpacing": 0
+                }
+              }
+            }
+          ],
+          "sources": [
+            {
+              "sourceId": "font-source",
+              "name": "Roboto Regular",
+              "mediaType": "font/ttf",
+              "source": {
+                "kind": "bundled",
+                "fontKey": "Roboto-Regular"
+              }
+            }
+          ],
+          "documentSnapshotId": "snapshot-7",
+          "lifecycleGeneration": 1
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "import-source-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layers": [],
+          "objects": [
+            {
+              "sourceId": "text-source",
+              "strokeId": "native-stroke:8:0"
+            }
+          ],
+          "skipped": [],
+          "assets": [
+            {
+              "sourceId": "font-source",
+              "assetId": "native-asset:8:0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Existing Google font descriptor as an asset-only source batch; no new URL transport",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "import-source-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.import.batch",
+        "payload": {
+          "command": "object.import.batch",
+          "layers": [],
+          "records": [],
+          "sources": [
+            {
+              "sourceId": "font-source",
+              "name": "Roboto Google",
+              "mediaType": "font/ttf",
+              "source": {
+                "kind": "google",
+                "family": "Roboto",
+                "weight": 400,
+                "italic": false
+              }
+            }
+          ],
+          "documentSnapshotId": "snapshot-7",
+          "lifecycleGeneration": 1
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "import-source-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layers": [],
+          "objects": [],
+          "skipped": [],
+          "assets": [
+            {
+              "sourceId": "font-source",
+              "assetId": "native-asset:8:0"
             }
           ]
         }

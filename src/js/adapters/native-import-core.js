@@ -23,20 +23,39 @@
     return !!value && value.available === true && same(info, value) && same(info, value.presentation) &&
       value.presentation.owner === 'native' && value.presentation.status === 'presented' && value.presentation.frame === frame;
   }
-  function wire(batch) {
-    return JSON.parse(JSON.stringify({
+  function wire(batch, before) {
+    const value = {
       command: contract.COMMAND,
       layers: batch.layers || [], records: batch.records || [], skipped: batch.skipped || [], unavailable: batch.unavailable || [],
-    }));
+    };
+    if (Object.prototype.hasOwnProperty.call(batch, 'objectOrder')) value.objectOrder = batch.objectOrder;
+    for (const key of ['assets', 'raster', 'text', 'sources']) {
+      if (Object.prototype.hasOwnProperty.call(batch, key) && (key === 'sources' || !(Array.isArray(batch[key]) && batch[key].length === 0))) value[key] = batch[key];
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'sources')) {
+      if (!before || ['documentSnapshotId', 'lifecycleGeneration'].some(key =>
+          Object.prototype.hasOwnProperty.call(batch, key) && batch[key] !== before[key])) throw new TypeError('native source pins do not match captured import context');
+      value.documentSnapshotId = before.documentSnapshotId;
+      value.lifecycleGeneration = before.lifecycleGeneration;
+    } else if (['documentSnapshotId', 'lifecycleGeneration'].some(key => Object.prototype.hasOwnProperty.call(batch, key))) {
+      throw new TypeError('source pins require sources');
+    }
+    return JSON.parse(JSON.stringify(value));
   }
+  const objects = batch => (batch.records || []).concat(batch.raster || [], batch.text || []);
+  const assets = batch => (batch.assets || []).concat(batch.sources || []);
   // The receipt must account for exactly what the batch declared: created + skipped = declared source entries.
   function accounting(applied, result, batch) {
-    if (!applied) return result.layers.length === 0 && result.objects.length === 0 && batch.layers.length === 0 && batch.records.length === 0 &&
+    const declaredObjects = objects(batch), declaredAssets = assets(batch), mappedAssets = result.assets || [];
+    if (!applied) return result.layers.length === 0 && result.objects.length === 0 && mappedAssets.length === 0 &&
+      batch.layers.length === 0 && declaredObjects.length === 0 && declaredAssets.length === 0 &&
       sameIds(triple(result.skipped), triple(batch.skipped));
     return sameIds(result.layers.map((r) => r.sourceId), batch.layers.map((l) => l.sourceId)) &&
-      sameIds(result.objects.map((r) => r.sourceId), batch.records.map((r) => r.sourceId)) &&
+      sameIds(result.objects.map((r) => r.sourceId), declaredObjects.map((r) => r.sourceId)) &&
+      sameIds(mappedAssets.map((r) => r.sourceId), declaredAssets.map((r) => r.sourceId)) &&
       new Set(result.layers.map((r) => r.layerUid)).size === result.layers.length &&
       new Set(result.objects.map((r) => r.strokeId)).size === result.objects.length &&
+      new Set(mappedAssets.map((r) => r.assetId)).size === mappedAssets.length &&
       sameIds(triple(result.skipped), triple(batch.skipped));
   }
 
@@ -60,13 +79,30 @@
       return { ok: true, ctx: Object.freeze({ session, before, frame, write, selection: selection.slice() }) };
     }
 
-    async function submit(ctx, batch) {
+    // Only the opt-in invocation marker path may cross an awaited staging boundary.
+    function markerCurrency(ctx) {
+      if (retired) return { status: 'unavailable', reason: 'retired' };
+      try {
+        const session = ports.currentSession(), info = session && session.info(), frame = ports.frame(), selection = ports.selection();
+        if (session !== ctx.session || !same(info, ctx.before) || frame !== ctx.frame || !sameIds(selection, ctx.selection)) {
+          return { status: 'stale', reason: 'context_changed' };
+        }
+        if (!Array.isArray(info.layers) || !Number.isSafeInteger(frame) || frame < 0 || frame >= info.totalFrames ||
+            ports.available(session, info) !== true || !presented(session, info, frame)) {
+          return { status: 'unavailable', reason: 'no_presented_native_session' };
+        }
+        if (session.importBatch !== ctx.write) return { status: 'stale', reason: 'context_changed' };
+      } catch (_) { return { status: 'unavailable', reason: 'no_presented_native_session' }; }
+      return null;
+    }
+
+    async function submit(ctx, batch, beforeInvoke) {
       if (retired) return { status: 'unavailable', reason: 'retired' };
       if (pending) return { status: 'busy' };
       const { session, before, frame, write } = ctx;
       let payload;
       try {
-        payload = wire(batch);
+        payload = wire(batch, before);
         contract.payload(contract.OP, payload);
       } catch (error) { return { status: 'invalid', reason: String(error && error.message || error) }; }
       const probe = { apiVersion: 2, requestId: 'project-import-batch-999999999', instanceId: before.instanceId, documentId: before.documentId,
@@ -80,6 +116,24 @@
       pending = true;
       let receipt;
       try {
+        if (beforeInvoke !== undefined) {
+          if (typeof beforeInvoke !== 'function') return { status: 'invalid', reason: 'invocation_marker_invalid' };
+          const beforeMarker = markerCurrency(ctx);
+          if (beforeMarker) return beforeMarker;
+          try {
+            const marked = beforeInvoke();
+            if (marked !== undefined) {
+              // Refuse async markers without awaiting; consume only a genuine Promise rejection.
+              if (marked && typeof marked === 'object') {
+                try { Promise.prototype.then.call(marked, undefined, () => {}); } catch (_) { /* not a Promise */ }
+              }
+              return { status: 'invalid', reason: 'invocation_marker_not_synchronous' };
+            }
+          } catch (_) { return { status: 'invalid', reason: 'invocation_marker_refused' }; }
+          // Marker code cannot dispose or move the captured intent and still dispatch.
+          const afterMarker = markerCurrency(ctx);
+          if (afterMarker) return afterMarker;
+        }
         receipt = await write.call(session, payload, before);
       } catch (error) {
         const message = String(error && error.message || error), refused = REFUSED.exec(message);
@@ -91,7 +145,7 @@
         if (/intent is stale or invalid/.test(message)) return { status: 'stale', reason: 'intent_stale' };
         return { status: 'unconfirmed', indeterminate: true, message };
       } finally { pending = false; }
-      return settle(ctx, batch, receipt, ticket);
+      return settle(ctx, payload, receipt, ticket);
     }
 
     function settle(ctx, batch, receipt, ticket) {
@@ -107,6 +161,7 @@
         status: 'imported', applied: result.applied, revision: receipt.contentRevision, historyEntriesAdded: result.historyEntriesAdded,
         layers: result.layers, objects: result.objects, skipped: result.skipped, readback: 'unconfirmed', selected: false,
       };
+      if (result.assets && result.assets.length) out.assets = result.assets;
       try {
         if (ticket !== generation || ports.currentSession() !== session) return out;
         const after = session.info(), rows = after && after.layers, made = result.layers;
@@ -128,7 +183,7 @@
     }
 
     return Object.freeze({
-      begin, submit,
+      begin, submit, supportsInvocationMarker: true,
       dispose() { retired = true; generation++; },
       isPending() { return pending; },
     });

@@ -1,9 +1,9 @@
 /* L10-J PSD import adapter. ag-psd (the vendored, untouched ag-psd.vendor.mjs, behind the `readPsd` port) stays the parser. The plan is the
  * baseline `importChildren` / `importFile` decision rebuilt without a side effect: one layer per top-level child that has a canvas and is
  * not hidden (`!layer.canvas || layer.hidden` skips), the baseline name counter, the placement rect, the opacity and the one-time canvas
- * resize rule. Each layer is a RASTER: the native raster asset record (lane 6 G27 / G38b) does not exist yet, so every eligible layer is an
- * `unavailable` row and the owner refuses the whole batch with the named provider. Nothing is published, the canvas is NOT resized (the
- * baseline resized first and then imported, even when nothing was importable) and no pixel is read or kept. */
+ * resize rule. An injected owned PNG stage encodes eligible canvases into scoped FilePNG sources for the SAME native batch as their
+ * raster placements. Without that provider the original unavailable rows refuse the whole batch. Native admission/history remain the
+ * only publisher; no individual asset attach or legacy writer is reachable. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -43,6 +43,52 @@
 
   function create(ports) {
     const core = ports.core, t = ports.t, notify = ports.notify || function () {};
+    function changed(ctx) {
+      const ready = core.begin();
+      if (!ready.ok) return { status: ready.status, reason: ready.reason };
+      const next = ready.ctx;
+      return next.session !== ctx.session || next.frame !== ctx.frame ||
+        ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'].some(key => next.before[key] !== ctx.before[key]) ||
+        next.selection.length !== ctx.selection.length || next.selection.some((id, i) => id !== ctx.selection[i])
+        ? { status: 'stale', reason: 'context_changed' } : null;
+    }
+    async function importRaster(ctx, psd, decided, batch) {
+      let attempt;
+      async function abort(outcome) {
+        if (attempt) {
+          const cleanup = await attempt.abort();
+          if (cleanup.status === 'retained') outcome.staging = cleanup;
+        }
+        return Object.assign({ plan: decided, eligible: decided.count }, outcome);
+      }
+      try {
+        attempt = ports.stage.createAttempt(ctx);
+        const sources = [], raster = [];
+        for (const row of decided.rows) {
+          const layerRef = `psd:${row.childIndex}`, assetId = `${layerRef}:asset`;
+          sources.push(await attempt.stageCanvas(assetId, row.name, psd.children[row.childIndex].canvas));
+          const stale = changed(ctx); if (stale) return abort(stale);
+          raster.push({ sourceId: `${layerRef}:raster`, entry: {
+            target: { contextId: 'scene-root', frameScope: { kind: 'authored', frame: ctx.frame }, layerUid: layerRef, strokeId: '' },
+            item: { assetId, x: row.x, y: row.y, width: row.w, height: row.h, opacity: row.opacity },
+          } });
+        }
+        const outcome = await attempt.submit(Object.assign({}, batch, { unavailable: [], sources, raster }));
+        const done = Object.assign({ plan: decided, eligible: decided.count }, outcome);
+        if (outcome.status === 'imported') {
+          done.count = decided.count;
+          if (outcome.readback === 'confirmed') notify(successToast(decided.count, t));
+          if (outcome.readback === 'confirmed' && outcome.selected && decided.resize && ports.resizeCanvas) {
+            try { done.canvasResize = { status: await ports.resizeCanvas(...decided.resize), width: decided.resize[0], height: decided.resize[1] }; }
+            catch (_) { done.canvasResize = { status: 'failed' }; }
+          }
+        }
+        return done;
+      } catch (error) {
+        const code = error && error.code;
+        return abort({ status: code === 'invalid_request' ? 'invalid' : code === 'stale_revision' ? 'stale' : 'unavailable', reason: 'png_stage_failed', code: code || 'unavailable' });
+      }
+    }
     async function importFile(file) {
       const begun = core.begin();
       if (!begun.ok) return { status: begun.status, reason: begun.reason };
@@ -60,6 +106,7 @@
         skipped: decided.skipped.map((s) => ({ kind: 'layer', sourceId: `psd:${s.childIndex}`, reason: s.reason })),
         unavailable: decided.rows.map((r) => ({ sourceId: `psd:${r.childIndex}`, need: 'raster-asset' })),
       };
+      if (ports.stage && typeof ports.stage.createAttempt === 'function') return importRaster(ctx, psd, decided, batch);
       const outcome = await core.submit(ctx, batch);
       // The owner must refuse a batch whose rows need a provider it lacks. A receipt for one is anomalous: it is reported as unconfirmed
       // (the publish, if any, is visible in the re-read session) and no canvas resize or success toast follows it.

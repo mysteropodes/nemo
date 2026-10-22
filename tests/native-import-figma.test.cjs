@@ -19,14 +19,20 @@ const CANVAS = { w: 1920, h: 1080 };
 const paper = helper.load();
 const J = (v) => JSON.stringify(v);
 
-function load(edits) {
+function load(edits, host) {
   let source = fs.readFileSync(ADAPTER, 'utf8');
+  let plan = fs.readFileSync(path.join(path.dirname(ADAPTER), 'native-import-figma-plan.js'), 'utf8');
   for (const [from, to] of edits || []) {
-    assert.equal(source.split(from).length, 2, `mutation anchor must occur exactly once: ${from}`);
-    source = source.replace(from, to);
+    assert.equal((source + plan).split(from).length, 2, `mutation anchor must occur exactly once: ${from}`);
+    if (source.includes(from)) source = source.replace(from, to); else plan = plan.replace(from, to);
   }
+  const prepared = { exports: {} };
+  new Function('module', 'exports', plan)(prepared, prepared.exports);
   const m = { exports: {} };
-  new Function('module', 'exports', 'require', source)(m, m.exports, (name) => (name === './native-import-svg.js' ? svg : require(name)));
+  new Function('module', 'exports', 'require', 'globalThis', source)(m, m.exports, name => {
+    if (name === './native-import-svg.js') return svg;
+    assert.equal(name, './native-import-figma-plan.js'); return prepared.exports;
+  }, host || globalThis);
   return m.exports;
 }
 // Everything the oracle row records, rebuilt from the plan (the font key is a provider answer the plan does not hold).
@@ -266,4 +272,256 @@ test('controls: the unmutated adapter has no mismatch and every source mutation 
     ['selection id keeps the dash', [["if (raw.indexOf(':') < 0) raw = raw.replace('-', ':');", '']]],
   ];
   for (const [name, edits] of mutants) assert.ok(mismatches(load(edits)) > 0 || nodeIdMismatch(load(edits)) > 0, `mutation not caught: ${name}`);
+});
+
+
+// Actual catalog literal; receipt-only native boundary below is not a font provider.
+function catalogHost(extra) {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'vector-text-bridge.js'), 'utf8');
+  const start = source.indexOf('var VECTOR_FONTS = {'), end = source.indexOf('var _vectorFontAssets =', start);
+  assert.ok(start >= 0 && end > start);
+  const fonts = new Function(source.slice(start, end) + ';return VECTOR_FONTS;')();
+  const sources = new Map(Object.keys(fonts).map(key => [key, { kind: 'bundled', fontKey: key }]));
+  Object.assign(fonts, extra);
+  if (extra) {
+    assert.deepEqual(Object.keys(extra), ['Google:Poppins-Regular']);
+    sources.set('Google:Poppins-Regular', { kind: 'google', family: 'Poppins', weight: 400, italic: false });
+  }
+  return { SMVectorText: { VECTOR_FONTS: fonts, addGoogleFont() { assert.fail('no individual font import'); },
+    readCatalog: () => Object.keys(fonts).map(key => ({ key, label: fonts[key].label, source: sources.get(key) || null })) } };
+}
+function textCase(families) {
+  const value = structuredClone(flowOf('text-variants'));
+  const frame = value.json.document.children[0].children[0];
+  frame.children = families.map((family, i) => {
+    const node = structuredClone(frame.children[0]);
+    node.name = 'Label ' + i; node.characters = 'Text ' + i;
+    node.style.fontFamily = family; node.style.fontWeight = i === 1 ? 700 : 400;
+    node.absoluteTransform = [[1, 0, 10 + i], [0, 1, 20 + i]];
+    return node;
+  });
+  return value;
+}
+function textPort(host, options) {
+  const h = makeSession(), calls = [], notifications = [], resized = [];
+  const o = options || {};
+  Object.defineProperty(h.session, 'importBatch', { value: async (payload, before) => {
+    calls.push(structuredClone(payload));
+    if (o.gate) await o.gate;
+    if (o.refuse || payload.unavailable.length) throw new Error('Native command refused: unavailable');
+    const revision = before.contentRevision + 1;
+    const layers = payload.layers.map((r, i) => ({ sourceId: r.sourceId, layerUid: 'native-layer:' + revision + ':' + i }));
+    const objects = payload.records.concat(payload.text || []).map((r, i) => ({ sourceId: r.sourceId, strokeId: 'native-item:' + i }));
+    const assets = (payload.sources || []).map((r, i) => ({ sourceId: r.sourceId, assetId: 'native-font:' + i }));
+    if (!o.noPublish) {
+      h.state.contentRevision = revision; h.state.documentSnapshotId = 'snapshot-' + revision;
+      payload.layers.forEach((r, i) => h.state.layers.push({ ...h.state.layers[0], layerUid: layers[i].layerUid, name: r.name }));
+    }
+    const result = { applied: true, historyEntriesAdded: 1, layers, objects, assets, skipped: payload.skipped };
+    if (o.tamper) o.tamper(result);
+    return { apiVersion: 2, requestId: 'controlled-figma-import', instanceId: before.instanceId, documentId: before.documentId,
+      contentRevision: revision, ok: true, result };
+  } });
+  const boundary = makePorts(h), core = coreModule.create(boundary.ports);
+  const adapter = load([], host).create({ paper: helper.port(paper, miniSvg), core, t: k => TEMPLATES.en[k],
+    // Explicit controlled readonly owner port; the production adapter never reads this legacy fixture object.
+    readCatalog: () => host.SMVectorText && host.SMVectorText.readCatalog(),
+    notify: m => notifications.push(m), resizeCanvas: async (w, hh) => { resized.push([w, hh]); return 'applied'; } });
+  return { h, calls, core, adapter, notifications, resized, selection: boundary.selection };
+}
+
+test('confirmed typography catalog maps real bundled and Google Text sources into one pinned batch', async () => {
+  const host = catalogHost({ 'Google:Poppins-Regular': { url: null, label: 'Poppins' } });
+  const f = textPort(host);
+  const result = await f.adapter.importFile(textCase([' DejaVu Sans ', 'Roboto', 'Poppins', 'Poppins']).json);
+  assert.equal(result.status, 'imported');
+  assert.equal(result.readback, 'confirmed');
+  assert.equal(result.historyEntriesAdded, 1);
+  assert.equal(f.calls.length, 1);
+  const payload = f.calls[0];
+  assert.equal(payload.documentSnapshotId, 'snapshot-7');
+  assert.equal(payload.lifecycleGeneration, 1);
+  assert.deepEqual(payload.sources.map(r => r.source), [
+    { kind: 'bundled', fontKey: 'DejaVuSans-Regular' }, { kind: 'bundled', fontKey: 'Roboto-Bold' },
+    { kind: 'google', family: 'Poppins', weight: 400, italic: false },
+  ]);
+  assert.deepEqual(payload.text.map(r => r.entry.block.font.assetId), ['figma:font:0', 'figma:font:1', 'figma:font:2', 'figma:font:2']);
+  assert.deepEqual(payload.text.map(r => r.sourceId), ['figma:0:text:0', 'figma:0:text:1', 'figma:0:text:2', 'figma:0:text:3']);
+  assert.deepEqual(result.report, { framesImported: 1, shapesImported: 0, textsImported: 4, imagesImported: 0, skipped: [] });
+  assert.equal(f.h.state.contentRevision, 8);
+});
+
+test('TextBlock preserves native color alpha, layout, frame-local anchors and missing bundled Bold fallback', async () => {
+  const flow = textCase(['Manrope']);
+  const node = flow.json.document.children[0].children[0].children[0];
+  node.style.fontWeight = 700; node.style.italic = true; node.style.textAlignHorizontal = 'RIGHT';
+  node.style.lineHeightPx = 36; node.style.letterSpacing = -0.75;
+  node.fills[0].color = { r: 0.1, g: 0.2, b: 0.3, a: 0.5 };
+  const f = textPort(catalogHost());
+  assert.equal((await f.adapter.importFile(flow.json)).status, 'imported');
+  assert.deepEqual(f.calls[0].sources[0].source, { kind: 'bundled', fontKey: 'Manrope-Regular' });
+  assert.deepEqual(f.calls[0].text[0].entry, {
+    target: { contextId: 'scene-root', frameScope: { kind: 'authored', frame: 0 }, layerUid: 'figma:0', strokeId: '' },
+    block: { text: 'Text 0', font: { kind: 'asset', assetId: 'figma:font:0' }, size: 18, color: '#1a334d80', align: 'right',
+      fixedWidth: 120, fixedHeight: null, bold: true, italic: true, underline: false, strike: false,
+      letterSpacing: -0.75, wordSpacing: 0, lineHeightMult: 2, textCase: 'none', anchorTopLeft: { x: 10, y: 20 } },
+  });
+});
+
+test('supported Text never converts unavailable image ingress into partial success and failed native fonts do not resize', async () => {
+  const host = catalogHost({ 'Google:Poppins-Regular': { url: null, label: 'Poppins' } });
+  const mixed = textPort(host);
+  const value = await mixed.adapter.importFile(flowOf('mixed-everything').json, flowOf('mixed-everything').opts);
+  assert.equal(value.status, 'unavailable');
+  assert.deepEqual(mixed.calls[0].unavailable, [{ sourceId: 'figma:0:image:0', need: 'raster-asset' }]);
+  assert.equal(mixed.calls[0].text.length, 1);
+  assert.equal(mixed.calls[0].records.length, 1);
+  assert.equal(mixed.h.state.contentRevision, 7);
+  assert.deepEqual(mixed.resized, []);
+  assert.equal(value.report.textsImported, 0);
+  const refused = textPort(host, { refuse: true });
+  assert.equal((await refused.adapter.importFile(textCase(['Poppins']).json)).status, 'unavailable');
+  assert.equal(refused.calls.length, 1);
+  assert.deepEqual(refused.resized, []);
+});
+
+test('native request bounds and receipt accounting protect Text/font publication without a second import', async () => {
+  const large = textPort(catalogHost());
+  const flow = textCase(['Roboto']);
+  flow.json.document.children[0].children[0].children[0].characters = 'x'.repeat(4096);
+  assert.equal((await large.adapter.importFile(flow.json)).status, 'too_large');
+  assert.equal(large.calls.length, 0);
+  const bad = textPort(catalogHost(), { tamper: result => result.assets.pop() });
+  const result = await bad.adapter.importFile(textCase(['Roboto']).json);
+  assert.equal(result.status, 'unconfirmed');
+  assert.equal(bad.calls.length, 1);
+  assert.deepEqual(bad.resized, []);
+});
+
+
+test('default family and Google Bold use baseline actual weights without individual font loading', async () => {
+  const host = catalogHost({ 'Google:Poppins-Regular': { url: null, label: 'Poppins' } });
+  const f = textPort(host);
+  const result = await f.adapter.importFile(textCase(['', 'Poppins', 'Inter']).json);
+  assert.equal(result.status, 'imported');
+  assert.deepEqual(f.calls[0].sources.map(r => r.source), [
+    { kind: 'bundled', fontKey: 'Roboto-Regular' }, { kind: 'google', family: 'Poppins', weight: 700, italic: false },
+    { kind: 'bundled', fontKey: 'Inter-Regular' },
+  ]);
+  assert.equal(f.calls[0].text[1].entry.block.bold, true);
+});
+
+test('unconfirmed family is explicit unavailable; catalog registration is read at call time', async () => {
+  const host = {}, f = textPort(host);
+  assert.equal((await f.adapter.importFile(textCase(['Roboto']).json)).status, 'unavailable');
+  host.SMVectorText = catalogHost().SMVectorText;
+  assert.equal((await f.adapter.importFile(textCase(['Roboto']).json)).status, 'imported');
+  const unknown = textPort(host);
+  assert.equal((await unknown.adapter.importFile(textCase(['Unconfirmed paid family']).json)).status, 'unavailable');
+  assert.deepEqual(unknown.calls[0].unavailable, [
+    { sourceId: 'figma:0:text:0', need: 'text' }, { sourceId: 'figma:0:font:0', need: 'font' },
+  ]);
+  assert.equal(Object.hasOwn(unknown.calls[0], 'sources'), false);
+  assert.equal(unknown.h.state.contentRevision, 7);
+  assert.deepEqual(unknown.resized, []);
+});
+
+
+// Controlled existing Tauri readonly reply: no font admission or asset publication.
+function readonlyHost(reply) {
+  const host = catalogHost(), lookups = [];
+  host.atob = globalThis.atob;
+  host.opentype = require('../src/js/opentype.min.js');
+  host.__TAURI__ = { core: { invoke: async (command, args) => {
+    assert.equal(command, 'fetch_google_font');
+    lookups.push(structuredClone(args));
+    return reply ? reply(args) : fs.readFileSync(path.join(__dirname, '..', 'src/fonts/Roboto-Regular.ttf')).toString('base64');
+  } } };
+  return { host, lookups };
+}
+
+test('readonly Regular discovery is deduplicated per import; Bold remains an authoritative 700 batch source', async () => {
+  const f = readonlyHost(), catalog = JSON.stringify(f.host.SMVectorText.VECTOR_FONTS), p = textPort(f.host);
+  const flow = textCase(['Poppins', 'Poppins', 'Poppins']);
+  const first = await p.adapter.importFile(flow.json);
+  assert.equal(first.status, 'imported');
+  assert.deepEqual(f.lookups, [{ family: 'Poppins', weight: 400, italic: false }]);
+  assert.deepEqual(p.calls[0].sources.map(r => r.source), [
+    { kind: 'google', family: 'Poppins', weight: 400, italic: false },
+    { kind: 'google', family: 'Poppins', weight: 700, italic: false },
+  ]);
+  assert.deepEqual(p.calls[0].text.map(r => r.entry.block.font.assetId), ['figma:font:0', 'figma:font:1', 'figma:font:0']);
+  assert.equal(p.calls.length, 1);
+  assert.equal(JSON.stringify(f.host.SMVectorText.VECTOR_FONTS), catalog, 'readonly discovery never registers a font');
+  assert.equal((await p.adapter.importFile(flow.json)).status, 'imported');
+  assert.equal(f.lookups.length, 2, 'each new import has its own bounded discovery intent');
+});
+
+test('failed paid-family discovery preserves exact warning, loose match, default and actual Bold fallback', async () => {
+  const f = readonlyHost(() => { throw new Error('controlled source unavailable'); }), p = textPort(f.host);
+  const result = await p.adapter.importFile(textCase(['Roboto Alternate', 'Paid Family', 'Roboto Alternate']).json);
+  assert.equal(result.status, 'imported');
+  assert.deepEqual(f.lookups, [
+    { family: 'Roboto Alternate', weight: 400, italic: false }, { family: 'Paid Family', weight: 400, italic: false },
+  ]);
+  assert.deepEqual(result.report.skipped, ['Roboto Alternate', 'Paid Family', 'Roboto Alternate'].map(family =>
+    'Police "' + family + '" introuvable sur Google Fonts — police de repli utilisée'));
+  assert.deepEqual(p.calls[0].sources.map(r => r.source), [
+    { kind: 'bundled', fontKey: 'Roboto-Regular' }, { kind: 'bundled', fontKey: 'Roboto-Bold' },
+  ]);
+  assert.equal(result.report.textsImported, 3);
+  assert.equal(p.calls.length, 1);
+});
+
+test('readonly success does not admit bytes or retry a refused authoritative batch with another font', async () => {
+  const f = readonlyHost(), p = textPort(f.host, { refuse: true });
+  const result = await p.adapter.importFile(textCase(['Unregistered Google Family']).json);
+  assert.equal(result.status, 'unavailable');
+  assert.equal(f.lookups.length, 1);
+  assert.equal(p.calls.length, 1);
+  assert.deepEqual(p.calls[0].sources[0].source, { kind: 'google', family: 'Unregistered Google Family', weight: 400, italic: false });
+  assert.equal(p.h.state.contentRevision, 7);
+  assert.deepEqual(p.resized, []);
+});
+
+test('disposal or native owner, revision, frame and selection drift during readonly discovery sends no batch', async () => {
+  for (const change of [p => p.core.dispose(), p => { p.h.state.documentId = 'replacement'; },
+    p => { p.h.state.lifecycleGeneration++; }, p => { p.h.state.contentRevision++; p.h.state.documentSnapshotId = 'changed'; },
+    p => { p.h.frame.value++; }, p => { p.selection.value = []; }]) {
+    let release, started;
+    const entered = new Promise(resolve => { started = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    const f = readonlyHost(() => { started(); return gate; }), p = textPort(f.host);
+    const pending = p.adapter.importFile(textCase(['Poppins']).json);
+    await entered;
+    change(p); release('controlled nonempty readonly response');
+    const result = await pending;
+    assert.ok(['unavailable', 'stale'].includes(result.status));
+    assert.equal(p.calls.length, 0);
+    assert.deepEqual(p.resized, []);
+    assert.deepEqual(result.report.skipped, [], 'owner drift is not a font failure or fallback warning');
+  }
+});
+
+
+test('malformed base64 and parsed font failure preserve original fallback without registering a family', async () => {
+  for (const response of ['%%%%', Buffer.from('<html>not a font</html>').toString('base64'), Buffer.from([0, 1, 2]).toString('base64')]) {
+    const f = readonlyHost(() => response), before = JSON.stringify(f.host.SMVectorText.VECTOR_FONTS), p = textPort(f.host);
+    const result = await p.adapter.importFile(textCase(['Paid Family']).json);
+    assert.equal(result.status, 'imported');
+    assert.equal(f.lookups.length, 1);
+    assert.deepEqual(p.calls[0].sources[0].source, { kind: 'bundled', fontKey: 'Roboto-Regular' });
+    assert.deepEqual(result.report.skipped, ['Police "Paid Family" introuvable sur Google Fonts — police de repli utilisée']);
+    assert.equal(JSON.stringify(f.host.SMVectorText.VECTOR_FONTS), before);
+  }
+});
+
+test('readonly font decode refuses oversize transport before allocation or parser use', async () => {
+  const f = readonlyHost(() => 'A'.repeat(Math.ceil(16 * 1024 * 1024 / 3) * 4 + 4));
+  let decoded = 0;
+  f.host.atob = () => { decoded++; assert.fail('oversize response must not decode'); };
+  const p = textPort(f.host), result = await p.adapter.importFile(textCase(['Paid Family']).json);
+  assert.equal(result.status, 'imported');
+  assert.equal(decoded, 0);
+  assert.deepEqual(p.calls[0].sources[0].source, { kind: 'bundled', fontKey: 'Roboto-Regular' });
 });

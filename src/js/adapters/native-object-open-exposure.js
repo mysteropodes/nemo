@@ -31,8 +31,12 @@
     var result={mode:mode,cameraAvailable:available,documentToComposition:forward,compositionToDocument:inverse};if(navigationValue!==undefined)result.navigation=actual;return result;
   }
   // The existing session owns desired presentation only. No geometry/camera keys live here.
-  function navigation(readMode){
+  function navigation(readMode,observe){
     var owner=null,mode=null,desired=nav(),gesture=null;
+    function observedBegin(kind,code){
+      var tag=kind==='pan'?'pan':kind==='zoom'?'zoom':'other';
+      try{if(typeof observe==='function')observe('navigation-begin',tag+':'+code);}catch(_){}
+    }
     function identity(info){return JSON.stringify([info.instanceId,info.documentId,info.lifecycleGeneration]);}
     function read(info){var next=viewMode(readMode),key=identity(info);
       if(owner!==key||mode!==next){owner=key;mode=next;desired=nav();gesture=null;}
@@ -41,19 +45,26 @@
     function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation);}catch(_){return false;}}
     function begin(p,info,frame,mapping,shownBounds,kind,point){
       var selected=read(info),b=mapping&&mapping.cssBounds;
-      if(!p||p.frame!==frame||p.view.mode!==selected.mode||!b||!shownBounds||!['x','y','width','height'].every(function(k){return Number.isFinite(b[k])&&b[k]===shownBounds[k];})||b.width<=0||b.height<=0||!['pan','zoom'].includes(kind))return null;
+      if(!p||p.frame!==frame||p.view.mode!==selected.mode||!b||!shownBounds||!['x','y','width','height'].every(function(k){return Number.isFinite(b[k])&&b[k]===shownBounds[k];})||b.width<=0||b.height<=0||!['pan','zoom'].includes(kind)){
+        observedBegin(kind,'view-refused');return null;
+      }
       var actual=nav(p.view.navigation),inverse=p.view.compositionToDocument,forward=p.view.documentToComposition;
       if(![inverse,forward].every(function(m){return Array.isArray(m)&&m.length===6&&m.every(Number.isFinite);}))return null;
       var cx=info.canvasW/2,cy=info.canvasH/2,r=actual.zoom/desired.zoom,shift=[desired.pan[0]-actual.pan[0],desired.pan[1]-actual.pan[1]];
       var m=[inverse[0]*r,inverse[1]*r,inverse[2]*r,inverse[3]*r,
         inverse[4]+(inverse[0]*cx+inverse[2]*cy)*(1-r)+shift[0],inverse[5]+(inverse[1]*cx+inverse[3]*cy)*(1-r)+shift[1]];
       var scale=Math.hypot(forward[0]*b.width/info.canvasW,forward[1]*b.height/info.canvasH)/actual.zoom;
-      if(!Number.isFinite(scale)||scale<=0||!m.every(Number.isFinite))return null;
+      if(!Number.isFinite(scale)||scale<=0||!m.every(Number.isFinite)){
+        observedBegin(kind,'view-refused');return null;
+      }
       point=point||{x:b.x+b.width/2,y:b.y+b.height/2};
-      if(![point.x,point.y].every(Number.isFinite))return null;
+      if(![point.x,point.y].every(Number.isFinite)){
+        observedBegin(kind,'view-refused');return null;
+      }
       gesture={source:[info.instanceId,info.documentId,info.contentRevision,info.documentSnapshotId,info.lifecycleGeneration],frame:frame,mode:mode,
         kind:kind,bounds:{x:b.x,y:b.y,width:b.width,height:b.height},canvas:[info.canvasW,info.canvasH],inverse:m,start:{x:point.x,y:point.y},base:nav(desired),scale:scale};
-      [gesture.source,gesture.bounds,gesture.canvas,gesture.inverse,gesture.start,gesture.base.pan,gesture.base,gesture].forEach(Object.freeze);return gesture;
+      [gesture.source,gesture.bounds,gesture.canvas,gesture.inverse,gesture.start,gesture.base.pan,gesture.base,gesture].forEach(Object.freeze);
+      observedBegin(kind,'admitted');return gesture;
     }
     function update(token,info,frame,mapping,point,factor,target){
       read(info);

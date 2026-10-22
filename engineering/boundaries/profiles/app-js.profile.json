@@ -2416,6 +2416,18 @@
       ]
     },
     {
+      "id": "app.native.import.png.stage.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-png-stage.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-png-stage.js"
+      ]
+    },
+    {
       "id": "app.native.import.svg",
       "layer": "application",
       "dir": "src/js/adapters",
@@ -2425,6 +2437,30 @@
       "sizeProfile": "Domain/application",
       "publicApi": [
         "native-import-svg.js"
+      ]
+    },
+    {
+      "id": "app.native.import.figma.plan",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-figma-plan.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-figma-plan.js"
+      ]
+    },
+    {
+      "id": "app.native.import.png.provider",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-png-provider.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-png-provider.js"
       ]
     },
     {

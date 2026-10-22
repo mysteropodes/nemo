@@ -189,3 +189,165 @@ test('import receipts cannot drop, duplicate or substitute declared mappings or 
     const r=structuredClone(complete);mutate(r);contract.result(OP,r);assert.throws(()=>contract.correlate(withRecords,reply(r)),/declared batch/);
   }
 });
+
+// Additional families use the same native command; fixtures describe retained lookup, not byte providers.
+function itemExamples() {
+  return JSON.parse(fs.readFileSync(path.join(__dirname, '../engineering/application/capabilities-v2/native-object-import.json'), 'utf8')).examples.slice(1, 4);
+}
+function familyPayload() {
+  const examples = itemExamples();
+  return { ...structuredClone(examples[0].request.payload),
+    assets: examples.slice(0, 2).flatMap(e => structuredClone(e.request.payload.assets)),
+    text: structuredClone(examples[1].request.payload.text) };
+}
+function changedFamily(change) {
+  const payload = familyPayload();
+  change(payload);
+  return payload;
+}
+
+test('retained image, retained font and bundled Text examples use the actual shared application contract', () => {
+  const application = require('../src/js/adapters/native-application.js');
+  assert.equal(itemExamples().length, 3);
+  for (const example of itemExamples()) {
+    ok(example.request.payload);
+    assert.doesNotThrow(() => application.validateRequest(example.request));
+    assert.doesNotThrow(() => contract.result(OP, example.response.result));
+    assert.doesNotThrow(() => contract.correlate(example.request, example.response));
+  }
+  ok({ command: 'object.import.batch', layers: [], records: [], assets: [], raster: [], text: [] });
+  const oversized = structuredClone(itemExamples()[2].request);
+  oversized.payload.text[0].entry.block.text = 'x'.repeat(4096);
+  assert.throws(() => application.validateRequest(oversized), /byte|bound|4096|large/i);
+});
+
+test('asset descriptors cannot forge retained records, locators, bytes or provider provenance', () => {
+  for (const key of ['bytes', 'record', 'source', 'path', 'mediaType', 'hasFontAdmission']) {
+    bad(changedFamily(p => { p.assets[0][key] = 'forged'; }), /missing or unknown/, key);
+  }
+  for (const key of ['assets', 'raster', 'text']) bad(changedFamily(p => { p[key] = null; }));
+  for (const value of ['', ' ', '\u0085', 'a\u0000b', 'é'.repeat(128), {}]) {
+    bad(changedFamily(p => { p.assets[0].assetId = value; }));
+  }
+  bad(changedFamily(p => { p.assets[1].sourceId = p.assets[0].sourceId; }), /repeats/);
+  bad(changedFamily(p => { p.skipped = [{ kind: 'asset', sourceId: p.assets[0].sourceId, reason: 'skip' }]; }), /repeats/);
+  bad(changedFamily(p => { p.text[0].sourceId = p.raster[0].sourceId; }), /repeats/);
+  bad(changedFamily(p => { p.skipped = [{ kind: 'element', sourceId: p.text[0].sourceId, reason: 'skip' }]; }), /repeats/);
+  ok(changedFamily(p => { p.raster[0].entry.target.contextId = 'component:import'; }));
+});
+
+test('RasterItem and TextBlock preserve presence and refuse invalid native fields before dispatch', () => {
+  const raster = (key, value) => changedFamily(p => { p.raster[0].entry.item[key] = value; });
+  for (const [key, value] of [['width', 0], ['height', -1], ['opacity', 1.1], ['rotation', NaN], ['isBitmapBrush', null], ['brushGroupId', ''], ['meshId', 'x'.repeat(256)], ['url', 'file:///x']]) bad(raster(key, value), undefined, key);
+  ok(raster('brushGroupId', ' '));
+  const text = (key, value) => changedFamily(p => { p.text[0].entry.block[key] = value; });
+  for (const [key, value] of [['text', ' \ufeff'], ['text', 'a\u0000b'], ['text', '\ud800'], ['size', 0], ['fixedWidth', 0], ['fixedHeight', -2], ['lineHeightMult', 0], ['bold', null], ['textCase', 'title'], ['textOverflow', false], ['color', 'red']]) bad(text(key, value), undefined, key);
+  ok(text('text', '\u0085'));
+  ok(text('fixedWidth', null));
+  ok(text('bold', false));
+  ok(text('wordSpacing', 0));
+  bad(text('font', { kind: 'bundled', fontKey: 'vector:Roboto-Regular' }));
+  bad(text('font', { kind: 'asset', assetId: 'font-source', bytes: 'forged' }));
+  for (const key of ['raster', 'text']) {
+    bad(changedFamily(p => { p[key][0].entry.extra = true; }));
+    bad(changedFamily(p => { p[key][0].entry.target.strokeId = 'chosen'; }));
+    bad(changedFamily(p => { p[key][0].entry.target.frameScope.kind = 'reference'; }));
+  }
+});
+
+test('all item and asset mappings are required and correlated without relaxing legacy receipts', () => {
+  const payload = familyPayload();
+  const request = { ...itemExamples()[0].request, payload };
+  const result = { applied: true, historyEntriesAdded: 1, layers: [], skipped: [],
+    objects: [{ sourceId: 'raster-source', strokeId: 'native-raster' }, { sourceId: 'text-source', strokeId: 'native-text' }],
+    assets: [{ sourceId: 'image-source', assetId: 'native-image' }, { sourceId: 'font-source', assetId: 'native-font' }] };
+  const reply = value => ({ ...itemExamples()[0].response, result: value });
+  assert.doesNotThrow(() => contract.correlate(request, reply(result)));
+  for (const mutate of [r => { delete r.assets; }, r => r.assets.pop(), r => { r.assets[1].sourceId = 'image-source'; }, r => { r.assets[1].assetId = 'native-image'; }, r => { r.assets[0].sourceId = 'foreign'; }, r => r.objects.pop(), r => { r.objects[1].strokeId = 'native-raster'; }]) {
+    const badResult = structuredClone(result);
+    mutate(badResult);
+    contract.result(OP, badResult);
+    assert.throws(() => contract.correlate(request, reply(badResult)), /declared batch/);
+  }
+  const assetsOnly = { ...request, payload: { command: 'object.import.batch', layers: [], records: [], assets: payload.assets } };
+  assert.doesNotThrow(() => contract.correlate(assetsOnly, reply({ ...result, objects: [] })));
+  assert.throws(() => contract.correlate(request, reply({ applied: false, historyEntriesAdded: 0, layers: [], objects: [], assets: [], skipped: [] })), /revision mismatch|declared batch/);
+  assert.throws(() => contract.result(OP, { ...result, assets: null }));
+  const oversized = { ...result, assets: Array.from({ length: 70 }, (_, i) => ({ sourceId: `s${i}`, assetId: `native-asset:${i}` })) };
+  assert.throws(() => contract.result(OP, oversized), /exceeds its bound/);
+});
+
+function sourceExamples() {
+  return JSON.parse(fs.readFileSync(path.join(__dirname, '../engineering/application/capabilities-v2/native-object-import.json'), 'utf8')).examples.slice(4);
+}
+
+test('only actual file, bundled and Google source descriptors enter the same pinned batch', () => {
+  const application = require('../src/js/adapters/native-application.js');
+  assert.equal(sourceExamples().length, 3);
+  for (const example of sourceExamples()) {
+    assert.doesNotThrow(() => application.validateRequest(example.request));
+    assert.doesNotThrow(() => contract.correlate(example.request, example.response));
+    for (const key of ['documentSnapshotId', 'lifecycleGeneration']) {
+      const copy = structuredClone(example.request.payload);
+      delete copy[key];
+      bad(copy);
+    }
+  }
+  const base = sourceExamples()[0].request.payload;
+  for (const [key, value] of [['sources', []], ['sources', null], ['documentSnapshotId', 'bad snapshot'], ['lifecycleGeneration', 0], ['lifecycleGeneration', 1.5]]) bad({ ...structuredClone(base), [key]: value });
+  for (const key of ['documentSnapshotId', 'lifecycleGeneration']) bad({ command: contract.COMMAND, layers: [], records: [], [key]: base[key] });
+  for (const change of [p => { p.sources[0].bytes = []; }, p => { p.sources[0].source.bytes = []; }, p => { p.sources[0].source = { kind: 'url', url: 'https://example.invalid/a.png' }; }, p => { p.sources[0].source.path = 'relative.png'; }, p => { p.sources[0].source.path = 'file:///a.png'; }, p => { p.sources[0].mediaType = 'image/jpeg'; }, p => { p.sources[0].name = ' '; }, p => { p.sources[0].name = 'x'.repeat(256); }]) {
+    const copy = structuredClone(base);
+    change(copy);
+    bad(copy);
+  }
+  const google = structuredClone(sourceExamples()[2].request.payload);
+  for (const [key, value] of [['weight', 0], ['weight', 1001], ['weight', 1.5], ['italic', null], ['family', ' '], ['url', 'https://example.invalid']]) {
+    const copy = structuredClone(google);
+    copy.sources[0].source[key] = value;
+    bad(copy);
+  }
+  bad({ ...structuredClone(base), sources: Array.from({ length: 1025 }, (_, i) => ({ ...base.sources[0], sourceId: `source:${i}` })) });
+});
+
+test('retained assets, source assets and skips share one ID space and complete receipts', () => {
+  const example = structuredClone(sourceExamples()[0]);
+  const payload = example.request.payload;
+  payload.assets = [{ sourceId: 'retained-source', assetId: 'retained-image' }];
+  example.response.result.assets.unshift({ sourceId: 'retained-source', assetId: 'native-asset:8:1' });
+  assert.doesNotThrow(() => contract.correlate(example.request, example.response));
+  bad({ ...payload, assets: [{ sourceId: 'image-source', assetId: 'retained-image' }] });
+  bad({ ...payload, skipped: [{ kind: 'asset', sourceId: 'image-source', reason: 'skip' }] });
+  for (const change of [r => r.assets.reverse(), r => r.assets.pop(), r => { r.assets[1].sourceId = 'retained-source'; }, r => { r.assets[1].assetId = r.assets[0].assetId; }, r => { r.applied = false; r.historyEntriesAdded = 0; }]) {
+    const copy = structuredClone(example.response);
+    change(copy.result);
+    assert.throws(() => contract.correlate(example.request, copy));
+  }
+  assert.doesNotThrow(() => contract.correlate(sourceExamples()[2].request, sourceExamples()[2].response));
+});
+
+
+test('objectOrder is an exact new-object permutation and never changes canonical receipt order', () => {
+  const payload = familyPayload();
+  payload.records = [{ sourceId: 'vector-source', record: record('L0', 0) }];
+  const order = ['text-source', 'vector-source', 'raster-source'];
+  ok(payload);
+  ok({ ...payload, objectOrder: order });
+  for (const value of [null, {}, 'text-source', [null], [], order.slice(1), [...order, 'extra'],
+    ['text-source', 'text-source', 'raster-source'], ['image-source', ...order.slice(1)],
+    ['L0', ...order.slice(1)], ['existing-origin', ...order.slice(1)]]) {
+    bad({ ...payload, objectOrder: value });
+  }
+  ok({ command: contract.COMMAND, layers: [], records: [], objectOrder: [] });
+  const example = structuredClone(itemExamples()[0]);
+  example.request.payload = { ...payload, objectOrder: order };
+  example.response.result = { applied: true, historyEntriesAdded: 1, layers: [], skipped: [],
+    objects: ['vector-source', 'raster-source', 'text-source'].map((sourceId, i) => ({ sourceId, strokeId: `object:${i}` })),
+    assets: ['image-source', 'font-source'].map((sourceId, i) => ({ sourceId, assetId: `asset:${i}` })) };
+  assert.doesNotThrow(() => contract.correlate(example.request, example.response));
+  const reordered = structuredClone(example.response);
+  reordered.result.objects.reverse();
+  assert.throws(() => contract.correlate(example.request, reordered));
+  example.request.payload.objectOrder.reverse();
+  assert.doesNotThrow(() => contract.correlate(example.request, example.response));
+});

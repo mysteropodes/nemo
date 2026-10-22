@@ -10,6 +10,18 @@ impl RevisionSync {
         external: bool,
         object_client: bool,
     ) -> Result<Delivery, String> {
+        if is_import_batch_sources(&request) {
+            return self
+                .dispatch_import_batch_step(
+                    instance,
+                    native,
+                    request,
+                    external,
+                    object_client,
+                    ImportBatchPhase::Probe,
+                )?
+                .ok_or_else(|| "import batch sources require async application dispatch".into());
+        }
         self.dispatch_font_step(
             instance,
             native,
@@ -86,7 +98,8 @@ impl RevisionSync {
         };
         let application = authority.active_mut(generation)?;
         if (request.operation == crate::application_mcp::font_source::IMPORT
-            || is_image_import(&request))
+            || is_image_import(&request)
+            || is_import_batch_sources(&request))
             && request
                 .payload
                 .get("lifecycleGeneration")
@@ -98,7 +111,9 @@ impl RevisionSync {
                     &request,
                     instance,
                     application.content_revision(),
-                    if is_image_import(&request) {
+                    if is_import_batch_sources(&request) {
+                        "native import batch lifecycle generation is stale"
+                    } else if is_image_import(&request) {
                         "native image lifecycle generation is stale"
                     } else {
                         "native font lifecycle generation is stale"
@@ -205,6 +220,12 @@ impl RevisionSync {
                 Some(response) => response,
                 None => return Ok(None),
             },
+            ResourcePhase::ImportBatch(phase) => {
+                match invoke_import_batch(application, &request, phase)? {
+                    Some(response) => response,
+                    None => return Ok(None),
+                }
+            }
             ResourcePhase::Regular => invoke_dispatch(application, &request)?,
         };
         let after = application.content_revision();
@@ -370,3 +391,7 @@ mod custom_brush_tests;
 #[cfg(test)]
 #[path = "native_comments_dispatch_tests.rs"]
 mod comments_tests;
+
+#[cfg(test)]
+#[path = "native_import_batch_dispatch_tests.rs"]
+mod import_batch_tests;

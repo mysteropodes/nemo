@@ -38,6 +38,15 @@
     "functions": 96.55
   },
   "files": {
+    "nemo-mcp/src/native_import_asset_contract.rs": {
+      "lines": 99.03,
+      "regions": 98.37,
+      "functions": 100
+    },
+    "nemo-mcp/src/native_import_asset_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report"
+    },
     "nemo-mcp/src/native_contract_tests.rs": {
       "noRegions": true,
       "reason": "no executable regions in the coverage report",

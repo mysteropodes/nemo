@@ -2,6 +2,8 @@
 
 #[path = "object_history.rs"]
 mod object_history;
+#[cfg(feature = "project_media_codec")]
+pub use object_history::object_shot_kernels::native_import_transaction::session::ImportAssetSource;
 pub use object_history::NativeObjectHistory;
 #[cfg(feature = "project_media_codec")]
 pub use object_history::{InactiveProject, PreparedProjectReplacement};

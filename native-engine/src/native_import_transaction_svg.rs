@@ -310,5 +310,6 @@ pub(crate) fn svg_plan_batch(
         records,
         skipped,
         unavailable: Vec::new(),
+        ..ImportBatch::default()
     })
 }
