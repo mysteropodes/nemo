@@ -1318,6 +1318,7 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
 #layer-ctrls{display:flex;align-items:center;gap:6px;}
 #layer-ctrls button{width:24px;height:24px;background:var(--panel3);border:none;color:rgba(236,234,231,.55);cursor:pointer;padding:2px;border-radius:7px;display:flex;align-items:center;justify-content:center;}
 #layer-ctrls button:hover{background:#2c2a31;color:var(--text);}
+#layer-ctrls #btn-camera[aria-pressed="true"]{background:var(--accent-dim);color:var(--accent-hover);}
 #layer-ctrls .material-symbols-rounded{font-size:13px;}
 #layer-ctrls svg{width:13px;height:13px;display:block;}
 /* Motion header uses the existing 42px alignment band: no extra left-only
