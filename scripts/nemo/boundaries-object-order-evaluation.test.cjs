@@ -59,11 +59,21 @@ test('private numeric producer cannot take writable history or render/applicatio
 // The helper's narrow input is the scalability boundary: no document object
 // slice/snapshot is available while resolving each ordered element.
 function indexedLookup(candidate) {
-  assert.equal((candidate.match(/\.objects\(\)/g) || []).length, 1);
   const helper = candidate.slice(candidate.indexOf('fn elements('), candidate.indexOf('pub(crate) fn prepare('));
   assert.doesNotMatch(helper, /ObjectSnapshot|ObjectRecord|\.objects\(|\.position\(/);
   assert.match(helper, /sources:[\s\S]*SourceIndices/);
   assert.match(helper, /sources[\s\S]*\.get\(/);
+  const indexed = candidate.slice(candidate.indexOf('pub(super) fn prepare_context_with_resolver'),
+    candidate.indexOf('fn natural_component('));
+  assert.equal((indexed.match(/\.objects\(\)/g) || []).length, 1);
+  assert.match(indexed, /let records = selected\.objects\(\);/);
+  assert.equal((indexed.match(/records\.iter\(\)/g) || []).length, 1);
+  const natural = candidate.slice(candidate.indexOf('fn natural_component('));
+  assert.equal((natural.match(/\.objects\(\)/g) || []).length, 1);
+  assert.match(natural, /for \(source_object_index, record\) in context\.objects\(\)\.iter\(\)\.enumerate\(\)/);
+  const layers = natural.slice(natural.indexOf('let layers = context'));
+  assert.doesNotMatch(layers, /\.objects\(|\.position\(/);
+  assert.match(layers, /std::mem::take\(&mut layer_elements\[index\]\)/);
 }
 
 test('element lookup cannot regress to a document scan per element', () => {
@@ -73,5 +83,8 @@ test('element lookup cannot regress to a document scan per element', () => {
     'snapshot: &ObjectSnapshot, sources: &SourceIndices')), assert.AssertionError);
   assert.throws(() => indexedLookup(producer.replace('let index = sources',
     'let index = snapshot.document().objects().iter().position(|_| true); let index = sources')),
+  assert.AssertionError);
+  assert.throws(() => indexedLookup(producer.replace('let elements = std::mem::take',
+    'let _rescan = context.objects().iter().filter(|_| true).count(); let elements = std::mem::take')),
   assert.AssertionError);
 });

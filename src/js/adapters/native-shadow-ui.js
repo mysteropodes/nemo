@@ -10,7 +10,7 @@
   function install(root) {
     if (installed.has(root)) return installed.get(root);
     var retired = false, pending = false, loading = null, refreshNeeded = false, epoch = 0, busyStamp = null;
-    var armIntentGeneration = 0;
+    var armIntentGeneration = 0, failedRead = null;
     var keys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
     function native() { return !!(root.__TAURI__ && root.__TAURI__.core); }
     function current() { return root.NemoNativeObjectProject && root.NemoNativeObjectProject.desktop(root); }
@@ -47,12 +47,27 @@
       return !stamp || stamp.session !== next.session || stamp.epoch !== next.epoch || stamp.ticket !== next.ticket ||
         keys.some(function (key) { return stamp.pin[key] !== next.pin[key]; });
     }
+    function sameReadOwner(stamp) {
+      try {
+        var next = identity();
+        return !retired && !pending && !!next && !changed(stamp, next) && available(next.session, next.info);
+      } catch (_) { return false; }
+    }
+    function readStamp() {
+      var stamp = identity(), shown;
+      if (!stamp || !available(stamp.session, stamp.info)) return null;
+      shown = stamp.session.readPresentedObjectSession();
+      var p = shown && shown.presentation;
+      if (!p || p.owner !== 'native' || p.status !== 'presented' ||
+          !keys.every(function (key) { return shown[key] === stamp.pin[key] && p[key] === stamp.pin[key]; })) return null;
+      stamp.presentation = p; return stamp;
+    }
     function busy() { return retired || pending || !!loading; }
     function shown(origin) { return !busy() && !!origin && model.read() === origin; }
     function settled() {
       busyStamp = null;
       var refresh = refreshNeeded; refreshNeeded = false; repaint();
-      if (refresh && !retired && !model.read()) presented();
+      if (refresh && !retired) presented();
     }
     async function edit(action, origin) {
       if (!shown(origin)) { disarm(); notice(); return { status: 'unavailable' }; }
@@ -79,9 +94,20 @@
         if (next && changed(busyStamp, next) && available(next.session, next.info)) refreshNeeded = true;
         return loading || Promise.resolve(null);
       }
-      if (model.read()) return Promise.resolve(model.read());
-      busyStamp = identity();
-      loading = model.refresh().catch(function () { disarm(); return null; })
+      var stamp;
+      try { stamp = readStamp(); } catch (_) {}
+      // Busy admission leaves both the sealed model and prior attempt unchanged.
+      if (!stamp) return Promise.resolve(null);
+      var value = model.read(); if (value) return Promise.resolve(value);
+      if (failedRead && sameReadOwner(failedRead) && failedRead.presentation === stamp.presentation) return Promise.resolve(null);
+      failedRead = null; busyStamp = stamp;
+      loading = model.refresh().then(function (value) {
+        if (sameReadOwner(stamp)) failedRead = null;
+        return value;
+      }).catch(function () {
+        try { if (sameReadOwner(stamp)) failedRead = stamp; } catch (_) {}
+        disarm(); return null;
+      })
         .finally(function () { loading = null; settled(); });
       repaint(); return loading;
     }
@@ -101,14 +127,14 @@
     if (checkbox && typeof checkbox.addEventListener === 'function') checkbox.addEventListener('change', checkboxChange, true);
     function dispose() {
       if (retired) return;
-      retired = true; armIntentGeneration++; refreshNeeded = false; cancel(); model.dispose();
+      retired = true; armIntentGeneration++; refreshNeeded = false; failedRead = null; cancel(); model.dispose();
       if (checkbox && typeof checkbox.removeEventListener === 'function') checkbox.removeEventListener('change', checkboxChange, true);
       if (typeof root.removeEventListener === 'function') root.removeEventListener('pagehide', dispose);
       repaint();
     }
     var controller = Object.freeze({ read: model.read, edit: edit, off: off, presented: presented,
       isPending: function () { return pending || !!loading; },
-      willProject: function () { epoch++; cancel(); if (!pending) model.invalidate(); repaint(); }, dispose: dispose });
+      willProject: function () { epoch++; failedRead = null; cancel(); if (!pending) model.invalidate(); repaint(); }, dispose: dispose });
     installed.set(root, controller); root.NemoNativeShadowController = controller;
     if (typeof root.addEventListener === 'function') root.addEventListener('pagehide', dispose, { once: true });
     return controller;
