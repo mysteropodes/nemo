@@ -18,6 +18,8 @@ const MODULES = {
   'native-import-contract.js': ['domain', 400], 'native-import-seam.js': ['domain', 400], 'native-import-core.js': ['application', 400],
   'native-import-svg.js': ['application', 400], 'native-import-figma.js': ['adapters', 500], 'native-import-drop.js': ['adapters', 500],
   'native-import-psd.js': ['adapters', 500], 'native-import-montage.js': ['adapters', 500], 'native-import-desktop.js': ['adapters', 500],
+  'native-import-png-stage.js': ['adapters', 500], 'native-import-figma-plan.js': ['application', 400],
+  'native-import-png-provider.js': ['application', 400], 'font-assets.js': ['adapters', 500],
 };
 const ALLOWED = { domain: ['domain'], application: ['domain'], adapters: ['application', 'domain'] };
 const cap = JSON.parse(read('engineering/application/capabilities-v2/native-object-import.json'));
@@ -78,10 +80,14 @@ test('loaded as classic scripts in index.html order every file defines its globa
   };
   win.window = win; win.globalThis = win;
   vm.createContext(win);
-  const order = ['native-import-contract.js', 'native-import-seam.js', 'native-import-core.js', 'native-import-svg.js', 'native-import-drop.js', 'native-import-figma.js', 'native-import-psd.js', 'native-import-montage.js'];
+  const order = ['font-assets.js', 'native-import-contract.js', 'native-import-seam.js', 'native-import-core.js',
+    'native-import-png-stage.js', 'native-import-svg.js', 'native-import-drop.js', 'native-import-figma-plan.js',
+    'native-import-figma.js', 'native-import-psd.js', 'native-import-montage.js', 'native-import-png-provider.js'];
   win.NemoNativeFontContract = require('../src/js/adapters/native-font-contract.js');
   const globals = { 'native-import-contract.js': 'NemoNativeImportContract', 'native-import-seam.js': 'NemoNativeImportSeam', 'native-import-core.js': 'NemoNativeImportCore', 'native-import-svg.js': 'NemoNativeImportSvg',
-    'native-import-drop.js': 'NemoNativeImportDrop', 'native-import-figma.js': 'NemoNativeImportFigma', 'native-import-psd.js': 'NemoNativeImportPsd', 'native-import-montage.js': 'NemoNativeImportMontage' };
+    'native-import-drop.js': 'NemoNativeImportDrop', 'native-import-figma.js': 'NemoNativeImportFigma', 'native-import-psd.js': 'NemoNativeImportPsd', 'native-import-montage.js': 'NemoNativeImportMontage',
+    'font-assets.js': 'NemoFontAssets', 'native-import-png-stage.js': 'NemoNativeImportPngStage',
+    'native-import-figma-plan.js': 'NemoNativeImportFigmaPlan', 'native-import-png-provider.js': 'NemoNativeImportPngProvider' };
   for (const file of order) {
     vm.runInContext(read(ADAPTERS + file), win, { filename: file });
     assert.equal(typeof win[globals[file]], 'object', `${file} defines ${globals[file]}`);

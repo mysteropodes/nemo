@@ -3,6 +3,10 @@ use crate::object_codec::{
     encode_project_envelope, ImageAssetLimits, ProjectReferenceState, ProjectWireError,
     ProjectWireLimits,
 };
+use crate::object_document::{
+    AuthoredOrder, FrameScopeKind, ObjectDocument, ObjectTarget, OrderContext, OrderElement,
+    OrderLayer, OrderPlan, OrderScope, Presence,
+};
 use crate::object_snapshot::{
     shared_image_resource_budget, validate_png_in_domain, ObjectSnapshot,
 };
@@ -50,6 +54,117 @@ fn refused(error: ProjectWireError) -> DispatchErrorCode {
     }
 }
 
+// Materialize only the admitted origin's natural stack, never a read default.
+fn natural_import_order(document: &ObjectDocument) -> Result<OrderPlan, DispatchErrorCode> {
+    let empty = || AuthoredOrder {
+        static_value: Presence::Missing,
+        track: Presence::Missing,
+        expression: Presence::Missing,
+    };
+    let layers = document
+        .layers
+        .iter()
+        .enumerate()
+        .map(|(index, layer)| {
+            Ok(OrderLayer {
+                layer_uid: layer.layer_uid().to_owned(),
+                natural_position: u32::try_from(index)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?,
+                order: empty(),
+            })
+        })
+        .collect::<Result<Vec<_>, DispatchErrorCode>>()?;
+    let mut plan = OrderPlan {
+        format: "nemo.native-object-order-plan".into(),
+        format_version: 1,
+        document_format_version: 2,
+        migration: "explicit-plan-required".into(),
+        reference_policy: "unresolved".into(),
+        contexts: vec![OrderContext {
+            context_id: "scene-root".into(),
+            layers: layers.clone(),
+            scopes: Vec::new(),
+        }],
+    };
+    let targets = document
+        .objects
+        .iter()
+        .map(|record| &record.target)
+        .chain(
+            document
+                .item_records()
+                .into_iter()
+                .flat_map(|items| items.targets()),
+        )
+        .filter(|target| target.frame_scope.kind == FrameScopeKind::Authored);
+    for target in targets {
+        if !plan
+            .contexts
+            .iter()
+            .any(|context| context.context_id == target.context_id)
+        {
+            plan.contexts.push(OrderContext {
+                context_id: target.context_id.clone(),
+                layers: layers.clone(),
+                scopes: Vec::new(),
+            });
+        }
+        append_import_order(&mut plan, target)?;
+    }
+    Ok(plan)
+}
+
+fn append_import_order(
+    plan: &mut OrderPlan,
+    target: &ObjectTarget,
+) -> Result<(), DispatchErrorCode> {
+    let invalid = DispatchErrorCode::InvalidRequest;
+    let context = plan
+        .contexts
+        .iter_mut()
+        .find(|context| context.context_id == target.context_id)
+        .ok_or(invalid)?;
+    let index = match context
+        .scopes
+        .iter()
+        .position(|scope| scope.frame_scope == target.frame_scope)
+    {
+        Some(index) => index,
+        None => {
+            let index = context
+                .scopes
+                .iter()
+                .position(|scope| scope.frame_scope.frame > target.frame_scope.frame)
+                .unwrap_or(context.scopes.len());
+            context.scopes.insert(
+                index,
+                OrderScope {
+                    frame_scope: target.frame_scope.clone(),
+                    elements: Vec::new(),
+                },
+            );
+            index
+        }
+    };
+    let scope = &mut context.scopes[index];
+    let position = scope
+        .elements
+        .iter()
+        .filter(|element| element.layer_uid == target.layer_uid)
+        .count();
+    scope.elements.push(OrderElement {
+        layer_uid: target.layer_uid.clone(),
+        stroke_id: target.stroke_id.clone(),
+        natural_position: u32::try_from(position).map_err(|_| invalid)?,
+        order: AuthoredOrder {
+            static_value: Presence::Missing,
+            track: Presence::Missing,
+            expression: Presence::Missing,
+        },
+    });
+    Ok(())
+}
+
 /// Construction is confined to strict PNG admission. No public DTO can forge it.
 pub(crate) struct PreparedReferenceAttachment {
     origin: ObjectSnapshot,
@@ -69,6 +184,100 @@ impl PreparedReferenceAttachment {
 }
 
 impl ObjectSnapshot {
+    /// Existing validated v1-to-v2 migration, confined to explicit import order.
+    /// The origin's natural records precede all new records; layer order is exact.
+    pub(crate) fn migrate_import_object_order(
+        &self,
+        document: ObjectDocument,
+        targets: &[ObjectTarget],
+    ) -> Result<ObjectDocument, DispatchErrorCode> {
+        let invalid = DispatchErrorCode::InvalidRequest;
+        let before = self.document();
+        if before.format_version != 1
+            || document.format_version != 1
+            || !before.composition_order.missing()
+            || !document.composition_order.missing()
+        {
+            return Err(invalid);
+        }
+        let mut plan = natural_import_order(before)?;
+        for context in &mut plan.contexts {
+            for (index, layer) in document.layers.iter().enumerate().skip(before.layers.len()) {
+                context.layers.push(OrderLayer {
+                    layer_uid: layer.layer_uid().to_owned(),
+                    natural_position: u32::try_from(index).map_err(|_| invalid)?,
+                    order: AuthoredOrder {
+                        static_value: Presence::Missing,
+                        track: Presence::Missing,
+                        expression: Presence::Missing,
+                    },
+                });
+            }
+        }
+        for target in targets {
+            append_import_order(&mut plan, target)?;
+        }
+        let bytes = serde_json::to_vec(&plan).map_err(|_| DispatchErrorCode::Internal)?;
+        crate::object_codec::migrate_ordered_project(&document, &bytes)
+            .map(|ordered| ordered.into_storage())
+            .map_err(|_| invalid)
+    }
+
+    /// Sealing permits only the same natural origin prefix during explicit migration.
+    pub(crate) fn import_order_migration_preserves_origin(&self, after: &ObjectDocument) -> bool {
+        let before = self.document();
+        if before.format_version != 1
+            || after.format_version != 2
+            || !before.composition_order.missing()
+        {
+            return false;
+        }
+        let (Ok(expected), Presence::Present(actual)) =
+            (natural_import_order(before), &after.composition_order)
+        else {
+            return false;
+        };
+        actual.format == expected.format
+            && actual.format_version == expected.format_version
+            && actual.document_format_version == expected.document_format_version
+            && actual.migration == expected.migration
+            && actual.reference_policy == expected.reference_policy
+            && expected.contexts.iter().all(|context| {
+                actual
+                    .contexts
+                    .iter()
+                    .find(|next| next.context_id == context.context_id)
+                    .is_some_and(|next| {
+                        next.layers.starts_with(&context.layers)
+                            && context.scopes.iter().all(|scope| {
+                                next.scopes
+                                    .iter()
+                                    .find(|next| next.frame_scope == scope.frame_scope)
+                                    .is_some_and(|next| next.elements.starts_with(&scope.elements))
+                            })
+                    })
+            })
+    }
+
+    /// Validate borrowed import PNG bytes with the shared charged workspace.
+    /// No encoded allocation is copied or retained by this immutable read.
+    pub(crate) fn validate_import_png(&self, source: &[u8]) -> Result<(), DispatchErrorCode> {
+        let limits = ImageAssetLimits::new(
+            ENCODED_BYTES,
+            RGBA_BYTES,
+            DECODER_BYTES,
+            DIMENSION,
+            DIMENSION,
+        )
+        .map_err(|_| DispatchErrorCode::Internal)?;
+        validate_png_in_domain(source, limits, shared_image_resource_budget()).map_err(|error| {
+            match error {
+                ProjectWireError::Budget => DispatchErrorCode::Unavailable,
+                _ => DispatchErrorCode::InvalidRequest,
+            }
+        })
+    }
+
     /// Trusted host supplies bytes separately from the bounded scalar request.
     /// This value is not a public DTO, identity publisher or another owner.
     #[cfg(feature = "font_asset_wire")]

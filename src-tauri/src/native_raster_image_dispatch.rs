@@ -55,6 +55,13 @@ impl RevisionSync {
                 .dispatch_video_scoped(instance, native, request, external, allowed)
                 .await;
         }
+        if crate::application_mcp::revision_sync::import_batch_dispatch::is_import_batch_sources(
+            &request,
+        ) {
+            return self
+                .dispatch_import_batch_scoped(instance, native, request, external, allowed)
+                .await;
+        }
         if !is_image_import(&request) {
             return self
                 .dispatch_async(instance, native, request, external)

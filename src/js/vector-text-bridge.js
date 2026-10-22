@@ -51,6 +51,9 @@ var VECTOR_FONTS = {
 };
 var _vectorFontAssets = window.NemoFontAssets.create({
   fonts: VECTOR_FONTS,
+  initialSources: Object.fromEntries(Object.keys(VECTOR_FONTS).map(function(key) {
+    return [key, {kind:'bundled',fontKey:key}];
+  })),
   // PRIVATE proposal: script registration remains a separate activation gate.
   nativeResources: window.__TAURI__ ? function(){
     if(!window.NemoNativeFontResources)throw new Error('Native font resources unavailable');
@@ -61,6 +64,7 @@ var _vectorFontAssets = window.NemoFontAssets.create({
   isDesktop: function () { return typeof window.__TAURI__ !== 'undefined'; },
   invoke: function (command, args) { return window.__TAURI__.core.invoke(command, args); },
 });
+_vectorFontAssets.bindCatalog();
 function loadVectorFont(key) {
   return _vectorFontAssets.load(key);
 }

@@ -23,11 +23,16 @@ use image_dispatch::{invoke_image, is_image_import, ImagePhase};
 #[path = "native_video_link_dispatch.rs"]
 mod video_dispatch;
 use video_dispatch::{invoke_video, is_video_link, VideoPhase};
+
+#[path = "native_import_batch_dispatch.rs"]
+mod import_batch_dispatch;
+use import_batch_dispatch::{invoke_import_batch, is_import_batch_sources, ImportBatchPhase};
 enum ResourcePhase<'a> {
     Regular,
     Font(FontPhase<'a>),
     Image(ImagePhase<'a>),
     Video(VideoPhase<'a>),
+    ImportBatch(ImportBatchPhase<'a>),
 }
 
 #[path = "native_revision_dispatch.rs"]

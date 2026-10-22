@@ -7,6 +7,10 @@ use crate::native_contract::exact;
 use serde_json::Value;
 use std::collections::HashSet;
 
+#[path = "native_import_asset_contract.rs"]
+mod assets;
+use assets::{asset_row, optional_rows, raster_row, source_rows, text_row};
+
 pub(crate) const OP: &str = "command.document.object.import.batch";
 const COMMAND: &str = "object.import.batch";
 /// Largest serialized `result` the dispatcher can echo inside its 4096-byte response (L10-H).
@@ -151,7 +155,7 @@ fn vector_body(value: Option<&Value>) -> bool {
     })
 }
 
-/// Structural pre-check of the one record family the importers create; the owner re-validates it.
+/// Structural pre-check of the vector record family; the owner re-validates it.
 fn vector_record(value: Option<&Value>) -> bool {
     value.is_some_and(|r| {
         exact(
@@ -227,11 +231,40 @@ fn skip_ids<'a>(
         .map(|row| row.get("sourceId").and_then(Value::as_str))
 }
 
+fn object_order(payload: &Value, records: &[Value], raster: &[Value], text: &[Value]) -> bool {
+    let Some(order) = payload.get("objectOrder") else {
+        return true;
+    };
+    let Some(order) = order.as_array() else {
+        return false;
+    };
+    let expected: HashSet<_> = source_ids(records)
+        .chain(source_ids(raster))
+        .chain(source_ids(text))
+        .flatten()
+        .collect();
+    order.len() == records.len() + raster.len() + text.len()
+        && distinct(order.iter().map(|value| source_id(Some(value))))
+        && order
+            .iter()
+            .all(|value| value.as_str().is_some_and(|id| expected.contains(id)))
+}
+
 pub(crate) fn request(payload: &Value) -> bool {
     let Some(o) = exact(
         payload,
         &["command", "layers", "records"],
-        &["skipped", "unavailable"],
+        &[
+            "skipped",
+            "unavailable",
+            "assets",
+            "raster",
+            "text",
+            "sources",
+            "documentSnapshotId",
+            "lifecycleGeneration",
+            "objectOrder",
+        ],
     ) else {
         return false;
     };
@@ -248,12 +281,30 @@ pub(crate) fn request(payload: &Value) -> bool {
     }) else {
         return false;
     };
+    let (Some(assets), Some(raster), Some(text), Some(sources)) = (
+        optional_rows(payload, "assets", asset_row),
+        optional_rows(payload, "raster", raster_row),
+        optional_rows(payload, "text", text_row),
+        source_rows(payload),
+    ) else {
+        return false;
+    };
     o.get("command").and_then(Value::as_str) == Some(COMMAND)
+        && object_order(payload, records, raster, text)
         && (o.get("unavailable").is_none() || rows(o.get("unavailable"), unavailable_row).is_some())
         && distinct(source_ids(layers))
-        && distinct(source_ids(records).chain(skip_ids(skipped, "element")))
+        && distinct(
+            source_ids(records)
+                .chain(source_ids(raster))
+                .chain(source_ids(text))
+                .chain(skip_ids(skipped, "element")),
+        )
         && distinct(skip_ids(skipped, "layer"))
-        && distinct(skip_ids(skipped, "asset"))
+        && distinct(
+            source_ids(assets)
+                .chain(source_ids(sources))
+                .chain(skip_ids(skipped, "asset")),
+        )
 }
 
 pub(crate) fn result(value: &Value) -> bool {
@@ -266,7 +317,7 @@ pub(crate) fn result(value: &Value) -> bool {
             "objects",
             "skipped",
         ],
-        &[],
+        &["assets"],
     )
     .is_some_and(|o| {
         let applied = o.get("applied").and_then(Value::as_bool);
@@ -285,6 +336,7 @@ pub(crate) fn result(value: &Value) -> bool {
                 })
             })
             .is_some()
+            && optional_rows(value, "assets", asset_row).is_some()
             && rows(o.get("skipped"), skip_row).is_some()
             && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= MAX_RECEIPT_BYTES)
     })
@@ -310,7 +362,25 @@ fn receipt_matches(payload: &Value, value: &Value) -> bool {
         return false;
     }
     let layers = payload["layers"].as_array().unwrap();
-    let records = payload["records"].as_array().unwrap();
+    let records = ["records", "raster", "text"]
+        .iter()
+        .filter_map(|key| payload.get(*key).and_then(Value::as_array))
+        .flatten()
+        .cloned()
+        .collect::<Vec<_>>();
+    let assets = optional_rows(payload, "assets", asset_row)
+        .unwrap()
+        .iter()
+        .chain(source_rows(payload).unwrap())
+        .cloned()
+        .collect::<Vec<_>>();
+    let mapped_assets = optional_rows(value, "assets", asset_row).unwrap();
+    let ordered_items = ["raster", "text"].iter().any(|key| {
+        payload
+            .get(*key)
+            .and_then(Value::as_array)
+            .is_some_and(|rows| !rows.is_empty())
+    });
     let empty = Vec::new();
     let skipped = payload
         .get("skipped")
@@ -320,9 +390,20 @@ fn receipt_matches(payload: &Value, value: &Value) -> bool {
         .get("unavailable")
         .is_none_or(|v| v.as_array().is_some_and(|rows| rows.is_empty()))
         && distinct(source_ids(layers).chain(skip_ids(skipped, "layer")))
-        && value["applied"].as_bool() == Some(!layers.is_empty() || !records.is_empty())
+        && value["applied"].as_bool()
+            == Some(!layers.is_empty() || !records.is_empty() || !assets.is_empty())
         && mapped_rows_match(layers, value["layers"].as_array().unwrap(), "layerUid")
-        && mapped_rows_match(records, value["objects"].as_array().unwrap(), "strokeId")
+        && mapped_rows_match(&records, value["objects"].as_array().unwrap(), "strokeId")
+        && (!ordered_items
+            || records
+                .iter()
+                .zip(value["objects"].as_array().unwrap())
+                .all(|(a, b)| a["sourceId"] == b["sourceId"]))
+        && mapped_rows_match(&assets, mapped_assets, "assetId")
+        && assets
+            .iter()
+            .zip(mapped_assets)
+            .all(|(a, b)| a["sourceId"] == b["sourceId"])
         && value["skipped"].as_array() == Some(skipped)
 }
 
@@ -351,3 +432,7 @@ pub(crate) fn response_matches(
 #[cfg(test)]
 #[path = "native_import_contract_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_import_asset_contract_tests.rs"]
+mod asset_tests;

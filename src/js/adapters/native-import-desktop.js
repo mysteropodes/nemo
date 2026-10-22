@@ -14,6 +14,9 @@
   // The user-visible line for a typed status that is not a success (success wording is the baseline's own toast, raised by the adapters).
   function noticeFor(result) {
     if (!result) return null;
+    if (result.reason === 'native_mixed_import_batch_unavailable') return 'Import PNG images separately from other file groups. Nothing was imported.';
+    if (result.reason === 'native_sequence_unavailable') return 'Image sequences are unavailable. Nothing was imported.';
+    if (result.reason === 'native_png_only') return 'Only PNG images can be imported here. Nothing was imported.';
     if (result.blocked) {
       // The native PNG-only reference group already raised the baseline toast; every other blocked group needs a provider.
       const groups = result.blocked.filter((b) => b.reason !== 'use-import-reference').map((b) => b.group);
@@ -62,7 +65,21 @@
     });
     const t = (key) => (root.SM && typeof root.SM.t === 'function' ? root.SM.t(key) : key);
     const notify = (message) => { try { if (typeof root.showToast === 'function') root.showToast(message); } catch (_) { /* a toast never fails an import */ } };
-    const surface = (result) => { const line = noticeFor(result); if (line) notify(line); return result; };
+    const surface = (result) => {
+      const retained = result && result.staging && result.staging.status === 'retained' ? result : null;
+      if (retained) notify(retained.status === 'imported'
+        ? 'The import is confirmed, but temporary resources still need cleanup.'
+        : 'Temporary import resources remain retained until the outcome is confirmed.');
+      if (result && result.staging && result.status === 'imported' && result.readback !== 'confirmed') notify('The import committed, but its view is not confirmed. Wait for synchronization before importing again.');
+      const line = noticeFor(result); if (line) notify(line); return result;
+    };
+    let stage = null;
+    try {
+      const module = root.NemoNativeImportPngStage, tauri = root.__TAURI__;
+      if (module && typeof module.create === 'function' && tauri && root.crypto && typeof root.crypto.randomUUID === 'function') {
+        stage = module.create({ core, fs: tauri.fs, path: tauri.path, uuid: () => root.crypto.randomUUID() });
+      }
+    } catch (_) { /* Missing staging ports are explicit unavailability, never a legacy writer. */ }
     const paper = () => { const P = root.paper; return { get project() { return P.project; }, Matrix: P.Matrix, Path: P.Path, CompoundPath: P.CompoundPath, Segment: P.Segment, Point: P.Point }; };
     const readText = overrides.readText || ((file) => (typeof file.text === 'function' ? file.text() : new Promise((resolve, reject) => {
       const r = new root.FileReader();
@@ -97,7 +114,7 @@
       importText: (text, opts) => svgRaw.importText(text, opts).then(surface), importFiles: (files, opts) => svgRaw.importFiles(files, opts).then(surface),
       importTexts: (items, opts) => svgRaw.importTexts(items, opts).then(surface), openFile: (opts) => svgRaw.openFile(opts).then(surface),
     });
-    // L06-M2: the ordinary image menu has a native path picker. DOM Files have no admitted native handle.
+    // The ordinary image menu keeps its native picker; DOM PNGs use owned staging for one batch.
     // PNG placement uses the declared native route; tests may explicitly disable it.
     const imageDeclared = overrides.imageRoute === undefined || overrides.imageRoute === true;
     let imagePending = false, imageRetired = false, imageUncertain = null;
@@ -149,9 +166,16 @@
       }
       return out;
     }
+    const importPngFiles = root.NemoNativeImportPngProvider ? root.NemoNativeImportPngProvider.create({
+      core, stage, retired: () => imageRetired, declared: () => imageDeclared, pending: () => imagePending,
+      setPending: value => { imagePending = value; }, uncertain: uncertainImageStatus,
+      hold: (ctx, state) => { imageUncertain = {ctx,state,receipt:null,error:{code:'image_batch_unconfirmed'}}; },
+      state: () => root.state, current, activeLayerUid, selection, samePins, sameSelection, notify, t,
+      ready: info => root.NemoNativeObjectProjectFile.projectionReadyForUI(root, info), presented: m.core.presented,
+    }) : async () => ({status:'unavailable',reason:'native_drop_handle_absent'});
     const image = Object.freeze({
-      available: () => false,
-      importFiles: async () => ({ status: 'unavailable', reason: 'native_drop_handle_absent' }),
+      available: () => !!stage && !!root.NemoNativeImportPngProvider && imageDeclared && !imageRetired,
+      importFiles: stage ? files => importPngFiles(files).then(surface) : importPngFiles,
       status: uncertainImageStatus,
       async recover() {
         if (imageRetired) return { status: 'unavailable', reason: 'retired' };
@@ -210,14 +234,15 @@
       declared: overrides.videoRoute === undefined || overrides.videoRoute === true }) : null;
     const drop = m.drop.create({
       svg, svgAvailable: () => core.begin().ok === true, providers: { image, video }, notify, surface,
+      admitDrop: (_files, plan) => !plan.groups.some(row => row.group === 'image') || plan.groups.length === 1,
       cancelPasteFallback: () => { if (root._svgPasteFallback) { root.clearTimeout(root._svgPasteFallback); root._svgPasteFallback = null; } },
     });
-    const figma = m.figma.create({ paper: paper(), core, t, notify, resizeCanvas, fetch: (...a) => root.fetch(...a) });
+    const figma = m.figma.create({ paper: paper(), core, stage, readCatalog: () => root.NemoFontAssets && root.NemoFontAssets.readCatalog(), t, notify, resizeCanvas, fetch: (...a) => root.fetch(...a) });
     // ag-psd stays an unprofiled vendor module: its one literal dynamic import lives in the retained legacy loader psd-import-bridge.js
     // (patch 13), which hands the cached module promise over as `window.SMAgPsdLoader.load`. This profiled adapter carries no dynamic import.
     const loadAgPsd = () => (root.SMAgPsdLoader && typeof root.SMAgPsdLoader.load === 'function'
       ? root.SMAgPsdLoader.load() : Promise.reject(new Error('The ag-psd loader is unavailable')));
-    const psd = m.psd.create({ core, t, notify, readPsd: overrides.readPsd || m.psd.readerFor(loadAgPsd) });
+    const psd = m.psd.create({ core, stage, t, notify, readPsd: overrides.readPsd || m.psd.readerFor(loadAgPsd) });
     const montage = m.montage.create({ declared: () => false });
 
     // The panel wiring of the baseline psd-import-bridge.js and figma-import.js `init()` (same ids, same strings).

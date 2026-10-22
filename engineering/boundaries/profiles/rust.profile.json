@@ -217,7 +217,8 @@
         "project_asset_admission.rs",
         "object_project_settings_revision.rs",
         "object_media_link_revision.rs",
-        "object_raster_image_import_revision.rs"
+        "object_raster_image_import_revision.rs",
+        "native_import_transaction_assets_revision.rs"
       ],
       "publicApi": [
         "revision.rs"
@@ -319,7 +320,8 @@
         "object_project_workspace_edit.rs",
         "object_project_custom_brush_edit.rs",
         "object_project_comments_edit.rs",
-        "object_mask_edit.rs"
+        "object_mask_edit.rs",
+        "native_import_transaction_assets_owner.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -390,7 +392,10 @@
         "object_media_link_command.rs",
         "object_layer_playhead_cut_history.rs",
         "object_audio_track_edit_history.rs",
-        "object_audio_track_edit_command.rs"
+        "object_audio_track_edit_command.rs",
+        "native_import_transaction_assets.rs",
+        "native_import_transaction_sources.rs",
+        "native_import_transaction_source_types.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -1443,6 +1448,7 @@
         "native_import_transaction_chain.rs",
         "native_import_transaction_controls.rs",
         "native_import_transaction_dispatch.rs",
+        "native_import_transaction_order.rs",
         "native_import_transaction_rows.rs",
         "native_import_transaction_support.rs",
         "native_import_transaction_svg.rs",
@@ -1725,7 +1731,10 @@
         "object_brush_runtime.rs",
         "object_brush_scene_join.rs",
         "object_brush_trim_bake.rs",
-        "object_bitmap_brush_transition.rs"
+        "object_bitmap_brush_transition.rs",
+        "native_import_transaction_assets.rs",
+        "native_import_transaction_asset_controls.rs",
+        "native_import_transaction_sources.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1882,7 +1891,9 @@
         "src/native_custom_brush_contract_tests.rs",
         "src/native_comments_contract.rs",
         "src/native_comments_contract_tests.rs",
-        "src/native_mask_contract_tests.rs"
+        "src/native_mask_contract_tests.rs",
+        "src/native_import_asset_contract.rs",
+        "src/native_import_asset_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1940,7 +1951,8 @@
         "native_raster_image_source.rs",
         "native_raster_image_dispatch.rs",
         "native_video_link_source.rs",
-        "native_video_link_dispatch.rs"
+        "native_video_link_dispatch.rs",
+        "native_import_batch_dispatch.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -2158,7 +2170,8 @@
         "native_workspace_dispatch_tests.rs",
         "native_custom_brush_dispatch_tests.rs",
         "native_comments_dispatch_tests.rs",
-        "native_object_brush_preview_tests.rs"
+        "native_object_brush_preview_tests.rs",
+        "native_import_batch_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2182,7 +2195,8 @@
         "native_object_image.rs",
         "native_object_preview_prepare.rs",
         "native_object_video.rs",
-        "native_object_video_link.rs"
+        "native_object_video_link.rs",
+        "native_object_import_batch.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"

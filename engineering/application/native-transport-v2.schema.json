@@ -4122,9 +4122,82 @@
           "items": {
             "$ref": "#/$defs/ObjectImportUnavailable"
           }
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportAsset"
+          }
+        },
+        "raster": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportRaster"
+          }
+        },
+        "text": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectImportText"
+          }
+        },
+        "objectOrder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ObjectImportSourceId"
+          },
+          "description": "Exact permutation of every new records/raster/text sourceId only. Excludes layers, assets, skips and origin objects. Absence preserves canonical family ordering; receipt order remains records then raster then text. Native owner validates coverage before one publication."
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectImportSource"
+          }
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lifecycleGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       },
-      "description": "One atomic import batch. An unavailable row (raster-asset, text, font) refuses the whole batch. The complete request is limited to 4096 bytes."
+      "description": "One atomic import batch. Optional assets/raster/text default to empty. Optional nonempty sources uses only the existing native scoped PNG file or bundled/Google font descriptors and requires the captured documentSnapshotId/lifecycleGeneration. No inline bytes, URL, AssetRecord or provider claim is admitted. The original request is fingerprinted before source IO, then the same lifecycle/owner is rechecked before one commit. Retained assets then sources share the asset ID space and receipt order. An unavailable row refuses the whole batch. Complete request remains 4096 bytes; owner/provider admission and saveability are authoritative.",
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "sources"
+            ]
+          },
+          "then": {
+            "required": [
+              "documentSnapshotId",
+              "lifecycleGeneration"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "documentSnapshotId"
+                  ]
+                },
+                {
+                  "required": [
+                    "lifecycleGeneration"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     "ObjectImportBatchResult": {
       "type": "object",
@@ -4188,9 +4261,28 @@
           "items": {
             "$ref": "#/$defs/ObjectImportSkip"
           }
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "assetId"
+            ],
+            "properties": {
+              "sourceId": {
+                "$ref": "#/$defs/ObjectImportSourceId"
+              },
+              "assetId": {
+                "$ref": "#/$defs/ObjectImportSourceId"
+              }
+            }
+          }
         }
       },
-      "description": "Compact receipt: outer contentRevision equals expectedRevision plus one iff applied. Created plus skipped equals the declared source entries. The serialized result is limited to 3072 bytes."
+      "description": "Compact receipt: outer contentRevision equals expectedRevision plus one iff applied. Every declared layer, vector/raster/text object, retained asset, source asset and skip is accounted for. Optional assets maps retained assets then sources in declaration order to newly minted assetIds and is omitted by the owner when empty. The serialized result is limited to 3072 bytes."
     },
     "ObjectQueryResult": {
       "type": "object",
@@ -14571,6 +14663,463 @@
           "maximum": 4294967295
         }
       }
+    },
+    "ObjectImportAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "assetId"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "assetId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        }
+      },
+      "description": "Reuse a record already retained by the pinned origin project inventory. No bytes, asset record, locator or provider claim is accepted. The owner resolves and validates the actual image/font record."
+    },
+    "ObjectImportRasterItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetId",
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "assetId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rotation": {
+          "type": "number"
+        },
+        "isBitmapBrush": {
+          "type": "boolean"
+        },
+        "brushGroupId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Native tag: at most 255 UTF-8 bytes, no NUL; whitespace spelling is preserved."
+        },
+        "isBrushTextureCopy": {
+          "type": "boolean"
+        },
+        "meshId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Native tag: at most 255 UTF-8 bytes, no NUL; whitespace spelling is preserved."
+        }
+      }
+    },
+    "ObjectImportFont": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "fontKey"
+          ],
+          "properties": {
+            "kind": {
+              "const": "bundled"
+            },
+            "fontKey": {
+              "enum": [
+                "Roboto-Regular",
+                "Roboto-Bold",
+                "DejaVuSans-Regular",
+                "DejaVuSans-Bold",
+                "DejaVuSerif-Regular",
+                "DejaVuSerif-Bold",
+                "Manrope-Regular",
+                "Inter-Regular"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "assetId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "asset"
+            },
+            "assetId": {
+              "$ref": "#/$defs/ObjectImportSourceId"
+            }
+          }
+        }
+      ]
+    },
+    "ObjectImportTextBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "font",
+        "size",
+        "color",
+        "align",
+        "anchorTopLeft"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536,
+          "description": "No NUL, at least one non-ECMAScript-trim-whitespace unit, at most 65536 UTF-16 units; native decode repeats these rules on original JSON bytes."
+        },
+        "font": {
+          "$ref": "#/$defs/ObjectImportFont"
+        },
+        "size": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+        },
+        "align": {
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ]
+        },
+        "fixedWidth": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "fixedHeight": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "bold": {
+          "type": "boolean"
+        },
+        "italic": {
+          "type": "boolean"
+        },
+        "underline": {
+          "type": "boolean"
+        },
+        "strike": {
+          "type": "boolean"
+        },
+        "letterSpacing": {
+          "type": "number"
+        },
+        "wordSpacing": {
+          "type": "number"
+        },
+        "lineHeightMult": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "textCase": {
+          "enum": [
+            "none",
+            "upper",
+            "lower",
+            "capitalize"
+          ]
+        },
+        "anchorTopLeft": {
+          "$ref": "#/$defs/ObjectImportPoint"
+        }
+      }
+    },
+    "ObjectImportRaster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "entry"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "entry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target",
+            "item"
+          ],
+          "properties": {
+            "target": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "contextId",
+                "frameScope",
+                "layerUid",
+                "strokeId"
+              ],
+              "properties": {
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "frameScope": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "frame"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "authored"
+                    },
+                    "frame": {
+                      "$ref": "#/$defs/ObjectFrame"
+                    }
+                  }
+                },
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source id of a layer in this batch, or the uid of an existing layer."
+                },
+                "strokeId": {
+                  "const": "",
+                  "description": "The owner mints every stroke id."
+                }
+              }
+            },
+            "item": {
+              "$ref": "#/$defs/ObjectImportRasterItem"
+            }
+          }
+        }
+      }
+    },
+    "ObjectImportText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "entry"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/ObjectImportSourceId"
+        },
+        "entry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target",
+            "block"
+          ],
+          "properties": {
+            "target": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "contextId",
+                "frameScope",
+                "layerUid",
+                "strokeId"
+              ],
+              "properties": {
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "frameScope": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "frame"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "authored"
+                    },
+                    "frame": {
+                      "$ref": "#/$defs/ObjectFrame"
+                    }
+                  }
+                },
+                "layerUid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source id of a layer in this batch, or the uid of an existing layer."
+                },
+                "strokeId": {
+                  "const": "",
+                  "description": "The owner mints every stroke id."
+                }
+              }
+            },
+            "block": {
+              "$ref": "#/$defs/ObjectImportTextBlock"
+            }
+          }
+        }
+      }
+    },
+    "ObjectImportSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sourceId",
+            "name",
+            "mediaType",
+            "source"
+          ],
+          "properties": {
+            "sourceId": {
+              "$ref": "#/$defs/ObjectImportSourceId"
+            },
+            "name": {
+              "$ref": "#/$defs/ObjectImportSourceId"
+            },
+            "mediaType": {
+              "const": "image/png"
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "path"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "file"
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\)",
+                  "description": "Absolute native file path with no NUL; canonical regular-file and filesystem-scope permission checks stay in the existing native ImageSource resolver."
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sourceId",
+            "name",
+            "mediaType",
+            "source"
+          ],
+          "properties": {
+            "sourceId": {
+              "$ref": "#/$defs/ObjectImportSourceId"
+            },
+            "name": {
+              "$ref": "#/$defs/ObjectImportSourceId"
+            },
+            "mediaType": {
+              "const": "font/ttf"
+            },
+            "source": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "fontKey"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "bundled"
+                    },
+                    "fontKey": {
+                      "enum": [
+                        "Roboto-Regular",
+                        "Roboto-Bold",
+                        "DejaVuSans-Regular",
+                        "DejaVuSans-Bold",
+                        "DejaVuSerif-Regular",
+                        "DejaVuSerif-Bold",
+                        "Manrope-Regular",
+                        "Inter-Regular"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "family",
+                    "weight",
+                    "italic"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "google"
+                    },
+                    "family": {
+                      "$ref": "#/$defs/ObjectImportSourceId"
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    },
+                    "italic": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   }
 }

@@ -37,6 +37,14 @@
       'guide-projection-replaced','presentation-replaced','geometry-changed','origin-missing','origin-changed','gesture-active',
       'area-missing','container-missing','axis-invalid','ordinal-invalid','guides-locked','rulers-off','point-unavailable',
       'native-unconfirmed','applied-unconfirmed','edit-exception'].includes(code)?code:'unknown';
+    if(event==='navigation-begin'){
+      if(code==='owner-unavailable')return code;
+      if(typeof code!=='string')return 'unknown';
+      var navigation=code.split(':');
+      return navigation.length===2&&['pan','zoom','other'].includes(navigation[0])&&
+        ['view-refused','admitted'].includes(navigation[1])?code:'unknown';
+    }
+    if(event==='navigation-update')return ['view-updated','rejected'].includes(code)?code:'unknown';
     if(event==='bootstrap-rejected')return code==='unsupported-format'?'unsupported-format':'other';
     if(event==='file-stage')return ['projection','ui-refresh','hide-start','layout-wait','layout-settled'].includes(code)?code:'unknown';
     if(event==='file-failed')return ['not-dispatched','unconfirmed'].includes(code)?code:'unknown';
@@ -53,7 +61,7 @@
   function openDiagnostic(root,event,code){
     if(!['file-open-started','file-new-started','file-completed','file-cancelled','file-failed','file-stage',
       'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','bpm-settings-refused',
-      'guide-entry-refused','guide-release-refused','guide-edit-refused'].includes(event))return;
+      'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update'].includes(event))return;
     try{
       var log=openLogs.get(root);if(!log){log={startedAt:Date.now(),events:[],serial:0,attempt:0,writing:false,pending:null};openLogs.set(root,log);}
       if(event==='file-open-started'||event==='file-new-started')log.attempt++;
@@ -76,7 +84,7 @@
     }catch(_){}
     // Preserve the existing optional fixture observer; it is never required to collect production evidence.
     try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,
-      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused'].includes(event)?safeCode(event,code):code);}catch(_){}
+      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update'].includes(event)?safeCode(event,code):code);}catch(_){}
   }
   // The captured read proof exists only during this action's synchronous guard.
   function withActionPresentation(origin,current,action){

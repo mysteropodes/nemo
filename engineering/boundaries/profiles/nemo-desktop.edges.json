@@ -234,7 +234,8 @@
           "export_job::MAX_OBJECT_EXPORT_FRAMES",
           "commands::LinkedVideoFacts",
           "native_media_frame_export::NativeVideoDecoder",
-          "native_media_frame_export::NativeVideoInfo"
+          "native_media_frame_export::NativeVideoInfo",
+          "history::ImportAssetSource"
         ],
         "rust.desktop.mcp.adapter.tests": [
           "application::REPRODUCTION_FIXTURE",
@@ -479,7 +480,8 @@
           "application::ObjectBrushRuntime",
           "object_render_scene::ObjectBrushAdmission",
           "export_job::export_object_frames_with_materializer",
-          "commands::LinkedVideoFacts"
+          "commands::LinkedVideoFacts",
+          "history::ImportAssetSource"
         ],
         "rust.desktop.media": [
           "native_media_frame_export::NativeVideoDecoder",

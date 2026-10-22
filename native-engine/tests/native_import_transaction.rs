@@ -333,6 +333,7 @@ fn a_locked_existing_layer_is_refused_end_to_end_and_a_new_layer_never_is() {
         records: vec![item("e:0", layer, 0, 9)],
         skipped: vec![],
         unavailable: vec![],
+        ..ImportBatch::default()
     };
     let locked_error = |uid: &str| ImportError::LayerLocked {
         layer_uid: uid.into(),
