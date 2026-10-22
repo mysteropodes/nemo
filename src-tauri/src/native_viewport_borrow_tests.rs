@@ -220,3 +220,189 @@ fn retained_slot_refuses_missing_wrong_instance_and_reentry_without_invoking_cal
         8
     );
 }
+
+// Exercise the final production TextureBlitter transfer on the compositor's
+// sole device/queue. No AppKit window, monitor profile or replacement shader.
+#[cfg(target_os = "macos")]
+fn read_encoded_rgba8(
+    gpu: &Compositor,
+    texture: &wgpu::Texture,
+    format: wgpu::TextureFormat,
+) -> Vec<u8> {
+    const ROW: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+    let buffer = gpu.device().create_buffer(&wgpu::BufferDescriptor {
+        label: Some("native-viewport-transfer-readback"),
+        size: u64::from(ROW * 2),
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let mut encoder = gpu
+        .device()
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(ROW),
+                rows_per_image: Some(2),
+            },
+        },
+        wgpu::Extent3d {
+            width: 2,
+            height: 2,
+            depth_or_array_layers: 1,
+        },
+    );
+    gpu.queue().submit(Some(encoder.finish()));
+    let slice = buffer.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |result| {
+        let _ = tx.send(result);
+    });
+    gpu.device()
+        .poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: Some(std::time::Duration::from_secs(10)),
+        })
+        .unwrap();
+    rx.recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    let mapped = slice.get_mapped_range();
+    let mut rgba = Vec::with_capacity(16);
+    for row in 0..2 {
+        let offset = (row * ROW) as usize;
+        rgba.extend_from_slice(&mapped[offset..offset + 8]);
+    }
+    drop(mapped);
+    buffer.unmap();
+    // Raw BGRA memory order is not a colour conversion.
+    if matches!(
+        format,
+        wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb
+    ) {
+        for pixel in rgba.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
+        }
+    }
+    rgba
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn gpu_selected_surface_blit_preserves_encoded_rgba8_bytes() {
+    use crate::native_viewport::NativeViewport;
+    use wgpu::TextureFormat::{Bgra8Unorm, Bgra8UnormSrgb, Rgba8Unorm, Rgba8UnormSrgb};
+
+    let gpu = Compositor::new().unwrap();
+    let errors = gpu.device().push_error_scope(wgpu::ErrorFilter::Validation);
+    let extent = wgpu::Extent3d {
+        width: 2,
+        height: 2,
+        depth_or_array_layers: 1,
+    };
+    let source = gpu.device().create_texture(&wgpu::TextureDescriptor {
+        label: Some("native-viewport-retained-encoded-rgba8"),
+        size: extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    // Original Camera ink, white, partial alpha and transparent black. Distinct
+    // positions also detect a channel, orientation or coverage mistake.
+    let encoded = [
+        17, 34, 51, 255, 255, 255, 255, 255, 17, 34, 51, 128, 0, 0, 0, 0,
+    ];
+    gpu.queue().write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &source,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &encoded,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(8),
+            rows_per_image: Some(2),
+        },
+        extent,
+    );
+    assert_eq!(read_encoded_rgba8(&gpu, &source, Rgba8Unorm), encoded);
+    assert!(pollster::block_on(errors.pop()).is_none());
+    for formats in [[Bgra8Unorm, Bgra8UnormSrgb], [Rgba8Unorm, Rgba8UnormSrgb]] {
+        let format = NativeViewport::select_surface_format(&formats).unwrap();
+        let errors = gpu.device().push_error_scope(wgpu::ErrorFilter::Validation);
+        let target = gpu.device().create_texture(&wgpu::TextureDescriptor {
+            label: Some("native-viewport-selected-attachment"),
+            size: extent,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let blitter = wgpu::util::TextureBlitter::new(gpu.device(), format);
+        let mut encoder = gpu
+            .device()
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        blitter.copy(
+            gpu.device(),
+            &mut encoder,
+            &source.create_view(&wgpu::TextureViewDescriptor::default()),
+            &target.create_view(&wgpu::TextureViewDescriptor::default()),
+        );
+        gpu.queue().submit(Some(encoder.finish()));
+        let actual = read_encoded_rgba8(&gpu, &target, format);
+        assert!(pollster::block_on(errors.pop()).is_none());
+        assert_eq!(actual, encoded, "selected native attachment {format:?}");
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn surface_format_requires_byte_preserving_unorm_and_prefers_bgra_then_rgba() {
+    use crate::native_viewport::NativeViewport;
+    use wgpu::TextureFormat::{
+        Bgra8Unorm, Bgra8UnormSrgb, Rgb10a2Unorm, Rgba16Float, Rgba8Unorm, Rgba8UnormSrgb,
+    };
+
+    for (formats, expected) in [
+        (vec![Bgra8Unorm], Bgra8Unorm),
+        (vec![Rgba8Unorm], Rgba8Unorm),
+        (vec![Rgba8Unorm, Bgra8Unorm], Bgra8Unorm),
+        (vec![Bgra8Unorm, Rgba8Unorm], Bgra8Unorm),
+        (vec![Rgba8UnormSrgb, Rgba16Float, Rgba8Unorm], Rgba8Unorm),
+        (vec![Bgra8UnormSrgb, Rgba8Unorm, Bgra8Unorm], Bgra8Unorm),
+    ] {
+        assert_eq!(
+            NativeViewport::select_surface_format(&formats).unwrap(),
+            expected
+        );
+    }
+    for formats in [
+        vec![],
+        vec![Bgra8UnormSrgb],
+        vec![Rgba8UnormSrgb],
+        vec![Rgba16Float, Rgb10a2Unorm],
+        vec![Bgra8UnormSrgb, Rgba16Float, Rgba8UnormSrgb],
+    ] {
+        assert!(NativeViewport::select_surface_format(&formats)
+            .unwrap_err()
+            .to_string()
+            .contains("no byte-preserving 8-bit unorm texture format"));
+    }
+}

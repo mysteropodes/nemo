@@ -6,9 +6,10 @@ const vm = require('node:vm');
 const clone = value => JSON.parse(JSON.stringify(value));
 
 function fixture({ composition = false } = {}) {
-  const events = new WeakMap(), trace = [], calls = [], notices = [], labels = [], timers = new Set(), frames = [];
+  const events = new WeakMap(), trace = [], calls = [], notices = [], diagnostics = [], labels = [], timers = new Set(), frames = [];
   const nativeListeners = new Map(), observers = new Set(), previewReleases = new Set();
   let source = 'fixture', context, root, disposed = false, installed = false, generation = 0, serial = 0, previewHold = null;
+  let compositionReadHold = null, compositionUnavailable = false;
   let canonicalPorts = null;
   let rect = { left: 66, top: 102, width: 1038, height: 504 };
   const nativeDocument = { canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40 };
@@ -141,6 +142,14 @@ function fixture({ composition = false } = {}) {
       const pin = info(), payload = request.payload, selector = payload.selector;
       assert.equal(payload.atRevision, 0); assert.equal(payload.documentSnapshotId, pin.documentSnapshotId);
       assert.equal(payload.contextId, 'scene-root');
+      if (!guideRead && selector.kind === 'settings') {
+        if (compositionReadHold) {
+          const held = compositionReadHold; compositionReadHold = null; held.entered(); await held.wait;
+        }
+        if (compositionUnavailable) return realm({ apiVersion: 2, requestId: request.requestId,
+          instanceId: pin.instanceId, documentId: pin.documentId, contentRevision: 0, ok: false,
+          error: { code: 'unavailable', message: 'Controlled native Composition read refusal' } });
+      }
       let result;
       if (!guideRead) {
         if (selector.kind === 'settings') result = { markersPresent: false, markerCount: 0, bpm: 120, bpmOffset: 0, bpmShow: false,
@@ -174,6 +183,7 @@ function fixture({ composition = false } = {}) {
     requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
     localStorage: { getItem: () => '0', setItem() {} }, showToast: text => notices.push(text),
+    __NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__: (event, code) => diagnostics.push([event, code]),
     Point: function Point(x, y) { this.x = x; this.y = y; },
     updateUI() {}, SMReference: { refreshNative() {} }, SMProject: { refreshActiveTabDirtyDot() {} },
     // Unused legacy service ports are explicit; no legacy document operation is admitted by this fixture.
@@ -288,7 +298,7 @@ function fixture({ composition = false } = {}) {
     disposed = true; for (const timer of timers) clearTimeout(timer); timers.clear(); frames.length = 0;
     await new Promise(setImmediate);
   }
-  return { root: browser, document, area, h, v, session, calls, trace, notices, labels, prepare, settle, open, tick, dispose,
+  return { root: browser, document, area, h, v, session, calls, trace, notices, diagnostics, labels, prepare, settle, open, tick, dispose,
     dispatch, saved: () => JSON.stringify(nativeDocument), originalDocument,
     ghosts: () => descendants(document).filter(element => element.style.opacity === '.6'),
     edits: () => calls.filter(call => call.request && String(call.request.operation).startsWith('command.')),
@@ -297,6 +307,15 @@ function fixture({ composition = false } = {}) {
       const started = new Promise(resolve => { entered = resolve; });
       const wait = new Promise(resolve => { release = () => { previewReleases.delete(release); resolve(); }; });
       previewReleases.add(release); previewHold = { entered, wait };
+      return { started, release };
+    },
+    refuseNextCompositionRead() {
+      assert(composition && !compositionReadHold);
+      let entered, release;
+      const started = new Promise(resolve => { entered = resolve; });
+      const wait = new Promise(resolve => { release = () => { previewReleases.delete(release); resolve(); }; });
+      // This is a typed native response boundary, not a controller, cache or queue replacement.
+      compositionUnavailable = true; previewReleases.add(release); compositionReadHold = { entered, wait };
       return { started, release };
     },
     async notifyWhilePending() {
