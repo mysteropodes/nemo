@@ -26,10 +26,9 @@
 //! totalFrames-sized array. Exposure holds are not extra authored frames. Every writeback uses
 //! the full retained ObjectTarget, never a filtered raster ordinal or a stroke-id-only lookup.
 //!
-//! Component item admission still resolves against root layers/frame bounds, and the component
-//! frame reader refuses items. This planner retains their references but refuses component writes
-//! until those real consumers join. Video layer records are likewise unavailable. These are
-//! outstanding acceptance requirements, not removed baseline functionality.
+//! Each declared component uses its own layers, frame bounds and explicit mixed order. The
+//! frame reader's component-item availability is a separate outstanding consumer requirement.
+//! Video layer records remain unavailable until their actual provider joins.
 use crate::object_document::{
     object_deserialize, ImageMesh, MeshIdSequence, ObjectDocument, ObjectTarget, Presence,
 };
@@ -206,7 +205,7 @@ pub(crate) fn plan_binding_edit_json(
             layer_uid,
         } => {
             let (set, layer) = layer_target(document, &context_id, &layer_uid)?;
-            duplicated_layer = Some(layer);
+            duplicated_layer = Some((context_id, layer));
             BindingOperation::DuplicateLayer { set, layer }
         }
         Action::AttachVideo { .. } | Action::DetachVideo { .. } => {
@@ -241,18 +240,44 @@ pub(crate) fn plan_binding_edit_json(
     if document.image_meshes().is_some() || !state.store.entries().is_empty() {
         next.image_meshes = Presence::Present(state.store);
     }
-    if let (Some(layer), BindingReport::Duplicated { pairs, .. }) = (duplicated_layer, &report) {
+    if let (Some((context_id, layer)), BindingReport::Duplicated { pairs, .. }) =
+        (duplicated_layer, &report)
+    {
         // Baseline duplicateLayer rewrites all THREE owners of a mesh id together: raster
         // tags, mesh-keyed elementMotion holders, and rig binds of the copied layer.
-        let uid = next.layers[layer].layer_uid().to_owned();
+        let uid = if context_id == ROOT {
+            next.layers[layer].layer_uid()
+        } else {
+            next.component_set()
+                .and_then(|set| set.component(&context_id))
+                .and_then(|component| component.layers().get(layer))
+                .ok_or(DispatchErrorCode::Internal)?
+                .layer_uid()
+        }
+        .to_owned();
         if let Presence::Present(holders) = &mut next.property_holders {
             for holder in holders.iter_mut().filter(|holder| {
-                holder.target.context_id() == ROOT && holder.target.layer_uid() == uid
+                holder.target.context_id() == context_id && holder.target.layer_uid() == uid
             }) {
                 remap_id(&mut holder.target.stroke_id, pairs);
             }
         }
-        if let Presence::Present(rig) = &mut next.layers[layer].rig {
+        let destination = if context_id == ROOT {
+            next.layers.get_mut(layer)
+        } else if let Presence::Present(tables) = &mut next.component_tables {
+            if let Presence::Present(set) = &mut tables.components {
+                set.components
+                    .iter_mut()
+                    .find(|component| component.symbol_id() == context_id)
+                    .and_then(|component| component.layers.get_mut(layer))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+        .ok_or(DispatchErrorCode::Internal)?;
+        if let Presence::Present(rig) = &mut destination.rig {
             for bind in &mut rig.binds {
                 remap_id(&mut bind.mesh_id, pairs);
             }

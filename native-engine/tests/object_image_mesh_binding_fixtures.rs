@@ -158,3 +158,54 @@ pub(super) fn component_mixed() -> Value {
     ]);
     value
 }
+
+pub(super) fn vertex_holder(layer: &str) -> Value {
+    json!({"target":{"contextId":"scene-root","layerUid":layer,"strokeId":"im_1"},
+        "properties":[{"property":"vtx8","static":[0.1,0.2],"track":{"keys":[
+            {"frame":0,"v":[0.1,0.2]},{"frame":23,"v":[0.3,0.4]}]}}]})
+}
+
+pub(super) fn tagged_copy_drawing() -> Value {
+    let mut value = drawing(24, Some("im_1"));
+    push_raster(
+        &mut value,
+        target("scene-root", "L2", 0, "copy"),
+        Some("im_1"),
+    );
+    value
+}
+
+pub(super) fn duplicated_layer_drawing() -> Value {
+    let mut value = drawing(24, Some("im_1"));
+    for frame in 0..24 {
+        let copy = target("scene-root", "L2", frame, &format!("copy-{frame}"));
+        push_raster(&mut value, copy, Some("im_1"));
+    }
+    value
+}
+
+pub(super) fn animated_drawing() -> Value {
+    let mut value = drawing(24, Some("im_1"));
+    value["propertyHolders"] = json!([vertex_holder("L0")]);
+    value
+}
+
+pub(super) fn animated_duplicate_drawing() -> Value {
+    let mut value = tagged_copy_drawing();
+    value["propertyHolders"] = json!([vertex_holder("L0"), vertex_holder("L2")]);
+    let row = include_str!("fixtures/object-rig-record/oracle.txt")
+        .lines()
+        .find(|line| line.starts_with("rig\tmesh_bind_two_bones_rebind_replaces\t"))
+        .unwrap();
+    let rig: Value = serde_json::from_str(row.split('\t').nth(2).unwrap()).unwrap();
+    value["layers"][0]["rig"] = rig.clone();
+    value["layers"][1]["rig"] = rig;
+    value
+}
+
+pub(super) fn component_timed_drawing() -> Value {
+    let mut value = component_drawing();
+    value["componentTables"]["components"]["components"][0]["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+            "contextId":"component-A","keys":[{"frame":0},{"frame":1},{"frame":2}],"samples":[]});
+    value
+}

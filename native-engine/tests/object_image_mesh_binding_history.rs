@@ -1,14 +1,9 @@
-//! Original #2242 production contract, registered by the new command planner after shared composition.
-//! These tests use the real codec, admitted assets, revision owner, dispatcher and history. They are
-//! UNRUN while the planner/facade/owner registration is pending; no replacement harness or owner is used.
+//! Original #2242 production contract through the composed planner, real codec, admitted assets,
+//! revision owner, dispatcher and history; no replacement harness or owner is used.
 //! Required command: test-history,evaluation,project_media_codec; preserve the existing kernel oracle.
-//! Required positive component gates below intentionally retain the full contract. Current blockers:
-//! item admission uses root layers/frame bounds; component frame reads reject items; the planner
-//! refuses component writes. Lead must compose those owners/consumers rather than ignore these gates.
-//! Sequence commit, undo/replacement lifetime, and thin kernel facade are shared composition work.
-//! Animated replacement/detach additionally need an explicit preserved-but-unbound holder state:
-//! current holder admission requires a raster still carrying the old mesh id. Tracks must not be
-//! silently deleted to make binding validation pass.
+//! Component codec/save admission now passes. Required local writes and actual frame-packet
+//! consumption remain positive gates; remaining consumer refusals must not be ignored.
+//! Animated replacement/detach must preserve authored tracks despite an unbound old mesh identity.
 use super::{plan_binding_edit_json, BindingEditPlan, BindingReport};
 use crate::history::NativeObjectHistory;
 use crate::object_codec::encode_storage_project;
@@ -154,6 +149,46 @@ fn assert_error(owner: &mut NativeObjectHistory, request: &Value, code: &str) {
     assert_eq!(dispatch(owner, request)["error"]["code"], code);
 }
 
+fn assert_component_frames(owner: &NativeObjectHistory, mesh_id: Option<&str>) {
+    use crate::object_document::FrameScopeKind;
+    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameSelector};
+    let snapshot = support::head(owner);
+    for frame in 0..3 {
+        let selector = ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "component-A",
+            scope_kind: FrameScopeKind::Authored,
+            frame,
+        };
+        let packet = prepare_object_frame(&snapshot, &selector).unwrap();
+        assert_eq!(packet.document_snapshot_id(), snapshot.snapshot_id());
+        assert_eq!(packet.content_revision(), owner.content_revision());
+        assert_eq!(packet.context_id(), "component-A");
+        assert_eq!(packet.frame(), frame);
+        assert_eq!(packet.source_layers()[0].layer_uid(), "inner-only");
+        assert_eq!(packet.raster_records().len(), 1);
+        let entry = packet.raster_records().next().unwrap().entry();
+        assert_eq!(serde_json::to_value(&entry.target).unwrap(), inner(frame));
+        assert_eq!(entry.item.mesh_id(), mesh_id);
+        assert_eq!(entry.item.asset_id().as_str(), "img-1");
+        let source = snapshot
+            .document()
+            .item_records()
+            .unwrap()
+            .raster_entries()
+            .iter()
+            .find(|source| source.target == entry.target)
+            .unwrap();
+        assert!(
+            std::ptr::eq(entry, source),
+            "the packet borrows its retained raster"
+        );
+    }
+}
+
 #[test]
 fn all_24_frames_and_store_publish_as_one_history_entry_and_scrub_identity_survives() {
     let mut owner = support::owner(&drawing(24, None));
@@ -209,11 +244,7 @@ fn another_real_layer_keeps_a_mesh_until_its_last_reference_detaches() {
 
 #[test]
 fn duplicated_layer_shares_one_fresh_deep_copy_across_its_frames_and_editing_is_independent() {
-    let mut value = drawing(24, Some("im_1"));
-    for frame in 0..24 {
-        let copy = target("scene-root", "L2", frame, &format!("copy-{frame}"));
-        push_raster(&mut value, copy, Some("im_1"));
-    }
+    let value = duplicated_layer_drawing();
     let mut owner = support::owner(&value);
     run(&mut owner, "duplicate", duplicate("L2"));
     for frame in 0..24 {
@@ -447,16 +478,18 @@ fn importing_a_high_mesh_id_raises_the_existing_owner_lifetime_sequence() {
 
 #[test]
 fn required_component_references_survive_root_detach_and_component_writes_use_local_frames() {
-    // Required positive acceptance gate: currently blocked at REAL codec item admission because
-    // inner-only is not a root layer and component frame 2 is beyond the root's two-frame bound.
-    let mut owner = support::owner(&component_drawing());
+    // Inner-only and frame 2 exercise the component's own layer and bounds through real consumers.
+    let mut owner = support::owner(&component_timed_drawing());
     run(&mut owner, "root-off", detach(at(0)));
     assert_eq!(wire(&owner)["imageMeshes"]["im_1"], mesh());
     assert_tags(&owner, (0..3).map(inner), Some("im_1"));
+    assert_component_frames(&owner, Some("im_1"));
     run(&mut owner, "component-off", detach(inner(2)));
     assert!(wire(&owner)["imageMeshes"].get("im_1").is_none());
+    assert_component_frames(&owner, None);
     run(&mut owner, "component-on", attach(inner(2)));
     assert_tags(&owner, (0..3).map(inner), Some("im_2"));
+    assert_component_frames(&owner, Some("im_2"));
     assert_tag(&owner, at(0), None);
     assert_tag(&owner, at(1), None);
 }
@@ -503,28 +536,9 @@ fn required_component_mixed_slots_use_local_order_and_leave_root_and_other_slots
     undo_to(&mut owner, &initial);
 }
 
-fn vertex_holder(layer: &str) -> Value {
-    json!({"target":{"contextId":"scene-root","layerUid":layer,"strokeId":"im_1"},
-        "properties":[{"property":"vtx8","static":[0.1,0.2],"track":{"keys":[
-            {"frame":0,"v":[0.1,0.2]},{"frame":23,"v":[0.3,0.4]}]}}]})
-}
-
 #[test]
 fn duplicate_remaps_real_mesh_vertex_holder_and_rig_bind_without_rewriting_the_original() {
-    let mut value = drawing(24, Some("im_1"));
-    push_raster(
-        &mut value,
-        target("scene-root", "L2", 0, "copy"),
-        Some("im_1"),
-    );
-    value["propertyHolders"] = json!([vertex_holder("L0"), vertex_holder("L2")]);
-    let row = include_str!("fixtures/object-rig-record/oracle.txt")
-        .lines()
-        .find(|line| line.starts_with("rig\tmesh_bind_two_bones_rebind_replaces\t"))
-        .unwrap();
-    let rig: Value = serde_json::from_str(row.split('\t').nth(2).unwrap()).unwrap();
-    value["layers"][0]["rig"] = rig.clone();
-    value["layers"][1]["rig"] = rig;
+    let value = animated_duplicate_drawing();
     let mut owner = support::owner(&value);
     run(&mut owner, "duplicate-animated", duplicate("L2"));
     let after = wire(&owner);
@@ -540,8 +554,7 @@ fn duplicate_remaps_real_mesh_vertex_holder_and_rig_bind_without_rewriting_the_o
 
 #[test]
 fn required_animated_binding_replacement_and_detach_preserve_authored_tracks() {
-    let mut value = drawing(24, Some("im_1"));
-    value["propertyHolders"] = json!([vertex_holder("L0")]);
+    let value = animated_drawing();
     let mut owner = support::owner(&value);
     // Required positive gate: current holder admission rejects the now unbound old identity.
     run(&mut owner, "replace-animated", attach(at(0)));
@@ -566,12 +579,7 @@ fn binding_history_and_replacement_conserve_retained_image_records_and_encoded_p
         let file: Value = serde_json::from_slice(&project_file(owner)).unwrap();
         serde_json::to_vec(&file["assets"]).unwrap()
     };
-    let mut value = drawing(24, Some("im_1"));
-    push_raster(
-        &mut value,
-        target("scene-root", "L2", 0, "copy"),
-        Some("im_1"),
-    );
+    let value = tagged_copy_drawing();
     let mut owner = support::owner(&value);
     let retained = support::head(&owner);
     let original = images(&owner);

@@ -95,6 +95,18 @@ pub(super) fn project(
         .flat_map(|plan| &plan.contexts)
         .map(|context| (context.context_id.as_str(), context))
         .collect();
+    let mut context_items: HashMap<_, Vec<_>> = HashMap::new();
+    for (target, raster) in rasters
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| (&entry.target, Some(index)))
+        .chain(texts.iter().map(|entry| (&entry.target, None)))
+    {
+        context_items
+            .entry(target.context_id())
+            .or_default()
+            .push((target, raster));
+    }
     for (set_index, context) in contexts.iter().enumerate() {
         // Index each authored scope once. A raster lookup uses its full layer/stroke key;
         // animated paint order remains irrelevant to native positional propagation.
@@ -126,13 +138,7 @@ pub(super) fn project(
             .objects
             .iter()
             .map(|object| (object.target(), None))
-            .chain(
-                rasters
-                    .iter()
-                    .enumerate()
-                    .map(|(index, entry)| (&entry.target, Some(index))),
-            )
-            .chain(texts.iter().map(|entry| (&entry.target, None)));
+            .chain(context_items.remove(context.id).unwrap_or_default());
         for (target, raster) in targets.filter(|(target, _)| {
             target.context_id() == context.id
                 && target.scope_kind() == &FrameScopeKind::Authored
@@ -179,12 +185,9 @@ pub(super) fn project(
                 } else if slots.iter().any(|(_, r)| r.is_some())
                     && slots.iter().any(|(_, r)| r.is_none())
                 {
-                    // No v1 cross-table order exists. Component references are retained below;
-                    // component writes are unavailable regardless of this projection.
-                    if context.id == ROOT {
-                        return Err(DispatchErrorCode::Unavailable);
-                    }
-                    slots.retain(|(_, raster)| raster.is_none());
+                    // No cross-table order exists for this context. Never guess a mixed slot
+                    // or project only its paths while silently omitting real item positions.
+                    return Err(DispatchErrorCode::Unavailable);
                 }
                 let frame_index = projected_frames.len();
                 let mut bound = vec![];
@@ -253,7 +256,13 @@ pub(super) fn layer_target(
         .iter()
         .position(|l| l.layer_uid() == layer_uid)
         .ok_or(DispatchErrorCode::NotFound)?;
-    if context_id != ROOT || document.layer_is_locked(layer_uid) {
+    if context.layers[layer].locked()
+        || document.duplicator_set().is_some_and(|set| {
+            set.duplicators
+                .iter()
+                .any(|record| record.context_id == context_id && record.layer_uid == layer_uid)
+        })
+    {
         return Err(DispatchErrorCode::Unavailable);
     }
     if context.layers[layer].widget.value().is_some() || context.layers[layer].is_null_layer() {
@@ -273,8 +282,9 @@ pub(super) fn slot_target(
     if target.scope_kind() != &FrameScopeKind::Authored {
         return Err(DispatchErrorCode::Unavailable);
     }
-    layer_target(document, target.context_id(), target.layer_uid())?;
-    if target.frame() >= document.total_frames() {
+    let (set, _) = layer_target(document, target.context_id(), target.layer_uid())?;
+    let all = contexts(document);
+    if target.frame() >= all[set].frames {
         return Err(DispatchErrorCode::InvalidRequest);
     }
     projection
