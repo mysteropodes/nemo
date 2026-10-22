@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "51ef583b5de9ac10576e486758f404429e777371",
-  "describe": "v0.7.0-alpha.4-2901-g51ef583b-dirty"
+  "head": "dbe4e166746c3df51d0ea98b47b5e2e9a6d58f73",
+  "describe": "v0.7.0-alpha.4-2904-gdbe4e166-dirty"
  },
- "inputsDigest": "f76f8de0382f7930e6cdfbf5431fabd0172a4a01e18621369b17b80a685ee3a4",
+ "inputsDigest": "e4d405e399cd7342c7abec20566405cac31bd37dd2ca70e7ea1ee998ab5afa05",
  "states": [
   "inventoried",
   "characterized",
@@ -1003,7 +1003,7 @@
    "capability": "Add a key",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:139 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:156 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1047,7 +1047,7 @@
    "capability": "Edit easing curve…",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:143 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:160 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1089,7 +1089,7 @@
    "capability": "Camera layer — framing keys (zoom/pan) interpolated with Bézier curves",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:119 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:130 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1100,7 +1100,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3
+    "native": 2
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -1112,10 +1112,10 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 53,
+    "functionsVisited": 75,
     "via": "variable button",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:108 renderCameraViewLock()",
+     "src/js/adapters/native-object-project-desktop.js:119 renderCameraViewLock()",
      "src/js/motion.js:7282 action()"
     ]
    },
@@ -17449,7 +17449,7 @@
     "functionsVisited": 279,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:231 presented()",
+     "src/js/adapters/native-object-project-desktop.js:248 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7109 show()"
     ]

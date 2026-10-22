@@ -239,7 +239,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 130, 131, 132, 133, 134, 180, 244, 245, 286, 287, 288, 289, 292, 293, 294, 295]);
+    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 130, 131, 132, 133, 134, 180, 244, 245, 287, 288, 289, 290, 293, 294, 295, 296]);
   // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 42 identities and adjacency stay fixed; Comments adds its four ordinary source members.
   assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 246);
   assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 246);
