@@ -26,15 +26,20 @@
       var pin = {}; keys.forEach(function (key) { pin[key] = info[key]; });
       return { session: session, info: Object.freeze(pin), ticket: session.readSubscriptionGeneration(), generation: generation };
     }
-    function current(stamp) {
-      return !retired && stamp.generation === generation && ports.currentSession() === stamp.session && stamp.session.isActive() &&
-        same(stamp.session.info(), stamp.info) && stamp.session.readSubscriptionGeneration() === stamp.ticket;
+    function current(stamp, failed) {
+      function check(value, code) { if (!value && failed) failed(code); return value; }
+      return check(!retired, 'retired') && check(stamp.generation === generation, 'generation-stale') &&
+        check(ports.currentSession() === stamp.session, 'session-replaced') && check(stamp.session.isActive(), 'inactive') &&
+        check(same(stamp.session.info(), stamp.info), 'five-pin-stale') &&
+        check(stamp.session.readSubscriptionGeneration() === stamp.ticket, 'subscription-stale');
     }
     function guard(stamp) { if (!current(stamp)) throw fault('stale_revision'); }
     // Keep action identity narrow; validate full current metadata for UI readiness.
-    function available(stamp) {
+    function available(stamp, failed) {
       var info = stamp.session.info();
-      return same(info, stamp.info) && ports.available(stamp.session, info) === true;
+      function check(value, code) { if (!value && failed) failed(code); return value; }
+      return check(same(info, stamp.info), 'five-pin-stale') &&
+        check(ports.available(stamp.session, info) === true, 'projection-unready');
     }
     function ready(stamp, context) {
       guard(stamp);
@@ -83,15 +88,23 @@
       if (typeof ports.publish === 'function' && ports.publish(projection) !== true) throw fault();
       guard(stamp); cache = { stamp: stamp, value: projection }; return projection;
     }
-    function read() {
+    function read(onRefusal) {
+      var code = null;
+      function failed(value) { if (code === null) code = value; }
+      function refused() {
+        if (typeof onRefusal === 'function') try { onRefusal(code || 'unknown'); } catch (_) {}
+        return null;
+      }
       try {
-        if (cache && current(cache.stamp)) {
-          if (presented(cache.stamp.session.readPresentedObjectSession(), cache.stamp.info) &&
-            available(cache.stamp)) return cache.value;
-          return null; // The existing queue may temporarily hide presentation without changing native metadata.
+        if (!cache) failed('cache-empty');
+        else if (current(cache.stamp, failed)) {
+          var shown = cache.stamp.session.readPresentedObjectSession();
+          if (!presented(shown, cache.stamp.info)) failed(shown ? 'presentation-mismatch' : 'presentation-missing');
+          else if (available(cache.stamp, failed)) return cache.value;
+          return refused(); // Temporary presentation refusal still retains the same sealed cache.
         }
-      } catch (_) {}
-      cache = null; return null;
+      } catch (_) { failed('exception'); }
+      cache = null; return refused();
     }
     async function edit(value, expected) {
       var intent = Contract.action(value), shown = read();

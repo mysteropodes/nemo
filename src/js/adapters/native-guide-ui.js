@@ -12,6 +12,7 @@
     if (installed.has(root)) return installed.get(root);
     var retired = false, loading = null, pending = false, gesture = null;
     var projectionEpoch = 0, refreshNeeded = false, busyStamp = null;
+    var refusalObserver = null;
     var identityKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
     var document = root.document;
     function native() { return !!(root.__TAURI__ && root.__TAURI__.core); }
@@ -24,68 +25,105 @@
     function notice(message) {
       if (typeof root.showToast === 'function') root.showToast(message || 'Guide changes are not confirmed. Wait for synchronization before trying again.');
     }
-    function busy() { return retired || pending || !!loading; }
+    function diagnostic(event, code) {
+      try {
+        var desktop = root.NemoNativeObjectProjectDesktop;
+        if (desktop && typeof desktop.openDiagnostic === 'function') desktop.openDiagnostic(root, event, code);
+      } catch (_) {}
+    }
+    function check(value, code) { if (!value && refusalObserver) refusalObserver(code); return value; }
+    // Only an existing operation's refusal observes these same guards; presentation reads stay silent.
+    function observe(action) {
+      var previous = refusalObserver, code = null;
+      refusalObserver = function (value) { if (code === null) code = value; };
+      try { return action(function (event) {
+        notice();
+        diagnostic(event, code || 'unknown');
+      }); } finally { refusalObserver = previous; }
+    }
+    function busy() {
+      return !check(!retired, 'retired') || !check(!pending, 'ui-pending') || !check(!loading, 'ui-loading');
+    }
     function identity() {
       try {
         var session = current(), info = session && session.info(), pin = {};
-        if (!session || !info || !session.isActive()) return null;
+        if (!check(session, 'session-missing') || !check(info, 'info-missing') || !check(session.isActive(), 'inactive')) return null;
         identityKeys.forEach(function (key) { pin[key] = info[key]; });
         return { session: session, info: info, pin: pin, epoch: projectionEpoch, ticket: session.readSubscriptionGeneration() };
-      } catch (_) { return null; }
+      } catch (_) { check(false, 'exception'); return null; }
     }
     function changed(stamp, next) {
-      return !stamp || stamp.session !== next.session || stamp.epoch !== next.epoch || stamp.ticket !== next.ticket ||
-        identityKeys.some(function (key) { return stamp.pin[key] !== next.pin[key]; });
+      return !check(stamp, 'identity-missing') || !check(stamp.session === next.session, 'session-replaced') ||
+        !check(stamp.epoch === next.epoch, 'epoch-stale') || !check(stamp.ticket === next.ticket, 'subscription-stale') ||
+        !check(!identityKeys.some(function (key) { return stamp.pin[key] !== next.pin[key]; }), 'five-pin-stale');
     }
     function settled() {
       busyStamp = null;
       var refresh = refreshNeeded; refreshNeeded = false; repaint();
       if (refresh && !retired && !model.read()) presented();
     }
-    function shown(origin) { return !busy() && !!origin && model.read() === origin; }
+    function shown(origin) {
+      return !busy() && check(!!origin, 'origin-missing') && check(model.read(refusalObserver) === origin, 'origin-changed');
+    }
     function repaint() { if (root.SMRulers) root.SMRulers.render(); }
     function cancelGesture() { if (gesture) { var old = gesture; gesture = null; old.cancel(); } }
     async function edit(action, origin) {
-      if (!shown(origin)) { notice(); return { status: 'unavailable' }; }
+      if (!observe(function (refused) {
+        if (!shown(origin)) { refused('guide-edit-refused'); return false; }
+        return true;
+      })) return { status: 'unavailable' };
       cancelGesture(); busyStamp = identity(); pending = true; repaint();
       try {
         var result = await model.edit(action, origin);
-        if (!['applied-presented', 'unchanged'].includes(result.status)) notice();
+        var status = result.status;
+        if (!['applied-presented', 'unchanged'].includes(status)) {
+          notice(); diagnostic('guide-edit-refused', status === 'applied-unconfirmed' ? 'applied-unconfirmed' : 'native-unconfirmed');
+        }
         return result;
-      } catch (error) { notice(); return { status: 'unconfirmed', code: error && error.code || 'unavailable' }; }
+      } catch (error) {
+        notice(); diagnostic('guide-edit-refused', 'edit-exception');
+        return { status: 'unconfirmed', code: error && error.code || 'unavailable' };
+      }
       finally { pending = false; settled(); }
     }
     function coordinateState() {
       try {
-        var stamp = identity(), projection = model.read(), state = root.state;
-        if (busy() || !stamp || !projection || !state || !available(stamp.session, stamp.info) ||
-            !identityKeys.every(function (key) { return projection.info[key] === stamp.pin[key]; })) return null;
+        var stamp = identity(), projection = model.read(refusalObserver), state = root.state;
+        if (busy() || !check(stamp, 'identity-missing') || !check(projection, 'projection-missing') || !check(state, 'state-missing') ||
+            !check(available(stamp.session, stamp.info), 'projection-unready') ||
+            !check(identityKeys.every(function (key) { return projection.info[key] === stamp.pin[key]; }), 'guide-pin-mismatch')) return null;
         var shown = stamp.session.readPresentedObjectSession(), p = shown && shown.presentation, frame = state.currentFrame;
-        if (!shown || !p || p.owner !== 'native' || p.status !== 'presented' || !p.view ||
-            !identityKeys.every(function (key) { return shown[key] === stamp.pin[key] && p[key] === stamp.pin[key]; }) ||
-            p.contextId !== 'scene-root' || typeof p.workId !== 'string' || !p.workId || !Number.isSafeInteger(p.viewGeneration) || p.viewGeneration < 1 ||
-            p.frame !== frame || !Number.isSafeInteger(frame) || frame < 0 || frame >= stamp.info.totalFrames ||
-            !Mapping.matchesView(root, p)) return null;
+        if (!check(shown, 'presentation-missing') || !check(p, 'presentation-missing') || !check(p.owner === 'native', 'presentation-owner') ||
+            !check(p.status === 'presented', 'presentation-status') || !check(p.view, 'view-missing') ||
+            !check(identityKeys.every(function (key) { return shown[key] === stamp.pin[key] && p[key] === stamp.pin[key]; }), 'presentation-pin-mismatch') ||
+            !check(p.contextId === 'scene-root', 'context-mismatch') || !check(typeof p.workId === 'string', 'work-id-invalid') || !check(p.workId, 'work-id-invalid') ||
+            !check(Number.isSafeInteger(p.viewGeneration), 'view-generation-invalid') || !check(!(p.viewGeneration < 1), 'view-generation-invalid') ||
+            !check(p.frame === frame, 'frame-mismatch') || !check(Number.isSafeInteger(frame), 'frame-mismatch') ||
+            !check(!(frame < 0), 'frame-mismatch') || !check(!(frame >= stamp.info.totalFrames), 'frame-mismatch') ||
+            !check(Mapping.matchesView(root, p), 'view-mismatch')) return null;
         var bounds = Mapping.bounds(root, stamp.info), element = document.getElementById('canvas-area');
         var area = element && element.getBoundingClientRect();
-        if (!bounds || !area || ![area.left, area.top, area.width, area.height].every(Number.isFinite) || area.width <= 0 || area.height <= 0) return null;
+        if (!check(bounds, 'canvas-bounds-unavailable') || !check(area, 'area-bounds-unavailable') ||
+            !check([area.left, area.top, area.width, area.height].every(Number.isFinite), 'area-bounds-unavailable') ||
+            !check(!(area.width <= 0), 'area-bounds-unavailable') || !check(!(area.height <= 0), 'area-bounds-unavailable')) return null;
         var context = { bounds: Object.freeze(Object.assign({}, bounds)), canvasW: stamp.info.canvasW, canvasH: stamp.info.canvasH,
           presentation: JSON.parse(JSON.stringify(p)) };
         var forward = Mapping.transform(context, false), inverse = Mapping.transform(context, true);
-        if (![forward, inverse].every(function (m) { var d = m[0] * m[3] - m[1] * m[2]; return Number.isFinite(d) && d !== 0; })) return null;
+        if (!check([forward, inverse].every(function (m) { var d = m[0] * m[3] - m[1] * m[2]; return Number.isFinite(d) && d !== 0; }), 'affine-unavailable')) return null;
         area = Object.freeze({ left: area.left, top: area.top, width: area.width, height: area.height });
         var signature = JSON.stringify([identityKeys.map(function (key) { return stamp.pin[key]; }), stamp.ticket, stamp.epoch,
           frame, p.workId, p.viewGeneration, p.view, context.canvasW, context.canvasH, context.bounds, area]);
         return { stamp: stamp, projection: projection, presentation: p, context: context, area: area, signature: signature };
-      } catch (_) { return null; }
+      } catch (_) { check(false, 'exception'); return null; }
     }
     // A transient conversion proof, never another writable viewport or guide owner.
     function coordinates() {
       var captured = coordinateState(); if (!captured) return null;
       function currentCoordinates() {
         var next = coordinateState();
-        return !!next && !changed(captured.stamp, next.stamp) && next.projection === captured.projection &&
-          next.presentation === captured.presentation && next.signature === captured.signature;
+        return check(!!next, 'coordinates-unavailable') && !changed(captured.stamp, next.stamp) &&
+          check(next.projection === captured.projection, 'guide-projection-replaced') &&
+          check(next.presentation === captured.presentation, 'presentation-replaced') && check(next.signature === captured.signature, 'geometry-changed');
       }
       function finite(point) { return point && Number.isFinite(point.x) && Number.isFinite(point.y); }
       function project(point) {
@@ -125,11 +163,17 @@
         transform: 'rotate(' + Math.atan2(dy, dx) + 'rad)' });
     }
     function beginDrag(event, axis, ordinal, container) {
-      var origin = model.read(), area = document.getElementById('canvas-area'), proof = coordinates();
-      if (!shown(origin) || !proof || gesture || !area || !container || !['h', 'v'].includes(axis) ||
-          ordinal !== null && (!Number.isSafeInteger(ordinal) || ordinal < 1 || ordinal > origin.guides[axis].length)) {
-        notice(); return false;
-      }
+      var origin, area, proof;
+      if (!observe(function (refused) {
+        origin = model.read(refusalObserver); area = document.getElementById('canvas-area'); proof = coordinates();
+        if (!shown(origin) || !check(proof, 'coordinates-unavailable') || !check(!gesture, 'gesture-active') ||
+            !check(area, 'area-missing') || !check(container, 'container-missing') || !check(['h', 'v'].includes(axis), 'axis-invalid') ||
+            ordinal !== null && (!check(Number.isSafeInteger(ordinal), 'ordinal-invalid') || !check(!(ordinal < 1), 'ordinal-invalid') ||
+              !check(!(ordinal > origin.guides[axis].length), 'ordinal-invalid'))) {
+          refused('guide-entry-refused'); return false;
+        }
+        return true;
+      })) return false;
       var pointer = event.pointerId, ghost = document.createElement('div');
       ghost.className = 'guide-line ' + axis; ghost.style.opacity = '.6'; ghost.style.pointerEvents = 'none'; container.appendChild(ghost);
       function cleanup() {
@@ -155,16 +199,19 @@
       function up(e) {
         if (e.pointerId !== pointer) return;
         e.stopImmediatePropagation(); cancel();
-        if (!shown(origin) || !proof.current() || root.state.guidesLocked || !root.state.rulersOn) { notice(); return; }
-        var x = e.clientX - proof.area.left, y = e.clientY - proof.area.top;
-        var back = (axis === 'h' ? y : x) < 18;
-        if (back) { if (ordinal !== null) edit({ kind: 'remove', axis: axis, ordinal: ordinal }, origin); return; }
-        var point = proof.unproject(e);
-        if (!point) { notice(); return; }
-        var position = axis === 'h' ? point.y : point.x;
-        var action = ordinal === null ? { kind: 'add', axis: axis, position: position } :
-          { kind: 'move', axis: axis, ordinal: ordinal, position: position };
-        edit(action, origin);
+        observe(function (refused) {
+          if (!shown(origin) || !proof.current() || !check(!root.state.guidesLocked, 'guides-locked') ||
+              !check(root.state.rulersOn, 'rulers-off')) { refused('guide-release-refused'); return; }
+          var x = e.clientX - proof.area.left, y = e.clientY - proof.area.top;
+          var back = (axis === 'h' ? y : x) < 18;
+          if (back) { if (ordinal !== null) edit({ kind: 'remove', axis: axis, ordinal: ordinal }, origin); return; }
+          var point = proof.unproject(e);
+          if (!check(point, 'point-unavailable')) { refused('guide-release-refused'); return; }
+          var position = axis === 'h' ? point.y : point.x;
+          var action = ordinal === null ? { kind: 'add', axis: axis, position: position } :
+            { kind: 'move', axis: axis, ordinal: ordinal, position: position };
+          edit(action, origin);
+        });
       }
       document.addEventListener('pointermove', move, true); document.addEventListener('pointerup', up, true);
       document.addEventListener('pointercancel', cancel, true); document.addEventListener('keydown', key, true); place(event); return true;

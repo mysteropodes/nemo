@@ -28,6 +28,15 @@
     if(event==='bpm-settings-refused')return ['controller-missing','cache-empty','retired','generation-stale',
       'session-replaced','inactive','five-pin-stale','subscription-stale','presentation-missing',
       'presentation-mismatch','projection-unready','exception'].includes(code)?code:'unknown';
+    if(['guide-entry-refused','guide-release-refused','guide-edit-refused'].includes(event))return ['cache-empty','retired','generation-stale',
+      'session-replaced','inactive','five-pin-stale','subscription-stale','presentation-missing','presentation-mismatch',
+      'projection-unready','exception','ui-pending','ui-loading','session-missing','info-missing','identity-missing',
+      'projection-missing','state-missing','guide-pin-mismatch','presentation-owner','presentation-status','view-missing',
+      'presentation-pin-mismatch','context-mismatch','work-id-invalid','view-generation-invalid','frame-mismatch','view-mismatch',
+      'canvas-bounds-unavailable','area-bounds-unavailable','affine-unavailable','coordinates-unavailable','epoch-stale',
+      'guide-projection-replaced','presentation-replaced','geometry-changed','origin-missing','origin-changed','gesture-active',
+      'area-missing','container-missing','axis-invalid','ordinal-invalid','guides-locked','rulers-off','point-unavailable',
+      'native-unconfirmed','applied-unconfirmed','edit-exception'].includes(code)?code:'unknown';
     if(event==='bootstrap-rejected')return code==='unsupported-format'?'unsupported-format':'other';
     if(event==='file-stage')return ['projection','ui-refresh','hide-start','layout-wait','layout-settled'].includes(code)?code:'unknown';
     if(event==='file-failed')return ['not-dispatched','unconfirmed'].includes(code)?code:'unknown';
@@ -43,7 +52,8 @@
   // A single coalesced writer keeps the last 32 events; storage can fail or hang without delaying Open.
   function openDiagnostic(root,event,code){
     if(!['file-open-started','file-new-started','file-completed','file-cancelled','file-failed','file-stage',
-      'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','bpm-settings-refused'].includes(event))return;
+      'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','bpm-settings-refused',
+      'guide-entry-refused','guide-release-refused','guide-edit-refused'].includes(event))return;
     try{
       var log=openLogs.get(root);if(!log){log={startedAt:Date.now(),events:[],serial:0,attempt:0,writing:false,pending:null};openLogs.set(root,log);}
       if(event==='file-open-started'||event==='file-new-started')log.attempt++;
@@ -65,7 +75,8 @@
       }
     }catch(_){}
     // Preserve the existing optional fixture observer; it is never required to collect production evidence.
-    try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,event==='bpm-settings-refused'?safeCode(event,code):code);}catch(_){}
+    try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,
+      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused'].includes(event)?safeCode(event,code):code);}catch(_){}
   }
   // The captured read proof exists only during this action's synchronous guard.
   function withActionPresentation(origin,current,action){
