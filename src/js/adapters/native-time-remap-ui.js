@@ -269,7 +269,7 @@
     });
     replace.addEventListener('click',function(){
       var c=video(),p=shown;if(!c||!p||c.video.declared()!==true)return;
-      return Promise.resolve(c.video.replaceActive(p.placementId)).then(function(r){return typeof c.surface==='function'?c.surface(r):r;});
+      return after(Promise.resolve(c.video.replaceActive(p.placementId)).then(function(r){return typeof c.surface==='function'?c.surface(r):r;}));
     });
     b.refresh=function(){
       var own=binding(),li=active(),p=own&&li>=0?own.nativeVideoPlacement(li):null;

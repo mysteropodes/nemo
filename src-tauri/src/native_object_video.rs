@@ -56,10 +56,10 @@ pub(super) fn with_source_frame_count(
 }
 
 /// A remapped layer reads its placement once per frame: the frame count of an
-/// unchanged source (same canonical path, length and mtime) is remembered so a
+/// unchanged source (same canonical path, file identity, length and mtime) is remembered so a
 /// decoder opens once per source version, not once per frame (CLAUDE.md §5bis(a)).
 const COUNT_CACHE_ENTRIES: usize = 64;
-type CountKey = (PathBuf, u64, SystemTime);
+type CountKey = (PathBuf, (u64, u64), u64, SystemTime);
 type CountCache = Mutex<Vec<(CountKey, u32)>>;
 static COUNTS: CountCache = Mutex::new(Vec::new());
 
@@ -67,7 +67,18 @@ fn count_key(path: &str) -> Option<CountKey> {
     let canonical = std::fs::canonicalize(path).ok()?;
     let metadata = std::fs::metadata(&canonical).ok()?;
     let modified = metadata.modified().ok()?;
-    Some((canonical, metadata.len(), modified))
+    Some((canonical, file_identity(&metadata), metadata.len(), modified))
+}
+
+/// A same-size, same-mtime file copied over the source is a new source version.
+#[cfg(unix)]
+fn file_identity(metadata: &std::fs::Metadata) -> (u64, u64) {
+    use std::os::unix::fs::MetadataExt;
+    (metadata.dev(), metadata.ino())
+}
+#[cfg(not(unix))]
+fn file_identity(_: &std::fs::Metadata) -> (u64, u64) {
+    (0, 0)
 }
 
 fn remember(cache: &CountCache, key: CountKey, count: u32) {
@@ -244,6 +255,7 @@ mod tests {
         let key = |n: u64| {
             (
                 PathBuf::from(format!("/clip-{n}.mov")),
+                (1, n),
                 n,
                 SystemTime::UNIX_EPOCH,
             )
