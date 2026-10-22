@@ -227,9 +227,11 @@ pub(crate) fn plan_binding_edit_json(
                 let item = state
                     .raster_at(location.at)
                     .map_err(|_| DispatchErrorCode::Internal)?;
+                // Source index is provenance, not identity: check the complete retained target
+                // before writing, then avoid a second linear raster-table search.
                 let entry = rasters
-                    .iter_mut()
-                    .find(|entry| entry.target == location.target)
+                    .get_mut(location.source_index)
+                    .filter(|entry| entry.target == location.target)
                     .ok_or(DispatchErrorCode::Internal)?;
                 entry.item = item.clone();
             }

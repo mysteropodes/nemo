@@ -11,7 +11,7 @@ use crate::object_snapshot::object_image_mesh_edit_read::{
     BindingLayer, BindingSlot, BindingState, BindingTarget,
 };
 use crate::request_receipts::DispatchErrorCode;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 struct Context<'a> {
     id: &'a str,
@@ -21,6 +21,7 @@ struct Context<'a> {
 }
 
 pub(super) struct Location {
+    pub(super) source_index: usize,
     pub(super) target: ObjectTarget,
     pub(super) at: BindingTarget,
 }
@@ -87,60 +88,78 @@ pub(super) fn project(
     } else {
         vec![]
     };
+    let order_contexts: HashMap<_, _> = document
+        .composition_order
+        .value()
+        .into_iter()
+        .flat_map(|plan| &plan.contexts)
+        .map(|context| (context.context_id.as_str(), context))
+        .collect();
     for (set_index, context) in contexts.iter().enumerate() {
-        let plan = document.composition_order.value().and_then(|plan| {
-            plan.contexts
-                .iter()
-                .find(|entry| entry.context_id == context.id)
-        });
+        // Index each authored scope once. A raster lookup uses its full layer/stroke key;
+        // animated paint order remains irrelevant to native positional propagation.
+        let scopes: HashMap<_, HashMap<_, _>> = order_contexts
+            .get(context.id)
+            .into_iter()
+            .flat_map(|plan| &plan.scopes)
+            .filter(|scope| scope.frame_scope.kind == FrameScopeKind::Authored)
+            .map(|scope| {
+                (
+                    scope.frame_scope.frame,
+                    scope
+                        .elements
+                        .iter()
+                        .map(|element| {
+                            (
+                                (element.layer_uid.as_str(), element.stroke_id.as_str()),
+                                element.natural_position,
+                            )
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
+        // Group once per context while preserving the original path/raster/text encounter order
+        // within each layer. Frames stay sparse and sorted exactly as before.
+        let mut layer_frames: HashMap<_, BTreeMap<_, Vec<_>>> = HashMap::new();
+        let targets = context
+            .objects
+            .iter()
+            .map(|object| (object.target(), None))
+            .chain(
+                rasters
+                    .iter()
+                    .enumerate()
+                    .map(|(index, entry)| (&entry.target, Some(index))),
+            )
+            .chain(texts.iter().map(|entry| (&entry.target, None)));
+        for (target, raster) in targets.filter(|(target, _)| {
+            target.context_id() == context.id
+                && target.scope_kind() == &FrameScopeKind::Authored
+                && target.frame() < context.frames
+        }) {
+            layer_frames
+                .entry(target.layer_uid())
+                .or_default()
+                .entry(target.frame())
+                .or_default()
+                .push((target, raster));
+        }
         let mut layers = vec![];
         let mut missing = vec![];
         for (layer_index, layer) in context.layers.iter().enumerate() {
             // A target plus optional actual raster; nonrasters occupy their real mixed positions.
-            let mut frames: BTreeMap<u32, Vec<(&ObjectTarget, Option<usize>)>> = BTreeMap::new();
-            let in_layer = |target: &ObjectTarget| {
-                target.context_id() == context.id
-                    && target.layer_uid() == layer.layer_uid()
-                    && target.scope_kind() == &FrameScopeKind::Authored
-                    && target.frame() < context.frames
-            };
-            let targets = context
-                .objects
-                .iter()
-                .map(|object| (object.target(), None))
-                .chain(
-                    rasters
-                        .iter()
-                        .enumerate()
-                        .map(|(index, entry)| (&entry.target, Some(index))),
-                )
-                .chain(texts.iter().map(|entry| (&entry.target, None)));
-            for (target, raster) in targets.filter(|(target, _)| in_layer(target)) {
-                frames
-                    .entry(target.frame())
-                    .or_default()
-                    .push((target, raster));
-            }
+            let frames = layer_frames.remove(layer.layer_uid()).unwrap_or_default();
             let mut projected_frames = vec![];
             for (frame_number, mut slots) in frames {
-                let scope = plan.and_then(|plan| {
-                    plan.scopes.iter().find(|scope| {
-                        scope.frame_scope.kind == FrameScopeKind::Authored
-                            && scope.frame_scope.frame == frame_number
-                    })
-                });
+                let scope = scopes.get(&frame_number);
                 if let Some(scope) = scope {
                     let mut positioned = vec![];
                     for (target, raster) in slots {
-                        let element = scope
-                            .elements
-                            .iter()
-                            .find(|entry| {
-                                entry.layer_uid == target.layer_uid
-                                    && entry.stroke_id == target.stroke_id
-                            })
+                        let position = scope
+                            .get(&(target.layer_uid(), target.stroke_id()))
                             .ok_or(DispatchErrorCode::Unavailable)?;
-                        positioned.push((element.natural_position, target, raster));
+                        positioned.push((*position, target, raster));
                     }
                     positioned.sort_by_key(|entry| entry.0);
                     if positioned
@@ -174,6 +193,7 @@ pub(super) fn project(
                         Some(index) => {
                             projected.insert(index);
                             result.locations.push(Location {
+                                source_index: index,
                                 target: target.clone(),
                                 at: BindingTarget {
                                     set: set_index,

@@ -11,10 +11,10 @@
 use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::object_text_layout_kernels::object_text_layout_record::pin::GlyphPin;
 use crate::object_document::{
-    item_asset_issue, text_holder_id, AssetInventory, FrameScopeKind, ItemAssetIssue, ItemRecords,
-    ObjectDocument, ObjectLayer, ObjectRecord, ObjectTarget, Presence,
+    item_asset_issue, text_holder_id, AssetInventory, ComponentTables, FrameScopeKind,
+    ItemAssetIssue, ItemRecords, ObjectDocument, ObjectLayer, ObjectRecord, ObjectTarget, Presence,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 fn invalid(message: &str) -> ObjectCodecError {
     ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message)
@@ -31,16 +31,20 @@ pub(crate) fn validate_items(document: &ObjectDocument) -> Result<(), ObjectCode
         document.total_frames,
         &document.layers,
         &document.objects,
+        document.component_tables.value(),
     )
 }
 
 /// The same admission over the parts of an ordered (v2) wire document, which is not an `ObjectDocument`.
+/// A declared component resolves only against its own layer list and frame bound; it never borrows
+/// an identically named root layer. Every context's path targets participate in item uniqueness.
 pub(crate) fn validate_item_parts(
     members: &Presence<ItemRecords>,
     format_version: u32,
     total_frames: u32,
     layers: &[ObjectLayer],
     objects: &[ObjectRecord],
+    component_tables: Option<&ComponentTables>,
 ) -> Result<(), ObjectCodecError> {
     let Some(items) = members.value() else {
         return Ok(());
@@ -52,7 +56,21 @@ pub(crate) fn validate_item_parts(
     {
         return Err(invalid("an items container must hold at least one entry"));
     }
-    let mut seen: HashSet<&ObjectTarget> = objects.iter().map(|record| &record.target).collect();
+    let component_set = component_tables.and_then(|tables| tables.components.value());
+    let components: HashMap<_, _> = component_set
+        .into_iter()
+        .flat_map(|set| &set.components)
+        .map(|component| (component.symbol_id(), component))
+        .collect();
+    let inner_objects = component_set
+        .into_iter()
+        .flat_map(|set| &set.components)
+        .flat_map(|component| component.objects());
+    let mut seen: HashSet<&ObjectTarget> = objects
+        .iter()
+        .chain(inner_objects)
+        .map(|record| &record.target)
+        .collect();
     for target in items.targets() {
         let valid = if format_version == 2 {
             !target.context_id.is_empty()
@@ -61,13 +79,24 @@ pub(crate) fn validate_item_parts(
         } else {
             target.valid()
         };
-        if !valid || target.frame_scope.frame >= total_frames {
+        if !valid {
+            return Err(invalid("invalid scoped item target or frame"));
+        }
+        let (local_layers, local_frames) = if target.context_id == "scene-root" {
+            (layers, total_frames)
+        } else {
+            let component = components
+                .get(target.context_id.as_str())
+                .ok_or_else(|| invalid("item context reference is unresolved"))?;
+            (component.layers(), component.total_frames())
+        };
+        if target.frame_scope.frame >= local_frames {
             return Err(invalid("invalid scoped item target or frame"));
         }
         if target.frame_scope.kind != FrameScopeKind::Authored {
             return Err(unsupported("items are authored records, never reference"));
         }
-        let layer = layers
+        let layer = local_layers
             .iter()
             .find(|layer| layer.layer_uid == target.layer_uid)
             .ok_or_else(|| invalid("item layer reference is unresolved"))?;

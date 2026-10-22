@@ -285,6 +285,7 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         document.total_frames,
         &document.layers,
         &document.objects,
+        document.component_tables.value(),
     )?;
     validate_order(
         &document.composition_order,
@@ -328,6 +329,7 @@ pub(crate) fn validate_storage_order(
         document.total_frames,
         &document.layers,
         &document.objects,
+        document.component_tables.value(),
     )?;
     validate_order(
         plan,
