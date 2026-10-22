@@ -214,6 +214,8 @@ pub(crate) struct CompactFailure {
 pub(crate) enum CompactResult {
     #[cfg(feature = "project_media_codec")]
     ImageImported(crate::commands::ImageImportResult),
+    #[cfg(feature = "project_media_codec")]
+    VideoLinked(crate::commands::VideoLinkResult),
     #[cfg(feature = "font_asset_wire")]
     FontImported {
         asset_id: String,

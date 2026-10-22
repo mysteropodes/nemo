@@ -103,6 +103,9 @@ pub(crate) use widget_edit::{
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_image_import_owner.rs"]
 pub(crate) mod image_import;
+#[cfg(feature = "project_media_codec")]
+#[path = "object_media_video_link_owner.rs"]
+pub(crate) mod video_link;
 // L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
 #[cfg(feature = "project_media_codec")]
 #[path = "object_raster_asset_owner.rs"]
