@@ -21,19 +21,19 @@ const PLAN=Object.freeze({source:'A',offsetFrames:0});
 const STEPS=Object.freeze(['open-video-project','preview','replace-source','offset-or-time-remap','save-reopen','export-png-sequence','verify-pixels']);
 const COVERED=Object.freeze(['open-video-project','save-reopen','export-png-sequence','verify-pixels']);
 const BLOCKED=Object.freeze([
-  Object.freeze({step:'import-video',finding:'missing-required-local-consumer',
-    evidence:['src/js/images.js:611-612 importVideo -> nativeMedia(null,"video")',
-      'src/js/adapters/native-import-drop.js:195-198,219-220 openMedia("video") -> native_media_picker_absent',
-      'src/js/adapters/native-import-desktop.js:209 providers:{image} only (no video provider; drops refuse provider-unavailable at native-import-drop.js:69)'],
+  // The ordinary UI route now exists (T12 point 8 JS slice); this driver's ordered witnesses do not drive it yet.
+  Object.freeze({step:'import-video',finding:'installed-step-not-driven',
+    evidence:['src/js/images.js:611-612 importVideo -> nativeMedia(null,"video") -> native-import-drop.js openMedia("video")',
+      'src/js/adapters/native-import-desktop.js:212 providers:{image, video}; native-import-video.js openFile -> native-video-asset.js importPicked',
+      'tests/desktop/video-installed-policy.cjs:189 witnessAction orders open/save/reopen/export only: no video-picker witness'],
     substitute:'Open Project… on a driver-authored native project that links staged source A (fixture open, not import)'}),
   Object.freeze({step:'preview',finding:'no-exact-installed-preview-readback',
     evidence:['tests/desktop/p38-owned-window.swift:282 helper actions; capture is a scaled window screenshot, not a pixel readback'],
     substitute:'captures are retained as evidence only; pixels are proven by export'}),
-  Object.freeze({step:'replace-source',finding:'missing-required-local-consumer',
-    evidence:['src/js/timeline.js:7184 the native footage panel disables replace: no native video attach or relink command',
-      'src-tauri/src/native_revision_sync.rs:305-312 catalog-only asset attach is unavailable on the host',
-      'native-engine/src/object_raster_image_import_owner.rs:91 the placed attach admits image/png only',
-      'src/js/adapters/native-project-placement-contract.js:33-39 place/remove need an asset id already in the catalog']}),
+  Object.freeze({step:'replace-source',finding:'installed-step-not-driven',
+    evidence:['src/js/timeline.js:7185 the native footage panel enables Replace only for a declared native video route',
+      'src/js/images.js:759 Replace -> NemoNativeImportController.video.replaceActive(placementId)',
+      'tests/desktop/video-installed-policy.cjs:189 witnessAction has no replace witness; PLAN stays source A']}),
   Object.freeze({step:'offset',finding:'missing-required-local-consumer',
     evidence:['src/js/adapters/native-project-placement-contract.js:33-34 setOffset/shiftOffset have no UI caller']}),
   Object.freeze({step:'time-remap',finding:'missing-required-local-consumer',

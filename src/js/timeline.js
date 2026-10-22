@@ -7180,9 +7180,11 @@ function updateFootagePanel(){
   // A web-imported (non-Tauri) video session has no real path to relink —
   // same limitation replaceNativeVideoSource itself guards on with a toast.
   repBtn.disabled=(kind.key==='video'&&ld.nativeVideo&&ld.nativeVideo.isWeb);
-  // No native video attach/relink command exists yet: report it, never reach the legacy relink writer.
-  if(nativePlacement){repBtn.disabled=true;repBtn.title='Replacing a native video source is unavailable: the native engine has no video attach or relink command yet.';}
-  else repBtn.removeAttribute('title');
+  // A native placement relinks through the native video provider only (images.js reads data-placement-id); never the legacy relink writer.
+  var nativeVideo=window.NemoNativeImportController&&window.NemoNativeImportController.video;
+  var routed=!!nativePlacement&&!!nativeVideo&&nativeVideo.declared()===true;
+  if(routed){repBtn.disabled=false;repBtn.dataset.placementId=nativePlacement.placementId;repBtn.removeAttribute('title');}
+  else{delete repBtn.dataset.placementId;if(nativePlacement){repBtn.disabled=true;repBtn.title='Replacing a native video source is unavailable: the native video link route is not declared.';}else repBtn.removeAttribute('title');}
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');

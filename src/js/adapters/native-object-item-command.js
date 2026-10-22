@@ -7,12 +7,14 @@
   var api=factory(contract);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectItemCommand=api;
-}(typeof globalThis==='object'?globalThis:this,function(contract){
+}(typeof globalThis==='object'?globalThis:this,function(itemContract){
   'use strict';
   function fault(code,message,extra){var e=new Error(message);e.code=code;return Object.assign(e,extra||{});}
   function ownerKey(pin){return JSON.stringify([pin.instanceId,pin.documentId,pin.lifecycleGeneration]);}
   function size(request){return new TextEncoder().encode(JSON.stringify(request)).length;}
-  function create(session,label){
+  // `override` names another closed contract of the same interface (payload/result/correlate) for an operation outside the item contract.
+  function create(session,label,override){
+    var contract=override||itemContract;
     if(!contract)throw new Error('Native object item contract is unavailable');
     function owner(){
       var pin=session.info();

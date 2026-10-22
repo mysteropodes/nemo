@@ -35,7 +35,7 @@
     }
   }
 
-  // `overrides` replaces named ports (readPsd, pickFile, resizeCanvas, readText) and exists for the tests of the composition only.
+  // `overrides` replaces named ports (readPsd, pickFile, resizeCanvas, readText, imageRoute, videoRoute) and exists for the tests of the composition only.
   function install(root, overrides) {
     if (installed.has(root)) return installed.get(root);
     overrides = overrides || {};
@@ -205,8 +205,11 @@
         } finally { imagePending = false; }
       },
     });
+    // T12 point 8: the video menu and the footage panel's Replace reach the native linked-video command; tests may disable it.
+    const video = root.NemoNativeImportVideo ? root.NemoNativeImportVideo.create({ root, core, presented: m.core.presented, current, selection,
+      declared: overrides.videoRoute === undefined || overrides.videoRoute === true }) : null;
     const drop = m.drop.create({
-      svg, svgAvailable: () => core.begin().ok === true, providers: { image }, notify, surface,
+      svg, svgAvailable: () => core.begin().ok === true, providers: { image, video }, notify, surface,
       cancelPasteFallback: () => { if (root._svgPasteFallback) { root.clearTimeout(root._svgPasteFallback); root._svgPasteFallback = null; } },
     });
     const figma = m.figma.create({ paper: paper(), core, t, notify, resizeCanvas, fetch: (...a) => root.fetch(...a) });
@@ -256,10 +259,10 @@
       importFiles: (files, opts) => svg.importFiles(files, opts), isSvgFile: m.drop.isSvgFile,
     });
     const controller = Object.freeze({
-      svg, drop, image, figma, psd, montage, core, attach, noticeFor, surface,
+      svg, drop, image, video, figma, psd, montage, core, attach, noticeFor, surface,
       openSvg: facade.openFile, importPsd: (file) => psd.importFile(file).then(surface),
       importFigma: (url, token, opts) => figma.run(url, token, opts).then(surface),
-      dispose() { imageRetired = true; core.dispose(); },
+      dispose() { imageRetired = true; if (video) video.dispose(); core.dispose(); },
     });
     root.SMSvgImport = facade;
     root.NemoNativeImportController = controller;
