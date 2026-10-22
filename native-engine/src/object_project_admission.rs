@@ -69,18 +69,6 @@ impl PreparedReferenceAttachment {
 }
 
 impl ObjectSnapshot {
-    /// Validate the command-prepared order plan through the existing codec.
-    /// The detached admitted document is returned without publication.
-    pub(crate) fn migrate_import_object_order(
-        &self,
-        document: super::ObjectDocument,
-        plan_bytes: &[u8],
-    ) -> Result<super::ObjectDocument, DispatchErrorCode> {
-        crate::object_codec::migrate_ordered_project(&document, plan_bytes)
-            .map(|ordered| ordered.into_storage())
-            .map_err(|_| DispatchErrorCode::InvalidRequest)
-    }
-
     /// Validate borrowed import PNG bytes with the shared charged workspace.
     /// No encoded allocation is copied or retained by this immutable read.
     pub(crate) fn validate_import_png(&self, source: &[u8]) -> Result<(), DispatchErrorCode> {

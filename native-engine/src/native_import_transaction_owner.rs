@@ -325,7 +325,7 @@ impl ObjectFillOwner {
     #[cfg(feature = "project_media_codec")]
     fn migrate_import_object_order(
         origin: &ObjectSnapshot,
-        document: ObjectDocument,
+        mut document: ObjectDocument,
         targets: &[ObjectTarget],
     ) -> Result<ObjectDocument, DispatchErrorCode> {
         let invalid = DispatchErrorCode::InvalidRequest;
@@ -354,8 +354,16 @@ impl ObjectFillOwner {
         for target in targets {
             append_import_order(&mut plan, target)?;
         }
-        let bytes = serde_json::to_vec(&plan).map_err(|_| DispatchErrorCode::Internal)?;
-        origin.migrate_import_object_order(document, &bytes)
+        // Keep both sides of the explicit v1-to-v2 transition on the existing
+        // immutable drawing admission path. The command owner builds the plan;
+        // the read query validates each detached document without owning it.
+        ObjectSnapshot::validate_drawing(&document)
+            .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        document.format_version = 2;
+        document.composition_order = Presence::Present(plan);
+        ObjectSnapshot::validate_drawing(&document)
+            .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        Ok(document)
     }
 
     /// Sealing permits only the same natural origin prefix during explicit migration.
