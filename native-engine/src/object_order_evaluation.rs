@@ -330,10 +330,7 @@ where
                 target.layer_uid.as_str(),
                 target.stroke_id.as_str(),
             );
-            if sources
-                .insert(key, records.len() + index)
-                .is_some()
-            {
+            if sources.insert(key, records.len() + index).is_some() {
                 return Err(ObjectFrameError::InvalidSource.into());
             }
         }
