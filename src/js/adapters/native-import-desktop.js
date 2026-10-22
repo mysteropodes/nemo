@@ -38,7 +38,7 @@
     }
   }
 
-  // `overrides` replaces named ports (readPsd, pickFile, resizeCanvas, readText, imageRoute, videoRoute) and exists for the tests of the composition only.
+  // `overrides` replaces named ports (readPsd, pickFile, resizeCanvas, readText, imageRoute, videoRoute: the T12 linked-video menu/Replace route) and exists for the tests of the composition only.
   function install(root, overrides) {
     if (installed.has(root)) return installed.get(root);
     overrides = overrides || {};
@@ -228,11 +228,8 @@
           return { status: 'refused', code };
         } finally { imagePending = false; }
       },
-    });
-    // T12 point 8: the video menu and the footage panel's Replace reach the native linked-video command; tests may disable it.
-    const video = root.NemoNativeImportVideo ? root.NemoNativeImportVideo.create({ root, core, presented: m.core.presented, current, selection,
-      declared: overrides.videoRoute === undefined || overrides.videoRoute === true }) : null;
-    const drop = m.drop.create({
+    }), video = root.NemoNativeImportVideo ? root.NemoNativeImportVideo.create({ root, core, presented: m.core.presented, current, selection,
+      declared: [undefined, true].includes(overrides.videoRoute) }) : null, drop = m.drop.create({
       svg, svgAvailable: () => core.begin().ok === true, providers: { image, video }, notify, surface,
       admitDrop: (_files, plan) => !plan.groups.some(row => row.group === 'image') || plan.groups.length === 1,
       cancelPasteFallback: () => { if (root._svgPasteFallback) { root.clearTimeout(root._svgPasteFallback); root._svgPasteFallback = null; } },
