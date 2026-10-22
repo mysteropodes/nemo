@@ -5,7 +5,7 @@
 }(typeof globalThis==='object'?globalThis:this,function(Desktop){
   'use strict';var installed=new WeakMap();
   function install(root){if(installed.has(root))return installed.get(root);
-    var retired=false,loading=null,pending=false,viewEpoch=0,readIntent=null;
+    var retired=false,loading=null,pending=false,viewEpoch=0,readIntent=null,failedRead=null;
     var pinKeys=['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'];
     function current(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
     function ready(session,info){return !retired&&session===current()&&!!root.NemoNativeObjectProjectFile&&
@@ -17,7 +17,7 @@
       var intent=readIntent;readIntent=null;
       if(intent)intent.resolve(value);
     }
-    function cancelRead(){viewEpoch++;finishRead(null);}
+    function cancelRead(){viewEpoch++;failedRead=null;finishRead(null);}
     function readOwner(){
       var session=current(),info=session&&session.info();
       if(retired||pending||!session||!session.isActive()||!info||
@@ -35,6 +35,8 @@
       if(!readIntent)return;
       try{
         if(!sameReadOwner(readIntent.stamp)){finishRead(null);return;}
+        // A busy public getter is not evidence that the sealed cache is stale.
+        if(!readIntent.stamp.session.readPresentedObjectSession())return;
         var value=model.read();
         if(value)finishRead(value);
         else if(completed&&readIntent.stamp.session.readPresentedObjectSession())finishRead(null);
@@ -49,9 +51,13 @@
         try{if(sameReadOwner(readIntent.stamp)){settleRead(false);return existing;}}catch(_){}
         finishRead(null);
       }
-      var value=model.read();if(value)return Promise.resolve(value);
+      var value;
+      try{value=stamp.session.readPresentedObjectSession()?model.read():null;}
+      catch(_){finishRead(null);return Promise.resolve(null);}
+      if(value)return Promise.resolve(value);
       var intent={stamp:stamp,promise:null,resolve:null};
       intent.promise=new Promise(function(resolve){intent.resolve=resolve;});readIntent=intent;
+      failedRead=null; // A new explicit intent may attempt a previously refused read once.
       // Register first, then use the existing path if settlement already happened.
       // A fenced public presentation waits for the ordinary completion fanout.
       try{if(stamp.session.readPresentedObjectSession())presented();}catch(_){finishRead(null);}
@@ -60,9 +66,25 @@
     // Repaint only after the complete pinned read becomes visible in the model cache.
     function presented(){
       settleRead(false);
-      if(retired||pending||loading||model.read())return loading||Promise.resolve(model.read());
-      loading=model.refresh().then(function(value){repaint();return value;}).catch(function(){return null;})
-        .finally(function(){loading=null;settleRead(true);});return loading;
+      if(retired||pending||loading)return loading||Promise.resolve(null);
+      var stamp,shown;
+      try{stamp=readOwner();shown=stamp&&stamp.session.readPresentedObjectSession();}catch(_){}
+      // Completion fanout can observe another queued resource's public fence.
+      // Leave the cache and attempt stamp alone until a real settled receipt exists.
+      if(!stamp||!shown||!shown.presentation)return Promise.resolve(null);
+      stamp.presentation=shown.presentation;
+      var value=model.read();if(value)return Promise.resolve(value);
+      if(failedRead&&sameReadOwner(failedRead)&&failedRead.presentation===stamp.presentation){
+        finishRead(null);return Promise.resolve(null);
+      }
+      failedRead=null;
+      loading=model.refresh().then(function(value){
+        if(!sameReadOwner(stamp))return null;
+        repaint();return value;
+      }).catch(function(){
+        try{if(sameReadOwner(stamp))failedRead=stamp;}catch(_){}
+        return null;
+      }).finally(function(){loading=null;settleRead(true);});return loading;
     }
     async function edit(action,expected){
       cancelRead();
