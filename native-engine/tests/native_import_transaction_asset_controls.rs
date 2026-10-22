@@ -1,7 +1,9 @@
 //! Negative controls use the actual project, provider, planner and dispatcher.
 //! A refusal or abandoned candidate must preserve the entire saved envelope and redo.
 use super::asset_tests::{new_png, png_batch, project_bytes, project_history, raster, text};
-use super::{ImportAsset, ImportBatch, ImportError, ImportRaster, ImportRecord, ImportSkip, SkipKind};
+use super::{
+    ImportAsset, ImportBatch, ImportError, ImportRaster, ImportRecord, ImportSkip, SkipKind,
+};
 use crate::object_document::{AssetId, AssetKind, AssetRecord, AssetSource};
 use crate::request_receipts::DispatchErrorCode;
 use serde_json::json;

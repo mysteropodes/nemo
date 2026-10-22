@@ -85,6 +85,7 @@ fn actual_png_vector_and_bundled_text_publish_once_and_round_trip_with_order_and
     for version in [1, 2] {
         let mut owner = project_history(version);
         let before = project_bytes(&owner);
+        let before_value: Value = serde_json::from_slice(&before).unwrap();
         let batch = png_batch(&owner);
         let allocation = Arc::clone(
             batch.assets[0]
@@ -152,8 +153,9 @@ fn actual_png_vector_and_bundled_text_publish_once_and_round_trip_with_order_and
         let saved = project_bytes(&owner);
         let value: Value = serde_json::from_slice(&saved).unwrap();
         assert_eq!(value["project"]["bpm"], 137.5);
-        assert_eq!(value["project"]["bpmOffset"], 4);
+        assert_eq!(value["project"]["bpmOffset"], 4.0);
         assert_eq!(value["project"]["bpmShow"], true);
+        assert_eq!(value["project"], before_value["project"]);
         let reopened = NativeObjectHistory::from_project_file("reopened", &saved).unwrap();
         assert_eq!(project_bytes(&reopened), saved);
         assert_eq!(owner.undo(1), Ok(2));
