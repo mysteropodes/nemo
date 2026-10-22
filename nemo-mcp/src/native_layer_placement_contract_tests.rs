@@ -10,7 +10,8 @@ fn output(placement: Value) -> Value {
 }
 fn video() -> Value {
     json!({"placementId":"p1","assetId":"v1","assetKind":"video","offsetFrames":5,
-        "timeRemap":{"keyCount":2,"keyAtFrame":false},"interpMode":"blend","frameBlend":true,
+        "timeRemap":{"keyCount":2,"keyAtFrame":false,"value":12.5,
+            "keys":[{"frame":0,"value":0},{"frame":24,"value":47}]},"interpMode":"blend","frameBlend":true,
         "sourceFrameCount":48})
 }
 #[test]
@@ -41,6 +42,9 @@ fn result_facts_are_bounded_and_belong_to_the_requested_snapshot() {
         plain[k] = Value::Null;
     }
     assert!(result("document", &q, &output(plain)));
+    let mut unlisted = video();
+    unlisted["timeRemap"] = json!({"keyCount":300,"keyAtFrame":true,"value":7.5,"keys":null});
+    assert!(result("document", &q, &output(unlisted)), "past the budget");
     for (field, value) in [
         ("assetKind", json!("image")),
         ("offsetFrames", json!("5")),
@@ -50,10 +54,27 @@ fn result_facts_are_bounded_and_belong_to_the_requested_snapshot() {
         ("sourceFrameCount", json!(1.5)),
         ("sourceFrameCount", json!(4_294_967_296_u64)),
         ("timeRemap", json!({"keyCount":2})),
-        ("timeRemap", json!({"keyCount":-1,"keyAtFrame":true})),
+        ("timeRemap", json!({"keyCount":2,"keyAtFrame":false})),
         (
             "timeRemap",
-            json!({"keys":[],"keyCount":0,"keyAtFrame":false}),
+            json!({"keyCount":-1,"keyAtFrame":true,"value":null,"keys":null}),
+        ),
+        (
+            "timeRemap",
+            json!({"keyCount":1,"keyAtFrame":false,"value":"3","keys":null}),
+        ),
+        (
+            "timeRemap",
+            json!({"keyCount":1,"keyAtFrame":false,"value":3,"keys":[]}),
+        ),
+        (
+            "timeRemap",
+            json!({"keyCount":1,"keyAtFrame":false,"value":3,"keys":[{"frame":0}]}),
+        ),
+        (
+            "timeRemap",
+            json!({"keyCount":1,"keyAtFrame":false,"value":3,
+                "keys":[{"frame":0,"value":3,"hold":true}]}),
         ),
         ("extra", json!(1)),
     ] {

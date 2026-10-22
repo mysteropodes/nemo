@@ -8800,6 +8800,9 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
             fieldWrap.appendChild(dl);
           }
           var display = selectedDimensionDisplay(holder, prop, dim, vals[dim]);
+          // The native placement's eased source frame; unknown until the frame is read.
+          var remapKnown = !!remapFacts && remapFacts.value !== null;
+          if (remapFacts) display = { value: remapKnown ? remapFacts.value : 0, mixed: !remapKnown };
           var f = scrubField(display.value, function (nv, edit) {
             if (motionSurface && motionSurface.routeDimension(nativeOpacityRoute, window.NemoOpacityApplication, vals, dim, nv, state.currentFrame)) return;
             if (remapFacts) { window.SM.timeRemapKeyIntent(state.layers.indexOf(holder), nv); return; }
@@ -8844,7 +8847,9 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
             renderLayerList(); renderTimeline();
             reloadIfTimeLinkOffset(prop);
             if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-          }, display.mixed || !!remapFacts, nativeOpacityRoute);
+          }, display.mixed, nativeOpacityRoute);
+          // A native drag commits once on release from the read value (ui.js); no value, no drag.
+          if (remapFacts) { if (remapKnown) f.dataset.nativeScrub = 'commit'; else f.classList.remove('scrub'); }
           fieldWrap.appendChild(f);
         })(d);
       }
@@ -10667,8 +10672,9 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // threading extra state through render calls).
     rowEl._smHolder = ld; rowEl._smProp = prop;
     rowEl.classList.toggle('prop-selected', isMotionPropSelected(ld, prop));
-    // A native placement exposes key facts, not key frames: the row stays, inert.
-    if (prop === 'timeRemap' && nativeRemapFacts(ld)) { rowEl.style.pointerEvents = 'none'; return; }
+    // A native placement's keys are detached display data, like native opacity: inert.
+    var remapRow = prop === 'timeRemap' ? nativeRemapFacts(ld) : null;
+    if (remapRow) { nativeRemapTrackRow(rowEl, prop, remapRow); return; }
     var track = trackFor(ld, prop);
     var w = state.totalFrames * FC;
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -12425,7 +12431,38 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   };
   window.SM.isTimeRemapped = function (li) { var ld = state.layers[li]; return !!(ld && ld.timeRemap); };
   // Only the native binding defines timeRemapKeyFacts/timeRemapKeyIntent; a legacy row reads its own track.
-  function nativeRemapFacts(holder) { var li = state.layers.indexOf(holder), f = window.SM.timeRemapKeyFacts; return li >= 0 && f ? f(li) : null; }
+  function nativeRemapFacts(holder) { var li = state.layers.indexOf(holder), f = window.SM && window.SM.timeRemapKeyFacts; return li >= 0 && f ? f(li) : null; }
+  // The native Time Remap keys as read (null past the read bound: no diamonds, still inert).
+  function nativeRemapTrackRow(rowEl, prop, facts) {
+    rowEl.style.pointerEvents = 'none';
+    var keys = facts.keys || [];
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', state.totalFrames * FC); svg.setAttribute('height', ROW_H);
+    svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;';
+    for (var i = 0; i + 1 < keys.length; i++) {
+      if (keys[i].value === keys[i + 1].value) continue;
+      var conn = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      conn.setAttribute('class', 'native-remap-connector');
+      conn.setAttribute('x', keys[i].frame * FC + FC / 2); conn.setAttribute('y', Math.round((ROW_H - 5) / 2));
+      conn.setAttribute('width', (keys[i + 1].frame - keys[i].frame) * FC); conn.setAttribute('height', 5); conn.setAttribute('rx', 2);
+      conn.style.cssText = 'fill:#2E6B60;pointer-events:none;'; svg.appendChild(conn);
+    }
+    rowEl.appendChild(svg);
+    for (var frame = 0; frame < state.totalFrames; frame++) {
+      var cell = document.createElement('div'), here = frame === state.currentFrame;
+      cell.className = 'fc motion-fc' + (here ? ' cur' : ''); cell.dataset.frame = frame;
+      if (keys.some(function (key) { return key.frame === frame; })) {
+        var diamond = document.createElement('div');
+        diamond.className = 'native-remap-diamond';
+        diamond.style.cssText = 'position:relative;z-index:2;width:7px;height:7px;border-radius:2px;'
+          + 'background:' + (here ? '#ffaa28' : 'transparent') + ';border:1.5px solid ' + (here ? '#ffaa28' : '#cfcfcf') + ';'
+          + 'transform:rotate(45deg);pointer-events:none;';
+        diamond.title = (PROP_LABEL[prop] || prop) + ' · ' + (frame + 1);
+        cell.appendChild(diamond);
+      }
+      rowEl.appendChild(cell);
+    }
+  }
   function disableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld || !ld.timeRemap) return false;

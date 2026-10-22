@@ -26,7 +26,11 @@
     if(bindings.has(root))return bindings.get(root);
     var target=root.SM;
     if(!target||!Placement||!entries.every(function(name){return typeof target[name]==='function';}))return null;
-    var original={},retired=false,pending=null,facts=new Map();
+    var original={},retired=false,pending=null;
+    // Placement facts by snapshot and layer (frame independent), the remap facts
+    // by frame, and the last answer for a layer of this document: a row stays
+    // while a new snapshot or frame is read, and only remapped layers read per frame.
+    var layers=new Map(),frames=new Map(),last=new Map(),inflight=new Set();
     entries.concat(optional).forEach(function(name){original[name]=target[name];});
     // The layer's placement at the playhead, pinned to the presented snapshot.
     function context(li){
@@ -38,8 +42,9 @@
       var row=s.layers&&s.layers[li],layer=Array.isArray(info.layers)&&info.layers[li];
       if(!row||!layer||typeof layer.layerUid!=='string'||row.layerUid!==layer.layerUid)return null;
       var pin={};pinKeys.forEach(function(k){pin[k]=info[k];});
-      return {session:session,info:info,pin:pin,frame:frame,uid:layer.layerUid,
-        key:info.documentSnapshotId+'\u0000'+layer.layerUid+'\u0000'+frame};
+      var at=info.documentSnapshotId+'\u0000'+layer.layerUid;
+      return {session:session,info:info,pin:pin,frame:frame,uid:layer.layerUid,layerKey:at,key:at+'\u0000'+frame,
+        docKey:info.instanceId+'\u0000'+info.documentId+'\u0000'+layer.layerUid};
     }
     function admitted(result,ctx){
       var p=result&&result.placement;
@@ -47,29 +52,50 @@
         result.layerUid===ctx.uid&&result.frame===ctx.frame&&
         (p===null||!!p&&typeof p.placementId==='string'&&p.assetKind==='video');
     }
+    function remember(map,key,value){if(map.size>=256)map.clear();map.set(key,value);}
     // Resolves the placement (null without one) or undefined when the read refused.
     function read(ctx){
       return Promise.resolve(ctx.session.readLayerPlacement(ctx.uid,ctx.frame,ctx.info)).then(function(result){
         if(!admitted(result,ctx))return undefined;
-        if(facts.size>=64)facts.clear();
-        facts.set(ctx.key,result.placement);
-        return result.placement;
+        var p=result.placement;
+        remember(layers,ctx.layerKey,p);remember(last,ctx.docKey,p);
+        if(remapped(p))remember(frames,ctx.key,p.timeRemap);
+        return p;
       },function(){return undefined;});
     }
-    // A synchronous answer from the last read of this snapshot; a miss asks once
-    // and redraws the panels when the answer differs from the default.
+    function signature(p){return JSON.stringify(p&&[p.placementId,p.interpMode,p.frameBlend,p.sourceFrameCount,remapped(p)&&[p.timeRemap.keyCount,p.timeRemap.keys]]);}
+    // One read per miss; the redraw is frame-only unless the row set or its keys changed.
+    function ask(ctx,li,before){
+      if(inflight.has(ctx.key))return;
+      inflight.add(ctx.key);
+      var shown=JSON.stringify(remapFacts(before,ctx));
+      read(ctx).then(function(p){
+        inflight.delete(ctx.key);
+        if(p===undefined||!context(li)||typeof root.updateUI!=='function')return;
+        if(signature(p)!==signature(before))root.updateUI();
+        else if(JSON.stringify(remapFacts(p,ctx))!==shown)root.updateUI(true);
+      });
+    }
+    // The layer's placement now, or the last one read for it while this snapshot is read.
+    function placementAt(ctx,li){
+      if(layers.has(ctx.layerKey))return layers.get(ctx.layerKey);
+      var before=last.get(ctx.docKey);
+      ask(ctx,li,before===undefined?null:before);
+      return before===undefined?null:before;
+    }
     function known(li,answer,fallback){
       var ctx=context(li);
-      if(!ctx)return fallback;
-      if(facts.has(ctx.key))return answer(facts.get(ctx.key));
-      facts.set(ctx.key,null);
-      read(ctx).then(function(p){
-        if(p===undefined)facts.delete(ctx.key);
-        else if(answer(p)!==fallback&&context(li)&&typeof root.updateUI==='function')root.updateUI();
-      });
-      return fallback;
+      return ctx?answer(placementAt(ctx,li)):fallback;
     }
     function remapped(p){return !!p&&p.timeRemap!==null;}
+    // The Time Remap facts at the playhead: the frame's own read, else the layer's
+    // keys with the value unknown (null) until the frame is read.
+    function remapFacts(p,ctx){
+      if(!remapped(p))return null;
+      if(frames.has(ctx.key))return frames.get(ctx.key);
+      var r=p.timeRemap,keys=Array.isArray(r.keys)?r.keys:null;
+      return {keyCount:r.keyCount,keyAtFrame:keys?keys.some(function(k){return k.frame===ctx.frame;}):false,value:null,keys:keys};
+    }
     function mode(p){return p&&p.interpMode||(p&&p.frameBlend?'blend':'none');}
     function toast(key,suffix){
       if(typeof root.showToast==='function'&&root.SM&&typeof root.SM.t==='function')root.showToast(root.SM.t(key)+(suffix||''));
@@ -93,7 +119,11 @@
         if(receipt.ok!==true||receipt.result.applied!==true)return false;
         await action.reconcile(receipt.contentRevision);
         return true;
-      }).then(function(applied){facts.clear();return applied===true;});
+      }).then(function(applied){
+        // A refused, stale or unconfirmed edit is reported; the projection stays the owner's.
+        if(applied!==true)toast('toastNativeTimeRemapNotApplied');
+        return applied===true;
+      });
     }
     function serialized(task){
       if(pending)return Promise.resolve(false);
@@ -104,7 +134,6 @@
     function toggleTimeRemap(li){
       return serialized(async function(){
         var ctx=context(li);if(!ctx)return false;
-        facts.delete(ctx.key);
         var p=await read(ctx);
         if(p===undefined||!context(li))return false;
         if(p===null){toast('toastTimeRemapAppliesToComponents');return false;}
@@ -126,20 +155,17 @@
     function setFootageInterpMode(li,value){
       return serialized(async function(){
         var ctx=context(li);if(!ctx)return false;
-        facts.delete(ctx.key);
         var p=await read(ctx);
         if(!p||!context(li))return false;
         if(p.interpMode===value)return true;
         return edit(ctx,{kind:'setInterpMode',placementId:p.placementId,interpMode:value});
       });
     }
-    function unavailable(message){if(typeof root.showToast==='function')root.showToast(message);return false;}
     // The Time Remap row's stopwatch (value null) or value field at the playhead,
     // as the baseline row: a key here is removed, the last one turns remapping off.
     function timeRemapKeyIntent(li,value){
       return serialized(async function(){
         var ctx=context(li);if(!ctx)return false;
-        facts.delete(ctx.key);
         var p=await read(ctx);
         if(!p||!remapped(p)||!context(li))return false;
         var r=p.timeRemap,id=p.placementId;
@@ -147,14 +173,24 @@
           if(typeof value!=='number'||!Number.isFinite(value))return false;
           return edit(ctx,{kind:'setTimeRemapKey',placementId:id,frame:ctx.frame,value:value});
         }
-        if(!r.keyAtFrame)return unavailable('The remapped source frame at the playhead is not read natively yet. Type the source frame in the Time Remap field to add a key.');
+        // No key here: key the eased source frame the native read evaluated at the playhead.
+        if(!r.keyAtFrame){
+          if(r.value===null){toast('toastNativeTimeRemapValueUnavailable');return false;}
+          return edit(ctx,{kind:'setTimeRemapKey',placementId:id,frame:ctx.frame,value:r.value});
+        }
         if(r.keyCount>1)return edit(ctx,{kind:'removeTimeRemapKey',placementId:id,frame:ctx.frame});
         if(!await edit(ctx,{kind:'disableTimeRemap',placementId:id}))return false;
         toast('toastTimeRemapDisabled');return true;
       });
     }
     var own={
-      timeRemapKeyFacts:function(li){return known(li,function(p){return remapped(p)?p.timeRemap:null;},null);},
+      timeRemapKeyFacts:function(li){
+        var ctx=context(li);if(!ctx)return null;
+        var p=placementAt(ctx,li),r=remapFacts(p,ctx);
+        // Only a remapped layer reads per frame; other layers answer from their snapshot read.
+        if(r&&!frames.has(ctx.key))ask(ctx,li,p);
+        return r;
+      },
       timeRemapKeyIntent:timeRemapKeyIntent,
       // The footage panel's source facts: the layer's video placement at the playhead, or null.
       nativeVideoPlacement:function(li){return known(li,function(p){return p||null;},null);},
@@ -165,7 +201,7 @@
     };
     entries.concat(optional).forEach(function(name){target[name]=own[name];});
     var binding=Object.freeze(Object.assign({},own,{dispose:function(){
-      retired=true;pending=null;facts.clear();
+      retired=true;pending=null;[layers,frames,last,inflight].forEach(function(m){m.clear();});
       // An active or indeterminate native owner must keep the refusing entries.
       var session=ports.currentSession();
       if(session&&session.blocksLegacy()===true)return false;

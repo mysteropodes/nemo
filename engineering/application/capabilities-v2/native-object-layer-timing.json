@@ -172,7 +172,18 @@
             "offsetFrames": 0,
             "timeRemap": {
               "keyCount": 2,
-              "keyAtFrame": true
+              "keyAtFrame": true,
+              "value": 0,
+              "keys": [
+                {
+                  "frame": 0,
+                  "value": 0
+                },
+                {
+                  "frame": 24,
+                  "value": 47
+                }
+              ]
             },
             "interpMode": "blend",
             "frameBlend": true,
@@ -182,5 +193,5 @@
       }
     }
   ],
-  "semantics": " Optional strict view:range reads the same immutable D27 raw/clamped layer ranges and custom/link booleans, including layers without drawing timing. Original five-field cell selector and eleven-field timing result remain exact separate branches. Range projection is read-only; unsupported contexts/providers and complete4096 limits remain explicit refusal; source examples are not desktop acceptance. T12 view \"placement\" returns the layer's video drawing placement (id, asset, offset, remap key count and key-at-frame, interpMode, frameBlend, and sourceFrameCount, the source frame count the desktop host fills from its decode session bound to the same placement and snapshot, or null) or null; remap keys are counted, never listed; any other view is refused."
+  "semantics": " Optional strict view:range reads the same immutable D27 raw/clamped layer ranges and custom/link booleans, including layers without drawing timing. Original five-field cell selector and eleven-field timing result remain exact separate branches. Range projection is read-only; unsupported contexts/providers and complete4096 limits remain explicit refusal; source examples are not desktop acceptance. T12 view \"placement\" returns the layer's video drawing placement (id, asset, offset, remap key count, key-at-frame, eased source frame at the frame and key list, interpMode, frameBlend, and sourceFrameCount, the source frame count the desktop host fills from its decode session bound to the same placement and snapshot, or null) or null; the key list is null when it would not fit the 4096-byte read, the count always fits; any other view is refused."
 }

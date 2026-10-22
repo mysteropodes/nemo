@@ -456,7 +456,9 @@
                       "additionalProperties": false,
                       "required": [
                         "keyCount",
-                        "keyAtFrame"
+                        "keyAtFrame",
+                        "value",
+                        "keys"
                       ],
                       "properties": {
                         "keyCount": {
@@ -465,6 +467,44 @@
                         },
                         "keyAtFrame": {
                           "type": "boolean"
+                        },
+                        "value": {
+                          "description": "The eased source frame at the read's frame; null without keys.",
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        },
+                        "keys": {
+                          "description": "The keys in frame order while the read fits its bound; null past it (keyCount still counts them).",
+                          "oneOf": [
+                            {
+                              "type": "null"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "frame",
+                                  "value"
+                                ],
+                                "properties": {
+                                  "frame": {
+                                    "type": "number"
+                                  },
+                                  "value": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          ]
                         }
                       }
                     }
@@ -504,7 +544,7 @@
               }
             }
           ],
-          "description": "T12: the layer's video drawing placement, or null. Remap keys are counted, never listed, so the read stays within 4096 bytes."
+          "description": "T12: the layer's video drawing placement, or null. Remap keys are listed while the read stays within 4096 bytes and counted always."
         }
       }
     }

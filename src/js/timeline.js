@@ -7124,7 +7124,7 @@ function updateFootagePanel(){
   if(!sec)return;
   var ld=state.layers[state.activeLayerIdx];
   // A native video placement has no legacy ld.nativeVideo; only the native binding defines this entry.
-  var nativePlacement=ld&&!ld.nativeVideo&&window.SM.nativeVideoPlacement?window.SM.nativeVideoPlacement(state.activeLayerIdx):null;
+  var nativePlacement=ld&&!ld.nativeVideo&&window.SM&&window.SM.nativeVideoPlacement?window.SM.nativeVideoPlacement(state.activeLayerIdx):null;
   var kind=!window.SMLayerKind||!ld?null:SMLayerKind.of(nativePlacement?{nativeVideo:true}:ld);
   var isFootage=kind&&(kind.key==='image'||kind.key==='sequence'||kind.key==='video');
   if(!isFootage||!window._layerActiveExplicit){sec.style.display='none';return;}
@@ -7184,7 +7184,7 @@ function updateFootagePanel(){
   var nativeVideo=window.NemoNativeImportController&&window.NemoNativeImportController.video;
   var routed=!!nativePlacement&&!!nativeVideo&&nativeVideo.declared()===true;
   if(routed){repBtn.disabled=false;repBtn.dataset.placementId=nativePlacement.placementId;repBtn.removeAttribute('title');}
-  else{delete repBtn.dataset.placementId;if(nativePlacement){repBtn.disabled=true;repBtn.title='Replacing a native video source is unavailable: the native video link route is not declared.';}else repBtn.removeAttribute('title');}
+  else{delete repBtn.dataset.placementId;if(nativePlacement){repBtn.disabled=true;repBtn.title=window.SM.t('titleNativeVideoReplaceUnavailable');}else repBtn.removeAttribute('title');}
 }
 function updateCompInstancePanel(){
   var sec=document.getElementById('comp-instance-sec');

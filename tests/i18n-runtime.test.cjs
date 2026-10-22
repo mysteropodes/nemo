@@ -32,10 +32,10 @@ function fixture(options={}){
 }
 test('all four retained dictionaries preserve exact bytes, key counts and fixed translations',()=>{
   const digest=crypto.createHash('sha256').update(dictionarySource()).digest('hex');
-  assert.equal(digest,'93642ea78f292f2bc7636788e0fd7a5b848cd0fd12b7999c0dc291d0637e3152');
+  assert.equal(digest,'fa0b8c3f36d4efe982e224e3dca88c39cda85ea7e0267f75a972bd5da3da3e5e');
   const data=dictionaries();assert.deepEqual(Object.keys(data),['en','fr','ja','es']);
   for(const [locale,title] of Object.entries({en:'Settings',fr:'Réglages',ja:'設定',es:'Ajustes'})){
-    assert.equal(Object.keys(data[locale]).length,2210);assert.equal(data[locale].settingsTitle,title);
+    assert.equal(Object.keys(data[locale]).length,2213);assert.equal(data[locale].settingsTitle,title);
   }
 });
 test('data loader calls the explicit runtime once with live state/storage ports',()=>{

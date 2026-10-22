@@ -178,7 +178,7 @@ test('footage panel enables Replace for a native placement only when the video r
  const h=fixture();const btn=footagePanel(h);
  assert.equal(btn.disabled,false);assert.equal(btn.dataset.placementId,'p1');assert.equal(btn.dataset.kind,'video');assert.equal(btn.title,'');
  const off=fixture({declared:false});const disabled=footagePanel(off);
- assert.equal(disabled.disabled,true);assert.equal(disabled.dataset.placementId,undefined);assert.match(disabled.title,/unavailable/);
+ assert.equal(disabled.disabled,true);assert.equal(disabled.dataset.placementId,undefined);assert.equal(disabled.title,'titleNativeVideoReplaceUnavailable','the localized unavailable title');
 });
 test('Replace calls replaceActive with the pinned placement id and relinks in place (replace intent)',async()=>{
  const h=fixture();footagePanel(h);
