@@ -135,6 +135,7 @@ test('native inspector reuses actual bound Reference nodes, preserves collapsed 
 function desktop(initial=[A,B]){
   let active=false,revision=0,layers=clone(initial),doc='document',generation=1,gate=null,pending=null,fault=null,dispatchGate=null;
   let undo=[],redo=[];const log=[],calls=[],listeners=new Map(),root=shippedEntrypoints(view());
+  const nativeFailure={code:'unavailable',message:'/private/secret/document.json: opaque native response body'};
   root.NemoNativeObjectProject=Project;root.NemoApplicationMcpTransport=Transport;root.NemoNativeApplicationAdapter=SDK;
   root.showToast=message=>log.push('toast:'+message);
   const meta=()=>({...metadata(layers,revision,doc,generation),undoDepth:undo.length,redoDepth:redo.length});
@@ -154,7 +155,8 @@ function desktop(initial=[A,B]){
     if(command==='nemo_native_object_preview'){
       if(pending)assert.deepEqual(r.revisionSync.event,pending);
       log.push('preview');if(gate){const wait=gate;gate=null;await wait;}
-      return {status:fault==='preview'?'refused':'presented',workId:'work-'+generation+'-'+revision,viewGeneration:generation};
+      if(fault==='preview-invoke')throw nativeFailure;
+      return {status:['preview','dispatch-reject','dispatch-refuse'].includes(fault)?'refused':'presented',workId:'work-'+generation+'-'+revision,viewGeneration:generation};
     }
     if(command==='nemo_native_dispatch'){
       if(r.operation==='query.document.object.layer.timing')return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,
@@ -167,6 +169,8 @@ function desktop(initial=[A,B]){
       undo.push(clone(layers));redo=[];layers=layers.map(layer=>layer.layerUid===r.payload.layerUid?{...layer,visible:r.payload.visible}:layer);revision++;
     }else{
       assert.equal(command,'nemo_native_object_dispatch');assert.ok(['command.document.object.undo','command.document.object.redo'].includes(r.operation));
+      if(fault==='dispatch-reject')throw nativeFailure;
+      if(fault==='dispatch-refuse')return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:revision,ok:false,error:{code:'unavailable'}};
       if(r.operation.endsWith('.undo')){assert.ok(undo.length);redo.push(clone(layers));layers=undo.pop();}
       else{assert.ok(redo.length);undo.push(clone(layers));layers=redo.pop();}revision++;
     }
@@ -182,7 +186,7 @@ function desktop(initial=[A,B]){
   const file=Files.bind(root,{read:()=>({tabId:'tab',name:'Project'}),touchRecent(){},commit(){},renderRecents(){},
     opened(){log.push('opened');},notice(message){log.push('notice:'+message);},show(){root.document.nodes.get('start-screen').classList.remove('hid');},
     hide(){root.document.nodes.get('start-screen').classList.add('hid');},repaint(){}});
-  return {root,session,file,log,calls,meta,hold(p){gate=p;},holdDispatch(p){dispatchGate=p;},fault(v){fault=v;},
+  return {root,session,file,log,calls,meta,nativeFailure,hold(p){gate=p;},holdDispatch(p){dispatchGate=p;},fault(v){fault=v;},
     async open(){assert.equal(await file.openPath('/native.json'),true,log.join('|'));log.length=0;poisonFrames(root);},
     async external(next){const from=revision;undo.push(clone(layers));redo=[];layers=clone(next);revision++;pending={instanceId:'instance',documentId:doc,lifecycleGeneration:generation,
       requestId:'external-'+revision,fromRevision:from,toRevision:revision};return listeners.get('nemo-native-revision')({payload:pending});}};
@@ -580,4 +584,34 @@ test('metadata presenter invokes native bar mount without adding persistent rang
  root.NemoNativeLayerRangeDesktop={mount(r,grid,value,ports){assert.strictEqual(r,root);assert.strictEqual(grid,root.document.nodes.get('frame-grid'));assert.strictEqual(value,info);assert.ok(ports);mounted++;},retire(r){assert.strictEqual(r,root);retired++;},owns:()=>false};
  assert.equal(UI.render(root,info,false,fixturePorts(root)),true);assert.equal(mounted,1);assert.equal(JSON.stringify(root.state.layers),before);
  UI.restoreInspector(root);assert.equal(retired,1);
+});
+
+// Exercise the exact shipped entry; native IPC remains the controlled boundary.
+for(const fault of ['preview','preview-invoke','dispatch-reject','dispatch-refuse'])test('ordinary Undo reports '+fault+' once with no opaque text or retry',async()=>{
+  const h=desktop();await h.open();await h.external([A,B,C]);h.root.SM.setActiveLayer(2);
+  const source=fs.readFileSync('src/js/tweens.js','utf8'),start=source.indexOf('function undo(){'),end=source.indexOf('\n// Both branches below',start);
+  assert.ok(start>=0&&end>start);h.root.NemoNativeOpacityCutover=h.session;
+  const context=vm.createContext({window:h.root,state:h.root.state});vm.runInContext(source.slice(start,end),context);
+  h.fault(fault);h.log.length=0;const before=h.calls.length;context.undo();
+  for(let n=0;n<8;n++)await new Promise(setImmediate);
+  assert.equal(h.root.state.layers.length,fault.startsWith('dispatch-')?3:2);
+  assert.equal(h.session.readPresentedObjectSession(),null);
+  const sent=h.calls.slice(before);assert.equal(sent.filter(c=>c.command==='nemo_native_object_dispatch').length,1);
+  assert.equal(sent.filter(c=>c.command==='nemo_native_object_preview').length,1);
+  assert.deepEqual(h.log.filter(x=>x.startsWith('toast:')),['toast:Native Undo could not be confirmed ('+(fault==='preview'?'status':'unavailable')+').']);
+  assert.equal(h.log.join('|').includes('/private/secret'),false);assert.equal(h.log.join('|').includes('opaque native response body'),false);
+});
+test('a broken history refusal notice preserves the exact original error and never retries',async()=>{
+  const h=desktop();await h.open();await h.external([A,B,C]);h.fault('preview-invoke');
+  h.root.showToast=()=>{throw Error('notice unavailable');};const before=h.calls.length;
+  await assert.rejects(h.session.historyFromUi('undo'),error=>error===h.nativeFailure);
+  assert.equal(h.session.readPresentedObjectSession(),null);
+  assert.equal(h.calls.slice(before).filter(c=>c.command==='nemo_native_object_dispatch').length,1);
+});
+
+test('history publication fencing keeps its existing single failure notice',async()=>{
+  const h=desktop();await h.open();await h.external([A,B,C]);h.root.updateUI=()=>{throw Error('publication failed');};h.log.length=0;
+  await assert.rejects(h.session.historyFromUi('undo'),/publication failed/);
+  assert.equal(h.session.isIndeterminate(),true);
+  assert.deepEqual(h.log.filter(x=>x.startsWith('toast:')),['toast:Native project state is unconfirmed. Reopen Nemo before continuing.']);
 });
