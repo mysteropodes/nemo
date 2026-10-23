@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a5d71e2c81946bdeca8013467d1fa1ad05381be5",
-  "describe": "a5d71e2c-dirty"
+  "head": "e6bad9a08053ca6daf629c11be064b4afc810931",
+  "describe": "v0.7.0-alpha.4-2925-ge6bad9a0-dirty"
  },
- "inputsDigest": "e210df792f5c11a3c2f951733bc256b620611722b4518dbd30f025923f7a89bd",
+ "inputsDigest": "55c38f372bccc2638a19e6c4c623af34aafcc30ce0956c48d7b89b010cd40ee2",
  "states": [
   "inventoried",
   "characterized",
@@ -1850,7 +1850,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 193,
+    "functionsVisited": 192,
     "via": "chain",
     "references": []
    },
@@ -2683,7 +2683,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 20,
+    "functionsVisited": 21,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9092 action()"
@@ -4805,7 +4805,7 @@
     "functionsVisited": 137,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:352 setShyMode()",
+     "src/js/adapters/native-object-ui.js:350 setShyMode()",
      "src/js/motion.js:13204 setAppMode()",
      "src/js/timeline.js:1228 toggleLayerShy()"
     ]
@@ -5058,7 +5058,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 112,
+    "functionsVisited": 103,
     "via": "helper el()",
     "references": []
    },
@@ -5101,7 +5101,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 29,
     "via": "helper el()",
     "references": []
    },
@@ -5144,7 +5144,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 86,
+    "functionsVisited": 79,
     "via": "helper el()",
     "references": []
    },
@@ -8013,7 +8013,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 35,
     "via": "variable sel",
     "references": []
    },
@@ -8335,7 +8335,7 @@
     "container": "kitsu-step-browse",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -8450,7 +8450,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -9912,7 +9912,7 @@
     "functionsVisited": 27,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:304 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:302 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -12254,7 +12254,7 @@
     "functionsVisited": 37,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:160 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:159 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -16344,7 +16344,7 @@
     "functionsVisited": 74,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:295 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:293 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:220 updatePlayhead()",
      "src/js/timeline.js:2834 updateUI()"
@@ -17226,7 +17226,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:41 currentPoint()",
@@ -17273,7 +17273,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 8,
+    "functionsVisited": 7,
     "via": "callback id",
     "references": [
      "src/js/tracker-panel.js:42 currentPoint()",
@@ -23582,7 +23582,7 @@
    "source": "src/js/markers.js:167",
    "meta": {
     "i18n": null,
-    "functionsVisited": 15
+    "functionsVisited": 13
    },
    "fixtures": [
     "static-props",
@@ -23656,7 +23656,7 @@
    "source": "src/js/markers.js:170",
    "meta": {
     "i18n": null,
-    "functionsVisited": 13
+    "functionsVisited": 12
    },
    "fixtures": [
     "static-props",
@@ -23693,7 +23693,7 @@
    "source": "src/js/markers.js:235",
    "meta": {
     "i18n": null,
-    "functionsVisited": 19
+    "functionsVisited": 18
    },
    "fixtures": [
     "static-props",
@@ -23730,7 +23730,7 @@
    "source": "src/js/markers.js:236",
    "meta": {
     "i18n": null,
-    "functionsVisited": 20
+    "functionsVisited": 19
    },
    "fixtures": [
     "static-props",
@@ -23918,7 +23918,7 @@
    "source": "src/js/markers.js:247",
    "meta": {
     "i18n": null,
-    "functionsVisited": 33
+    "functionsVisited": 39
    },
    "fixtures": [
     "static-props",
@@ -27035,7 +27035,7 @@
    "source": "src/js/motion.js:9819",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 172
+    "functionsVisited": 165
    },
    "fixtures": [
     "static-props",
@@ -27159,7 +27159,7 @@
    "source": "src/js/motion.js:9864",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 433
+    "functionsVisited": 428
    },
    "fixtures": [
     "static-props",
@@ -28370,7 +28370,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 97
+    "functionsVisited": 90
    },
    "fixtures": [
     "static-props",
@@ -28522,7 +28522,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 97
+    "functionsVisited": 90
    },
    "fixtures": [
     "static-props",
@@ -30022,7 +30022,7 @@
    "source": "src/js/timeline.js:5596",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 172
+    "functionsVisited": 165
    },
    "fixtures": [
     "keyed-props",
@@ -30137,7 +30137,7 @@
    "source": "src/js/timeline.js:5627",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 433
+    "functionsVisited": 428
    },
    "fixtures": [
     "keyed-props",
