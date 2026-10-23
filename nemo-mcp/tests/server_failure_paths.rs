@@ -194,7 +194,7 @@ async fn discovery_status_fixture(timeout: bool) {
                 &mut stream,
                 &json!({"apiVersion":2,
                 "requestId":status["nativeStatus"]["requestId"],"instanceId":expected.instance_id,
-                "available":true}),
+                "available":true,"lifecycleGeneration":41}),
             ))
             .await
             .unwrap();
@@ -214,6 +214,7 @@ async fn discovery_status_fixture(timeout: bool) {
     assert_eq!(status["available"], false);
     assert!(status.get("documentId").is_none());
     assert!(status.get("contentRevision").is_none());
+    assert!(status.get("lifecycleGeneration").is_none());
     let reason = status["reason"].as_str().unwrap();
     if timeout {
         assert_eq!(reason, "native host status timed out");

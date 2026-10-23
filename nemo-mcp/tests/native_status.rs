@@ -40,7 +40,7 @@ fn native_status_request_rejects_invalid_version_and_bounded_identities() {
 #[test]
 fn native_host_status_requires_valid_identity_and_a_complete_availability_state() {
     let valid = json!({"apiVersion":2,"requestId":"status-1","instanceId":"instance-a",
-        "available":true,"documentId":"document-a","contentRevision":0});
+        "available":true,"documentId":"document-a","contentRevision":0,"lifecycleGeneration":17});
     assert!(serde_json::from_value::<NativeHostStatus>(valid.clone())
         .unwrap()
         .validate()
@@ -80,6 +80,11 @@ fn native_host_status_requires_valid_identity_and_a_complete_availability_state(
         (&request.request_id, &request.instance_id)
     );
     assert!(!unavailable.available);
+    assert!(unavailable.lifecycle_generation.is_none());
+    assert!(serde_json::to_value(&unavailable)
+        .unwrap()
+        .get("lifecycleGeneration")
+        .is_none());
     assert!(unavailable.document_id.is_none() && unavailable.content_revision.is_none());
     for reason in [None, Some(String::new())] {
         let mut invalid = unavailable.clone();
@@ -89,4 +94,77 @@ fn native_host_status_requires_valid_identity_and_a_complete_availability_state(
             if message == "invalid native host status")
         );
     }
+}
+
+fn refused_status(value: serde_json::Value) -> bool {
+    match serde_json::from_value::<NativeHostStatus>(value) {
+        Ok(status) => status.validate().is_err(),
+        Err(_) => true,
+    }
+}
+
+#[test]
+fn active_generation_is_required_positive_safe_integer_not_a_default_or_null() {
+    let valid = json!({"apiVersion":2,"requestId":"generation","instanceId":"instance-a",
+        "available":true,"documentId":"document-a","contentRevision":23,"lifecycleGeneration":37});
+    for generation in [1, 37, 9_007_199_254_740_991u64] {
+        let mut value = valid.clone();
+        value["lifecycleGeneration"] = json!(generation);
+        let status: NativeHostStatus = serde_json::from_value(value.clone()).unwrap();
+        status.validate().unwrap();
+        assert_eq!(status.lifecycle_generation, Some(generation));
+        assert_eq!(serde_json::to_value(status).unwrap(), value);
+    }
+    let mut missing = valid.clone();
+    missing
+        .as_object_mut()
+        .unwrap()
+        .remove("lifecycleGeneration");
+    assert!(
+        refused_status(missing),
+        "missing generation must not become 1"
+    );
+    for generation in [
+        json!(null),
+        json!(0),
+        json!(-1),
+        json!(1.5),
+        json!(1.0),
+        json!(true),
+        json!("37"),
+        json!([]),
+        json!({}),
+        json!(9_007_199_254_740_992u64),
+        json!(u64::MAX),
+    ] {
+        let mut invalid = valid.clone();
+        invalid["lifecycleGeneration"] = generation;
+        assert!(refused_status(invalid.clone()), "accepted {invalid}");
+    }
+    let mut unknown = valid;
+    unknown["generation"] = json!(37);
+    assert!(refused_status(unknown));
+    let duplicate = r#"{"apiVersion":2,"requestId":"generation","instanceId":"instance-a","available":true,"documentId":"document-a","contentRevision":23,"lifecycleGeneration":37,"lifecycleGeneration":38}"#;
+    assert!(serde_json::from_str::<NativeHostStatus>(duplicate).is_err());
+}
+
+#[test]
+fn unavailable_status_cannot_carry_generation_and_request_cannot_supply_it() {
+    let unavailable = json!({"apiVersion":2,"requestId":"generation","instanceId":"instance-a",
+        "available":false,"reason":"native authority inactive"});
+    assert!(!refused_status(unavailable.clone()));
+    for generation in [
+        json!(null),
+        json!(0),
+        json!(1),
+        json!(37),
+        json!(9_007_199_254_740_991u64),
+    ] {
+        let mut invalid = unavailable.clone();
+        invalid["lifecycleGeneration"] = generation;
+        assert!(refused_status(invalid.clone()), "accepted {invalid}");
+    }
+    let injected_request = json!({"apiVersion":2,"requestId":"generation",
+        "instanceId":"instance-a","lifecycleGeneration":37});
+    assert!(serde_json::from_value::<NativeStatusRequest>(injected_request).is_err());
 }

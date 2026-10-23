@@ -323,6 +323,7 @@ fn native_status(
         request_id: request.request_id,
         instance_id: instance_id.to_owned(),
         available: reason.is_none(),
+        lifecycle_generation: current.map(|(generation, _)| generation),
         document_id: current.map(|(_, application)| application.document_id().into()),
         content_revision: current.map(|(_, application)| application.content_revision()),
         reason: reason.map(str::to_owned),
