@@ -48,7 +48,9 @@
       if (cached) { serial++; cached = null; cancelDrag(); }
       paintPanel(); schedulePaint(); return Promise.resolve(null);
     }
-    if (prior && sameKey(prior, key)) { cached.proof = proof; paintPanel(); schedulePaint(); return prior.promise || Promise.resolve(prior.read); }
+    // A refused read is not a cached result: a queued resource read can fence
+    // admission temporarily without replacing the native presentation.
+    if (prior && sameKey(prior, key) && (prior.promise || prior.read)) { cached.proof = proof; paintPanel(); schedulePaint(); return prior.promise || Promise.resolve(prior.read); }
     if (cached) cancelDrag();
     serial++;
     var token = serial;

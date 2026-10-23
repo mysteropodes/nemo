@@ -248,6 +248,7 @@ const ComposedFiles = require('../src/js/adapters/native-object-project-file.js'
 const ComposedUI = require('../src/js/adapters/native-object-ui.js');
 const meshVm = require('node:vm');
 const meshTurn = () => new Promise(setImmediate);
+const meshGate = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 function meshElement(){
   const listeners={},classes=new Set();
   const el={children:[],style:{},dataset:{},attributes:{},value:'',max:0,textContent:'',className:'',type:'',offsetWidth:200,offsetHeight:120,
@@ -271,7 +272,7 @@ function meshDocument(){const nodes=new Map();for(const id of ['layer-list','fra
   nodes.get('start-screen').classList.add('hid');const doc={nodes,body:meshElement(),created:0,activeElement:null,readyState:'complete',
     getElementById(id){if(nodes.has(id))return nodes.get(id);function find(node){if(node.id===id)return node;for(const child of node.children){const found=find(child);if(found)return found;}return null;}for(const node of nodes.values()){const found=find(node);if(found)return found;}return null;},
     createElement(){doc.created++;return meshElement();},createComment:()=>meshElement(),addEventListener(){},removeEventListener(){}};return doc;}
-function composedMesh(geometry = false, meshValue) {
+function composedMesh(geometry = false, meshValue, beforeDispatch = async () => {}, desktopCompletion = false) {
   const root = { state: { tool: 'select', playing: false }, userLayers: [], document: meshDocument(), addEventListener() {}, requestAnimationFrame: f => setImmediate(f) };
   const doc = root.document, calls = [], minted = [], messages = [];
   for (const id of ['p-imagemesh-sec', 'p-imagemesh-on', 'p-imagemesh-edit', 'p-imagemesh-body',
@@ -286,7 +287,7 @@ function composedMesh(geometry = false, meshValue) {
   root.showToast = message => messages.push(message);
   root.NemoNativeObjectUI = ComposedUI;
   let active = false, revision = 0, documentId = 'document', generation = 1, liveSession;
-  let mesh = meshValue || { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 };
+  let mesh = meshValue === undefined ? { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 } : meshValue;
   const metadata = () => ({ apiVersion: 2, instanceId: 'instance', documentId, lifecycleGeneration: generation,
     contentRevision: revision, documentSnapshotId: `native-object:${documentId}:${revision}`, documentDigest: 'a'.repeat(64), byteCount: 1000,
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 24, reference: null, undoDepth: revision, redoDepth: 0,
@@ -296,7 +297,9 @@ function composedMesh(geometry = false, meshValue) {
       contentRevision: revision, ok: true, result };
   }
   async function dispatch(r) {
-    calls.push(r); minted.push(r.requestId);
+    calls.push(r); minted.push(r.requestId); await beforeDispatch(r);
+    if (r.operation === 'query.document.object.project.workspace.read') return response(r, { instanceId: r.instanceId, documentId,
+      atRevision: revision, documentSnapshotId: metadata().documentSnapshotId, contextId: 'scene-root', result: { workspacePresent: false } });
     if (r.operation === 'query.document.object.layer.timing') return { ...response(r, null), ok: false,
       error: { code: 'unavailable', message: 'This literal transport does not provide timing' } };
     if (r.operation === 'query.document.object') {
@@ -359,17 +362,25 @@ function composedMesh(geometry = false, meshValue) {
   const session = ComposedProject.create(ports); liveSession = session;
   root.NemoNativeObjectProject = { desktop: () => liveSession };
   root.NemoNativeObjectImageMesh = Mesh;
+  if (desktopCompletion) {
+    Object.assign(root, { __TAURI__: { core: { invoke } }, removeEventListener() {}, NemoNativeObjectProjectFile: ComposedFiles,
+      NemoNativeViewportUnderlay: require('../src/js/adapters/native-viewport-underlay.js'),
+      NemoNativeWorkspaceDesktop: require('../src/js/adapters/native-workspace-desktop.js') });
+    const workspaceUI = require('../src/js/adapters/native-workspace-ui.js');
+    workspaceUI.presentation(root, { order: () => [], applyOrder() {} }); workspaceUI.install(root);
+    ports.presented = require('../src/js/adapters/native-object-project-desktop.js').createPorts(root).presented;
+  }
   const context = meshVm.createContext({ window: root, document: doc, state: root.state, console });
-  async function open() {
+  if (geometry) {
+    meshVm.runInContext(fs.readFileSync(path.join(__dirname, '../src/js/image-mesh.js'), 'utf8'), context);
+    context.SMImageMesh = root.SMImageMesh;
+  }
+  meshVm.runInContext(fs.readFileSync(path.join(__dirname, '../src/js/image-mesh-bridge.js'), 'utf8'), context);
+  async function open(settle = true) {
     await session.openPath('/native-mesh.json');
     assert.equal(ComposedUI.select(root, session.info(), 1, false, 'L2', session.readPresentedObjectSession(), uiPorts), true);
     assert.equal(ComposedUI.select(root, session.info(), 0, false, 'L0', session.readPresentedObjectSession(), uiPorts), true);
-    if (geometry) {
-      meshVm.runInContext(fs.readFileSync(path.join(__dirname, '../src/js/image-mesh.js'), 'utf8'), context);
-      context.SMImageMesh = root.SMImageMesh;
-    }
-    meshVm.runInContext(fs.readFileSync(path.join(__dirname, '../src/js/image-mesh-bridge.js'), 'utf8'), context);
-    await root.SMImageMeshUI.refresh(); await meshTurn();
+    if (settle) { await root.SMImageMeshUI.refresh(); await meshTurn(); }
   }
   return { root, session, calls, minted, messages, open, uiPorts,
     async settle() { await meshTurn(); await root.SMImageMeshUI.refresh(); await meshTurn(); },
@@ -379,6 +390,30 @@ function composedMesh(geometry = false, meshValue) {
     captured: () => pointer,
   };
 }
+
+test('unbound mesh admission recovers through actual desktop completion and workspace fanout', { timeout: 2000 }, async () => {
+  const selection = meshGate(), entered = meshGate(), workspace = meshGate(), workspaceEntered = meshGate(); let hold = true;
+  const h = composedMesh(false, null, async r => {
+    if (r.operation === 'query.document.object' && hold) { hold = false; entered.resolve(); await selection.promise; }
+    if (r.operation === 'query.document.object.project.workspace.read') { workspaceEntered.resolve(); await workspace.promise; }
+  }, true);
+  await h.open(false); await entered.promise;
+  const proof = ComposedUI.readImageMeshSelection(h.root), shown = h.session.readPresentedObjectSession();
+  assert.ok(proof); assert.equal(proof.current(), true);
+  const initial = h.root.SMImageMeshUI.refresh(), checkbox = h.root.document.getElementById('p-imagemesh-on');
+  await workspaceEntered.promise; // Project completion -> real desktop timer -> actual Workspace controller -> native read.
+  assert.equal(h.session.readPresentedObjectSession(), null); assert.equal(proof.current(), false);
+  selection.resolve(); assert.equal(await initial, null, 'the initial read cannot publish through the real queue fence');
+  assert.equal(checkbox.disabled, true); assert.equal(h.calls.filter(r => r.operation === OP).length, 0);
+  workspace.resolve();
+  await meshTurn(); await new Promise(resolve => setTimeout(resolve, 0)); await meshTurn(); // Drain the known desktop completion timer.
+  assert.ok(h.root.NemoNativeWorkspaceController.read(), 'the actual workspace controller finished its native read');
+  assert.equal(h.session.readPresentedObjectSession().presentation, shown.presentation); assert.equal(proof.current(), true);
+  assert.equal(checkbox.disabled, false, 'queue completion must recover admission without a manual Mesh refresh');
+  assert.equal(checkbox.checked, false); assert.equal(h.root.SMImageMeshUI.hasMesh(), false);
+  assert.equal(h.calls.filter(r => r.operation === 'query.document.object').length, 2, 'completion starts one new unbound selection read');
+  assert.equal(h.calls.filter(r => r.operation === OP).length, 0); assert.deepEqual(h.messages, []);
+});
 
 test('ordinary checkbox composes real UI proof, native pages, leased Mesh command and Project reconciliation', async () => {
   const h = composedMesh(); await h.open();
