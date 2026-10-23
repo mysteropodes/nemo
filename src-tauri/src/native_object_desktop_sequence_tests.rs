@@ -212,6 +212,7 @@ mod adversarial_120_frames {
                 &selector,
                 |owner| {
                     assert!(owner.matches_project_snapshot(selector.document_snapshot_id));
+                    assert!(owner.pending_object_motion_frames().is_empty());
                     owner.export_test_state()
                 },
             )
@@ -328,18 +329,38 @@ mod adversarial_120_frames {
     #[test]
     fn real_new_120_frames_publish_once_or_reconcile_every_later_batch_failure() {
         let mut gpu = Compositor::new().unwrap();
-        for case in [
-            Case::Success,
-            Case::LateWriteLoss,
-            Case::CancelAfterTwo,
-            Case::ReplaceAfterTwo,
-            Case::ReplaceBeforePublish,
+        for (case, previewed) in [
+            (Case::Success, false),
+            (Case::Success, true),
+            (Case::LateWriteLoss, true),
+            (Case::CancelAfterTwo, true),
+            (Case::ReplaceAfterTwo, true),
+            (Case::ReplaceBeforePublish, true),
         ] {
             let root = OutputRoot::new();
             let (state, mut raw, before) = new_64_square_project(&root);
             raw["frameRange"] = json!({"start": 0, "end": 119});
             let admitted =
                 Arc::new(admit_request(&raw.to_string(), state.instance_id(), |_| true).unwrap());
+            if previewed {
+                // Ordinary New has already displayed frame 0. Its finalized Motion
+                // record is replayed from ready, so the first export child captures
+                // only frames 1..31. Exercise the production owner/preview join.
+                let selector = admitted.request.selector();
+                state
+                    .with_object_preview_owner(
+                        admitted.request.lifecycle_generation,
+                        &selector,
+                        |owner| {
+                            owner.with_prepared_object_preview(
+                                &selector,
+                                admitted.output.clone(),
+                                |_| Ok(()),
+                            )
+                        },
+                    )
+                    .unwrap();
+            }
             let mut sequence = SequenceExport::new(admitted, root.staging());
             let mut callbacks = 0;
             let mut replacement = None;

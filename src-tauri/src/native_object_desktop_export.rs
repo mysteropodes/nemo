@@ -318,34 +318,42 @@ fn with_export_consumer<T>(
 ) -> HostResult<T> {
     let mut selector = admitted.request.selector();
     selector.frame = frame;
+    let read_frames = frames.clone();
     state
-        .with_object_preview_owner(admitted.request.lifecycle_generation, &selector, |owner| {
-            if !owner.matches_project_snapshot(&admitted.request.document_snapshot_id) {
-                return Err("native object export snapshot is stale".into());
-            }
-            owner.require_project_output(admitted.output.dimensions())?;
-            if let Some(range) = admitted.request.frame_range {
-                let info = owner.project_file_info()?;
-                if info
-                    .get("totalFrames")
-                    .and_then(serde_json::Value::as_u64)
-                    .is_none_or(|total| u64::from(range.end) >= total)
-                {
-                    return Err("native object sequence range exceeds the pinned document".into());
+        .with_object_export_owner(
+            admitted.request.lifecycle_generation,
+            &selector,
+            &read_frames,
+            |owner| {
+                if !owner.matches_project_snapshot(&admitted.request.document_snapshot_id) {
+                    return Err("native object export snapshot is stale".into());
                 }
-            }
-            Ok(target(ObjectExportConsumer {
-                owner,
-                selector: selector.clone(),
-                frames,
-                request_id,
-                output: admitted.output.clone(),
-                maximum_encoded_bytes: admitted.request.maximum_encoded_bytes,
-                format: admitted.request.format,
-                destination: admitted.destination.clone(),
-                staging_root,
-            }))
-        })
+                owner.require_project_output(admitted.output.dimensions())?;
+                if let Some(range) = admitted.request.frame_range {
+                    let info = owner.project_file_info()?;
+                    if info
+                        .get("totalFrames")
+                        .and_then(serde_json::Value::as_u64)
+                        .is_none_or(|total| u64::from(range.end) >= total)
+                    {
+                        return Err(
+                            "native object sequence range exceeds the pinned document".into()
+                        );
+                    }
+                }
+                Ok(target(ObjectExportConsumer {
+                    owner,
+                    selector: selector.clone(),
+                    frames,
+                    request_id,
+                    output: admitted.output.clone(),
+                    maximum_encoded_bytes: admitted.request.maximum_encoded_bytes,
+                    format: admitted.request.format,
+                    destination: admitted.destination.clone(),
+                    staging_root,
+                }))
+            },
+        )
         .map_err(|message| host_error("unavailable", message))?
 }
 fn export_with_target(
