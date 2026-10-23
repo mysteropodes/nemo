@@ -1,6 +1,6 @@
 //! Bounded immutable Mesh view; the scene producer supplies the actual raster projection.
-use super::{ObjectSnapshot, MAX_MESSAGE_BYTES};
 use crate::object_codec::{object_deserialize, ObjectTarget};
+use crate::object_snapshot::{ObjectSnapshot, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use serde::Deserialize;
 use serde_json::json;
@@ -46,7 +46,7 @@ impl ImageMeshReadProjection {
         work_id: String,
         view_generation: u64,
     ) -> Result<Self, DispatchErrorCode> {
-        if !super::envelope_identifier(&work_id)
+        if !crate::object_snapshot::envelope_identifier(&work_id)
             || !(1..=9_007_199_254_740_991).contains(&view_generation)
         {
             return Err(DispatchErrorCode::Unavailable);
@@ -196,7 +196,7 @@ impl ObjectSnapshot {
             || view.kind != "imageMesh"
             || view.context_id.is_empty()
             || view.layer_uid.is_empty()
-            || !super::envelope_identifier(&view.work_id)
+            || !crate::object_snapshot::envelope_identifier(&view.work_id)
             || !(1..=9_007_199_254_740_991).contains(&view.view_generation)
             || view
                 .page
