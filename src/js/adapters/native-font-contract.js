@@ -44,7 +44,9 @@
       if(typeof v.base64!=='string'||! /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(v.base64)||atob(v.base64).length!==v.returnedLength||btoa(atob(v.base64))!==v.base64||v.offset+v.returnedLength>v.totalLength)fail('font chunk invalid');}
   }
   function correlate(q,r){
-    if(r.instanceId!==q.instanceId||r.documentId!==q.documentId)fail('font response owner mismatch');if(!r.ok)return;
+    // Native refusals identify the current document after owner replacement.
+    const replaced=!r.ok&&r.error.code==='wrong_document';
+    if(r.instanceId!==q.instanceId||(r.documentId!==q.documentId&&!replaced))fail('font response owner mismatch');if(!r.ok)return;
     const p=q.payload,v=r.result;
     if(q.operation===IMPORT){if(r.contentRevision!==q.expectedRevision+1)fail('font import revision mismatch');return;}
     if(p.action==='receipt'){if(v.forRequestId!==p.forRequestId||!Object.prototype.hasOwnProperty.call(v,'status')||Object.prototype.hasOwnProperty.call(v,'contentRevision')&&v.contentRevision>r.contentRevision)fail('font receipt correlation mismatch');return;}

@@ -252,3 +252,44 @@ test('actual SDK rejects inconsistent catalog pagination, noncanonical base64 pa
   assert.throws(()=>SDK.validateRequest({...base,payload:{...base.payload,offset:1025}}));
   assert.throws(()=>SDK.validateRequest({...read,payload:{...read.payload,offset:16*1024*1024}}));
 });
+
+for (const action of ['list', 'inspect', 'read', 'receipt', 'import']) {
+  test('common SDK preserves typed replaced-document font refusal for ' + action, async () => {
+    const imported = {assetId:'font',mediaType:'font/ttf',encodedBytes:1,encodedSha256:'a'.repeat(64)};
+    const font = {...imported,name:'Roboto-Regular',sourceKind:'embedded',available:true};
+    const payloads = {
+      list: {action:'list',atRevision:0,documentSnapshotId:'snapshot',offset:0,limit:1},
+      inspect: {action:'inspect',atRevision:0,documentSnapshotId:'snapshot',assetId:'font'},
+      read: {action:'read',atRevision:0,documentSnapshotId:'snapshot',assetId:'font',offset:0,length:1},
+      receipt: {action:'receipt',forRequestId:'original-import'},
+      import: {command:'object.asset.font.import',documentSnapshotId:'snapshot',lifecycleGeneration:1,source:{kind:'bundled',fontKey:'Roboto-Regular'}}
+    };
+    const results = {
+      list: {atRevision:0,documentSnapshotId:'snapshot',offset:0,nextOffset:null,totalFontRecords:1,rows:[font]},
+      inspect: {atRevision:0,documentSnapshotId:'snapshot',font},
+      read: {atRevision:0,documentSnapshotId:'snapshot',assetId:'font',offset:0,returnedLength:1,totalLength:1,encodedSha256:'a'.repeat(64),base64:'AA=='},
+      receipt: {status:'not_found',forRequestId:'original-import'},
+      import: {applied:true,historyEntriesAdded:1,...imported}
+    };
+    const request = {apiVersion:2,requestId:'font-owner-request',instanceId:'instance',documentId:'old-document',
+      operation:action==='import'?'command.document.object.asset.font.import':'query.document.object.asset.font',
+      ...(action==='import'?{expectedRevision:0}:{}),payload:payloads[action]};
+    const refusal = {apiVersion:2,requestId:request.requestId,instanceId:request.instanceId,documentId:'new-document',
+      contentRevision:0,ok:false,error:{code:'wrong_document',message:'native font read refused'}};
+    const dispatch = response => SDK.createNativeApplicationAdapter('font-owner-test',{dispatch:async()=>response}).dispatch(request);
+
+    assert.deepEqual(await dispatch(refusal),refusal);
+    assert.deepEqual(await dispatch({...refusal,documentId:request.documentId}),{...refusal,documentId:request.documentId});
+    await assert.rejects(dispatch({...refusal,instanceId:'other-instance'}),/font response owner mismatch/);
+    await assert.rejects(dispatch({...refusal,requestId:'other-request'}),/response identity/);
+    await assert.rejects(dispatch({...refusal,error:{code:'wrong_document'}}));
+    for (const code of ['invalid_request','wrong_instance','stale_revision','busy_conflict','unavailable','not_found','cancelled_before_dispatch','internal']) {
+      await assert.rejects(dispatch({...refusal,error:{code,message:'refused'}}),/font response owner mismatch/);
+    }
+    const success = {apiVersion:2,requestId:request.requestId,instanceId:request.instanceId,documentId:request.documentId,
+      contentRevision:action==='import'?1:0,ok:true,result:results[action]};
+    assert.deepEqual(await dispatch(success),success);
+    await assert.rejects(dispatch({...success,documentId:'new-document'}),/font response owner mismatch/);
+    await assert.rejects(dispatch({...success,instanceId:'other-instance'}),/font response owner mismatch/);
+  });
+}
