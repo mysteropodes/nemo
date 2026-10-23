@@ -1,5 +1,6 @@
 //! Desktop staging remains owned until explicit cleanup, including private sequence children.
 use crate::native_application_ports::DesktopArtifactPort;
+use crate::native_object_desktop_export::MAX_PNG_BYTES;
 use native_engine::export_job::{ExportArtifact, StagedArtifactPort, MAX_OBJECT_EXPORT_FRAMES};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -177,10 +178,10 @@ fn read_owned_frame(path: &Path) -> Result<Vec<u8>, String> {
         return Err("private child frame changed".into());
     }
     let mut bytes = Vec::new();
-    file.take(super::MAX_PNG_BYTES as u64 + 1)
+    file.take(MAX_PNG_BYTES as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(|error| error.to_string())?;
-    if bytes.is_empty() || bytes.len() > super::MAX_PNG_BYTES {
+    if bytes.is_empty() || bytes.len() > MAX_PNG_BYTES {
         return Err("private child frame exceeds the native PNG budget".into());
     }
     Ok(bytes)

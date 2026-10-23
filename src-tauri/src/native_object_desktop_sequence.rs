@@ -1,6 +1,6 @@
 //! Native orchestration of bounded children, with one final external publication.
-use super::port::SequenceArtifactPort;
-use super::*;
+use crate::native_object_desktop_export::port::SequenceArtifactPort;
+use crate::native_object_desktop_export::*;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
