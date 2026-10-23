@@ -202,10 +202,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-font-panel.js',
     'src/js/adapters/native-viewport-underlay.js',
     'src/js/adapters/native-object-project-metadata.js',
+    'src/js/adapters/native-object-project-reads.js',
     'src/js/adapters/native-object-project-properties.js',
     'src/js/adapters/native-object-project-desktop.js',
     'src/js/adapters/native-object-project-export.js',
-    'src/js/adapters/native-object-project-reads.js',
     'src/js/adapters/native-object-project.js',
     'src/js/adapters/native-object-project-file.js',
     'src/js/adapters/native-object-ui.js',
@@ -241,10 +241,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 24, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 131, 132, 133, 134, 135, 181, 245, 246, 288, 289, 290, 291, 294, 295, 296, 297]);
-  // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 43 identities and adjacency stay fixed; Comments adds its four ordinary source members.
-  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 247);
-  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 247);
+    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22, 24, 25, 27, 28, 29, 30, 31, 32, 34, 35, 36, 37, 38, 132, 133, 134, 135, 136, 182, 246, 247, 289, 290, 291, 292, 295, 296, 297, 298]);
+  // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All original identities and adjacency stay fixed; Comments adds its four ordinary source members, and the Mesh reader loads immediately after project metadata.
+  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 248);
+  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 248);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -252,10 +252,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 178);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 179);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 180);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 182);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 179);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 180);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 181);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 183);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));

@@ -33,7 +33,12 @@ fn field(kind: &str) -> (Value, Value) {
 
 fn changed(value: &Value, path: &str, replacement: Value) -> Value {
     let mut value = value.clone();
-    *value.pointer_mut(path).unwrap() = replacement;
+    if let Some(slot) = value.pointer_mut(path) {
+        *slot = replacement;
+    } else {
+        let (parent, member) = path.rsplit_once('/').unwrap();
+        value.pointer_mut(parent).unwrap()[member] = replacement;
+    }
     value
 }
 
