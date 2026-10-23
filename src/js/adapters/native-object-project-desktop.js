@@ -250,6 +250,7 @@
           settingsNotice('presented',info);
           renderCameraViewLock(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
+          if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
           if(shown)openDiagnostic(root,'camera-presented',cameraPresentedCode(shown));
         }catch(_){}},0);
       },
