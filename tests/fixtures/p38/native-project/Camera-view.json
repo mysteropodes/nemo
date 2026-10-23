@@ -1,0 +1,195 @@
+{
+  "format": "nemo.native-project-document",
+  "formatVersion": 1,
+  "project": {
+    "canvasW": 320,
+    "canvasH": 180,
+    "fps": 24,
+    "cameraLayerOn": true,
+    "cameraKeys": [
+      {
+        "frame": 0,
+        "x": 160,
+        "y": 90,
+        "w": 320
+      },
+      {
+        "frame": 4,
+        "x": 160,
+        "y": 90,
+        "w": 160
+      }
+    ]
+  },
+  "drawing": {
+    "format": "nemo.native-object-document",
+    "formatVersion": 2,
+    "totalFrames": 21,
+    "layers": [
+      {
+        "layerUid": "L2",
+        "timing": {
+          "format": "nemo.native-layer-timing",
+          "formatVersion": 1,
+          "family": "drawing",
+          "contextId": "scene-root",
+          "keys": [
+            {
+              "frame": 0
+            }
+          ],
+          "samples": []
+        }
+      },
+      {
+        "layerUid": "L0",
+        "timing": {
+          "format": "nemo.native-layer-timing",
+          "formatVersion": 1,
+          "family": "drawing",
+          "contextId": "scene-root",
+          "keys": [
+            {
+              "frame": 0
+            }
+          ],
+          "samples": []
+        }
+      },
+      {
+        "layerUid": "L1",
+        "timing": {
+          "format": "nemo.native-layer-timing",
+          "formatVersion": 1,
+          "family": "drawing",
+          "contextId": "scene-root",
+          "keys": [
+            {
+              "frame": 0
+            }
+          ],
+          "samples": []
+        }
+      }
+    ],
+    "objects": [
+      {
+        "schemaVersion": 1,
+        "family": "closed-solid-fill-cubic-path",
+        "target": {
+          "contextId": "scene-root",
+          "frameScope": {
+            "kind": "authored",
+            "frame": 0
+          },
+          "layerUid": "L0",
+          "strokeId": "a"
+        },
+        "geometry": {
+          "kind": "cubic-path",
+          "closed": true,
+          "coordinateSpace": "document-world",
+          "handleSpace": "relative",
+          "segments": [
+            {
+              "point": {
+                "x": 100,
+                "y": 60
+              },
+              "handleIn": {
+                "x": 0,
+                "y": 0
+              },
+              "handleOut": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            {
+              "point": {
+                "x": 120,
+                "y": 60
+              },
+              "handleIn": {
+                "x": 0,
+                "y": 0
+              },
+              "handleOut": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            {
+              "point": {
+                "x": 100,
+                "y": 80
+              },
+              "handleIn": {
+                "x": 0,
+                "y": 0
+              },
+              "handleOut": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          ]
+        },
+        "fill": {
+          "kind": "solid",
+          "r": 0.06666666666666667,
+          "g": 0.13333333333333333,
+          "b": 0.2,
+          "a": 1
+        }
+      }
+    ],
+    "compositionOrder": {
+      "format": "nemo.native-object-order-plan",
+      "formatVersion": 1,
+      "documentFormatVersion": 2,
+      "contexts": [
+        {
+          "contextId": "scene-root",
+          "layers": [
+            {
+              "layerUid": "L0",
+              "naturalPosition": 0,
+              "order": {}
+            },
+            {
+              "layerUid": "L1",
+              "naturalPosition": 1,
+              "order": {}
+            },
+            {
+              "layerUid": "L2",
+              "naturalPosition": 2,
+              "order": {}
+            }
+          ],
+          "scopes": [
+            {
+              "frameScope": {
+                "kind": "authored",
+                "frame": 0
+              },
+              "elements": [
+                {
+                  "layerUid": "L0",
+                  "strokeId": "a",
+                  "naturalPosition": 0,
+                  "order": {}
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "migration": "explicit-plan-required",
+      "referencePolicy": "unresolved"
+    }
+  },
+  "viewportReference": null,
+  "assets": []
+}
