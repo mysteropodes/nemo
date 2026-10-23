@@ -174,22 +174,33 @@ fn validate_order(
     let components = component_tables
         .value()
         .and_then(|tables| tables.components.value());
+    let explicit_contexts: HashSet<_> = plan
+        .contexts
+        .iter()
+        .map(|context| context.context_id.as_str())
+        .collect();
     // Optional explicit inner plans do not create a migration requirement for
     // native component records whose owner already defines natural order.
     let inner_records = components
         .into_iter()
         .flat_map(|set| set.components.iter())
-        .filter(|component| {
-            plan.contexts
-                .iter()
-                .any(|context| context.context_id == component.symbol_id())
-        })
+        .filter(|component| explicit_contexts.contains(component.symbol_id()))
         .flat_map(|component| component.objects());
     let expected: HashSet<_> = objects
         .iter()
         .chain(inner_records)
         .map(|r| &r.target)
-        .chain(items.into_iter().flat_map(|items| items.targets()))
+        .chain(
+            items
+                .into_iter()
+                .flat_map(|items| items.targets())
+                .filter(|target| {
+                    // The same optional inner-plan contract applies to paths and items. Root items
+                    // still require complete explicit coverage; implicit components use natural order.
+                    target.context_id == "scene-root"
+                        || explicit_contexts.contains(target.context_id.as_str())
+                }),
+        )
         .filter(|target| target.frame_scope.kind == FrameScopeKind::Authored)
         .map(|target| {
             (
@@ -285,6 +296,7 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         document.total_frames,
         &document.layers,
         &document.objects,
+        document.component_tables.value(),
     )?;
     validate_order(
         &document.composition_order,
@@ -328,6 +340,7 @@ pub(crate) fn validate_storage_order(
         document.total_frames,
         &document.layers,
         &document.objects,
+        document.component_tables.value(),
     )?;
     validate_order(
         plan,

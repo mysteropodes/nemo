@@ -18,14 +18,14 @@ pub(crate) use font_assets::{
     FontAssetMetadata,
 };
 
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
 #[cfg(feature = "font_asset_wire")]
 pub(crate) use crate::object_document::AssetRecord;
 #[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
 pub(crate) use crate::object_document::{AssetId, AssetKind};
-use crate::object_document::{
-    ImageMeshStore, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
-};
+pub(crate) use crate::object_document::{ImageMesh, ImageMeshStore, MeshIdSequence};
 pub(crate) use crate::object_document::{ObjectLayer, Presence, PropertyHolder};
+use crate::object_document::{OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 #[path = "object_property_codec.rs"]
 mod property_codec;
 pub(crate) use property_codec::validate_property_holders;

@@ -43,15 +43,9 @@ impl FrameContext {
         if admitted.context.kind() == ContextKind::SceneRoot {
             return Ok(Self::Scene);
         }
-        if snapshot.document().item_records().is_some_and(|items| {
-            items
-                .targets()
-                .any(|target| target.context_id() == selector.context_id)
-        }) {
-            // Inner component records currently own drawing objects, not the
-            // scene's separate raster/text item table. Never paint a subset.
-            return Err(ObjectFrameError::Unavailable);
-        }
+        // Codec admission resolves item targets against this component's local layers and
+        // frame bound. The ordinary frame builder selects those retained raster/text records
+        // by complete context identity alongside the component's own geometry.
         snapshot
             .document()
             .component_set()

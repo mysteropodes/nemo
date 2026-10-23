@@ -1,9 +1,9 @@
 /* Public v2 contract of the lane-3 object operations: image mesh edit, widget create / write / settings, rig edit and
  * rig pose. Pure validation with the interface of the font contract (admitted, requiresRevision, payload, result,
- * correlate, paths); `compose(base)` joins another contract of that interface. The shapes below are GENERATED from
- * one table (tools/spec.js) that the Rust validator (nemo-mcp native_object_rig_contract.rs), the transport schema
- * and the capability descriptors are generated from too. No owner, no writer, no host: the native owner stays the
- * only authority and repeats every rule on the original bytes. */
+ * correlate, paths); `compose(base)` joins another contract of that interface. The legacy shapes came from the
+ * historical tools/spec.js table. Binding shapes are source-derived additions shared with Rust and the schema;
+ * that generator is absent. The original corpus stays unchanged, with separate binding agreement controls.
+ * No owner, writer or host: the native owner stays the only authority and repeats every rule on original bytes. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -13,7 +13,7 @@
 
   const PREFIX = 'command.document.object.';
   const SPEC = {
-    "image.mesh.edit": {"command":"object.image.mesh.edit","result":"command","node":{"t":"obj","req":{"meshId":{"t":"str","min":1,"max":128},"action":{"t":"union","by":"kind","cases":{"setOffset":{"req":{"index":{"t":"int","min":0,"max":4294967295},"du":{"t":"num","abs":1000000000},"dv":{"t":"num","abs":1000000000}}},"resetOffsets":{"req":{}},"setOutline":{"req":{"outline":{"t":"arr","of":{"t":"pair","abs":4},"min":3,"max":512,"perimeter":16}},"opt":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}},"setDensity":{"req":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}}}}}}},
+    "image.mesh.edit": {"command":"object.image.mesh.edit","result":"command","node":{"t":"oneOf","cases":[{"t":"obj","req":{"meshId":{"t":"str","min":1,"max":128},"action":{"t":"union","by":"kind","cases":{"setOffset":{"req":{"index":{"t":"int","min":0,"max":4294967295},"du":{"t":"num","abs":1000000000},"dv":{"t":"num","abs":1000000000}}},"resetOffsets":{"req":{}},"setOutline":{"req":{"outline":{"t":"arr","of":{"t":"pair","abs":4},"min":3,"max":512,"perimeter":16}},"opt":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}},"setDensity":{"req":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}}}}}},{"t":"obj","req":{"action":{"t":"union","by":"kind","cases":{"attach":{"req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1},"frameScope":{"t":"obj","req":{"kind":{"t":"enum","v":["authored","reference"]},"frame":{"t":"int","min":0,"max":4294967295}}},"layerUid":{"t":"str","min":1},"strokeId":{"t":"str","min":1}}},"mesh":{"t":"obj","req":{"outline":{"t":"arr","of":{"t":"pair"},"min":0},"verts":{"t":"arr","of":{"t":"pair"},"min":0},"tris":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0}},"opt":{"offsets":{"t":"arr","of":{"t":"pair"},"min":0},"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}}}},"detach":{"req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1},"frameScope":{"t":"obj","req":{"kind":{"t":"enum","v":["authored","reference"]},"frame":{"t":"int","min":0,"max":4294967295}}},"layerUid":{"t":"str","min":1},"strokeId":{"t":"str","min":1}}}}},"propagate":{"req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1},"frameScope":{"t":"obj","req":{"kind":{"t":"enum","v":["authored","reference"]},"frame":{"t":"int","min":0,"max":4294967295}}},"layerUid":{"t":"str","min":1},"strokeId":{"t":"str","min":1}}},"meshId":{"t":"oneOf","cases":[{"t":"str","min":0},{"t":"null"}]}}},"releaseIfUnused":{"req":{"meshId":{"t":"str","min":0}}},"duplicate":{"req":{"contextId":{"t":"str","min":1},"layerUid":{"t":"str","min":1}}}}}}}]}},
     "widget.create": {"command":"object.widget.create","result":"created","node":{"t":"obj","req":{"kind":{"t":"enum","v":["joystick","slider"]},"name":{"t":"str","min":0},"pos":{"t":"pair","abs":1000000000}}}},
     "widget.write": {"command":"object.widget.write","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1},"frame":{"t":"num"},"to":{"t":"union","by":"kind","cases":{"local":{"req":{"point":{"t":"pair","abs":1000000000}}},"world":{"req":{"point":{"t":"pair","abs":1000000000},"anchor":{"t":"pair","abs":1000000000},"angleDegrees":{"t":"num","abs":1000000000}}},"rest":{"req":{}}}}}}},
     "widget.settings": {"command":"object.widget.settings","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1},"set":{"t":"obj","opt":{"pos":{"t":"pair","abs":1000000000},"size":{"t":"pair","abs":1000000000},"x":{"t":"obj","opt":{"min":{"t":"num","abs":1000000000},"max":{"t":"num","abs":1000000000},"rest":{"t":"num","abs":1000000000},"label":{"t":"str","min":0}},"minMembers":1},"y":{"t":"obj","opt":{"min":{"t":"num","abs":1000000000},"max":{"t":"num","abs":1000000000},"rest":{"t":"num","abs":1000000000},"label":{"t":"str","min":0}},"minMembers":1}},"minMembers":1}}}},
@@ -53,6 +53,19 @@
         if (!plain(v) || typeof v[n.by] !== 'string' || !has(n.cases, v[n.by])) fail(`${at}.${n.by} is not admitted`);
         return object(n.cases[v[n.by]], v, at, [n.by, v[n.by]]);
       }
+      case 'oneOf': {
+        if (!Array.isArray(n.cases)) fail(`${at} has invalid alternatives`);
+        let matches = 0;
+        for (const branch of n.cases) {
+          try { check(branch, v, at); matches += 1; }
+          catch (error) { if (!(error instanceof TypeError)) throw error; }
+        }
+        if (matches !== 1) fail(`${at} must match exactly one admitted shape`);
+        return undefined;
+      }
+      case 'null':
+        if (v !== null) fail(`${at} must be null`);
+        return undefined;
       case 'str':
         if (typeof v !== 'string' || bytes(v) < (n.min || 0) || (n.max !== undefined && bytes(v) > n.max)) fail(`${at} is not a bounded string`);
         return undefined;

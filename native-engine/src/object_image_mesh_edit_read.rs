@@ -15,6 +15,11 @@
 //!
 //! The density control of the baseline editor calls `setOutline` with the CURRENT outline and the new
 //! density (`image-mesh-bridge.js` `setDensity`); [`Retopology::Density`] is exactly that call.
+//!
+//! Binding transactions use the plain member projections below to reach the existing binding
+//! kernel. They carry actual raster records, a mesh store and the caller's lifetime sequence;
+//! no document, snapshot, command owner or publication authority enters this facade.
+use crate::object_codec::{ImageMesh, ImageMeshStore, MeshIdSequence, RasterItem};
 
 /// One mesh in normalized `(0,0)..(1,1)` image space. `verts[0..outline.len())` ARE the outline;
 /// `offsets` is a separate array of the same length as `verts`; `cols`/`rows` are the integer grid
@@ -121,4 +126,287 @@ pub(crate) fn retopologize(
 ) -> Result<MeshState, RetopologyRefusal> {
     let _ = (state, change);
     Err(RetopologyRefusal::KernelUnavailable)
+}
+
+/// An actual raster or an occupied nonraster position; no fabricated item stands for a path/text.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum BindingSlot {
+    Raster(RasterItem),
+    NonRaster,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) struct BindingLayer {
+    pub(crate) frames: Vec<Vec<BindingSlot>>,
+}
+
+/// Detached member values. The sequence is never initialized from, or replaced by, the store.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct BindingState {
+    pub(crate) store: ImageMeshStore,
+    pub(crate) sequence: MeshIdSequence,
+    pub(crate) sets: Vec<Vec<BindingLayer>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BindingTarget {
+    pub(crate) set: usize,
+    pub(crate) layer: usize,
+    pub(crate) frame: usize,
+    pub(crate) slot: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum BindingOperation {
+    Attach {
+        target: BindingTarget,
+        mesh: ImageMesh,
+    },
+    Detach {
+        target: BindingTarget,
+    },
+    Propagate {
+        target: BindingTarget,
+        mesh_id: Option<String>,
+    },
+    ReleaseIfUnused {
+        mesh_id: String,
+    },
+    DuplicateLayer {
+        set: usize,
+        layer: usize,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum BindingReport {
+    Attach {
+        mesh_id: String,
+        replaced: Option<String>,
+        written: usize,
+        skipped: usize,
+    },
+    Detach {
+        mesh_id: Option<String>,
+        released: bool,
+        written: usize,
+        skipped: usize,
+    },
+    Propagate {
+        written: usize,
+        skipped: usize,
+    },
+    Released(bool),
+    Duplicated {
+        pairs: Vec<(String, String)>,
+        dangling: Vec<String>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BindingRefusal {
+    Unavailable,
+    UnknownTarget,
+    InvalidInput,
+}
+
+impl BindingState {
+    /// Read the returned member projection without cloning the entire store/layer set for each
+    /// raster writeback. This accessor performs no binding operation or document evaluation.
+    #[cfg(feature = "evaluation")]
+    pub(crate) fn raster_at(&self, target: BindingTarget) -> Result<&RasterItem, BindingRefusal> {
+        match self
+            .sets
+            .get(target.set)
+            .and_then(|set| set.get(target.layer))
+            .and_then(|layer| layer.frames.get(target.frame))
+            .and_then(|frame| frame.get(target.slot))
+            .ok_or(BindingRefusal::UnknownTarget)?
+        {
+            BindingSlot::Raster(item) => Ok(item),
+            BindingSlot::NonRaster => Err(BindingRefusal::InvalidInput),
+        }
+    }
+
+    #[cfg(not(feature = "evaluation"))]
+    pub(crate) fn raster_at(&self, target: BindingTarget) -> Result<&RasterItem, BindingRefusal> {
+        let _ = target;
+        Err(BindingRefusal::Unavailable)
+    }
+}
+
+#[cfg(feature = "evaluation")]
+mod binding_adapter {
+    use crate::evaluation::object_image_mesh_kernels::object_image_mesh_binding as kernel;
+    use crate::object_snapshot::object_image_mesh_edit_read::{
+        BindingLayer, BindingOperation, BindingRefusal, BindingReport, BindingSlot, BindingState,
+        BindingTarget,
+    };
+
+    impl From<BindingTarget> for kernel::SlotTarget {
+        fn from(target: BindingTarget) -> Self {
+            Self {
+                set: target.set,
+                layer: target.layer,
+                frame: target.frame,
+                slot: target.slot,
+            }
+        }
+    }
+
+    impl From<BindingState> for kernel::MeshBindingState {
+        fn from(state: BindingState) -> Self {
+            Self {
+                store: state.store,
+                sequence: state.sequence,
+                sets: state
+                    .sets
+                    .into_iter()
+                    .map(|set| {
+                        set.into_iter()
+                            .map(|layer| {
+                                kernel::BindingLayer {
+                                    frames: layer
+                                        .frames
+                                        .into_iter()
+                                        .map(|frame| {
+                                            frame
+                                                .into_iter()
+                                                .map(|slot| match slot {
+                                                    BindingSlot::Raster(item) => {
+                                                        kernel::BindingSlot::Raster(item)
+                                                    }
+                                                    BindingSlot::NonRaster => {
+                                                        kernel::BindingSlot::NonRaster
+                                                    }
+                                                })
+                                                .collect()
+                                        })
+                                        .collect(),
+                                    // No native video record is provided by this port. Its commands remain
+                                    // typed unavailable rather than inventing a video reference provider.
+                                    native_video: false,
+                                    video_mesh_id: None,
+                                }
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            }
+        }
+    }
+
+    impl From<kernel::MeshBindingState> for BindingState {
+        fn from(state: kernel::MeshBindingState) -> Self {
+            Self {
+                store: state.store,
+                sequence: state.sequence,
+                sets: state
+                    .sets
+                    .into_iter()
+                    .map(|set| {
+                        set.into_iter()
+                            .map(|layer| BindingLayer {
+                                frames: layer
+                                    .frames
+                                    .into_iter()
+                                    .map(|frame| {
+                                        frame
+                                            .into_iter()
+                                            .map(|slot| match slot {
+                                                kernel::BindingSlot::Raster(item) => {
+                                                    BindingSlot::Raster(item)
+                                                }
+                                                kernel::BindingSlot::NonRaster => {
+                                                    BindingSlot::NonRaster
+                                                }
+                                            })
+                                            .collect()
+                                    })
+                                    .collect(),
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            }
+        }
+    }
+
+    fn refusal(error: kernel::BindingError) -> BindingRefusal {
+        match error {
+            kernel::BindingError::UnknownLayer | kernel::BindingError::UnknownSlot => {
+                BindingRefusal::UnknownTarget
+            }
+            kernel::BindingError::VideoLayerUnavailable => BindingRefusal::Unavailable,
+            kernel::BindingError::TargetNotRaster
+            | kernel::BindingError::Item(_)
+            | kernel::BindingError::Mesh(_) => BindingRefusal::InvalidInput,
+        }
+    }
+
+    pub(super) fn apply(
+        state: BindingState,
+        operation: BindingOperation,
+    ) -> Result<(BindingState, BindingReport), BindingRefusal> {
+        let mut state = kernel::MeshBindingState::from(state);
+        let report = match operation {
+            BindingOperation::Attach { target, mesh } => {
+                let report = state.attach(target.into(), mesh).map_err(refusal)?;
+                BindingReport::Attach {
+                    mesh_id: report.mesh_id,
+                    replaced: report.replaced,
+                    written: report.propagate.written,
+                    skipped: report.propagate.skipped,
+                }
+            }
+            BindingOperation::Detach { target } => {
+                let report = state.detach(target.into()).map_err(refusal)?;
+                BindingReport::Detach {
+                    mesh_id: report.mesh_id,
+                    released: report.released,
+                    written: report.propagate.written,
+                    skipped: report.propagate.skipped,
+                }
+            }
+            BindingOperation::Propagate { target, mesh_id } => {
+                let report = state
+                    .propagate(target.into(), mesh_id.as_deref())
+                    .map_err(refusal)?;
+                BindingReport::Propagate {
+                    written: report.written,
+                    skipped: report.skipped,
+                }
+            }
+            BindingOperation::ReleaseIfUnused { mesh_id } => {
+                BindingReport::Released(state.release_if_unused(&mesh_id).map_err(refusal)?)
+            }
+            BindingOperation::DuplicateLayer { set, layer } => {
+                let report = state.remap_duplicated_layer(set, layer).map_err(refusal)?;
+                BindingReport::Duplicated {
+                    pairs: report.pairs,
+                    dangling: report.dangling,
+                }
+            }
+        };
+        Ok((state.into(), report))
+    }
+}
+
+/// Run the existing all-or-nothing kernel on detached member values. No caller sequence is
+/// reconstructed, no raster is replaced by a placeholder, and an error returns no proposal.
+#[cfg(feature = "evaluation")]
+pub(crate) fn apply_binding(
+    state: BindingState,
+    operation: BindingOperation,
+) -> Result<(BindingState, BindingReport), BindingRefusal> {
+    binding_adapter::apply(state, operation)
+}
+
+#[cfg(not(feature = "evaluation"))]
+pub(crate) fn apply_binding(
+    state: BindingState,
+    operation: BindingOperation,
+) -> Result<(BindingState, BindingReport), BindingRefusal> {
+    let _ = (state, operation);
+    Err(BindingRefusal::Unavailable)
 }
