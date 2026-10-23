@@ -449,3 +449,86 @@ test('request generation cancelled while the new subscriber attaches cannot retu
   assert.equal(await creating,false);assert.equal(s.isActive(),false);assert.equal(s.readPresentedObjectSession(),null);
   assert.deepEqual(notices,[]);assert.equal(f.ui.isDirty(),true);
 });
+
+async function pendingBlankSave(){
+  const h=host(),app=ordinary(h);
+  app.element('start-new').listeners.click();
+  assert.equal(await blank64(app)(),true);
+  const s=Project.desktop(app.window),pin=structuredClone(s.info()),gate=deferred();
+  assert.deepEqual([pin.canvasW,pin.canvasH,pin.fps,pin.totalFrames],[64,64,24,120]);
+  assert.equal(app.window.state.canvasBg,'#ffffff');
+  assert.deepEqual([app.window.state.waIn,app.window.state.waOut],[0,119]);
+  let entered=false,picked=0;
+  app.window.__TAURI__.dialog.save=async()=>{picked++;return '/settled-blank.json';};
+  h.before=async command=>{if(command==='nemo_native_object_preview'){entered=true;await gate.promise;}};
+  const preview=s.presentPreview(0);preview.catch(()=>{});
+  await turn();assert.equal(entered,true);assert.equal(s.readPresentedObjectSession(),null);
+  return {h,app,s,pin,gate,preview,picked:()=>picked,
+    writes:()=>h.calls.filter(c=>c.command==='nemo_native_object_save_as')};
+}
+test('ordinary New 64 by 64 Save As waits for admitted presentation and saves the exact 120-frame owner once',async()=>{
+  const f=await pendingBlankSave();let completed=false;
+  const saving=f.app.project.saveAs().then(value=>{completed=true;return value;});
+  try{
+    await turn();assert.equal(completed,false,'the accepted save intent must wait, not lose the click');
+    assert.equal(f.picked(),0);assert.equal(f.writes().length,0);
+    assert.equal(f.app.project.getCurrentLabel(),'PNG baseline (not saved)');
+    f.gate.resolve();await f.preview;
+    assert.equal((await saving).acknowledged,true);
+    assert.equal(f.picked(),1);assert.equal(f.writes().length,1);
+    const request=f.writes()[0].r;
+    assert.deepEqual([request.instanceId,request.documentId,request.atRevision,request.documentSnapshotId],
+      [f.pin.instanceId,f.pin.documentId,f.pin.contentRevision,f.pin.documentSnapshotId]);
+    assert.deepEqual(f.s.info(),f.pin);
+    assert.equal(f.app.project.getCurrentLabel(),'settled-blank — /settled-blank.json');
+    assert.equal(f.app.project.isDirty(),false);assert.equal(f.app.mutations,0);assert.equal(f.app.downloads.length,0);
+    assert.ok(f.app.writes.every(([key])=>key==='nemo-recents'));
+  }finally{f.gate.resolve();await Promise.allSettled([f.preview,saving]);}
+});
+for(const drift of ['revision','snapshot','lifecycle','document','newer-queue','replacement','deferred']){
+  test('pending ordinary Save As refuses '+drift+' before picker or publication',async()=>{
+    const f=await pendingBlankSave(),other=[];
+    const saving=f.app.project.saveAs();
+    try{
+      await turn();assert.equal(f.picked(),0);assert.equal(f.writes().length,0);
+      if(drift==='revision')f.h.info().contentRevision++;
+      if(drift==='snapshot')f.h.info().documentSnapshotId+='-advanced';
+      if(drift==='lifecycle')f.h.info().lifecycleGeneration++;
+      if(drift==='document')f.h.info().documentId='replacement-owner';
+      if(drift==='newer-queue')other.push(f.s.presentPreview(0));
+      if(drift==='replacement')other.push(f.s.newProject({canvasW:64,canvasH:64,fps:24}));
+      if(drift==='deferred')f.h.after=(command,request,result)=>command==='nemo_native_object_preview'?
+        {...result,status:'deferred-occluded'}:result;
+      other.forEach(p=>p.catch(()=>{}));
+      f.gate.resolve();await Promise.allSettled([f.preview,...other]);
+      assert.equal((await saving).acknowledged,false);
+      assert.equal(f.picked(),0);assert.equal(f.writes().length,0);
+      assert.equal(f.app.project.getCurrentLabel(),'PNG baseline (not saved)');
+      assert.equal(f.app.project.isDirty(),true);assert.equal(f.app.mutations,0);
+    }finally{f.gate.resolve();await Promise.allSettled([f.preview,saving,...other]);}
+  });
+}
+test('pending ordinary Save As retains picker cancellation without publication or a saved label',async()=>{
+  const f=await pendingBlankSave();let cancelled=0;
+  f.app.window.__TAURI__.dialog.save=async()=>{cancelled++;return null;};
+  const saving=f.app.project.saveAs();
+  try{
+    await turn();assert.equal(cancelled,0);f.gate.resolve();await f.preview;
+    assert.equal((await saving).acknowledged,false);assert.equal(cancelled,1);
+    assert.equal(f.writes().length,0);assert.equal(f.app.project.getCurrentLabel(),'PNG baseline (not saved)');
+    assert.equal(f.app.project.isDirty(),true);
+  }finally{f.gate.resolve();await Promise.allSettled([f.preview,saving]);}
+});
+test('pending Save As retains its original UI ticket and refuses replacement before the picker',async()=>{
+  const h=host(),s=session(h),gate=deferred();let generation=1,picked=0;
+  const f=fileUI(s,{readUI:()=>({handle:'tab',generation}),pick:async()=>{picked++;return '/wrong-tab.json';}});
+  assert.equal(await f.ui.newProject({w:64,h:64,fps:24,name:'Original'}),true);
+  h.before=async command=>{if(command==='nemo_native_object_preview')await gate.promise;};
+  const preview=s.presentPreview(0);preview.catch(()=>{});await turn();const saving=f.ui.saveAs();
+  try{
+    await turn();generation++;gate.resolve();await preview;
+    assert.equal((await saving).acknowledged,false);assert.equal(picked,0);
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_save_as').length,0);
+    assert.deepEqual(f.meta(),{name:'Original',path:null});assert.equal(f.ui.isDirty(),true);
+  }finally{gate.resolve();await Promise.allSettled([preview,saving]);}
+});

@@ -75,6 +75,13 @@ async function fixture(initial, browser = false) {
   }
   const session = { info: () => info, isActive: () => active, requestId: () => 'workspace-' + (++serial), readSubscriptionGeneration: () => ticket,
     readPresentedObjectSession: () => active && !running ? shown(info) : null,
+    captureSaveSession() {
+      const origin = info, observed = tail, generation = ticket;
+      return async () => {
+        await observed;
+        return observed === tail && generation === ticket && origin === info ? session.readPresentedObjectSession() : null;
+      };
+    },
     runResourceCommand(fn) {
       running++; const job = tail.then(() => { const origin = info;
         return fn({ dispatch: q => root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('workspace-ui', { dispatch }).dispatch(q),

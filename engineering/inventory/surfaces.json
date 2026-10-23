@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "cdeb74df092e9c1a94bdf6fd2d76db046dca6cbd",
-  "describe": "v0.7.0-alpha.4-2933-gcdeb74df-dirty"
+  "head": "586f70be214c3b43bb31d5e864bfa6e7ff40922b",
+  "describe": "v0.7.0-alpha.4-2953-g586f70be-dirty"
  },
- "inputsDigest": "16a99aaf45b345e1eb10b9ef5c83ac74eebc31709c9bc1d859a1191ade9ff6e8",
+ "inputsDigest": "25525340ad186d3ef647daa5b3b077466398caca9776c6caf53b24b5036d0557",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 249,
+   "native": 245,
    "export": 5,
    "animation": 443,
    "history": 355,
@@ -453,7 +453,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 129,
+    "functionsVisited": 132,
     "via": "variable btn",
     "references": []
    },
@@ -2642,7 +2642,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 277,
+    "functionsVisited": 278,
     "via": "chain",
     "references": [
      "src/js/images.js:705",
@@ -2711,10 +2711,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1620",
@@ -2724,7 +2722,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 17,
+    "functionsVisited": 16,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9154 action()"
@@ -3570,7 +3568,7 @@
     "functionsVisited": 2,
     "via": "variable addFillBtn",
     "references": [
-     "src/js/adapters/native-palette-ui.js:148 render()",
+     "src/js/adapters/native-palette-ui.js:163 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3612,7 +3610,7 @@
     "functionsVisited": 2,
     "via": "variable addStrokeBtn",
     "references": [
-     "src/js/adapters/native-palette-ui.js:148 render()",
+     "src/js/adapters/native-palette-ui.js:163 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3657,7 +3655,7 @@
     "functionsVisited": 85,
     "via": "variable newBtn",
     "references": [
-     "src/js/adapters/native-palette-ui.js:148 render()",
+     "src/js/adapters/native-palette-ui.js:163 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3700,7 +3698,7 @@
     "via": "variable replaceBtn",
     "references": [
      "src/js/palette-panel.js:229 render()",
-     "src/js/adapters/native-palette-ui.js:151 render()",
+     "src/js/adapters/native-palette-ui.js:166 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -3748,7 +3746,7 @@
     "functionsVisited": 83,
     "via": "variable swapBtn",
     "references": [
-     "src/js/adapters/native-palette-ui.js:151 render()",
+     "src/js/adapters/native-palette-ui.js:166 render()",
      "src/js/palette-panel.js:22 paletteNativeUnavailable()"
     ]
    },
@@ -4680,7 +4678,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 55,
+    "functionsVisited": 59,
     "via": "chain",
     "references": []
    },
@@ -4961,10 +4959,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2194",
@@ -7352,10 +7348,9 @@
    "consumers": {
     "persist": 1,
     "export": 1,
-    "animation": 3,
-    "native": 3
+    "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1679",
@@ -12812,10 +12807,9 @@
     "history": 2,
     "selection": 2,
     "render": 2,
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:929",
@@ -12827,7 +12821,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 98,
+    "functionsVisited": 97,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6326 paintStrokeSwatches()"
@@ -14105,7 +14099,7 @@
     "via": "variable scopeSel",
     "references": [
      "src/js/palette-panel.js:227 render()",
-     "src/js/adapters/native-palette-ui.js:151 render()"
+     "src/js/adapters/native-palette-ui.js:166 render()"
     ]
    },
    "fixtures": [
@@ -22208,13 +22202,13 @@
    "fixtures": []
   },
   {
-   "id": "menu:adapters/native-palette-ui.js:106",
+   "id": "menu:adapters/native-palette-ui.js:121",
    "kind": "menu",
    "surface": "dynamic menu (tabs)",
    "capability": "Renommer…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/adapters/native-palette-ui.js:106 tabs()"
+    "src/js/adapters/native-palette-ui.js:121 tabs()"
    ],
    "events": [
     "click"
@@ -22228,7 +22222,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-palette-ui.js:106",
+   "source": "src/js/adapters/native-palette-ui.js:121",
    "meta": {
     "i18n": null,
     "functionsVisited": 29
@@ -22241,13 +22235,13 @@
    ]
   },
   {
-   "id": "menu:adapters/native-palette-ui.js:107",
+   "id": "menu:adapters/native-palette-ui.js:122",
    "kind": "menu",
    "surface": "dynamic menu (tabs)",
    "capability": "Dupliquer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/adapters/native-palette-ui.js:107 tabs()"
+    "src/js/adapters/native-palette-ui.js:122 tabs()"
    ],
    "events": [
     "click"
@@ -22261,7 +22255,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-palette-ui.js:107",
+   "source": "src/js/adapters/native-palette-ui.js:122",
    "meta": {
     "i18n": null,
     "functionsVisited": 25
@@ -22274,46 +22268,13 @@
    ]
   },
   {
-   "id": "menu:adapters/native-palette-ui.js:109",
+   "id": "menu:adapters/native-palette-ui.js:124",
    "kind": "menu",
    "surface": "dynamic menu (tabs)",
    "capability": "Supprimer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/adapters/native-palette-ui.js:109 tabs()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/adapters/native-palette-ui.js:109",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 1
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "menu:adapters/native-palette-ui.js:124",
-   "kind": "menu",
-   "surface": "dynamic menu (colors)",
-   "capability": "Retirer de la palette",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/adapters/native-palette-ui.js:124 colors()"
+    "src/js/adapters/native-palette-ui.js:124 tabs()"
    ],
    "events": [
     "click"
@@ -22328,6 +22289,39 @@
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/adapters/native-palette-ui.js:124",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 1
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "menu:adapters/native-palette-ui.js:139",
+   "kind": "menu",
+   "surface": "dynamic menu (colors)",
+   "capability": "Retirer de la palette",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/adapters/native-palette-ui.js:139 colors()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/adapters/native-palette-ui.js:139",
    "meta": {
     "i18n": null,
     "functionsVisited": 57
