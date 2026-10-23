@@ -358,6 +358,14 @@
     }
     function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&view.matches(presentation,info)&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
+    function captureSaveSession(){
+      var pin=info,observed=queue,ticket=subscriptionTicket;
+      return async function(){
+        if(!active()||openingRequested||synchronizing||!same(info,pin))return null;
+        await observed;
+        return observed===queue&&ticket===subscriptionTicket&&!openingRequested&&same(info,pin)?presentedSession():null;
+      };
+    }
     async function readLayerView(layerUid,frame,pin,view){
       async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
       function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&value.presentation.frame===frame&&
@@ -422,7 +430,7 @@
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
       beginViewportNavigation:function(kind,point){return active()&&!openingRequested&&!synchronizing&&presentation&&same(info,presentation)&&(!ports.projectionReady||ports.projectionReady(info))&&(!ports.subscriptionActive||ports.subscriptionActive())?view.begin(presentation,info,ports.frame(),ports.mapping(info),presentationBounds,kind,point):(openDiagnostic('navigation-begin','owner-unavailable'),null);},updateViewportNavigation:function(token,point,factor,target){try{if(!active()||openingRequested||synchronizing||!presentation||!same(info,presentation)||ports.projectionReady&&!ports.projectionReady(info)||ports.subscriptionActive&&!ports.subscriptionActive())throw new Error('Native navigation owner is unavailable');view.update(token,info,ports.frame(),ports.mapping(info),point,factor,target);openDiagnostic('navigation-update','view-updated');return renderPreview(ports.frame());}catch(error){openDiagnostic('navigation-update','rejected');return Promise.reject(error);}},presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
-      acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
+      captureSaveSession:captureSaveSession,acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
       identity:requireActive,requestRelease:function(){return false;},releaseCurrent:function(){return false;},
       persistenceJSON:function(){throw new Error('Native project files must be saved through the native file command');}});
