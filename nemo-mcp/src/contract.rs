@@ -400,12 +400,27 @@ pub struct NativeHostStatus {
     pub request_id: String,
     pub instance_id: String,
     pub available: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_status_generation"
+    )]
+    pub lifecycle_generation: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub document_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_revision: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+}
+
+fn deserialize_status_generation<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // Missing is allowed for unavailable status; an explicitly present null is
+    // never a lifecycle witness and must not be normalized into absence.
+    u64::deserialize(deserializer).map(Some)
 }
 
 impl NativeHostStatus {
@@ -415,6 +430,7 @@ impl NativeHostStatus {
             request_id: request.request_id.clone(),
             instance_id: request.instance_id.clone(),
             available: false,
+            lifecycle_generation: None,
             document_id: None,
             content_revision: None,
             reason: Some(reason.into()),
@@ -432,7 +448,14 @@ impl NativeHostStatus {
             || self
                 .content_revision
                 .is_some_and(|value| value > MAX_SAFE_REVISION)
-            || (self.available && (self.document_id.is_none() || self.content_revision.is_none()))
+            || self
+                .lifecycle_generation
+                .is_some_and(|value| value == 0 || value > MAX_SAFE_REVISION)
+            || (self.available
+                && (self.document_id.is_none()
+                    || self.content_revision.is_none()
+                    || self.lifecycle_generation.is_none()))
+            || (!self.available && self.lifecycle_generation.is_some())
             || (!self.available && self.reason.as_deref().is_none_or(str::is_empty))
         {
             return Err(RequestError::InvalidRequest(

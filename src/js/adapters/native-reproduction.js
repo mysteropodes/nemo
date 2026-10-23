@@ -32,8 +32,8 @@
   }
   async function check(root, identity) {
     if (!identity || !same(identity, capture(root))) throw new Error('Native catalog session changed.');
-    // Binding is an existing identity read, not subscribe/disconnect. Native
-    // status intentionally omits generation; the host binding owns that fence.
+    // Binding is an existing identity read, not subscribe/disconnect. Keep the
+    // catalog's subscription fence even when native status exposes generation.
     var status;
     try { status = await invoke(root, 'nemo_native_revision_sync', { request: { action: 'binding' } }); }
     catch (_) {

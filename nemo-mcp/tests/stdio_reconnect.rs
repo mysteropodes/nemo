@@ -327,11 +327,12 @@ async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) 
         } else {
             let mut status = json!({"apiVersion":2,"requestId":request.request_id,
                 "instanceId":SELECTED,"available":true,
-                "documentId":"native-document","contentRevision":23});
+                "documentId":"native-document","contentRevision":23,"lifecycleGeneration":37});
             match native_reply {
                 "available" => {}
                 "unavailable" => {
                     status["available"] = json!(false);
+                    status.as_object_mut().unwrap().remove("lifecycleGeneration");
                     status["reason"] = json!("native authority inactive");
                     // The closed status DTO permits optional pins when unavailable;
                     // discovery must still expose no active document/revision.
@@ -345,6 +346,16 @@ async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) 
                 }
                 "unknown-member" => status["injected"] = json!(true),
                 "unsafe-revision" => status["contentRevision"] = json!(9_007_199_254_740_992u64),
+                "missing-generation" => { status.as_object_mut().unwrap().remove("lifecycleGeneration"); }
+                "null-generation" => status["lifecycleGeneration"] = Value::Null,
+                "zero-generation" => status["lifecycleGeneration"] = json!(0),
+                "fractional-generation" => status["lifecycleGeneration"] = json!(1.5),
+                "string-generation" => status["lifecycleGeneration"] = json!("37"),
+                "unsafe-generation" => status["lifecycleGeneration"] = json!(9_007_199_254_740_992u64),
+                "unavailable-generation" => {
+                    status["available"] = json!(false);
+                    status["reason"] = json!("native authority inactive");
+                }
                 "oversized" => status["reason"] = json!("x".repeat(4096)),
                 other => panic!("unknown fixture {other}"),
             }
@@ -386,7 +397,7 @@ async fn executable_discovers_real_native_status_after_unanswered_or_refused_leg
                 "instanceId":SELECTED,"buildId":"native-only-build",
                 "documentId":"native-document","revision":23,"capabilities":null,
                 "nativeHostStatus":{"apiVersion":2,"instanceId":SELECTED,"available":true,
-                    "documentId":"native-document","contentRevision":23}
+                    "documentId":"native-document","contentRevision":23,"lifecycleGeneration":37}
             }])
         );
         let legacy: Value =
@@ -423,6 +434,13 @@ async fn executable_native_only_discovery_rejects_uncorrelated_malformed_oversiz
         "missing-document",
         "unknown-member",
         "unsafe-revision",
+        "missing-generation",
+        "null-generation",
+        "zero-generation",
+        "fractional-generation",
+        "string-generation",
+        "unsafe-generation",
+        "unavailable-generation",
         "oversized",
         "silent",
     ] {

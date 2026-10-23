@@ -100,7 +100,8 @@ const server = net.createServer(socket => {
       if (message.nativeStatus) {
         const status = message.nativeStatus;
         socket.end(JSON.stringify({apiVersion: 2, requestId: status.requestId,
-          instanceId, available: true, documentId: 'native-document-1', contentRevision: 0}) + '\n');
+          instanceId, available: true, documentId: 'native-document-1', contentRevision: 0,
+          lifecycleGeneration: 7}) + '\n');
       } else if (message.nativeRequest) {
         socket.end(JSON.stringify(native(message.nativeRequest)) + '\n');
       } else {
@@ -263,7 +264,7 @@ async fn compiled_mcp_shares_application_revision_retries_and_history() {
             discovery["instances"][0]["nativeHostStatus"],
             json!({"apiVersion":2,"requestId":discovery["instances"][0]["nativeHostStatus"]["requestId"],
                 "instanceId":instance,"available":true,"documentId":"native-document-1",
-                "contentRevision":0})
+                "contentRevision":0,"lifecycleGeneration":7})
         );
 
         let native_query = json!({"apiVersion":2,"requestId":"native-query",
