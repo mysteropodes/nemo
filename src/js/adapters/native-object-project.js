@@ -464,5 +464,8 @@
     catch(error){return uiFailure(root,error);}
     return true; // An unconfirmed selection is consumed, never a legacy fallback.
   }
-  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI,bindUIComposition:function(root,compose){return Desktop.bindUIComposition(root,compose);}});
+  // Shared DTO validation crosses this existing module entry, never its private reader.
+  var objectQueryContract=Object.freeze({payload:Reads.payload,result:Reads.result,correlate:Reads.correlate,paths:Reads.paths});
+  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI,objectQueryContract:objectQueryContract,
+    bindUIComposition:function(root,compose){return Desktop.bindUIComposition(root,compose);}});
 }));
