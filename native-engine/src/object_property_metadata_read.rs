@@ -272,6 +272,7 @@ impl ObjectSnapshot {
             {
                 Some(holder) => Cow::Borrowed(holder),
                 None => Cow::Owned(PropertyHolder {
+                    mesh_source: Presence::Missing,
                     target: target.clone(),
                     controls: Presence::Missing,
                     properties: vec![],

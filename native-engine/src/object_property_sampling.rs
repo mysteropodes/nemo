@@ -123,6 +123,9 @@ pub fn sample_property_raw(
         return Err(PropertySampleError::InvalidFrame);
     }
     let document = snapshot.document();
+    if PropertyHolder::mesh_is_unbound(document, target) {
+        return Err(PropertySampleError::Unavailable);
+    }
     if !target_exists(document, target) {
         return Err(PropertySampleError::MissingTarget);
     }
@@ -138,6 +141,7 @@ pub fn sample_property_raw(
         return Err(PropertySampleError::UnsupportedProperty);
     }
     let empty = PropertyHolder {
+        mesh_source: Presence::Missing,
         target: target.clone(),
         controls: Presence::Missing,
         properties: vec![],

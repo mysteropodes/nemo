@@ -30,16 +30,27 @@ object_deserialize!(PropertyHolderTarget {
     context_id: String, layer_uid: String, #[serde(default)] stroke_id: Presence<String>
 });
 
+/// Explicit retained mesh provenance; public selector identity remains unchanged.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct MeshSource {
+    mesh_id: String,
+}
+object_deserialize!(MeshSource { mesh_id: String });
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PropertyHolder {
     pub(crate) target: PropertyHolderTarget,
     #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) mesh_source: Presence<MeshSource>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) controls: Presence<Vec<ExpressionControl>>,
     pub(crate) properties: Vec<PropertyRecord>,
 }
 object_deserialize!(PropertyHolder {
-    target: PropertyHolderTarget, #[serde(default)] controls: Presence<Vec<ExpressionControl>>,
+    target: PropertyHolderTarget, #[serde(default)] mesh_source: Presence<MeshSource>,
+    #[serde(default)] controls: Presence<Vec<ExpressionControl>>,
     properties: Vec<PropertyRecord>
 });
 
@@ -290,6 +301,12 @@ impl PropertyHolder {
         let mut identities = HashSet::new();
         for holder in holders.value().into_iter().flatten() {
             let target = &holder.target;
+            let retained_mesh = holder.has_retained_mesh_source();
+            if !holder.mesh_source.missing() && !retained_mesh {
+                return Err(invalid(
+                    "meshSource requires a nonempty matching element identity",
+                ));
+            }
             // A declared component owns its inner identities; never search root
             // tables or another component when a local layer/element is absent.
             // Legacy order-only contexts retain their previous storage admission.
@@ -299,6 +316,7 @@ impl PropertyHolder {
                 meshes,
                 component.map_or(records, |c| c.objects()),
                 target,
+                retained_mesh,
             ) {
                 return Err(unsupported("ambiguous path/item and mesh holder identity"));
             }
@@ -314,6 +332,9 @@ impl PropertyHolder {
                         .any(|layer| layer.layer_uid() == target.layer_uid)
                 },
             );
+            if retained_mesh && component.is_none() && target.context_id() != "scene-root" {
+                return Err(invalid("meshSource requires a real context"));
+            }
             if !layer_exists {
                 return Err(invalid("unresolved property holder context or layer"));
             }
@@ -339,7 +360,8 @@ impl PropertyHolder {
                 if stroke_id.is_empty()
                     || !(element_exists
                         || targets::item_target(items, target)
-                        || targets::mesh(items, meshes, target).is_some())
+                        || targets::mesh(items, meshes, target).is_some()
+                        || retained_mesh)
                 {
                     return Err(invalid("unresolved property holder element"));
                 }
@@ -364,7 +386,9 @@ impl PropertyHolder {
                 }
                 if catalog::vertex_index(&record.property).is_some() {
                     let source_records = component.map_or(records, |c| c.objects());
-                    if !targets::has_vertex_source(items, meshes, source_records, target) {
+                    if !retained_mesh
+                        && !targets::has_vertex_source(items, meshes, source_records, target)
+                    {
                         return Err(unsupported(
                             "vertex property requires its actual path or mesh source",
                         ));

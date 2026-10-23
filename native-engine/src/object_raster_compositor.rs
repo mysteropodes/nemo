@@ -96,13 +96,18 @@ impl Compositor {
                 PaintEntry::Raster(index) => {
                     #[cfg(all(feature = "application", feature = "project_media_codec"))]
                     {
-                        let (image, transform, opacity) =
-                            prepared.raster_image(index).ok_or_else(|| {
-                                CompositorError::new("native raster resource is unavailable")
-                            })?;
-                        let brush =
-                            vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
-                        scene.draw_image(&brush, transform);
+                        if !prepared
+                            .replay_raster_mesh(index, scene)
+                            .map_err(CompositorError::new)?
+                        {
+                            let (image, transform, opacity) =
+                                prepared.raster_image(index).ok_or_else(|| {
+                                    CompositorError::new("native raster resource is unavailable")
+                                })?;
+                            let brush = vello::peniko::ImageBrush::new(image.clone())
+                                .multiply_alpha(opacity);
+                            scene.draw_image(&brush, transform);
+                        }
                     }
                     #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
                     {
@@ -127,6 +132,7 @@ impl Compositor {
         Ok(())
     }
 }
+
 /// A layered GPU result needs its own final whole-image camera pass; do not
 /// pretend that transforming only the flat source paints covers that path.
 pub(super) fn check_layered_camera(

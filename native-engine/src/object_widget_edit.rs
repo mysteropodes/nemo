@@ -301,6 +301,7 @@ impl ObjectFillOwner {
             .cloned()
             .unwrap_or_default();
         holders.push(PropertyHolder {
+            mesh_source: Presence::Missing,
             target: PropertyHolderTarget {
                 context_id: ROOT_CONTEXT.to_owned(),
                 layer_uid: uid,

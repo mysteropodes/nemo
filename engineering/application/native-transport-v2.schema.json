@@ -2448,6 +2448,40 @@
       "additionalProperties": false,
       "required": [
         "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.image.mesh.edit"
+        },
+        "meshId": {
+          "$ref": "#/$defs/ObjectRigId"
+        },
+        "action": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectImageMeshAction"
+            },
+            {
+              "$ref": "#/$defs/ObjectImageMeshBindingAction"
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectImageMeshLegacyEditPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectImageMeshBindingPayload"
+        }
+      ]
+    },
+    "ObjectImageMeshLegacyEditPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
         "meshId",
         "action"
       ],
@@ -2460,6 +2494,216 @@
         },
         "action": {
           "$ref": "#/$defs/ObjectImageMeshAction"
+        }
+      }
+    },
+    "ObjectImageMeshBindingTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strokeId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ObjectImageMeshBindingMesh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outline",
+        "verts",
+        "tris"
+      ],
+      "properties": {
+        "outline": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "verts": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "tris": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        },
+        "offsets": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    },
+    "ObjectImageMeshBindingAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "mesh"
+          ],
+          "properties": {
+            "kind": {
+              "const": "attach"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectImageMeshBindingTarget"
+            },
+            "mesh": {
+              "$ref": "#/$defs/ObjectImageMeshBindingMesh"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target"
+          ],
+          "properties": {
+            "kind": {
+              "const": "detach"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectImageMeshBindingTarget"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "target",
+            "meshId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "propagate"
+            },
+            "target": {
+              "$ref": "#/$defs/ObjectImageMeshBindingTarget"
+            },
+            "meshId": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "meshId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "releaseIfUnused"
+            },
+            "meshId": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contextId",
+            "layerUid"
+          ],
+          "properties": {
+            "kind": {
+              "const": "duplicate"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "ObjectImageMeshBindingPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.image.mesh.edit"
+        },
+        "action": {
+          "$ref": "#/$defs/ObjectImageMeshBindingAction"
         }
       }
     },

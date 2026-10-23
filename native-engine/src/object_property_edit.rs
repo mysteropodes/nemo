@@ -218,6 +218,7 @@ impl ObjectFillOwner {
         let mut holder = index
             .map(|i| holders[i].clone())
             .unwrap_or_else(|| PropertyHolder {
+                mesh_source: Presence::Missing,
                 target: payload.target.clone(),
                 controls: Presence::Missing,
                 properties: vec![],
@@ -240,6 +241,9 @@ impl ObjectFillOwner {
             .properties
             .iter()
             .position(|r| r.property == payload.property);
+        if record_index.is_none() && PropertyHolder::mesh_is_unbound(&document, &payload.target) {
+            return Err(DispatchErrorCode::Unavailable);
+        }
         let mut record = record_index
             .map(|i| holder.properties[i].clone())
             .unwrap_or_else(|| PropertyRecord {
