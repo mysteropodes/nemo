@@ -38,6 +38,28 @@ test('every action sends exactly its closed members', async () => {
   assert.deepEqual(fx.owner.log.received.map((r) => r.expectedRevision), [7, 8, 9, 10], 'each call reads the pin at execution');
 });
 
+test('binding methods send the admitted native action shapes through the existing serialized route', async () => {
+  const fx = createFixture({});
+  const adapter = Mesh.create(fx.session);
+  const target = { contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 13 }, strokeId: 'raster-13' };
+  const destination = { ...target, layerUid: 'L2', frameScope: { kind: 'authored', frame: 7 }, strokeId: 'copy-7' };
+  const mesh = { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3],
+    offsets: [[0, 0], [0, 0], [0, 0], [0, 0]], cols: 1, rows: 1 };
+  await adapter.attach(target, mesh);
+  await adapter.propagate(destination, 'im_1');
+  await adapter.duplicate('scene-root', 'L2');
+  await adapter.detach(target);
+  await adapter.releaseIfUnused('im_1');
+  assert.deepEqual(fx.owner.log.received.map((r) => r.payload), [
+    { command: 'object.image.mesh.edit', action: { kind: 'attach', target, mesh } },
+    { command: 'object.image.mesh.edit', action: { kind: 'propagate', target: destination, meshId: 'im_1' } },
+    { command: 'object.image.mesh.edit', action: { kind: 'duplicate', contextId: 'scene-root', layerUid: 'L2' } },
+    { command: 'object.image.mesh.edit', action: { kind: 'detach', target } },
+    { command: 'object.image.mesh.edit', action: { kind: 'releaseIfUnused', meshId: 'im_1' } },
+  ]);
+  assert.deepEqual(fx.owner.log.received.map((r) => r.expectedRevision), [7, 8, 9, 10, 11]);
+});
+
 test('a falsy density option is left out exactly like the baseline setOutline ignores it', async () => {
   const fx = createFixture({});
   const mesh = Mesh.create(fx.session);
@@ -51,6 +73,22 @@ test('two calls queued back to back send revisions 7 then 8 (the pin is read at 
   const mesh = Mesh.create(fx.session);
   await Promise.all([mesh.setOffset('im_1', 1, 0.5, 0), mesh.setOffset('im_1', 2, 0.25, 0)]);
   assert.deepEqual(fx.owner.log.received.map((r) => [r.requestId, r.expectedRevision]), [['project-mesh-1', 7], ['project-mesh-2', 8]]);
+});
+
+test('a queued binding from a stale native view mints no request id and sends no command', async () => {
+  const fx = createFixture({});
+  const mesh = Mesh.create(fx.session);
+  const target = { contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 13 }, strokeId: 'raster-13' };
+  const capturedRevision = fx.state.revision;
+  const current = (pin) => pin.contentRevision === capturedRevision;
+  const earlier = mesh.resetOffsets('im_1');
+  const stale = mesh.detach(target, current);
+  await earlier;
+  const error = await refused(stale);
+  assert.equal(error.code, 'stale_revision');
+  assert.equal(error.reason, 'mesh_selection_stale');
+  assert.deepEqual(fx.events.ids, ['project-mesh-1'], 'the rejected binding does not mint a request id');
+  assert.deepEqual(fx.owner.log.received.map((r) => r.payload.action), [{ kind: 'resetOffsets' }], 'the rejected binding sends no native command');
 });
 
 test('a no-op edit is an unapplied receipt on the same revision', async () => {
@@ -100,10 +138,10 @@ test('a request above the public 4096-byte bound is refused locally and never sp
   assert.equal(fx.owner.log.received.length, 0);
 });
 
-test('attach, detach and animated vertex keys have no native operation: typed unavailability, zero requests', async () => {
+test('video binding and animated vertex keys remain unavailable with zero requests', async () => {
   const fx = createFixture({});
   const mesh = Mesh.create(fx.session);
-  assert.deepEqual(Mesh.UNAVAILABLE, { attach: 'mesh_binding_unavailable', detach: 'mesh_binding_unavailable', attachToVideoLayer: 'mesh_binding_unavailable',
+  assert.deepEqual(Mesh.UNAVAILABLE, { attachToVideoLayer: 'mesh_binding_unavailable',
     detachFromVideoLayer: 'mesh_binding_unavailable', setVertexKey: 'mesh_vertex_animation_unavailable' });
   for (const [name, reason] of Object.entries(Mesh.UNAVAILABLE)) {
     const error = await refused(mesh[name]({}));

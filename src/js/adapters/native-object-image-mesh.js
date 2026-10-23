@@ -1,7 +1,7 @@
 /* Image mesh edits as native commands (lane 3, F17/F18): offset, reset, outline and density, each ONE sealed owner transaction
  * (`command.document.object.image.mesh.edit`). A thin client of the native project session: it owns no mesh store, no mirror of
  * `state.imageMeshes` and no document writer; the legacy SMImageMesh writers are never called. What has no native operation
- * (attach / detach to a raster or a video layer, animated per-vertex keys) is a typed unavailability, never a fallback.
+ * (video-layer binding and animated per-vertex keys) is a typed unavailability, never a fallback.
  * Hit-testing and the drag preview stay in image-mesh-bridge.js (document-capture pointer listeners, presentation only). */
 (function (root, factory) {
   const commonjs = typeof module === 'object' && module.exports;
@@ -13,7 +13,6 @@
 }(typeof globalThis === 'object' ? globalThis : this, function (Command, Contract) {
   'use strict';
   const UNAVAILABLE = Object.freeze({
-    attach: 'mesh_binding_unavailable', detach: 'mesh_binding_unavailable',
     attachToVideoLayer: 'mesh_binding_unavailable', detachFromVideoLayer: 'mesh_binding_unavailable',
     setVertexKey: 'mesh_vertex_animation_unavailable',
   });
@@ -26,20 +25,34 @@
 
   function create(session) {
     const commands = Command.create(session, 'mesh');
-    const edit = (meshId, action) => commands.execute(Contract.MESH_EDIT, () => ({ command: 'object.image.mesh.edit', meshId, action }));
+    const guarded = (build, current) => (pin) => {
+      if (current !== undefined && (typeof current !== 'function' || current(pin) !== true)) {
+        throw Command.fault('stale_revision', 'Native mesh selection changed', { reason: 'mesh_selection_stale' });
+      }
+      return build();
+    };
+    const edit = (meshId, action, current) => commands.execute(Contract.MESH_EDIT,
+      guarded(() => ({ command: 'object.image.mesh.edit', meshId, action }), current));
+    const binding = (action, current) => commands.execute(Contract.MESH_EDIT,
+      guarded(() => ({ command: 'object.image.mesh.edit', action }), current));
     // NS.setOutline ignores a falsy density option (the baseline keeps the existing grid): only truthy values are sent.
-    function setOutline(meshId, outline, options) {
+    function setOutline(meshId, outline, options, current) {
       const action = { kind: 'setOutline', outline };
       const o = options || {};
       if (o.cols) action.cols = o.cols;
       if (o.rows) action.rows = o.rows;
-      return edit(meshId, action);
+      return edit(meshId, action, current);
     }
     const api = {
-      setOffset: (meshId, index, du, dv) => edit(meshId, { kind: 'setOffset', index, du, dv }),
-      resetOffsets: (meshId) => edit(meshId, { kind: 'resetOffsets' }),
+      attach: (target, mesh, current) => binding({ kind: 'attach', target, mesh }, current),
+      detach: (target, current) => binding({ kind: 'detach', target }, current),
+      propagate: (target, meshId, current) => binding({ kind: 'propagate', target, meshId }, current),
+      releaseIfUnused: (meshId, current) => binding({ kind: 'releaseIfUnused', meshId }, current),
+      duplicate: (contextId, layerUid, current) => binding({ kind: 'duplicate', contextId, layerUid }, current),
+      setOffset: (meshId, index, du, dv, current) => edit(meshId, { kind: 'setOffset', index, du, dv }, current),
+      resetOffsets: (meshId, current) => edit(meshId, { kind: 'resetOffsets' }, current),
       setOutline,
-      setDensity: (meshId, cols, rows) => edit(meshId, { kind: 'setDensity', cols, rows }),
+      setDensity: (meshId, cols, rows, current) => edit(meshId, { kind: 'setDensity', cols, rows }, current),
     };
     Object.keys(UNAVAILABLE).forEach((name) => { api[name] = unavailable(name); });
     return Object.freeze(api);
