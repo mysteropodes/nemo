@@ -158,10 +158,10 @@ pub(super) fn presented_project() -> Value {
         .unwrap()
         .push(second);
     for entry in value["drawing"]["items"]["raster"].as_array_mut().unwrap() {
-        // The fixed PNG is blue then white. Raster x/y are its centre, so this
-        // rect is [3,5,20,10]: the borrowed surface's (8,8) samples blue,
-        // while its independent (40,40) background sample stays outside.
-        entry["item"]["x"] = json!(13);
+        // The fixed PNG is blue then white. Centre (16,10) gives rect [6,5,20,10].
+        // Pixel centre (8.5,8.5) maps to texel (0.25,0.35): default bilinear
+        // Pad sampling fetches only blue; (40,40) stays outside the outline.
+        entry["item"]["x"] = json!(16);
         entry["item"]["y"] = json!(10);
         entry["item"]["meshId"] = json!("im_1");
     }
@@ -221,7 +221,7 @@ fn assert_selected(response: &Value, request: &Value) {
         "frameScope":{"kind":"authored","frame":0}})
     );
     for (field, expected) in [
-        ("x", 3.),
+        ("x", 6.),
         ("y", 5.),
         ("width", 20.),
         ("height", 10.),
