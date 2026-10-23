@@ -54,11 +54,15 @@ pub(super) fn ambiguous(
     meshes: Option<&ImageMeshStore>,
     records: &[ObjectRecord],
     target: &PropertyHolderTarget,
+    retained_mesh: bool,
 ) -> bool {
-    if mesh(items, meshes, target).is_none() {
+    let bound = mesh(items, meshes, target).is_some();
+    if !bound && !retained_mesh {
         return false;
     }
-    let id = target.stroke_id().expect("bound mesh identity");
+    let Some(id) = target.stroke_id() else {
+        return false;
+    };
     path_vertices(records, target).is_some()
         || items.is_some_and(|items| {
             items
@@ -68,12 +72,90 @@ pub(super) fn ambiguous(
                 || items.raster_entries().iter().any(|r| {
                     same_layer(&r.target, target)
                         && r.target.stroke_id() == id
-                        && r.item.mesh_id() != Some(id)
+                        && (!bound || r.item.mesh_id() != Some(id))
                 })
         })
 }
 
 impl PropertyHolder {
+    pub(crate) fn has_retained_mesh_source(&self) -> bool {
+        self.mesh_source.value().is_some_and(|source| {
+            !source.mesh_id.is_empty() && self.target.stroke_id() == Some(source.mesh_id.as_str())
+        })
+    }
+
+    /// Establish provenance only for an exact legacy holder retained in the admitted source.
+    /// The caller publishes this change with the binding transition in one detached candidate.
+    pub(crate) fn retain_bound_mesh_source(&mut self, document: &ObjectDocument) -> bool {
+        if !self.mesh_source.missing()
+            || !document
+                .property_holders()
+                .unwrap_or(&[])
+                .iter()
+                .any(|holder| holder == &*self)
+            || Self::bound_mesh(document, self.target()).is_none()
+        {
+            return false;
+        }
+        self.mesh_source = crate::object_document::Presence::Present(
+            crate::object_document::properties::MeshSource {
+                mesh_id: self
+                    .target
+                    .stroke_id()
+                    .expect("actual bound mesh")
+                    .to_owned(),
+            },
+        );
+        true
+    }
+
+    /// Destination-only duplication remaps this marker with the separately remapped target.
+    pub(crate) fn remap_mesh_source(&mut self, pairs: &[(String, String)]) {
+        if !self.has_retained_mesh_source() {
+            return;
+        }
+        if let crate::object_document::Presence::Present(source) = &mut self.mesh_source {
+            if let Some((_, new)) = pairs.iter().find(|(old, _)| old == &source.mesh_id) {
+                source.mesh_id = new.clone();
+            }
+        }
+    }
+
+    /// Locate an existing validated holder, never a target-only fabricated mesh source.
+    pub(crate) fn retained_mesh_source<'a>(
+        document: &'a ObjectDocument,
+        target: &PropertyHolderTarget,
+    ) -> Option<&'a Self> {
+        let holder = document
+            .property_holders()?
+            .iter()
+            .find(|holder| holder.target() == target && holder.has_retained_mesh_source())?;
+        let layers = if target.context_id() == "scene-root" {
+            document.layers()
+        } else {
+            document
+                .component_set()?
+                .component(target.context_id())?
+                .layers()
+        };
+        if !layers
+            .iter()
+            .any(|layer| layer.layer_uid() == target.layer_uid())
+            || Self::target_ambiguous(document, target)
+        {
+            return None;
+        }
+        Some(holder)
+    }
+
+    pub(crate) fn mesh_is_unbound(
+        document: &ObjectDocument,
+        target: &PropertyHolderTarget,
+    ) -> bool {
+        Self::retained_mesh_source(document, target).is_some()
+            && mesh(document.items.value(), document.image_meshes(), target).is_none()
+    }
+
     pub(crate) fn target_ambiguous(
         document: &ObjectDocument,
         target: &PropertyHolderTarget,
@@ -87,6 +169,11 @@ impl PropertyHolder {
             document.image_meshes(),
             records,
             target,
+            document
+                .property_holders()
+                .unwrap_or(&[])
+                .iter()
+                .any(|holder| holder.target() == target && holder.has_retained_mesh_source()),
         )
     }
     pub(crate) fn vertex_index(property: &str) -> Option<usize> {
@@ -105,7 +192,9 @@ impl PropertyHolder {
         document: &ObjectDocument,
         target: &PropertyHolderTarget,
     ) -> bool {
-        item_target(document.items.value(), target) || Self::bound_mesh(document, target).is_some()
+        item_target(document.items.value(), target)
+            || Self::bound_mesh(document, target).is_some()
+            || Self::retained_mesh_source(document, target).is_some()
     }
     pub(crate) fn vertex_count(
         document: &ObjectDocument,
@@ -124,7 +213,8 @@ impl PropertyHolder {
         path_vertices(records, target)
     }
     /// Stored tracks survive a topology shrink. New selectors cannot invent a
-    /// vertex, but an already-authored orphan track is retained and readable.
+    /// vertex. A retained unbound mesh exposes only its existing authored vertex metadata;
+    /// its values and geometry remain unavailable through the consumer's unbound guard.
     pub(crate) fn metadata_in_document(
         &self,
         document: &ObjectDocument,
@@ -135,15 +225,25 @@ impl PropertyHolder {
         }
         let mut metadata = self.metadata(property)?;
         if let Some(index) = crate::object_document::properties::catalog::vertex_index(property) {
-            let count = Self::vertex_count(document, self.target())?;
-            if index >= count && !self.properties().iter().any(|r| r.property() == property) {
-                return None;
+            let retained = Self::retained_mesh_source(document, self.target());
+            match Self::vertex_count(document, self.target()) {
+                Some(count)
+                    if index < count
+                        || self.properties().iter().any(|r| r.property() == property) => {}
+                None if retained.is_some_and(|holder| {
+                    holder
+                        .properties()
+                        .iter()
+                        .any(|record| record.property() == property)
+                }) => {}
+                _ => return None,
             }
-            metadata.unit = if Self::bound_mesh(document, self.target()).is_some() {
-                "%"
-            } else {
-                "px"
-            };
+            metadata.unit =
+                if retained.is_some() || Self::bound_mesh(document, self.target()).is_some() {
+                    "%"
+                } else {
+                    "px"
+                };
         }
         Some(metadata)
     }

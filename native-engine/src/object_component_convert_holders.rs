@@ -42,6 +42,7 @@ pub(super) fn single(
 fn lift_first(inner: &mut PropertyHolder, instance_uid: &str) -> Option<PropertyHolder> {
     let controls = std::mem::take(&mut inner.controls);
     let mut outer = PropertyHolder {
+        mesh_source: Presence::Missing,
         target: PropertyHolderTarget {
             context_id: "scene-root".to_owned(),
             layer_uid: instance_uid.to_owned(),

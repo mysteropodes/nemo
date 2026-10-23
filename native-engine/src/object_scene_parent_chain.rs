@@ -400,8 +400,9 @@ impl SceneParentChains {
             .collect();
         for (layer, item) in records {
             let admitted = (|| -> Result<(), ChainUnavailable> {
-                if item.mesh_id().is_some()
-                    || item.is_bitmap_brush() == Some(true)
+                // Mesh deformation maps through the final D30 rectangle, so its
+                // layer pivot still comes from the retained raster display rect.
+                if item.is_bitmap_brush() == Some(true)
                     || item.brush_group_id().is_some()
                     || item.is_brush_texture_copy() == Some(true)
                 {

@@ -376,6 +376,10 @@ mod property_edit_tests;
 mod property_bake_tests;
 
 #[cfg(test)]
+#[path = "native_image_mesh_binding_public_tests.rs"]
+mod image_mesh_binding_public_tests;
+
+#[cfg(test)]
 #[path = "native_composition_dispatch_tests.rs"]
 mod composition_tests;
 

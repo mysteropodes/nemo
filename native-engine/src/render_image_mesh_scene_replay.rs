@@ -78,6 +78,18 @@ pub(crate) fn replay_mesh_item<H>(
     item: &MeshSceneItem<H>,
     image: &ImageData,
 ) -> Result<ReplayReport, ReplayError> {
+    replay_mesh_item_with_transform(scene, item, image, item.view())
+}
+
+/// The common artwork wrapper applies its camera/navigation matrix once.
+/// Dilation still comes from the item's actual output view, independently of
+/// this emitted transform; retained geometry and image ownership are unchanged.
+pub(crate) fn replay_mesh_item_with_transform<H>(
+    scene: &mut Scene,
+    item: &MeshSceneItem<H>,
+    image: &ImageData,
+    transform: [f64; 6],
+) -> Result<ReplayReport, ReplayError> {
     let plan_size = item.image().pixel_size();
     let image_size = (image.width, image.height);
     if plan_size != image_size {
@@ -95,7 +107,7 @@ pub(crate) fn replay_mesh_item<H>(
             })
         }
     };
-    let view = Affine::new(item.view());
+    let view = Affine::new(transform);
     let outline = polygon(&plan.outline.points);
     scene.push_layer(Fill::NonZero, Mix::Normal, plan.opacity, view, &outline);
     let brush = ImageBrush::new(image.clone());

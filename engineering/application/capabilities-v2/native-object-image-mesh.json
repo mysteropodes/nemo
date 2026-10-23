@@ -27,9 +27,9 @@
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+    "policy": "Complete correlated retained receipt or typed refusal; bounded literal mesh edit data only, no full document snapshot or encoded media. Requests above 4096 encoded bytes are refused, never split."
   },
-  "semantics": "Edit the normalized rest data of one native image mesh as one sealed transaction: write one vertex offset, reset every offset, or retopologize from a new outline or density (the outline stays the stable vertex prefix and the sculpt is carried). Retopology needs the evaluation kernel of the engine build and is a typed unavailable otherwise. A no-op preserves bytes, revision and history. Attach, detach and animated per-vertex rows have no operation and are unavailable. No JS/Paper writer or optimistic mutation.",
+  "semantics": "Edit the normalized rest data of one native image mesh as one sealed transaction: write one vertex offset, reset every offset, or retopologize from a new outline or density (the outline stays the stable vertex prefix and the sculpt is carried). Retopology needs the evaluation kernel of the engine build and is a typed unavailable otherwise. A no-op preserves bytes, revision and history. Binding actions attach a literal mesh to a native raster target, detach it, propagate a nullable mesh id through applicable authored frames at the same natural position, release only unreferenced meshes, or deep-duplicate mesh bindings in an already duplicated destination layer. Targets retain context, layer, frame scope and stroke identity; reference rasters retain meshes. These actions require the native evaluation provider and otherwise report typed unavailable. Video binding actions remain unavailable; this operation does not author animated per-vertex rows. No JS/Paper writer or optimistic mutation.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

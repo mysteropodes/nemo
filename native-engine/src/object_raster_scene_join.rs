@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 pub(crate) struct RasterSource {
     pub(crate) source_index: usize,
     pub(crate) layer_index: usize,
+    mesh_id: Option<String>,
     pub(crate) source: RasterSceneSource,
 }
 pub(super) fn unavailable(index: usize, reason: &'static str) -> ObjectSceneError {
@@ -31,8 +32,7 @@ pub(super) fn sources_excluding(
         .map(|record| {
             let entry = record.entry();
             let item = &entry.item;
-            if item.mesh_id().is_some()
-                || item.is_bitmap_brush() == Some(true)
+            if item.is_bitmap_brush() == Some(true)
                 || item.brush_group_id().is_some()
                 || item.is_brush_texture_copy() == Some(true)
             {
@@ -42,6 +42,12 @@ pub(super) fn sources_excluding(
                 ));
             }
             let layer = &packet.source_layers()[record.layer_index()];
+            if item.mesh_id().is_some() && layer.rig().is_some() {
+                return Err(unavailable(
+                    record.source_index(),
+                    "native mesh rig pose is unavailable",
+                ));
+            }
             if layer.path_fx().is_some_and(|effects| !effects.is_empty()) {
                 return Err(unavailable(
                     record.source_index(),
@@ -62,6 +68,7 @@ pub(super) fn sources_excluding(
             Ok(RasterSource {
                 source_index: record.source_index(),
                 layer_index: record.layer_index(),
+                mesh_id: item.mesh_id().map(str::to_owned),
                 source: RasterSceneSource {
                     asset_id: item.asset_id().as_str().to_owned(),
                     rect: crate::evaluation::motion_parent_chain::ImageRect {
@@ -125,6 +132,9 @@ pub fn declared_versions(
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 mod retained {
     use super::*;
+    use crate::object_render_scene::render_image_mesh_kernels::render_image_mesh_scene::{
+        prepare_mesh_scene_item, scene_refusal, MeshSceneItem, MeshSceneSource,
+    };
     use crate::object_render_scene::scene_effect_kernels::object_scene_resource_set::{
         decoded_rgba8_bytes, SceneResourceEntry, SceneResourceKind, SceneResourceMismatch,
     };
@@ -149,6 +159,7 @@ mod retained {
     pub(crate) struct RasterResources {
         assets: BTreeMap<String, RasterAsset>,
         draws: Vec<RasterSceneImage<AssetPixels>>,
+        meshes: Vec<Option<MeshSceneItem<AssetPixels>>>,
         resources: Arc<ObjectSceneResourceSet>,
     }
     struct Pixels<'a>(&'a BTreeMap<String, RasterAsset>);
@@ -176,6 +187,7 @@ mod retained {
                 .collect();
             let mut assets = BTreeMap::new();
             let mut draws = Vec::new();
+            let mut meshes = Vec::new();
             for source in plan.raster_sources() {
                 let id = &source.source.asset_id;
                 if !assets.contains_key(id) {
@@ -216,16 +228,33 @@ mod retained {
                     .native_parent_chains()
                     .chain(source.layer_index)
                     .map_err(|error| unavailable(source.source_index, error.reason()))?;
-                draws.push(
-                    prepare_raster_scene_image(&source.source, &chain, &Pixels(&assets)).map_err(
-                        |_| {
-                            unavailable(
-                                source.source_index,
-                                "native raster placement is unavailable",
-                            )
-                        },
-                    )?,
-                );
+                let image = prepare_raster_scene_image(&source.source, &chain, &Pixels(&assets))
+                    .map_err(|_| {
+                        unavailable(
+                            source.source_index,
+                            "native raster placement is unavailable",
+                        )
+                    })?;
+                let mesh = source
+                    .mesh_id
+                    .as_deref()
+                    .map(|mesh_id| {
+                        prepare_mesh_scene_item(
+                            &image,
+                            &MeshSceneSource {
+                                mesh_id,
+                                view: Affine::IDENTITY.as_coeffs(),
+                                offsets: None,
+                                pose: None,
+                            },
+                            plan.packet().snapshot().document().image_meshes(),
+                        )
+                        .map_err(|error| scene_refusal(&error, source.source_index))
+                    })
+                    .transpose()?
+                    .flatten();
+                meshes.push(mesh);
+                draws.push(image);
             }
             let entries = assets
                 .iter()
@@ -248,13 +277,24 @@ mod retained {
             Ok(Self {
                 assets,
                 draws,
+                meshes,
                 resources,
             })
         }
         pub(crate) fn draw(&self, index: usize) -> Option<(&ImageData, Affine, f32)> {
+            if self.meshes.get(index)?.is_some() {
+                return None;
+            }
             let draw = self.draws.get(index)?;
             let asset = self.assets.get(draw.asset_id())?;
             Some((&asset.image, draw.placement(), draw.opacity_f32()))
+        }
+        pub(crate) fn mesh(
+            &self,
+            index: usize,
+        ) -> Option<(&ImageData, &MeshSceneItem<AssetPixels>)> {
+            let mesh = self.meshes.get(index)?.as_ref()?;
+            Some((&self.assets.get(mesh.image().asset_id())?.image, mesh))
         }
         pub(crate) fn images(&self) -> impl Iterator<Item = &ImageData> {
             self.assets.values().map(|asset| &asset.image)
@@ -326,5 +366,27 @@ impl crate::object_render_scene::ObjectCompositionWitness {
     }
     pub(crate) fn raster_images(&self) -> impl Iterator<Item = &vello::peniko::ImageData> + '_ {
         self.rasters.iter().flat_map(|resources| resources.images())
+    }
+    /// Geometry is retained in document space. Only seam dilation is replanned
+    /// for the current output view; the compositor applies that artwork matrix.
+    pub(crate) fn replay_raster_mesh(
+        &self,
+        index: usize,
+        scene: &mut vello::Scene,
+    ) -> Result<bool, String> {
+        let Some((image, mesh)) = self.rasters.as_ref().and_then(|r| r.mesh(index)) else {
+            return Ok(false);
+        };
+        let replanned;
+        let mesh = if let Some(view) = self.camera_matrix() {
+            replanned = mesh.for_view(view);
+            &replanned
+        } else {
+            mesh
+        };
+        crate::object_render_scene::render_image_mesh_kernels::render_image_mesh_scene_replay::replay_mesh_item_with_transform(
+            scene, mesh, image, [1., 0., 0., 1., 0., 0.],
+        ).map_err(|error| error.code().to_owned())?;
+        Ok(true)
     }
 }
