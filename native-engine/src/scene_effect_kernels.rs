@@ -13,3 +13,6 @@ pub(crate) mod scene_effect_order;
 #[path = "scene_effect_params.rs"]
 #[allow(dead_code)]
 pub(crate) mod scene_effect_params;
+#[path = "scene_effect_scene_join.rs"]
+#[allow(dead_code)]
+pub(crate) mod scene_effect_scene_join;

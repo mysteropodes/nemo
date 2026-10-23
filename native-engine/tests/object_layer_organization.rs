@@ -140,10 +140,17 @@ fn unresolved_membership_invalid_shape_null_boolean_and_unknown_metadata_refuse(
                 "{value}"
             );
         }
-        // Structural parent/cycle and other family activation stay refused.
+        // Ordered v2 admits a valid static link; legacy and invalid graphs stay refused.
+        let mut parented = source.clone();
+        parented["layers"][0]["parentLayerUid"] = json!("L1");
+        if version == 2 {
+            assert_eq!(encoded(&admitted(&parented)), parented);
+        } else {
+            assert!(decode_storage_project(parented.to_string().as_bytes()).is_err());
+        }
         for (key, value) in [
-            ("parentLayerUid", json!("L1")),
-            ("isFolderLayer", json!(true)),
+            ("parentLayerUid", json!("L0")),
+            ("parentLayerUid", json!("absent")),
             ("solo", json!(false)),
             ("linkGroupId", json!("linked")),
         ] {

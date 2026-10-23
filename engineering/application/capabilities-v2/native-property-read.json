@@ -23,7 +23,7 @@
     "adapterOwnsWritableMirror": false,
     "fallback": "none"
   },
-  "readPolicy": "Existing sole native owner selects the current immutable revision/snapshot. rawSample reuses native raw self sampling and deliberately ignores active expressions. authoredKeys returns admitted OrderKey DTOs with authored missing/null/empty fields unchanged; fixed-count pinned pages or unavailable, never a JS evaluator, mirror, default curve substitution, publication or ACK.",
+  "readPolicy": "Existing sole native owner selects the current immutable revision/snapshot. rawSample reuses native raw self sampling and deliberately ignores active expressions. authoredKeys returns admitted OrderKey DTOs with authored missing/null/empty fields unchanged; fixed-count pinned pages or unavailable, never a JS evaluator, mirror, default curve substitution, publication or ACK. expressionContext reads actual retained comp/self/key-count providers with explicit project-metadata unavailability; it grants no expression execution or writable authority. Optional mesh context binds the actual raster mesh in this context/layer, reads its rest UV/count only, and never adds rest sculpt to animated percent offsets. expressionState reads stored expression presence/enabled flags without evaluating. A real native owner may attach only its exact source/code/target/frame-matched transient diagnostic receipt; absent, stale or unvisited receipts remain explicitly not-evaluated, never inferred success. Diagnostics are not persistent document fields and code is not truncated into this bounded result.",
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
@@ -158,6 +158,194 @@
             }
           ],
           "nextOffset": null
+        }
+      }
+    },
+    {
+      "label": "Pinned native project context and holder identity",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "property-context",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.read",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "view": {
+            "kind": "expressionContext",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0"
+            },
+            "property": "opacity",
+            "frame": -1.5
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "property-context",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "d11-read-fixture",
+          "documentId": "native-object-document-1",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "kind": "expressionContext",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "property": "opacity",
+          "dimension": 1,
+          "frame": -1.5,
+          "self": {
+            "name": "Ball",
+            "index": 0,
+            "isShape": false,
+            "hasParent": false,
+            "property": "opacity",
+            "parent": null
+          },
+          "comp": {
+            "width": 320,
+            "height": 180,
+            "fps": 25,
+            "frames": 21,
+            "layers": 2,
+            "name": "Scene",
+            "frameDuration": 0.04,
+            "duration": 0.84,
+            "numLayers": 2
+          },
+          "keyCount": 0,
+          "compUnavailable": null
+        }
+      }
+    },
+    {
+      "label": "Actual bare raster-mesh holder context: rest UV and percent-offset track remain separate",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "mesh-context",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.read",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "view": {
+            "kind": "expressionContext",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0",
+              "strokeId": "im_1"
+            },
+            "property": "vtx1",
+            "frame": 0
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "mesh-context",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "d11-read-fixture",
+          "documentId": "native-object-document-1",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "kind": "expressionContext",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0",
+            "strokeId": "im_1"
+          },
+          "property": "vtx1",
+          "dimension": 2,
+          "frame": 0,
+          "self": {
+            "name": null,
+            "index": 0,
+            "isShape": false,
+            "hasParent": false,
+            "property": "vtx1",
+            "parent": null
+          },
+          "comp": null,
+          "keyCount": 0,
+          "compUnavailable": "projectMetadata",
+          "mesh": {
+            "meshId": "im_1",
+            "vertexIndex": 1,
+            "vertexCount": 3,
+            "outlineVertexCount": 3,
+            "vertexUV": [
+              1,
+              0
+            ],
+            "isOutlineVertex": true
+          }
+        }
+      }
+    },
+    {
+      "label": "Pinned expression-state storage read: evaluation is explicitly unavailable until an exact native owner receipt exists",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "property-expression-state",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.read",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "view": {
+            "kind": "expressionState",
+            "target": {
+              "contextId": "scene-root",
+              "layerUid": "L0"
+            },
+            "property": "opacity",
+            "frame": -1.5
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "property-expression-state",
+        "instanceId": "d11-read-fixture",
+        "documentId": "native-object-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "d11-read-fixture",
+          "documentId": "native-object-document-1",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:native-object-document-1:0",
+          "kind": "expressionState",
+          "target": {
+            "contextId": "scene-root",
+            "layerUid": "L0"
+          },
+          "property": "opacity",
+          "dimension": 1,
+          "frame": -1.5,
+          "expression": {
+            "present": true,
+            "enabled": true
+          },
+          "evaluation": {
+            "state": "unavailable",
+            "reason": "not-evaluated"
+          }
         }
       }
     }

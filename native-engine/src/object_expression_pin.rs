@@ -6,9 +6,10 @@ use crate::evaluation::property_expression_runtime::{
     evaluate_with_fallback, publish_if_current, Diagnostic, Publish,
 };
 use crate::history::NativeObjectHistory;
-use crate::object_document::{FrameScopeKind, PropertyHolderTarget};
+use crate::object_document::{ExpressionHolder, FrameScopeKind, PropertyHolderTarget};
 #[cfg(feature = "object_expression_runtime")]
 use crate::object_expression_runtime::{DetachedCandidate, ExpressionRefusal, PropertyCandidate};
+use crate::object_frame_packet::expression_sources as holder_source;
 use crate::object_frame_packet::{
     raw_expression_numeric, raw_expression_order, sample_property_raw, ObjectFrameError,
     ObjectFrameSelector, PropertySampleError,
@@ -182,6 +183,17 @@ const PROP_DIM: &[(&str, usize)] = &[
     ("dupOffsetPosZ", 1),
     ("dupOffsetRotX", 1),
     ("dupOffsetRotY", 1),
+    // Original effector-layer.js propKeysFor / registerEffectorPropMeta.
+    ("effRadius", 1),
+    ("effStrength", 1),
+    ("effAngle", 1),
+    ("effOffPosition", 2),
+    ("effOffRotation", 1),
+    ("effOffScale", 2),
+    ("effOffOpacity", 1),
+    ("effOffPositionZ", 1),
+    ("effOffRotationX", 1),
+    ("effOffRotationY", 1),
     ("parentBlend", 1),
     ("matteOn", 1),
     ("timeLinkInOffset", 1),
@@ -202,7 +214,7 @@ const PROP_DIM: &[(&str, usize)] = &[
 /// One typed Motion property expression, pinned to one retained snapshot.
 pub(crate) struct PropertyExpressionRequest {
     snapshot: ObjectSnapshot,
-    target: PropertyHolderTarget,
+    target: ExpressionHolder,
     property: String,
     frame: f64,
     depth: u32,
@@ -212,6 +224,15 @@ pub(crate) struct PropertyExpressionRequest {
 }
 
 impl PropertyExpressionRequest {
+    pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
+        &self.snapshot
+    }
+    pub(crate) fn target(&self) -> &ExpressionHolder {
+        &self.target
+    }
+    pub(crate) fn property(&self) -> &str {
+        &self.property
+    }
     pub(crate) fn frame(&self) -> f64 {
         self.frame
     }
@@ -247,11 +268,21 @@ impl PropertyExpressionRequest {
             .ok_or(ObjectFrameError::Unavailable)?;
         verify_owner_snapshot(owner, &current, &self.snapshot)?;
         let revision = self.snapshot.content_revision();
-        let outcome = match publish_if_current(revision, current.content_revision(), candidate) {
-            Publish::Publish(candidate) => candidate.into_outcome()?,
-            Publish::Stale => return Err(ObjectFrameError::WrongRevision.into()),
-        };
-        let fallback = evaluate_with_fallback(self.dim, &self.raw, outcome);
+        let (outcome, dependencies) =
+            match publish_if_current(revision, current.content_revision(), candidate) {
+                Publish::Publish(candidate) => candidate.into_parts(),
+                Publish::Stale => return Err(ObjectFrameError::WrongRevision.into()),
+            };
+        let mut fallback = evaluate_with_fallback(self.dim, &self.raw, outcome?);
+        if fallback.diagnostic.is_none()
+            && dependencies.iter().any(|d| {
+                d.diagnostic == Some(Diagnostic::TooDeep)
+                    && d.target == self.target
+                    && d.property == self.property
+            })
+        {
+            fallback.diagnostic = Some(Diagnostic::TooDeep);
+        }
         Ok(PropertyEvaluation {
             value: fallback.value,
             diagnostic: fallback.diagnostic,
@@ -260,6 +291,7 @@ impl PropertyExpressionRequest {
                 target: self.target,
                 property: self.property,
             }),
+            dependencies,
         })
     }
 }
@@ -271,6 +303,19 @@ pub(crate) struct PropertyEvaluation {
     pub(crate) value: Vec<f64>,
     pub(crate) diagnostic: Option<Diagnostic>,
     pub(crate) disable: Option<PropertyDisableRequest>,
+    pub(crate) dependencies: Vec<PropertyDependencyEffect>,
+}
+
+/// Inner diagnostics and timeout-disable requests retain their real target.
+/// Reading never commits them; the existing owner publishes them with the
+/// same final revision check as the outer result.
+#[cfg(feature = "object_expression_runtime")]
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PropertyDependencyEffect {
+    pub(crate) target: ExpressionHolder,
+    pub(crate) property: String,
+    pub(crate) diagnostic: Option<Diagnostic>,
+    pub(crate) disable: bool,
 }
 
 /// Motion's `ex.enabled = false` after a timeout, as data for the owner.
@@ -278,7 +323,7 @@ pub(crate) struct PropertyEvaluation {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PropertyDisableRequest {
     pub(crate) content_revision: u64,
-    pub(crate) target: PropertyHolderTarget,
+    pub(crate) target: ExpressionHolder,
     pub(crate) property: String,
 }
 
@@ -294,19 +339,103 @@ pub(crate) fn prepare_property_expression_request(
         .acquire_snapshot(owner.content_revision())
         .ok_or(ObjectFrameError::Unavailable)?;
     verify_owner_snapshot(owner, &current, snapshot)?;
-    let raw = sample_property_raw(snapshot, target, property, frame).map_err(|e| match e {
+    prepare_retained_property_expression_request(snapshot, target, property, frame, depth)
+}
+
+/// A dependency read stays on the outer request's immutable snapshot. Only
+/// the outer request's owner finalizer can publish any of its results.
+pub(crate) fn prepare_retained_property_expression_request(
+    snapshot: &ObjectSnapshot,
+    target: &PropertyHolderTarget,
+    property: &str,
+    frame: f64,
+    depth: u32,
+) -> Result<PropertyExpressionRequest, ObjectFrameError> {
+    prepare_retained_holder_expression_request(
+        snapshot,
+        &ExpressionHolder::Property(target.clone()),
+        property,
+        frame,
+        depth,
+    )
+}
+pub(crate) fn prepare_holder_expression_request(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    target: &ExpressionHolder,
+    property: &str,
+    frame: f64,
+    depth: u32,
+) -> Result<PropertyExpressionRequest, ObjectFrameError> {
+    let current = owner
+        .acquire_snapshot(owner.content_revision())
+        .ok_or(ObjectFrameError::Unavailable)?;
+    verify_owner_snapshot(owner, &current, snapshot)?;
+    prepare_retained_holder_expression_request(snapshot, target, property, frame, depth)
+}
+pub(crate) fn prepare_retained_holder_expression_request(
+    snapshot: &ObjectSnapshot,
+    target: &ExpressionHolder,
+    property: &str,
+    frame: f64,
+    depth: u32,
+) -> Result<PropertyExpressionRequest, ObjectFrameError> {
+    if let ExpressionHolder::TextAnimator { .. } = target {
+        if !frame.is_finite() {
+            return Err(ObjectFrameError::FrameOutOfRange);
+        }
+        let raw = holder_source::raw(snapshot, target, property, frame)?;
+        let code = holder_source::code(snapshot, target, property)
+            .filter(|code| !code.is_empty() && holder_source::enabled(snapshot, target, property))
+            .ok_or(ObjectFrameError::Unavailable)?
+            .to_owned();
+        return Ok(PropertyExpressionRequest {
+            snapshot: snapshot.clone(),
+            target: target.clone(),
+            property: property.to_owned(),
+            frame,
+            depth,
+            code,
+            raw,
+            dim: Dim::Known(1),
+        });
+    }
+    let ordinary = target
+        .property_target()
+        .ok_or(ObjectFrameError::InvalidSource)?;
+    let raw = sample_property_raw(snapshot, ordinary, property, frame).map_err(|e| match e {
         PropertySampleError::InvalidFrame => ObjectFrameError::FrameOutOfRange,
         PropertySampleError::MissingTarget => ObjectFrameError::InvalidSource,
         PropertySampleError::UnsupportedProperty | PropertySampleError::Unavailable => {
             ObjectFrameError::Unavailable
         }
     })?;
+    if property == "order" {
+        let code = snapshot
+            .document()
+            .property_order(ordinary)
+            .and_then(|order| order.expression.value())
+            .filter(|e| e.enabled && !e.code.is_empty())
+            .ok_or(ObjectFrameError::Unavailable)?
+            .code
+            .clone();
+        return Ok(PropertyExpressionRequest {
+            snapshot: snapshot.clone(),
+            target: target.clone(),
+            property: property.to_owned(),
+            frame,
+            depth,
+            code,
+            raw,
+            dim: Dim::for_prop(property, Some(1)),
+        });
+    }
     let holder = snapshot
         .document()
         .property_holders()
         .unwrap_or(&[])
         .iter()
-        .find(|holder| holder.target() == target)
+        .find(|holder| holder.target() == ordinary)
         .ok_or(ObjectFrameError::Unavailable)?;
     let code = holder
         .properties()

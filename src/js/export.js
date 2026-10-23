@@ -1205,10 +1205,12 @@ function exportSvgSequenceJob(){
     tauri:exportTauri,mkdir:exportMkdir,removeDir:exportRemoveDir,writeText:exportWriteText,saveAllLayerFrames:saveAllLayerFrames});
   return _svgSequenceJob;
 }
+function exportMainSvgWorkflow(){
+  return window.NemoNativeMainSvgExport.create({authority:exportNativeOpacity,available:exportTauriAvailable,
+    range:exportFrameRange,pick:exportPickDir,release:exportReleaseNative,legacy:exportSvgSequenceJob,frame:exportFrameSVGString});
+}
 async function exportSVGSequenceToDir(dir,opts){
-  if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
-  var nativeAuthority=window.NemoNativeOpacityCutover;if(nativeAuthority&&nativeAuthority.blocksLegacy())await nativeAuthority.releaseCurrent('svg-export');
-  var r=exportFrameRange(opts);return await exportSvgSequenceJob().run({dir:dir,start:r.start,end:r.end,requestId:opts&&opts.requestId,onProgress:opts&&opts.onProgress});
+  return await exportMainSvgWorkflow().toDir(dir,opts);
 }
 async function exportGIFToPath(outPath,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur) — voir exportGifBrowser.'};
@@ -1273,20 +1275,7 @@ window.SMExport={
   pickVideoMimeType:function(){return typeof exportPickVideoMimeType==='function'?exportPickVideoMimeType():'';},
 
   exportSVGSequence:async function(opts){
-    await exportReleaseNative('svg-export');var r=exportFrameRange(opts);
-    if(exportTauriAvailable()){
-      var dir=await exportPickDir('Dossier de séquence SVG');
-      if(!dir)return{cancelled:true};
-      return await exportSVGSequenceToDir(dir,opts); // same P18 job boundary as the render-manager path
-    }else{
-      // browser fallback: download a single representative frame so the
-      // feature is still testable outside Tauri
-      var svg=exportFrameSVGString(r.start);
-      var blob=new Blob([svg],{type:'image/svg+xml'});
-      var u=URL.createObjectURL(blob);var a=document.createElement('a');
-      a.href=u;a.download='frame_'+pad4(1)+'.svg';a.click();URL.revokeObjectURL(u);
-      return{ok:true,browserFallback:true};
-    }
+    return await exportMainSvgWorkflow().run(opts);
   },
 
   exportPNGSequence:async function(opts){

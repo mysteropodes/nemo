@@ -66,7 +66,7 @@ function host(options={}){
   status:()=>tree(nodes['motion-props-body']).find(n=>n.attrs.role==='status')?.textContent,
   set hold(v){hold=v;},set ready(v){ready=v;},replace(){info={...info,lifecycleGeneration:info.lifecycleGeneration+1};},transport(){transportGeneration++;},release(){const item=waiting.shift();if(item)item.resolve(reply(item.request));},retire(){UI.restoreInspector(root);},set active(v){active=v;}};
 }
-test('actual ordinary Motion installer reaches visible existing inspector through native UI paint and SDK',async()=>{const h=host();h.paint();await h.settle();assert.ok(h.rows().length>5);assert.equal(h.nodes['motion-props-sec'].hidden,false);assert.equal(h.status(),'Properties are read-only.');assert.ok(h.calls.every(c=>c.operation==='query.document.object.property.metadata'));assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);});
+test('actual ordinary Motion installer reaches visible existing inspector through native UI paint and SDK',async()=>{const h=host();h.paint();await h.settle();assert.ok(h.rows().length>5);assert.equal(h.nodes['motion-props-sec'].hidden,false);assert.equal(h.status(),'Select Keys to inspect native animation.');assert.ok(h.button('Keys'));assert.ok(h.calls.every(c=>c.operation==='query.document.object.property.metadata'));assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.deepEqual(h.nodes['motion-props-body'].children,[h.old]);});
 test('repeated frame paints retain controls, focus and one header listener',async()=>{const h=host();h.paint();await h.settle();const pick=h.button('Red'),before=h.calls.length;await pick.focus();h.root.state.currentFrame=10;h.paint();await h.settle();assert.equal(h.calls.length,before);assert.equal(h.doc.activeElement,pick);assert.equal(h.header.listeners.get('contextmenu').length,1);h.retire();assert.equal(h.header.listeners.get('contextmenu').length,0);});
 test('document capture routes P Shift R and U with no legacy bubble shortcut',async()=>{const h=host();let legacy=0;h.doc.addEventListener('keydown',()=>legacy++);h.paint();await h.settle();await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');await h.doc.body.fire('keydown',{key:'r',shiftKey:true});await h.settle();assert.deepEqual([...new Set(h.rows().map(r=>r.dataset.property))],['position','rotation']);await h.doc.body.fire('keydown',{key:'u'});await h.settle();assert.match(h.status(),/^Partial reveal:/);assert.equal(legacy,0);assert.equal(tree(h.nodes['motion-props-body']).filter(n=>n.className==='native-motion-unavailable-group').length,4);h.retire();});
 test('header filter dispatch uses ordinary preference and refuses unsupported facts',async()=>{const h=host();h.paint();await h.settle();await h.header.fire('contextmenu');assert.equal(h.menus.length,1);h.menus[0].find(i=>i.label==='expressions').action();await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'xc_number');assert.equal(h.storage['nemo-motion-filter'],'expressions');h.menus[0].find(i=>i.label==='errors').action();await h.settle();assert.equal(h.rows().length,0);assert.equal(h.status(),'This Motion filter is unavailable.');h.retire();});
@@ -93,8 +93,96 @@ test('ordinary UI paint and public reveal use actual sole Project cached port an
  const {createRequire}=require('node:module'),ownerPath=path.join(__dirname,'native-object-project-desktop-ports.test.cjs'),ownerSource=fs.readFileSync(ownerPath,'utf8');
  const makeOwner=new Function('require',ownerSource.slice(0,ownerSource.indexOf('\ntest('))+';return fixture;')(createRequire(ownerPath));
  const f=makeOwner();await f.open();const h=host({root:f.root}),Project=require('../src/js/adapters/native-object-project.js'),before=f.session.info();
+ f.root.NemoNativeObjectProject=Project;require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(f.root);
  f.mutateReply(reply=>{const request=f.calls.at(-1).r;if(request.operation!=='query.document.object.property.metadata')return;const v=request.payload.view,list=v.kind==='targets'?[{kind:'context',contextId:'scene-root'},{kind:'layer',target:{contextId:'scene-root',layerUid:'drawing'}}]:fixture.propertyPageOracle.slice(0,5);reply.result={instanceId:request.instanceId,documentId:request.documentId,atRevision:request.payload.atRevision,documentSnapshotId:request.payload.documentSnapshotId,kind:v.kind,target:v.kind==='targets'?null:v.target,items:clone(list.slice(v.offset,v.offset+v.limit)),nextOffset:null,unavailableCategories:clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories)};});
- assert.equal(Project.paintUI(f.root,false),true);await h.settle();assert.equal(h.rows().length,5);assert.equal(h.status(),'Properties are read-only.');
+ assert.equal(Project.paintUI(f.root,false),true);await h.settle();assert.equal(h.rows().length,5);assert.equal(h.status(),'Select Keys to inspect native animation.');assert.ok(h.button('Keys'));
  await h.doc.body.fire('keydown',{key:'p'});await h.settle();assert.equal(h.rows().length,1);assert.equal(h.rows()[0].dataset.property,'position');assert.equal(Project.desktop(f.root),f.session);assert.strictEqual(f.session.info(),before);assert.equal(f.transports.length,1);
  const queries=f.calls.filter(c=>c.r?.operation==='query.document.object.property.metadata');assert.ok(queries.length>=3);assert.ok(queries.every(c=>/^project-metadata-/.test(c.r.requestId)&&!('expectedRevision'in c.r)));assert.ok(f.calls.every(c=>!c.r?.operation?.startsWith('command.')));h.retire();
+});
+
+test('ordinary Motion hooks expose known cleared selection only after native editor retirement',async()=>{
+ const h=host();assert.equal(typeof UI.readSelectedMotionKeys,'function');
+ const ordinary=Binding.createOrdinary(h.root,{});const info=h.ports.currentSession().info();assert.equal(ordinary.captureSelectedKeys(info),null,'Motion with no qualified editor is unknown');
+ h.root.state.appMode='animation';const cleared=ordinary.captureSelectedKeys(info);assert.deepEqual(cleared.keys,[]);assert.equal(cleared.isCurrent(),true);
+ ordinary.dispose();assert.equal(cleared.isCurrent(),false);assert.equal(ordinary.captureSelectedKeys(info),null);h.retire();
+});
+
+
+test('actual ordinary Drawing paint retires native keys and exposes only a current known-cleared selection',async()=>{
+ const h=host();h.paint();await h.settle();h.root.state.appMode='drawing';h.paint();
+ const snapshot=UI.readSelectedMotionKeys(h.root,h.ports.currentSession().info());
+ assert.ok(snapshot);assert.deepEqual(snapshot.keys,[]);assert.equal(snapshot.isCurrent(),true);
+ h.root.state.appMode='motion';assert.equal(snapshot.isCurrent(),false);h.retire();
+});
+
+test('ordinary key timeline observer is dynamic safe and detachable without manufacturing an unopened property projection',()=>{
+ const h=host(),events=[],ordinary=Binding.createOrdinary(h.root,{keyTimelineChanged:reason=>events.push(reason)});
+ assert.equal(ordinary.readKeyTimeline(),null);let notified=0;
+ assert.equal(ordinary.setKeyTimelineListener(()=>{notified++;throw Error('observer');}),true);
+ assert.equal(notified,1);assert.ok(events.includes('listener'));assert.equal(ordinary.readKeyTimeline(),null);
+ assert.equal(ordinary.setKeyTimelineListener(3),false);assert.equal(ordinary.setKeyTimelineListener(null),true);
+ const n=notified;ordinary.dispose();assert.equal(notified,n);assert.equal(ordinary.readKeyTimeline(),null);assert.equal(ordinary.setKeyTimelineListener(()=>{}),false);h.retire();
+});
+
+test('actual Panel reuses first inspector and reopens identities without duplicate track instances',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'native-motion-key-timeline.test.cjs'),'utf8');
+ const begin=source.indexOf('// BEGIN REUSABLE REAL PROPERTY PANEL FIXTURE'),end=source.indexOf('// END REUSABLE REAL PROPERTY PANEL FIXTURE');assert.ok(begin>0&&end>begin);
+ const createPropertyPanel=new Function('require',source.slice(begin,end)+'\nreturn createPropertyPanel;')(require);
+ const doc=document(),container=doc.createElement('div');doc.body.appendChild(container);
+ const pin={instanceId:'panel-instance',documentId:'panel-document',lifecycleGeneration:1,contentRevision:4,documentSnapshotId:'panel-snapshot'},target={contextId:'scene-root',layerUid:'panel-layer'};
+ const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
+ const h=createPropertyPanel({document:doc,container,readContext:context,tracks:[{target,property:'opacity',dimension:1,items:[{frame:1,v:[50]}]},{target,property:'position',dimension:2,items:[{frame:2,v:[5,7]}]}]});
+ assert.equal(await h.ready,true);const initial=tree(container).find(node=>node.className==='native-motion-property-keys');
+ await h.openProperty(target,'opacity');assert.strictEqual(tree(container).find(node=>node.className==='native-motion-property-keys'),initial);
+ await h.openProperty(target,'position');assert.equal(h.readKeyTimelines().tracks.length,2);assert.equal(h.readKeyTimeline().property,'position');
+ await h.openProperty(target,'opacity');assert.equal(h.readKeyTimeline().property,'opacity');assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,2);
+ const view=h.readKeyTimelines();h.dispose();assert.equal(view.isCurrent(),false);assert.equal(h.readKeyTimelines(),null);assert.equal(tree(container).filter(node=>node.className==='native-motion-property-keys').length,0);
+});
+
+
+test('ordinary native Motion bake uses the existing exact pinned public intent and refuses retired UI scope',async()=>{
+ const h=host(),read=h.ports.readPropertyMetadata,writes=[];
+ h.ports.readPropertyMetadata=async selector=>{
+  const result=await read(selector);
+  if(result.kind==='properties')result.items.forEach(row=>{if(row.authored&&row.authored.availability==='available'){row.authored.expressionEnabled=true;}});
+  return result;
+ };
+ const app=SDK.createNativeApplicationAdapter('bake-ui',{dispatch:async request=>{
+  writes.push(clone(request));return {apiVersion:2,requestId:request.requestId,instanceId:request.instanceId,
+   documentId:request.documentId,contentRevision:request.expectedRevision+1,ok:true,result:{applied:true,historyEntriesAdded:1}};
+ }});
+ h.ports.editProperty=async(payload,pin,current)=>{
+  assert.equal(current(),true);
+  return app.dispatch({apiVersion:2,requestId:'ordinary-bake',instanceId:pin.instanceId,documentId:pin.documentId,
+   expectedRevision:pin.contentRevision,operation:'command.document.object.property.edit',payload});
+ };
+ h.paint();await h.settle();const button=h.button('Bake expression');assert.ok(button);
+ h.root.state.currentFrame++; // Whole-composition bake uses frame-independent metadata.
+ await button.fire('click');assert.equal(writes.length,1);
+ assert.deepEqual(writes[0].payload.action,{kind:'bake'});
+ assert.equal(writes[0].payload.command,'object.property.edit');
+ assert.equal(typeof writes[0].expectedRevision,'number');
+ const retired=h.button('Bake expression');assert.ok(retired);h.replace();
+ await retired.fire('click');assert.equal(writes.length,1,'retired owner cannot reuse the old native intent');
+ h.retire();
+});
+
+test('real Order inspector exposes its bake and reads without granting unavailable generic value or key writes',async()=>{
+ const Panel=require('../src/js/adapters/native-motion-property-panel.js'),doc=document(),container=doc.createElement('div');doc.body.appendChild(container);
+ const pin={instanceId:'order-instance',documentId:'order-document',lifecycleGeneration:1,contentRevision:0,documentSnapshotId:'order-snapshot'},target={contextId:'scene-root',layerUid:'L0'};
+ const context=()=>({pin,frame:3,viewGeneration:1,presented:{...pin,available:true,presentation:{...pin,owner:'native',status:'presented',frame:3}}});
+ const row=clone(fixture.propertyPageOracle.find(r=>r.property==='opacity'));row.property='order';row.authored={availability:'available',keyCount:2,hasStaticOverride:true,expressionEnabled:true};
+ const categories=clone(fixture.cases.find(c=>c.expectedResult).expectedResult.unavailableCategories),writes=[];
+ const panel=Panel.create(container,{document:doc,readContext:context,readSelection:()=>target,readSelections:()=>[target],readContextId:()=>target.contextId,
+  async query(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.kind==='targets'?null:q.view.target,items:q.view.kind==='targets'?[{kind:'context',contextId:target.contextId},{kind:'layer',target}]:[clone(row)],nextOffset:null,unavailableCategories:categories};},
+  async readProperty(q){return {instanceId:q.instanceId,documentId:q.documentId,atRevision:q.atRevision,documentSnapshotId:q.documentSnapshotId,kind:q.view.kind,target:q.view.target,property:'order',dimension:1,...q.view.kind==='rawSample'?{frame:q.view.frame,value:[20]}:{trackPresent:true,items:[{frame:0,v:[17]},{frame:15,v:[32]}],nextOffset:null}};},
+  async editProperty(p){writes.push(p);return {applied:true,historyEntriesAdded:1};},editPropertyTrack(){throw Error('Order generic track writer must remain unavailable');}});
+ assert.equal(await panel.refresh(true),true);await tick();await tick();
+ const numeric=tree(container).filter(n=>n.tagName==='INPUT'&&n.className==='motion-val');assert.equal(numeric.length,1);assert.ok(numeric.every(n=>n.disabled&&n.readOnly));
+ const bake=tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Bake expression');assert.ok(bake);await bake.fire('click');
+ assert.equal(writes.length,1);assert.equal(writes[0].property,'order');assert.deepEqual(writes[0].action,{kind:'bake'});
+ await tree(container).find(n=>n.tagName==='BUTTON'&&n.textContent==='Keys').fire('click');await tick();
+ const checks=tree(container).filter(n=>n.type==='checkbox');assert.equal(checks.length,2);assert.ok(checks.every(n=>n.disabled));
+ const keyPanel=tree(container).find(n=>n.className==='native-motion-property-keys');assert.ok(tree(keyPanel).filter(n=>n.tagName==='INPUT').every(n=>n.disabled));
+ assert.equal(panel.readKeyTimeline().selectFrames([0]),false);assert.equal(writes.length,1);panel.dispose();
 });

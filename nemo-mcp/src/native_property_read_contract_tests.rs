@@ -27,6 +27,156 @@ fn output(keys: bool) -> Value {
     }
     v
 }
+
+#[test]
+fn actual_context_view_is_closed_and_correlated_in_the_mcp_contract() {
+    let descriptor: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/capabilities-v2/native-property-read.json"
+    ))
+    .unwrap();
+    let example = descriptor["examples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["request"]["payload"]["view"]["kind"] == "expressionContext")
+        .unwrap();
+    let p = &example["request"]["payload"];
+    let v = &example["response"]["result"];
+    let document = v["documentId"].as_str().unwrap();
+    assert!(request(p));
+    assert!(result(document, p, v));
+    for (pointer, replacement) in [
+        ("/frame", json!(99)),
+        ("/self/property", json!("foreign")),
+        ("/self/index", json!(-1)),
+        ("/comp/numLayers", json!(99)),
+        ("/comp/frameDuration", json!(0)),
+        ("/comp/duration", json!(99)),
+        ("/compUnavailable", json!("projectMetadata")),
+        ("/keyCount", json!(65537)),
+        ("/target/layerUid", json!("foreign")),
+    ] {
+        let mut bad = v.clone();
+        *bad.pointer_mut(pointer).unwrap() = replacement;
+        assert!(!result(document, p, &bad), "{pointer}");
+    }
+    for pointer in ["", "/self", "/comp"] {
+        let mut bad = v.clone();
+        bad.pointer_mut(pointer).unwrap()["extra"] = json!(true);
+        assert!(!result(document, p, &bad), "{pointer}");
+    }
+    let mut unavailable = v.clone();
+    unavailable["comp"] = Value::Null;
+    unavailable["compUnavailable"] = json!("projectMetadata");
+    assert!(result(document, p, &unavailable));
+    unavailable["compUnavailable"] = Value::Null;
+    assert!(!result(document, p, &unavailable));
+
+    // Real views include unresolved element holders and resolved parent names.
+    let mut parent = v.clone();
+    parent["self"]["parent"] = json!({"name":"Parent","index":1});
+    parent["self"]["hasParent"] = json!(true);
+    assert!(result(document, p, &parent));
+    let mut unresolved = v.clone();
+    unresolved["self"] = Value::Null;
+    assert!(result(document, p, &unresolved));
+    let mut unnamed = v.clone();
+    unnamed["self"]["name"] = Value::Null;
+    assert!(result(document, p, &unnamed));
+    // Preserve the baseline alias's (totalFrames || 1) / fps behavior.
+    let mut empty = v.clone();
+    empty["comp"]["frames"] = json!(0);
+    empty["comp"]["duration"] = json!(1. / 25.);
+    assert!(result(document, p, &empty));
+    for pointer in ["/self", "/self/parent", "/comp"] {
+        let object = parent.pointer(pointer).unwrap().as_object().unwrap();
+        for field in object.keys() {
+            let mut bad = parent.clone();
+            bad.pointer_mut(pointer)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
+            assert!(!result(document, p, &bad), "missing {pointer}/{field}");
+        }
+    }
+    for (pointer, replacement) in [
+        ("/self/name", json!(false)),
+        ("/self/index", json!(u64::from(u32::MAX) + 1)),
+        ("/self/isShape", json!(0)),
+        ("/self/hasParent", json!("true")),
+        ("/self/parent/name", Value::Null),
+        ("/self/parent/index", json!(-1)),
+        ("/comp/width", json!(0)),
+        ("/comp/height", json!(0)),
+        ("/comp/frames", json!(-1)),
+        ("/comp/layers", json!(false)),
+        ("/comp/name", Value::Null),
+        ("/comp/fps", json!(0)),
+        ("/comp/fps", json!(-25)),
+        ("/comp/fps", json!("25")),
+        ("/keyCount", json!(-1)),
+        ("/keyCount", json!(true)),
+    ] {
+        let mut bad = parent.clone();
+        *bad.pointer_mut(pointer).unwrap() = replacement;
+        assert!(!result(document, p, &bad), "{pointer}");
+    }
+}
+#[test]
+fn actual_mesh_context_is_closed_correlated_and_has_no_rest_pose_fallback() {
+    let d: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/capabilities-v2/native-property-read.json"
+    ))
+    .unwrap();
+    let e = d["examples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["response"]["result"].get("mesh").is_some())
+        .unwrap();
+    let p = &e["request"]["payload"];
+    let v = &e["response"]["result"];
+    let doc = v["documentId"].as_str().unwrap();
+    assert!(result(doc, p, v));
+    for (key, replacement) in [
+        ("meshId", json!("foreign")),
+        ("vertexIndex", json!(-2)),
+        ("vertexIndex", json!(u64::from(u32::MAX) + 1)),
+        ("vertexCount", json!(-1)),
+        ("outlineVertexCount", json!(4)),
+        ("vertexUV", json!([1])),
+        ("vertexUV", json!([0, "1"])),
+        ("isOutlineVertex", json!(false)),
+        ("extra", json!(true)),
+    ] {
+        let mut bad = v.clone();
+        bad["mesh"][key] = replacement;
+        assert!(!result(doc, p, &bad), "{key}");
+    }
+    for key in v["mesh"].as_object().unwrap().keys() {
+        let mut bad = v.clone();
+        bad["mesh"].as_object_mut().unwrap().remove(key);
+        assert!(!result(doc, p, &bad), "missing {key}");
+    }
+    for index in [-1, 99] {
+        let mut q = p.clone();
+        let mut orphan = v.clone();
+        let name = if index == -1 { "position" } else { "vtx99" };
+        q["view"]["property"] = json!(name);
+        orphan["property"] = json!(name);
+        orphan["self"]["property"] = json!(name);
+        orphan["mesh"]["vertexIndex"] = json!(index);
+        orphan["mesh"]["isOutlineVertex"] = json!(false);
+        assert!(!result(doc, &q, &orphan));
+        orphan["mesh"]["vertexUV"] = json!([0, 0]);
+        assert!(result(doc, &q, &orphan));
+    }
+    let p = payload(false);
+    let mut raw = output(false);
+    raw["mesh"] = v["mesh"].clone();
+    assert!(!result("document", &p, &raw));
+}
 #[test]
 fn property_read_shapes_and_presence_are_closed_without_inventing_track_defaults() {
     for keys in [false, true] {
@@ -193,4 +343,73 @@ fn property_read_admitted_short_curves_and_explicit_tangents_are_preserved() {
     let mut q = payload(false);
     q["view"]["frame"] = json!("2");
     assert!(!request(&q));
+}
+
+#[test]
+fn exact_authored_key_lock_metadata_is_nullable_and_kept_separate_from_original_curve_oracles() {
+    let q = payload(true);
+    for lock in [Value::Null, json!("in"), json!("out"), json!("layer")] {
+        let mut value = output(true);
+        value["items"][0]["lockTo"] = lock;
+        assert!(result("document", &q, &value));
+    }
+    for lock in [
+        json!("unknown"),
+        json!(true),
+        json!(1),
+        json!({}),
+        json!([]),
+    ] {
+        let mut value = output(true);
+        value["items"][0]["lockTo"] = lock;
+        assert!(!result("document", &q, &value));
+    }
+}
+
+#[test]
+fn expression_state_is_closed_correlated_and_does_not_infer_missing_evaluations() {
+    let mut p = payload(false);
+    p["view"]["kind"] = json!("expressionState");
+    let mut v = output(false);
+    v.as_object_mut().unwrap().remove("value");
+    v["kind"] = json!("expressionState");
+    v["expression"] = json!({"present":true,"enabled":false});
+    v["evaluation"] = json!({"state":"unavailable","reason":"not-evaluated"});
+    assert!(request(&p));
+    assert!(result("document", &p, &v));
+    for diagnostic in [
+        Value::Null,
+        json!({"kind":"timeout"}),
+        json!({"kind":"tooDeep"}),
+        json!({"kind":"mustReturnNumber"}),
+        json!({"kind":"mustReturnNumberOrXY"}),
+        json!({"kind":"runtime","message":"data:literal error","line":0}),
+        json!({"kind":"syntax","message":"bad","line":null}),
+    ] {
+        v["evaluation"] = json!({"state":"evaluated","diagnostic":diagnostic});
+        assert!(result("document", &p, &v));
+    }
+    for (pointer, replacement) in [
+        ("/frame", json!(7)),
+        ("/target/layerUid", json!("foreign")),
+        ("/documentSnapshotId", json!("foreign")),
+        ("/expression/present", json!(false)),
+        (
+            "/evaluation/diagnostic",
+            json!({"kind":"timeout","extra":true}),
+        ),
+        (
+            "/evaluation/diagnostic",
+            json!({"kind":"syntax","message":"error","line":-1}),
+        ),
+        ("/evaluation", json!({"state":"evaluated"})),
+        (
+            "/evaluation",
+            json!({"state":"unavailable","reason":"not-evaluated","diagnostic":null}),
+        ),
+    ] {
+        let mut bad = v.clone();
+        *bad.pointer_mut(pointer).unwrap() = replacement;
+        assert!(!result("document", &p, &bad), "{pointer}");
+    }
 }

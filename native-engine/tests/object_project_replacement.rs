@@ -384,3 +384,6 @@ fn blank_replacement_refuses_invalid_stale_and_foreign_intent_before_commit() {
         Err(DispatchErrorCode::Unavailable)
     ));
 }
+
+#[path = "object_project_retained_history.rs"]
+mod retained_history_tests;

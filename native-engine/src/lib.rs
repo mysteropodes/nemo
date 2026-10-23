@@ -21,11 +21,14 @@ engine_modules! {
     "compositor" => compositor, render_scene, render_geometry, object_render_scene;
     "viewport" => desktop_viewport;
     "export_job" => export_job, export_job_lifecycle, png_output;
-    "application" => application, protocol, read_queries;
+    "application" => application, protocol, read_queries, native_media_frame_export;
 }
 
 #[cfg(feature = "reference_image_asset")]
 pub(crate) mod reference_image_asset;
+
+#[cfg(feature = "application")]
+pub(crate) mod object_expression_bake;
 
 #[cfg(feature = "object_expression_pin")]
 pub(crate) mod object_expression_pin;
@@ -68,6 +71,7 @@ test_modules! {
     "test-evaluation" => property_follow_path_sample_tests = "../tests/property_follow_path_sample.rs";
     "test-evaluation" => property_follow_path_sample_controls_tests = "../tests/property_follow_path_sample_controls.rs";
     "test-evaluation" => property_expression_views_tests = "../tests/property_expression_views.rs";
+    "test-evaluation" => property_expression_lookup_tests = "../tests/property_expression_lookup.rs";
     "test-evaluation" => property_expression_views_controls_tests = "../tests/property_expression_views_controls.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
@@ -93,3 +97,7 @@ mod object_expression_pin_tests;
 #[cfg(all(test, feature = "test-object_expression_runtime"))]
 #[path = "../tests/object_expression_runtime.rs"]
 mod object_expression_runtime_tests;
+
+#[cfg(all(test, feature = "export_job", feature = "project_media_codec"))]
+#[path = "../tests/object_stored_gradient.rs"]
+mod object_stored_gradient_tests;

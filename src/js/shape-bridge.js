@@ -12,6 +12,38 @@
   var dragging = false;
   var shapeStart = null; // world [x,y]
   var shapeTool = null;
+  var nativeTool = null;
+  function nativeEvent(kind, event) {
+    if (!nativeTool && window.NemoNativeObjectShapeTool) {
+      nativeTool = window.NemoNativeObjectShapeTool.create(window, {
+        mapping: window.NemoNativeViewportUnderlay && window.NemoNativeViewportUnderlay.canvasMapping,
+        geometry: shapeGeom,
+        constrain: function (tool, start, end) {
+          var a = new Point(start[0], start[1]), b = new Point(end[0], end[1]);
+          var p = tool === 'line' ? constrainAngle45(a, b) : constrainSquare(a, b);
+          return [p.x, p.y];
+        },
+        lineStyle: function () {
+          var style = { strokeWidth: state.brushSize, data: {} }; applyStrokeStyle(style);
+          var out = { miterLimit: style.miterLimit, dashOffset: style.dashOffset };
+          if (style.dashArray.length) out.dashArray = style.dashArray.slice();
+          if (style.data.paintOrder !== undefined) out.paintOrder = style.data.paintOrder;
+          return out;
+        }
+      });
+      window.NemoNativeShapeToolController = nativeTool;
+    }
+    if (nativeTool && nativeTool.handle(kind, event)) return true;
+    // A missing/disposed client never reopens a Paper writer under a native owner.
+    var owner = window.NemoNativeObjectProject && window.NemoNativeObjectProject.desktop(window);
+    if (owner && owner.blocksLegacy() && ['line', 'rect', 'ellipse', 'star', 'speechbubble'].includes(state.tool)) {
+      if (event.target === document.getElementById('drawing-canvas') || event.target === document.getElementById('canvas-area')) {
+        event.stopImmediatePropagation(); event.preventDefault();
+      }
+      return true;
+    }
+    return false;
+  }
   function allowLegacyEdit(event) {
     var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('shape') === true; } catch (_) {}
     if (allowed) return true; if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
@@ -152,6 +184,7 @@
   }
 
   function onDown(e) {
+    if (nativeEvent('down', e)) return;
     if (!shouldIntercept()) return;
     if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
@@ -200,6 +233,7 @@
     return [pt.x, pt.y];
   }
   function onMove(e) {
+    if (nativeEvent('move', e)) return;
     if (!dragging) return;
     e.stopImmediatePropagation();
     e.preventDefault();
@@ -209,6 +243,7 @@
     window.SMEngineBridge.renderWithOverlayItem(withSymmetryPreview(overlayItem(s[0], s[1])));
   }
   function onUp(e) {
+    if (nativeEvent('up', e)) return;
     if (!dragging) return;
     if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
@@ -314,7 +349,8 @@
     target.addEventListener('pointerdown', onDown, { capture: true });
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });
-    target.addEventListener('pointercancel', onUp, { capture: true });
+    target.addEventListener('pointercancel', function (e) { if (!nativeEvent('cancel', e)) onUp(e); }, { capture: true });
+    target.addEventListener('lostpointercapture', function (e) { nativeEvent('cancel', e); }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

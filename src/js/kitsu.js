@@ -18,7 +18,8 @@
 // http:default scope (wildcarded — the server URL is only known at runtime,
 // entered by the user, same trust model as SMProject's folder picker).
 (function () {
-  function kitsuOk() { return typeof window.__TAURI__ !== 'undefined' && !!window.__TAURI__.http; }
+  var service = window.NemoKitsuService.desktop(window);
+  function kitsuOk() { return service.available(); }
   var SESSION_KEY = 'sm-kitsu-session';
 
   function loadSession() {
@@ -37,44 +38,9 @@
   // a saved .json file is a nice-to-have for later, not v1 scope.
   state.kitsuShot = null;
 
-  async function apiRequest(session, path, opts) {
-    opts = opts || {};
-    var url = session.serverUrl + '/api' + path;
-    var headers = Object.assign({}, opts.headers || {});
-    if (session.accessToken) headers['Authorization'] = 'Bearer ' + session.accessToken;
-    var res = await window.__TAURI__.http.fetch(url, {
-      method: opts.method || 'GET',
-      headers: headers,
-      body: opts.body
-    });
-    if (!res.ok) {
-      var text = '';
-      try { text = await res.text(); } catch (e) { }
-      throw new Error('Kitsu (' + res.status + ') ' + (text || res.statusText || path));
-    }
-    return res.json();
-  }
-
+  async function apiRequest(session, path, opts) { return service.request(session, path, opts); }
   async function login(serverUrl, email, password) {
-    if (!kitsuOk()) throw new Error('Connexion Kitsu disponible uniquement dans l\'app desktop');
-    var base = serverUrl.replace(/\/+$/, '');
-    var form = new URLSearchParams();
-    form.set('email', email);
-    form.set('password', password);
-    var res = await window.__TAURI__.http.fetch(base + '/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form.toString()
-    });
-    if (!res.ok) throw new Error('Échec de connexion (' + res.status + ') — vérifie l\'URL, l\'email et le mot de passe');
-    var data = await res.json();
-    if (!data.access_token) throw new Error('Réponse de connexion inattendue (pas de token)');
-    var session = {
-      serverUrl: base,
-      accessToken: data.access_token,
-      personName: (data.user && (data.user.full_name || (data.user.first_name || '') + ' ' + (data.user.last_name || ''))) || email,
-      personId: data.user && data.user.id
-    };
+    var session = await service.login(serverUrl, email, password);
     state.kitsuSession = session;
     saveSession(session);
     return session;

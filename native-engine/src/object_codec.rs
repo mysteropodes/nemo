@@ -1,9 +1,11 @@
 //! Atomic admission and semantic JSON round-trip for staged native objects.
+#[path = "object_effect_stack_codec.rs"]
+mod effect_stack_codec;
 #[cfg(feature = "commands")]
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
 pub use crate::object_document::{
-    FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
+    FrameScope, FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
 };
 #[cfg(feature = "font_asset_admission")]
 #[path = "font_asset_admission.rs"]
@@ -16,10 +18,17 @@ pub(crate) use font_assets::{
     FontAssetMetadata,
 };
 
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_item::RasterItem;
 #[cfg(feature = "font_asset_wire")]
-pub(crate) use crate::object_document::{AssetId, AssetKind, AssetRecord};
-use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
-pub(crate) use crate::object_document::{Presence, PropertyHolder};
+pub(crate) use crate::object_document::AssetRecord;
+#[cfg(all(feature = "font_asset_wire", not(feature = "history")))]
+pub(crate) use crate::object_document::{AssetId, AssetKind};
+pub(crate) use crate::object_document::{ImageMesh, ImageMeshStore, MeshIdSequence};
+pub(crate) use crate::object_document::{ObjectLayer, Presence, PropertyHolder};
+use crate::object_document::{OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
+#[path = "object_property_codec.rs"]
+mod property_codec;
+pub(crate) use property_codec::validate_property_holders;
 use serde::Deserialize;
 use std::collections::HashSet;
 
@@ -40,6 +49,16 @@ pub(crate) mod project_settings_test_codec {
 }
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
+// L06-H (lane #2112): the lane-6 document kernels the read-queries preparation consumes.
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_admission as raster_asset_admission;
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_admission::png_port as raster_asset_png_port;
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::object_raster_asset_kernels::object_raster_asset_use as raster_asset_use;
+// L06-E (lane #2112): the asset value types the read-queries pixel handle names; read-queries may not import object_document.
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::{AssetId, AssetInventory, AssetKind};
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use project::{
     decode_allocated_project, decode_validated_project, encode_project as encode_project_envelope,
@@ -86,7 +105,28 @@ mod order;
 #[path = "object_vector_codec.rs"]
 #[allow(dead_code)]
 mod object_vector_codec;
+// L04-I (#2110): admission of the componentTables member (v2 only).
+#[path = "object_component_codec.rs"]
+mod object_component_codec;
+pub(crate) use object_component_codec::validate_component_tables;
+// L02-G (#2108): admission of the per-layer group table.
+#[path = "object_group_codec.rs"]
+mod object_group_codec;
+// L01-E (#2107): admission of the vector extension slot and of the per-layer pathFx stack.
+#[path = "object_vector_ext_codec.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_vector_ext_codec;
+// L05-G (#2111): admission of the per-layer range record (inPoint, outPoint, timeLink, markers).
+#[path = "object_frame_edit_range_codec.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_frame_edit_range_codec;
+// L06-L (#2112): admission of the lane-6 `items` document member (raster items and text blocks).
+#[path = "object_raster_asset_codec.rs"]
+#[allow(dead_code)]
+mod object_raster_asset_codec;
 pub use crate::object_document::OrderedObjectDocument;
+#[allow(unused_imports)]
+pub(crate) use object_raster_asset_codec::{validate_item_assets, validate_item_parts};
 pub use order::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,6 +176,11 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         property_holders: wire.property_holders,
         layer_folders: wire.layer_folders,
         composition_order: Presence::Missing,
+        image_meshes: wire.image_meshes,
+        items: wire.items,
+        component_tables: Presence::Missing,
+        motion_arcs: wire.motion_arcs,
+        audio_tracks: wire.audio_tracks,
     };
     validate(&document)?;
     Ok(document)
@@ -150,23 +195,34 @@ struct LegacyDocument {
     objects: Vec<ObjectRecord>,
     property_holders: Presence<Vec<PropertyHolder>>,
     layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
+    image_meshes: Presence<ImageMeshStore>,
+    items: Presence<crate::object_document::ItemRecords>,
+    motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
+    audio_tracks: Presence<crate::object_document::AudioTracks>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
-    #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>
+    #[serde(default)] layer_folders: Presence<Option<crate::object_document::LayerFolders>>,
+    #[serde(default)] image_meshes: Presence<ImageMeshStore>,
+    #[serde(default)] items: Presence<crate::object_document::ItemRecords>,
+    #[serde(default)] motion_arcs: Presence<Option<crate::object_document::MotionArcs>>,
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
 });
 
-/// Explicit core storage admission; both attempts read the original raw bytes.
+/// Route canonical v2 to its strict codec so its typed refusal is not masked by v1.
+/// The header chooses a codec only; admission always reads the ORIGINAL raw bytes.
 pub fn decode_storage_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> {
-    match decode_project(bytes) {
-        Ok(document) => Ok(document),
-        Err(legacy_error) => match decode_ordered_project(bytes) {
-            Ok(document) => Ok(document.into_storage()),
-            Err(_) => Err(legacy_error),
-        },
+    #[derive(Deserialize)]
+    struct StorageVersion {
+        #[serde(rename = "formatVersion")]
+        version: u32,
     }
+    if serde_json::from_slice::<StorageVersion>(bytes).is_ok_and(|wire| wire.version == 2) {
+        return decode_ordered_project(bytes).map(|document| document.into_storage());
+    }
+    decode_project(bytes)
 }
 
 pub fn encode_storage_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecError> {
@@ -185,7 +241,8 @@ pub(crate) fn validate_storage(document: &ObjectDocument) -> Result<(), ObjectCo
             "v2 requires explicit compositionOrder",
         )
     })?;
-    order::validate_storage_order(document, plan)
+    order::validate_storage_order(document, plan)?;
+    validate_component_tables(&document.component_tables, &document.layers)
 }
 
 pub(crate) fn parse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ObjectCodecError> {
@@ -208,11 +265,13 @@ pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecE
 }
 
 pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    order::validate_audio_tracks(document.audio_tracks.value())?;
     use ObjectCodecErrorKind::Unsupported;
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
     if document.format != OBJECT_DOCUMENT_FORMAT
         || document.format_version != OBJECT_DOCUMENT_FORMAT_VERSION
         || !document.composition_order.missing()
+        || !document.component_tables.missing()
     {
         return Err(reject(
             Unsupported,
@@ -231,7 +290,29 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.layers,
         &document.objects,
         None,
-    )
+        None,
+        document.items.value(),
+        document.image_meshes.value(),
+    )?;
+    validate_image_meshes(&document.image_meshes)?;
+    object_raster_asset_codec::validate_items(document)
+}
+
+/// L03-J: typed admission of the optional image-mesh table; absent is valid, present is checked whole.
+pub(crate) fn validate_image_meshes(
+    store: &Presence<ImageMeshStore>,
+) -> Result<(), ObjectCodecError> {
+    match store.value() {
+        None => Ok(()),
+        Some(store) => store.validate().map_err(|error| {
+            let kind = if error.is_duplicate() {
+                ObjectCodecErrorKind::DuplicateId
+            } else {
+                ObjectCodecErrorKind::Invalid
+            };
+            ObjectCodecError::new(kind, error.message())
+        }),
+    }
 }
 
 pub(crate) fn validate_layer_organization(
@@ -242,36 +323,32 @@ pub(crate) fn validate_layer_organization(
         .map_err(|message| ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message))
 }
 
-pub(crate) fn validate_property_holders(
-    holders: &Presence<Vec<PropertyHolder>>,
-    layers: &[ObjectLayer],
-    records: &[ObjectRecord],
-    plan: Option<&crate::object_document::OrderPlan>,
-) -> Result<(), ObjectCodecError> {
-    use crate::object_document::PropertyAdmissionError;
-    crate::object_document::validate_property_holders(holders, layers, records, plan).map_err(
-        |error| {
-            let (kind, message) = match error {
-                PropertyAdmissionError::Invalid(message) => {
-                    (ObjectCodecErrorKind::Invalid, message)
-                }
-                PropertyAdmissionError::Unsupported(message) => {
-                    (ObjectCodecErrorKind::Unsupported, message)
-                }
-                PropertyAdmissionError::DuplicateId(message) => {
-                    (ObjectCodecErrorKind::DuplicateId, message)
-                }
-            };
-            ObjectCodecError::new(kind, message)
-        },
-    )
-}
-
+/// Legacy and component-symbol content retain their original parent refusal.
 pub(crate) fn validate_content(
     total_frames: u32,
     declared_layers: &[ObjectLayer],
     objects: &[ObjectRecord],
     complete_contexts: bool,
+) -> Result<(), ObjectCodecError> {
+    validate_content_inner(
+        total_frames,
+        declared_layers,
+        objects,
+        complete_contexts,
+        false,
+    )
+}
+
+#[path = "object_parent_links.rs"]
+mod parent_links;
+pub(crate) use parent_links::validate_scene_content;
+
+fn validate_content_inner(
+    total_frames: u32,
+    declared_layers: &[ObjectLayer],
+    objects: &[ObjectRecord],
+    complete_contexts: bool,
+    scene_parents: bool,
 ) -> Result<(), ObjectCodecError> {
     use ObjectCodecErrorKind::{DuplicateId, Invalid, Unsupported};
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
@@ -281,11 +358,12 @@ pub(crate) fn validate_content(
             "positive totalFrames and identified layers are required",
         ));
     }
+    effect_stack_codec::validate_fields(declared_layers, objects)?;
     let mut layers = HashSet::new();
     for layer in declared_layers {
         // Drawing Fill enforces its own lock guard. Generic Motion actions
-        // retain their permissive baseline semantics; parenting remains separate.
-        if layer.parent_layer_uid.value().is_some_and(Option::is_some) {
+        // retain their permissive baseline semantics; only the explicit scene codec admits parents.
+        if !scene_parents && layer.parent_layer_uid.value().is_some_and(Option::is_some) {
             return Err(reject(Unsupported, "layer parenting is unavailable"));
         }
         if let Some(color) = layer.color.value() {
@@ -313,13 +391,46 @@ pub(crate) fn validate_content(
                 reject(kind, message)
             })?;
         }
+        object_vector_ext_codec::validate_layer_path_fx(layer)?;
+        object_frame_edit_range_codec::validate_layer_range(layer)?;
         if layer.layer_uid.is_empty() {
             return Err(reject(Invalid, "empty layerUid"));
         }
         if !layers.insert(layer.layer_uid.as_str()) {
             return Err(reject(DuplicateId, "duplicate layerUid"));
         }
+        if layer.is_null_layer()
+            && objects
+                .iter()
+                .any(|record| record.target.layer_uid == layer.layer_uid)
+        {
+            return Err(reject(Invalid, "a Null layer carries no objects"));
+        }
+        if let Some(table) = layer.groups.value() {
+            object_group_codec::validate_group_table(
+                &layer.layer_uid,
+                table,
+                objects,
+                complete_contexts,
+            )?;
+        }
     }
+    crate::object_document::validate_widget_layers(declared_layers, objects)
+        .map_err(|error| reject(Invalid, error.message()))?;
+    crate::object_document::object_rig_record::validate_rig_layers(declared_layers, objects)
+        .map_err(|error| {
+            let kind = if error.is_duplicate() {
+                DuplicateId
+            } else if error.is_unsupported() {
+                Unsupported
+            } else {
+                Invalid
+            };
+            reject(kind, error.message())
+        })?;
+    // L08-J (#2114): layer compositing fields (blend, mattes, effects stack, kind flags).
+    crate::object_document::validate_layer_compositing(declared_layers, objects)
+        .map_err(|error| reject(Invalid, error.message()))?;
     let mut targets = HashSet::new();
     for record in objects {
         let vector_family = record.family == crate::object_document::VECTOR_FAMILY;
@@ -344,6 +455,7 @@ pub(crate) fn validate_content(
         if !targets.insert(&record.target) {
             return Err(reject(DuplicateId, "duplicate scoped object key"));
         }
+        object_vector_ext_codec::validate_vector_ext(record)?;
         if vector_family {
             object_vector_codec::validate_vector_record(record)?;
             continue;

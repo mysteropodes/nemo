@@ -27,6 +27,7 @@ fn wire_limits() -> ProjectWireLimits {
             DIMENSION,
         )
         .unwrap();
+    let limits = limits.with_audio_limit(ENCODED_BYTES).unwrap();
     #[cfg(feature = "font_asset_wire")]
     let limits = limits
         .with_font_limits(crate::object_codec::FontAssetLimits::new(ENCODED_BYTES, 256).unwrap());
@@ -68,6 +69,25 @@ impl PreparedReferenceAttachment {
 }
 
 impl ObjectSnapshot {
+    /// Validate borrowed import PNG bytes with the shared charged workspace.
+    /// No encoded allocation is copied or retained by this immutable read.
+    pub(crate) fn validate_import_png(&self, source: &[u8]) -> Result<(), DispatchErrorCode> {
+        let limits = ImageAssetLimits::new(
+            ENCODED_BYTES,
+            RGBA_BYTES,
+            DECODER_BYTES,
+            DIMENSION,
+            DIMENSION,
+        )
+        .map_err(|_| DispatchErrorCode::Internal)?;
+        validate_png_in_domain(source, limits, shared_image_resource_budget()).map_err(|error| {
+            match error {
+                ProjectWireError::Budget => DispatchErrorCode::Unavailable,
+                _ => DispatchErrorCode::InvalidRequest,
+            }
+        })
+    }
+
     /// Trusted host supplies bytes separately from the bounded scalar request.
     /// This value is not a public DTO, identity publisher or another owner.
     #[cfg(feature = "font_asset_wire")]
@@ -145,9 +165,19 @@ impl ObjectSnapshot {
         Self::from_managed_project_wire(instance, bytes, wire_limits()).map_err(refused)
     }
 
-    pub(crate) fn serialize_project_file(&self) -> Result<Vec<u8>, DispatchErrorCode> {
+    pub fn serialize_project_file(&self) -> Result<Vec<u8>, DispatchErrorCode> {
         let project = self.project().ok_or(DispatchErrorCode::Unavailable)?;
         encode_project_envelope(project, wire_limits()).map_err(refused)
+    }
+
+    /// L06-H: dry-run of `serialize_project_file` on a candidate project that has
+    /// not been published. Same encoder, same limits; the bytes are discarded.
+    pub(crate) fn check_candidate_saveable(
+        candidate: &crate::object_codec::ProjectEnvelope,
+    ) -> Result<(), DispatchErrorCode> {
+        encode_project_envelope(candidate, wire_limits())
+            .map(|_| ())
+            .map_err(refused)
     }
 
     pub(crate) fn prepare_reference_attachment(
@@ -220,3 +250,26 @@ impl ObjectSnapshot {
         })
     }
 }
+
+#[path = "object_project_composition_read.rs"]
+mod composition;
+#[path = "object_project_custom_brush_read.rs"]
+mod custom_brush_read;
+#[path = "object_project_guide_read.rs"]
+mod guide_read;
+#[path = "object_project_palette_read.rs"]
+mod palette_read;
+#[path = "object_project_perspective_read.rs"]
+mod perspective_read;
+#[path = "object_project_shadow_read.rs"]
+mod shadow_read;
+#[path = "object_project_workspace_read.rs"]
+mod workspace_read;
+
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_project_comments_read.rs"]
+mod comments_read;
+
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_palette_read.rs"]
+mod palette_read_tests;

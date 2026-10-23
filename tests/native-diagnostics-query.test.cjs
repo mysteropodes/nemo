@@ -161,6 +161,7 @@ function harness(options = {}) {
     vm.runInContext('window.__TAURI__ = {core: {invoke: async (...args) => JSON.parse(await hostInvoke(...args))}}', ctx);
   }
   if (!options.early) host();
+  load('adapters/labs-registry-model.js');
   load('labs/labs-core.js'); load('labs/diagnostics-panel.js');
   ctx.SMLabs.enable('diagnostics-panel');
   return { ctx, model, calls, nodes, selections, downloads, revoked, host, flush() { for (const fn of [...timers.values()]) fn(); }, get panel() { return nodes.find(n => n.id === 'labs-diagnostics' && !n.removed) || nodes.at(-1); },

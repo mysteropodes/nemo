@@ -7,7 +7,7 @@
 // silently changed out from under a project that already uses them by name.
 (function () {
   var popover = null, closeHandlers = null;
-  var demoPath = null;
+  var demoPath = null, viewEpoch = 0;
   var FIELDS = [
     { key: 'nibSize', label: 'Taille du nib', min: 0.2, max: 4, step: 0.05 },
     { key: 'roundness', label: 'Rondeur', min: 0.1, max: 1, step: 0.05 },
@@ -81,6 +81,7 @@
   var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true, grain: 1, noise: 0, valueJitter: 0, roughness: 0 };
 
   function closePopover() {
+    viewEpoch++;
     if (!popover) return;
     popover.remove();
     popover = null;
@@ -115,10 +116,17 @@
 
   function open(startFromKey, onApply) {
     closePopover();
-    var starting = startFromKey ? window.resolveBrushPreset(startFromKey) : null;
-    var editingCustomId = (startFromKey && state.customBrushPresets && state.customBrushPresets[startFromKey]) ? startFromKey : null;
+    var nativeCatalog=!!(window.__TAURI__&&window.__TAURI__.core),catalog=window.NemoNativeCustomBrushUI;
+    var owner=nativeCatalog&&catalog.controller(window),origin=owner&&owner.read();
+    if(nativeCatalog&&(!owner||!owner.ready(origin))){catalog.notice(window);return;}
+    var custom=nativeCatalog&&typeof startFromKey==='string'&&catalog.exists(window,startFromKey,origin)===true;
+    var nativeRecord=custom&&catalog.record(window,startFromKey,origin);
+    if(custom&&!nativeRecord){catalog.notice(window);return;}
+    var openedEpoch=viewEpoch,saving=false;
+    var starting = nativeCatalog&&custom&&!startFromKey ? nativeRecord : startFromKey ? window.resolveBrushPreset(startFromKey) : null;
+    var editingCustomId = nativeCatalog?(custom?startFromKey:null):((startFromKey && state.customBrushPresets && state.customBrushPresets[startFromKey]) ? startFromKey : null);
     var params = Object.assign({}, DEFAULT_PARAMS, starting || {});
-    var nameSeed = editingCustomId ? (state.customBrushPresets[editingCustomId].label || 'Mon brush') : (startFromKey && window.BrushPresetPicker ? window.BrushPresetPicker.labelFor(startFromKey) + ' copie' : 'Mon brush');
+    var nameSeed = (nativeCatalog?editingCustomId!==null:!!editingCustomId) ? ((nativeCatalog?nativeRecord:state.customBrushPresets[editingCustomId]).label || 'Mon brush') : (startFromKey && window.BrushPresetPicker ? window.BrushPresetPicker.labelFor(startFromKey) + ' copie' : 'Mon brush');
 
     var el = document.createElement('div');
     el.className = 'ctx-menu bp-editor-pop';
@@ -182,6 +190,7 @@
       if (params.tipShape === 'custom') refreshCaptureStatus();
     }
     el.querySelector('#bpe-capture-btn').addEventListener('click', function () {
+      if(nativeCatalog){catalog.notice(window,'Native custom stamp capture is unavailable. The brush source/provider is not joined.');return;}
       var sel = (typeof selectedPaths !== 'undefined' && selectedPaths.length === 1) ? selectedPaths[0] : null;
       var res = window.captureBrushStamp(sel);
       if (!res.ok) { showToast(res.reason); return; }
@@ -245,8 +254,9 @@
 
     el.querySelector('#bpe-cancel').addEventListener('click', closePopover);
     el.querySelector('#bpe-save').addEventListener('click', function () {
-      var id = editingCustomId || ('custom-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e4));
-      if (!state.customBrushPresets) state.customBrushPresets = {};
+      if(nativeCatalog&&(saving||popover!==el||openedEpoch!==viewEpoch))return;
+      var id = (nativeCatalog?editingCustomId!==null:!!editingCustomId) ? editingCustomId : ('custom-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e4));
+      if (!nativeCatalog&&!state.customBrushPresets) state.customBrushPresets = {};
       params.label = nameInput.value.trim() || 'Mon brush';
       // Diameter (2026-08-27, feedback #73 — "ajouter la possibilité
       // d'enregistrer les paramètres de réglage de l'outil (diamètre,
@@ -258,6 +268,18 @@
       // set, same as before); restored on selection in
       // SM.setBrushPreset (timeline.js).
       params.savedBrushSize = state.brushSize;
+      if(nativeCatalog){
+        saving=true;var selectionIntent=catalog.selectionIntent(window),saveButton=el.querySelector('#bpe-save');saveButton.disabled=true;
+        owner.edit({kind:'upsert',id:id,preset:params},origin).then(function(result){
+          if(popover!==el||viewEpoch!==openedEpoch||!owner.confirmed(result)||catalog.selectionIntent(window)!==selectionIntent)return;
+          closePopover();
+          if(!catalog.record(window,id,result.projection)){catalog.notice(window,'Preset saved; its native record is unavailable for preview or selection.');return;}
+          if(onApply)onApply(id);
+          if(window.BrushPresetPicker&&BrushPresetPicker.refreshFavorites)BrushPresetPicker.refreshFavorites();
+          showToast('Brush "'+params.label+SM.t('toastSavedSuffix'));
+        }).finally(function(){saving=false;if(popover===el)saveButton.disabled=false;});
+        return;
+      }
       state.customBrushPresets[id] = params;
       closePopover();
       if (onApply) onApply(id);
@@ -279,5 +301,5 @@
     closeHandlers = function () { document.removeEventListener('keydown', onKey); };
   }
 
-  window.BrushEditor = { open: open };
+  window.BrushEditor = { open: open, close: closePopover };
 })();

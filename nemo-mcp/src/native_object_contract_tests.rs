@@ -2,6 +2,23 @@ use super::*;
 use crate::contract::NativeApplicationRequest;
 use serde_json::json;
 
+#[test]
+fn history_payload_matcher_refuses_legacy_and_foreign_operations() {
+    let undo = json!({"command":"object.undo"});
+    let redo = json!({"command":"object.redo"});
+    assert!(history_request("command.document.object.undo", &undo));
+    assert!(history_request("command.document.object.redo", &redo));
+    for operation in [
+        "history.undo",
+        "history.redo",
+        "command.document.undo",
+        "command.document.redo",
+    ] {
+        assert!(!history_request(operation, &undo));
+        assert!(!history_request(operation, &redo));
+    }
+}
+
 fn cases() -> Value {
     serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
@@ -466,4 +483,34 @@ fn timing_selector_accepts_closed_frame_bounds_and_refuses_out_of_domain_selecto
             assert!(!timing_result("document", &payload, &result));
         }
     }
+}
+
+#[test]
+fn a_vector_family_record_is_judged_by_the_vector_validator_and_keeps_the_read_target() {
+    let payload = cases()["read"]["request"]["payload"].clone();
+    let segment = |x: f64, y: f64| json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    let vector = json!({"schemaVersion":1,"family":"editable-vector-path","target":payload["stableTarget"],
+        "geometry":{"kind":"cubic-path","closed":false,"coordinateSpace":"document-world","handleSpace":"relative",
+            "segments":[segment(10.0, 20.0), segment(110.0, 70.0)]},
+        "fill":null,
+        "vector":{"stroke":{"kind":"solid","r":0.0,"g":0.5,"b":1.0,"a":1.0},"hasRealStroke":true,"strokeWidth":4,
+            "strokeCap":"round","strokeJoin":"miter","opacity":1}});
+    assert!(record(&vector));
+    let valid =
+        json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","object":vector});
+    assert!(super::result("document", &payload, &valid));
+
+    let mut negative_width = vector.clone();
+    negative_width["vector"]["strokeWidth"] = json!(-1);
+    assert!(!record(&negative_width));
+    let mut bodiless = vector.clone();
+    bodiless.as_object_mut().unwrap().remove("vector");
+    assert!(!record(&bodiless));
+    let mut elsewhere = valid.clone();
+    elsewhere["object"]["target"]["strokeId"] = json!("different");
+    assert!(!super::result("document", &payload, &elsewhere));
+    // The closed-fill family stays closed: it does not take the vector body.
+    let mut mixed = cases()["records"][0].clone();
+    mixed["vector"] = vector["vector"].clone();
+    assert!(!record(&mixed));
 }

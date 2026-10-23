@@ -12,7 +12,15 @@ use std::collections::BTreeMap;
 
 #[path = "object_viewport_consumer.rs"]
 mod object_consumer;
+#[path = "viewport_scene_overlay.rs"]
+#[allow(dead_code)]
+mod viewport_scene_overlay;
 pub use object_consumer::ObjectViewportFrame;
+#[path = "object_viewport_projection.rs"]
+mod object_viewport_projection;
+pub use object_viewport_projection::{
+    ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+};
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

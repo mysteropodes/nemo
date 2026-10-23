@@ -17,11 +17,28 @@ use tokio::{io::AsyncReadExt, net::TcpStream, sync::oneshot};
 mod font_dispatch;
 use font_dispatch::{invoke_font, FontPhase};
 
+#[path = "native_raster_image_dispatch.rs"]
+mod image_dispatch;
+use image_dispatch::{invoke_image, is_image_import, ImagePhase};
+
+#[path = "native_import_batch_dispatch.rs"]
+mod import_batch_dispatch;
+use import_batch_dispatch::{invoke_import_batch, is_import_batch_sources, ImportBatchPhase};
+enum ResourcePhase<'a> {
+    Regular,
+    Font(FontPhase<'a>),
+    Image(ImagePhase<'a>),
+    ImportBatch(ImportBatchPhase<'a>),
+}
+
 #[path = "native_revision_dispatch.rs"]
 mod dispatch_core;
 
+#[path = "native_object_motion_finalize.rs"]
+mod motion_finalize;
 #[path = "native_object_preview_route.rs"]
 mod object_preview_route;
+use motion_finalize::MotionReservation;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -74,10 +91,11 @@ struct RevisionState {
     identity: Option<(u64, String)>,
     subscriber: Option<RevisionBinding>,
     pending: Option<PendingRevision>,
+    motion_reservation: Option<MotionReservation>,
 }
 
 #[derive(Clone, Default)]
-pub(super) struct RevisionSync(Arc<Mutex<RevisionState>>);
+pub(super) struct RevisionSync(Arc<Mutex<RevisionState>>, Arc<tokio::sync::Notify>);
 
 pub(super) struct Delivery {
     pub(super) response: NativeApplicationResponse,
@@ -85,6 +103,18 @@ pub(super) struct Delivery {
 }
 
 impl RevisionState {
+    // The original event construction is shared verbatim by command dispatch
+    // and trusted retained-effects completion. It never releases its own ACK.
+    fn begin_event(&mut self, event: RevisionEvent) -> (RevisionEvent, oneshot::Receiver<()>) {
+        let (sender, receiver) = oneshot::channel();
+        self.pending = Some(PendingRevision {
+            event: event.clone(),
+            sender: Some(sender),
+            acknowledged: false,
+            failed: false,
+        });
+        (event, receiver)
+    }
     fn reconcile(&mut self, generation: u64, document: &str) {
         let identity = (generation, document.to_owned());
         if self.identity.as_ref() != Some(&identity) {
@@ -104,6 +134,7 @@ impl RevisionSync {
             .take()
             .map(|binding| binding.subscription_id);
         *state = RevisionState::default(); // Drops the old waiter before a later generation can register.
+        self.1.notify_waiters();
         subscriber
     }
 
@@ -133,6 +164,7 @@ impl RevisionSync {
                 pending.failed = true;
                 pending.sender = None;
             }
+            self.1.notify_waiters();
             return Ok(serde_json::Value::Null);
         }
         let (generation, application) = authority
@@ -165,6 +197,7 @@ impl RevisionSync {
                     return Err("native revision subscription is occupied or indeterminate; release before re-entry".into());
                 }
                 state.subscriber = Some(binding.clone());
+                self.1.notify_waiters();
                 serde_json::to_value(binding).map_err(|error| error.to_string())
             }
             RevisionControl::Acknowledge {
@@ -201,6 +234,7 @@ impl RevisionSync {
                     .is_err()
                 {
                     pending.failed = true;
+                    self.1.notify_waiters();
                     return Err(
                         "native revision waiter was disconnected; synchronization is indeterminate"
                             .into(),
@@ -254,10 +288,12 @@ impl RevisionSync {
         };
         if live && acknowledged && pending.acknowledged && !pending.failed {
             state.pending = None;
+            self.1.notify_waiters();
             true
         } else {
             pending.failed = true;
             pending.sender = None;
+            self.1.notify_waiters();
             false
         }
     }
@@ -267,6 +303,19 @@ fn invoke_dispatch(
     application: &mut dyn NativeDispatch,
     request: &NativeApplicationRequest,
 ) -> Result<NativeApplicationResponse, String> {
+    if is_image_import(request) {
+        return invoke_image(application, request, ImagePhase::Regular)?
+            .ok_or_else(|| "native image source requires async scoped dispatch".into());
+    }
+    if request.operation == "command.document.object.asset.attach" {
+        return Ok(unavailable(
+            request,
+            &request.instance_id,
+            application.content_revision(),
+            "catalog-only image attach source route is unavailable",
+            false,
+        ));
+    }
     if request.operation == crate::application_mcp::font_source::IMPORT {
         return invoke_font(application, request, FontPhase::Regular)?
             .ok_or_else(|| "font source requires async application dispatch".into());
@@ -274,6 +323,28 @@ fn invoke_dispatch(
     let native_request: OpacityRequest =
         serde_json::from_value(serde_json::to_value(request).map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
+    if request.operation == "command.document.object.asset.remove" {
+        let owner = application
+            .as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
+            .ok_or("native asset removal owner unavailable")?;
+        return match owner.remove_asset(&native_request) {
+            Ok(response) => serde_json::from_value(
+                serde_json::to_value(response).map_err(|error| error.to_string())?,
+            )
+            .map_err(|error| error.to_string()),
+            Err(code) => serde_json::from_value(serde_json::json!({
+                "apiVersion": NATIVE_API_VERSION,
+                "requestId": request.request_id,
+                "instanceId": owner.instance_id(),
+                "documentId": owner.document_id(),
+                "contentRevision": owner.content_revision(),
+                "ok": false,
+                "error": {"code": code, "message": "Native asset removal refused."}
+            }))
+            .map_err(|error| error.to_string()),
+        };
+    }
     let response = if request.operation == crate::application_mcp::font_source::QUERY {
         application
             .as_any_mut()
@@ -321,6 +392,19 @@ pub(super) async fn serve_native(
     emit: impl FnOnce(RevisionEvent) -> Result<(), String>,
     timeout: Duration,
 ) -> Result<(), String> {
+    serve_native_scoped(stream, instance, native, sync, request, emit, timeout, None).await
+}
+
+pub(super) async fn serve_native_scoped(
+    stream: &mut TcpStream,
+    instance: &str,
+    native: &NativeState,
+    sync: &RevisionSync,
+    request: NativeApplicationRequest,
+    emit: impl FnOnce(RevisionEvent) -> Result<(), String>,
+    timeout: Duration,
+    allowed: Option<crate::application_mcp::image_source::ImageReadPermission>,
+) -> Result<(), String> {
     let mut byte = [0u8; 1];
     match stream.try_read(&mut byte) {
         Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
@@ -329,7 +413,7 @@ pub(super) async fn serve_native(
     let mut delivery = tokio::select! {
         biased;
         _ = stream.read(&mut byte) => return Err("native connection cancelled before publication".into()),
-        result = sync.dispatch_async(instance, native, request.clone(), true) => result?,
+        result = sync.dispatch_scoped(instance, native, request.clone(), true, allowed) => result?,
     };
     if let Some((event, receiver)) = delivery.notification {
         let acknowledged = if emit(event.clone()).is_ok() {
@@ -346,7 +430,7 @@ pub(super) async fn serve_native(
                 "native command committed but consumer synchronization is indeterminate; do not execute again; release before re-entry", true);
         }
     }
-    wire::write_json(stream, &delivery.response)
+    wire::write_native_response(stream, &delivery.response, &request)
         .await
         .map_err(|error| error.to_string())
 }

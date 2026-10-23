@@ -670,6 +670,7 @@
       "dir": "scripts/nemo",
       "files": [
         "boundaries-rust.test.cjs",
+        "boundaries-native-input.test.cjs",
         "boundaries-nemo-desktop-policy.test.cjs",
         "boundaries-native-object-client.test.cjs",
         "boundaries-object-frame-packet.test.cjs",

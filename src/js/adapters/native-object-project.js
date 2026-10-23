@@ -3,10 +3,12 @@
  * this provider or the file adapter. Callback reads retain current native authority. */
 (function(root,factory){
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding);
+  var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
+  var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -14,10 +16,12 @@
   function same(a,b){return !!a&&!!b&&['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration'].every(function(k){return a[k]===b[k];});}
   var metadata=Metadata&&Metadata.decode;if(typeof metadata!=='function')throw new Error('Native project metadata parser is unavailable');
   function create(ports){
-    var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
-    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null;
+    if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
+    if(!Exposure||typeof Exposure.navigation!=='function')throw new Error('Native project view ports are unavailable');
+    var view=Exposure.navigation(ports.viewMode,openDiagnostic),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
+    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
-    function openDiagnostic(event,code){if(typeof ports.openDiagnostic==='function')try{ports.openDiagnostic(event,code);}catch(_){} }
+    function openDiagnostic(event,code){try{if(typeof ports.openDiagnostic==='function')ports.openDiagnostic(event,code);}catch(_){} }
     function openStage(stage){if(openAttempt){openAttempt.stage=stage;openAttempt.invokeErrors=new Set();}}
     function invokeTracked(command,args){
       var attempt=openAttempt,stage=attempt&&attempt.stage;
@@ -66,7 +70,7 @@
       var pin=epoch(info),ticket=++subscriptionTicket;
       var value=await ports.subscribeRevisions(function(event,binding){return synchronizeRevision(event,pin,ticket,binding);},function(error){
         if(ticket===subscriptionTicket&&sameEpoch(pin,epoch(info)))fence(error);
-      },invokeTracked);
+      },invokeTracked,function(){return !openingCancelled&&(!openExposure||!openExposure.isStopped())&&ticket===subscriptionTicket&&active()&&sameEpoch(pin,epoch(info));});
       if(value===null)return;
       if(ticket!==subscriptionTicket||!active()||!sameEpoch(pin,epoch(info))||
         !sameEpoch(value,pin)||value.contentRevision!==info.contentRevision||!id(value.subscriptionId))
@@ -132,22 +136,22 @@
     }
     function enterProject(source,transition){
       if(openingRequested||phase!=='idle'&&phase!=='native')return Promise.reject(new Error('Native project Open is unavailable'));
-      openingRequested=true;wantedFrame=null;
+      openingRequested=true;openingCancelled=false;wantedFrame=null;
       return enqueue(async function(){
-        var previous=info,priorPresentation=presentation,priorBounds=presentationBounds,priorPhase=phase,dispatched=false,inBootstrap=false;
-        function current(){if(transition&&transition.isCurrent&&transition.isCurrent()!==true){
+        var previous=info,priorPresentation=presentation,priorBounds=presentationBounds,priorPhase=phase,dispatched=false,inBootstrap=false,reconciling=false;
+        function current(){if(openingCancelled)throw new Error('Native project Open was cancelled');if(openExposure)openExposure.assertActive();if(!reconciling&&transition&&transition.isCurrent&&transition.isCurrent()!==true){
           if(dispatched)throw new Error('Native project request changed after dispatch');
           throw localRefusal('Native project request was cancelled');}}
         phase='opening';presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);
         try{
-          current();
-          await retireSubscription();
-          if(transition&&transition.confirm&&await transition.confirm(previous)!==true){
-            if(previous)await verifyOwner(previous);phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();
+          openExposure=Exposure.create(ports.subscribeWindowOcclusion,current);current();await openExposure.connect();
+          await openExposure.join(retireSubscription);
+          if(transition&&transition.confirm&&await openExposure.join(function(){return transition.confirm(previous);})!==true){
+            if(previous)await openExposure.join(function(){return verifyOwner(previous);});phase=priorPhase;presentation=priorPresentation;if(previous)await openExposure.join(attachSubscription);
             if(priorPresentation&&ports.surfaceChanged)ports.surfaceChanged(priorPresentation,priorBounds);return false;}
           current();
-          if(transition&&transition.occlude)await transition.occlude();
-          var before=await status();
+          if(transition&&transition.occlude)await openExposure.join(function(){return transition.occlude();});
+          var before=await openExposure.join(status);
           if(!before||before.apiVersion!==2||!id(before.instanceId)||
               (previous?before.available!==true||before.instanceId!==previous.instanceId||before.documentId!==previous.documentId||
                 before.contentRevision!==previous.contentRevision||before.lifecycleGeneration!==previous.lifecycleGeneration:before.available!==false))
@@ -156,48 +160,53 @@
           if(previous)request.replace={documentId:previous.documentId,expectedRevision:previous.contentRevision,
             documentSnapshotId:previous.documentSnapshotId,lifecycleGeneration:previous.lifecycleGeneration};
           current();dispatched=true;inBootstrap=true;
-          var receipt=await raw('nemo_native_object_bootstrap',request);inBootstrap=false;
+          var receipt=await openExposure.join(function(){return raw('nemo_native_object_bootstrap',request);});inBootstrap=false;
           if(typeof ports.openDiagnostic==='function')openAttempt={stage:'receipt',invokeErrors:new Set()};
           if(!receipt||receipt.apiVersion!==2||receipt.requestId!==rid||receipt.instanceId!==before.instanceId||
               !id(receipt.documentId)||receipt.contentRevision!==0||!integer(receipt.resourceCount,0)||
               receipt.resourceCount>1||receipt.viewportAvailable!==false||previous&&receipt.documentId===previous.documentId)
             throw new Error('Native project Open could not be reconciled');
-          openStage('installed-status');var installed=await status();
+          openStage('installed-status');var installed=await openExposure.join(status);
           if(!installed||installed.apiVersion!==2||installed.available!==true||installed.documentId!==receipt.documentId||
               installed.instanceId!==before.instanceId||installed.contentRevision!==0||
               !integer(installed.lifecycleGeneration,previous?previous.lifecycleGeneration+1:1))
             throw new Error('Native project installation is uncorrelated');
-          openStage('metadata');var candidate=await inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
-            contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});
+          openStage('metadata');var candidate=await openExposure.join(function(){return inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
+            contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});});
           if(source.newProject&&(candidate.canvasW!==source.newProject.canvasW||candidate.canvasH!==source.newProject.canvasH||
             candidate.fps!==source.newProject.fps||receipt.resourceCount!==0))throw new Error('Native New Project metadata is uncorrelated');
           info=candidate;current();
-          openStage('first-preview');await present(0,candidate);openStage('first-owner');await verifyOwner(candidate);
+          openStage('first-preview');await present(0,candidate,null,openExposure);openStage('first-owner');await openExposure.join(function(){return verifyOwner(candidate);});
           current();
-          if(transition&&transition.reveal){openStage('reveal');await transition.reveal(candidate);
-            openStage('second-preview');await present(0,candidate);openStage('second-owner');await verifyOwner(candidate);}
+          if(transition&&transition.reveal){openStage('reveal');await openExposure.join(function(){return transition.reveal(candidate);});
+            openStage('second-preview');await present(0,candidate,null,openExposure);openStage('second-owner');await openExposure.join(function(){return verifyOwner(candidate);});}
+          openExposure.detach();
           current();phase='native';
-          openStage('ui-commit');if(transition&&transition.commit)await transition.commit(candidate);
+          openStage('ui-commit');if(transition&&transition.commit)await openExposure.join(function(){return transition.commit(candidate);});
           current();
-          openStage('publication');changed();openStage('subscriber');await attachSubscription();
+          openStage('publication');changed();openStage('subscriber');await openExposure.join(attachSubscription);
           current();
           return candidate;
         }catch(error){
           openFailure(error);
+          if(openingCancelled||openExposure&&openExposure.isStopped())throw fence(error);
           if(!dispatched||inBootstrap&&(disposition(error)==='notDispatched'||!source.newProject&&!previous&&error&&error.code==='unsupported_format')){
+            reconciling=true; // Retired request currency cannot block safe prior-owner reconciliation; explicit stop still fences.
             try{
-              if(previous)await verifyOwner(previous);
-              else{var empty=await status();if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
-              info=previous;phase=priorPhase;presentation=priorPresentation;
-              if(transition&&transition.restore)await transition.restore(previous);
+              if(previous)await openExposure.join(function(){return verifyOwner(previous);});
+              else{var empty=await openExposure.join(status);if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
+              current();info=previous;phase=priorPhase;presentation=priorPresentation;
+              if(transition&&transition.restore)await openExposure.join(function(){return transition.restore(previous);});
               if(priorPresentation&&ports.surfaceChanged)ports.surfaceChanged(priorPresentation,priorBounds);
-              if(previous)await attachSubscription();
+              if(previous)await openExposure.join(attachSubscription);current();
             }catch(unknown){throw fence(unknown);}
-            if(!source.newProject&&!previous&&error&&error.code==='unsupported_format')return null;
+            reconciling=false;
+            if(!source.newProject&&!previous&&error&&error.code==='unsupported_format'){current();return null;}
             throw disposition(error)==='notDispatched'?error:localRefusal(error&&error.message||'Native project Open was not dispatched');
           }
           throw fence(error);
-        }finally{openAttempt=null;openingRequested=false;}
+        }finally{var retiring=openExposure;openExposure=null;openAttempt=null;openingRequested=false;openingCancelled=false;
+          if(retiring)try{retiring.close();}catch(error){throw fence(error);}}
       });
     }
     function previewFailure(detail,error){
@@ -219,55 +228,45 @@
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
         viewport:viewport};
     }
-    function previewReceiptFailure(request,receipt){
-      if(!['opening','native'].includes(phase)||!same(info,request))return 'owner';
-      if(!receipt)return 'receipt';
-      var status=receipt.status;
-      if(status!=='presented')return ['stale-discarded','deferred-timeout','deferred-occluded','failed-validation',
-        'failed-device-lost','failed-retry-lost','failed-retry-outdated','failed-recreate','failed-reconfigure'].includes(status)?'status-'+status:'status';
-      if(!id(receipt.workId))return 'work-id';
-      if(!integer(receipt.viewGeneration,1))return 'view-generation';
-      return null;
-    }
-    async function present(frame,pin,revisionSync){
+    async function present(frame,pin,revisionSync,exposure,allowSuperseded){
       var request;
       try{request=frameRequest(frame,pin);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
+      var selected=view.read(pin||requireActive()),mode=selected.mode;if(mode!=='canvas')request.viewMode=mode;if(!view.identity(selected.navigation))request.navigation=selected.navigation;
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      try{receipt=await raw('nemo_native_object_preview',request);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||view.read(info).mode===mode&&JSON.stringify(view.read(info).navigation)===JSON.stringify(selected.navigation)),allowDeferred,mode,selected.navigation);}
+        catch(error){throw previewFailure('receipt-access',error);}}
+      try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),false);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
-      var failure;
-      try{failure=previewReceiptFailure(request,receipt);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure('receipt-access',error);}
-      if(failure){
-        presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(failure,new Error('Native project frame was not presented'));
+      if(receipt.failure){
+        presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented'));
       }
-      presentation=freeze({owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
-        viewGeneration:receipt.viewGeneration,instanceId:request.instanceId,documentId:request.documentId,
-        contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration});
+      presentation=freeze(Exposure.presentedFrame(receipt,request,frame));
       presentationBounds=bounds;if(ports.surfaceChanged)ports.surfaceChanged(presentation,bounds);
       return presentation;
     }
-    function presentPreview(frame){
+    function presentPreview(frame,allowSuperseded){
       if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native project Open or synchronization is in progress'));
-      var submitted=epoch(info);return enqueue(function(){guardEpoch(submitted);return present(frame);});
+      var submitted=epoch(info);return enqueue(function(){guardEpoch(submitted);return present(frame,undefined,undefined,undefined,allowSuperseded);});
     }
     function renderPreview(frame){
-      if(!active()||openingRequested)return Promise.resolve(null);
+      if(!active()||openingRequested)return Promise.resolve(null);view.read(requireActive());
       wantedFrame=frame;
       if(rendering)return rendering;
       rendering=(async function(){var receipt;
-        while(wantedFrame!==null){var latest=wantedFrame;wantedFrame=null;receipt=await presentPreview(latest);}
+        while(wantedFrame!==null){var latest=wantedFrame;wantedFrame=null;receipt=await presentPreview(latest,true);}
         return receipt;
       }()).catch(function(error){wantedFrame=null;if(ports.notice)ports.notice(error.message);return null;}).finally(function(){rendering=null;});
       return rendering;
     }
     function changed(){if(ports.changed)ports.changed(info);}
-    function mutation(makeRequest,command){
+    function mutation(makeRequest,command,needsPresentation){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       if(synchronizing)return Promise.reject(new Error('Native object revision synchronization is in progress'));
-      var submitted=epoch(info);return enqueue(async function(){
-      guardEpoch(submitted);var pin=requireActive(),request=makeRequest(pin);presentation=null;
+      var submitted=epoch(info),origin=needsPresentation?freeze(presentedSession()):null,ticket=subscriptionTicket;return enqueue(async function(){
+      guardEpoch(submitted);var pin=requireActive(),request=needsPresentation?Desktop.withActionPresentation(origin,function(){return pending===1&&currentPresentation(origin,ticket)&&
+        origin.presentation.frame===(ports.frame?ports.frame():0);},function(lease){return makeRequest(pin,lease);}):makeRequest(pin);presentation=null;
       var receipt;
       try{receipt=await raw(command,request);}catch(error){
         // A transport error cannot establish whether a native command committed.
@@ -284,10 +283,20 @@
       }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
+    function currentPresentation(origin,ticket){return !openingRequested&&!synchronizing&&active()&&origin&&origin.presentation===presentation&&view.matches(presentation,info)&&same(info,origin)&&ticket===subscriptionTicket&&
+      (!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&
+      typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;}
     function runFontResource(action){if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native font owner busy or unavailable'));
-      var submitted=epoch(info);return enqueue(async function(){guardEpoch(submitted);return action({dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
-        reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
-          changed();await present(ports.frame?ports.frame():0,next);return next;}});});}
+      var submitted=epoch(info),origin=freeze(presentedSession()),ticket=subscriptionTicket;
+      return enqueue(async function(){guardEpoch(submitted);var running=true;
+        try{return await action({
+          // Read-only and action-local: only this operation's own pending entry is exempted.
+          // Captured presentation/subscription identity must survive; the public getter stays fenced.
+          readPresentedObjectSession:function(){return running&&pending===1&&currentPresentation(origin,ticket)?origin:null;},
+          dispatch:function(request){guardEpoch(submitted);return raw('nemo_native_dispatch',request);},
+          reconcile:async function(revision){guardEpoch(submitted);var next;try{next=await inspect();guardEpoch(submitted);if(revision!==undefined&&next.contentRevision!==revision)throw new Error('Native font import revision is uncorrelated');}catch(error){throw fence(error);}
+            changed();await present(ports.frame?ports.frame():0,next);return next;}});
+        }finally{running=false;}});}
     function reference(action){return mutation(function(pin){return {apiVersion:2,requestId:requestId('reference'),instanceId:pin.instanceId,
       documentId:pin.documentId,lifecycleGeneration:pin.lifecycleGeneration,expectedRevision:pin.contentRevision,
       documentSnapshotId:pin.documentSnapshotId,action:typeof action==='function'?action(pin.reference):action};},'nemo_native_object_reference');}
@@ -311,12 +320,17 @@
       return {apiVersion:2,requestId:requestId('layer-create'),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.layer.create',expectedRevision:pin.contentRevision,payload:{command:'object.layer.create',name:name}};
     },'nemo_native_dispatch');}
+    function importBatch(payload,expected){return mutation(function(pin){
+      if(!same(pin,expected)||!payload||typeof payload!=='object'||Array.isArray(payload)||payload.command!=='object.import.batch')throw new Error('Native import intent is stale or invalid');
+      return {apiVersion:2,requestId:requestId('import-batch'),instanceId:pin.instanceId,documentId:pin.documentId,operation:'command.document.object.import.batch',expectedRevision:pin.contentRevision,payload:payload};
+    },'nemo_native_dispatch');}
     function editLayerPolicy(payload,expected){return mutation(function(pin){
       if(!same(pin,expected)||!payload||Array.isArray(payload)||Object.keys(payload).length!==4||!['command','layerUid','flag','value'].every(function(k){return Object.prototype.hasOwnProperty.call(payload,k);})||payload.command!=='object.layer.policy.edit'||!['locked','shy'].includes(payload.flag)||typeof payload.value!=='boolean'||typeof payload.layerUid!=='string'||!payload.layerUid||pin.layers.filter(function(l){return l.layerUid===payload.layerUid;}).length!==1)throw new Error('Native layer policy intent is stale or invalid');
       return {apiVersion:2,requestId:requestId('layer-policy'),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.layer.policy.edit',expectedRevision:pin.contentRevision,
         payload:{command:'object.layer.policy.edit',layerUid:payload.layerUid,flag:payload.flag,value:payload.value}};
     },'nemo_native_dispatch');}
+    function editFrames(operation,payload,expected,current){return mutation(function(pin,lease){if(typeof current==='function'&&(!lease.readPresentedObjectSession()||current(lease)!==true||!lease.readPresentedObjectSession()))throw new Error('Native frame edit intent is stale');if(!same(pin,expected)||!FrameEdit||!FrameEdit.valid(operation,payload))throw new Error('Native frame edit intent is '+(same(pin,expected)?'invalid':'stale'));return {apiVersion:2,requestId:requestId('frame-edit'),instanceId:pin.instanceId,documentId:pin.documentId,operation:operation,expectedRevision:pin.contentRevision,payload:JSON.parse(JSON.stringify(payload))};},'nemo_native_dispatch',typeof current==='function');}
     function editProjectSettings(action,expected){return mutation(function(pin){
       if(!same(pin,expected))throw new Error('Native project settings intent is stale');
       return {apiVersion:2,requestId:requestId('project-settings'),instanceId:pin.instanceId,documentId:pin.documentId,
@@ -341,62 +355,44 @@
       return {apiVersion:2,requestId:request.requestId,instanceId:value.instanceId,documentId:value.documentId,contentRevision:value.contentRevision,ok:true,
         result:{atRevision:value.contentRevision,documentSnapshotId:value.documentSnapshotId,documentDigest:value.documentDigest,byteCount:value.byteCount}};
     }
-    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&same(info,presentation)&&pending===0?
+    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&view.matches(presentation,info)&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
-    async function readLayerTiming(layerUid,frame,pin){
-      // Observe existing work without entering, advancing or settling its queue.
+    async function readLayerView(layerUid,frame,pin,view){
       async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
-      function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&
-        value.presentation.frame===frame&&integer(frame,0)&&frame<pin.totalFrames&&
-        pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length===1;}
+      function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&value.presentation.frame===frame&&
+        integer(frame,0)&&frame<pin.totalFrames&&pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length===1;}
       try{
         await settled();if(!ready())return null;
-        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId('timing'),instanceId:pin.instanceId,documentId:pin.documentId,
+        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId(view||'timing'),instanceId:pin.instanceId,documentId:pin.documentId,
           operation:'query.document.object.layer.timing',payload:{atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,
             contextId:'scene-root',layerUid:layerUid,frame:frame}};
-        var response=await raw('nemo_native_dispatch',request);
-        await settled();
+        if(view)request.payload.view=view;
+        var response=await raw('nemo_native_dispatch',request);await settled();
         if(ticket!==subscriptionTicket||!ready()||!response||response.ok!==true||response.instanceId!==pin.instanceId||
           response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)return null;
         var result=response.result;
-        if(!result||Object.keys(result).length!==11||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
+        if(!result||Object.keys(result).length!==(view?9:11)||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
           ['atRevision','documentSnapshotId','contextId','layerUid','frame'].some(function(k){return result[k]!==request.payload[k];}))return null;
-        return freeze(Object.assign({},result));
+        if(view==='placement'&&!(result.kind==='layerPlacement'&&typeof result.placement==='object'))return null;
+        if(view==='range'){
+          var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
+          if(result.kind!=='layerRange'||!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
+            !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return null;
+        }
+        return freeze(view?JSON.parse(JSON.stringify(result)):Object.assign({},result));
       }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
     }
-    async function readPropertyMetadata(selector){
-      var fields=['instanceId','documentId','atRevision','documentSnapshotId','view'];
-      if(!selector||typeof selector!=='object'||Array.isArray(selector)||
-        Object.keys(selector).length!==fields.length||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(selector,k);}))
-        throw new TypeError('Invalid native metadata selector');
-      var pin=info,ticket=subscriptionTicket,shown=presentation;
-      function ready(){
-        return active()&&!openingRequested&&pending===0&&!synchronizing&&subscription&&
-          ticket===subscriptionTicket&&presentation===shown&&same(info,pin)&&presentedSession()&&
-          typeof ports.dispatchApplication==='function'&&typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true&&
-          typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;
-      }
-      if(!ready()||selector.instanceId!==pin.instanceId||selector.documentId!==pin.documentId||
-        selector.atRevision!==pin.contentRevision||selector.documentSnapshotId!==pin.documentSnapshotId)
-        throw new Error('Native metadata owner or presentation is unavailable');
-      var request={apiVersion:2,requestId:requestId('metadata'),instanceId:selector.instanceId,documentId:selector.documentId,
-        operation:'query.document.object.property.metadata',payload:{atRevision:selector.atRevision,
-          documentSnapshotId:selector.documentSnapshotId,view:selector.view}};
-      // The same subscribed desktop port calls the real SDK before transport.
-      var response=await ports.dispatchApplication(request);
-      if(!ready())throw new Error('Native metadata owner or presentation changed');
-      if(!response||response.apiVersion!==2||response.requestId!==request.requestId||response.instanceId!==pin.instanceId||
-        response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)
-        throw new Error('Native metadata response is uncorrelated');
-      if(response.ok!==true){var error=new Error('Native metadata read unavailable');
-        error.code=response.error&&response.error.code||'unavailable';throw error;}
-      var result=response.result;
-      if(!result||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
-        result.atRevision!==pin.contentRevision||result.documentSnapshotId!==pin.documentSnapshotId)
-        throw new Error('Native metadata result is uncorrelated');
-      return freeze(result);
-    }
-    function exportPng(destination,frames,onProgress,signal){
+    function readLayerTiming(layerUid,frame,pin){return readLayerView(layerUid,frame,pin);}
+    function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'range');}
+    function readLayerPlacement(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'placement');}
+    var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
+      dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
+      state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
+        synchronizing:synchronizing,subscribed:!!subscription,presentationCurrent:active()&&!synchronizing&&presentation&&same(info,presentation),
+        get presented(){return presentedSession();},dispatchAvailable:typeof ports.dispatchApplication==='function',
+        get projectionReady(){return typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true;},
+        get subscriptionActive(){return typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;}};}});
+    function exportFrames(destination,frames,onProgress,signal,format){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
       guardEpoch(submitted);
@@ -406,7 +402,8 @@
       }))throw new Error('Native object export frame range is invalid');
       if(signal&&signal.aborted)return {status:'cancelled'};
       var request=frameRequest(requested[0]);if(requested.length>1)request.frames=requested;
-      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.png';});
+      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.'+format;});
+      if(format==='svg')request.format='svg';
       request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
       var receipt=await raw('nemo_native_object_export',request);
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId||receipt.documentId!==request.documentId||
@@ -415,19 +412,27 @@
         !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
-    return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
+    function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}
+    function exportSvg(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'svg');}
+    return Object.freeze({openPath:openPath,newProject:newProject,cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
-      readPropertyMetadata:readPropertyMetadata,
-      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
+      get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
+      get editProperty(){return properties.available()?properties.editProperty:undefined;},
+      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,readLayerRange:readLayerRange,readLayerPlacement:readLayerPlacement,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
+      get editFrames(){return FrameEdit&&typeof ports.dispatchApplication==='function'&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editFrames:undefined;},
       get editProjectSettings(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editProjectSettings:undefined;},
       get createLayer(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?createLayer:undefined;},
+      get importBatch(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?importBatch:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
-      presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,
+      beginViewportNavigation:function(kind,point){return active()&&!openingRequested&&!synchronizing&&presentation&&same(info,presentation)&&(!ports.projectionReady||ports.projectionReady(info))&&(!ports.subscriptionActive||ports.subscriptionActive())?view.begin(presentation,info,ports.frame(),ports.mapping(info),presentationBounds,kind,point):(openDiagnostic('navigation-begin','owner-unavailable'),null);},updateViewportNavigation:function(token,point,factor,target){try{if(!active()||openingRequested||synchronizing||!presentation||!same(info,presentation)||ports.projectionReady&&!ports.projectionReady(info)||ports.subscriptionActive&&!ports.subscriptionActive())throw new Error('Native navigation owner is unavailable');view.update(token,info,ports.frame(),ports.mapping(info),point,factor,target);openDiagnostic('navigation-update','view-updated');return renderPreview(ports.frame());}catch(error){openDiagnostic('navigation-update','rejected');return Promise.reject(error);}},presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
       acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
       identity:requireActive,requestRelease:function(){return false;},releaseCurrent:function(){return false;},
@@ -453,12 +458,15 @@
         if(!session)return Promise.reject(new Error('Native metadata session is unavailable'));
         return session.readPropertyMetadata(selector);
       },
+      readProperty:function(selector){var session=uiSession(root);if(!session)return Promise.reject(new Error('Native property session is unavailable'));return session.readProperty(selector);},
+      get editPropertyTrack(){var session=uiSession(root);return session&&session.editPropertyTrack;},
+      get editProperty(){var session=uiSession(root);return session&&session.editProperty;},
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
       projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},
       repaint:function(frameOnly){return paintUI(root,frameOnly);}
     };
     if(root.NemoNativeObjectUI&&typeof root.NemoNativeObjectUI.createPolicyPorts==='function')
-      Object.assign(ports,root.NemoNativeObjectUI.createPolicyPorts(root,ports));
+      Object.assign(ports,Desktop.composeUI(root,ports,root.NemoNativeObjectUI.createPolicyPorts(root,ports)));
     Object.freeze(ports);uiBindings.set(root,ports);return ports;
   }
   function uiFailure(root,error){
@@ -476,7 +484,7 @@
     var ports=nativeObjectUiPorts(root);
     try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,ports)!==true)
       throw new Error('Native document UI presentation is unavailable');
-      if(ports.bindPolicyEntries)ports.bindPolicyEntries();}
+      Desktop.didPaintUI(root,ports);}
     catch(error){return uiFailure(root,error);}
     return true;
   }
@@ -488,5 +496,5 @@
     catch(error){return uiFailure(root,error);}
     return true; // An unconfirmed selection is consumed, never a legacy fallback.
   }
-  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI});
+  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI,bindUIComposition:function(root,compose){return Desktop.bindUIComposition(root,compose);}});
 }));

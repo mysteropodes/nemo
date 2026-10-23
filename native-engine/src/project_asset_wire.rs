@@ -4,7 +4,7 @@ use crate::object_codec::project::{
     FORMAT,
 };
 use crate::object_document::{
-    AssetId, AssetInventory, AssetKind, AssetRecord, AssetSource, ProjectEnvelope,
+    AssetId, AssetInventory, AssetKind, AssetPlacement, AssetRecord, AssetSource, ProjectEnvelope,
     ProjectReferenceState,
 };
 use crate::reference_image_asset::ImageAssetLimits;
@@ -18,8 +18,16 @@ use std::{
 
 const MAX_ASSETS: usize = 1024;
 const MAX_LOCATOR: usize = 4096;
+
+// L09-H (#2115): the placement table of the catalog wire (G42, I16b).
+#[path = "project_audio_asset_wire.rs"]
+mod audio;
+#[path = "object_media_link_track.rs"]
+pub(crate) mod object_media_link_track;
 #[path = "project_asset_payload.rs"]
 mod payload;
+#[path = "project_asset_source_wire.rs"]
+mod source_wire;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,26 +69,6 @@ struct Entry<'a> {
     #[serde(borrow)]
     source: &'a RawValue,
 }
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct Embedded<'a> {
-    #[serde(borrow)]
-    kind: &'a RawValue,
-    #[serde(borrow)]
-    media_type: &'a RawValue,
-    #[serde(borrow)]
-    encoding: &'a RawValue,
-    #[serde(borrow)]
-    data: &'a RawValue,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Linked<'a> {
-    #[serde(borrow)]
-    kind: &'a RawValue,
-    #[serde(borrow)]
-    locator: &'a RawValue,
-}
 
 fn array<'a, T: Deserialize<'a>>(
     raw: &'a RawValue,
@@ -114,6 +102,10 @@ fn array<'a, T: Deserialize<'a>>(
 }
 
 enum Source {
+    Wave {
+        data: String,
+        length: usize,
+    },
     Png {
         data: String,
         length: usize,
@@ -128,7 +120,7 @@ enum Source {
 impl Source {
     fn encoded_length(&self) -> Option<usize> {
         match self {
-            Self::Png { length, .. } => Some(*length),
+            Self::Png { length, .. } | Self::Wave { length, .. } => Some(*length),
             #[cfg(feature = "font_asset_wire")]
             Self::Font { length, .. } => Some(*length),
             Self::Linked(_) => None,
@@ -153,8 +145,10 @@ pub(crate) struct PreparedProjectWire {
     records: Vec<Record>,
     lengths: Vec<usize>,
     catalog: Option<Vec<usize>>,
+    placements: Vec<AssetPlacement>,
     viewport: Option<Viewport>,
     png: Option<(usize, ImageAssetLimits)>,
+    audio: Option<usize>,
     #[cfg(feature = "font_asset_wire")]
     font: Option<crate::object_codec::FontAssetLimits>,
 }
@@ -258,6 +252,8 @@ fn prepare_legacy(
         return Err(ProjectWireError::Unsupported);
     }
     let base = base(wire.project, wire.drawing, limits)?;
+    // Legacy wire has only its optional viewport PNG, never an Audio catalog.
+    audio::validate_tracks(base.drawing(), |_| None)?;
     let mut pending_data = None;
     if let Some(raw) = asset {
         limits.png.ok_or(ProjectWireError::Budget)?;
@@ -294,8 +290,10 @@ fn prepare_legacy(
             .collect(),
         records,
         catalog: None,
+        placements: Vec::new(),
         viewport,
         png: limits.png,
+        audio: limits.audio,
         #[cfg(feature = "font_asset_wire")]
         font: limits.font,
     })
@@ -310,9 +308,10 @@ fn prepare_catalog(
         return Err(ProjectWireError::Unsupported);
     }
     let catalog: Catalog<'_> = object(wire.asset_inventory)?;
-    if !array::<&RawValue>(catalog.placements, MAX_ASSETS)?.is_empty() {
-        return Err(ProjectWireError::Unsupported);
-    }
+    let placements = object_media_link_track::read(array::<&RawValue>(
+        catalog.placements,
+        object_media_link_track::MAX_PLACEMENTS,
+    )?)?;
     let mut records = Vec::new();
     let mut ids = HashMap::new();
     for raw in array::<&RawValue>(wire.assets, MAX_ASSETS)? {
@@ -325,37 +324,7 @@ fn prepare_catalog(
         }
         let kind =
             AssetKind::from_tag(&text(e.kind, 5)?).map_err(|_| ProjectWireError::Unsupported)?;
-        // Strict disjoint source shapes: trying both never admits unknown members.
-        let source = if let Ok(source) = object::<Linked<'_>>(e.source) {
-            if text(source.kind, 8)? != "linked" {
-                return Err(ProjectWireError::Unsupported);
-            }
-            let locator = text(source.locator, MAX_LOCATOR)?;
-            AssetSource::linked(locator.clone(), MAX_LOCATOR)
-                .map_err(|_| ProjectWireError::Invalid)?;
-            Source::Linked(locator)
-        } else {
-            let source: Embedded<'_> = object(e.source)?;
-            if text(source.kind, 8)? != "embedded" || text(source.encoding, 6)? != "base64" {
-                return Err(ProjectWireError::Unsupported);
-            }
-            match (kind, text(source.media_type, 9)?.as_str()) {
-                (AssetKind::Image, "image/png") => {
-                    let (data, length) = payload::prepare(
-                        source.data,
-                        limits.png.ok_or(ProjectWireError::Budget)?.0,
-                    )?;
-                    Source::Png { data, length }
-                }
-                #[cfg(feature = "font_asset_wire")]
-                (AssetKind::Font, "font/ttf") => {
-                    let font = limits.font.ok_or(ProjectWireError::Unsupported)?;
-                    let (data, length) = payload::prepare(source.data, font.encoded_byte_limit())?;
-                    Source::Font { data, length }
-                }
-                _ => return Err(ProjectWireError::Unsupported),
-            }
-        };
+        let source = source_wire::prepare(e.source, kind, limits)?;
         if ids.insert(id.clone(), records.len()).is_some() {
             return Err(ProjectWireError::Invalid);
         }
@@ -376,6 +345,9 @@ fn prepare_catalog(
         }
         order.push(index);
     }
+    // Cross-check placements against the file's own records BEFORE any binary
+    // allocation (the catalog constructor repeats these checks at decode).
+    object_media_link_track::validate(&placements, |id| ids.get(id).map(|i| records[*i].kind))?;
     let viewport = viewport(wire.viewport_reference, &ids, &records)?;
     if let Some(v) = &viewport {
         used.insert(v.index);
@@ -383,16 +355,20 @@ fn prepare_catalog(
     if used.len() != records.len() {
         return Err(ProjectWireError::Invalid);
     }
+    let base = base(wire.project, wire.drawing, limits)?;
+    audio::validate_tracks(base.drawing(), |id| ids.get(id).map(|i| records[*i].kind))?;
     Ok(PreparedProjectWire {
-        base: base(wire.project, wire.drawing, limits)?,
+        base,
         lengths: records
             .iter()
             .filter_map(|r| r.source.encoded_length())
             .collect(),
         records,
         catalog: Some(order),
+        placements,
         viewport,
         png: limits.png,
+        audio: limits.audio,
         #[cfg(feature = "font_asset_wire")]
         font: limits.font,
     })
@@ -413,6 +389,12 @@ impl PreparedProjectWire {
             let source = match &record.source {
                 Source::Linked(locator) => AssetSource::linked(locator.clone(), MAX_LOCATOR)
                     .map_err(|_| ProjectWireError::Invalid)?,
+                Source::Wave { data, length } => {
+                    let (source, allocation) =
+                        audio::decode(data, *length, self.audio, &mut allocate)?;
+                    allocations.push(allocation);
+                    source
+                }
                 Source::Png { data, length } => {
                     let (cap, png) = self.png.ok_or(ProjectWireError::Budget)?;
                     let encoded = payload::decode(data, *length, &mut allocate)?;
@@ -471,10 +453,19 @@ impl PreparedProjectWire {
                 .map_err(|_| ProjectWireError::Invalid)?;
                 entries.push(Arc::new(value));
             }
-            let inventory = AssetInventory::new(entries, Vec::new(), MAX_ASSETS, 0)
-                .map_err(|_| ProjectWireError::Invalid)?;
+            let inventory = AssetInventory::new(
+                entries,
+                self.placements,
+                MAX_ASSETS,
+                object_media_link_track::MAX_PLACEMENTS,
+            )
+            .map_err(|_| ProjectWireError::Invalid)?;
             project = project.with_asset_inventory(Some(inventory));
         }
+        crate::object_codec::validate_item_assets(project.drawing(), project.asset_inventory())
+            .map_err(|_| ProjectWireError::Invalid)?;
+        crate::object_document::resolve_sound_assets(project.drawing(), project.asset_inventory())
+            .map_err(|_| ProjectWireError::Invalid)?;
         Ok(DecodedProjectWire {
             project,
             allocations,

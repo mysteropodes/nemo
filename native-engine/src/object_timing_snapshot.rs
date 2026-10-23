@@ -5,6 +5,11 @@ use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelop
 use crate::revision::ObjectSnapshot;
 use serde::{Deserialize, Serialize};
 
+#[path = "object_layer_placement_snapshot.rs"]
+mod layer_placement;
+#[path = "object_layer_range_snapshot.rs"]
+mod layer_range;
+
 #[derive(Debug)]
 struct TimingSelector {
     at_revision: u64,
@@ -45,7 +50,14 @@ impl ObjectSnapshot {
     ) -> Result<ResponseEnvelope, DispatchErrorCode> {
         let payload =
             serde_json::to_vec(&request.payload).map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        let read = match self.query_layer_timing_json(&payload) {
+        let selected = match request.payload.get("view") {
+            Some(view) if view == "placement" => self.query_layer_placement_json(&payload),
+            Some(_) => self.query_layer_range_json(&payload),
+            None => self.query_layer_timing_json(&payload).and_then(|read| {
+                serde_json::to_value(read).map_err(|_| DispatchErrorCode::Internal)
+            }),
+        };
+        let read = match selected {
             Ok(read) => read,
             Err(code) => {
                 return Ok(self.read_failure(
@@ -62,7 +74,7 @@ impl ObjectSnapshot {
             document_id: self.document_id().into(),
             content_revision: self.content_revision(),
             ok: true,
-            result: Some(serde_json::to_value(read).map_err(|_| DispatchErrorCode::Internal)?),
+            result: Some(read),
             error: None,
         };
         if !matches!(

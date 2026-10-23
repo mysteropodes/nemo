@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 
 const MAX_BYTES: usize = 4096;
 const MAX_REVISION: u64 = 9_007_199_254_740_991;
-const OPERATIONS: [&str; 8] = [
+const OPERATIONS: [&str; 11] = [
     "query.document.object",
     "command.document.object.fill.set",
     "command.document.object.undo",
@@ -17,6 +17,9 @@ const OPERATIONS: [&str; 8] = [
     "command.document.object.layer.visibility.set",
     "command.document.object.project.settings.edit",
     "command.document.object.layer.policy.edit",
+    "command.document.object.project.placement.edit",
+    "command.document.object.audio.track.edit",
+    "command.document.object.layer.cut",
 ];
 
 /// Only original-byte admission can construct this token. Public typed dispatch
@@ -122,6 +125,13 @@ pub(super) fn client_status(state: &ApplicationMcp) -> Result<Value, String> {
 }
 
 impl ApplicationMcp {
+    pub(crate) fn dispatch_object_request_json(
+        &self,
+        raw: &str,
+    ) -> Result<NativeApplicationResponse, String> {
+        dispatch_raw(self, raw)
+    }
+
     pub(crate) fn serialize_object_file_snapshot(
         &self,
         raw: &str,
@@ -159,7 +169,24 @@ pub async fn nemo_native_dispatch(
     request: NativeApplicationRequest,
 ) -> Result<NativeApplicationResponse, String> {
     require_main(&window)?;
-    state.dispatch_native_async(request).await
+    use tauri_plugin_fs::FsExt;
+    let permission = std::sync::Arc::new(move |path: &std::path::Path| {
+        window
+            .try_fs_scope()
+            .is_some_and(|scope| scope.is_allowed(path))
+    });
+    let response = state
+        .dispatch_native_scoped(request.clone(), permission)
+        .await?;
+    if matches!(
+        request.operation.as_str(),
+        "command.document.object.frames.clipboard.copy"
+            | "command.document.object.frames.clipboard.cut"
+            | "command.document.object.frames.clipboard.paste"
+    ) {
+        wire::validate_native_response(&response, &request).map_err(|error| error.to_string())?;
+    }
+    Ok(response)
 }
 
 #[tauri::command]
@@ -169,7 +196,7 @@ pub(crate) fn nemo_native_object_dispatch(
     request_json: String,
 ) -> Result<NativeApplicationResponse, String> {
     require_main(&window)?;
-    dispatch_raw(&state, &request_json)
+    state.dispatch_object_request_json(&request_json)
 }
 
 #[tauri::command]

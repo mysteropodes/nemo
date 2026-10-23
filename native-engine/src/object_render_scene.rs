@@ -4,6 +4,13 @@ use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::Sce
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
 use crate::render_geometry::ClosedCubicPath;
 use std::sync::Arc;
+use vello::kurbo::BezPath;
+
+#[path = "object_component_render_scene.rs"]
+pub(crate) mod component_scene;
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_component_render_scene.rs"]
+mod component_tests;
 
 use scene_effect_kernels::object_scene_resource_set::{
     same_scene_resources, SceneResourceMismatch,
@@ -11,12 +18,16 @@ use scene_effect_kernels::object_scene_resource_set::{
 pub use scene_effect_kernels::object_scene_resource_set::{
     ObjectSceneResourceSet, SceneResourceMismatchKind,
 };
+use scene_effect_kernels::scene_effect_scene_join::SceneEffectPlan;
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 #[path = "object_reference_scene.rs"]
 mod reference;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
-pub use reference::prepare_object_viewport_composition;
+pub use reference::{
+    object_viewport_quality, prepare_object_camera_viewport_composition,
+    prepare_object_navigated_viewport_composition, prepare_object_viewport_composition,
+};
 
 #[path = "object_scheduled_scene.rs"]
 mod scheduled;
@@ -26,16 +37,62 @@ pub use scheduled::{
     LiveObjectComposition, ScheduledObjectSceneError,
 };
 
+#[path = "object_brush_admission.rs"]
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+mod brush_admission;
+#[path = "object_brush_scene_join.rs"]
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub(crate) mod brush_scene;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub use brush_admission::ObjectBrushAdmission;
+#[path = "object_brush_paint_join.rs"]
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+mod brush_paint;
+#[path = "object_raster_scene_join.rs"]
+pub(crate) mod raster_scene;
+// T12 / T28.media: video placements drawn from decoded source frames.
+#[path = "object_media_scene_join.rs"]
+pub(crate) mod media_scene;
+pub(crate) use paint::raster::{ordered_entries, PaintEntry, PaintIndex};
+pub(crate) use raster_scene::declared_versions as object_raster_resource_versions;
+#[path = "object_mask_inputs.rs"]
+pub(crate) mod mask_inputs;
 #[path = "object_paint_plan.rs"]
 mod paint;
 // L07-F (#2113): contour scene producer joined through the L07-C pin registry.
+#[path = "object_duplicator_scene.rs"]
+pub(crate) mod duplicator_scene;
 #[path = "object_scene_producer_contour.rs"]
 mod object_scene_producer_contour;
 use object_scene_producer_contour::CompiledContour;
+// L07-J (#2113): leased bitmap-brush ink drawn into a Vello scene (scene consumer of the brush producer).
+#[path = "object_scene_producer_brush_ink.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_brush_ink;
+// L07-I (#2113): typed scene style -> Vello paint (fill, stroke, gradient, paint order); the compositor draws through it.
+#[path = "object_scene_style_emit.rs"]
+pub(crate) mod object_scene_style_emit;
+// L07-L (#2113): text block scene producer joined through the L07-C pin registry.
+#[path = "object_scene_producer_text.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_text;
+#[path = "object_text_scene_join.rs"]
+pub(crate) mod text_scene;
 // L08-A (#2144): lane-8 scene composition/effect family aggregator.
 #[path = "scene_effect_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod scene_effect_kernels;
+// L06-K (#2112): lane-6 text/raster scene join family aggregator.
+#[path = "text_glyph_scene_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod text_glyph_scene_kernels;
+// L03-S (#2109): lane-3 image-mesh scene join family aggregator (scene item and vello replay).
+#[path = "render_image_mesh_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_image_mesh_kernels;
+// L01-I (#2107): drawn geometry of the editable vector family (open or closed path, clipping contour, envelope).
+#[path = "render_vector_path.rs"]
+pub(crate) mod render_vector_path;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use paint::tests::paint_contents;
 #[cfg(test)]
@@ -52,7 +109,15 @@ pub use paint::{
 pub struct ObjectCompositionWitness {
     plan: ObjectPaintPlan,
     viewport: bool,
+    viewport_quality: Option<String>,
+    camera: Option<[f64; 6]>,
     resources: Option<Arc<ObjectSceneResourceSet>>,
+    /// Joined layer/effect plan of this witness' packet (L08-K); `None` keeps the flat fast path.
+    scene_effects: Option<Arc<SceneEffectPlan>>,
+    /// Decoded video frames of the plan's video slots (T12); `None` while undecoded.
+    media: Option<Arc<media_scene::MediaDraws>>,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    rasters: Option<Arc<raster_scene::RasterResources>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     reference: Option<reference::ReferenceScene>,
 }
@@ -62,19 +127,60 @@ pub fn prepare_object_composition(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
-    Ok(ObjectCompositionWitness {
+    let camera = plan.packet().stored_camera_matrix().map_err(|_| {
+        ObjectSceneError::UnsupportedGeometry {
+            source_object_index: 0,
+            reason: "stored camera transform unavailable",
+        }
+    })?;
+    let witness = ObjectCompositionWitness {
         plan: plan.clone(),
         viewport: false,
+        viewport_quality: None,
+        camera,
         resources: None,
+        scene_effects: None,
+        media: None,
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         reference: None,
-    })
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        rasters: None,
+    };
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    {
+        return brush_paint::attach(text_scene::attach(raster_scene::attach(witness, None)?)?);
+    }
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+    {
+        if !plan.raster_sources().is_empty() {
+            return Err(raster_scene::unavailable(
+                0,
+                "native raster resources require project media support",
+            ));
+        }
+        text_scene::attach(witness)
+    }
 }
 
 impl ObjectCompositionWitness {
     /// Viewport content is never an artwork export source, even with no image.
+    pub(crate) fn expected_quality(&self) -> &str {
+        self.viewport_quality.as_deref().unwrap_or("final")
+    }
     pub(crate) fn is_viewport(&self) -> bool {
         self.viewport
+    }
+    /// Artwork-only transform; unlocked Canvas presentation stays untransformed.
+    pub(crate) fn camera_matrix(&self) -> Option<[f64; 6]> {
+        self.camera
+    }
+    pub(crate) fn camera_canvas_dimensions(&self) -> Option<(u32, u32)> {
+        self.camera?;
+        self.plan
+            .packet()
+            .snapshot()
+            .project()
+            .map(|p| p.project().canvas_dimensions())
     }
     /// Read the same retained snapshot used for every painted record.
     pub(crate) fn canvas_background_rgba8(&self) -> [u8; 4] {
@@ -92,11 +198,31 @@ impl ObjectCompositionWitness {
     pub fn scene_resources(&self) -> Option<&Arc<ObjectSceneResourceSet>> {
         self.resources.as_ref()
     }
+    /// Attach the joined layer/effect plan of THIS witness' packet (L08-K). A plan joined onto another
+    /// instance/document/revision/snapshot/context/scope/frame is refused and nothing is attached.
+    pub(crate) fn with_scene_effects(
+        mut self,
+        effects: Arc<SceneEffectPlan>,
+    ) -> Result<Self, ObjectSceneError> {
+        if !effects.is_for_packet(self.plan.packet()) {
+            return Err(ObjectSceneError::WrongSnapshot);
+        }
+        self.scene_effects = Some(effects);
+        Ok(self)
+    }
+    pub(crate) fn scene_effects(&self) -> Option<&Arc<SceneEffectPlan>> {
+        self.scene_effects.as_ref()
+    }
     /// Set equality with an evaluation key's declaration; an absent set is empty.
     pub(crate) fn verify_scene_resources(
         &self,
         declared: &std::collections::BTreeMap<String, String>,
     ) -> Result<(), SceneResourceMismatch> {
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if let Some(rasters) = &self.rasters {
+            rasters.verify(declared)?;
+        }
+        text_scene::verify(self, declared)?;
         match &self.resources {
             Some(set) => set.verify_declared(declared),
             None => ObjectSceneResourceSet::empty().verify_declared(declared),
@@ -124,6 +250,8 @@ impl ObjectCompositionWitness {
     /// selector/packet types into composition consumers.
     pub fn same_identity_as(&self, other: &Self) -> bool {
         self.viewport == other.viewport
+            && self.viewport_quality == other.viewport_quality
+            && self.camera == other.camera
             && self.instance_id() == other.instance_id()
             && self.document_id() == other.document_id()
             && self.content_revision() == other.content_revision()
@@ -132,12 +260,17 @@ impl ObjectCompositionWitness {
             && self.plan.packet().scope_kind() == other.plan.packet().scope_kind()
             && self.frame() == other.frame()
             && same_scene_resources(self.resources.as_deref(), other.resources.as_deref())
+            && self.scene_effects == other.scene_effects
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectSceneError {
     ReferenceUnavailable,
+    UnsupportedComponent {
+        source_layer_index: usize,
+        reason: &'static str,
+    },
     WrongInstance,
     WrongDocument,
     WrongRevision,
@@ -167,6 +300,18 @@ impl<'a> ObjectRenderEntry<'a> {
     pub fn envelope(&self) -> [f64; 4] {
         self.compiled.envelope
     }
+    /// The geometry the compositor draws (L01-I): the open or closed evaluated path of a vector record, otherwise the path
+    /// of the closed contour itself. Use this, not `contour()`, to paint.
+    pub(crate) fn path(&self) -> &'a BezPath {
+        let compiled = self.compiled;
+        compiled
+            .drawn
+            .as_ref()
+            .unwrap_or_else(|| compiled.contour.path())
+    }
+    pub(crate) fn layer_opacity(&self) -> f64 {
+        self.compiled.layer_opacity
+    }
     /// Typed straight-RGBA paint admitted with the contour (L07-A `SceneSolid`).
     pub(crate) fn solid(&self) -> &'a SceneSolid {
         &self.compiled.solid
@@ -177,9 +322,28 @@ impl<'a> ObjectRenderEntry<'a> {
 #[derive(Debug, Clone)]
 pub struct ObjectRenderScene {
     packet: ObjectFramePacket,
+    duplicators: Arc<duplicator_scene::DuplicatorScene>,
     contours: Arc<[CompiledContour]>,
+    rasters: Arc<[raster_scene::RasterSource]>,
+    texts: text_scene::TextSources,
+    components: component_scene::ComponentSources,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    brushes: Option<Arc<brush_scene::BrushSources>>,
+    videos: Arc<[media_scene::VideoSlot]>,
 }
 impl ObjectRenderScene {
+    pub(crate) fn brush_paints_empty(&self) -> bool {
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            self.brushes
+                .as_ref()
+                .is_none_or(|sources| sources.paints.is_empty())
+        }
+        #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+        {
+            true
+        }
+    }
     pub fn packet(&self) -> &ObjectFramePacket {
         &self.packet
     }
@@ -208,8 +372,15 @@ pub fn prepare_object_render_scene(
     validate_pins(packet, expected)?;
     let contours = object_scene_producer_contour::produce(packet).into_admitted()?;
     Ok(ObjectRenderScene {
+        duplicators: Arc::new(duplicator_scene::prepare(packet)?),
         packet: packet.clone(),
         contours: contours.into(),
+        rasters: raster_scene::sources(packet)?.into(),
+        texts: text_scene::prepare(packet)?,
+        components: component_scene::prepare(packet, expected)?,
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        brushes: None,
+        videos: media_scene::slots(packet)?.into(),
     })
 }
 
@@ -229,7 +400,7 @@ fn validate_pins(
     if expected.document_snapshot_id != packet.document_snapshot_id() {
         return Err(ObjectSceneError::WrongSnapshot);
     }
-    if expected.context_id != "scene-root" || expected.context_id != packet.context_id() {
+    if expected.context_id != packet.context_id() {
         return Err(ObjectSceneError::InvalidContext);
     }
     if &expected.scope_kind != packet.scope_kind() {
@@ -240,3 +411,12 @@ fn validate_pins(
     }
     Ok(())
 }
+
+#[cfg(all(
+    test,
+    feature = "history",
+    feature = "application",
+    feature = "project_media_codec"
+))]
+#[path = "../tests/object_raster_scene_join.rs"]
+mod raster_join_tests;

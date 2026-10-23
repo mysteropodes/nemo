@@ -4,9 +4,22 @@
 #[path = "object_parametric_geometry.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_parametric_geometry;
+// G22/L01-G: Paper.js move / scale of a stored segment list (the segment half of the select-bridge translate/scale gestures).
+#[path = "object_parametric_transform.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_parametric_transform;
 #[path = "object_path_effects_kernel.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_path_effects_kernel;
+// G22/G13 L01-H: evaluation join (path effects first, parametric rebuild after) at a pinned snapshot and frame.
+#[path = "render_vector_eval.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_vector_eval;
+
+// G14 L01-I: stroke-aware scene metadata of the vector render/export join (retained primary solid, stroke reach).
+#[path = "render_vector_stroke.rs"]
+#[allow(dead_code)]
+pub(crate) mod render_vector_stroke;
 
 // G14/G22/G13 L01-C: characterization oracle of the baseline serP/desP stroke normalization (tests only, no production code).
 #[cfg(test)]

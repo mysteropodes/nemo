@@ -1,13 +1,17 @@
 /* Ordinary file UI consumes native pins/digests; never project/media bytes. */
 (function(root,factory){
-  var api=factory();
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-layer-splice.js'):root.NemoNativeObjectLayerSplice);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProjectFile=api;
-}(typeof globalThis==='object'?globalThis:this,function(){
+}(typeof globalThis==='object'?globalThis:this,function(Splice){
   'use strict';
   var projections=new WeakMap();
   var settingsKeys=['canvasW','canvasH','fps','totalFrames','canvasBg','waIn','waOut'];
   function has(value,key){return Object.prototype.hasOwnProperty.call(value,key);}
+  // Parent links are opaque native UIDs. Missing and null both project as no parent.
+  function parentValue(layer){return has(layer,'parentLayerUid')?layer.parentLayerUid:null;}
+  function validParent(layer){return !has(layer,'parentLayerUid')||layer.parentLayerUid===null||
+    typeof layer.parentLayerUid==='string'&&layer.parentLayerUid.length>0;}
   function validateSettings(info){
     if(!info||!['canvasW','canvasH','totalFrames'].every(function(k){return Number.isSafeInteger(info[k])&&info[k]>0;})||
       !Number.isFinite(info.fps)||info.fps<=0||has(info,'canvasBg')&&(typeof info.canvasBg!=='string'||!/^#?(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(info.canvasBg))||
@@ -27,7 +31,9 @@
     var pin=projections.get(root),rows=root.state&&root.state.layers;
     return !!pin&&!!info&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===info[k];})&&
       Array.isArray(rows)&&Array.isArray(info.layers)&&rows.length===info.layers.length&&
-      rows.every(function(row,i){return row.layerUid===info.layers[i].layerUid;});
+      rows.every(function(row,i){var incoming=info.layers[i];return incoming&&validParent(incoming)&&
+        row.layerUid===incoming.layerUid&&parentValue(row)===pin.layerParents[i]&&
+        (info.contentRevision!==pin.contentRevision||parentValue(incoming)===pin.layerParents[i]);});
   }
   function refreshVisibility(root,info){
     if(!projectionMatches(root,info))return false;
@@ -41,7 +47,8 @@
       ['canvasBg','waIn','waOut'].every(function(k){return !has(info,k)||root.state[k]===info[k];})&&
       next.every(function(layer,i){var row=root.state.layers[i];return row.visible===layer.visible&&
         (layer.name===undefined||row.name===layer.name)&&['locked','shy','color','parentLayerUid'].every(function(k){
-          return ['locked','shy'].includes(k)?row[k]===(layer[k]===true):!Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
+          return k==='parentLayerUid'?parentValue(row)===parentValue(layer):
+            ['locked','shy'].includes(k)?row[k]===(layer[k]===true):!Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
         });});
   }
   function layerTable(layers){
@@ -57,7 +64,7 @@
       if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')throw new Error('Native layer visibility is invalid');
       if(['locked','shy'].some(function(k){return Object.prototype.hasOwnProperty.call(layer,k)&&typeof layer[k]!=='boolean';}))throw new Error('Native layer policy flags are invalid');
       if(Object.prototype.hasOwnProperty.call(layer,'color')&&(typeof layer.color!=='string'||!/^#[a-fA-F0-9]{6}$/.test(layer.color)))throw new Error('Native layer color is invalid');
-      if(Object.prototype.hasOwnProperty.call(layer,'parentLayerUid')&&layer.parentLayerUid!==null)throw new Error('Native layer parent is unsupported');
+      if(!validParent(layer))throw new Error('Native layer parent is invalid');
       var row={layerUid:layer.layerUid,name:Object.prototype.hasOwnProperty.call(layer,'name')?layer.name:undefined,visible:layer.visible!==false};
       ['locked','shy','color','parentLayerUid'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];});
       seen.add(layer.layerUid);next.push(row);
@@ -67,37 +74,32 @@
   function projectFields(row,layer){
     ['locked','shy','color','parentLayerUid'].forEach(function(k){
       if(Object.prototype.hasOwnProperty.call(layer,k))row[k]=layer[k];else if(['locked','shy'].includes(k))row[k]=false;
+      else if(k==='parentLayerUid'&&has(row,k))row[k]=null;
     });
   }
   function refreshLayerTable(root,info){
     var pin=projections.get(root),s=root.state,rows=s&&s.layers;
     if(!pin||!info||!['instanceId','documentId','lifecycleGeneration','totalFrames'].every(function(k){return pin[k]===info[k];})||
-      !Array.isArray(rows)||rows.length!==pin.layerUids.length||!pin.layerUids.every(function(uid,i){return rows[i]&&rows[i].layerUid===uid;}))return false;
+      !Array.isArray(rows)||rows.length!==pin.layerUids.length||!pin.layerUids.every(function(uid,i){return rows[i]&&rows[i].layerUid===uid&&
+        parentValue(rows[i])===pin.layerParents[i];}))return false;
     validateSettings(info);
     if(!Number.isSafeInteger(pin.contentRevision)||!Number.isSafeInteger(info.contentRevision)||info.contentRevision<pin.contentRevision||
       typeof info.documentSnapshotId!=='string'||!info.documentSnapshotId||
       info.contentRevision===pin.contentRevision&&(info.documentSnapshotId!==pin.documentSnapshotId||!settingsMatch(pin,info)))return false;
     var next=layerTable(info.layers),delta=next.length-rows.length;
-    if(info.contentRevision===pin.contentRevision&&next.some(function(l,i){return rows[i]&&['locked','shy'].some(function(k){return rows[i][k]!== (l[k]===true);});}))return false;
-    if(Math.abs(delta)>1||delta!==0&&info.contentRevision===pin.contentRevision||
-      !next.slice(0,Math.min(next.length,rows.length)).every(function(row,i){return row.layerUid===pin.layerUids[i];}))return false;
-    // Prepare all metadata and selection before changing this read-side table.
-    var active=s.activeLayerIdx,selection=root._layerSel;
-    if(delta<0){
-      var previousSelection=selection;
-      selection=Array.isArray(selection)?selection.filter(function(i){return Number.isInteger(i)&&i>=0&&i<next.length;}):[];
-      if(!Number.isInteger(active)||active<0||active>=next.length)active=selection.length?selection[0]:Math.max(0,next.length-1);
-      if(!selection.length&&next.length&&previousSelection&&previousSelection.length)selection=[active];
-      else if(previousSelection&&selection.length===previousSelection.length)selection=previousSelection;
-    }
-    if(delta>0){var added=next[next.length-1];rows.push({layerUid:added.layerUid,
-      name:added.name===undefined?'Layer '+next.length:added.name,visible:added.visible});}
-    else if(delta<0)rows.pop();
+    if(info.contentRevision===pin.contentRevision&&next.some(function(l,i){return rows[i]&&
+      (parentValue(l)!==pin.layerParents[i]||['locked','shy'].some(function(k){return rows[i][k]!== (l[k]===true);}));}))return false;
+    if(!Splice||typeof Splice.plan!=='function'||delta!==0&&info.contentRevision===pin.contentRevision)return false;
+    var splice=Splice.plan(pin.layerUids,rows,next,s.activeLayerIdx,root._layerSel,root._layerSelAnchor);
+    if(!splice)return false;
+    // Prepare the detached UID plan before changing this read-side table.
+    if(delta>0)rows.splice(splice.at,0,splice.added);
+    else if(delta<0)rows.splice(splice.at,1);
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
-    if(delta<0){s.activeLayerIdx=active;root._layerSel=selection;}
+    if(delta!==0){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
     projectSettings(root,info,pin);
     projections.set(root,pinSettings(Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
-      contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId}),info));
+      contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId,layerParents:next.map(parentValue)}),info));
     return true;
   }
   function create(session,ports,workflow,acknowledgement){
@@ -111,6 +113,7 @@
       },
       markSavedIndeterminate:function(){baseline=null;ports.repaint();}
     });
+    function diagnostic(event,code){try{if(ports.openDiagnostic)ports.openDiagnostic(event,code);}catch(_){}}
     async function openPath(path){return enter(path,null);}
     async function newProject(config,isCurrent,onCreationFailure){
       if(!config||typeof config!=='object')return false;
@@ -120,6 +123,7 @@
     async function enter(path,config,isCurrent,onCreationFailure){
       if(saving||opening)return false;
       opening=true;
+      diagnostic(config?'file-new-started':'file-open-started');
       try{
         var creating=!!config,revealing=false;
         if(creating&&typeof session.newProject!=='function')throw {message:'Native New Project is unavailable',details:{disposition:'notDispatched'}};
@@ -139,8 +143,10 @@
           }
         });
         if(creating&&info&&ports.createdNotice)ports.createdNotice();
+        diagnostic(info?'file-completed':'file-cancelled');
         return info===null?null:!!info;
       }catch(error){
+        try{diagnostic('file-failed',error&&error.details&&error.details.disposition==='notDispatched'?'not-dispatched':'unconfirmed');}catch(_){}
         if(error&&error.details&&error.details.disposition==='notDispatched')ports.refused(error);
         else{baseline=null;ports.failed(error);ports.repaint();if(onCreationFailure)onCreationFailure(error);}
         return false;
@@ -180,13 +186,15 @@
     root._layerSel=info.layers.length?[0]:[];root.selectedPaths=[];
     if(root.userLayers)root.userLayers.forEach(function(layer){layer.visible=false;});
     if(root.SMReference)root.SMReference.refreshNative();
-    var pin={layerUids:info.layers.map(function(layer){return layer.layerUid;}),contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId};
+    var pin={layerUids:info.layers.map(function(layer){return layer.layerUid;}),layerParents:layers.map(parentValue),
+      contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId};
     ['instanceId','documentId','lifecycleGeneration','canvasW','canvasH','fps','totalFrames'].forEach(function(k){pin[k]=info[k];});
     projections.set(root,pinSettings(pin,info));
   }
   function bind(root,ports){
     var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
     if(!session)return null;
+    function diagnostic(event,code){try{var d=root.NemoNativeObjectProjectDesktop;if(d&&d.openDiagnostic)d.openDiagnostic(root,event,code);}catch(_){}}
     var startWasHidden=false;
     function commit(path,info){
       var name=root.SMProjectDocument.baseName(path);
@@ -194,18 +202,23 @@
       ports.touchRecent(path,name,info,true);ports.commit(path,name);ports.renderRecents();return true;
     }
     var ui=create(session,{
+      openDiagnostic:diagnostic,
       readUI:function(){return {handle:ports.read().tabId||'native-project-opening',generation:1};},
       confirmReplace:function(creating){return root.__TAURI__.dialog.ask('Unsaved changes will be lost. '+(creating?'Create a new project?':'Open another project?'),
         {title:'Unsaved changes',kind:'warning',okLabel:creating?'Discard and create':'Discard and open',cancelLabel:'Cancel'});},
       occlude:function(){startWasHidden=root.document.getElementById('start-screen').classList.contains('hid');ports.show();},
       restore:function(previous){if(previous&&startWasHidden)ports.hide();},
       reveal:async function(info){
-        projectView(root,info);if(root.updateUI)root.updateUI();ports.hide();
+        diagnostic('file-stage','projection');projectView(root,info);
+        diagnostic('file-stage','ui-refresh');if(root.updateUI)root.updateUI();
+        diagnostic('file-stage','hide-start');ports.hide();
+        diagnostic('file-stage','layout-wait');
         await new Promise(function(resolve,reject){var done=false,timer=setTimeout(function(){
             if(done)return;done=true;reject(new Error('Native project layout did not settle'));
           },1500);
           function finish(){if(done)return;done=true;clearTimeout(timer);resolve();}
           root.requestAnimationFrame(function(){root.requestAnimationFrame(finish);});});
+        diagnostic('file-stage','layout-settled');
       },
       opened:function(path,info){if(commit(path,info)!==true)return false;ports.opened();ports.notice('Opened: '+ports.read().name);return true;},
       created:function(name){ports.commit(null,name);ports.opened();return true;},

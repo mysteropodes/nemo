@@ -9,9 +9,27 @@
     "resolves": "literal require()/import specifiers between declared modules, window.SM* global access, size, expired exceptions, import cycles",
     "doesNotResolve": "references between classic scripts through document-scope globals (e.g. NemoExportJob, SMEngineBridge without the window. prefix); those edges are NOT analyzed and are reported as unresolved, never as passing"
   },
-  "enforcedLayers": ["domain", "application", "adapters", "bootstrap"],
-  "enforcedRules": ["layer-violation", "private-import", "global-state", "cycle", "unsupported-import", "unprofiled-local-import", "unsupported-global", "expired-exception"],
-  "legacyLayers": ["app-legacy", "app-domain", "app-presentation-adapter"],
-  "legacyUnresolvedCeiling": 447,
-  "legacyUnresolvedNote": "Count of checker findings in legacy layers at adoption was 449 (main b4a4fe249821bc534dd1a63dbb4b037df6455ec3: 439 global-state + 4 unsupported-global + 2 unsupported-import + 1 unprofiled-local-import in app-legacy, 1 global-state in app-domain, 2 global-state in app-presentation-adapter). P34/#1520 adopts app.idb.store into adapters, removing its one legacy global-state finding and ratcheting the ceiling to 448. The ceiling may only go down; lowering it is the ordinary change that accompanies a migration or repair."
+  "enforcedLayers": [
+    "domain",
+    "application",
+    "adapters",
+    "bootstrap"
+  ],
+  "enforcedRules": [
+    "layer-violation",
+    "private-import",
+    "global-state",
+    "cycle",
+    "unsupported-import",
+    "unprofiled-local-import",
+    "unsupported-global",
+    "expired-exception"
+  ],
+  "legacyLayers": [
+    "app-legacy",
+    "app-domain",
+    "app-presentation-adapter"
+  ],
+  "legacyUnresolvedCeiling": 438,
+  "legacyUnresolvedNote": "Count of checker findings in legacy layers at adoption was 449 (main b4a4fe249821bc534dd1a63dbb4b037df6455ec3: 439 global-state + 4 unsupported-global + 2 unsupported-import + 1 unprofiled-local-import in app-legacy, 1 global-state in app-domain, 2 global-state in app-presentation-adapter). P34/#1520 adopts app.idb.store into adapters, removing its one legacy global-state finding and ratcheting the ceiling to 448. The ceiling may only go down; lowering it is the ordinary change that accompanies a migration or repair. T08/#2270: the unchanged checker observed 443 legacy findings at 5b067dea404e87e4cd22bc3716687f22bacfab0e; the next measured ratchet sets the ceiling to 443. This is a static boundary count, not runtime or installed acceptance. T15: the unchanged checker at 1a9b30ab68d816a69d3a1c91e7dfba20753a2d84 observed 438 legacy findings (431 global-state, 2 unsupported-import, 1 unprofiled-local-import, 4 unsupported-global) after the retained presentation/catalog extraction. Ratchet the existing ceiling from 443 to 438; the original equality/growth oracles and all enforced rules remain unchanged. Actual report and cleanup: #1062/6311355478."
 }

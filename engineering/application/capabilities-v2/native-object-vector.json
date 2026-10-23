@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.vector",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.vector.edit",
+    "command.document.object.parametric.edit",
+    "command.document.object.path.effects.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectVectorEditPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectParametricPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectPathEffectsPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 65536,
+    "requestBytesByOperation": {
+      "command.document.object.vector.edit": 65536,
+      "command.document.object.parametric.edit": 4096,
+      "command.document.object.path.effects.edit": 4096
+    },
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete original UTF-8 request envelope: vector edit is bounded at 65536 bytes; parametric and path-effect edits remain 4096 bytes. Replies remain 4096 bytes. Larger requests are refused, never split or truncated. Complete correlated retained receipt or typed refusal."
+  },
+  "semantics": "Create, replace and delete one editable open or closed vector path (nullable fill and stroke with alpha, hasRealStroke, width, cap, join, miter limit, dash, paint order, opacity, optional pressure ribbon fields, paramShape and boxAngle); translate, scale or re-parameterize a dynamic rect, ellipse or star; replace the complete ordered path-effect stack of a layer (zigzag, roughen; storage order is evaluation order, an empty stack is authored). One request is one atomic revision and one undo entry; an effective no-op keeps presence, bytes, history and redo and reports applied=false. The owner allocates the id of a created stroke (the record names an empty strokeId) and reports it. A locked Drawing layer, a layer with an active path effect, a reference scope and a pressure ribbon (for parameter edits) are typed refusals. Source geometry is never mutated by an effect: the stack is evaluated at a pinned snapshot and frame. No JS or Paper writer, no optimistic mutation. Stored vectorExt.fillGradient admits exactly two-stop linear/radial baseline paint, with document-world endpoints and original hex color strings/stop order. The existing baseline stroke producer maps fillGradient without a second owner. Other stop counts and pressure-gradient combinations remain unavailable; no installed gradient/UI acceptance is implied.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "create vector path; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "vector-example-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.vector.edit",
+        "payload": {
+          "command": "object.vector.create",
+          "record": {
+            "schemaVersion": 1,
+            "family": "editable-vector-path",
+            "target": {
+              "contextId": "scene-root",
+              "frameScope": {
+                "kind": "authored",
+                "frame": 3
+              },
+              "layerUid": "layer-a",
+              "strokeId": ""
+            },
+            "geometry": {
+              "kind": "cubic-path",
+              "closed": false,
+              "coordinateSpace": "document-world",
+              "handleSpace": "relative",
+              "segments": [
+                {
+                  "point": {
+                    "x": 10,
+                    "y": 20
+                  },
+                  "handleIn": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "handleOut": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "point": {
+                    "x": 110,
+                    "y": 70
+                  },
+                  "handleIn": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "handleOut": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ]
+            },
+            "fill": null,
+            "vector": {
+              "stroke": {
+                "kind": "solid",
+                "r": 0,
+                "g": 0.5,
+                "b": 1,
+                "a": 1
+              },
+              "hasRealStroke": true,
+              "strokeWidth": 4,
+              "strokeCap": "round",
+              "strokeJoin": "round",
+              "miterLimit": 10,
+              "dashOffset": 0,
+              "opacity": 1
+            }
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "vector-example-1",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "operation": "create",
+          "strokeId": "native-stroke:8:0"
+        }
+      }
+    },
+    {
+      "label": "replace vector path; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "vector-example-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.vector.edit",
+        "payload": {
+          "command": "object.vector.replace",
+          "record": {
+            "schemaVersion": 1,
+            "family": "editable-vector-path",
+            "target": {
+              "contextId": "scene-root",
+              "frameScope": {
+                "kind": "authored",
+                "frame": 3
+              },
+              "layerUid": "layer-a",
+              "strokeId": "native-stroke:3:0"
+            },
+            "geometry": {
+              "kind": "cubic-path",
+              "closed": false,
+              "coordinateSpace": "document-world",
+              "handleSpace": "relative",
+              "segments": [
+                {
+                  "point": {
+                    "x": 10,
+                    "y": 20
+                  },
+                  "handleIn": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "handleOut": {
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "point": {
+                    "x": 110,
+                    "y": 70
+                  },
+                  "handleIn": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "handleOut": {
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ]
+            },
+            "fill": null,
+            "vector": {
+              "stroke": {
+                "kind": "solid",
+                "r": 0,
+                "g": 0.5,
+                "b": 1,
+                "a": 1
+              },
+              "hasRealStroke": true,
+              "strokeWidth": 4,
+              "strokeCap": "round",
+              "strokeJoin": "round",
+              "miterLimit": 10,
+              "dashOffset": 0,
+              "opacity": 1
+            }
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "vector-example-2",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "operation": "replace",
+          "strokeId": "native-stroke:3:0"
+        }
+      }
+    },
+    {
+      "label": "delete vector path; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "vector-example-3",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.vector.edit",
+        "payload": {
+          "command": "object.vector.delete",
+          "stableTarget": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 3
+            },
+            "layerUid": "layer-a",
+            "strokeId": "native-stroke:3:0"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "vector-example-3",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "operation": "delete",
+          "strokeId": "native-stroke:3:0"
+        }
+      }
+    },
+    {
+      "label": "set parameters; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "vector-example-4",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.parametric.edit",
+        "payload": {
+          "command": "object.parametric.set",
+          "stableTarget": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 3
+            },
+            "layerUid": "layer-a",
+            "strokeId": "native-stroke:3:0"
+          },
+          "paramShape": {
+            "kind": "star",
+            "pointCount": 6,
+            "innerRatio": 0.5
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "vector-example-4",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "translate shape; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "vector-example-5",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.parametric.edit",
+        "payload": {
+          "command": "object.parametric.translate",
+          "stableTarget": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 3
+            },
+            "layerUid": "layer-a",
+            "strokeId": "native-stroke:3:0"
+          },
+          "delta": [
+            12,
+            -4.5
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "vector-example-5",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "scale shape; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "vector-example-6",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.parametric.edit",
+        "payload": {
+          "command": "object.parametric.scale",
+          "stableTarget": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 3
+            },
+            "layerUid": "layer-a",
+            "strokeId": "native-stroke:3:0"
+          },
+          "scale": [
+            2,
+            2
+          ],
+          "anchor": [
+            0,
+            0
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "vector-example-6",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "set path effects; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "vector-example-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.path.effects.edit",
+        "payload": {
+          "command": "object.path.effects.set",
+          "layerUid": "layer-a",
+          "stack": [
+            {
+              "type": "zigzag",
+              "enabled": true,
+              "p1": 12,
+              "p2": 4,
+              "p3": 0
+            },
+            {
+              "type": "roughen",
+              "enabled": false
+            }
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "vector-example-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

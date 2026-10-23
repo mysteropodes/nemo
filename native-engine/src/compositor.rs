@@ -9,6 +9,18 @@ mod object_compositor;
 mod object_target;
 #[path = "compositor_readback.rs"]
 mod readback;
+#[path = "scene_effect_gpu_blend.rs"]
+#[allow(dead_code)]
+mod scene_effect_gpu_blend;
+#[path = "scene_effect_gpu_fx.rs"]
+#[allow(dead_code)]
+mod scene_effect_gpu_fx;
+#[path = "scene_effect_gpu_pass.rs"]
+#[allow(dead_code)]
+mod scene_effect_gpu_pass;
+#[path = "scene_effect_scene_join_stack.rs"]
+#[allow(dead_code)]
+mod scene_effect_scene_join_stack;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use object_compositor::scheduled_tests::{
     owner as object_test_owner, plan as object_test_plan, schedule as schedule_test_object,
@@ -55,6 +67,12 @@ pub struct Compositor {
     queue: wgpu::Queue,
     renderer: Renderer,
     scene: Scene,
+    /// Lazily built colour-adjust / vignette / blur pipelines of the GPU effect executor
+    /// (L08-H); device-bound, never exposed, dropped with the compositor.
+    effect_kernels: Option<std::sync::Arc<scene_effect_gpu_pass::EffectKernels>>,
+    /// Lazily built blend/matte pipelines of the layered path (L08-G); device-bound,
+    /// never exposed, dropped with the compositor.
+    blend_kernels: Option<std::sync::Arc<scene_effect_gpu_blend::BlendKernels>>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     last_reference_image: Option<u64>,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
@@ -116,6 +134,8 @@ impl CompositorInstance {
             &device,
             RendererOptions {
                 antialiasing_support: AaSupport::area_only(),
+                // Keep preparation serial; fine Area rasterization stays on the GPU.
+                use_cpu: true,
                 ..Default::default()
             },
         )
@@ -127,6 +147,8 @@ impl CompositorInstance {
             queue,
             renderer,
             scene: Scene::new(),
+            effect_kernels: None,
+            blend_kernels: None,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             last_reference_image: None,
             #[cfg(all(feature = "application", feature = "project_media_codec"))]

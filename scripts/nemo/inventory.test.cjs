@@ -78,7 +78,9 @@ test('unmapped rows are explicit: no handler, no events, and the lookups that me
       // surface's handler reads or writes (a form field read on submit, a
       // colour well repainted from its picker); a control nobody touches at
       // all would be a new finding, so it is asserted here.
-      assert.ok(r.meta.references.length > 0, r.id + ' is unmapped and never looked up by any handler');
+      // L10-J cutover: #psd-input is bound by native-import-desktop.js bindPanels(doc) through an injected document port, a flow the static
+      // analysis cannot follow, and the legacy psd-import-bridge.js lookup is gone; it is the one control allowed to carry no reference.
+      if (r.id !== 'dom:#psd-input') assert.ok(r.meta.references.length > 0, r.id + ' is unmapped and never looked up by any handler');
       for (const ref of r.meta.references) assert.match(ref, /^src\/js\/[\w./-]+:\d+( [\w$]+\(\))?$/, r.id + ' reference ' + ref);
     }
   }
@@ -110,7 +112,7 @@ test('ids looked up through a table (getElementById(IDS[key])) are bound', () =>
 test('ids iterated from an array literal (["a","b"].forEach(id => getElementById(id))) are bound', () => {
   const r = byId('dom:#btn-open-tutorial-topbar');
   assert.equal(r.status, 'inventoried');
-  assert.ok(r.handler.some((h) => h.startsWith('src/js/tutorial.js:')), r.handler);
+  assert.ok(r.handler.some((h) => h.startsWith('src/js/adapters/tutorial-presentation.js:')), r.handler);
   assert.ok(r.events.includes('click'));
 });
 

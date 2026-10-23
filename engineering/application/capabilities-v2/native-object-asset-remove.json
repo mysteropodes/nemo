@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.asset.remove",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.asset.remove"
+  ],
+  "input": {
+    "$ref": "../native-object-item-v1.schema.json#/$defs/AssetRemove"
+  },
+  "output": {
+    "$ref": "../native-object-item-v1.schema.json#/$defs/AssetCommandResult"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document, glyph or pixel payload in either direction."
+  },
+  "semantics": "Remove an unreferenced embedded image through the existing native asset transaction/history owner. In-use assets are refused. Exact request replay returns the retained receipt; an absent asset is a no-op. Catalog-only attach remains unavailable.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": []
+}

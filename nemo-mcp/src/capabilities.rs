@@ -31,11 +31,47 @@ pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
         "../../engineering/application/capabilities-v2/native-object-property-metadata.json"
     ),
     include_str!("../../engineering/application/capabilities-v2/native-project-settings.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-composition.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-palette.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-guide.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-shadow.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-perspective.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-workspace.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-custom-brush.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-comments.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-project-placement.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-audio-track.json"),
     include_str!("../../engineering/application/capabilities-v2/native-layer-policy.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-layer-playhead-cut.json"),
     include_str!("../../engineering/application/capabilities-v2/native-property-track-edit.json"),
     include_str!("../../engineering/application/capabilities-v2/native-property-read.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-text-read.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-property-edit.json"),
+    include_str!(
+        "../../engineering/application/capabilities-v2/native-object-layer-lifecycle.json"
+    ),
+    include_str!("../../engineering/application/capabilities-v2/native-object-group.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-selection-edit.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-boolean.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-fill.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-item.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-asset.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-asset-remove.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-vector.json"),
     include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
     include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-image-mesh.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-widget.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-rig.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-component.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-duplicator.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-frame-edit.json"),
+    include_str!(
+        "../../engineering/application/capabilities-v2/native-bitmap-brush-resources.json"
+    ),
+    include_str!("../../engineering/application/capabilities-v2/native-vector-export.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-media-export.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-import.json"),
 ];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

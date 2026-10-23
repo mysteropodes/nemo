@@ -1,0 +1,77 @@
+# L06-I oracle: media-library holder binding of the baseline (resolveSrcLayer / reinsertKind) at fbe4b8a3, plus one valid PNG.
+# P <name> <base64> | R <case> <entry> <layers> <baseline uid|-> <how uid|name|none> <native ok|layer|blank> | K <case> <entry> <alive> <kind|->
+# generator tools/gen.js; baseline fbe4b8a33e6d5a229f014154df2ba21988a9fabc; png corpus 4c710c5216aec26feb73c5e476724710df89ec09
+P	blue	iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR4nGNgYPgPBgAU9AX7uVYDfQAAAABJRU5ErkJggg==
+P	red	iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII=
+R	S1/nouid/noname	{"layerUid":null,"layerName":null}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	-	none	blank
+R	S1/nouid/Alpha	{"layerUid":null,"layerName":"Alpha"}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	L1	name	blank
+R	S1/nouid/Gone	{"layerUid":null,"layerName":"Gone"}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	-	none	blank
+R	S1/L1/noname	{"layerUid":"L1","layerName":null}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	L1	uid	ok
+R	S1/L1/Alpha	{"layerUid":"L1","layerName":"Alpha"}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	L1	uid	ok
+R	S1/L1/Gone	{"layerUid":"L1","layerName":"Gone"}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	L1	uid	ok
+R	S1/Lgone/noname	{"layerUid":"Lgone","layerName":null}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	-	none	layer
+R	S1/Lgone/Alpha	{"layerUid":"Lgone","layerName":"Alpha"}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	L1	name	layer
+R	S1/Lgone/Gone	{"layerUid":"Lgone","layerName":"Gone"}	[{"layerUid":"L1","name":"Alpha"},{"layerUid":"L2","name":"Beta"}]	-	none	layer
+R	S2/nouid/noname	{"layerUid":null,"layerName":null}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	-	none	blank
+R	S2/nouid/Alpha	{"layerUid":null,"layerName":"Alpha"}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	L2	name	blank
+R	S2/nouid/Gone	{"layerUid":null,"layerName":"Gone"}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	-	none	blank
+R	S2/L1/noname	{"layerUid":"L1","layerName":null}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	L1	uid	ok
+R	S2/L1/Alpha	{"layerUid":"L1","layerName":"Alpha"}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	L1	uid	ok
+R	S2/L1/Gone	{"layerUid":"L1","layerName":"Gone"}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	L1	uid	ok
+R	S2/Lgone/noname	{"layerUid":"Lgone","layerName":null}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	-	none	layer
+R	S2/Lgone/Alpha	{"layerUid":"Lgone","layerName":"Alpha"}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	L2	name	layer
+R	S2/Lgone/Gone	{"layerUid":"Lgone","layerName":"Gone"}	[{"layerUid":"L1","name":"Renamed"},{"layerUid":"L2","name":"Alpha"}]	-	none	layer
+R	S3/nouid/noname	{"layerUid":null,"layerName":null}	[]	-	none	blank
+R	S3/nouid/Alpha	{"layerUid":null,"layerName":"Alpha"}	[]	-	none	blank
+R	S3/nouid/Gone	{"layerUid":null,"layerName":"Gone"}	[]	-	none	blank
+R	S3/L1/noname	{"layerUid":"L1","layerName":null}	[]	-	none	layer
+R	S3/L1/Alpha	{"layerUid":"L1","layerName":"Alpha"}	[]	-	none	layer
+R	S3/L1/Gone	{"layerUid":"L1","layerName":"Gone"}	[]	-	none	layer
+R	S3/Lgone/noname	{"layerUid":"Lgone","layerName":null}	[]	-	none	layer
+R	S3/Lgone/Alpha	{"layerUid":"Lgone","layerName":"Alpha"}	[]	-	none	layer
+R	S3/Lgone/Gone	{"layerUid":"Lgone","layerName":"Gone"}	[]	-	none	layer
+R	S4/nouid/noname	{"layerUid":null,"layerName":null}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	-	none	blank
+R	S4/nouid/Alpha	{"layerUid":null,"layerName":"Alpha"}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	L2	name	blank
+R	S4/nouid/Gone	{"layerUid":null,"layerName":"Gone"}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	-	none	blank
+R	S4/L1/noname	{"layerUid":"L1","layerName":null}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	L1	uid	ok
+R	S4/L1/Alpha	{"layerUid":"L1","layerName":"Alpha"}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	L1	uid	ok
+R	S4/L1/Gone	{"layerUid":"L1","layerName":"Gone"}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	L1	uid	ok
+R	S4/Lgone/noname	{"layerUid":"Lgone","layerName":null}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	-	none	layer
+R	S4/Lgone/Alpha	{"layerUid":"Lgone","layerName":"Alpha"}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	L2	name	layer
+R	S4/Lgone/Gone	{"layerUid":"Lgone","layerName":"Gone"}	[{"layerUid":"L2","name":"Alpha"},{"layerUid":"L1","name":"Alpha"}]	-	none	layer
+K	image/embedded/none/gone	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":null}	0	image
+K	image/embedded/none/alive	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":null}	1	image
+K	image/embedded/path/gone	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":false,"path":"clips/a.mov","webHandleId":null}	0	image
+K	image/embedded/path/alive	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":false,"path":"clips/a.mov","webHandleId":null}	1	image
+K	image/embedded/handle/gone	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":"h1"}	0	image
+K	image/embedded/handle/alive	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":"h1"}	1	image
+K	image/linked/none/gone	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":null}	0	image
+K	image/linked/none/alive	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":null}	1	image
+K	image/linked/path/gone	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":true,"path":"clips/a.mov","webHandleId":null}	0	image
+K	image/linked/path/alive	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":true,"path":"clips/a.mov","webHandleId":null}	1	image
+K	image/linked/handle/gone	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":"h1"}	0	image
+K	image/linked/handle/alive	{"kind":"image","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":"h1"}	1	image
+K	video/embedded/none/gone	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":null}	0	-
+K	video/embedded/none/alive	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":null}	1	video-clone
+K	video/embedded/path/gone	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":false,"path":"clips/a.mov","webHandleId":null}	0	-
+K	video/embedded/path/alive	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":false,"path":"clips/a.mov","webHandleId":null}	1	video-clone
+K	video/embedded/handle/gone	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":"h1"}	0	-
+K	video/embedded/handle/alive	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":"h1"}	1	video-clone
+K	video/linked/none/gone	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":null}	0	-
+K	video/linked/none/alive	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":null}	1	video-clone
+K	video/linked/path/gone	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":true,"path":"clips/a.mov","webHandleId":null}	0	video-linked
+K	video/linked/path/alive	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":true,"path":"clips/a.mov","webHandleId":null}	1	video-linked
+K	video/linked/handle/gone	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":"h1"}	0	video-linked
+K	video/linked/handle/alive	{"kind":"video","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":"h1"}	1	video-linked
+K	audio/embedded/none/gone	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":null}	0	-
+K	audio/embedded/none/alive	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":null}	1	-
+K	audio/embedded/path/gone	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":false,"path":"clips/a.mov","webHandleId":null}	0	-
+K	audio/embedded/path/alive	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":false,"path":"clips/a.mov","webHandleId":null}	1	-
+K	audio/embedded/handle/gone	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":"h1"}	0	-
+K	audio/embedded/handle/alive	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":false,"path":null,"webHandleId":"h1"}	1	-
+K	audio/linked/none/gone	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":null}	0	-
+K	audio/linked/none/alive	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":null}	1	-
+K	audio/linked/path/gone	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":true,"path":"clips/a.mov","webHandleId":null}	0	-
+K	audio/linked/path/alive	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":true,"path":"clips/a.mov","webHandleId":null}	1	-
+K	audio/linked/handle/gone	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":"h1"}	0	-
+K	audio/linked/handle/alive	{"kind":"audio","layerUid":"L1","layerName":"Alpha","linked":true,"path":null,"webHandleId":"h1"}	1	-

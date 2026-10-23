@@ -71,7 +71,7 @@
       if (!value || !['400', '700'].includes(weight.value)) { status.textContent = 'Enter a Google Fonts family.'; return; }
       return importFont({kind: 'google', family: value, weight: Number(weight.value), italic: false});
     });
-    var useNotice = node('div', 'Resources only. Native text placement and font binding are unavailable.');
+    var useNotice = node('div', 'Document font resources.');
     [status, refreshButton, list, loadButton, bundledSelect, bundledButton, family, weight, googleButton, useNotice]
       .forEach(function (n) { body.appendChild(n); });
     section.appendChild(toggle); section.appendChild(body); container.appendChild(section);

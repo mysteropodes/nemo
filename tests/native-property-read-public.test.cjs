@@ -49,6 +49,59 @@ test('D11 descriptor and inline schema declare only the exact pinned native prop
   assert.deepEqual(d.examples[0].response.result.value, [20]);
 });
 
+test('native context view crosses the actual SDK validator with closed fields and full correlation', async () => {
+  const d = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-property-read.json')));
+  const example = d.examples.find(e => e.request.payload.view.kind === 'expressionContext');
+  const q = example.request, r = example.response;
+  assert.deepEqual(await read(q,r),r);
+  for (const mutate of [
+    x => x.result.frame++, x => x.result.self.property = 'foreign',
+    x => x.result.comp.numLayers++, x => x.result.comp.frameDuration = 0,
+    x => x.result.comp.duration++, x => x.result.compUnavailable = 'projectMetadata',
+    x => x.result.self.extra = true, x => x.result.comp.extra = true,
+    x => x.result.self.parent = {name:'Parent',index:-1}, x => x.result.keyCount = 65537,
+    x => x.result.target.layerUid = 'foreign'
+  ]) {
+    const bad = structuredClone(r); mutate(bad); await assert.rejects(read(q,bad),TypeError);
+  }
+  const unavailable = structuredClone(r);
+  unavailable.result.comp = null; unavailable.result.compUnavailable = 'projectMetadata';
+  assert.deepEqual(await read(q,unavailable),unavailable);
+  unavailable.result.compUnavailable = null; await assert.rejects(read(q,unavailable),TypeError);
+  for (const mutate of [x => x.payload.view.extra=true, x => delete x.payload.view.frame,
+    x => x.payload.view.frame=null, x => x.expectedRevision=0]) {
+    const bad=structuredClone(q);mutate(bad);assert.throws(()=>adapter(()=>r).readProperty(bad),TypeError);
+  }
+});
+
+test('actual mesh context is closed, correlated and separates missing vertices from rest UV', async () => {
+  const d = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-property-read.json')));
+  const e = d.examples.find(e => e.response.result.mesh);
+  assert.deepEqual(await read(e.request,e.response),e.response);
+  for (const mutate of [
+    m=>m.meshId='foreign', m=>m.vertexIndex=-2, m=>m.vertexIndex=2**32,
+    m=>m.vertexCount=-1, m=>m.outlineVertexCount=4, m=>m.vertexUV=[1],
+    m=>m.vertexUV=[0,NaN], m=>m.isOutlineVertex=false, m=>m.extra=true,
+    m=>{m.vertexIndex=99;m.isOutlineVertex=false;},
+  ]) {
+    const r=structuredClone(e.response);mutate(r.result.mesh);
+    await assert.rejects(read(e.request,r),TypeError);
+  }
+  for (const index of [-1,99]) {
+    const q=structuredClone(e.request),r=structuredClone(e.response);
+    const p=index===-1 ? 'position' : 'vtx99';q.payload.view.property=p;r.result.property=p;r.result.self.property=p;
+    Object.assign(r.result.mesh,
+      {vertexIndex:index,vertexUV:[0,0],isOutlineVertex:false});
+    assert.deepEqual(await read(q,r),r);
+  }
+  for (const key of Object.keys(e.response.result.mesh)) {
+    const r=structuredClone(e.response);delete r.result.mesh[key];
+    await assert.rejects(read(e.request,r),TypeError);
+  }
+  const q=request(),r=response(q);r.result.mesh=e.response.result.mesh;
+  await assert.rejects(read(q,r),TypeError);
+});
+
 test('raw reads preserve finite signed fractional frames and all dimensions without evaluating in JS', async () => {
   for (const frame of [-100, -1.5, 0, 0.25, 12]) for (const dimension of [1, 2, 3, 4]) {
     const q = request(); q.payload.view.frame = frame;
@@ -226,4 +279,9 @@ test('classic browser helper/SDK expose the same read with the literal finite na
     }}).readProperty(q);
   })()`, context);
   assert.equal(value.result.value[0], 20); assert.equal(value.contentRevision, 7);
+});
+
+test('authored-key read accepts only actual nullable standing lock modes while preserving DTO shape',async()=>{
+ for(const lockTo of [null,'in','out','layer']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;assert.deepEqual((await read(q,r)).result.items[0],r.result.items[0]);}
+ for(const lockTo of [false,0,'',{},'unknown']){const q=request('authoredKeys'),r=response(q);r.result.items[0].lockTo=lockTo;await assert.rejects(read(q,r),TypeError);}
 });

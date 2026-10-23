@@ -215,15 +215,27 @@ pub(crate) fn render_layer(document: &ObjectDocument, layer: usize) -> String {
         .collect();
     tokens.join(";")
 }
+/// JavaScript `Number.prototype.toString(36)`: a held frame names its key in base 36, with as many digits as it needs.
+fn base36(mut n: u32) -> String {
+    let mut digits = Vec::new();
+    loop {
+        digits.push(char::from_digit(n % 36, 36).unwrap());
+        n /= 36;
+        if n == 0 {
+            break;
+        }
+    }
+    digits.iter().rev().collect()
+}
 pub(crate) fn exposure_string(document: &ObjectDocument, layer: usize) -> String {
     let timing = document.layers[layer].timing.value().unwrap();
     (0..document.total_frames)
         .map(|f| match timing.exposure(f) {
-            ("key", _, _) => '*',
-            ("interpolated", _, true) => '!',
-            ("interpolated", _, false) => '~',
-            ("held", Some(key), _) => char::from_digit(key, 36).unwrap(),
-            _ => '-',
+            ("key", _, _) => "*".to_owned(),
+            ("interpolated", _, true) => "!".to_owned(),
+            ("interpolated", _, false) => "~".to_owned(),
+            ("held", Some(key), _) => base36(key),
+            _ => "-".to_owned(),
         })
         .collect()
 }

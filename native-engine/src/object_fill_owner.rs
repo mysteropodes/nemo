@@ -1,20 +1,123 @@
 //! Private bridge from codec admission and sealed fill origins to revision storage.
 use crate::commands::{prepare_object_fill_json, PreparedObjectFill};
 use crate::object_document::{
-    object_deserialize, AuthoredOrder, ObjectDocument, ObjectLayer, OrderLayer, Presence,
-    ProjectEnvelope, ProjectReferenceState,
+    MeshIdSequence, ObjectDocument, ProjectEnvelope, ProjectReferenceState,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectRevisionOwner;
-use serde::Deserialize;
-use std::collections::HashSet;
 #[path = "object_property_edit.rs"]
 mod property_edit;
 pub(crate) use property_edit::PreparedPropertyEdit;
 #[path = "object_project_settings.rs"]
 mod project_settings;
 pub(crate) use project_settings::PreparedProjectSettings;
+// L10-H (#2116): atomic import batch (sealed candidate + the single publish).
+#[path = "native_import_transaction_owner.rs"]
+mod import_batch;
+pub(crate) use import_batch::{ImportBatchResult, ImportSkipReport, PreparedImportBatch};
+// L05-H (#2134), re-homed from the lane-5 evaluation aggregator: detached frame-clipboard packet kernel (copyFrames).
+#[path = "object_frame_clipboard_packet.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_packet;
+pub(crate) use object_frame_clipboard_packet::FrameClipboardPacket;
+// L05-I (lane #2111): sealed paste / cut / duplicate-selection transactions (pasteFrames, cutFrames, duplicateSelectedFrames).
+#[path = "object_frame_clipboard_paste.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_paste;
+#[path = "object_frame_clipboard_paste_plan.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_paste_plan;
+#[path = "object_frame_clipboard_paste_wire.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_paste_wire;
+pub(crate) use object_frame_clipboard_paste::{
+    CellRef, FrameClipboardOperation, PasteCell, PasteRequest,
+};
+pub(crate) use object_frame_clipboard_paste_plan::{
+    packet_paste_cells, FrameClipboardOutcome, PreparedFrameClipboard,
+};
+pub(crate) use object_frame_clipboard_paste_wire::{cut_clipboard_payload, paste_payload};
+// L04-I (#2110): sealed replacement of the lane-4 component/StoryBoard/duplicator tables.
+#[path = "object_component_commit.rs"]
+#[allow(dead_code)]
+mod component_tables;
+#[allow(unused_imports)]
+pub(crate) use component_tables::{ComponentTablesEdit, PreparedComponentTables};
+// F11 cut-at-playhead through the existing sealed revision owner.
+#[path = "object_layer_playhead_cut_owner.rs"]
+mod layer_playhead_cut;
+pub(crate) use layer_playhead_cut::PreparedLayerPlayheadCut;
+#[path = "object_layer_lifecycle_ops.rs"]
+mod layer_lifecycle;
+pub(crate) use layer_lifecycle::PreparedLayerLifecycle;
+#[path = "object_group_ops.rs"]
+mod group_edit;
+pub(crate) use group_edit::{PreparedBooleanEdit, PreparedGroupEdit};
+// L05-B (#2160), re-homed from the evaluation aggregator: pure document-level frame remap kernel.
+#[path = "object_frame_edit_document.rs"]
+#[allow(dead_code)]
+mod object_frame_edit_document;
+// L05-C (lane #2111): sealed insert / extend / duplicate / remove frame transactions.
+#[path = "object_frame_edit_structure.rs"]
+mod object_frame_edit_structure;
+pub(crate) use object_frame_edit_structure::PreparedFrameStructure;
+// L05-D (lane #2111): sealed F6 / Clear Keyframe / Delete Frames / Remove Tween transactions.
+#[path = "object_exposure_edit_key.rs"]
+mod object_exposure_edit_key;
+pub(crate) use object_exposure_edit_key::PreparedExposureKey;
+// F7 uses the same revision owner with an always-checkpoint blank-key candidate.
+#[path = "object_blank_key_edit.rs"]
+mod object_blank_key_edit;
+pub(crate) use object_blank_key_edit::PreparedBlankKey;
+// L05-E (lane #2111): sealed key-retime (moveKeyframe) transaction.
+#[path = "object_exposure_edit_retime.rs"]
+mod object_exposure_edit_retime;
+pub(crate) use object_exposure_edit_retime::PreparedExposureRetime;
+// L05-J2 (lane #2111): Motion-track half of Repeat Selection and the cross-context frame clipboard port (F13).
+#[path = "object_frame_clipboard_tracks.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_tracks;
+#[path = "object_frame_clipboard_tracks_context.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_tracks_context;
+#[allow(unused_imports)]
+pub(crate) use object_frame_clipboard_tracks_context::ClipboardContexts;
+// L05-J1 (lane #2111): sealed Repeat Selection transaction (repeatSelection). Imports L05-I's helpers and L05-B's kernel.
+#[path = "object_frame_clipboard_repeat.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_repeat;
+#[path = "object_frame_clipboard_repeat_wire.rs"]
+#[allow(dead_code)]
+mod object_frame_clipboard_repeat_wire;
+#[allow(unused_imports)]
+pub(crate) use object_frame_clipboard_repeat::{
+    clamp_times, grown_total, PreparedFrameRepeat, RepeatRequest,
+};
+#[allow(unused_imports)]
+pub(crate) use object_frame_clipboard_repeat_wire::repeat_payload;
+// L03-M (#2109): widget (rig control) transactions; the settings edit is a child of this module.
+#[path = "object_widget_edit.rs"]
+mod widget_edit;
+pub(crate) use widget_edit::{
+    PreparedImageMeshEdit, PreparedRigEdit, PreparedRigPose, PreparedWidgetEdit,
+};
+#[cfg(feature = "project_media_codec")]
+#[path = "object_raster_image_import_owner.rs"]
+pub(crate) mod image_import;
+// L06-H (lane #2112): sealed commit of a prepared asset attach / remove.
+#[cfg(feature = "project_media_codec")]
+#[path = "object_raster_asset_owner.rs"]
+#[allow(dead_code)]
+mod object_raster_asset_owner;
+// L09-H (#2115): sealed placement edits (G42, I16b).
+#[path = "object_media_link_owner.rs"]
+#[allow(dead_code)]
+mod object_media_link_owner;
+pub(crate) use object_media_link_owner::PreparedPlacementEdit;
+#[path = "object_audio_track_edit_owner.rs"]
+mod audio_track_edit;
+pub(crate) use audio_track_edit::PreparedAudioTrackEdit;
 // L01-F (#2107): sealed vector create/replace/delete over the same revision owner.
 #[path = "object_vector_edit.rs"]
 mod vector_edit;
@@ -27,6 +130,29 @@ pub(crate) use vector_edit::order::{
 #[path = "object_layer_policy_edit.rs"]
 mod layer_policy_edit;
 pub(crate) use layer_policy_edit::PreparedLayerPolicy;
+#[path = "object_component_owner_kernels.rs"]
+pub(crate) mod component_owner;
+// L01-G (#2107): sealed parameter edit of a dynamic shape (rect/ellipse/star set, translate, scale) and sealed
+// replacement of a layer's ordered path-effect stack. Both read the vector edit's guards (`vector_edit::check_*`).
+#[path = "object_parametric_edit.rs"]
+mod parametric_edit;
+#[path = "object_path_effects_edit.rs"]
+mod path_effects_edit;
+#[path = "scene_effect_layer_edit.rs"]
+pub(crate) mod scene_effect_layer_edit;
+#[path = "object_selection_edit_ops.rs"]
+mod selection_edit;
+pub(crate) use selection_edit::{PasteDestination, PreparedSelectionEdit};
+// L06-L (#2112): sealed raster-item / text-block create, edit and delete over the same revision owner.
+#[path = "object_raster_asset_commands.rs"]
+mod item_commands;
+pub(crate) use item_commands::{ItemEditResult, PreparedItemEdit};
+#[path = "object_text_layout_commands.rs"]
+mod text_commands;
+
+// #2106 size split: layer create / layer visibility transactions of this owner, moved verbatim.
+#[path = "object_layer_create_visibility.rs"]
+mod layer_create_visibility;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ReferenceEdit {
@@ -46,18 +172,6 @@ pub(crate) struct PreparedReferenceEdit {
     changed: bool,
 }
 
-#[derive(Debug)]
-struct LayerVisibilityPayload {
-    command: String,
-    layer_uid: String,
-    visible: bool,
-}
-object_deserialize!(LayerVisibilityPayload {
-    command: String,
-    layer_uid: String,
-    visible: bool
-});
-
 /// A detached value sealed to this owner's original immutable snapshot.
 #[derive(Debug, Clone)]
 pub(crate) struct PreparedLayerVisibility {
@@ -65,16 +179,6 @@ pub(crate) struct PreparedLayerVisibility {
     document: ObjectDocument,
     changed: bool,
 }
-
-#[derive(Debug)]
-struct LayerCreatePayload {
-    command: String,
-    name: String,
-}
-object_deserialize!(LayerCreatePayload {
-    command: String,
-    name: String
-});
 
 /// Structural edit sealed to an existing snapshot, not an authoritative owner.
 #[derive(Debug, Clone)]
@@ -90,143 +194,17 @@ impl PreparedLayerCreate {
     }
 }
 
+#[path = "object_image_mesh_identity.rs"]
+mod mesh_identity;
+
 #[derive(Debug)]
 pub(crate) struct ObjectFillOwner {
     revisions: ObjectRevisionOwner,
+    // Lifetime state: history and project replacement must never rewind issued mesh ids.
+    mesh_id_sequence: MeshIdSequence,
 }
 
 impl ObjectFillOwner {
-    pub(crate) fn prepare_layer_create_json(
-        &self,
-        bytes: &[u8],
-    ) -> Result<PreparedLayerCreate, DispatchErrorCode> {
-        if bytes.len() > 4096 {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
-        let payload: LayerCreatePayload =
-            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        if payload.command != "object.layer.create" {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
-        let origin = self.current_snapshot();
-        let next = origin
-            .content_revision()
-            .checked_add(1)
-            .filter(|revision| *revision <= 9_007_199_254_740_991)
-            .ok_or(DispatchErrorCode::Unavailable)?;
-        let mut document = origin.document().clone();
-        // Revision identity is monotonic even across undo/redo. Check imported
-        // IDs as well; neither preparation nor a refused commit consumes an ID.
-        let layer_uid = {
-            let existing: HashSet<_> = document.layers.iter().map(ObjectLayer::layer_uid).collect();
-            (0..=existing.len())
-                .map(|suffix| format!("native-layer:{next}:{suffix}"))
-                .find(|id| !existing.contains(id.as_str()))
-                .ok_or(DispatchErrorCode::Unavailable)?
-        };
-        let natural_position =
-            u32::try_from(document.layers.len()).map_err(|_| DispatchErrorCode::Unavailable)?;
-        if let Presence::Present(plan) = &mut document.composition_order {
-            for context in &mut plan.contexts {
-                context.layers.push(OrderLayer {
-                    layer_uid: layer_uid.clone(),
-                    natural_position,
-                    order: AuthoredOrder {
-                        static_value: Presence::Missing,
-                        track: Presence::Missing,
-                        expression: Presence::Missing,
-                    },
-                });
-            }
-        }
-        document.layers.push(ObjectLayer::blank_drawing(
-            layer_uid.clone(),
-            payload.name,
-            document.layers.len(),
-        ));
-        ObjectSnapshot::validate_drawing(&document)
-            .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        Ok(PreparedLayerCreate {
-            origin,
-            document,
-            layer_uid,
-        })
-    }
-    pub(crate) fn commit_layer_create(
-        &mut self,
-        candidate: PreparedLayerCreate,
-    ) -> Result<u64, DispatchErrorCode> {
-        let current = self.current_snapshot();
-        if candidate.origin.instance_id() != current.instance_id() {
-            return Err(DispatchErrorCode::WrongInstance);
-        }
-        if candidate.origin.document_id() != current.document_id() {
-            return Err(DispatchErrorCode::WrongDocument);
-        }
-        if candidate.origin.snapshot_id() != current.snapshot_id()
-            || candidate.origin.content_revision() != current.content_revision()
-        {
-            return Err(DispatchErrorCode::StaleRevision);
-        }
-        self.revisions
-            .publish(candidate.document)
-            .map_err(|_| DispatchErrorCode::Unavailable)
-    }
-    pub(crate) fn prepare_layer_visibility_json(
-        &self,
-        bytes: &[u8],
-    ) -> Result<PreparedLayerVisibility, DispatchErrorCode> {
-        let payload: LayerVisibilityPayload =
-            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        if payload.command != "object.layer.visibility.set" || payload.layer_uid.is_empty() {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
-        let origin = self.current_snapshot();
-        let index = origin
-            .document()
-            .layers
-            .iter()
-            .position(|layer| layer.layer_uid() == payload.layer_uid)
-            .ok_or(DispatchErrorCode::NotFound)?;
-        let changed = origin.document().layers[index].visible() != payload.visible;
-        let mut document = origin.document().clone();
-        if changed {
-            document.layers[index].visible = Presence::Present(payload.visible);
-        }
-        Ok(PreparedLayerVisibility {
-            origin,
-            document,
-            changed,
-        })
-    }
-    pub(crate) fn commit_layer_visibility(
-        &mut self,
-        candidate: PreparedLayerVisibility,
-    ) -> Result<u64, DispatchErrorCode> {
-        let current = self.current_snapshot();
-        if candidate.origin.instance_id() != current.instance_id() {
-            return Err(DispatchErrorCode::WrongInstance);
-        }
-        if candidate.origin.document_id() != current.document_id() {
-            return Err(DispatchErrorCode::WrongDocument);
-        }
-        if candidate.origin.snapshot_id() != current.snapshot_id()
-            || candidate.origin.content_revision() != current.content_revision()
-        {
-            return Err(DispatchErrorCode::StaleRevision);
-        }
-        if !candidate.changed {
-            return Ok(self.content_revision());
-        }
-        self.revisions
-            .publish(candidate.document)
-            .map_err(|_| DispatchErrorCode::Unavailable)
-    }
-    #[cfg(feature = "project_media_codec")]
-    pub(crate) fn replace_admitted_snapshot(&mut self, snapshot: ObjectSnapshot) {
-        self.revisions = ObjectRevisionOwner::from_admitted(snapshot);
-    }
-
     #[cfg(feature = "font_asset_wire")]
     pub(crate) fn commit_font_asset(
         &mut self,
@@ -250,15 +228,24 @@ impl ObjectFillOwner {
             .map_err(|_| DispatchErrorCode::Unavailable)
     }
 
+    /// Initial admission only: preserve the already minted inactive identity.
+    #[cfg(feature = "project_media_codec")]
+    pub(crate) fn from_admitted_snapshot(
+        snapshot: ObjectSnapshot,
+    ) -> Result<Self, DispatchErrorCode> {
+        if snapshot.content_revision() != 0 || snapshot.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        Self::from_identity_snapshot(snapshot)
+    }
+
     #[cfg(feature = "project_media_codec")]
     pub(crate) fn from_project_file(
         instance: String,
         bytes: &[u8],
     ) -> Result<Self, DispatchErrorCode> {
         let snapshot = ObjectSnapshot::admit_project_file(instance, bytes)?;
-        Ok(Self {
-            revisions: ObjectRevisionOwner::from_admitted(snapshot),
-        })
+        Self::from_identity_snapshot(snapshot)
     }
     #[cfg(feature = "project_media_codec")]
     pub(crate) fn commit_reference_attachment(
@@ -353,9 +340,7 @@ impl ObjectFillOwner {
         ObjectSnapshot::validate_drawing(project.drawing())
             .map_err(|_| "project drawing admission failed")?;
         let snapshot = ObjectSnapshot::from_admitted_project(instance_id, project)?;
-        Ok(Self {
-            revisions: ObjectRevisionOwner::from_admitted(snapshot),
-        })
+        Self::from_identity_snapshot(snapshot).map_err(|_| "mesh identity admission failed")
     }
     pub(crate) fn new(
         instance_id: impl Into<String>,
@@ -363,9 +348,7 @@ impl ObjectFillOwner {
     ) -> Result<Self, &'static str> {
         let snapshot = ObjectSnapshot::new(instance_id, document)
             .map_err(|_| "object document admission failed")?;
-        Ok(Self {
-            revisions: ObjectRevisionOwner::from_admitted(snapshot),
-        })
+        Self::from_identity_snapshot(snapshot).map_err(|_| "mesh identity admission failed")
     }
     pub(crate) fn instance_id(&self) -> &str {
         self.revisions.instance_id()
@@ -471,3 +454,8 @@ mod tests {
         assert_eq!(after.encoded_png().as_ptr(), pointer);
     }
 }
+
+// Whole-cell Move and atomic bar Shift share this existing native owner.
+#[path = "object_frame_bulk_move.rs"]
+mod object_frame_bulk_move;
+pub(crate) use object_frame_bulk_move::{PreparedBulkFrameEdit, PreparedLayerShift};

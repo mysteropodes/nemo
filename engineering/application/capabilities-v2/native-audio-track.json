@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.audio-track",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.audio.track.edit"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectAudioTrackPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained metadata edit receipt or typed refusal. No document, encoded source, placement offset, volume or Motion payload."
+  },
+  "semantics": "Metadata-only edits resolve a stored native AudioTrack by its stable audioId. setMuted takes an exact boolean; same effective false on an absent muted field preserves its absence. rename retains the exact name, including empty text, within 255 UTF-8 bytes and without NUL. setTrim requires at least one authored field: trimStart is a JSON number, trimEnd is a JSON number or explicit null; omitted fields are untouched, finite numbers are not clamped or rounded. unset removes exactly name, muted, trimStart or trimEnd, retaining absent versus null semantics. audioId is nonblank under Rust trim semantics, at most 255 UTF-8 bytes and contains no NUL. A changed edit uses the existing sealed document/revision/history owner and adds one revision and one undo entry; an exact no-op preserves revision, serialized presence and redo. Common retained request receipts handle replay before stale checking, including after undo. Missing AudioIDs and invalid payloads refuse atomically. Existing asset identity/source allocation, sole placement offset, volume and Motion remain under their existing owners. This capability does not establish import, remove, split, volume/Motion editing, ordinary editor UI, audio decoding/playback, export or installed acceptance. No JavaScript/Paper/WebAudio writable fallback is admitted.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Mute a stored AudioID through the shared native metadata owner",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "audio-mute-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.audio.track.edit",
+        "payload": {
+          "kind": "setMuted",
+          "audioId": "track-a",
+          "muted": true
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "audio-mute-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Explicit null end already present produces a no-op metadata receipt",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "audio-trim-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 8,
+        "operation": "command.document.object.audio.track.edit",
+        "payload": {
+          "kind": "setTrim",
+          "audioId": "track-a",
+          "trimEnd": null
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "audio-trim-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": false,
+          "historyEntriesAdded": 0
+        }
+      }
+    }
+  ]
+}

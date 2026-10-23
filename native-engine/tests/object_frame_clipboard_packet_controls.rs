@@ -134,3 +134,34 @@ fn reference_control_is_not_vacuous_and_nothing_from_reference_scope_is_copied()
     assert_eq!(exposed_rows, 418);
     assert_eq!(disagreeing(&all, Mutant::None), 0);
 }
+
+#[path = "object_frame_edit_document_build.rs"]
+#[allow(dead_code)]
+mod build;
+#[path = "object_frame_clipboard_paste_rows.rs"]
+#[allow(dead_code)]
+mod ordered_rows;
+
+#[test]
+fn ordered_copy_keeps_authored_order_independent_of_record_sequence() {
+    let input = ordered_rows::ordered_document(build::Build::V2Extras);
+    let o = crate::commands::ObjectFillOwner::new("ordered-copy", input).unwrap();
+    let packet = o
+        .copy_frame_clipboard(&[crate::commands::CellRef {
+            layer_uid: "L0".into(),
+            frame: 0,
+        }])
+        .unwrap();
+    let cell = &packet.cells()[0];
+    assert_eq!(
+        cell.records()
+            .iter()
+            .map(|record| record.target().stroke_id())
+            .collect::<Vec<_>>(),
+        ["a", "b"]
+    );
+    assert_eq!(
+        serde_json::to_value(cell.order_elements().value().unwrap()).unwrap(),
+        ordered_rows::ordered_elements("L0")
+    );
+}

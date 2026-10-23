@@ -183,7 +183,7 @@ fn failed_identity_releases_pending_charge_and_existing_pin_stays_unmodified() {
 }
 
 #[test]
-fn nonempty_placement_cannot_enter_owner_before_its_real_consumer_exists() {
+fn image_placement_on_an_existing_layer_is_admitted_and_a_dangling_one_charges_nothing() {
     use crate::object_document::{AssetPlacement, AssetTarget};
     let base = project();
     let records = inventory(&base, true).records().to_vec();
@@ -201,7 +201,66 @@ fn nonempty_placement_cannot_enter_owner_before_its_real_consumer_exists() {
     let inventory = AssetInventory::new(records, vec![placement], 2, 1).unwrap();
     let value = base.with_asset_inventory(Some(inventory));
     let budget = EncodedRetentionBudget::new(1024).unwrap();
-    assert!(pending_charges(&value, &budget).is_err());
+    // The fixture drawing has exactly one layer, `L`: the image placement is admitted and charges the three
+    // encoded allocations (reference plus the two catalog records), all released when the tickets drop.
+    let tickets = pending_charges(&value, &budget).unwrap();
+    assert_eq!(tickets.len(), 3);
+    drop(tickets);
+    assert_eq!(budget.used(), Ok(0));
+    let dangling = AssetPlacement::new(
+        "p".into(),
+        AssetId::new("first".into()).unwrap(),
+        AssetTarget::Drawing {
+            context_id: "scene-root".into(),
+            layer_uid: "nope".into(),
+            stroke_id: None,
+        },
+        0,
+    )
+    .unwrap();
+    let records = value.asset_inventory().unwrap().records().to_vec();
+    let inventory = AssetInventory::new(records, vec![dangling], 2, 1).unwrap();
+    let missing = base.with_asset_inventory(Some(inventory));
+    assert_eq!(
+        pending_charges(&missing, &budget).err(),
+        Some("asset placement layer unresolved")
+    );
+    assert_eq!(budget.used(), Ok(0));
+}
+
+#[test]
+fn video_placement_on_an_existing_layer_is_admitted_and_an_unresolved_one_charges_nothing() {
+    use crate::object_document::{AssetPlacement, AssetTarget};
+    let base = project();
+    let mut records = inventory(&base, true).records().to_vec();
+    let clip = AssetId::new("clip".into()).unwrap();
+    let source = AssetSource::linked("clips/take-1.mov".into(), 4096).unwrap();
+    records.push(Arc::new(
+        AssetRecord::new(clip.clone(), "take-1".into(), AssetKind::Video, source).unwrap(),
+    ));
+    // The fixture drawing has exactly one layer, `L`, in the implicit scene root.
+    let place = |layer: &str| {
+        let target = AssetTarget::Drawing {
+            context_id: "scene-root".into(),
+            layer_uid: layer.into(),
+            stroke_id: None,
+        };
+        AssetPlacement::new("p".into(), clip.clone(), target, -3).unwrap()
+    };
+    let budget = EncodedRetentionBudget::new(1024).unwrap();
+    let admitted = AssetInventory::new(records.clone(), vec![place("L")], 3, 1).unwrap();
+    let admitted = base.with_asset_inventory(Some(admitted));
+    // Reference + the two embedded PNG records; the linked video has no bytes.
+    let tickets = pending_charges(&admitted, &budget).unwrap();
+    assert_eq!(tickets.len(), 3);
+    drop(tickets);
+    assert_eq!(budget.used(), Ok(0));
+    let missing = AssetInventory::new(records, vec![place("nope")], 3, 1).unwrap();
+    let missing = base.with_asset_inventory(Some(missing));
+    assert_eq!(
+        pending_charges(&missing, &budget).err(),
+        Some("asset placement layer unresolved")
+    );
     assert_eq!(budget.used(), Ok(0));
 }
 
@@ -212,7 +271,7 @@ fn typed_embedded_kind_and_media_refuse_before_any_ticket_or_identity() {
         panic!()
     };
     let original_allocation = Arc::clone(reference.encoded_allocation());
-    let original_metadata = *base.project();
+    let original_metadata = base.project().clone();
     // These PNG sources really passed the existing PNG codec in project().
     // Changing AssetRecord.kind does not change that valid source precondition.
     for (kind, media) in [

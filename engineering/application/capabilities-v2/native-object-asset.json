@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.asset",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.asset.attach"
+  ],
+  "input": {
+    "$ref": "../native-object-item-v1.schema.json#/$defs/ImageImportAttach"
+  },
+  "output": {
+    "$ref": "../native-object-item-v1.schema.json#/$defs/ImageImportResult"
+  },
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document, glyph or pixel payload in either direction."
+  },
+  "semantics": "Bounded PNG resource and placement import only. A required placement intent creates a still layer or places on an authored frame atomically, with one revision/history entry and canonical native asset ID/dimensions/target. Catalog-only attach retains compatibility validation but refuses unavailable before source I/O. Other codecs, sequences, DOM drop handles and video remain unavailable. Catalog removal is declared separately. This declaration covers only the bounded PNG placement route; installed acceptance and full media parity are recorded separately.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": []
+}

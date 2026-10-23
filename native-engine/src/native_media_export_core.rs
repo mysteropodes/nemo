@@ -4,6 +4,12 @@
 //! children so the shared parent never grows. Later leaves (audio disposition)
 //! add their own child here.
 
+#[path = "native_media_export_job.rs"]
+pub(crate) mod native_media_export_job;
+
+#[path = "native_media_export_lease.rs"]
+pub(crate) mod native_media_export_lease;
+
 #[path = "native_media_export_plan.rs"]
 pub(crate) mod native_media_export_plan;
 

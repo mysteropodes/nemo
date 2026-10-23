@@ -379,12 +379,15 @@ fn a_corrupted_oracle_row_is_detected_in_every_section() {
 
 #[test]
 fn scene_solid_range_rule_is_the_compositor_color_rule() {
-    // L07-F: the compositor no longer carries a second copy of the rule; it converts
-    // through SceneSolid::rgba_f32 and reports the kernel's own message.
-    assert!(COMPOSITOR.contains(".solid()"));
-    assert!(COMPOSITOR.contains(".rgba_f32()"));
+    // L07-F/L07-I: the compositor holds no copy of the rule; every item is converted once, in
+    // object_scene_style_emit.rs, through SceneSolid::rgba_f32, and errors carry the kernel's own message.
+    let emit = include_str!("../src/object_scene_style_emit.rs");
+    assert!(emit.contains(".rgba_f32()"));
+    assert!(emit.contains("EmitError::Paint"));
+    assert!(COMPOSITOR.contains("prepare_item("));
     assert!(COMPOSITOR.contains("CompositorError::new(error.message())"));
     assert!(!COMPOSITOR.contains("(0.0..=1.0).contains"));
+    assert!(!emit.contains("(0.0..=1.0).contains"));
     let message = ScenePaintError::UnrepresentableStraightRgba.message();
     assert_eq!(message, "unrepresentable object straight RGBA");
 }

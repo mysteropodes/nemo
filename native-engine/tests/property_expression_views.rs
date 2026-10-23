@@ -65,6 +65,7 @@ pub(crate) fn target(layer: &str, stroke: Option<&str>) -> PropertyHolderTarget 
 pub(crate) fn holder(target: PropertyHolderTarget) -> PropertyHolder {
     PropertyHolder {
         target,
+        mesh_source: Presence::Missing,
         controls: Presence::Missing,
         properties: vec![],
     }
@@ -103,6 +104,11 @@ pub(crate) fn document(
         property_holders: Presence::Present(holders),
         layer_folders: Presence::Missing,
         composition_order: Presence::Missing,
+        image_meshes: Presence::Missing,
+        items: Presence::Missing,
+        component_tables: Presence::Missing,
+        motion_arcs: Presence::Missing,
+        audio_tracks: Presence::Missing,
     }
 }
 

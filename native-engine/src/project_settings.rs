@@ -1,12 +1,25 @@
 //! Immutable supplied project settings, not a document owner, wire codec or UI command.
 //! Supplied settings share the existing project revision owner.
 
+#[path = "project_metadata_annotations.rs"]
+mod annotations;
+#[path = "project_metadata_fields.rs"]
+mod visual;
+pub(crate) use annotations::{ProjectCommentRecord, ProjectWorkspaceRecord};
+#[path = "project_metadata_presets.rs"]
+mod presets;
+pub(crate) use presets::{BrushPresetRecord, ProjectPresetCatalog};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectMetadataError {
     InvalidCanvas,
     InvalidFps,
     InvalidCanvasBackground,
     InvalidWorkArea,
+    InvalidCompositionMetadata,
+    InvalidVisualMetadata,
+    InvalidAnnotations,
+    InvalidPresets,
 }
 
 /// Exact accepted spelling plus straight sRGB RGBA8, including the source alpha.
@@ -59,7 +72,7 @@ impl CanvasBackground {
 
 /// Supplied metadata only. Missing optional fields remain missing, never white or
 /// a synthesized full-timeline work area. totalFrames remains ObjectDocument-owned.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ProjectMetadata {
     canvas_width: u32,
     canvas_height: u32,
@@ -67,6 +80,14 @@ pub(crate) struct ProjectMetadata {
     canvas_background: Option<CanvasBackground>,
     wa_in: Option<f64>,
     wa_out: Option<f64>,
+    markers: Option<std::sync::Arc<[(f64, Option<String>, Option<String>)]>>,
+    bpm: Option<f64>,
+    bpm_offset: Option<f64>,
+    bpm_show: Option<bool>,
+    visual: visual::VisualMetadata,
+    annotations: annotations::Annotations,
+    custom_brush_presets: Option<std::sync::Arc<ProjectPresetCatalog>>,
+    camera: crate::object_document::ProjectCameraState,
 }
 impl ProjectMetadata {
     /// The existing constructor API and positive finite storage FPS are preserved.
@@ -88,6 +109,14 @@ impl ProjectMetadata {
             canvas_background: None,
             wa_in: None,
             wa_out: None,
+            markers: None,
+            bpm: None,
+            bpm_offset: None,
+            bpm_show: None,
+            visual: visual::VisualMetadata::default(),
+            annotations: annotations::Annotations::default(),
+            custom_brush_presets: None,
+            camera: crate::object_document::ProjectCameraState::default(),
         })
     }
     pub(crate) fn with_canvas_dimensions(
@@ -138,8 +167,79 @@ impl ProjectMetadata {
             ..self
         })
     }
+    /// Exact supplied root-composition metadata. A shared immutable collection
+    /// keeps drawing/media-preserving envelope edits cheap; order is authored order.
+    pub(crate) fn with_composition_metadata(
+        self,
+        markers: Option<Vec<(f64, Option<String>, Option<String>)>>,
+        bpm: Option<f64>,
+        bpm_offset: Option<f64>,
+        bpm_show: Option<bool>,
+    ) -> Result<Self, ProjectMetadataError> {
+        let text_valid = |text: &Option<String>| {
+            text.as_ref()
+                .is_none_or(|v| v.len() <= 1024 && !v.contains('\0'))
+        };
+        if bpm.is_some_and(|v| !v.is_finite())
+            || bpm_offset.is_some_and(|v| !v.is_finite())
+            || markers.as_ref().is_some_and(|values| {
+                values.len() > 4096
+                    || values.iter().any(|(frame, name, color)| {
+                        !frame.is_finite() || !text_valid(name) || !text_valid(color)
+                    })
+            })
+        {
+            return Err(ProjectMetadataError::InvalidCompositionMetadata);
+        }
+        Ok(Self {
+            markers: markers.map(std::sync::Arc::from),
+            bpm,
+            bpm_offset,
+            bpm_show,
+            ..self
+        })
+    }
+    pub(crate) fn composition_markers(&self) -> Option<&[(f64, Option<String>, Option<String>)]> {
+        self.markers.as_deref()
+    }
+    pub(crate) fn composition_bpm(&self) -> (Option<f64>, Option<f64>, Option<bool>) {
+        (self.bpm, self.bpm_offset, self.bpm_show)
+    }
+    /// A scalar tempo edit retains the existing shared marker allocation.
+    /// Supplied finite values are storage values; UI clamps belong to intent.
+    pub(crate) fn with_composition_bpm(
+        self,
+        bpm: Option<f64>,
+        bpm_offset: Option<f64>,
+        bpm_show: Option<bool>,
+    ) -> Result<Self, ProjectMetadataError> {
+        if bpm.is_some_and(|v| !v.is_finite()) || bpm_offset.is_some_and(|v| !v.is_finite()) {
+            return Err(ProjectMetadataError::InvalidCompositionMetadata);
+        }
+        Ok(Self {
+            bpm,
+            bpm_offset,
+            bpm_show,
+            ..self
+        })
+    }
     pub(crate) fn canvas_dimensions(&self) -> (u32, u32) {
         (self.canvas_width, self.canvas_height)
+    }
+    pub(crate) fn with_camera(
+        self,
+        keys: Option<Vec<crate::object_document::ProjectCameraKey>>,
+        layer_on: Option<bool>,
+    ) -> Result<Self, ProjectMetadataError> {
+        let camera = crate::object_document::ProjectCameraState::new(keys, layer_on)
+            .map_err(|_| ProjectMetadataError::InvalidCompositionMetadata)?;
+        Ok(Self { camera, ..self })
+    }
+    pub(crate) fn camera_keys(&self) -> Option<&[crate::object_document::ProjectCameraKey]> {
+        self.camera.keys.as_deref()
+    }
+    pub(crate) fn camera_layer_on(&self) -> Option<bool> {
+        self.camera.layer_on
     }
     pub(crate) fn fps(&self) -> f64 {
         self.fps
@@ -160,3 +260,7 @@ impl ProjectMetadata {
 #[cfg(test)]
 #[path = "../tests/project_settings.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/project_composition_metadata.rs"]
+mod project_composition_metadata;

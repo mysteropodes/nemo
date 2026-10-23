@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.vector.export",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "unavailable",
+    "reason": "host export route for native SVG frame jobs is not registered"
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "job.export.svg.begin",
+    "job.export.svg.status",
+    "job.export.svg.cancel"
+  ],
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "domainErrorCodes": [
+    "staging_failed",
+    "frame_failed",
+    "write_failed",
+    "publish_failed",
+    "cleanup_failed",
+    "document_replaced"
+  ],
+  "authority": {
+    "document": "native-engine::history::NativeObjectHistory",
+    "exportJobs": "native-engine::export_job::native_vector_export::native_vector_export_job",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxReadResponseBytes": 4096,
+    "accepted": [
+      "pinned document snapshot id",
+      "opaque output handle",
+      "bounded source frame numbers"
+    ],
+    "forbidden": [
+      "raw pixels",
+      "binary payload",
+      "canvas",
+      "SVG text",
+      "geometry JSON",
+      "file paths"
+    ]
+  },
+  "semantics": "Export up to 32 frames of the pinned snapshot as SVG through the one bounded native export job (same permit, staging, cancel, cleanup and replacement fences as the PNG job). The job publishes frame_0001.svg ... in the requested order into the host-picked destination; the receipt is the shared JobReceipt. The page never sees SVG text. Scene equivalence with the pinned PNG frame is the target (the baseline Paper exportSVG bytes are not reproducible). Unavailable until the host registers the export route; until then every caller receives typed unavailability and no legacy writer exists.",
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "SVG begin names only a pinned snapshot, an output handle and frame numbers",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fixture-svg",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "expectedRevision": 0,
+        "operation": "job.export.svg.begin",
+        "payload": {
+          "documentSnapshotId": "native-object:native-document-1:0",
+          "contextId": "scene-root",
+          "outputHandle": "output/fixture",
+          "frames": [
+            0,
+            1
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fixture-svg",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "jobId": "native-export-job-1",
+          "status": "running",
+          "pinnedRevision": 0,
+          "documentSnapshotId": "native-object:native-document-1:0",
+          "progress": 0,
+          "artifact": null,
+          "cleanup": {
+            "status": "pending"
+          },
+          "externalEffectDisposition": "none"
+        }
+      }
+    },
+    {
+      "label": "SVG status names only the job",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fixture-svg-status",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "operation": "job.export.svg.status",
+        "payload": {
+          "jobId": "native-export-job-1"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fixture-svg-status",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "jobId": "native-export-job-1",
+          "status": "running",
+          "pinnedRevision": 0,
+          "documentSnapshotId": "native-object:native-document-1:0",
+          "progress": 0,
+          "artifact": null,
+          "cleanup": {
+            "status": "pending"
+          },
+          "externalEffectDisposition": "none"
+        }
+      }
+    }
+  ]
+}

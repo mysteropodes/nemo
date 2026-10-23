@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
-const { create, plan, matches, positionTooltip } = require('../src/js/adapters/tutorial-native-placement.js');
+const { create, plan, matches, positionTooltip, perspectiveStep } = require('../src/js/adapters/tutorial-native-placement.js');
 
 function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
 function rect(left, top, width, height) { return { left, top, width, height, right: left + width, bottom: top + height }; }
@@ -293,13 +293,15 @@ function tutorialFixture() {
   const placement = { ready: () => true,
     place: (...args) => { live = true; places.push(args); return Promise.resolve('ready'); },
     close: () => { if (live) stopCount++; live = false; return Promise.resolve(true); } };
-  const window = { document, state: { language: 'fr' }, NemoTutorialNativePlacement: { create: () => placement } };
+  const window = { document, state: { language: 'fr' }, NemoTutorialNativePlacement: { create: () => placement, perspectiveStep } };
   const context = { window, document, localStorage: { getItem: k => store.get(k), setItem: (k, v) => store.set(k, v) },
     SM: { t: () => '%s completed' },
     setInterval: fn => { handlers.set('timer', fn); return 1; }, clearInterval() {} };
-  vm.runInNewContext(fs.readFileSync('src/js/tutorial.js', 'utf8'), context);
+  vm.runInNewContext(fs.readFileSync('src/js/adapters/tutorial-presentation.js', 'utf8') + '\n' +
+    fs.readFileSync('src/js/tutorial.js', 'utf8'), context);
   handlers.get('DOMContentLoaded')();
-  return { handlers, store, nodes, window, placement, places, stopCount: () => stopCount };
+  return { handlers, store, nodes, window, placement, places, stopCount: () => stopCount,
+    runSource: source => vm.runInNewContext(source, context) };
 }
 test('ordinary category/search/module handlers lead to the explicit Reference availability notice', async () => {
   const h = tutorialFixture(); await h.window.SMTutorial.open();
@@ -450,3 +452,84 @@ for (const operation of ['start', 'open']) {
     assert.equal(h.store.get('nemo-tut-feedback-shown'), '1'); assert.equal(h.store.has('nemo-tutorial-done'), false);
   });
 }
+
+// Controlled native session/projection ports; the bridge read and tutorial render callbacks are production source.
+function perspectiveTutorial(enabled, available = true) {
+  const h = tutorialFixture(); let ticket = 1, active = true, projection, pin, session;
+  h.window.__TAURI__ = { core: {} };
+  Object.defineProperty(h.window.state, 'perspectiveEnabled', { get() { throw Error('legacy Perspective read'); }, set() { throw Error('legacy Perspective write'); } });
+  Object.defineProperty(h.window, '__tutBaseline', { get() { throw Error('legacy step baseline read'); }, set() { throw Error('legacy step baseline write'); } });
+  function publish(value, revision = 0, fields = {}) {
+    pin = Object.freeze({ instanceId: pin ? pin.instanceId : 'i', documentId: pin ? pin.documentId : 'd',
+      lifecycleGeneration: pin ? pin.lifecycleGeneration : 1, contentRevision: revision, documentSnapshotId: 's' + revision, ...fields });
+    const settings = Object.freeze(value === undefined ? {} : { perspectiveEnabled: value });
+    projection = Object.freeze({ info: pin, perspective: Object.freeze({ settings, items: Object.freeze([]) }) });
+  }
+  function owner() { return { info: () => pin, isActive: () => active, readSubscriptionGeneration: () => ticket,
+    readPresentedObjectSession: () => active && available ? { ...pin, presentation: { ...pin, owner: 'native', status: 'presented' } } : null }; }
+  publish(enabled); session = owner();
+  h.window.NemoNativeObjectProject = { desktop: () => session };
+  h.window.NemoNativePerspectiveController = { read: () => active && available ? projection : null };
+  const bridge = fs.readFileSync('src/js/perspective-bridge.js', 'utf8'), start = bridge.indexOf('(function () {'), end = bridge.indexOf('  function nativeEdit(', start);
+  assert(start >= 0 && end > start); h.runSource(bridge.slice(start, end) + '\n})();');
+  const card = () => h.nodes.get('tut-tooltip').innerHTML;
+  return { ...h, card, publish, availability(value) { available = value; }, active(value) { active = value; },
+    ticket() { ticket++; }, replaceSession() { session = owner(); },
+    async enter() { await h.window.SMTutorial.start('perspective'); h.handlers.get('.tut-nextclick')();
+      h.handlers.get('click')({ target: { closest: selector => { assert.equal(selector, '.tool-btn[data-tool="line"]'); return {}; } } });
+      assert(card().includes('Active le guide')); return h.handlers.get('timer'); } };
+}
+test('actual native renderStep before/check observes a confirmed boolean change in either direction', async () => {
+  for (const initial of [false, true, undefined]) {
+    const h = perspectiveTutorial(initial), poll = await h.enter(); poll(); assert(h.card().includes('Active le guide'));
+    h.publish(!initial, 1); poll(); assert(h.card().includes('Reviens à la Ligne'));
+    assert.equal(h.store.has('nemo-tutorial-done'), false);
+  }
+});
+test('an unavailable initial Perspective read cannot act as false or pass on first recovery', async () => {
+  const h = perspectiveTutorial(true, false), poll = await h.enter(); poll(); assert(h.card().includes('Active le guide'));
+  h.availability(true); poll(); assert(h.card().includes('Active le guide'), 'first authenticated value establishes its own baseline');
+  h.publish(false, 1); poll(); assert(h.card().includes('Reviens à la Ligne'));
+});
+test('availability alone and an unconfirmed same-revision value cannot advance the real native step', async () => {
+  const h = perspectiveTutorial(false), poll = await h.enter();
+  h.availability(false); poll(); h.availability(true); poll(); assert(h.card().includes('Active le guide'));
+  h.publish(true); poll(); assert(h.card().includes('Active le guide'), 'same native pin cannot prove an edit');
+  h.publish(false); poll(); h.availability(false); poll(); h.publish(true, 1); h.availability(true); poll();
+  assert(h.card().includes('Reviens à la Ligne'), 'a known same-owner baseline may confirm an actual edit after queue occlusion');
+});
+test('document, lifecycle, session and subscription replacements establish fresh native step baselines', async () => {
+  for (const replace of [h => h.publish(true, 1, { instanceId: 'other-instance' }), h => h.publish(true, 1, { documentId: 'other' }), h => h.publish(true, 1, { lifecycleGeneration: 2 }),
+    h => { h.publish(true, 1); h.replaceSession(); }, h => { h.publish(true, 1); h.ticket(); }]) {
+    const h = perspectiveTutorial(false), poll = await h.enter(); replace(h); poll(); assert(h.card().includes('Active le guide'));
+    poll(); assert(h.card().includes('Active le guide'));
+    h.publish(false, 2); poll(); assert(h.card().includes('Reviens à la Ligne'));
+  }
+});
+test('missing native ports, inactive owner and noncurrent projection never read the protected state measure', async () => {
+  const h = perspectiveTutorial(false), original = h.window.readPerspectiveSettings, poll = await h.enter();
+  h.window.readPerspectiveSettings = null; poll(); h.window.readPerspectiveSettings = original;
+  h.active(false); poll(); h.active(true); h.publish(false, 1); poll(); assert(h.card().includes('Active le guide'));
+  h.window.readPerspectiveSettings = () => ({ perspectiveEnabled: true }); h.publish(true, 2); poll();
+  assert(h.card().includes('Active le guide'), 'lookalike settings are not the confirmed projection port');
+  h.window.readPerspectiveSettings = original; h.publish(false, 3); poll(); assert(h.card().includes('Active le guide'));
+  h.publish(true, 4); poll(); assert(h.card().includes('Reviens à la Ligne'));
+});
+test('native revision rollback or unchanged snapshot refuses a changed value as an edit proof', async () => {
+  for (const fields of [{ documentSnapshotId: 's0' }, { contentRevision: 0, documentSnapshotId: 'other' }]) {
+    const h = perspectiveTutorial(false), poll = await h.enter(); h.publish(true, 1, fields); poll();
+    assert(h.card().includes('Active le guide'));
+  }
+});
+test('retired and restarted renderStep callbacks cannot reuse another step or run baseline', async () => {
+  const h = perspectiveTutorial(false), oldPoll = await h.enter();
+  await h.window.SMTutorial.stop(); h.publish(true, 1); oldPoll(); assert.equal(h.nodes.get('tut-tooltip').classList.contains('on'), false);
+  const poll = await h.enter(); oldPoll(); poll(); assert(h.card().includes('Active le guide'));
+  h.publish(false, 2); oldPoll(); assert(h.card().includes('Active le guide')); poll(); assert(h.card().includes('Reviens à la Ligne'));
+});
+test('browser renderStep keeps the original stateChangedStep callbacks and existing boolean baseline', async () => {
+  const h = tutorialFixture(); h.window.state.perspectiveEnabled = true;
+  await h.window.SMTutorial.start('perspective'); h.handlers.get('.tut-nextclick')(); h.handlers.get('click')({ target: { closest: () => ({}) } });
+  assert.equal(h.window.__tutBaseline, true); h.handlers.get('timer')(); assert(h.nodes.get('tut-tooltip').innerHTML.includes('Active le guide'));
+  h.window.state.perspectiveEnabled = false; h.handlers.get('timer')(); assert(h.nodes.get('tut-tooltip').innerHTML.includes('Reviens à la Ligne'));
+});

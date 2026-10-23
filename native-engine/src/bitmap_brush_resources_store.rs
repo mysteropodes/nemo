@@ -108,6 +108,12 @@ impl BrushBitmapStore {
         }
     }
 
+    /// The quota domain this store charges. A decode feeding the store (L07-G) reserves
+    /// from this same budget, never from another one.
+    pub(crate) fn budget(&self) -> &ImageResourceBudget {
+        &self.budget
+    }
+
     /// `setBudgetBytes(n)`: `Math.max(1, Math.floor(n))`; returns the budget.
     pub(crate) fn set_budget_bytes(&mut self, n: f64) -> u64 {
         self.soft_budget = budget_bytes_from_number(n);

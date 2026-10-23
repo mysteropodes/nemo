@@ -235,7 +235,9 @@ pub(crate) fn rotate_segments(
     // The chain below deliberately keeps Paper's `x * 1 + y * 0` terms: they preserve signed
     // zeros and the operand order bit for bit.
     let t = angle_deg * (PI / 180.0);
-    let (i, r) = (t.cos(), t.sin());
+    // Use portable Sun-derived trigonometry instead of host-libm final-bit variation.
+    // Keep Paper's degree conversion and every following matrix operation unchanged.
+    let (i, r) = (libm::cos(t), libm::sin(t));
     let (cx, cy) = (centre[0], centre[1]);
     let s = cx - cx * i + cy * r;
     let n = cy - cx * r - cy * i;

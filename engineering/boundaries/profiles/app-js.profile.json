@@ -193,6 +193,30 @@
       ]
     },
     {
+      "id": "app.feedback.local.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "feedback-local.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "feedback-local.js"
+      ]
+    },
+    {
+      "id": "app.feedback.remote.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "feedback-remote.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "feedback-remote.js"
+      ]
+    },
+    {
       "id": "app.feedback.bridge",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -313,6 +337,18 @@
       ]
     },
     {
+      "id": "app.kitsu.service.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "kitsu-service.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "kitsu-service.js"
+      ]
+    },
+    {
       "id": "app.kitsu",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -421,6 +457,18 @@
       ]
     },
     {
+      "id": "app.p2p.contact.model.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "p2p-contact-model.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "p2p-contact-model.js"
+      ]
+    },
+    {
       "id": "app.p2p.contacts",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -505,6 +553,18 @@
       ]
     },
     {
+      "id": "app.shader.effect.catalog.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "shader-effect-catalog.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "shader-effect-catalog.js"
+      ]
+    },
+    {
       "id": "app.shader.effects.library",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -586,6 +646,18 @@
       "sizeProfile": "App JS unclassified (pre-R01)",
       "publicApi": [
         "transplant.js"
+      ]
+    },
+    {
+      "id": "app.tutorial.presentation.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "tutorial-presentation.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "tutorial-presentation.js"
       ]
     },
     {
@@ -1265,11 +1337,13 @@
       "layer": "app-legacy",
       "dir": "src/js",
       "files": [
-        "layer-inout.js"
+        "layer-inout.js",
+        "layer-inout-selection.js"
       ],
       "sizeProfile": "App JS unclassified (pre-R01)",
       "publicApi": [
-        "layer-inout.js"
+        "layer-inout.js",
+        "layer-inout-selection.js"
       ]
     },
     {
@@ -2102,6 +2176,138 @@
       ]
     },
     {
+      "id": "app.native.object.component.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-component-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-component-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.component.intent",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-component-intent.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-component-intent.js"
+      ]
+    },
+    {
+      "id": "app.native.object.component.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-component.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-component.js"
+      ]
+    },
+    {
+      "id": "app.native.object.duplicator.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-duplicator.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-duplicator.js"
+      ]
+    },
+    {
+      "id": "app.native.object.edit.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-edit-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-edit-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.edit.intent.core",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-edit-intent-core.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-edit-intent-core.js"
+      ]
+    },
+    {
+      "id": "app.native.object.edit.seam",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-edit-seam.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-edit-seam.js"
+      ]
+    },
+    {
+      "id": "app.native.object.group.intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-group-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-group-intent.js"
+      ]
+    },
+    {
+      "id": "app.native.object.layer-lifecycle.intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-layer-lifecycle-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-layer-lifecycle-intent.js"
+      ]
+    },
+    {
+      "id": "app.native.bitmap.brush.resources.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-bitmap-brush-resources-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-bitmap-brush-resources-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.bitmap.brush.resources.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-bitmap-brush-resources.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-bitmap-brush-resources.js"
+      ]
+    },
+    {
       "id": "app.native.diagnostics.query.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2162,6 +2368,162 @@
       ]
     },
     {
+      "id": "app.native.project.placement.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-project-placement-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-project-placement-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.import.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.import.seam",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-seam.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-seam.js"
+      ]
+    },
+    {
+      "id": "app.native.import.core",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-core.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-core.js"
+      ]
+    },
+    {
+      "id": "app.native.import.png.stage.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-png-stage.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-png-stage.js"
+      ]
+    },
+    {
+      "id": "app.native.import.svg",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-svg.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-svg.js"
+      ]
+    },
+    {
+      "id": "app.native.import.figma.plan",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-figma-plan.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-figma-plan.js"
+      ]
+    },
+    {
+      "id": "app.native.import.png.provider",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-png-provider.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-import-png-provider.js"
+      ]
+    },
+    {
+      "id": "app.native.import.figma.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-figma.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-figma.js"
+      ]
+    },
+    {
+      "id": "app.native.import.drop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-drop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-drop.js"
+      ]
+    },
+    {
+      "id": "app.native.import.psd.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-psd.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-psd.js"
+      ]
+    },
+    {
+      "id": "app.native.import.montage.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-montage.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-montage.js"
+      ]
+    },
+    {
+      "id": "app.native.import.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-desktop.js"
+      ]
+    },
+    {
       "id": "app.native.project-settings.intent.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2183,6 +2545,42 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-project-settings-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.frame-edit.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-frame-edit-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-frame-edit-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.frame-edit.intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-frame-edit-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-frame-edit-intent.js"
+      ]
+    },
+    {
+      "id": "app.native.frame-edit.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-frame-edit-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-frame-edit-desktop.js"
       ]
     },
     {
@@ -2215,7 +2613,9 @@
       "dir": "src/js/adapters",
       "files": [
         "native-object-project.js",
-        "native-object-project-desktop.js"
+        "native-object-project-desktop.js",
+        "native-object-project-properties.js",
+        "native-object-open-exposure.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -2239,11 +2639,27 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-ui.js"
+        "native-object-ui.js",
+        "native-layer-range-desktop.js",
+        "native-layer-playhead-cut-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-ui.js"
+        "native-object-ui.js",
+        "native-layer-range-desktop.js",
+        "native-layer-playhead-cut-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.time.remap.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-time-remap-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-time-remap-ui.js"
       ]
     },
     {
@@ -2328,6 +2744,42 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-opacity-export.js"
+      ]
+    },
+    {
+      "id": "app.native.vector.export.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-vector-export-adapter.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-vector-export-adapter.js"
+      ]
+    },
+    {
+      "id": "app.native.media.export.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-media-export-adapter.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-media-export-adapter.js"
+      ]
+    },
+    {
+      "id": "app.native.main.svg.export.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-main-svg-export.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-main-svg-export.js"
       ]
     },
     {
@@ -2541,7 +2993,9 @@
       "files": [
         "native-motion-property-view.js",
         "native-motion-property-panel.js",
-        "native-motion-property-binding.js"
+        "native-motion-property-binding.js",
+        "native-motion-property-keys.js",
+        "native-motion-property-value.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -2573,6 +3027,20 @@
       ]
     },
     {
+      "id": "app.native.media.export.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-media-export-core.js",
+        "native-media-export-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-media-export-core.js",
+        "native-media-export-contract.js"
+      ]
+    },
+    {
       "id": "app.native.font.resources.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2582,6 +3050,186 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-font-resources.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-rig-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.seam",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-seam.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-rig-seam.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.command",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig-command.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-rig-command.js"
+      ]
+    },
+    {
+      "id": "app.native.object.image.mesh.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-image-mesh.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-image-mesh.js"
+      ]
+    },
+    {
+      "id": "app.native.object.widget.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-widget.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-widget.js"
+      ]
+    },
+    {
+      "id": "app.native.object.rig.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-rig.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-rig.js"
+      ]
+    },
+    {
+      "id": "app.native.object.item.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-item-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-item-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.item.command",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-item-command.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-item-command.js"
+      ]
+    },
+    {
+      "id": "app.native.object.raster.asset.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-raster-asset.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-raster-asset.js"
+      ]
+    },
+    {
+      "id": "app.native.object.text.layout.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-text-layout.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-text-layout.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-vector-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.stroke",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector-stroke.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-vector-stroke.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.command",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector-command.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-vector-command.js"
+      ]
+    },
+    {
+      "id": "app.native.object.vector.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-vector.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-vector.js"
+      ]
+    },
+    {
+      "id": "app.native.object.shape.tool",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-shape-tool.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-shape-tool.js"
       ]
     },
     {
@@ -2606,6 +3254,426 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-font-panel.js"
+      ]
+    },
+    {
+      "id": "app.native.text.read.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-read-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-text-read-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.text.read.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-read.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-read.js"
+      ]
+    },
+    {
+      "id": "app.native.text.tool",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-tool.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-tool.js"
+      ]
+    },
+    {
+      "id": "app.native.text.tool.desktop",
+      "layer": "bootstrap",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-tool-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-tool-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.layer.playhead.cut.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-layer-playhead-cut-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-layer-playhead-cut-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.audio.track.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-audio-track-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-audio-track-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.object.layer.splice.domain",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-layer-splice.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-layer-splice.js"
+      ]
+    },
+    {
+      "id": "app.native.fill.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-fill-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-fill-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.text.animator",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-animator.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-animator.js"
+      ]
+    },
+    {
+      "id": "app.native.text.animator.desktop",
+      "layer": "bootstrap",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-text-animator-desktop.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-text-animator-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.composition.contract.adapter",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-composition-contract.js"
+      ],
+      "publicApi": [
+        "native-composition-contract.js"
+      ],
+      "sizeProfile": "Domain/application"
+    },
+    {
+      "id": "app.native.composition.desktop.adapter",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-composition-desktop.js"
+      ],
+      "publicApi": [
+        "native-composition-desktop.js"
+      ],
+      "sizeProfile": "Domain/application"
+    },
+    {
+      "id": "app.native.composition.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-composition-ui.js"
+      ],
+      "publicApi": [
+        "native-composition-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "app.native.palette.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-palette-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.palette.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-palette-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.palette.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-palette-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-palette-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-guide-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-guide-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.guide.ui",
+      "layer": "bootstrap",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-guide-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-guide-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.shadow.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-shadow-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-shadow-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.shadow.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-shadow-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-shadow-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.shadow.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-shadow-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-shadow-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-perspective-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-perspective-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.perspective.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-perspective-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-perspective-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.workspace.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-workspace-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-workspace-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.workspace.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-workspace-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-workspace-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.workspace.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-workspace-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-workspace-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.custom-brush.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-custom-brush-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-custom-brush-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.custom-brush.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-custom-brush-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-custom-brush-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.custom-brush.ui",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-custom-brush-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-custom-brush-ui.js"
+      ]
+    },
+    {
+      "id": "app.native.comments.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-comments-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-comments-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.comments.application",
+      "layer": "application",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-comments-desktop.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-comments-desktop.js"
+      ]
+    },
+    {
+      "id": "app.native.comments.ui",
+      "layer": "bootstrap",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-comments-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-comments-ui.js"
+      ]
+    },
+    {
+      "id": "app.comments.presentation.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "project-comments-presentation.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "project-comments-presentation.js"
       ]
     }
   ],
@@ -2672,15 +3740,6 @@
   },
   "exceptions": [
     {
-      "path": "src/js/feedback-bridge.js",
-      "rule": "size",
-      "ceiling": 581,
-      "owner": "ivg-design",
-      "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
-      "expires": "2026-12-05"
-    },
-    {
       "path": "src/js/group-bridge.js",
       "rule": "size",
       "ceiling": 842,
@@ -2692,10 +3751,10 @@
     {
       "path": "src/js/i18n.js",
       "rule": "size",
-      "ceiling": 4241,
+      "ceiling": 4186,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Translation table embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'); ceiling captured as an exact no-growth baseline, not an application-code review.",
+      "reason": "Four authored translation dictionaries plus explicit install call only; handwritten locale switching/DOM/storage behavior is already isolated in app.i18n.runtime.adapter. Preserve whole catalog rather than arbitrary chunking. Existing tests/i18n-runtime.test.cjs verifies exact dictionary bytes/key counts and real runtime/caller behavior. No generated/vendor exemption or size-profile increase.",
       "expires": "2026-12-05"
     },
     {
@@ -2737,10 +3796,10 @@
     {
       "path": "src/js/shader-effects-library.js",
       "rule": "size",
-      "ceiling": 1312,
+      "ceiling": 1285,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Shader effect catalog embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'). Confirmed by direct read: lines 20-28 are two small builder helpers (param(), fx(), 9 lines combined), lines 30-1306 are the `effects` array \u2014 roughly 80 WGSL-fragment-body entries built via those helpers \u2014 and lines 1308-1313 are the window.SMSHADER_EFFECTS/SMSHADER_EFFECT_CATEGORIES assignments plus a 4-line window.SMShaderEffectDef lookup helper. Data catalog, not undisciplined control-flow growth; ceiling captured as an exact no-growth baseline, not an application-code review.",
+      "reason": "Authored WGSL fragment bodies, parameter/default/spatial descriptors and category order are preserved as one catalog, not split to meet a code budget. T15 moves all existing constructor/install/lookup control into the ordinary bounded app.shader.effect.catalog.adapter. Exact authored block integrity and real public lookup are enforced by tests/shader-effect-catalog.test.cjs; no generated/vendor exemption or size-profile increase.",
       "expires": "2026-12-05"
     },
     {
@@ -2755,10 +3814,10 @@
     {
       "path": "src/js/tutorial.js",
       "rule": "size",
-      "ceiling": 1864,
+      "ceiling": 1410,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
+      "reason": "Original handwritten tutorial curriculum: exact lesson definitions, translations, SVG and executable setup/check predicates are preserved together under this reduced no-growth ceiling; not generated or inert data. Independent presentation/placement/lifecycle/search/help now belongs to bounded app.tutorial.presentation.adapter. Original P37 prefix integrity and all behavioral oracles remain. Broader structural R22 remains open.",
       "expires": "2026-12-05"
     },
     {

@@ -443,11 +443,11 @@ test('an undeclared .rs file fails, both as a new source and as a dropped declar
 
 test('a raised legacy ceiling fails, per path and as a raised ordinary budget', () => {
   const perPath = structuredClone(profile);
-  const raised = perPath.exceptions.find((exception) => exception.path === 'src-tauri/src/video_decode.rs');
+  const raised = perPath.exceptions.find((exception) => exception.path === 'geometry-wasm/tests/effect_layer_overlay_repro.rs');
   raised.ceiling += 1;
   const growth = compareSizeBaseline(baseline, perPath, { root: ROOT });
   assert.equal(growth.ok, false);
-  const violation = growth.violations.find((entry) => entry.file === 'src-tauri/src/video_decode.rs');
+  const violation = growth.violations.find((entry) => entry.file === 'geometry-wasm/tests/effect_layer_overlay_repro.rs');
   assert.ok(violation, JSON.stringify(growth.violations));
   assert.equal(violation.rule, 'size-baseline-growth');
   assert.equal(violation.detail.candidateCeiling, violation.detail.priorCeiling + 1);
@@ -466,8 +466,10 @@ test('a raised legacy ceiling fails, per path and as a raised ordinary budget', 
   dropped.exceptions = dropped.exceptions.filter((exception) => exception.path !== 'geometry-wasm/src/fill.rs');
   const removal = compareSizeBaseline(baseline, dropped, { root: ROOT });
   assert.equal(removal.ok, true);
+  // T22/#2287 already retired the video_decode.rs waiver against the frozen
+  // seed, so that real reduction is listed alongside the deleted one.
   assert.deepEqual(removal.reductions.map((entry) => [entry.file, entry.priorCeiling, entry.candidateCeiling]),
-    [['geometry-wasm/src/fill.rs', 998, LIMITS.hardMax]]);
+    [['src-tauri/src/video_decode.rs', 2266, LIMITS.hardMax], ['geometry-wasm/src/fill.rs', 998, LIMITS.hardMax]]);
   const unwaived = checkSourceSizes(dropped, { root: ROOT });
   assert.equal(unwaived.ok, false);
   assert.deepEqual(unwaived.violations.map((entry) => [entry.rule, entry.file]),

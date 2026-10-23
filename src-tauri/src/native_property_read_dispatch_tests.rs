@@ -101,7 +101,7 @@ fn property_read_public_raw_samples_ignore_expressions_and_preserve_owner_and_by
     }
     assert_eq!(
         success(&state, query(&state, &id, false, "L1"))["value"],
-        json!([17])
+        json!([17.0])
     );
     assert_eq!(saved(&state, &id), before);
     assert_eq!(state.native_project_info(&id).unwrap(), info);
@@ -283,3 +283,6 @@ fn property_read_oversized_authored_page_refuses_without_truncation_or_mutation(
     assert_eq!(saved(&state, &id), before);
     assert_eq!(state.native_project_info(&id).unwrap(), info);
 }
+
+#[path = "native_text_read_dispatch_tests.rs"]
+mod text_read_tests;

@@ -35,6 +35,45 @@ function fixture(custom={}) {
   return {owner,calls,rows,notices,get retained(){return retained;},set retained(v){retained=v;},tabs:adapter.create({},ports)};
 }
 
+test('replacement eligibility is a read-only fence through busy preparation, retained B and correlated close',async()=>{
+  let resume;const gate=new Promise(resolve=>{resume=resolve;});
+  const f=fixture({async invoke({req}){if(req.action.kind==='prepare')await gate;}});
+  assert.equal(f.tabs.canReplaceActiveProject(),true);assert.equal(f.calls.length,0);
+  const preparing=f.tabs.openPath('/B.json');await new Promise(setImmediate);
+  assert.equal(f.tabs.isBusy(),true);assert.equal(f.tabs.canReplaceActiveProject(),false);
+  resume();assert.equal((await preparing).status,'prepared');
+  const held=f.tabs.held(),calls=f.calls.length;
+  assert.equal(f.tabs.isBusy(),false);assert.equal(f.tabs.canReplaceActiveProject(),false);
+  assert.equal(f.calls.length,calls,'eligibility must not send a native request');
+  assert.equal(Object.isFrozen(held),true);assert.throws(()=>{held.preparationToken='forged';},TypeError);
+  assert.equal((await f.tabs.close({...held})).status,'unavailable','a mutable alias cannot close retained B');
+  assert.equal(f.tabs.canReplaceActiveProject(),false);assert.strictEqual(f.tabs.held(),held);
+  assert.equal((await f.tabs.close(held)).status,'closed');assert.equal(f.tabs.canReplaceActiveProject(),true);
+});
+
+test('unknown preparation outcome blocks replacement even with no visible inactive row',async()=>{
+  const f=fixture({invoke({req}){
+    if(req.action.kind==='inspect'&&!req.action.recoverRequestId)return receipt(req,'inactive-absent');
+    throw Error('unknown prepare or recovery outcome');
+  }});
+  assert.equal((await f.tabs.openPath('/B.json')).status,'refused');
+  assert.equal(f.tabs.isBusy(),false);assert.equal(f.tabs.held(),null);assert.equal(f.rows.length,0);
+  const calls=f.calls.length;assert.equal(f.tabs.canReplaceActiveProject(),false);
+  assert.equal(f.calls.length,calls,'uncertainty is not resolved by asking for eligibility');
+});
+
+test('pending and unknown close outcomes cannot release the replacement fence',async()=>{
+  let resume,closing=false;const gate=new Promise(resolve=>{resume=resolve;});
+  const f=fixture({async invoke({req}){
+    if(req.action.kind==='close'){closing=true;await gate;throw Error('lost close outcome');}
+    if(closing&&req.action.recoverRequestId)throw Error('unknown close recovery');
+  }});
+  await f.tabs.openPath('/B.json');const held=f.tabs.held(),close=f.tabs.close(held);
+  await new Promise(setImmediate);assert.equal(f.tabs.isBusy(),true);assert.equal(f.tabs.canReplaceActiveProject(),false);
+  resume();assert.equal((await close).status,'refused');assert.equal(f.tabs.isBusy(),false);
+  assert.strictEqual(f.tabs.held(),held);assert.equal(f.tabs.canReplaceActiveProject(),false);
+});
+
 test('prepare uses the final typed DTO and retains only bounded metadata',async()=>{
   const f=fixture(),result=await f.tabs.openPath('/Projects/B.json');
   assert.equal(result.status,'prepared');assert.equal(f.calls.length,2);

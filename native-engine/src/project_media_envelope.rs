@@ -4,7 +4,10 @@ use std::sync::Arc;
 
 #[path = "project_settings.rs"]
 mod project_settings;
-pub(crate) use project_settings::{ProjectMetadata, ProjectMetadataError};
+pub(crate) use project_settings::{
+    BrushPresetRecord, ProjectCommentRecord, ProjectMetadata, ProjectMetadataError,
+    ProjectPresetCatalog, ProjectWorkspaceRecord,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectReferenceError {
@@ -211,6 +214,11 @@ mod tests {
             } else {
                 Presence::Present(order)
             },
+            image_meshes: Presence::Missing,
+            items: Presence::Missing,
+            component_tables: Presence::Missing,
+            motion_arcs: Presence::Missing,
+            audio_tracks: Presence::Missing,
         }
     }
 
@@ -249,7 +257,7 @@ mod tests {
             let bare = drawing(version);
             let before = serde_json::to_vec(&bare).unwrap();
             let metadata = ProjectMetadata::new(320, 180, 24.).unwrap();
-            let project = ProjectEnvelope::no_media(metadata, bare.clone());
+            let project = ProjectEnvelope::no_media(metadata.clone(), bare.clone());
             assert_eq!(project.project(), &metadata);
             assert_eq!(project.reference_state(), ProjectReferenceState::NoMedia);
             assert_eq!(project.drawing().format_version(), version);

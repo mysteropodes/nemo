@@ -201,17 +201,16 @@ fn actual_history_refusals_preserve_owner_and_are_exactly_replayed() {
 }
 
 #[test]
-fn public_history_routes_remain_unregistered_and_opacity_aliases_cannot_mutate() {
+fn public_history_routes_are_registered_and_opacity_aliases_cannot_mutate() {
     let state = ApplicationMcp::default();
     let receipt = install(&state);
     fill(&state, &receipt);
     let before = content(&state);
     for action in ["undo", "redo"] {
         let r = history(&receipt, "public", 1, action);
-        assert!(state
-            .dispatch_native(serde_json::from_value(r.clone()).unwrap())
-            .unwrap_err()
-            .contains("not declared"));
+        let request: nemo_mcp::contract::NativeApplicationRequest =
+            serde_json::from_value(r.clone()).unwrap();
+        assert!(request.validate().is_ok());
         let mut alias = r;
         alias["operation"] = json!(format!("command.document.{action}"));
         assert_eq!(dispatch(&state, alias)["error"]["code"], "invalid_request");

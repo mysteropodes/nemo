@@ -107,10 +107,25 @@ struct Stage {
     identity: (u64, u64),
 }
 
+#[derive(Clone, Copy)]
+enum ArtifactFrameFormat {
+    Png,
+    Svg,
+}
+impl ArtifactFrameFormat {
+    fn suffix(self) -> &'static str {
+        match self {
+            Self::Png => ".png",
+            Self::Svg => ".svg",
+        }
+    }
+}
+
 pub(crate) struct DesktopArtifactPort {
     root: PathBuf,
     bindings: DesktopArtifactBindings,
     stages: BTreeMap<String, Stage>,
+    format: ArtifactFrameFormat,
 }
 
 #[derive(Clone, Default)]
@@ -153,6 +168,22 @@ impl DesktopArtifactPort {
         root: PathBuf,
         bindings: impl IntoIterator<Item = (String, PathBuf)>,
     ) -> Result<Self, String> {
+        Self::for_format(root, bindings, ArtifactFrameFormat::Png)
+    }
+
+    /// Explicit SVG artifact names; all staging and publication rules are shared.
+    pub(crate) fn new_svg(
+        root: PathBuf,
+        bindings: impl IntoIterator<Item = (String, PathBuf)>,
+    ) -> Result<Self, String> {
+        Self::for_format(root, bindings, ArtifactFrameFormat::Svg)
+    }
+
+    fn for_format(
+        root: PathBuf,
+        bindings: impl IntoIterator<Item = (String, PathBuf)>,
+        format: ArtifactFrameFormat,
+    ) -> Result<Self, String> {
         let controls = DesktopArtifactBindings::default();
         for (handle, destination) in bindings {
             controls.bind(handle, destination)?;
@@ -165,6 +196,7 @@ impl DesktopArtifactPort {
             root,
             bindings: controls,
             stages: BTreeMap::new(),
+            format,
         })
     }
 
@@ -238,7 +270,7 @@ impl StagedArtifactPort for DesktopArtifactPort {
     }
 
     fn write_frame(&mut self, job_id: &str, name: &str, bytes: &[u8]) -> Result<(), String> {
-        if !valid_frame_name(name) {
+        if !valid_frame_name(name, self.format) {
             return Err(ArtifactError::InvalidFrame.message());
         }
         let stage = self.stage(job_id).map_err(ArtifactError::message)?;
@@ -278,7 +310,9 @@ impl StagedArtifactPort for DesktopArtifactPort {
             || files.is_empty()
             || manifest.len() != files.len()
             || manifest != stage.files
-            || files.iter().any(|name| !valid_frame_name(name))
+            || files
+                .iter()
+                .any(|name| !valid_frame_name(name, self.format))
         {
             return Err(ArtifactError::ManifestMismatch.message());
         }
@@ -323,9 +357,9 @@ impl StagedArtifactPort for DesktopArtifactPort {
     }
 }
 
-fn valid_frame_name(name: &str) -> bool {
+fn valid_frame_name(name: &str, format: ArtifactFrameFormat) -> bool {
     name.strip_prefix("frame_")
-        .and_then(|n| n.strip_suffix(".png"))
+        .and_then(|n| n.strip_suffix(format.suffix()))
         .is_some_and(|digits| digits.len() == 4 && digits.bytes().all(|b| b.is_ascii_digit()))
 }
 

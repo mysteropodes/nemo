@@ -1,10 +1,12 @@
 //! PRIVATE source proposal: baseline transport only; no asset identity/owner.
 use base64::Engine;
 use serde::Deserialize;
+use std::{future::Future, time::Duration};
 
 pub(super) const IMPORT: &str = "command.document.object.asset.font.import";
 pub(super) const QUERY: &str = "query.document.object.asset.font";
 const MAX: usize = 16 * 1024 * 1024;
+const FETCH_DEADLINE: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
@@ -76,16 +78,74 @@ where
             weight,
             italic,
         } => {
-            if family.trim().is_empty()
-                || family.len() > 255
-                || family.contains('\0')
-                || !(1..=1000).contains(&weight)
-            {
-                return Err("invalid font source descriptor".into());
-            }
+            validate_google_descriptor(&family, weight)?;
             decoded(&google(family, weight, italic).await?).map(FontBytes::Downloaded)
         }
     }
+}
+
+fn validate_google_descriptor(family: &str, weight: u32) -> Result<(), String> {
+    if family.trim().is_empty()
+        || family.len() > 255
+        || family.contains('\0')
+        || !(1..=1000).contains(&weight)
+    {
+        return Err("invalid font source descriptor".into());
+    }
+    Ok(())
+}
+
+fn check_body_length(length: Option<u64>) -> Result<(), String> {
+    if length.is_some_and(|length| length > MAX as u64) {
+        return Err("font source exceeds byte admission limit".into());
+    }
+    Ok(())
+}
+
+fn append_bounded_body(bytes: &mut Vec<u8>, chunk: &[u8]) -> Result<(), String> {
+    if bytes
+        .len()
+        .checked_add(chunk.len())
+        .is_none_or(|length| length > MAX)
+    {
+        return Err("font source exceeds byte admission limit".into());
+    }
+    // Check each accumulated length before reserving or copying transport bytes.
+    bytes
+        .try_reserve_exact(chunk.len())
+        .map_err(|_| "font source allocation unavailable")?;
+    bytes.extend_from_slice(chunk);
+    Ok(())
+}
+
+async fn read_bounded_body(mut response: reqwest::Response) -> Result<Vec<u8>, String> {
+    check_body_length(response.content_length())?;
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
+        append_bounded_body(&mut bytes, &chunk)?;
+    }
+    Ok(bytes)
+}
+
+async fn read_bounded_css(response: reqwest::Response) -> Result<String, String> {
+    let headers = response.headers().clone();
+    let bytes = read_bounded_body(response).await?;
+    // Preserve reqwest's existing charset/BOM decoding on an already bounded body.
+    let mut bounded = tauri::http::Response::new(bytes);
+    *bounded.headers_mut() = headers;
+    reqwest::Response::from(bounded)
+        .text()
+        .await
+        .map_err(|error| error.to_string())
+}
+
+async fn fetch_before_deadline<F>(fetch: F, deadline: Duration) -> Result<String, String>
+where
+    F: Future<Output = Result<String, String>>,
+{
+    tokio::time::timeout(deadline, fetch)
+        .await
+        .map_err(|_| "font source fetch deadline exceeded".to_owned())?
 }
 
 pub(crate) async fn fetch_google_font(
@@ -93,7 +153,19 @@ pub(crate) async fn fetch_google_font(
     weight: u32,
     italic: bool,
 ) -> Result<String, String> {
-    use base64::Engine;
+    fetch_before_deadline(
+        fetch_google_font_body(family, weight, italic),
+        FETCH_DEADLINE,
+    )
+    .await
+}
+
+async fn fetch_google_font_body(
+    family: String,
+    weight: u32,
+    italic: bool,
+) -> Result<String, String> {
+    validate_google_descriptor(&family, weight)?;
     let axis = if italic { "ital,wght@1," } else { "wght@" };
     let css_url = format!(
         "https://fonts.googleapis.com/css2?family={}:{}{}&display=swap",
@@ -102,15 +174,13 @@ pub(crate) async fn fetch_google_font(
         weight
     );
     let client = reqwest::Client::new();
-    let css = client
+    let response = client
         .get(&css_url)
         .header("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2)")
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .text()
-        .await
         .map_err(|e| e.to_string())?;
+    let css = read_bounded_css(response).await?;
     // The response is one @font-face block per requested weight/style —
     // just one here since exactly one weight/italic combo was asked for.
     // Extract the URL inside its first src: url(...) rather than a full
@@ -127,14 +197,12 @@ pub(crate) async fn fetch_google_font(
             )
         })?
         .to_string();
-    let bytes = client
+    let response = client
         .get(&ttf_url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .bytes()
-        .await
         .map_err(|e| e.to_string())?;
+    let bytes = read_bounded_body(response).await?;
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 #[cfg(test)]

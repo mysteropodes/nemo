@@ -4,11 +4,20 @@
   "id": "native.object.layer-timing",
   "version": 1,
   "status": "active",
-  "availability": { "state": "available", "reason": null },
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
   "transportSchema": "../native-transport-v2.schema.json",
-  "operations": ["query.document.object.layer.timing"],
-  "input": { "$ref": "../native-layer-timing-v1.schema.json#/$defs/Selector" },
-  "output": { "$ref": "../native-layer-timing-v1.schema.json#/$defs/ReadResult" },
+  "operations": [
+    "query.document.object.layer.timing"
+  ],
+  "input": {
+    "$ref": "../native-layer-timing-v1.schema.json#/$defs/Selector"
+  },
+  "output": {
+    "$ref": "../native-layer-timing-v1.schema.json#/$defs/ReadResult"
+  },
   "authority": {
     "document": "native-engine::object_snapshot::ObjectSnapshot",
     "adapterOwnsWritableMirror": false,
@@ -20,21 +29,158 @@
     "maxReadResponseBytes": 4096,
     "policy": "Complete correlated shared envelope or typed unavailable; no truncation, inferred timing, caller lifecycle echo or public Add activation."
   },
-  "commonErrorCodes": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "not_found", "unavailable", "cancelled_before_dispatch", "internal"],
-  "ports": [{ "label": "ui", "state": "pending" }, { "label": "mcp", "state": "pending" }],
-  "examples": [{
-    "label": "Pinned current-head timing query through the existing shared v2 application service",
-    "request": {
-      "apiVersion": 2,
-      "requestId": "timing-read-0",
-      "instanceId": "instance-A",
-      "documentId": "document-A",
-      "operation": "query.document.object.layer.timing",
-      "payload": { "atRevision": 0, "documentSnapshotId": "native-object:document-A:0", "contextId": "scene-root", "layerUid": "layer-1", "frame": 0 }
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "not_found",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
     },
-    "response": {
-      "apiVersion": 2, "requestId": "timing-read-0", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 0, "ok": true,
-      "result": { "instanceId": "instance-A", "documentId": "document-A", "atRevision": 0, "documentSnapshotId": "native-object:document-A:0", "contextId": "scene-root", "layerUid": "layer-1", "frame": 0, "cellKind": "key", "sourceFrame": 0, "hasContent": false, "manualEdit": false }
+    {
+      "label": "mcp",
+      "state": "pending"
     }
-  }]
+  ],
+  "examples": [
+    {
+      "label": "Pinned current-head timing query through the existing shared v2 application service",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "timing-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.layer.timing",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "timing-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0,
+          "cellKind": "key",
+          "sourceFrame": 0,
+          "hasContent": false,
+          "manualEdit": false
+        }
+      }
+    },
+    {
+      "label": "Snapshot-pinned native bar range without invented cell exposure",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-range-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.layer.timing",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0,
+          "view": "range"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-range-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "kind": "layerRange",
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0,
+          "range": {
+            "rawInPoint": 0,
+            "rawOutPoint": 11,
+            "inPoint": 0,
+            "outPoint": 11,
+            "hasCustomRange": false,
+            "hasTimeLink": false
+          }
+        }
+      }
+    },
+    {
+      "label": "T12 snapshot-pinned video placement facts for the Time Remap and footage controls",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-placement-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.layer.timing",
+        "payload": {
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0,
+          "view": "placement"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-placement-read-0",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "kind": "layerPlacement",
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 0,
+          "documentSnapshotId": "native-object:document-A:0",
+          "contextId": "scene-root",
+          "layerUid": "layer-1",
+          "frame": 0,
+          "placement": {
+            "placementId": "placement-1",
+            "assetId": "video-1",
+            "assetKind": "video",
+            "offsetFrames": 0,
+            "timeRemap": {
+              "keyCount": 2,
+              "keyAtFrame": true
+            },
+            "interpMode": "blend",
+            "frameBlend": true,
+            "sourceFrameCount": null
+          }
+        }
+      }
+    }
+  ],
+  "semantics": " Optional strict view:range reads the same immutable D27 raw/clamped layer ranges and custom/link booleans, including layers without drawing timing. Original five-field cell selector and eleven-field timing result remain exact separate branches. Range projection is read-only; unsupported contexts/providers and complete4096 limits remain explicit refusal; source examples are not desktop acceptance. T12 view \"placement\" returns the layer's video drawing placement (id, asset, offset, remap key count and key-at-frame, interpMode, frameBlend, and sourceFrameCount, the source frame count the desktop host fills from its decode session bound to the same placement and snapshot, or null) or null; remap keys are counted, never listed; any other view is refused."
 }

@@ -3,15 +3,15 @@
 use crate::compositor::{Compositor, CompositorError};
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
-use crate::render_scene::{
+pub(super) use crate::render_scene::{
     reserve_readback_bytes as reserve_target_bytes, ReadbackReservation as TargetReservation,
 };
 // Earlier feature-off targets retain their prior behavior. The desktop app
 // enables both features; only that configuration claims the shared image quota.
 #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
-struct TargetReservation;
+pub(super) struct TargetReservation;
 #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
-fn reserve_target_bytes(_: usize) -> Result<TargetReservation, &'static str> {
+pub(super) fn reserve_target_bytes(_: usize) -> Result<TargetReservation, &'static str> {
     Ok(TargetReservation)
 }
 
@@ -87,7 +87,7 @@ impl Compositor {
     }
 
     // Tests inject quota/checkpoints into the actual production allocation path.
-    fn object_target_with(
+    pub(super) fn object_target_with(
         &self,
         width: u32,
         height: u32,
@@ -116,7 +116,9 @@ impl Compositor {
             format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
         // Install the owner before view creation or any injected fallible work.

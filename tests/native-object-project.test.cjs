@@ -179,6 +179,7 @@ test('single-frame native export preserves pinned host route; invalid ranges do 
   await assert.rejects(s.exportPng('/new-output',[1,0]),/frame range is invalid/);
   const r=h.calls.find(c=>c.command==='nemo_native_object_export').r;
   assert.equal(r.documentSnapshotId,'snapshot-0');assert.equal(r.maximumEncodedBytes,4*1024*1024);
+  assert.equal(Object.hasOwn(r,'format'),false,'PNG remains the omitted-format default');
   assert.equal('reference' in r,false);
 });
 test('native export reports no success for contradictory or malformed Rust receipts',async()=>{
@@ -239,6 +240,7 @@ function ordinary(h,deferFrames=false){
     root.document.documentElement={clientWidth:1280,clientHeight:900,
       classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
       style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}};
+    root.stageLayer={visible:true};root.paper={view:{update(){}}};
     root.NemoNativeViewportUnderlay=require('../src/js/adapters/native-viewport-underlay.js');
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
     root.NemoNativeObjectInactiveProjectTabs=require('../src/js/adapters/native-object-inactive-project-tabs.js');
@@ -612,4 +614,192 @@ test('inclusive 32-frame bound is admitted and pre-cancelled sequences never dis
   assert.deepEqual(progress,[[32,32]]);
   assert.deepEqual(await s.exportPng('/cancel',[0,1],()=>assert.fail('cancelled progress'),{aborted:true}),{status:'cancelled'});
   assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
+});
+
+function svgHost(){
+  const h=host(),invoke=h.invoke;
+  h.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export'&&JSON.parse(args.requestJson).format==='svg'){
+      const request=JSON.parse(args.requestJson),frames=request.frames||[request.frame];
+      value.artifactFiles=frames.map((_,i)=>'frame_'+String(i+1).padStart(4,'0')+'.svg');
+    }return value;};
+  return h;
+}
+test('SVG shares the real Project queue and pin while PNG keeps its omitted format',async()=>{
+  const h=svgHost(),invoke=h.invoke,first=deferred();let exports=0;
+  h.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export'&&++exports===1)await first.promise;return value;};
+  const s=await presented(h),before=JSON.stringify(s.info()),progress=[],frames=[0,10];
+  const png=s.exportPng('/png',[0]),svg=s.exportSvg('/svg',frames,(...v)=>progress.push(v));
+  frames[1]=20;await turn();assert.equal(exports,1);assert.deepEqual(progress,[]);
+  first.resolve();const [one,two]=await Promise.all([png,svg]);
+  const requests=h.calls.filter(c=>c.command==='nemo_native_object_export').map(c=>c.r);
+  assert.equal(Object.hasOwn(requests[0],'format'),false);
+  assert.equal(requests[1].format,'svg');assert.deepEqual(requests[1].frames,[0,10]);
+  assert.equal(requests[1].frame,0);assert.notEqual(one.requestId,two.requestId);
+  assert.deepEqual(two.artifactFiles,['frame_0001.svg','frame_0002.svg']);
+  for(const request of requests){assert.equal(request.instanceId,'instance');assert.equal(request.documentId,'document');
+    assert.equal(request.contentRevision,0);assert.equal(request.documentSnapshotId,'snapshot-0');
+    assert.equal(request.lifecycleGeneration,1);assert.equal(request.contextId,'scene-root');
+    assert.equal(request.maximumEncodedBytes,4*1024*1024);}
+  assert.deepEqual(progress,[[2,2]]);assert.equal(JSON.stringify(s.info()),before);
+});
+test('SVG rejects wrong extension, count, order and every terminal receipt correlation drift',async()=>{
+  const invalid=[{artifactFiles:['frame_0001.png','frame_0002.png']},
+    {artifactFiles:['frame_0002.svg','frame_0001.svg']},{artifactFiles:['frame_0001.svg']},
+    {artifactFiles:['frame_0001.svg','frame_0001.svg']},{artifactFiles:['../frame_0001.svg','frame_0002.svg']},
+    {requestId:'foreign'},{instanceId:'foreign'},{documentId:'foreign'},{contentRevision:1},
+    {documentSnapshotId:'stale'},{status:'running'},{cleanupComplete:false},{published:false},
+    {cleanupStatus:'pending'},{externalEffectDisposition:'indeterminate'},{errorCode:'publish_failed'}];
+  for(const patch of invalid){const h=svgHost(),invoke=h.invoke,progress=[];
+    h.invoke=async(command,args)=>{const value=await invoke(command,args);return command==='nemo_native_object_export'?{...value,...patch}:value;};
+    const s=await presented(h),before=JSON.stringify(s.info());
+    await assert.rejects(s.exportSvg('/svg',[0,10],(...v)=>progress.push(v)),/publication is unconfirmed/);
+    assert.deepEqual(progress,[]);assert.equal(JSON.stringify(s.info()),before);
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
+  }
+});
+test('SVG range bounds and predispatch cancellation never invoke a legacy or native writer',async()=>{
+  const h=svgHost(),s=await presented(h),before=JSON.stringify(s.info());
+  for(const frames of [null,[],[0,0],[1,0],[0,21],[-1],[0,0.5],Array.from({length:33},(_,i)=>i)])
+    await assert.rejects(s.exportSvg('/invalid',frames),/frame range is invalid/);
+  assert.deepEqual(await s.exportSvg('/cancel',[0],()=>assert.fail('no cancelled progress'),{aborted:true}),{status:'cancelled'});
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,0);
+  assert.equal(JSON.stringify(s.info()),before);
+});
+test('SVG sees current native history revision and refuses submission once Open begins',async()=>{
+  const h=svgHost(),s=await presented(h);
+  await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});
+  await s.exportSvg('/after-edit',[0]);
+  const request=h.calls.find(c=>c.command==='nemo_native_object_export').r;
+  assert.equal(request.contentRevision,1);assert.equal(request.documentSnapshotId,'snapshot-1');
+  const blocked=svgHost(),invoke=blocked.invoke,first=deferred();let waiting=false;
+  blocked.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export'&&!waiting){waiting=true;await first.promise;}
+    return value;};
+  const session=await presented(blocked),one=session.exportPng('/first',[0]);
+  await turn();const opening=session.openPath('/other.json',{confirm:async()=>false}),two=session.exportSvg('/stale',[0]);
+  await assert.rejects(two,/Open is in progress/);first.resolve();await one;assert.equal(await opening,false);
+  assert.equal(blocked.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
+  assert.equal(blocked.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1);
+  assert.equal(session.isActive(),true);assert.equal(session.info().documentId,'document');
+});
+
+test('Camera View uses native projection proof while PNG and SVG exports never inherit the session selector',async()=>{
+ const h=host(),original=h.invoke;let mode='canvas';
+ const view={mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]};
+ h.invoke=async(command,args)=>{const result=await original(command,args),q=args&&JSON.parse(args.requestJson);
+  if(command==='nemo_native_object_export'&&q.format==='svg')return {...result,artifactFiles:['frame_0001.svg']};
+  return command==='nemo_native_object_preview'&&q.viewMode==='stored-camera'?{...result,view:structuredClone(view)}:result;};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0,viewMode:()=>mode});
+ await s.openPath('/project.json');const before=JSON.stringify(s.info());const canvas=s.readPresentedObjectSession().presentation;
+ assert.equal(canvas.view.mode,'canvas');mode='stored-camera';assert.equal(s.readPresentedObjectSession(),null);
+ const camera=await s.presentPreview(0);assert.deepEqual(camera.view,view);assert.notEqual(camera,canvas);assert(Object.isFrozen(camera.view.documentToComposition));
+ await s.exportPng('/camera-png',[0]);await s.exportSvg('/camera-svg',[0]);
+ for(const {r} of h.calls.filter(c=>c.command==='nemo_native_object_export'))assert.equal(Object.hasOwn(r,'viewMode'),false);
+ assert.equal(JSON.stringify(s.info()),before);mode='canvas';assert.equal(s.readPresentedObjectSession(),null);
+ assert.equal((await s.presentPreview(0)).view.mode,'canvas');
+});
+
+test('Camera View refuses missing, foreign, singular or inconsistent native mapping and stale async choice',async()=>{
+ for(const view of [undefined,{mode:'canvas',cameraAvailable:true,documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]},
+  {mode:'stored-camera',cameraAvailable:true,documentToComposition:[0,0,0,0,0,0],compositionToDocument:[1,0,0,1,0,0]},
+  {mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[1,0,0,1,0,0]}]){
+  const h=host(),invoke=h.invoke;let mode='canvas';h.invoke=async(command,args)=>{const r=await invoke(command,args);return command==='nemo_native_object_preview'&&mode==='stored-camera'?{...r,view}:r;};
+  const s=Project.create({invoke:h.invoke,mapping:()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}}),viewMode:()=>mode});
+  await s.openPath('/project.json');mode='stored-camera';await assert.rejects(s.presentPreview(0));assert.equal(s.readPresentedObjectSession(),null);assert.equal(s.info().contentRevision,0);
+ }
+ const h=host(),invoke=h.invoke,wait=deferred();let mode='canvas',hold=false;
+ h.invoke=async(command,args)=>{const r=await invoke(command,args);if(command==='nemo_native_object_preview'&&hold){await wait.promise;return {...r,view:{mode:'stored-camera',cameraAvailable:true,documentToComposition:[2,0,0,2,-160,-90],compositionToDocument:[.5,0,0,.5,80,45]}};}return r;};
+ const s=Project.create({invoke:h.invoke,mapping:()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}}),viewMode:()=>mode});
+ await s.openPath('/project.json');mode='stored-camera';hold=true;const pending=s.presentPreview(0);await turn();mode='canvas';wait.resolve();await assert.rejects(pending);assert.equal(s.readPresentedObjectSession(),null);
+});
+
+test('actual native camera toolbar click uses current receipt availability and never the legacy camera writer',()=>{
+ const {extractFunction}=require('./fixtures/lib/sandbox.cjs'),source=fs.readFileSync(require.resolve('../src/js/camera.js'),'utf8');
+ const events=[],button={hidden:false,setAttribute(k,v){this[k]=v;},addEventListener(k,fn){this[k]=fn;}};
+ let available=true;const state={cameraView:false,currentFrame:4};
+ Object.defineProperties(state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera key read');}}});
+ const session={isActive:()=>true,readPresentedObjectSession:()=>({presentation:{view:{cameraAvailable:available}}}),renderPreview:frame=>events.push(frame)};
+ const root={state,document:{getElementById:id=>id==='btn-camera'?button:null},SM:{t:k=>k},NemoNativeObjectProject:{desktop:()=>session},
+  NemoNativeObjectProjectDesktop:require('../src/js/adapters/native-object-project-desktop.js')};
+ root.window=root;const context=vm.createContext(root);
+ for(const name of ['nativeSession','renderNativeViewLock','applyCameraView','initUI'])vm.runInContext(extractFunction(source,name),context);
+ vm.runInContext('initUI();renderNativeViewLock();',context);assert.equal(button.hidden,false);assert.equal(button['aria-pressed'],'false');
+ button.click();assert.equal(state.cameraView,true);assert.deepEqual(events,[4]);assert.equal(button['aria-pressed'],'true');
+ available=false;vm.runInContext('renderNativeViewLock()',context);assert.equal(button.hidden,true);button.click();assert.deepEqual(events,[4]);
+ available=true;button.click();assert.equal(state.cameraView,false);assert.deepEqual(events,[4,4]);
+});
+
+test('session view change invalidates the original pending action lease before another native paint',async()=>{
+ const h=host(),entered=deferred(),release=deferred();let mode='canvas';
+ const s=Project.create({invoke:h.invoke,mapping:()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}}),projectionReady:()=>true,viewMode:()=>mode});
+ await s.openPath('/project.json');const original=s.readPresentedObjectSession().presentation;
+ const action=s.runResourceCommand(async ctx=>{assert.equal(ctx.readPresentedObjectSession().presentation,original);entered.resolve();await release.promise;assert.equal(ctx.readPresentedObjectSession(),null);});
+ await entered.promise;mode='stored-camera';assert.equal(s.readPresentedObjectSession(),null);release.resolve();await action;
+ assert.equal(s.info().contentRevision,0);assert.equal(h.calls.some(c=>c.command==='nemo_native_dispatch'),false);
+ const inspect=require('../src/js/adapters/native-object-open-exposure.js').inspectReceipt;
+ const dormant={status:'presented',workId:'native-dormant',viewGeneration:1,view:{mode:'stored-camera',cameraAvailable:false,documentToComposition:[1,0,0,1,0,0],compositionToDocument:[1,0,0,1,0,0]}};
+ assert.equal(inspect(dormant,true,false,'stored-camera').failure,null);
+});
+
+function navigationFixture(){
+ const h=host(),invoke=h.invoke,hold=deferred();let mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
+ const literals=new Map([
+  ['1:0,0',[[2,0,0,2,-160,-90],[.5,0,0,.5,80,45]]],
+  ['1:10,-5',[[2,0,0,2,-180,-80],[.5,0,0,.5,90,40]]],
+  ['1:5,-2.5',[[2,0,0,2,-170,-85],[.5,0,0,.5,85,42.5]]],
+  ['2:10,-5',[[4,0,0,4,-520,-250],[.25,0,0,.25,130,62.5]]],
+  ['2:-30,-15',[[4,0,0,4,-360,-210],[.25,0,0,.25,90,52.5]]],
+ ]);
+ h.invoke=async(command,args)=>{const result=await invoke(command,args),q=args&&JSON.parse(args.requestJson);
+  if(command!=='nemo_native_object_preview'||q.viewMode!=='stored-camera')return result;
+  const n=q.navigation||{zoom:1,pan:[0,0]},pair=literals.get(n.zoom+':'+n.pan.join(','));assert.ok(pair,'independent authored navigation literal');
+  if(pause)await hold.promise;
+  const reply={...result,view:{mode:'stored-camera',navigation:n,cameraAvailable:true,documentToComposition:pair[0],compositionToDocument:pair[1]}};return tamper?tamper(reply):reply;};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode});
+ return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
+}
+test('native session hand and zoom retain exact view intent through scrub while excluding export and source/history',async()=>{
+ const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
+ const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});assert.ok(Object.isFrozen(hand));assert.ok(Object.isFrozen(hand.inverse));
+ const pending=f.s.updateViewportNavigation(hand,{x:80,y:70});assert.equal(f.s.readPresentedObjectSession(),null);await pending;
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:1,pan:[10,-5]});
+ const zoom=f.s.beginViewportNavigation('zoom',null);await f.s.updateViewportNavigation(zoom,null,2);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.documentToComposition,[4,0,0,4,-520,-250]);
+ f.frame=1;await f.s.presentPreview(1);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:2,pan:[10,-5]});
+ await assert.rejects(f.s.updateViewportNavigation(zoom,null,2),/source changed/);
+ await f.s.exportPng('/native-navigation',[0]);
+ const exp=f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r;
+ assert.equal(Object.hasOwn(exp,'navigation'),false);assert.equal(Object.hasOwn(exp,'viewMode'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+ f.mode='canvas';assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(1);
+ f.mode='stored-camera';await f.s.renderPreview(1);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:1,pan:[0,0]});
+});
+test('native navigation anchors the actual inverse and coalesces rapid input without publishing an old tool proof',async()=>{
+ const f=navigationFixture();await f.open();const initial=f.s.readPresentedObjectSession().presentation;
+ const zoom=f.s.beginViewportNavigation('zoom',{x:40,y:30});await f.s.updateViewportNavigation(zoom,{x:40,y:30},2);
+ assert.deepEqual(f.s.readPresentedObjectSession().presentation.view.navigation,{zoom:2,pan:[-30,-15]});
+ const inverse=f.s.readPresentedObjectSession().presentation.view.compositionToDocument;
+ assert.deepEqual([inverse[0]*40+inverse[4],inverse[3]*30+inverse[5]],[100,60]);
+ f.mode='canvas';await f.s.renderPreview(0);f.mode='stored-camera';await f.s.renderPreview(0);
+ const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});f.pause();
+ const first=f.s.updateViewportNavigation(hand,{x:90,y:65});await turn();
+ const latest=f.s.updateViewportNavigation(hand,{x:80,y:70});assert.equal(f.s.readPresentedObjectSession(),null);
+ f.release();await Promise.all([first,latest]);
+ const requested=f.h.calls.filter(c=>c.command==='nemo_native_object_preview').slice(-2).map(c=>c.r.navigation);
+ assert.deepEqual(requested,[{zoom:1,pan:[5,-2.5]},{zoom:1,pan:[10,-5]}]);
+ const current=f.s.readPresentedObjectSession().presentation;assert.notEqual(current,initial);
+ assert.deepEqual(current.view.navigation,{zoom:1,pan:[10,-5]});
+ f.rect={x:1,y:0,width:320,height:180};await assert.rejects(f.s.updateViewportNavigation(hand,{x:79,y:70}),/bounds changed/);
+ f.mode='canvas';assert.equal(f.s.beginViewportNavigation('pan',{x:1,y:1}),null);
+});
+
+test('native view receipt refuses mismatched or non-closed navigation without a tool proof or source edit',async()=>{
+ for(const navigation of [null,undefined,{zoom:2,pan:[0,0]},{zoom:1,pan:[0,0],extra:true},{zoom:1,pan:[0,Infinity]}]){
+  const f=navigationFixture();f.tamper(reply=>({...reply,view:{...reply.view,navigation}}));
+  await assert.rejects(f.open());assert.equal(f.s.readPresentedObjectSession(),null);assert.equal(f.s.info().contentRevision,0);
+ }
 });

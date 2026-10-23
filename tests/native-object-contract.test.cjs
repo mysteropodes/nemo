@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const { validate } = require('../scripts/nemo/lib/capability-schema.cjs');
-const { validateRequest, validateResponse } = require('../src/js/adapters/native-application.js');
+const { createNativeApplicationAdapter, validateRequest, validateResponse } = require('../src/js/adapters/native-application.js');
 const root = path.resolve(__dirname, '..');
 const load = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
 const schema = load('engineering/application/native-object-v1.schema.json');
@@ -216,6 +216,7 @@ test('registered object read has an active source route with pending installed p
   assert.equal(descriptor.status, 'active');
   assert.deepEqual(descriptor.operations, [
     'query.document.object', 'command.document.object.layer.visibility.set',
+    'command.document.object.undo', 'command.document.object.redo',
   ]);
   assert.equal(descriptor.availability.state, 'available');
   assert.equal(descriptor.availability.reason, null);
@@ -336,15 +337,121 @@ test('timing declaration and closed transport definitions retain the accepted se
   assert.equal(timing.id, 'native.object.layer-timing'); assert.deepEqual(timing.operations, ['query.document.object.layer.timing']);
   assert.equal(timing.availability.state, 'available'); assert.ok(timing.ports.every(port => port.state === 'pending'));
   assert.equal(branch.allOf[0].$ref, '#/$defs/ForbiddenRevisionRequest'); assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectLayerTimingPayload');
-  const normalize = value => JSON.parse(JSON.stringify(value).replaceAll('#/$defs/ObjectLayerTimingFrame', '#/$defs/Frame'));
+  const timingReferences = Object.fromEntries([
+    ['ObjectLayerTimingFrame','Frame'], ['ObjectLayerTimingCellPayload','CellSelector'],
+    ['ObjectLayerRangePayload','RangeSelector'], ['ObjectLayerTimingCellResult','CellReadResult'],
+    ['ObjectLayerRangeResult','RangeReadResult'], ['ObjectLayerPlacementPayload','PlacementSelector'],
+    ['ObjectLayerPlacementResult','PlacementReadResult']
+  ].map(([from,to])=>['#/$defs/'+from,'#/$defs/'+to]));
+  const normalize = value => JSON.parse(JSON.stringify(value),(key,entry)=>key==='$ref'&&Object.hasOwn(timingReferences,entry)?timingReferences[entry]:entry);
+  // Preserve both original cell and admitted range contracts down to their closed leaf definitions.
+  for(const [from,to] of [['ObjectLayerTimingCellPayload','CellSelector'],['ObjectLayerRangePayload','RangeSelector'],
+    ['ObjectLayerTimingCellResult','CellReadResult'],['ObjectLayerRangeResult','RangeReadResult'],
+    ['ObjectLayerPlacementPayload','PlacementSelector'],['ObjectLayerPlacementResult','PlacementReadResult']])assert.deepEqual(normalize(transport.$defs[from]),accepted[to]);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingPayload), accepted.Selector);
   assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingResult), accepted.ReadResult);
   assert.deepEqual(transport.$defs.ObjectLayerTimingFrame, accepted.Frame);
   assert.ok(transport.$defs.ResponseBase.properties.result.oneOf.some(value => value.$ref === '#/$defs/ObjectLayerTimingResult'));
+  // This subset validator has no oneOf: check the same declared exclusive branches.
+  const validateSelector=value=>{const branches=transport.$defs.ObjectLayerTimingPayload.oneOf.map(branch=>validate(branch,value,transport.$defs));return branches.filter(errors=>errors.length===0).length===1?[]:['selector must match exactly one declared branch'];};
   const request = timing.examples[0].request; assert.equal(validateRequest(request), request);
-  assert.deepEqual(validate(transport.$defs.ObjectLayerTimingPayload, request.payload, transport.$defs), []);
-  for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }]) {
-    assert.ok(validate(transport.$defs.ObjectLayerTimingPayload, bad, transport.$defs).length);
+  assert.deepEqual(validateSelector(request.payload), []);
+  const rangeRequest={...request,payload:{...request.payload,view:'range'}};
+  assert.equal(validateRequest(rangeRequest),rangeRequest);
+  assert.deepEqual(validateSelector(rangeRequest.payload),[]);
+  // T12 placement view: the same selector with its own view constant.
+  const placementRequest={...request,payload:{...request.payload,view:'placement'}};
+  assert.equal(validateRequest(placementRequest),placementRequest);
+  assert.deepEqual(validateSelector(placementRequest.payload),[]);
+  const placement=timing.examples.find(e=>e.request.payload.view==='placement');
+  assert.equal(validateRequest(placement.request),placement.request);
+  assert.doesNotThrow(()=>validateResponse(placement.response,placement.request.requestId,placement.request.operation));
+  assert.deepEqual(validate(transport.$defs.ObjectLayerPlacementResult,placement.response.result,transport.$defs),[]);
+  for(const bad of [{assetKind:'image'},{offsetFrames:'0'},{interpMode:''},{frameBlend:1},{sourceFrameCount:0},{sourceFrameCount:1.5},{timeRemap:{keyCount:-1,keyAtFrame:true}},{timeRemap:{keyCount:1}},{extra:1}]){
+    const result={...placement.response.result,placement:{...placement.response.result.placement,...bad}};
+    assert.throws(()=>validateResponse({...placement.response,result},placement.request.requestId,placement.request.operation),TypeError,JSON.stringify(bad));
+  }
+  const counted={...placement.response,result:{...placement.response.result,placement:{...placement.response.result.placement,sourceFrameCount:48}}};
+  assert.doesNotThrow(()=>validateResponse(counted,placement.request.requestId,placement.request.operation));
+  const empty={...placement.response,result:{...placement.response.result,placement:null}};
+  assert.doesNotThrow(()=>validateResponse(empty,placement.request.requestId,placement.request.operation));
+  for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }, {...rangeRequest.payload,view:'other'}]) {
+    assert.ok(validateSelector(bad).length);
   }
   assert.equal(load('engineering/application/capabilities-v2/native-object-layer-create.json').availability.state, 'available');
+});
+
+
+test('public object Undo and Redo declare closed revision-pinned commands and exact compact receipts', () => {
+  for (const action of ['undo', 'redo']) {
+    const request = { apiVersion: 2, requestId: `object-${action}`, instanceId: 'instance-A',
+      documentId: 'document-A', expectedRevision: 7, operation: `command.document.object.${action}`,
+      payload: { command: `object.${action}` } };
+    const branch = transport.$defs.Request.oneOf.find(entry =>
+      entry.allOf?.some(part => part.properties?.operation?.const === request.operation));
+    assert.equal(branch.allOf[0].$ref, '#/$defs/RequiredRevisionRequest');
+    const payloadRef = `#/$defs/Object${action === 'undo' ? 'Undo' : 'Redo'}Payload`;
+    assert.equal(branch.allOf[1].properties.payload.$ref, payloadRef);
+    const payload = transport.$defs[payloadRef.slice('#/$defs/'.length)];
+    assert.equal(payload.additionalProperties, false); assert.deepEqual(payload.required, ['command']);
+    assert.deepEqual(validate(payload, request.payload, transport.$defs), []);
+    assert.strictEqual(validateRequest(request), request);
+    for (const invalid of [null, [], {}, { command: `object.${action}`, extra: true },
+      { command: `object.${action === 'undo' ? 'redo' : 'undo'}` }, { command: null }]) {
+      assert.ok(validate(payload, invalid, transport.$defs).length);
+      assert.throws(() => validateRequest({ ...request, payload: invalid }));
+    }
+    const { expectedRevision, ...missing } = request;
+    assert.throws(() => validateRequest(missing));
+    for (const invalid of [null, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])
+      assert.throws(() => validateRequest({ ...request, expectedRevision: invalid }));
+    assert.throws(() => validateRequest({ ...request, extra: true }));
+    assert.deepEqual(transport.$defs.RequiredRevisionRequest.allOf[1].required, ['expectedRevision']);
+    const response = { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId,
+      documentId: request.documentId, contentRevision: 8, ok: true,
+      result: { applied: true, historyEntriesAdded: 0 } };
+    assert.strictEqual(validateResponse(response, request.requestId, request.operation), response);
+    assert.deepEqual(validate(transport.$defs.ObjectHistoryResult, response.result, transport.$defs), []);
+    assert.deepEqual(validate(transport.$defs.CommandResult, response.result, transport.$defs), []);
+    for (const result of [null, {}, { applied: false, historyEntriesAdded: 0 },
+      { applied: true, historyEntriesAdded: 1 }, { applied: true, historyEntriesAdded: null },
+      { applied: true, historyEntriesAdded: Number.MAX_SAFE_INTEGER + 1 },
+      { applied: true, historyEntriesAdded: 0, extra: true }]) {
+      assert.ok(validate(transport.$defs.ObjectHistoryResult, result, transport.$defs).length);
+      assert.throws(() => validateResponse({ ...response, result }, request.requestId, request.operation));
+    }
+    const { result, ...missingResult } = response;
+    assert.throws(() => validateResponse(missingResult, request.requestId, request.operation));
+    assert.throws(() => validateResponse(response, 'other-request', request.operation));
+    const oversized = { ...missingResult, ok: false, error: { code: 'busy_conflict', message: 'x'.repeat(4096) } };
+    assert.throws(() => validateResponse(oversized, request.requestId, request.operation), /4096/);
+    // The legacy opacity domain still requires its original empty payload.
+    assert.deepEqual(validateRequest({ ...request, operation: `history.${action}`, payload: {} }).payload, {});
+    assert.throws(() => validateRequest({ ...request, operation: `history.${action}` }));
+  }
+});
+
+test('public object history dispatch preserves owner and advanced revision correlation', async () => {
+  for (const action of ['undo', 'redo']) {
+    const request = { apiVersion: 2, requestId: `dispatch-${action}`, instanceId: 'instance-A',
+      documentId: 'document-A', expectedRevision: 7, operation: `command.document.object.${action}`,
+      payload: { command: `object.${action}` } };
+    const response = { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId,
+      documentId: request.documentId, contentRevision: 8, ok: true,
+      result: { applied: true, historyEntriesAdded: 0 } };
+    let sent;
+    const adapter = createNativeApplicationAdapter('ui', { dispatch: value => { sent = value; return response; } });
+    assert.strictEqual(await adapter.dispatch(request), response);
+    assert.deepEqual(sent, request); assert.notStrictEqual(sent, request);
+    for (const invalid of [{ ...response, documentId: 'foreign' }, { ...response, instanceId: 'foreign' },
+      { ...response, contentRevision: 7 }, { ...response, contentRevision: 9 },
+      { ...response, result: { applied: true, historyEntriesAdded: 1 } }]) {
+      const bad = createNativeApplicationAdapter('ui', { dispatch: () => invalid });
+      await assert.rejects(bad.dispatch(request));
+    }
+    const failed = { ...response, ok: false, contentRevision: 7,
+      error: { code: 'busy_conflict', message: 'Object history could not move.' } };
+    delete failed.result;
+    assert.strictEqual(await createNativeApplicationAdapter('ui', { dispatch: () => failed }).dispatch(request), failed);
+  }
 });

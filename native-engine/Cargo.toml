@@ -16,12 +16,12 @@ font_asset_admission = ["project_media_codec", "dep:read-fonts"]
 font_asset_wire = ["font_asset_admission"]
 commands = ["codec"]
 history = ["commands"]
-evaluation = ["commands"]
+evaluation = ["commands", "dep:libm"]
 scheduler = ["evaluation"]
 compositor = ["scheduler", "dep:vello", "dep:wgpu", "dep:pollster"]
 viewport = ["compositor", "dep:raw-window-handle"]
 export_job = ["history", "compositor", "dep:png"]
-application = ["history", "export_job"]
+application = ["history", "export_job", "object_expression_runtime"]
 object_expression_pin = ["history", "evaluation"]
 object_expression_runtime = ["object_expression_pin", "dep:rquickjs"]
 # Test harness selectors are separate from production module availability.
@@ -38,6 +38,8 @@ test-object_expression_pin = ["object_expression_pin"]
 test-object_expression_runtime = ["object_expression_runtime"]
 
 [dependencies]
+# #2130: portable trig for Paper-compatible rotation; already pinned transitively.
+libm = { version = "=0.2.16", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 # Reproduction's object export must preserve adjacent f64 command values.
 serde_json = { version = "1", features = ["float_roundtrip", "raw_value"], optional = true }
@@ -51,6 +53,11 @@ miniz_oxide = { version = "=0.9.1", default-features = false, optional = true }
 base64 = { version = "=0.22.1", optional = true }
 read-fonts = { version = "=0.39.2", optional = true }
 rquickjs = { version = "=0.14.0", default-features = false, features = ["std"], optional = true }
+# L02-I (#2108): the polygon boolean / eraser engine of the native boolean join. MIT OR Apache-2.0,
+# edition 2024 / rust-version 1.88; the rayon feature stays off (single-threaded, deterministic).
+i_overlay = { version = "=9.0.0", default-features = false }
+# T10: retained fill geometry, independent of compositor/WASM feature availability.
+kurbo = "=0.13.1"
 
 [[test]]
 name = "codec"

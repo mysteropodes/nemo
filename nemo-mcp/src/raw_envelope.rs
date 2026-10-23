@@ -94,7 +94,7 @@ impl<R: AsyncRead> GuardedInput<R> {
     pub(super) fn new(reader: R, max_content_bytes: usize) -> Self {
         Self {
             reader: BufReader::new(reader),
-            frame: Vec::with_capacity(max_content_bytes + 1),
+            frame: Vec::with_capacity((64 * 1024).min(max_content_bytes + 1)),
             max_content_bytes,
             output_at: 0,
             ready: false,
@@ -104,7 +104,21 @@ impl<R: AsyncRead> GuardedInput<R> {
     }
     fn finish_frame(&mut self) {
         let view = self.frame.strip_prefix(UTF8_BOM).unwrap_or(&self.frame);
-        if self.discarding || matches!(check_unique(view), Err(RawEnvelopeError::Duplicate)) {
+        let content = view.strip_suffix(b"\n").unwrap_or(view);
+        let prefix_bytes = self.frame.len() - view.len();
+        let original_content_len = self.frame.strip_suffix(b"\n").unwrap_or(&self.frame).len();
+        let outer_oversize = original_content_len > crate::contract::MAX_MESSAGE_BYTES - 2
+            && !super::native_request_bytes::clipboard_wrapper_admitted(
+                content,
+                true,
+                prefix_bytes,
+            );
+        let invalid_native = match check_unique(view) {
+            Err(RawEnvelopeError::Duplicate) => true,
+            Ok(()) => super::native_request_bytes::check(view).is_err(),
+            Err(RawEnvelopeError::Malformed(_)) => false,
+        };
+        if self.discarding || invalid_native || outer_oversize {
             self.frame.clear();
             self.frame.extend_from_slice(INVALID_FRAME);
         }

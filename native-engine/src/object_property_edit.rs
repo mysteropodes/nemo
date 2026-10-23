@@ -9,6 +9,8 @@ use crate::request_receipts::DispatchErrorCode;
 use serde::Deserialize;
 use serde_json::Number;
 
+#[path = "object_property_bake_edit.rs"]
+mod bake_edit;
 #[path = "object_property_curve_edits.rs"]
 mod curves;
 #[path = "object_property_track_edit.rs"]
@@ -77,6 +79,12 @@ pub(crate) struct PreparedPropertyEdit {
     document: ObjectDocument,
     changed: bool,
 }
+impl PreparedPropertyEdit {
+    /// The proposed document, for a caller that chains further edits before sealing its own candidate.
+    pub(super) fn into_document(self) -> ObjectDocument {
+        self.document
+    }
+}
 fn finite(n: &Number) -> Result<f64, DispatchErrorCode> {
     n.as_f64()
         .filter(|v| v.is_finite())
@@ -132,40 +140,62 @@ fn track(record: &mut PropertyRecord) -> &mut OrderTrack {
 fn set_key(
     record: &mut PropertyRecord,
     frame: Number,
-    mut values: Vec<Number>,
+    values: Vec<Number>,
     curve: Option<Vec<OrderCurvePoint>>,
 ) {
-    let keys = &mut track(record).keys;
-    let at = frame.as_f64().unwrap();
-    if let Some(key) = keys.iter_mut().find(|key| key.frame.as_f64() == Some(at)) {
-        preserve_values(&key.v, &mut values);
-        key.v = values;
-        if let Some(mut curve) = curve {
-            if let Some(Some(before)) = key.curve_points.value() {
-                preserve_curve(before, &mut curve);
+    track(record).scalar_intent_key(frame, values, curve);
+}
+impl OrderTrack {
+    pub(crate) fn scalar_intent_key(
+        &mut self,
+        frame: Number,
+        mut values: Vec<Number>,
+        curve: Option<Vec<OrderCurvePoint>>,
+    ) {
+        let keys = &mut self.keys;
+        let at = frame.as_f64().unwrap();
+        if let Some(key) = keys.iter_mut().find(|key| key.frame.as_f64() == Some(at)) {
+            preserve_values(&key.v, &mut values);
+            key.v = values;
+            if let Some(mut curve) = curve {
+                if let Some(Some(before)) = key.curve_points.value() {
+                    preserve_curve(before, &mut curve);
+                }
+                key.curve_points = Presence::Present(Some(curve));
             }
-            key.curve_points = Presence::Present(Some(curve));
+        } else {
+            keys.push(OrderKey {
+                frame,
+                v: values,
+                hold: Presence::Missing,
+                lock_to: Presence::Missing,
+                curve_points: Presence::Present(Some(curve.unwrap_or_else(default_curve))),
+                h_in: Presence::Present(vec![0.into(), 0.into()]),
+                h_out: Presence::Present(vec![0.into(), 0.into()]),
+            });
+            keys.sort_by(|a, b| {
+                a.frame
+                    .as_f64()
+                    .unwrap()
+                    .total_cmp(&b.frame.as_f64().unwrap())
+            });
         }
-    } else {
-        keys.push(OrderKey {
-            frame,
-            v: values,
-            hold: Presence::Missing,
-            curve_points: Presence::Present(Some(curve.unwrap_or_else(default_curve))),
-            h_in: Presence::Present(vec![0.into(), 0.into()]),
-            h_out: Presence::Present(vec![0.into(), 0.into()]),
-        });
-        keys.sort_by(|a, b| {
-            a.frame
-                .as_f64()
-                .unwrap()
-                .total_cmp(&b.frame.as_f64().unwrap())
-        });
     }
 }
 impl ObjectFillOwner {
     pub(crate) fn prepare_property_edit_json(
         &self,
+        bytes: &[u8],
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
+        let origin = self.current_snapshot();
+        let document = origin.document().clone();
+        Self::apply_property_edit_json(origin, document, bytes)
+    }
+    /// The same strict edit applied to `document`, a working copy of `origin` (the snapshot the
+    /// candidate is sealed to), so a chain of edits stays one atomic candidate.
+    pub(super) fn apply_property_edit_json(
+        origin: ObjectSnapshot,
+        mut document: ObjectDocument,
         bytes: &[u8],
     ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
         if bytes.len() > 4096 {
@@ -179,8 +209,6 @@ impl ObjectFillOwner {
         if matches!(payload.property.as_str(), "order" | "timeRemap") {
             return Err(DispatchErrorCode::Unavailable);
         }
-        let origin = self.current_snapshot();
-        let mut document = origin.document().clone();
         let mut holders = document
             .property_holders
             .value()
@@ -190,25 +218,32 @@ impl ObjectFillOwner {
         let mut holder = index
             .map(|i| holders[i].clone())
             .unwrap_or_else(|| PropertyHolder {
+                mesh_source: Presence::Missing,
                 target: payload.target.clone(),
                 controls: Presence::Missing,
                 properties: vec![],
             });
         // Validate even a no-op selector; absent targets cannot invent a holder.
-        crate::object_document::validate_property_holders(
+        PropertyHolder::validate_with_items(
             &Presence::Present(vec![holder.clone()]),
             &document.layers,
             &document.objects,
             document.composition_order.value(),
+            document.component_tables(),
+            document.items.value(),
+            document.image_meshes.value(),
         )
         .map_err(|_| DispatchErrorCode::NotFound)?;
         let metadata = holder
-            .metadata(&payload.property)
+            .metadata_in_document(&document, &payload.property)
             .ok_or(DispatchErrorCode::Unavailable)?;
         let record_index = holder
             .properties
             .iter()
             .position(|r| r.property == payload.property);
+        if record_index.is_none() && PropertyHolder::mesh_is_unbound(&document, &payload.target) {
+            return Err(DispatchErrorCode::Unavailable);
+        }
         let mut record = record_index
             .map(|i| holder.properties[i].clone())
             .unwrap_or_else(|| PropertyRecord {
@@ -337,5 +372,42 @@ impl ObjectFillOwner {
         self.revisions
             .publish(candidate.document)
             .map_err(|_| DispatchErrorCode::Unavailable)
+    }
+}
+
+// Text selector holders share the exact existing key mutation/number preservation.
+impl PropertyRecord {
+    pub(crate) fn scalar_intent_keyed(&self) -> bool {
+        keyed(self)
+    }
+    pub(crate) fn scalar_intent_value(
+        &mut self,
+        frame: Number,
+        value: Number,
+        force_key: bool,
+        curve: Option<Vec<OrderCurvePoint>>,
+    ) {
+        let mut values = vec![value];
+        if force_key || keyed(self) {
+            set_key(self, frame, values, curve);
+        } else {
+            if let Some(before) = self.static_value.value() {
+                preserve_values(before, &mut values);
+            }
+            self.static_value = Presence::Present(values);
+        }
+    }
+    pub(crate) fn scalar_intent_remove(&mut self, at: f64) {
+        if let Presence::Present(t) = &mut self.track {
+            t.keys.retain(|k| k.frame.as_f64() != Some(at));
+        }
+    }
+    pub(crate) fn scalar_intent_freeze(&mut self, value: Number) {
+        track(self).keys.clear();
+        let mut values = vec![value];
+        if let Some(before) = self.static_value.value() {
+            preserve_values(before, &mut values);
+        }
+        self.static_value = Presence::Present(values);
     }
 }

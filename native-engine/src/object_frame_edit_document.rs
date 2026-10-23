@@ -178,7 +178,11 @@ fn remap(
 }
 
 /// Remove one layer's authored records and order elements at the matching frames; emptied scopes stay.
-fn drop_cells(document: &mut ObjectDocument, layer: &str, matches: &dyn Fn(u32) -> bool) {
+pub(crate) fn drop_cells(
+    document: &mut ObjectDocument,
+    layer: &str,
+    matches: &dyn Fn(u32) -> bool,
+) {
     document.objects.retain(|record| {
         !(scene_authored(record)
             && record.target.layer_uid == layer
@@ -195,7 +199,7 @@ fn drop_cells(document: &mut ObjectDocument, layer: &str, matches: &dyn Fn(u32) 
 
 /// Copy one layer's authored cell (records appended in order, order elements) to another frame. Stroke ids,
 /// geometry, fill, natural positions and authored order are copied as they are.
-fn clone_cell(document: &mut ObjectDocument, layer: &str, from: u32, to: u32) {
+pub(crate) fn clone_cell(document: &mut ObjectDocument, layer: &str, from: u32, to: u32) {
     let copies: Vec<ObjectRecord> = document
         .objects
         .iter()
@@ -439,6 +443,12 @@ pub(crate) fn demote_span(
     finish(next)
 }
 
+// L05-E (lane #2111): the document half of the key retime (moveKeyframe, F10); a child so the scope helpers stay private.
+#[path = "object_exposure_edit_retime_document.rs"]
+mod object_exposure_edit_retime_document;
+pub(crate) use object_exposure_edit_retime_document::{
+    retime_key, retime_key_with_active, RetimeOutcome,
+};
 #[cfg(test)]
 #[path = "../tests/object_frame_edit_document_build.rs"]
 mod build;

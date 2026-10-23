@@ -9,7 +9,28 @@
 // so they can't desync from anything. state.bpm / state.bpmOffset /
 // state.bpmShow are the whole model.
 (function () {
+  function native() { return !!(window.__TAURI__ && window.__TAURI__.core); }
+  function projection(onRefusal) {
+    var c = window.NemoNativeCompositionController;
+    if (!c && typeof onRefusal === 'function') try { onRefusal('controller-missing'); } catch (_) {}
+    return c && c.read(onRefusal);
+  }
+  function settingsRefused(code) {
+    try {
+      var desktop = window.NemoNativeObjectProjectDesktop;
+      if (desktop && typeof desktop.openDiagnostic === 'function') desktop.openDiagnostic(window, 'bpm-settings-refused', code);
+    } catch (_) {}
+  }
+  function submit(action, origin) {
+    var c = window.NemoNativeCompositionController;
+    if (!c || !origin) { if (window.showToast) showToast('Native BPM settings are unavailable.'); return; }
+    return c.edit(action, origin);
+  }
   function cfg() {
+    if (native()) {
+      var p = projection(), c = p && p.composition;
+      return c ? { bpm: c.effectiveBpm, offset: c.effectiveBpmOffset, on: c.effectiveBpmShow } : { bpm: 120, offset: 0, on: false };
+    }
     if (state.bpm == null) state.bpm = 120;
     if (state.bpmOffset == null) state.bpmOffset = 0;   // frames before the first beat
     return { bpm: state.bpm, offset: state.bpmOffset, on: !!state.bpmShow };
@@ -34,7 +55,7 @@
   // Nearest beat to a frame — the snap used by the layer bars and keyframes
   // when the grid is on and Shift is held.
   function snapFrame(frame) {
-    if (!state.bpmShow) return frame;
+    if (!cfg().on) return frame;
     var fpb = framesPerBeat();
     if (fpb < 0.5) return frame;
     var c = cfg();
@@ -46,7 +67,7 @@
     var grid = document.getElementById('frame-grid');
     if (!grid) return;
     Array.prototype.slice.call(grid.querySelectorAll('.bpm-line')).forEach(function (el) { el.remove(); });
-    if (!state.bpmShow) return;
+    if (!cfg().on) return;
     var beats = beatFrames();
     var frag = document.createDocumentFragment();
     beats.forEach(function (b) {
@@ -61,14 +82,102 @@
     grid.appendChild(frag);
   }
 
-  function openSettings() {
+  var dismissSettings = null, pendingSettings = null;
+  function openNativeSettings(origin, c) {
+    if (dismissSettings) return;
+    var owner = window.NemoNativeCompositionController;
+    if (!owner || typeof owner.edit !== 'function') { submit({}, null); return; }
+    // Keep the original projection throughout text entry; confirmation must not rebase it.
+    var previousFocus = document.activeElement, tempo = null, offsetStage = false;
+    function element(tag, className, text) {
+      var el = document.createElement(tag);
+      if (className) el.className = className;
+      if (text) el.textContent = text;
+      return el;
+    }
+    var overlay = element('div', 'modal-overlay'); overlay.id = 'bpm-settings-dialog';
+    // Like the existing export dialog, stay outside the native AppKit canvas column.
+    overlay.style.justifyContent = 'flex-end'; overlay.style.paddingRight = '10px'; overlay.style.boxSizing = 'border-box';
+    var form = element('form', 'modal-box');
+    form.style.width = '260px'; form.style.maxWidth = 'calc(100vw - 20px)';
+    form.setAttribute('role', 'dialog'); form.setAttribute('aria-modal', 'true');
+    form.setAttribute('aria-labelledby', 'bpm-settings-label');
+    var header = element('div', 'modal-hdr'); header.appendChild(element('span', '', 'BPM'));
+    var x = element('button', 'modal-x', '×'); x.type = 'button'; x.id = 'bpm-settings-close';
+    x.setAttribute('aria-label', 'Close'); header.appendChild(x); form.appendChild(header);
+    var body = element('div', 'modal-bdy');
+    var label = element('label'); label.id = 'bpm-settings-label'; label.htmlFor = 'bpm-settings-value';
+    var input = element('input', 'pi'); input.id = 'bpm-settings-value'; input.type = 'text';
+    input.inputMode = 'decimal'; input.style.width = '100%';
+    body.appendChild(label); body.appendChild(input);
+    var actions = element('div', 'pr'); actions.style.justifyContent = 'flex-end';
+    var cancel = element('button', 'pbtn', 'Cancel'); cancel.type = 'button'; cancel.id = 'bpm-settings-cancel';
+    var confirm = element('button', 'pbtn ac', 'OK'); confirm.type = 'submit'; confirm.id = 'bpm-settings-confirm';
+    actions.appendChild(cancel); actions.appendChild(confirm); body.appendChild(actions);
+    form.appendChild(body); overlay.appendChild(form);
+    function close() {
+      if (dismissSettings !== close) return;
+      dismissSettings = null; overlay.remove();
+      if (previousFocus && previousFocus.isConnected && typeof previousFocus.focus === 'function') previousFocus.focus();
+    }
+    function commit(action) {
+      if (dismissSettings !== close) return;
+      close();
+      if (window.NemoNativeCompositionController !== owner) { submit({}, null); return; }
+      return owner.edit(action, origin);
+    }
+    function stage() {
+      label.textContent = offsetStage ? 'Décalage du premier temps, en frames' : 'Tempo en BPM (0 pour masquer la grille)';
+      input.value = String(offsetStage ? c.offset : c.bpm); input.focus(); input.select();
+    }
+    form.addEventListener('submit', function (event) {
+      event.preventDefault(); event.stopPropagation();
+      if (dismissSettings !== close) return;
+      if (offsetStage) return commit({ kind: 'setBpm', bpm: tempo, bpmOffset: Math.max(0, parseInt(input.value, 10) || 0), bpmShow: true });
+      tempo = parseFloat(input.value);
+      if (isNaN(tempo) || tempo <= 0) return commit({ kind: 'setBpm', bpmShow: false });
+      offsetStage = true; stage();
+    });
+    x.addEventListener('click', close); cancel.addEventListener('click', close);
+    overlay.addEventListener('click', function (event) { if (event.target === overlay) close(); });
+    overlay.addEventListener('keydown', function (event) {
+      event.stopPropagation();
+      if (event.key === 'Escape') { event.preventDefault(); close(); }
+    });
+    dismissSettings = close; document.body.appendChild(overlay); stage();
+  }
+  window.addEventListener('pagehide', function () { pendingSettings = null; if (dismissSettings) dismissSettings(); }, { once: true });
+
+  function openSettings(origin) {
+    if (native()) {
+      if (dismissSettings || pendingSettings) return;
+      var supplied = arguments.length, refusal = null;
+      origin = supplied ? origin : projection(function (code) { refusal = code; settingsRefused(code); });
+      if (!origin) {
+        var owner = window.NemoNativeCompositionController;
+        if (!supplied && refusal === 'presentation-missing' && owner && typeof owner.readWhenPresented === 'function') {
+          var request = pendingSettings = {};
+          function settled(value) {
+            if (pendingSettings !== request) return;
+            pendingSettings = null;
+            if (window.NemoNativeCompositionController !== owner || !value || owner.read() !== value) { submit({}, null); return; }
+            return openNativeSettings(value, { bpm: value.composition.effectiveBpm, offset: value.composition.effectiveBpmOffset });
+          }
+          try { return Promise.resolve(owner.readWhenPresented()).then(settled, function () { return settled(null); }); }
+          catch (_) { return settled(null); }
+        }
+        submit({}, null); return;
+      }
+      return openNativeSettings(origin, { bpm: origin.composition.effectiveBpm, offset: origin.composition.effectiveBpmOffset });
+    }
     var c = cfg();
     var v = prompt('Tempo en BPM (0 pour masquer la grille)', String(c.bpm));
     if (v === null) return;
     var bpm = parseFloat(v);
-    if (isNaN(bpm) || bpm <= 0) { state.bpmShow = false; refresh(); return; }
+    if (isNaN(bpm) || bpm <= 0) { if (native()) { submit({ kind: 'setBpm', bpmShow: false }, origin); return; } state.bpmShow = false; refresh(); return; }
     var o = prompt('Décalage du premier temps, en frames', String(c.offset));
     if (o === null) return;
+    if (native()) return submit({ kind: 'setBpm', bpm: bpm, bpmOffset: Math.max(0, parseInt(o, 10) || 0), bpmShow: true }, origin);
     state.bpm = bpm;
     state.bpmOffset = Math.max(0, parseInt(o, 10) || 0);
     state.bpmShow = true;
@@ -76,6 +185,7 @@
     if (window.showToast) showToast(bpm + ' BPM — ' + framesPerBeat().toFixed(2) + ' frames par temps');
   }
   function toggle() {
+    if (native()) { var p = projection(); return submit({ kind: 'setBpm', bpmShow: !cfg().on }, p); }
     state.bpmShow = !state.bpmShow;
     if (state.bpmShow && !state.bpm) state.bpm = 120;
     refresh();
@@ -84,7 +194,7 @@
   function refresh() {
     render();
     var b = document.getElementById('btn-bpm');
-    if (b) b.classList.toggle('active', !!state.bpmShow);
+    if (b) b.classList.toggle('active', cfg().on);
   }
 
   function init() {

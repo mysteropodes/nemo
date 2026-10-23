@@ -1,0 +1,573 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mysteropodes/nemo/engineering/application/native-bitmap-brush-resources-v1.schema.json",
+  "description": "Lane-7 bitmap-brush resource operations: publish one admitted embedded PNG asset as a brush bitmap in the native charged store (command.document.object.brush.bitmap.publish), and read one store row or the brush part of one pinned scene (query.document.object.brush.bitmap). Names ids and sizes only: pixels reach the native owner as a project asset, never through this contract. The native owner repeats every rule on the original bytes; this document is the closed public shape.",
+  "$comment": "Bounds, request/reply correlation and the 4096-byte envelope are also enforced by the SDK contract (native-bitmap-brush-resources-contract.js) and the common Rust validators (native_brush_resource_contract.rs).",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "Opaque": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "\\S",
+      "description": "Authored bytes are preserved; no identifier grammar is invented. Not blank. The schema is looser by design than the validators: maxLength counts characters here while the validators bound the UTF-8 byte length at 255, and the validators also refuse NUL."
+    },
+    "Revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "Version": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$",
+      "description": "The decimal store version (a u64 counter that starts at one); the validators additionally bound it to u64::MAX."
+    },
+    "Side": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096,
+      "description": "Pixels per side. The baseline baker (bakeToCanvas, MAX_TEX) never leaves a canvas larger than 4096."
+    },
+    "Cost": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 67108864,
+      "description": "Decoded RGBA bytes, always width * height * 4 (the validators check the product; JSON Schema cannot)."
+    },
+    "Publish": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "documentSnapshotId",
+        "assetId",
+        "brushId",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.brush.bitmap.publish"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "assetId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "brushId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "width": {
+          "$ref": "#/$defs/Side"
+        },
+        "height": {
+          "$ref": "#/$defs/Side"
+        }
+      }
+    },
+    "PublishResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applied",
+        "historyEntriesAdded",
+        "brushId",
+        "version",
+        "width",
+        "height",
+        "bytes"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "historyEntriesAdded": {
+          "const": 0
+        },
+        "brushId": {
+          "$ref": "#/$defs/Opaque"
+        },
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "width": {
+          "$ref": "#/$defs/Side"
+        },
+        "height": {
+          "$ref": "#/$defs/Side"
+        },
+        "bytes": {
+          "$ref": "#/$defs/Cost"
+        }
+      }
+    },
+    "InspectQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "atRevision",
+        "documentSnapshotId",
+        "brushId"
+      ],
+      "properties": {
+        "action": {
+          "const": "inspect"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "brushId": {
+          "$ref": "#/$defs/Opaque"
+        }
+      }
+    },
+    "SceneQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "frame",
+        "offset",
+        "limit"
+      ],
+      "properties": {
+        "action": {
+          "const": "scene"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "limit": {
+          "const": 1
+        }
+      }
+    },
+    "Query": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/InspectQuery"
+        },
+        {
+          "$ref": "#/$defs/SceneQuery"
+        }
+      ]
+    },
+    "Bitmap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "width",
+        "height",
+        "bytes"
+      ],
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/Version"
+        },
+        "width": {
+          "$ref": "#/$defs/Side"
+        },
+        "height": {
+          "$ref": "#/$defs/Side"
+        },
+        "bytes": {
+          "$ref": "#/$defs/Cost"
+        }
+      }
+    },
+    "BrushRow": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "brushId",
+            "resident"
+          ],
+          "properties": {
+            "brushId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "resident": {
+              "const": false
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "brushId",
+            "resident",
+            "version",
+            "width",
+            "height",
+            "bytes"
+          ],
+          "properties": {
+            "brushId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "resident": {
+              "const": true
+            },
+            "version": {
+              "$ref": "#/$defs/Version"
+            },
+            "width": {
+              "$ref": "#/$defs/Side"
+            },
+            "height": {
+              "$ref": "#/$defs/Side"
+            },
+            "bytes": {
+              "$ref": "#/$defs/Cost"
+            }
+          }
+        }
+      ]
+    },
+    "InspectResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "brush"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "brush": {
+          "$ref": "#/$defs/BrushRow"
+        }
+      }
+    },
+    "SceneEntry": {
+      "description": "One brush-bearing record of the pinned scene, in the order of the packet's numeric order plan. Exactly one of ink (the leased bitmap) or unavailable (the typed reason it is not drawn); an unavailable ink is never omitted.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sourceObjectIndex",
+            "layerUid",
+            "strokeId",
+            "brushId",
+            "ink"
+          ],
+          "properties": {
+            "sourceObjectIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 262144
+            },
+            "layerUid": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "strokeId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "brushId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "ink": {
+              "$ref": "#/$defs/Bitmap"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sourceObjectIndex",
+            "layerUid",
+            "strokeId",
+            "brushId",
+            "unavailable"
+          ],
+          "properties": {
+            "sourceObjectIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 262144
+            },
+            "layerUid": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "strokeId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "brushId": {
+              "$ref": "#/$defs/Opaque"
+            },
+            "unavailable": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code"
+              ],
+              "properties": {
+                "code": {
+                  "$ref": "#/$defs/Opaque"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SceneResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "frame",
+        "offset",
+        "nextOffset",
+        "totalEntries",
+        "entries"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frame": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "nextOffset": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalEntries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/SceneEntry"
+          }
+        }
+      }
+    },
+    "Input": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Publish"
+        },
+        {
+          "$ref": "#/$defs/InspectQuery"
+        },
+        {
+          "$ref": "#/$defs/SceneQuery"
+        }
+      ]
+    },
+    "Output": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PublishResult"
+        },
+        {
+          "$ref": "#/$defs/InspectResult"
+        },
+        {
+          "$ref": "#/$defs/SceneResult"
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "label": "Publish one admitted PNG asset as the brush bitmap i1:abc (not available until the native route is registered); the revision does not move",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "brush-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.brush.bitmap.publish",
+        "payload": {
+          "command": "object.brush.bitmap.publish",
+          "documentSnapshotId": "snapshot-7",
+          "assetId": "asset-project-asset-1",
+          "brushId": "i1:abc",
+          "width": 241,
+          "height": 41
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "brush-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 0,
+          "brushId": "i1:abc",
+          "version": "1",
+          "width": 241,
+          "height": 41,
+          "bytes": 39524
+        }
+      }
+    },
+    {
+      "label": "Read the first brush entry of the scene pinned to snapshot-7, frame 12",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "brush-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.brush.bitmap",
+        "payload": {
+          "action": "scene",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "frame": 12,
+          "offset": 0,
+          "limit": 1
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "brush-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "frame": 12,
+          "offset": 0,
+          "nextOffset": 1,
+          "totalEntries": 2,
+          "entries": [
+            {
+              "sourceObjectIndex": 5,
+              "layerUid": "L1",
+              "strokeId": "native-brush:1:0",
+              "brushId": "i1:abc",
+              "ink": {
+                "version": "3",
+                "width": 241,
+                "height": 41,
+                "bytes": 39524
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "Read the second entry: its ink is missing and stays a typed entry",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "brush-9",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.brush.bitmap",
+        "payload": {
+          "action": "scene",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "frame": 12,
+          "offset": 1,
+          "limit": 1
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "brush-9",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "frame": 12,
+          "offset": 1,
+          "nextOffset": null,
+          "totalEntries": 2,
+          "entries": [
+            {
+              "sourceObjectIndex": 2,
+              "layerUid": "L0",
+              "strokeId": "native-brush:2:0",
+              "brushId": "i1:m1",
+              "unavailable": {
+                "code": "ink-missing"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

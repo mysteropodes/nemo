@@ -2,7 +2,7 @@
 use crate::native_dispatch::{NativeDispatch, NativeReleaseProgress};
 use native_engine::{
     application::ApplicationReleaseReceipt,
-    commands::{OpacityRequest, ResponseEnvelope},
+    commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope},
     document::OpacityDocument,
     export_job::{ExportReleaseReconciliation, JobReceipt, PendingFrame, ReconciliationStage},
     history::{InactiveProject, NativeObjectHistory, PreparedProjectReplacement},
@@ -16,8 +16,23 @@ use std::collections::BTreeMap;
 mod inactive_requests;
 use inactive_requests::InactiveRequest;
 
+#[path = "native_object_retained_tabs.rs"]
+mod retained_tabs;
+use retained_tabs::ParkedProject;
+pub(crate) use retained_tabs::PreparedRetainedActivation;
+
 #[path = "native_object_font.rs"]
 mod font_assets;
+#[path = "native_object_image.rs"]
+mod image_import;
+#[path = "native_object_import_batch.rs"]
+mod import_batch;
+
+#[path = "native_object_expression_state.rs"]
+mod expression_state;
+
+#[path = "native_object_motion_effects.rs"]
+mod motion_effects;
 
 #[path = "native_object_export.rs"]
 mod export;
@@ -34,10 +49,11 @@ fn envelope_identity(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(byte))
 }
 
-/// Exactly one admitted engine owner; no cloned authority or writable host mirror.
+/// Sole routed active history; any parked history remains private and unrouted.
 pub(crate) struct NativeObjectHost {
     history: NativeObjectHistory,
-    inactive_project: Option<(String, InactiveProject)>,
+    inactive_project: Option<(String, Option<InactiveProject>)>,
+    parked_project: Option<ParkedProject>,
     inactive_requests: BTreeMap<String, InactiveRequest>,
     preview: preview::ObjectPreview,
     object_export: Option<export::ObjectExportSession>,
@@ -65,92 +81,21 @@ impl NativeObjectHost {
         Ok(())
     }
 
-    /// Only detached metadata escapes; the actual charged B remains in this host.
-    pub(crate) fn prepare_inactive_project(
+    /// Catalog removal delegates to the existing sealed asset/history owner.
+    /// Keep preflight codes typed for the common API, including changed-body replay.
+    pub(crate) fn remove_asset(
         &mut self,
-        instance: &str,
-        document: &str,
-        revision: u64,
-        snapshot: &str,
-        bytes: &[u8],
-    ) -> Result<serde_json::Value, String> {
-        self.require_inactive_owner(instance, document, revision, snapshot)?;
-        if self.inactive_project.is_some() {
-            return Err("one inactive native project is already retained".into());
+        request: &OpacityRequest,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        if self.released.is_some() {
+            return Err(DispatchErrorCode::Unavailable);
         }
-        let project = self
-            .history
-            .prepare_inactive_project(snapshot, bytes)
-            .map_err(|error| format!("native inactive project admission: {error:?}"))?;
-        let mut info = Self::inactive_metadata(&project)?;
-        if let Some(id) = self.pending_inactive_request_id() {
-            info["preparationRequestId"] = serde_json::json!(id);
+        let before = self.history.content_revision();
+        let response = self.history.dispatch_asset_command(request, None);
+        if self.history.content_revision() != before {
+            self.preview.invalidate();
         }
-        if serde_json::to_vec(&info).map_or(true, |v| v.len() > 65536) {
-            return Err("native inactive project metadata exceeds UI limit".into());
-        }
-        let token = info["preparationToken"]
-            .as_str()
-            .ok_or("native inactive project token unavailable")?
-            .to_owned();
-        self.record_inactive_prepared(&token);
-        self.inactive_project = Some((token, project));
-        Ok(info)
-    }
-
-    fn inactive_metadata(project: &InactiveProject) -> Result<serde_json::Value, String> {
-        let mut info = project
-            .metadata()
-            .map_err(|_| "native inactive project metadata unavailable")?;
-        // The fresh immutable B snapshot identity is an opaque retention token,
-        // never permission to activate or dispatch into B.
-        info["preparationToken"] = info["documentSnapshotId"].clone();
-        if serde_json::to_vec(&info).map_or(true, |bytes| bytes.len() > 65536) {
-            return Err("native inactive project metadata exceeds UI limit".into());
-        }
-        Ok(info)
-    }
-
-    pub(crate) fn inactive_project_info(
-        &self,
-        instance: &str,
-        document: &str,
-        revision: u64,
-        snapshot: &str,
-        token: &str,
-    ) -> Result<serde_json::Value, String> {
-        self.require_inactive_owner(instance, document, revision, snapshot)?;
-        let (retained, project) = self
-            .inactive_project
-            .as_ref()
-            .filter(|(retained, _)| retained == token)
-            .ok_or("native inactive project token is unavailable")?;
-        let info = Self::inactive_metadata(project)?;
-        if info["preparationToken"] != *retained {
-            return Err("native inactive project identity changed".into());
-        }
-        Ok(info)
-    }
-
-    pub(crate) fn close_inactive_project(
-        &mut self,
-        instance: &str,
-        document: &str,
-        revision: u64,
-        snapshot: &str,
-        token: &str,
-    ) -> Result<(), String> {
-        self.require_inactive_owner(instance, document, revision, snapshot)?;
-        if !self
-            .inactive_project
-            .as_ref()
-            .is_some_and(|(retained, _)| retained == token)
-        {
-            return Err("native inactive project token is unavailable".into());
-        }
-        self.inactive_project = None;
-        self.record_inactive_closed(token);
-        Ok(())
+        response
     }
 
     pub(crate) fn matches_project_snapshot(&self, snapshot: &str) -> bool {
@@ -201,6 +146,7 @@ impl NativeObjectHost {
         &mut self,
         prepared: PreparedProjectReplacement,
     ) -> Result<(), String> {
+        self.require_parked_disposable()?;
         if !self
             .release_progress()
             .is_some_and(|progress| progress.reconciliation_complete())
@@ -212,6 +158,7 @@ impl NativeObjectHost {
             .map_err(|_| "native project replacement origin changed".to_string())?;
         self.preview = preview::ObjectPreview::default();
         self.inactive_project = None;
+        self.parked_project = None;
         self.inactive_requests.clear();
         self.object_export = None;
         self.released = None;
@@ -277,6 +224,7 @@ impl NativeObjectHost {
         Ok(Self {
             history,
             inactive_project: None,
+            parked_project: None,
             inactive_requests: BTreeMap::new(),
             preview: preview::ObjectPreview::default(),
             object_export: None,
@@ -298,6 +246,7 @@ impl NativeObjectHost {
         Ok(Self {
             history,
             inactive_project: None,
+            parked_project: None,
             inactive_requests: BTreeMap::new(),
             preview: preview::ObjectPreview::default(),
             object_export: None,
@@ -315,6 +264,7 @@ impl NativeObjectHost {
         Ok(Self {
             history,
             inactive_project: None,
+            parked_project: None,
             inactive_requests: BTreeMap::new(),
             preview: preview::ObjectPreview::default(),
             object_export: None,
@@ -339,8 +289,13 @@ impl NativeDispatch for NativeObjectHost {
         if self.released.is_some() {
             return Err("native object host was released".into());
         }
+        if request.operation() == "command.document.object.asset.remove" {
+            return self
+                .remove_asset(&request)
+                .map_err(|_| "native asset removal correlation is invalid".into());
+        }
         let before = self.history.content_revision();
-        let command = self.history.try_dispatch_object_command(&request);
+        let command = self.history.dispatch_object_command(&request);
         if self.history.content_revision() != before {
             // The command already committed. Cleanup failure is retained by the
             // preview owner; it must not falsify this command's revision/result.
@@ -355,9 +310,20 @@ impl NativeDispatch for NativeObjectHost {
             .history
             .acquire_snapshot(self.content_revision())
             .ok_or("native object snapshot is unavailable")?;
-        snapshot
-            .dispatch(request)
-            .map_err(|_| "native object read correlation is invalid".into())
+        let expression_state = request.operation() == "query.document.object.property.read"
+            && serde_json::to_value(&request)
+                .ok()
+                .is_some_and(|wire| wire["payload"]["view"]["kind"] == "expressionState");
+        let response = snapshot
+            .dispatch(request.clone())
+            .map_err(|_| "native object read correlation is invalid".to_string())?;
+        // T12: a layerPlacement read gains the decoder's source frame count.
+        let response = crate::native_dispatch::video::with_source_frame_count(response, &snapshot);
+        if expression_state && response.is_ok() {
+            self.project_expression_state(&request, response)
+        } else {
+            Ok(response)
+        }
     }
     fn replace_document(&mut self, _: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
         Err("native object host replacement is unavailable".into())
@@ -369,6 +335,7 @@ impl NativeDispatch for NativeObjectHost {
         Err("native object export is unavailable".into())
     }
     fn release_project(&mut self) -> Result<NativeReleaseProgress, String> {
+        self.require_parked_disposable()?;
         let application = match &self.released {
             Some(retained) => retained.clone(),
             None => {
@@ -401,6 +368,7 @@ impl NativeDispatch for NativeObjectHost {
         };
         self.released = Some(application.clone());
         self.inactive_project = None;
+        self.parked_project = None;
         self.inactive_requests.clear();
         self.preview.release();
         Ok(self.preview.progress(application))
@@ -434,3 +402,10 @@ mod history_tests;
 #[cfg(test)]
 #[path = "native_object_export_tests.rs"]
 mod export_tests;
+
+#[cfg(test)]
+#[path = "native_asset_remove_dispatch_tests.rs"]
+mod asset_remove_tests;
+
+#[cfg(test)]
+pub(crate) use preview::motion_tests::{finalizer_fixture, finalizer_svg};

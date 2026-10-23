@@ -11,15 +11,15 @@
 //! Read-only and std-only beyond the document types: it takes an immutable snapshot, mutates
 //! nothing, owns every byte it returns (no reference or Arc into the snapshot survives), and
 //! refuses typed before cloning past its cell and byte bounds. Paste, cut, delete and every
-//! history effect belong to later leaves; nothing here is a document writer.
-use crate::object_document::{FrameScopeKind, ObjectRecord};
+//! history effect belong to the sealed clipboard planner; nothing here is a document writer.
+use crate::object_document::{FrameScopeKind, ObjectRecord, OrderElement, Presence};
 use crate::revision::ObjectSnapshot;
 use std::collections::{HashMap, HashSet};
 
 const CONTEXT: &str = "scene-root";
 /// Hard ceiling on selected cells; a caller limit can only tighten it.
 pub(crate) const MAX_PACKET_CELLS: usize = 4096;
-/// Hard ceiling on the encoded JSON bytes of all copied records (held cells count again).
+/// Hard ceiling on the encoded JSON bytes of copied records and v2 order arrays (held cells count again).
 pub(crate) const MAX_PACKET_BYTES: usize = 4 * 1024 * 1024;
 
 /// Caller bounds; each is clamped to the hard ceiling above.
@@ -71,7 +71,7 @@ pub(crate) enum ClipboardPacketError {
     WrongDocument,
     WrongRevision,
     WrongSnapshot,
-    /// Ordered (v2) documents carry composition-order scopes this packet does not copy.
+    /// A document version outside the admitted v1/v2 clipboard formats.
     OrderedDocumentUnavailable,
     EmptySelection,
     UnknownLayer,
@@ -97,6 +97,7 @@ pub(crate) struct PacketCell {
     source_frame: Option<u32>,
     manual_edit: bool,
     records: Vec<ObjectRecord>,
+    order_elements: Presence<Vec<OrderElement>>,
 }
 impl PacketCell {
     /// Layer index minus the smallest selected layer index (baseline `rl`).
@@ -129,6 +130,10 @@ impl PacketCell {
     /// records for a held cell, none for a blank key or an unexposed cell.
     pub(crate) fn records(&self) -> &[ObjectRecord] {
         &self.records
+    }
+    /// Exact authored order DTOs of the shown source cell; absent only for legacy v1.
+    pub(crate) fn order_elements(&self) -> &Presence<Vec<OrderElement>> {
+        &self.order_elements
     }
     /// Baseline paste: a key, a blank key and a copied in-between all land as a full key
     /// (isKeyframe true, isInterpolated false, isManualEdit removed); a plain cell lands plain.
@@ -184,7 +189,7 @@ impl FrameClipboardPacket {
     pub(crate) fn extent(&self) -> (usize, u32) {
         (self.extent_layers, self.extent_frames)
     }
-    /// Encoded JSON bytes of all copied records, held cells counted per cell.
+    /// Encoded JSON bytes of copied records and v2 order arrays, held cells counted per cell.
     pub(crate) fn encoded_bytes(&self) -> usize {
         self.encoded_bytes
     }
@@ -216,7 +221,7 @@ pub(crate) fn copy_frame_cells(
         return Err(E::WrongSnapshot);
     }
     let document = snapshot.document();
-    if document.format_version() != 1 {
+    if !matches!(document.format_version(), 1 | 2) {
         return Err(E::OrderedDocumentUnavailable);
     }
     if selection.is_empty() {
@@ -296,6 +301,50 @@ pub(crate) fn copy_frame_cells(
                 .ok_or(E::TooManyBytes)?;
             records.push(record.clone());
         }
+        let order_elements = match &document.composition_order {
+            Presence::Missing => Presence::Missing,
+            Presence::Present(plan) => {
+                // Charge the array delimiters first, then one element and separator at a time.
+                // Never encode the whole selected array before enforcing the caller's budget.
+                encoded_bytes = encoded_bytes
+                    .checked_add(2)
+                    .filter(|total| *total <= max_bytes)
+                    .ok_or(E::TooManyBytes)?;
+                let mut elements = Vec::new();
+                for element in plan
+                    .contexts
+                    .iter()
+                    .filter(|context| context.context_id == CONTEXT)
+                    .flat_map(|context| &context.scopes)
+                    .filter(|scope| {
+                        scope.frame_scope.kind == FrameScopeKind::Authored
+                            && Some(scope.frame_scope.frame) == source_frame
+                    })
+                    .flat_map(|scope| &scope.elements)
+                    .filter(|element| element.layer_uid == layer.layer_uid())
+                {
+                    if !records
+                        .iter()
+                        .any(|record| record.target().stroke_id() == element.stroke_id.as_str())
+                    {
+                        return Err(E::RecordUnavailable);
+                    }
+                    let cost = serde_json::to_vec(element)
+                        .map_err(|_| E::RecordUnavailable)?
+                        .len();
+                    encoded_bytes = encoded_bytes
+                        .checked_add(cost)
+                        .and_then(|total| total.checked_add(usize::from(!elements.is_empty())))
+                        .filter(|total| *total <= max_bytes)
+                        .ok_or(E::TooManyBytes)?;
+                    elements.push(element.clone());
+                }
+                if elements.len() != records.len() {
+                    return Err(E::RecordUnavailable);
+                }
+                Presence::Present(elements)
+            }
+        };
         cells.push(PacketCell {
             rel_layer: layer_position - min_layer,
             rel_frame: frame - min_frame,
@@ -305,6 +354,7 @@ pub(crate) fn copy_frame_cells(
             source_frame,
             manual_edit,
             records,
+            order_elements,
         });
     }
     Ok(FrameClipboardPacket {

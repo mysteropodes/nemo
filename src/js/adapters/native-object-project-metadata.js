@@ -15,7 +15,8 @@
         (!Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean')&&
         ['locked','shy'].every(function(k){return !Object.prototype.hasOwnProperty.call(l,k)||typeof l[k]==='boolean';})&&
         (!Object.prototype.hasOwnProperty.call(l,'color')||typeof l.color==='string'&&/^#[a-fA-F0-9]{6}$/.test(l.color))&&
-        (!Object.prototype.hasOwnProperty.call(l,'parentLayerUid')||l.parentLayerUid===null);}))throw new Error('Native project metadata is uncorrelated');
+        (!Object.prototype.hasOwnProperty.call(l,'parentLayerUid')||l.parentLayerUid===null||
+          typeof l.parentLayerUid==='string'&&l.parentLayerUid.length>0);}))throw new Error('Native project metadata is uncorrelated');
     // Copy only admitted UI fields; embedded files/objects never become JS state.
     var result={};['apiVersion','instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration',
       'documentDigest','byteCount','canvasW','canvasH','fps','totalFrames','undoDepth','redoDepth'].forEach(function(k){result[k]=v[k];});

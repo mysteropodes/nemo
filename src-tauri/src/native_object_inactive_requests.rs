@@ -28,12 +28,13 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(self.content_revision())
             .ok_or("unavailable:inactive owner snapshot unavailable")?;
+        let has_retained_project = self.has_inactive_project();
         for record in self
             .inactive_requests
             .values_mut()
             .filter(|r| r.outcome.is_none())
         {
-            if !record.prepares || self.inactive_project.is_some() {
+            if !record.prepares || has_retained_project {
                 record.outcome = Some(inactive_failure("inactive_indeterminate", "indeterminate"));
             } else if record.snapshot != current.snapshot_id() {
                 record.outcome = Some(inactive_failure("stale_revision", "notDispatched"));
@@ -63,12 +64,9 @@ impl NativeObjectHost {
         if self.inactive_requests.contains_key(id) {
             return Err("request_conflict:inactive request already admitted".into());
         }
-        let closes_current = self
-            .inactive_project
-            .as_ref()
-            .is_some_and(|(token, _)| Some(token.as_str()) == close_token);
+        let closes_current = self.retained_project_token() == close_token && close_token.is_some();
         // Preserve one receipt for closing B, including after a lost prepare reply.
-        let needs_close_reserve = prepares || (self.inactive_project.is_some() && !closes_current);
+        let needs_close_reserve = prepares || (self.has_inactive_project() && !closes_current);
         if self.inactive_requests.len() >= 16
             || (needs_close_reserve && self.inactive_requests.len() >= 15)
         {
@@ -77,7 +75,7 @@ impl NativeObjectHost {
         if self.inactive_requests.values().any(|r| r.outcome.is_none()) {
             return Err("inactive_pending:another inactive request is pending".into());
         }
-        if prepares && self.inactive_project.is_some() {
+        if prepares && self.has_inactive_project() {
             return Err("preparation_busy:one inactive project is already retained".into());
         }
         let snapshot = self
@@ -120,21 +118,16 @@ impl NativeObjectHost {
         Ok(())
     }
     pub(crate) fn current_inactive_project(&self) -> Result<Option<serde_json::Value>, String> {
-        self.inactive_project
-            .as_ref()
-            .map(|(token, project)| {
-                let mut info = Self::inactive_metadata(project)?;
-                if let Some((id, _)) = self
-                    .inactive_requests
-                    .iter()
-                    .find(|(_, r)| r.retained_token.as_ref() == Some(token))
-                {
-                    info["preparationRequestId"] = serde_json::json!(id);
-                }
-                Ok(info)
-            })
-            .transpose()
+        self.retained_project_metadata()
     }
+
+    pub(super) fn inactive_preparation_request_for_token(&self, token: &str) -> Option<&str> {
+        self.inactive_requests
+            .iter()
+            .find(|(_, r)| r.retained_token.as_deref() == Some(token))
+            .map(|(id, _)| id.as_str())
+    }
+
     pub(crate) fn pending_inactive_request_id(&self) -> Option<&str> {
         self.inactive_requests
             .iter()

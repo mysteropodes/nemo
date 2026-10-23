@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.layer-lifecycle",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.layer.delete",
+    "command.document.object.layer.duplicate",
+    "command.document.object.layer.rename",
+    "command.document.object.layer.reorder"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerDeletePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerDuplicatePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerRenamePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerReorderPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Delete, duplicate, rename or batch-reorder document layers as sealed structural edits through the single native owner. A successful edit adds one revision and one undo entry; a no-op preserves presence, bytes, history and redo. Duplicate retains and re-reports its minted layerUid. Targets are stable native layerUid values; the editor layer selection is carried as identities and is rebuilt by the caller from the post-revision projection. Locked and shy policy is consumed from the layer policy owner. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native layer.delete command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-delete-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.delete",
+        "payload": {
+          "command": "object.layer.delete",
+          "selection": {
+            "active": "layer-b",
+            "selected": [
+              "layer-b"
+            ],
+            "anchor": "layer-b"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-delete-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native layer.duplicate command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.duplicate",
+        "payload": {
+          "command": "object.layer.duplicate",
+          "layerUid": "layer-b"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-duplicate-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    },
+    {
+      "label": "Shared native layer.rename command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-rename-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.rename",
+        "payload": {
+          "command": "object.layer.rename",
+          "layerUid": "layer-b",
+          "name": "Ink"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-rename-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native layer.reorder command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-reorder-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.reorder",
+        "payload": {
+          "command": "object.layer.reorder",
+          "layerUids": [
+            "layer-c"
+          ],
+          "gap": 0,
+          "selection": {
+            "active": "layer-c",
+            "selected": [
+              "layer-c"
+            ]
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-lifecycle-layer-reorder-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

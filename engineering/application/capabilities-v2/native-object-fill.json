@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.fill",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.fill.trace"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectFillTracePayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Trace real stored-vector walls at the pointer, recolour/remove the selected fill, and commit curved same-colour union plus persistent fill provenance in one native revision/history transaction. Stored wall edits regenerate linked fills inside that same candidate. No JS/Paper document fallback. Manual Close Gap gesture and later component mounts retain their original acceptance holds.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Native paint-bucket command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fill-trace-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.fill.trace",
+        "payload": {
+          "command": "object.fill.trace",
+          "layerUid": "layer-a",
+          "contextId": "scene-root",
+          "frame": 0,
+          "point": [
+            20,
+            20
+          ],
+          "color": "#336699ff",
+          "opacity": 1,
+          "remove": false
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fill-trace-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

@@ -62,10 +62,22 @@ fn timing_selector(value: &Value) -> Option<u64> {
 }
 
 pub(super) fn timing_request(value: &Value) -> bool {
+    if value.get("view").is_some_and(|view| view == "placement") {
+        return layer_placement::request(value);
+    }
+    if value.get("view").is_some() {
+        return layer_range::request(value);
+    }
     timing_selector(value).is_some()
 }
 
 pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if payload.get("view").is_some_and(|view| view == "placement") {
+        return layer_placement::result(document_id, payload, result);
+    }
+    if payload.get("view").is_some() {
+        return layer_range::result(document_id, payload, result);
+    }
     let Some(requested) = timing_selector(payload) else {
         return false;
     };
@@ -141,6 +153,23 @@ pub(super) fn visibility_result(value: &Value) -> bool {
             ),
             (Some(true), Some(1)) | (Some(false), Some(0))
         )
+    })
+}
+
+pub(super) fn history_request(operation: &str, value: &Value) -> bool {
+    let command = match operation {
+        "command.document.object.undo" => "object.undo",
+        "command.document.object.redo" => "object.redo",
+        _ => return false,
+    };
+    exact(value, &["command"], &[])
+        .is_some_and(|value| value.get("command").and_then(Value::as_str) == Some(command))
+}
+
+pub(super) fn history_result(value: &Value) -> bool {
+    exact(value, &["applied", "historyEntriesAdded"], &[]).is_some_and(|value| {
+        value.get("applied").and_then(Value::as_bool) == Some(true)
+            && value.get("historyEntriesAdded").and_then(Value::as_u64) == Some(0)
     })
 }
 
@@ -221,6 +250,9 @@ fn fill(value: &Value) -> bool {
 }
 
 fn record(value: &Value) -> bool {
+    if value.get("family").and_then(Value::as_str) == Some(crate::native_contract::vector::FAMILY) {
+        return crate::native_contract::vector::record(value);
+    }
     exact(
         value,
         &["schemaVersion", "family", "target", "geometry", "fill"],
@@ -255,3 +287,8 @@ pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool
 #[cfg(test)]
 #[path = "native_object_contract_tests.rs"]
 mod tests;
+
+#[path = "native_layer_placement_contract.rs"]
+mod layer_placement;
+#[path = "native_layer_range_contract.rs"]
+mod layer_range;

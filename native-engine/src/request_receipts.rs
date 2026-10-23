@@ -3,6 +3,9 @@
 //! Entries keep a bounded-request SHA-256 fingerprint and typed terminal
 //! disposition, never the request JSON, document, or generic response value.
 
+#[path = "object_frame_clipboard_transport.rs"]
+pub(crate) mod frame_clipboard_transport;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Number, Value};
 use std::collections::HashMap;
@@ -44,6 +47,10 @@ fn expected_revision<'de, D: serde::Deserializer<'de>>(
 }
 
 impl OpacityRequest {
+    pub fn operation(&self) -> &str {
+        &self.operation
+    }
+
     pub fn query(
         request_id: impl Into<String>,
         instance_id: impl Into<String>,

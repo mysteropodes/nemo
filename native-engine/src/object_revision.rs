@@ -21,6 +21,14 @@ mod project_settings;
 #[path = "object_reference_revision.rs"]
 mod reference_attachment;
 
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_raster_image_import_revision.rs"]
+mod image_import;
+
+#[cfg(feature = "history")]
+#[path = "native_import_transaction_assets_revision.rs"]
+mod import_assets;
+
 static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]
 const MAX_CONTENT_REVISION: u64 = 9_007_199_254_740_991;
@@ -173,10 +181,10 @@ impl ObjectRevisionOwner {
     }
     pub(crate) fn publish(&mut self, document: ObjectDocument) -> Result<u64, &'static str> {
         let current = self
-            .snapshots
-            .get(&self.content_revision)
+            .acquire(self.content_revision)
             .ok_or("current revision absent")?;
-        let value = match current.as_ref() {
+        asset_admission::validate_drawing_only(current.document(), &document)?;
+        let value = match current.value.as_ref() {
             ProjectRevisionValue::BareDrawing(_) => ProjectRevisionValue::BareDrawing(document),
             ProjectRevisionValue::Project(project) => {
                 ProjectRevisionValue::Project(project.with_drawing(document))
@@ -399,18 +407,10 @@ mod tests {
 
     #[test]
     fn safe_integer_exhaustion_preserves_all_retained_snapshots_and_head() {
-        let document = ObjectDocument {
-            format: "nemo.native-object-document".into(),
-            format_version: 1,
-            total_frames: 1,
-            layers: vec![crate::object_document::ObjectLayer::identified(
-                "limit-layer".into(),
-            )],
-            objects: vec![],
-            property_holders: Default::default(),
-            layer_folders: Default::default(),
-            composition_order: Default::default(),
-        };
+        let document: ObjectDocument = serde_json::from_value(serde_json::json!({
+            "format":"nemo.native-object-document","formatVersion":1,"totalFrames":1,
+            "layers":[{"layerUid":"limit-layer"}],"objects":[]}))
+        .unwrap();
         let bare = ObjectSnapshot::from_admitted("limit-test".into(), document.clone()).unwrap();
         let project = ProjectEnvelope::no_media(
             crate::object_document::ProjectMetadata::new(320, 180, 24.).unwrap(),

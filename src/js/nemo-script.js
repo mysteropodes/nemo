@@ -382,13 +382,13 @@
 
   // ---- structural ------------------------------------------------------
   // Cuts the layer in two at `frame`; returns the second half.
-  Layer.prototype.splitAt = function (frame) {
-    var before = state.layers.length;
-    if (frame != null) goToFrame(frame | 0);
-    window.SM.splitLayerAtPlayhead(this.index);
-    if (state.layers.length === before) fail('coupe impossible : la frame est hors du calque');
-    return new Layer(this.index + 1);
-  };
+  Layer.prototype.splitAt = window.NemoNativeLayerPlayheadCutUI.scripting({
+    nativeBlocked:function(){var p=window.NemoNativeObjectProject,s=p&&p.desktop(window);return !!s&&s.blocksLegacy();},
+    layers:function(){return state.layers;},
+    move:goToFrame,fail:fail,
+    split:function(index){window.SM.splitLayerAtPlayhead(index);},
+    layer:function(index){return new Layer(index);}
+  });
   // Merges this layer with others into one. Returns the survivor.
   Layer.prototype.mergeWith = function (others) {
     var idx = [this.index].concat((others || []).map(function (l) { return l.index; }));
@@ -619,7 +619,7 @@
       get enabled() { return !!state.cameraLayerOn; }
     };
 
-    return api;
+    return window.NemoNativeCompositionUI.scripting(window, api, fail);
   }
 
   // ---- runner ----

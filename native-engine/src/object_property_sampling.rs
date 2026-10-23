@@ -1,10 +1,15 @@
 //! Pure raw Motion sampling from one retained native snapshot. No expression execution.
 use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::object_document::{
-    ObjectDocument, OrderKey, Presence, PropertyHolder, PropertyHolderTarget,
+    ObjectDocument, OrderKey, Presence, PropertyHolder, PropertyHolderTarget, PropertyRecord,
 };
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
+
+#[path = "object_frame_camera.rs"]
+mod camera;
+#[path = "object_frame_motion_values.rs"]
+pub(crate) mod frame_motion;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropertySampleError {
@@ -34,6 +39,27 @@ fn handle(value: &Presence<Vec<Number>>) -> [f64; 2] {
         .unwrap_or([0., 0.])
 }
 fn target_exists(document: &ObjectDocument, target: &PropertyHolderTarget) -> bool {
+    if let Some(component) = document.component_set().and_then(|set| {
+        set.components
+            .iter()
+            .find(|component| component.symbol_id() == target.context_id())
+    }) {
+        return component
+            .layers()
+            .iter()
+            .any(|layer| layer.layer_uid() == target.layer_uid())
+            && target.stroke_id().is_none_or(|stroke| {
+                PropertyHolder::item_target_exists(document, target)
+                    || component.objects().iter().any(|record| {
+                        let item = record.target();
+                        item.context_id() == target.context_id()
+                            && item.layer_uid() == target.layer_uid()
+                            && item.stroke_id() == stroke
+                            && item.scope_kind()
+                                == &crate::object_document::FrameScopeKind::Authored
+                    })
+            });
+    }
     let context_exists =
         document
             .composition_order
@@ -49,13 +75,14 @@ fn target_exists(document: &ObjectDocument, target: &PropertyHolderTarget) -> bo
             .iter()
             .any(|layer| layer.layer_uid() == target.layer_uid())
         && target.stroke_id().is_none_or(|stroke| {
-            document.objects.iter().any(|object| {
-                object.target.context_id == target.context_id()
-                    && object.target.layer_uid == target.layer_uid()
-                    && object.target.stroke_id == stroke
-                    && object.target.frame_scope.kind
-                        == crate::object_document::FrameScopeKind::Authored
-            })
+            PropertyHolder::item_target_exists(document, target)
+                || document.objects.iter().any(|object| {
+                    object.target.context_id == target.context_id()
+                        && object.target.layer_uid == target.layer_uid()
+                        && object.target.stroke_id == stroke
+                        && object.target.frame_scope.kind
+                            == crate::object_document::FrameScopeKind::Authored
+                })
         })
 }
 pub(crate) fn default_curve() -> Vec<CurveSample> {
@@ -96,13 +123,25 @@ pub fn sample_property_raw(
         return Err(PropertySampleError::InvalidFrame);
     }
     let document = snapshot.document();
+    if PropertyHolder::mesh_is_unbound(document, target) {
+        return Err(PropertySampleError::Unavailable);
+    }
     if !target_exists(document, target) {
         return Err(PropertySampleError::MissingTarget);
     }
-    if matches!(property, "order" | "timeRemap") {
+    if property == "order" {
+        let order = document
+            .property_order(target)
+            .ok_or(PropertySampleError::Unavailable)?;
+        return crate::object_frame_packet::order::numeric_at(order, at)
+            .map(|v| vec![v])
+            .map_err(|_| PropertySampleError::Unavailable);
+    }
+    if property == "timeRemap" {
         return Err(PropertySampleError::UnsupportedProperty);
     }
     let empty = PropertyHolder {
+        mesh_source: Presence::Missing,
         target: target.clone(),
         controls: Presence::Missing,
         properties: vec![],
@@ -114,7 +153,7 @@ pub fn sample_property_raw(
         .find(|holder| holder.target() == target)
         .unwrap_or(&empty);
     let metadata = holder
-        .metadata(property)
+        .metadata_in_document(document, property)
         .ok_or(PropertySampleError::UnsupportedProperty)?;
     let record = holder
         .properties()
@@ -133,6 +172,27 @@ pub fn sample_property_raw(
             .and_then(numbers);
     }
     sample_keys(property, keys, at)
+}
+/// Raw sampling shared by stored text-selector holders; no target or guest evaluation.
+impl PropertyRecord {
+    pub(crate) fn sample_scalar_raw(
+        &self,
+        fallback: f64,
+        at: f64,
+    ) -> Result<f64, PropertySampleError> {
+        if !at.is_finite() {
+            return Err(PropertySampleError::InvalidFrame);
+        }
+        let keys = self.track.value().map(|t| t.keys.as_slice()).unwrap_or(&[]);
+        if keys.is_empty() {
+            return self
+                .static_value
+                .value()
+                .map(|v| numbers(v).map(|v| v[0]))
+                .unwrap_or(Ok(fallback));
+        }
+        sample_keys(&self.property, keys, at).map(|v| v[0])
+    }
 }
 fn sample_keys(
     property: &str,
@@ -179,3 +239,6 @@ fn sample_keys(
     }
     Ok(result)
 }
+
+#[path = "object_text_animator_evaluation.rs"]
+mod text_animator;

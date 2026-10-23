@@ -1,10 +1,12 @@
 //! Strict v2 storage DTOs. They carry no live owner, evaluator or painter state.
 use crate::object_document::{
-    object_deserialize, FrameScope, LayerFolders, ObjectDocument, ObjectLayer, ObjectRecord,
-    PropertyHolder,
+    object_deserialize, ComponentTables, FrameScope, ImageMeshStore, ItemRecords, KeyLockMode,
+    LayerFolders, MotionArcs, ObjectDocument, ObjectLayer, ObjectRecord, PropertyHolder,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
+#[path = "object_property_order.rs"]
+mod property_order;
 
 /// Missing differs from present null. T chooses where null is actually allowed.
 #[derive(Debug, Clone, PartialEq)]
@@ -55,12 +57,27 @@ pub struct OrderedObjectDocument {
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     pub(crate) composition_order: OrderPlan,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) image_meshes: Presence<ImageMeshStore>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) items: Presence<ItemRecords>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) component_tables: Presence<ComponentTables>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) audio_tracks: Presence<crate::object_document::AudioTracks>,
 }
 object_deserialize!(OrderedObjectDocument {
     format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
-    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>, composition_order: OrderPlan
+    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>, composition_order: OrderPlan,
+    #[serde(default)] image_meshes: Presence<ImageMeshStore>,
+    #[serde(default)] items: Presence<ItemRecords>,
+    #[serde(default)] component_tables: Presence<ComponentTables>,
+    #[serde(default)] motion_arcs: Presence<Option<MotionArcs>>,
+    #[serde(default)] audio_tracks: Presence<crate::object_document::AudioTracks>
 });
 impl OrderedObjectDocument {
     pub(crate) fn into_storage(self) -> ObjectDocument {
@@ -73,6 +90,11 @@ impl OrderedObjectDocument {
             property_holders: self.property_holders,
             layer_folders: self.layer_folders,
             composition_order: Presence::Present(self.composition_order),
+            image_meshes: self.image_meshes,
+            items: self.items,
+            component_tables: self.component_tables,
+            motion_arcs: self.motion_arcs,
+            audio_tracks: self.audio_tracks,
         }
     }
     pub fn total_frames(&self) -> u32 {
@@ -177,6 +199,8 @@ pub(crate) struct OrderKey {
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) hold: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) lock_to: Presence<Option<KeyLockMode>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) h_in: Presence<Vec<Number>>,
@@ -186,6 +210,7 @@ pub(crate) struct OrderKey {
 object_deserialize!(OrderKey {
     frame: Number, v: Vec<Number>,
     #[serde(default)] hold: Presence<bool>,
+    #[serde(default)] lock_to: Presence<Option<KeyLockMode>>,
     #[serde(default)] curve_points: Presence<Option<Vec<OrderCurvePoint>>>,
     #[serde(default)] h_in: Presence<Vec<Number>>,
     #[serde(default)] h_out: Presence<Vec<Number>>

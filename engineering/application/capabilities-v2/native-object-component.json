@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.component",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.component.convert",
+    "command.document.object.component.expose",
+    "command.document.object.component.place"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectComponentConvertPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectComponentExposePayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectComponentPlacePayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained receipt or typed refusal; no document or resource payload. Requests above 4096 encoded bytes are refused, never split."
+  },
+  "semantics": "Convert one layer into a component in place or merge several layers into one new component instance, place an existing component as a new locked instance layer, and expose a component property bound to one inner stroke, as sealed transactions through the single native owner. Targets are stable native layerUid and component symbolId values; the exposed-property key is made by the caller (ep_ plus the base-36 clock and four random base-36 digits, as the baseline expose()). One revision and one undo entry per applied edit; a no-op (the same exposed property twice) publishes nothing. A request made inside an open component, a v1 document, or a layer kind the baseline refuses is a typed refusal that publishes nothing. Animating a flat layer never converts it; only these requests do. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native component.convert command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "component-component-convert-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.component.convert",
+        "payload": {
+          "command": "object.component.convert",
+          "contextId": "scene-root",
+          "layerUids": [
+            "layer-a",
+            "layer-b"
+          ]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "component-component-convert-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    },
+    {
+      "label": "Shared native component.expose command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "component-component-expose-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.component.expose",
+        "payload": {
+          "command": "object.component.expose",
+          "symbolId": "native-component:6:0",
+          "key": "ep_mfz9q1k2_8x2a",
+          "targetStrokeId": "stroke-1",
+          "targetField": "opacity",
+          "label": "Eye",
+          "default": 100
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "component-component-expose-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    },
+    {
+      "label": "Shared native component.place command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "component-component-place-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.component.place",
+        "payload": {
+          "command": "object.component.place",
+          "symbolId": "native-component:6:0",
+          "name": "Hand"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "component-component-place-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    }
+  ]
+}

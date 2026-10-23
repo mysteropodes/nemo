@@ -108,6 +108,8 @@ test('native inspector reuses actual bound Reference nodes, preserves collapsed 
   Object.defineProperty(root.state,'refMedia',{get(){throw Error('legacy reference read');}});
   const context=vm.createContext({window:root,document:doc,state:root.state,SM:root.SM,showToast:()=>{},
     requestAnimationFrame:f=>f(),syncPropsPanelCollapseTitle:()=>{},localStorage:{setItem(){}}});
+  root.localStorage=context.localStorage;
+  root.SMWorkspace=require('../src/js/adapters/native-workspace-ui.js').presentation(root,{order:()=>null,applyOrder(){}});
   vm.runInContext(shipped('renderPropsPanelRail')+'\n'+shipped('togglePropsPanelCollapse'),context);
   root.renderPropsPanelRail=context.renderPropsPanelRail;root.togglePropsPanelCollapse=context.togglePropsPanelCollapse;
   vm.runInContext(fs.readFileSync('src/js/reference-bridge.js','utf8'),context);
@@ -174,6 +176,7 @@ function desktop(initial=[A,B]){
   require('./helpers/native-viewport-underlay.cjs').install(root);
   const session=Project.desktop(root);
   const render=UI.render;root.NemoNativeObjectUI={...UI,render(r,i,frameOnly,ports){log.push('UI:'+i.contentRevision);return render(r,i,frameOnly,ports);}};
+  require('../src/js/bootstrap/native-opacity-application.js').bindObjectUI(root);
   root.SMProjectDocument={baseName:()=> 'Project'};root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
   root.requestAnimationFrame=f=>setImmediate(f);
   const file=Files.bind(root,{read:()=>({tabId:'tab',name:'Project'}),touchRecent(){},commit(){},renderRecents(){},
@@ -338,7 +341,7 @@ test('production composition reuses frozen callback identities and resolves sess
   h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){bindings.push(ports);return render(root,info,frameOnly,ports);}};
   await h.open();const first=bindings[0],old=first.currentSession().info(),button=eye(h.root,0);
   h.root.updateUI(true);assert.equal(eye(h.root,0),button);assert.equal(Object.isFrozen(first),true);
-  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','fontResources','layerPolicy','projectSettings','projectionReady','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
+  assert.deepEqual(Object.keys(first).sort(),['bindPolicyEntries','clearDrawingSelection','currentSession','disposePolicyEntries','editProperty','editPropertyTrack','fontResources','layerPolicy','projectSettings','projectionReady','readProperty','readPropertyMetadata','readShyMode','readTransportGeneration','repaint','selectLayer','setShyMode']);assert.equal(first.projectSettings(),null);const settings=Object.freeze({edit(){}});h.root.NemoNativeProjectSettingsController=settings;assert.strictEqual(first.projectSettings(),settings);delete h.root.NemoNativeProjectSettingsController;
   assert.equal(first.fontResources(),null);
   const fontCalls=[],assetId=' opaque font / 雪 ',source={kind:'google',family:'Poppins',weight:700,italic:false},signal={aborted:false};
   h.root.SMVectorText={listNativeFontAssets:async()=>{fontCalls.push(['list']);return [{assetId}];},
@@ -417,13 +420,16 @@ test('native optional Drawing fields retain exact values and absent old metadata
 });
 test('Drawing field projection refresh preserves rows and rejects invalid tables before any publication',()=>{
   const invalid=[{locked:null},{locked:0},{shy:null},{shy:0},{color:null},{color:123},{color:'#fff'},{color:'#GG0000'},
-    {color:'123456'},{parentLayerUid:'B'},{parentLayerUid:false}];
+    {color:'123456'},{parentLayerUid:''},{parentLayerUid:false},{parentLayerUid:0},{parentLayerUid:[]},{parentLayerUid:{}},
+    {unsupportedDrawingField:true}];
   for(const fields of invalid){
     const root=view(),before=JSON.stringify(root.state),rows=root.state.layers,selection=root._layerSel;
     const info=metadata([{...A,color:'#123456'},{...B,...fields}],1);
     assert.throws(()=>Files.refreshLayerTable(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
     assert.equal(root.state.layers,rows);assert.equal(root._layerSel,selection);assert.equal(Files.projectionReadyForUI(root,info),false);
-    assert.throws(()=>Files.refreshVisibility(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
+    if(Object.hasOwn(fields,'parentLayerUid'))assert.equal(Files.refreshVisibility(root,info),false);
+    else assert.throws(()=>Files.refreshVisibility(root,info),/Native layer/);
+    assert.equal(JSON.stringify(root.state),before);
     assert.throws(()=>Files.projectView(root,info),/Native layer/);assert.equal(JSON.stringify(root.state),before);
   }
   const root=view(),row=root.state.layers[0],next=metadata([{...A,locked:false,color:'#b49Be6',parentLayerUid:null},B],1);
@@ -440,7 +446,8 @@ test('Drawing field projection refresh preserves rows and rejects invalid tables
   assert.equal(root.state.layers[2].color,'#7EA0FA');assert.equal(root.state.layers[2].locked,false);assert.equal(root.state.layers[2].parentLayerUid,null);
 });
 test('unsupported Drawing fields are rejected by the session before detached metadata or UI publication',async()=>{
-  for(const fields of [{locked:null},{locked:'false'},{shy:null},{shy:'false'},{color:null},{color:'#123'},{color:'#12345G'},{parentLayerUid:'B'}]){
+  for(const fields of [{locked:null},{locked:'false'},{shy:null},{shy:'false'},{color:null},{color:'#123'},{color:'#12345G'},
+    {parentLayerUid:''},{parentLayerUid:false},{parentLayerUid:0},{parentLayerUid:[]},{parentLayerUid:{}}]){
     const h=desktop([{...A,...fields},B]),before=JSON.stringify(h.root.state),rows=h.root.state.layers;
     assert.equal(await h.file.openPath('/native.json'),false);assert.equal(h.session.info(),null);
     assert.equal(JSON.stringify(h.root.state),before);assert.equal(h.root.state.layers,rows);assert.equal(h.log.includes('ACK'),false);
@@ -470,4 +477,107 @@ test('admitted native lock and shy booleans preserve authored presence in sessio
     for(const flag of ['locked','shy']){assert.equal(Object.hasOwn(meta.layers[0],flag),Object.hasOwn(flags,flag));if(Object.hasOwn(flags,flag))assert.equal(meta.layers[0][flag],flags[flag]);assert.equal(row[flag],flags[flag]===true);}
     assert.equal(Object.isFrozen(meta.layers[0]),true);assert.equal(Files.projectionReadyForUI(h.root,meta),true);
   }
+});
+
+for(const modifier of ['metaKey','ctrlKey'])test('ordinary native row '+modifier+' toggles selected layers without a document/history write',async()=>{
+  const h=desktop();await h.open();const root=h.root,before=h.meta();
+  const writes=()=>h.calls.filter(c=>c.command==='nemo_native_object_dispatch'||c.command==='nemo_native_dispatch'&&!c.request.operation.startsWith('query.')).length;
+  const count=writes();pick(root,1).dispatch('click',{[modifier]:true,shiftKey:true});
+  assert.deepEqual(root._layerSel,[0,1]);assert.equal(root.state.activeLayerIdx,1);assert.equal(root._layerSelAnchor,1);
+  assert.equal(pick(root,0).attributes['aria-pressed'],'true');assert.equal(pick(root,1).attributes['aria-pressed'],'true');
+  pick(root,0).dispatch('click',{[modifier]:true});assert.deepEqual(root._layerSel,[1]);
+  assert.equal(root.state.activeLayerIdx,0);assert.equal(pick(root,0).attributes['aria-pressed'],'false');
+  pick(root,0).click();assert.deepEqual(root._layerSel,[0]);assert.equal(root._layerSelAnchor,0);
+  assert.equal(writes(),count);assert.deepEqual(h.meta(),before);poisonFrames(root);
+});
+test('ordinary native Shift row clicks retain the range anchor and preserve boolean programmatic selection',async()=>{
+  const h=desktop();await h.open();await h.external([A,B,C]);const root=h.root;
+  root._layerSelAnchor=-1;root._layerSel=[];root.state.activeLayerIdx=0;
+  pick(root,2).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);assert.equal(root._layerSelAnchor,-1);
+  pick(root,1).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1]);assert.equal(root._layerSelAnchor,-1);
+  pick(root,2).click();pick(root,0).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);assert.equal(root._layerSelAnchor,2);
+  root._layerSelAnchor=-1;root._layerSel=[];root.state.activeLayerIdx=2;
+  pick(root,0).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);
+  pick(root,1).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1]);assert.equal(root._layerSelAnchor,-1);
+  const selection=root._layerSel;root.SM.setActiveLayer(1,true);assert.equal(root._layerSel,selection);
+  root.SM.setActiveLayer(1);assert.deepEqual(root._layerSel,[1]);assert.equal(root._layerSelAnchor,1);
+});
+test('native row modifiers reject retired controls and consume post-drag clicks without changing selection',async()=>{
+  const h=desktop();await h.open();const root=h.root,retired=pick(root,0);
+  pick(root,1).dispatch('click',{ctrlKey:true});const selection=root._layerSel;
+  assert.equal(retired.dispatch('click',{shiftKey:true}),false);assert.equal(root._layerSel,selection);
+  root._layerDragJustEnded=true;assert.equal(pick(root,0).dispatch('click',{metaKey:true}),false);
+  assert.equal(root._layerDragJustEnded,false);assert.equal(root._layerSel,selection);
+  pick(root,0).dispatch('click',{metaKey:true});assert.deepEqual(root._layerSel,[1]);
+});
+for(const fault of ['refused','foreign'])test('native modified row refuses '+fault+' presentation before changing selection',async()=>{
+  const h=desktop();await h.open();const root=h.root,selection=root._layerSel,active=root.state.activeLayerIdx,anchor=root._layerSelAnchor;
+  if(fault==='refused')h.fault('preview');
+  else h.root.NemoNativeObjectUI={...UI,select:(r,i,index,preserve,uid,presentation,ports)=>UI.select(r,i,index,preserve,uid,{...presentation,documentId:'foreign'},ports)};
+  if(fault==='refused'){await assert.rejects(h.session.presentPreview(7));assert.equal(h.session.readPresentedObjectSession(),null);}
+  pick(root,1).dispatch('click',{ctrlKey:true});assert.equal(root._layerSel,selection);assert.equal(root.state.activeLayerIdx,active);assert.equal(root._layerSelAnchor,anchor);
+});
+test('native modified row rolls back every selection field when presentation repaint throws',async()=>{
+  const h=desktop();await h.open();const root=h.root;
+  root.selectedPaths=['sentinel'];root.state.selectedStrokeIndices=[3];root._layerActiveExplicit=false;
+  const old={active:root.state.activeLayerIdx,selection:root._layerSel,anchor:root._layerSelAnchor,paths:root.selectedPaths,indices:root.state.selectedStrokeIndices,explicit:root._layerActiveExplicit};
+  const create=root.document.createElement,failure=Error('fixture render refusal');root.document.createElement=()=>{throw failure;};
+  try{assert.throws(()=>pick(root,1).dispatch('click',{metaKey:true}),error=>error===failure);}finally{root.document.createElement=create;}
+  assert.equal(root.state.activeLayerIdx,old.active);assert.equal(root._layerSel,old.selection);assert.equal(root._layerSelAnchor,old.anchor);
+  assert.equal(root.selectedPaths,old.paths);assert.equal(root.state.selectedStrokeIndices,old.indices);assert.equal(root._layerActiveExplicit,old.explicit);
+});
+
+test('native modified row refuses an actual in-flight external revision until final presentation',async()=>{
+  const h=desktop();await h.open();const root=h.root;let release;h.hold(new Promise(resolve=>{release=resolve;}));
+  const change=h.external([A,B,C]);await new Promise(setImmediate);
+  const selection=root._layerSel,active=root.state.activeLayerIdx,anchor=root._layerSelAnchor;
+  try{pick(root,2).dispatch('click',{shiftKey:true});assert.equal(root._layerSel,selection);assert.equal(root.state.activeLayerIdx,active);assert.equal(root._layerSelAnchor,anchor);}
+  finally{release();await change;}
+  pick(root,2).dispatch('click',{shiftKey:true});assert.deepEqual(root._layerSel,[0,1,2]);
+});
+
+// Parent metadata is an admitted native read-side field. Graph validity (unknown/self/cycle)
+// stays in the real native owner; these literals use an existing, distinct parent UID.
+test('Drawing projection admits an existing opaque parent and retains row selection and revision fences',()=>{
+  const parent=A.layerUid,root=view(),rows=root.state.layers,child=rows[1],selection=root._layerSel,frame=root.state.currentFrame;
+  const next=metadata([A,{...B,parentLayerUid:parent}],1);
+  assert.equal(Files.refreshLayerTable(root,next),true);
+  assert.equal(root.state.layers,rows);assert.equal(root.state.layers[1],child);
+  assert.equal(child.parentLayerUid,parent);assert.equal(root._layerSel,selection);assert.equal(root.state.currentFrame,frame);
+  assert.equal(Files.projectionReadyForUI(root,next),true);
+  const prior=JSON.stringify(root.state),drift={...next,layers:[A,{...B,parentLayerUid:null}]};
+  assert.equal(Files.refreshLayerTable(root,drift),false);assert.equal(Files.refreshVisibility(root,drift),false);
+  assert.equal(JSON.stringify(root.state),prior);assert.equal(Files.projectionReadyForUI(root,drift),false);
+  assert.equal(Files.projectionReadyForUI(root,next),true);
+  for(const layers of [[A,{...B,parentLayerUid:null}],[A,{...B,parentLayerUid:parent}],[A,B]]){
+    const revision=next.contentRevision+1;next.contentRevision=revision;next.documentSnapshotId='document-snapshot-'+revision;
+    const info={...next,layers};assert.equal(Files.refreshLayerTable(root,info),true);
+    assert.equal(root.state.layers,rows);assert.equal(root.state.layers[1],child);
+    assert.equal(child.parentLayerUid,Object.hasOwn(layers[1],'parentLayerUid')?layers[1].parentLayerUid:null);
+    assert.equal(root._layerSel,selection);assert.equal(root.state.currentFrame,frame);assert.equal(Files.projectionReadyForUI(root,info),true);
+  }
+});
+test('Drawing session publishes frozen admitted parent metadata only through the confirmed native presentation',async()=>{
+  const parent=A.layerUid,h=desktop([A,{...B,parentLayerUid:parent}]);await h.open();
+  const root=h.root,meta=h.session.info(),rows=root.state.layers,child=rows[1],selection=root._layerSel,frame=root.state.currentFrame;
+  assert.equal(meta.layers[1].parentLayerUid,parent);assert.equal(Object.isFrozen(meta.layers[1]),true);
+  assert.equal(child.parentLayerUid,parent);assert.equal(Files.projectionReadyForUI(root,meta),true);
+  let release;h.hold(new Promise(resolve=>{release=resolve;}));
+  const change=h.external([A,{...B,parentLayerUid:null}]);await new Promise(setImmediate);
+  assert.equal(h.log.includes('ACK'),false);assert.equal(h.session.readPresentedObjectSession(),null);
+  pick(root,1).click();assert.equal(root._layerSel,selection);assert.equal(root.state.activeLayerIdx,0);
+  release();await change;
+  const next=h.session.info();assert.equal(next.contentRevision,meta.contentRevision+1);assert.equal(next.layers[1].parentLayerUid,null);
+  assert.equal(Object.isFrozen(next.layers[1]),true);assert.equal(meta.layers[1].parentLayerUid,parent,'old detached metadata remains exact');
+  assert.equal(root.state.layers,rows);assert.equal(root.state.layers[1],child);assert.equal(child.parentLayerUid,null);
+  assert.equal(root._layerSel,selection);assert.equal(root.state.currentFrame,frame);assert.equal(Files.projectionReadyForUI(root,next),true);
+  assert.ok(h.log.indexOf('preview')<h.log.indexOf('ACK'));
+  assert.equal(h.calls.some(call=>call.request&&call.request.operation&&call.request.operation.startsWith('command.')),false);
+});
+
+test('metadata presenter invokes native bar mount without adding persistent range fields to projected layers',()=>{
+ const root=view(),info=metadata();let mounted=0,retired=0;const before=JSON.stringify(root.state.layers);
+ root.NemoNativeLayerRangeDesktop={mount(r,grid,value,ports){assert.strictEqual(r,root);assert.strictEqual(grid,root.document.nodes.get('frame-grid'));assert.strictEqual(value,info);assert.ok(ports);mounted++;},retire(r){assert.strictEqual(r,root);retired++;},owns:()=>false};
+ assert.equal(UI.render(root,info,false,fixturePorts(root)),true);assert.equal(mounted,1);assert.equal(JSON.stringify(root.state.layers),before);
+ UI.restoreInspector(root);assert.equal(retired,1);
 });

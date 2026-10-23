@@ -717,7 +717,9 @@ window.SM={
     window.SM.setStrokeColor(f);
   },
   setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},
-  setBrushPreset:function(v){state.brushPreset=v||'none';
+  setBrushPreset:function(v){
+    if(window.__TAURI__&&window.__TAURI__.core)return window.NemoNativeCustomBrushUI?NemoNativeCustomBrushUI.select(window,v):false;
+    state.brushPreset=v||'none';
     // Restore the saved diameter for a custom preset (feedback #73 — see
     // brush-editor.js's own comment on savedBrushSize for why this is
     // custom-preset-only). Syncs the real UI field too, not just state,
@@ -883,7 +885,7 @@ window.SM={
   setCanvasSize:function(w,h){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasSize',width:w,height:h}):Promise.resolve({status:'unavailable'});},setCanvasBg:function(c){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasBackground',color:c}):Promise.resolve({status:'unavailable'});},
   setCanvasClip:function(v){state.canvasClip=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
   setSafetyZones:function(v){state.safetyZones=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
-  fitCanvas:fitCanvas,resetView:resetView,
+  fitCanvas:function(){if(typeof nativeViewportNavigation!=='function'||!nativeViewportNavigation('fit'))return fitCanvas();},resetView:function(){if(typeof nativeViewportNavigation!=='function'||!nativeViewportNavigation('reset'))return resetView();},
   setOnionRange:function(inF,outF){state.onionIn=inF;state.onionOut=outF;renderOS();},
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
@@ -1238,6 +1240,25 @@ window.SM={
   // the whole content and all their keyframes — it is the in/out window that
   // splits, which is exactly how AE does it (and why the two halves can be
   // retimed independently afterwards without anything being lost).
+  // Footage interpolation mode of a video layer (native-video-bridge.js). Under
+  // the native owner native-time-remap-ui.js replaces both entries.
+  footageInterpMode:function(li){
+    var nv=(state.layers[li]&&state.layers[li].nativeVideo)||{};
+    // L'ancien booléen reste la valeur de repli : un projet enregistré avant
+    // les trois modes doit rouvrir sur ce qu'il faisait.
+    return nv.interpMode||(nv.frameBlend?'blend':'none');
+  },
+  setFootageInterpMode:function(li,mode){
+    var l=state.layers[li];
+    if(!l||!l.nativeVideo)return false;
+    saveAllLayerFrames();pushUndoLayers(true);
+    l.nativeVideo.interpMode=mode;
+    l.nativeVideo.frameBlend=(mode!=='none');
+    if(window.SMNativeVideo&&SMNativeVideo.invalidate)SMNativeVideo.invalidate();
+    loadFrame(state.currentFrame);
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    return true;
+  },
   splitLayerAtPlayhead:function(li){
     li=(li==null?state.activeLayerIdx:li);
     var ld=state.layers[li];if(!ld){showToast(SM.t('hsNoLayer'));return;}
@@ -7124,26 +7145,14 @@ function updateFootagePanel(){
   // elle agit, c'est-à-dire sur une vidéo effectivement remappée dans le temps.
   var blendRow=document.getElementById('footage-blend-row');
   if(blendRow){
-    var showBlend=kind.key==='video'&&!!ld.nativeVideo&&!!ld.timeRemap;
+    var showBlend=kind.key==='video'&&!!ld.nativeVideo&&window.SM.isTimeRemapped(state.activeLayerIdx);
     blendRow.style.display=showBlend?'flex':'none';
     var sel=document.getElementById('footage-interp-mode');
     if(sel){
-      var nv=ld.nativeVideo||{};
-      // L'ancien booléen reste la valeur de repli : un projet enregistré avant
-      // les trois modes doit rouvrir sur ce qu'il faisait.
-      sel.value=nv.interpMode||(nv.frameBlend?'blend':'none');
+      sel.value=window.SM.footageInterpMode(state.activeLayerIdx);
       if(!sel._wired){
         sel._wired=true;
-        sel.addEventListener('change',function(){
-          var l=state.layers[state.activeLayerIdx];
-          if(!l||!l.nativeVideo)return;
-          saveAllLayerFrames();pushUndoLayers(true);
-          l.nativeVideo.interpMode=sel.value;
-          l.nativeVideo.frameBlend=(sel.value!=='none');
-          if(window.SMNativeVideo&&SMNativeVideo.invalidate)SMNativeVideo.invalidate();
-          loadFrame(state.currentFrame);
-          if(window.SMEngineBridge)SMEngineBridge.renderNow();
-        });
+        sel.addEventListener('change',function(){window.SM.setFootageInterpMode(state.activeLayerIdx,sel.value);});
       }
     }
   }
@@ -7544,7 +7553,7 @@ function showToast(m){var el=document.getElementById('toast');el.textContent=m;e
 var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);}});
 // COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
 // #1114); dispatch by action lives here, same pattern as runToolShortcut below.
-function runCommandShortcutAction(action,e){switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
+function runCommandShortcutAction(action,e){if(window.NemoNativeFrameEditDesktop&&window.NemoNativeFrameEditDesktop.install(window).shortcut(action,e))return;switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
 function runCommandShortcut(k,event){
   var lk=(k||'').toLowerCase();
   if(!lk)return false;
@@ -7806,7 +7815,9 @@ function stopRecording(){
 }
 function openCommentPopover(worldPt,existing){
   if(!document.getElementById('comment-popover'))return;
-  _activeComment=existing||{
+  var nativeComment=window.NemoNativeCommentsUI?NemoNativeCommentsUI.begin(window,existing):(window.__TAURI__&&window.__TAURI__.core?false:null);
+  if(nativeComment===false)return;
+  _activeComment=nativeComment||existing||{
     id:'c_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6),
     x:worldPt.x,y:worldPt.y,frame:state.currentFrame,
     authorId:state.userProfile&&state.userProfile.id,
@@ -7814,10 +7825,11 @@ function openCommentPopover(worldPt,existing){
     authorColor:state.userProfile&&state.userProfile.color,
     text:'',createdAt:Date.now(),resolved:false,
   };
+  var editing=nativeComment?NemoNativeCommentsUI.existing(window,_activeComment):!!existing;
   var pop=document.getElementById('comment-popover');
   var ca=document.getElementById('canvas-area');
   var rect=ca.getBoundingClientRect();
-  var vp=view.projectToView(worldPt);
+  var vp=NemoProjectCommentsPresentation.position(window,worldPt,_activeComment);
   var rawLeft=rect.left+vp.x+12,rawTop=rect.top+vp.y-8;
   // Clamp fully on-screen (2026-08-27, "si la fenetre de feedback est trop
   // basse dans l'ecran aucun moyen de la faire defiler pour valider") — a
@@ -7834,13 +7846,13 @@ function openCommentPopover(worldPt,existing){
   pop.style.left=Math.round(Math.max(margin,Math.min(rawLeft,window.innerWidth-estW-margin)))+'px';
   pop.style.top=Math.round(Math.max(margin,Math.min(rawTop,window.innerHeight-estH-margin)))+'px';
   document.getElementById('comment-author-row').textContent=
-    (existing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
+    (editing?'Par ':'Nouveau — ')+(_activeComment.authorName||'Anonyme')+' · frame '+(_activeComment.frame+1);
   document.getElementById('comment-text').value=_activeComment.text||'';
   var fbNameEl0=document.getElementById('comment-fb-name'),fbEmailEl0=document.getElementById('comment-fb-email');
   if(fbNameEl0)fbNameEl0.value=(state.userProfile&&state.userProfile.name)||'';
   if(fbEmailEl0)fbEmailEl0.value=(state.userProfile&&state.userProfile.email)||'';
   document.getElementById('comment-resolved').checked=!!_activeComment.resolved;
-  document.getElementById('comment-delete').style.display=existing?'':'none';
+  document.getElementById('comment-delete').style.display=editing?'':'none';
   _activeFbTags=[];
   document.querySelectorAll('#comment-fb-tags .fb-tag').forEach(function(b){b.classList.remove('active');});
   var fbBlocking=document.getElementById('comment-fb-blocking');if(fbBlocking)fbBlocking.checked=false;
@@ -7856,6 +7868,7 @@ function openCommentPopover(worldPt,existing){
 function closeCommentPopover(){
   var pop=document.getElementById('comment-popover');
   if(pop)pop.style.display='none';
+  if(window.NemoNativeCommentsUI)NemoNativeCommentsUI.cancel(window,_activeComment);
   _activeComment=null;
   _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
   setCommentShots([]);
@@ -7933,6 +7946,8 @@ function initCommentPopover(){
   saveBtn.addEventListener('click',function(){
     if(!_activeComment)return;
     if(_recording)stopRecording();
+    if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.save(window,_activeComment,document.getElementById('comment-text').value,document.getElementById('comment-resolved').checked))return;
+    if(window.__TAURI__&&window.__TAURI__.core)return;
     _activeComment.text=document.getElementById('comment-text').value;
     _activeComment.resolved=document.getElementById('comment-resolved').checked;
     if(!state.comments)state.comments=[];
@@ -7945,7 +7960,10 @@ function initCommentPopover(){
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   });
   delBtn.addEventListener('click',function(){
-    if(!_activeComment||!state.comments)return;
+    if(!_activeComment)return;
+    if(window.NemoNativeCommentsUI&&NemoNativeCommentsUI.remove(window,_activeComment))return;
+    if(window.__TAURI__&&window.__TAURI__.core)return;
+    if(!state.comments)return;
     var idx=state.comments.indexOf(_activeComment);
     if(idx>=0)state.comments.splice(idx,1);
     saveActiveLayerFrame();closeCommentPopover();updateUI();refreshFbAvatars();
@@ -9213,84 +9231,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // out-of-project tooling for the dev loop. Click opens a compact list of
 // those comments; clicking one jumps to its frame. Read-only glance —
 // editing/resolving still happens on the pin itself via the Comment tool.
-function fbInitial(name){return (name||'?').trim().charAt(0).toUpperCase()||'?';}
-function refreshFbAvatars(){
-  var el=document.getElementById('fb-avatars');
-  if(!el)return;
-  var comments=state.comments||[];
-  var seen={},people=[];
-  if(state.userProfile){people.push({id:state.userProfile.id,name:state.userProfile.name,color:state.userProfile.color,me:true});seen[state.userProfile.id]=true;}
-  comments.forEach(function(c){
-    if(c.authorId&&!seen[c.authorId]){seen[c.authorId]=true;people.push({id:c.authorId,name:c.authorName,color:c.authorColor});}
-  });
-  el.innerHTML='';
-  var maxShown=4;
-  people.slice(0,maxShown).forEach(function(p){
-    var av=document.createElement('div');
-    av.className='fb-av';av.style.background=p.color||'#888';
-    av.textContent=fbInitial(p.name);
-    av.title=(p.name||'?')+(p.me?' (toi)':'');
-    el.appendChild(av);
-  });
-  if(people.length>maxShown){
-    var more=document.createElement('div');
-    more.className='fb-av fb-av-more';more.textContent='+'+(people.length-maxShown);
-    el.appendChild(more);
-  }
-}
-function renderFbAvatarPopover(){
-  var pop=document.getElementById('fb-avatars-pop');
-  if(!pop)return;
-  pop.innerHTML='';
-  var comments=(state.comments||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
-  if(!comments.length){
-    pop.innerHTML='<div class="fb-pop-empty">Aucun commentaire d\'équipe sur ce projet.</div>';
-    return;
-  }
-  comments.forEach(function(cm){
-    var item=document.createElement('div');item.className='fb-pop-item';
-    var av=document.createElement('div');av.className='fb-pop-av';
-    av.style.background=cm.authorColor||'#888';
-    av.textContent=fbInitial(cm.authorName);
-    item.appendChild(av);
-    var body=document.createElement('div');body.className='fb-pop-body';
-    var note=document.createElement('div');note.className='fb-pop-note';note.textContent=cm.text||'';note.title=cm.text||'';
-    body.appendChild(note);
-    var meta=document.createElement('div');meta.className='fb-pop-meta';
-    meta.appendChild(document.createTextNode((cm.authorName||'?')+' · frame '+((cm.frame||0)+1)));
-    var st=document.createElement('span');
-    st.className='fb-pop-status'+(cm.resolved?' resolved':'');
-    st.textContent=cm.resolved?'résolu':'à traiter';
-    meta.appendChild(st);
-    body.appendChild(meta);
-    item.appendChild(body);
-    item.addEventListener('click',function(){
-      if(typeof cm.frame==='number')goToFrame(cm.frame);
-      document.getElementById('fb-avatars-pop').classList.remove('open');
-    });
-    pop.appendChild(item);
-  });
-}
-function toggleFbAvatarsPopover(){
-  var pop=document.getElementById('fb-avatars-pop');
-  if(!pop)return;
-  if(pop.classList.contains('open')){pop.classList.remove('open');return;}
-  renderFbAvatarPopover();
-  var r=document.getElementById('fb-avatars').getBoundingClientRect();
-  pop.style.top=(r.bottom+6)+'px';
-  pop.style.right=(window.innerWidth-r.right)+'px';
-  pop.classList.add('open');
-}
-function initFbAvatars(){
-  var el=document.getElementById('fb-avatars');
-  if(!el)return;
-  el.addEventListener('click',function(e){e.stopPropagation();toggleFbAvatarsPopover();});
-  document.addEventListener('click',function(e){
-    var pop=document.getElementById('fb-avatars-pop');
-    if(pop&&pop.classList.contains('open')&&!pop.contains(e.target))pop.classList.remove('open');
-  });
-  refreshFbAvatars();
-}
+function refreshFbAvatars(){return NemoProjectCommentsPresentation.create(window).refresh();}
+function renderFbAvatarPopover(){return NemoProjectCommentsPresentation.create(window).render();}
+function toggleFbAvatarsPopover(){return NemoProjectCommentsPresentation.create(window).toggle();}
+function initFbAvatars(){return NemoProjectCommentsPresentation.create(window).init();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initFbAvatars);else initFbAvatars();
 
 // ---- GitHub feedback triage dashboard (beta testers → mysteropodes/
@@ -9716,8 +9660,8 @@ function onKeyDown(event){
   // ways, on different platforms). event.code (Equal/Minus/Digit0 +
   // Numpad variants), not event.key — still layout-proof against AZERTY,
   // same reasoning as round 2.
-  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
-  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Minus'||event.code==='NumpadSubtract')){event.preventDefault();view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();if(typeof nativeViewportNavigation==='function'&&nativeViewportNavigation('zoom',null,null,1.1))return;view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
+  if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Minus'||event.code==='NumpadSubtract')){event.preventDefault();if(typeof nativeViewportNavigation==='function'&&nativeViewportNavigation('zoom',null,null,1/1.1))return;view.zoom=Math.max(.05,view.zoom/1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}
   if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Digit0'||event.code==='Numpad0')){event.preventDefault();window.SM.fitCanvas();return;}
   if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;
   var k=event.key;
@@ -10653,6 +10597,9 @@ document.getElementById('p-brushpreset').addEventListener('change',function(){wi
 // swatch is clicked — same eligibility/strip/apply logic as before, just
 // callable from more than one caller.
 function applyVectorBrushToSelection(preset){
+  if(window.__TAURI__&&window.__TAURI__.core){
+    showToast('Native custom vector brush application is unavailable.');return false;
+  }
   // `p.strokeColor` used to gate eligibility — excluded every fill-
   // camouflaged anchor (a Bitmap Brush stroke with a fill, or any already-
   // textured anchor with strokeColor nulled by the SAME camouflage
@@ -10950,6 +10897,7 @@ document.getElementById('btn-resetv').addEventListener('click',function(){window
 // scrubbing instead of only on release.
 document.getElementById('zoom-scrub').addEventListener('input',function(){
   var pct=parseFloat(this.value);if(!pct||pct<=0)return;
+  if(typeof nativeViewportNavigation==='function'&&nativeViewportNavigation('absolute',null,null,pct/100))return;
   view.zoom=pct/100;renderArcs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
 });
 document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
@@ -11627,6 +11575,7 @@ window.updateCombinePanel=updateCombinePanel;
   var cancelBtn=document.getElementById('exp-cancel'),nativePngAbort=null;
   cancelBtn.addEventListener('click',function(){
     if(nativePngAbort){cancelBtn.disabled=true;nativePngAbort.abort();return;}
+    var nativeAuthority=window.NemoNativeOpacityCutover;if(nativeAuthority&&nativeAuthority.blocksLegacy())return;
     var s=window.SMExport.svgSequenceJob(),id=s&&s.meta().running;
     if(!id)return; // the directory picker is still open — no job exists yet
     cancelBtn.disabled=true;s.cancel(id);progEl.style.display='block';progEl.textContent=SM.t('exportCancelled');
@@ -11645,14 +11594,15 @@ window.updateCombinePanel=updateCombinePanel;
       onProgress:function(i,n){progEl.style.display='block';progEl.textContent=SM.t('exportRenderingFrame').replace('{i}',i).replace('{n}',n);},
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
-    var nativePng=fmtSel.value==='png'&&window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy();
+    var nativeAuthority=window.NemoNativeOpacityCutover;
+    var nativeExport=(fmtSel.value==='png'||fmtSel.value==='svg')&&nativeAuthority&&nativeAuthority.blocksLegacy();
+    var nativePng=fmtSel.value==='png'&&nativeExport;
     nativePngAbort=nativePng?new AbortController():null;if(nativePngAbort)opts.signal=nativePngAbort.signal;
-    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&window.SMExport.isAvailable())?'':'none';
+    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&!nativeExport&&window.SMExport.isAvailable())?'':'none';
     try{
-      // The native PNG job reads a pinned Rust revision. Saving Paper frames
+      // Native PNG/SVG read a pinned Rust revision. Saving Paper frames
       // here would either be denied or create a second document writer.
-      var nativeOpacity=window.NemoNativeOpacityCutover;
-      if(fmtSel.value!=='png'||!nativeOpacity||!nativeOpacity.blocksLegacy())saveAllLayerFrames();
+      if(!nativeExport)saveAllLayerFrames();
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent=SM.t('exportCancelled');}
@@ -11740,30 +11690,7 @@ function renderPropsPanelRail(show){
 }
 window.renderPropsPanelRail=renderPropsPanelRail;
 function togglePropsPanelCollapse(force){
-  var panel=document.getElementById('props-panel');
-  if(!panel)return;
-  var collapsed=force!==undefined?force:!panel.classList.contains('collapsed');
-  // Panel-width persistence (ui.js) sets a plain inline style.width, which
-  // always wins over the .collapsed class's own `width:36px` rule (inline
-  // beats any selector, regardless of specificity) — without clearing it
-  // here first, a resized-then-collapsed panel would stay visually wide
-  // with just the rail's few narrow items floating in the leftover space.
-  // Stashed on window (not a local var) so ui.js's own startup restore can
-  // prime it too, for the "starts collapsed" case.
-  if(collapsed){
-    if(panel.style.width)window._propsExpandedWidth=panel.style.width;
-    panel.style.width='';
-  }else if(window._propsExpandedWidth){
-    panel.style.width=window._propsExpandedWidth;
-  }
-  panel.classList.toggle('collapsed',collapsed);
-  // Dragging a 36px rail wider makes no sense — hide the resize handle
-  // rather than leave a control that would just fight the collapsed width.
-  var resizeHandle=document.getElementById('props-panel-resize');
-  if(resizeHandle)resizeHandle.style.display=collapsed?'none':'';
-  if(collapsed&&window._lastPropsShow)renderPropsPanelRail(window._lastPropsShow);
-  syncPropsPanelCollapseTitle();
-  try{localStorage.setItem('nemo-props-panel-collapsed',collapsed?'1':'0');}catch(e){}
+  return window.SMWorkspace.toggleProps(force);
 }
 window.togglePropsPanelCollapse=togglePropsPanelCollapse;
 // STATE-dependent title (collapse vs expand) — can't live on data-i18n-title,

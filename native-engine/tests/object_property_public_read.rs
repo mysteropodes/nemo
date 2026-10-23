@@ -321,3 +321,46 @@ fn no_evaluation_build_reports_raw_sample_unavailable_but_authored_read_works() 
     );
     assert!(read(&pin, view("authoredKeys")).is_ok());
 }
+
+#[cfg(all(feature = "evaluation", feature = "history"))]
+#[test]
+fn real_project_expression_context_flows_through_the_original_public_dispatch() {
+    use crate::history::NativeObjectHistory;
+    use crate::object_document::{ProjectEnvelope, ProjectMetadata};
+    let drawing = decode_storage_project(
+        source(json!([{"property":"opacity","static":[37]}]))
+            .to_string()
+            .as_bytes(),
+    )
+    .unwrap();
+    let owner = NativeObjectHistory::from_admitted_project(
+        "public-context",
+        ProjectEnvelope::no_media(ProjectMetadata::new(640, 360, 30.).unwrap(), drawing),
+    )
+    .unwrap();
+    let pin = owner.acquire_snapshot(0).unwrap();
+    let view = json!({"kind":"expressionContext","target":{"contextId":"scene-root","layerUid":"L0"},"property":"opacity","frame":3.5});
+    let response = pin.dispatch(public(&pin, view.clone())).unwrap();
+    assert!(response.ok);
+    let result = response.result.unwrap();
+    assert_eq!(result["kind"], "expressionContext");
+    assert_eq!(result["documentSnapshotId"], pin.snapshot_id());
+    assert_eq!(result["comp"]["width"], 640);
+    assert_eq!(result["comp"]["fps"], 30.);
+    assert_eq!(result["self"]["index"], 0);
+    assert_eq!(result["keyCount"], 0);
+    assert!(result["compUnavailable"].is_null());
+    let mut wrong = selector(&pin, view.clone());
+    wrong["documentSnapshotId"] = json!("foreign");
+    assert_eq!(
+        pin.query_property_read_json(wrong.to_string().as_bytes()),
+        Err(DispatchErrorCode::StaleRevision)
+    );
+    let mut missing = view;
+    missing["target"]["layerUid"] = json!("deleted");
+    assert_eq!(read(&pin, missing), Err(DispatchErrorCode::NotFound));
+    assert_eq!(owner.history_depths(), (0, 0));
+}
+
+#[path = "object_property_expression_state.rs"]
+mod expression_state;

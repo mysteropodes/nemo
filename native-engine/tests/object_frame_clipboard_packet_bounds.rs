@@ -100,7 +100,7 @@ fn malformed_selections_and_documents_are_refused_typed() {
         refuse(&untimed, &[cell("A", 0)]),
         ClipboardPacketError::TimingUnavailable
     );
-    // ordered (v2) documents carry composition-order scopes this packet does not copy
+    // An ordered packet carries the exact admitted DTO, not an invented record order.
     let ordered = snapshot_of(
         json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":3,
         "layers":[{"layerUid":"A","timing":timing_json(&[1], json!([]))}],
@@ -111,9 +111,34 @@ fn malformed_selections_and_documents_are_refused_typed() {
             "scopes":[{"frameScope":{"kind":"authored","frame":1},
                 "elements":[{"layerUid":"A","strokeId":"A","naturalPosition":0,"order":{}}]}]}]}}),
     );
+    let packet = copy(&ordered, &[cell("A", 1)]).unwrap();
     assert_eq!(
-        refuse(&ordered, &[cell("A", 1)]),
-        ClipboardPacketError::OrderedDocumentUnavailable
+        serde_json::to_value(packet.cells()[0].order_elements().value().unwrap()).unwrap(),
+        json!([{"layerUid":"A","strokeId":"A","naturalPosition":0,"order":{}}])
+    );
+    let exact = packet.encoded_bytes();
+    assert!(copy_frame_cells(
+        &ordered,
+        &pins(&ordered),
+        &[cell("A", 1)],
+        &PacketLimits {
+            max_cells: 1,
+            max_bytes: exact
+        }
+    )
+    .is_ok());
+    assert_eq!(
+        copy_frame_cells(
+            &ordered,
+            &pins(&ordered),
+            &[cell("A", 1)],
+            &PacketLimits {
+                max_cells: 1,
+                max_bytes: exact - 1
+            }
+        )
+        .unwrap_err(),
+        ClipboardPacketError::TooManyBytes
     );
 }
 
@@ -239,4 +264,62 @@ fn byte_ceiling_clamps_an_unbounded_caller_limit() {
     let few = sized();
     let ok = copy_frame_cells(&few, &pins(&few), &[cell("L0", 0)], &unbounded).unwrap();
     assert_eq!(ok.encoded_bytes(), 3 * RECORD_BYTES);
+}
+
+#[test]
+fn rich_multi_element_order_obeys_exact_array_byte_budget_without_changing_source() {
+    let records = vec![record("A", "first", 1, 11), record("A", "second", 1, 22)];
+    let elements = json!([
+        {"layerUid":"A","strokeId":"second","naturalPosition":0,"order":{
+            "static":[-7],"track":{"keys":[{"frame":0,"v":[3],"hold":true},
+                {"frame":1,"v":[5],"hIn":[0,1],"hOut":[1,0]}]},
+            "expression":{"enabled":false,"code":"1 + 2"}}},
+        {"layerUid":"A","strokeId":"first","naturalPosition":1,"order":{
+            "static":[9],"track":{"keys":[{"frame":0,"v":[-2]},
+                {"frame":2,"v":[8],"curvePoints":null}]}}}
+    ]);
+    let expected_bytes = records
+        .iter()
+        .map(|value| serde_json::to_vec(value).unwrap().len())
+        .sum::<usize>()
+        + serde_json::to_vec(&elements).unwrap().len();
+    let snapshot = snapshot_of(json!({
+        "format":"nemo.native-object-document","formatVersion":2,"totalFrames":3,
+        "layers":[{"layerUid":"A","timing":timing_json(&[1], json!([]))}],
+        "objects":records,
+        "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,
+            "documentFormatVersion":2,"migration":"explicit-plan-required","referencePolicy":"unresolved",
+            "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"A","naturalPosition":0,"order":{}}],
+                "scopes":[{"frameScope":{"kind":"authored","frame":1},"elements":elements}]}]}
+    }));
+    let before = serde_json::to_vec(snapshot.document()).unwrap();
+    let selection = [cell("A", 1)];
+    let limits = PacketLimits {
+        max_cells: 1,
+        max_bytes: expected_bytes,
+    };
+    let packet = copy_frame_cells(&snapshot, &pins(&snapshot), &selection, &limits).unwrap();
+    assert_eq!(packet.encoded_bytes(), expected_bytes);
+    assert_eq!(
+        serde_json::to_value(packet.cells()[0].order_elements().value().unwrap()).unwrap(),
+        elements
+    );
+    assert_eq!(
+        copy_frame_cells(
+            &snapshot,
+            &pins(&snapshot),
+            &selection,
+            &PacketLimits {
+                max_bytes: expected_bytes - 1,
+                ..limits
+            }
+        )
+        .unwrap_err(),
+        ClipboardPacketError::TooManyBytes
+    );
+    assert_eq!(
+        serde_json::to_vec(snapshot.document()).unwrap(),
+        before,
+        "both success and partial-budget refusal leave the retained source untouched"
+    );
 }

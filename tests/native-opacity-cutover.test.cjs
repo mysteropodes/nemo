@@ -487,10 +487,18 @@ test('classic startup loads frozen guard modules before the production first-lay
     'js/application/native-opacity-viewport.js',
     'js/application/native-object-save-as-workflow.js',
     'js/application/native-object-saved-acknowledgement.js',
+    'js/adapters/native-font-panel.js',
+    'js/adapters/native-frame-edit-contract.js',
     'js/adapters/native-viewport-underlay.js',
+    'js/adapters/native-object-project-metadata.js',
+    'js/adapters/native-object-project-properties.js',
+    'js/adapters/native-object-project-desktop.js',
+    'js/adapters/native-object-open-exposure.js',
     'js/adapters/native-object-project.js',
+    'js/adapters/native-object-layer-splice.js',
     'js/adapters/native-object-project-file.js',
     'js/adapters/native-object-ui.js', 'js/adapters/native-drawing-add.js', 'js/adapters/native-drawing-add-desktop.js', 'js/adapters/native-project-settings-intent.js', 'js/adapters/native-project-settings-desktop.js',
+    'js/adapters/native-frame-edit-intent.js',
     'js/adapters/native-object-reference.js',
     'js/application/native-opacity-operations.js', 'js/application/opacity-application.js',
     'js/adapters/native-opacity-legacy-surface.js', 'js/adapters/native-opacity-motion-surface.js',
@@ -1213,6 +1221,7 @@ test('a real Draw gesture captured before bootstrap cannot commit or release nat
     resume() { calls.resume++; }, renderNow() { calls.render++; }, setPressureCursor() {} };
   Object.defineProperty(scope, 'userLayers', { get() { calls.documentAccess++; return []; } });
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/draw-bridge.js'), 'utf8'), scope);
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters/native-object-shape-tool.js'), 'utf8'), scope);
   function event() {
     return { clientX: 10, clientY: 20, pressure: 0.5, stopped: 0, prevented: 0,
       stopImmediatePropagation() { this.stopped++; }, preventDefault() { this.prevented++; } };
@@ -3252,6 +3261,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   const events = [], invokes = [], imports = [], deniedEntries = [], toasts = [];
   let ports, nativeBlocked = false, pluginOpen = 0, panelOpen = 0;
   let delayedScript = null, delayedPlugin = null, delayedArchive = null;
+  let svgObjectOwner = null; const svgObjectCalls = [];
   const serializedDocument = { totalFrames: 21, layers: [{ opacity: 25 }] };
   const paperProject = { activeLayer: { opacity: 1 }, itemCount: 1 };
   const activity = { scriptRuns: 0, pluginLoads: 0 };
@@ -3304,6 +3314,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
       if (value === 'unsupported') throw new Error('unsupported');
       return { projection: { format: 'nemo.native-opacity-document' }, resources: [{ resourceId: 'geometry/r08/0' }] };
     } },
+    NemoNativeObjectProject: { desktop() { return svgObjectOwner; } },
     NemoApplication: { handle() { return 'legacy'; }, setInstanceId() {}, capabilities() { return []; } },
     NemoOpacityApplication: { meta() { return { instanceId: 'legacy', documentId: 'legacy', revision: 0 }; }, legacy() { return 'legacy'; } },
     NemoApplicationMcpTransport: { createNativeTauriTransport(received) {
@@ -3343,9 +3354,16 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.strictEqual(desktop.SMEngineBridge.nativeEditGuard, desktop.SMNativeEditGuard);
   assert.equal(Object.isFrozen(desktop.NemoNativeOpacityCutover), true);
   assert.deepEqual(Object.keys(desktop.NemoNativeOpacityCutover).sort(), [
-    'blocksLegacy', 'exportPng', 'getNativeIdentity', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
+    'blocksLegacy', 'exportPng', 'exportSvg', 'getNativeIdentity', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
     'prepared', 'presentPreview', 'projectSelection', 'releaseCurrent', 'renderPreview',
   ]);
+  assert.equal(desktop.NemoNativeOpacityCutover.exportSvg, undefined, 'older opacity owner does not advertise the object SVG route');
+  svgObjectOwner = { blocksLegacy: () => true, exportSvg: (...args) => { svgObjectCalls.push(args); return 'native-svg-receipt'; } };
+  assert.equal(desktop.NemoNativeOpacityCutover.exportSvg('/svg', [0, 7], null, null), 'native-svg-receipt');
+  assert.deepEqual(svgObjectCalls, [['/svg', [0, 7], null, null]]);
+  svgObjectOwner = { blocksLegacy: () => false, exportSvg: () => assert.fail('idle object owner must not be routed') };
+  assert.equal(desktop.NemoNativeOpacityCutover.exportSvg, undefined);
+  svgObjectOwner = null;
   for (const authorityKey of ['activate', 'requestRelease', 'handleV1',
     'legacyIntent', 'setOpacity', 'history']) {
     assert.equal(desktop.NemoNativeOpacityCutover[authorityKey], undefined, authorityKey);

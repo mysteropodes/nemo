@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-perspective",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object.project.perspective.read",
+    "command.document.object.project.perspective.edit"
+  ],
+  "input": {
+    "oneOf": [
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectPerspectiveReadPayload"
+      },
+      {
+        "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectPerspectiveEditPayload"
+      }
+    ]
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete4096-byte pinned response or typed refusal; no count-only/truncated record, raw document, path or resource payload."
+  },
+  "semantics": "Original Perspective enable/toggle, mode cycle/reset, lock-all, unlocked VP move and whole-horizon translation through one native document/history owner. Native read provider computes effective defaults without persisting absent/null/empty metadata; raw flags/count and vpSource remain truthful. Imported coordinates, order, unknown mode, inert density and absent/false/true lock fields survive. Explicit native gestures materialize defaults using native document dimensions; caller arrays/dimensions and density setters are not admitted. Pinned complete pages use effectiveVPCount, zero-based cursor, limits1..16 and strict progress within complete4096-byte envelopes or typed refusal. Original Labs callbacks await confirmed same-owner projection; native drag owns only transient ghost geometry and one release command. No legacy desktop persistent mirror or fallback. Source candidate only; installed overlay/snap/drawing/history/save-reopen and full T08 acceptance remain open.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Native effective defaults preserve absent stored VP metadata",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "perspective-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object.project.perspective.read",
+        "payload": {
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "selector": {
+            "kind": "settings"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "perspective-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 7,
+        "ok": true,
+        "result": {
+          "instanceId": "instance-A",
+          "documentId": "document-A",
+          "atRevision": 7,
+          "documentSnapshotId": "snapshot-7",
+          "contextId": "scene-root",
+          "result": {
+            "perspectiveVPsPresent": false,
+            "perspectiveVPsNull": false,
+            "perspectiveVPCount": 0,
+            "effectiveVPCount": 2,
+            "vpSource": "default"
+          }
+        }
+      }
+    },
+    {
+      "label": "Original unlocked VP drag commits once through native history",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "perspective-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.perspective.edit",
+        "payload": {
+          "command": "object.project.perspective.edit",
+          "action": {
+            "kind": "move",
+            "ordinal": 1,
+            "x": -12.25,
+            "y": 90.5
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "perspective-edit-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

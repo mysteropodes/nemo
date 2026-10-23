@@ -7,8 +7,9 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
+const kitsuService = require('../src/js/adapters/kitsu-service.js');
 const kitsuSource = fs.readFileSync(path.join(ROOT, 'src/js/kitsu.js'), 'utf8');
-const tutorialSource = fs.readFileSync(path.join(ROOT, 'src/js/tutorial.js'), 'utf8');
+const tutorialSource = fs.readFileSync(path.join(ROOT, 'src/js/adapters/tutorial-presentation.js'), 'utf8');
 
 function deferred() {
   let resolve;
@@ -83,6 +84,7 @@ function kitsuHarness(mode) {
   const context = {
     console,
     state,
+    NemoKitsuService: kitsuService,
     URLSearchParams,
     sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     document: { readyState: 'loading', addEventListener() {} },
@@ -138,7 +140,7 @@ function tutorialHarness(mode) {
   vm.createContext(context);
   const source = extractFunctionSource(tutorialSource, 'startModule');
   vm.runInContext(`${source}\nthis.startModuleUnderTest = startModule;`, context,
-    { filename: 'src/js/tutorial.js:startModule' });
+    { filename: 'src/js/adapters/tutorial-presentation.js:startModule' });
   return { context, replacement, replacementCalls, continuationCalls };
 }
 

@@ -619,11 +619,6 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // untouched, while the column/filter preferences follow the workstation.
   var _motionSearch = '';
   var _motionFilterMode = 'all';
-  // Default column preset (2026-08-29, Cyril: "3D/mograph par default") — the
-  // 3D Layer/Duplicator toggle icons only show under this preset (see
-  // style.css's `[data-motion-columns]` rules); 'animation' (the prior
-  // default) hid them, which read as "these icons disappeared" until you
-  // knew to open the column picker and switch presets.
   var _motionColumnPreset = '3d';
   var _motionSnapEnabled = true;
   try {
@@ -631,6 +626,11 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     _motionColumnPreset = localStorage.getItem('nemo-motion-columns') || '3d';
     _motionSnapEnabled = localStorage.getItem('nemo-motion-snap') !== '0';
   } catch (e) {}
+  if(typeof NemoNativeWorkspaceUI!=='undefined'&&NemoNativeWorkspaceUI&&typeof NemoNativeWorkspaceUI.bindMotion==='function')
+  NemoNativeWorkspaceUI.bindMotion(window, {
+    read:function(){return _motionColumnPreset;},
+    apply:function(value){_motionColumnPreset=value;var panel=document.getElementById('layer-panel');if(panel)panel.dataset.motionColumns=value;}
+  });
   function propHasContent(holder, prop) {
     if (prop === 'opacity' && nativeOwns(holder, prop)) {
       var model = nativeOpacityModel(holder, state.currentFrame);
@@ -2809,7 +2809,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     if (prop === 'timeRemap') {
       var tli = state.layers.indexOf(ld);
       if (tli < 0) return;
-      ld.timeRemap ? disableTimeRemap(tli) : enableTimeRemap(tli);
+      window.SM.toggleTimeRemap(tli);
       return;
     }
     if (isAnimated(ld, prop)) {
@@ -6867,7 +6867,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         var old = document.getElementById('motion-filter-pop');
-        if (old) { old.remove(); return; }
+        if (old) { if(old._workspaceDispose)old._workspaceDispose(); old.remove(); return; }
         var pop = document.createElement('div'); pop.id = 'motion-filter-pop'; pop.className = 'ctx-menu motion-filter-pop';
         var search = document.createElement('input'); search.type = 'search'; search.className = 'motion-filter-search';
         search.placeholder = 'Calque ou propriété…'; search.value = _motionSearch;
@@ -6877,12 +6877,12 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
           var o = document.createElement('option'); o.value = it[0]; o.textContent = it[1]; filter.appendChild(o);
         });
         filter.value = _motionFilterMode;
-        var colLabel = document.createElement('label'); colLabel.textContent = 'Colonnes';
-        var cols = document.createElement('select'); cols.className = 'motion-filter-select';
-        [['compact','Compact'],['animation','Animation'],['compositing','Compositing'],['3d','3D / Mograph']].forEach(function (it) {
-          var o = document.createElement('option'); o.value = it[0]; o.textContent = it[1]; cols.appendChild(o);
+        var column=NemoNativeWorkspaceUI.motionColumns(window,panel,{
+          read:function(){return _motionColumnPreset;},
+          apply:function(value){_motionColumnPreset=value;}
         });
-        cols.value = _motionColumnPreset;
+        var colLabel=column.label,cols=column.select;
+        pop._workspaceDispose=column.dispose;
         var snapRow = document.createElement('label'); snapRow.className = 'motion-filter-check';
         var snap = document.createElement('input'); snap.type = 'checkbox'; snap.checked = _motionSnapEnabled;
         snapRow.appendChild(snap); snapRow.appendChild(document.createTextNode(' Magnétisme des clés'));
@@ -6895,9 +6895,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
         function rerender() { renderLayerList(); renderTimeline(); }
         search.addEventListener('input', function () { _motionSearch = search.value.trim().toLowerCase(); rerender(); });
         filter.addEventListener('change', function () { _motionFilterMode = filter.value; try { localStorage.setItem('nemo-motion-filter', _motionFilterMode); } catch (x) {} rerender(); });
-        cols.addEventListener('change', function () { _motionColumnPreset = cols.value; panel.dataset.motionColumns = _motionColumnPreset; try { localStorage.setItem('nemo-motion-columns', _motionColumnPreset); } catch (x) {} });
         snap.addEventListener('change', function () { _motionSnapEnabled = snap.checked; try { localStorage.setItem('nemo-motion-snap', _motionSnapEnabled ? '1' : '0'); } catch (x) {} });
-        function close(ev) { if (!pop.contains(ev.target) && ev.target !== btn) { pop.remove(); document.removeEventListener('pointerdown', close, true); } }
+        function close(ev) { if (!pop.contains(ev.target) && ev.target !== btn) { column.dispose(); pop.remove(); document.removeEventListener('pointerdown', close, true); } }
         setTimeout(function () { document.addEventListener('pointerdown', close, true); search.focus(); search.select(); }, 0);
       });
     }
@@ -7340,8 +7339,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
           // calques composants') — leaving the row always clickable lets
           // that existing message do the explaining instead of a silent
           // grey row.
-          { label: ld.timeRemap ? SM.t('ctxDisableTimeRemap') : SM.t('ctxEnableTimeRemap'),
-            action: function () { ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li); } },
+          { label: window.SM.isTimeRemapped(li) ? SM.t('ctxDisableTimeRemap') : SM.t('ctxEnableTimeRemap'),
+            action: function () { window.SM.toggleTimeRemap(li); } },
           { label: SM.t('ctxMergeSelectedLayers'), disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
           { label: SM.t('ctxObjectDuplicatorEllipsis'), disabled: !multi, action: function () { window.SM.convertSelectionToObjectDuplicator(_layerSel.slice()); } },
           { sep: true },
@@ -7436,12 +7435,64 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // holder), including the stopwatch and the add-key diamond, so both
   // locations can add/remove keyframes and neither can drift from the
   // other's behavior.
+  // The accepted opacity owner has a separate native projection from the
+  // Object Project inspector. Only its two admitted properties are presented;
+  // no generic holder renderer, expression writer or release route is entered.
+  function renderNativeOpacityPropsPanel(body) {
+    var owner = window.NemoNativeOpacityCutover, surface = window.NemoNativeOpacityMotionSurface;
+    try {
+      if (!owner || !surface || typeof owner.isActive !== 'function' || owner.isActive() !== true) return false;
+      var prepared = owner.prepared(), selected = state.layers && state.layers[state.activeLayerIdx];
+      if (!prepared || !selected || selected.layerUid !== prepared.layerUid ||
+          _motionCanvasEmptyClick || (typeof _layerSel !== 'undefined' && !_layerSel.length)) return false;
+      var holder = Object.freeze({ layerUid: prepared.layerUid }), frame = state.currentFrame;
+      var plan = surface.opacityReadModel(owner, holder, frame);
+      var position = surface.read(owner, holder, 'position', frame), opacity = surface.read(owner, holder, 'opacity', frame);
+      if (!plan.handled || !position.handled || !opacity.handled) return false;
+      body.innerHTML = '';
+      var heading = document.createElement('div'); heading.className = 'motion-props-layername';
+      heading.textContent = 'Native properties'; body.appendChild(heading);
+      [['position', position.value], ['opacity', opacity.value]].forEach(function (entry) {
+        var prop = entry[0], values = entry[1], row = document.createElement('div');
+        row.className = 'lrow motion-prop-row'; row._smHolder = holder; row._smProp = prop;
+        var label = document.createElement('span'); label.textContent = PROP_LABEL[prop]; row.appendChild(label);
+        var fields = document.createElement('div'); fields.className = 'motion-fields'; row.appendChild(fields);
+        values.forEach(function (value) {
+          var input;
+          if (prop === 'opacity' && plan.opacityMode === 'static' && window.NemoOpacityApplication &&
+              typeof window.NemoOpacityApplication.legacy === 'function') {
+            input = scrubField(value, function (next) {
+              var current = state.layers && state.layers[state.activeLayerIdx];
+              if (window.NemoNativeOpacityCutover !== owner || state.currentFrame !== frame ||
+                  !current || current.layerUid !== plan.layerUid ||
+                  (typeof _layerSel !== 'undefined' && !_layerSel.length)) return;
+              surface.routeDimension(plan, window.NemoOpacityApplication, values, 0, next, frame);
+            }, false, plan);
+          } else {
+            input = document.createElement('input'); input.type = 'number'; input.className = 'motion-val';
+            input.value = fmtVal(value); input.readOnly = true; input.disabled = true;
+          }
+          fields.appendChild(input);
+        });
+        body.appendChild(row);
+        var opened = window._exprEditorOpen;
+        if (opened && opened.holder && opened.holder.layerUid === plan.layerUid && opened.prop === prop) {
+          var expression = document.createElement('div'); expression.className = 'lrow motion-expr-editor';
+          var raw = document.createElement('span'); raw.className = 'motion-expr-raw';
+          raw.textContent = SM.t('exprRawValuePrefix') + values.map(fmtVal).join(', ') + ' ' + PROP_UNIT[prop];
+          expression.appendChild(raw); body.appendChild(expression);
+        }
+      });
+      return true;
+    } catch (_) { return false; }
+  }
   function renderMotionPropsPanel() {
     var body = document.getElementById('motion-props-body');
     if (!body) return;
     if(n20AllowLegacyWrite('motion.metadata.read')!==true){
       var nativeUi=window.NemoNativeObjectUI;
       if(nativeUi&&typeof nativeUi.paintMotionInspector==='function'&&nativeUi.paintMotionInspector(window)===true)return;
+      if(renderNativeOpacityPropsPanel(body))return;
       body.textContent='Native Motion property metadata is unavailable.';return;
     }
     body.innerHTML = '';
@@ -11529,6 +11580,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // expr-bake.js does the actual RDP reduction + writes the keys; this is
   // just the toast/refresh wiring, same split as setExpressionCode above.
   function bakeExpressionOnRow(holder, prop) {
+    if (!n20AllowLegacyWrite('motion-expression-bake')) return;
     if (!window.SMExprBake) return;
     var result = SMExprBake.bakeExpressionToKeyframes(holder, prop, 0, state.totalFrames - 1);
     if (!result) return;
@@ -12359,6 +12411,13 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     if (window.showToast) showToast(SM.t('toastTimeRemapEnabledFromSuffix') + last);
     return true;
   }
+  // Late-bound entries: under the native owner native-time-remap-ui.js replaces
+  // both, reading the layer's video placement and editing it natively.
+  window.SM.toggleTimeRemap = function (li) {
+    var ld = state.layers[li];
+    return ld && ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li);
+  };
+  window.SM.isTimeRemapped = function (li) { var ld = state.layers[li]; return !!(ld && ld.timeRemap); };
   function disableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld || !ld.timeRemap) return false;
@@ -13248,6 +13307,19 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // moved the layer range while in Motion — same priority call as the
   // canvas, where drag-anywhere marquee wins over object-move unless you
   // grab an actual object. Superseded by the entry above.
+  function routeNativeLayerBarMarquee(e) {
+    var owned=false;
+    try {
+      var project=window.NemoNativeObjectProject,session=project&&project.desktop(window),cutover=window.NemoNativeOpacityCutover;
+      owned=!!(session&&(session.isActive()||session.blocksLegacy&&session.blocksLegacy())||cutover&&cutover.blocksLegacy&&cutover.blocksLegacy());
+    } catch (_) { owned=true; }
+    if(!owned)return false;
+    e.stopPropagation();e.preventDefault();
+    var helper=window.NemoNativeLayerRangeDesktop;
+    if(helper&&typeof helper.startMarquee==='function')helper.startMarquee(window,e);
+    else if(window.showToast)window.showToast('Native layer range selection is unavailable.');
+    return true;
+  }
   function initGridMarquee() {
     var wrap = document.getElementById('fg-wrap');
     if (!wrap) return;
@@ -13272,6 +13344,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();
       if (e.clientX > r.left + wrap.clientWidth || e.clientY > r.top + wrap.clientHeight) return;
+      if(routeNativeLayerBarMarquee(e))return;
       e.stopPropagation(); e.preventDefault();
       startMarquee(e);
     }, true);

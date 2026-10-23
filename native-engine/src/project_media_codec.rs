@@ -1,8 +1,10 @@
 //! Strict private project wire; drawing admission always sees original bytes.
-use crate::object_document::{Presence, ProjectEnvelope, ProjectMetadata, ProjectReferenceState};
+#[cfg(test)]
+use crate::object_document::ProjectMetadata;
+use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 #[cfg(feature = "project_media_codec")]
 use crate::reference_image_asset::{ImageAssetError, ImageAssetLimits};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::value::RawValue;
 
 #[cfg(feature = "project_media_codec")]
@@ -10,6 +12,10 @@ use serde_json::value::RawValue;
 mod asset_wire;
 #[cfg(feature = "project_media_codec")]
 pub(crate) use asset_wire::{prepare_project_wire, DecodedProjectWire, PreparedProjectWire};
+
+#[path = "project_metadata_wire.rs"]
+mod metadata;
+use metadata::Metadata;
 
 const FORMAT: &str = "nemo.native-project-document";
 const MAX_ENVELOPE: usize = 32 * 1024 * 1024;
@@ -45,6 +51,7 @@ impl From<ImageAssetError> for ProjectWireError {
 /// Explicit caller limits cannot exceed the staged file ceilings.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ProjectWireLimits {
+    audio: Option<usize>,
     envelope_bytes: usize,
     drawing_bytes: usize,
     #[cfg(feature = "project_media_codec")]
@@ -53,6 +60,13 @@ pub(crate) struct ProjectWireLimits {
     font: Option<crate::object_codec::FontAssetLimits>,
 }
 impl ProjectWireLimits {
+    pub(crate) fn with_audio_limit(mut self, encoded: usize) -> Result<Self, ProjectWireError> {
+        if encoded == 0 || encoded > 16 * 1024 * 1024 {
+            return Err(ProjectWireError::Budget);
+        }
+        self.audio = Some(encoded);
+        Ok(self)
+    }
     #[cfg(feature = "font_asset_wire")]
     pub(crate) fn with_font_limits(mut self, font: crate::object_codec::FontAssetLimits) -> Self {
         self.font = Some(font);
@@ -70,6 +84,7 @@ impl ProjectWireLimits {
             return Err(ProjectWireError::Budget);
         }
         Ok(Self {
+            audio: None,
             envelope_bytes,
             drawing_bytes,
             #[cfg(feature = "project_media_codec")]
@@ -106,58 +121,6 @@ struct Input<'a> {
     viewport_reference: &'a RawValue,
     #[serde(borrow)]
     assets: &'a RawValue,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Metadata {
-    canvas_w: u32,
-    canvas_h: u32,
-    fps: f64,
-    #[serde(skip_serializing_if = "Presence::missing")]
-    canvas_bg: Presence<String>,
-    #[serde(skip_serializing_if = "Presence::missing")]
-    wa_in: Presence<f64>,
-    #[serde(skip_serializing_if = "Presence::missing")]
-    wa_out: Presence<f64>,
-}
-// Derived decoding alone admits positional arrays; reuse the drawing's
-// object-only visitor with strict duplicate/unknown/required-member checks.
-crate::object_document::object_deserialize!(Metadata {
-    canvas_w: u32,
-    canvas_h: u32,
-    fps: f64,
-    #[serde(default)] canvas_bg: Presence<String>,
-    #[serde(default)] wa_in: Presence<f64>,
-    #[serde(default)] wa_out: Presence<f64>
-});
-
-impl Metadata {
-    fn into_metadata(self) -> Result<ProjectMetadata, ProjectWireError> {
-        ProjectMetadata::new(self.canvas_w, self.canvas_h, self.fps)
-            .and_then(|value| {
-                value.with_canvas_background(self.canvas_bg.value().map(String::as_str))
-            })
-            .and_then(|value| {
-                value.with_work_area(self.wa_in.value().copied(), self.wa_out.value().copied())
-            })
-            .map_err(|_| ProjectWireError::Invalid)
-    }
-    fn from_metadata(value: &ProjectMetadata) -> Self {
-        let (canvas_w, canvas_h) = value.canvas_dimensions();
-        let (wa_in, wa_out) = value.work_area();
-        Self {
-            canvas_w,
-            canvas_h,
-            fps: value.fps(),
-            canvas_bg: value
-                .canvas_background()
-                .map(|v| Presence::Present(v.to_owned()))
-                .unwrap_or(Presence::Missing),
-            wa_in: wa_in.map(Presence::Present).unwrap_or(Presence::Missing),
-            wa_out: wa_out.map(Presence::Present).unwrap_or(Presence::Missing),
-        }
-    }
 }
 
 pub(crate) fn decode_project(
@@ -232,6 +195,11 @@ pub(crate) fn decode_validated_project(
         let metadata = wire.project.into_metadata()?;
         let drawing = crate::object_codec::decode_storage_project(wire.drawing.get().as_bytes())
             .map_err(ProjectWireError::Drawing)?;
+        crate::object_codec::validate_item_assets(&drawing, None)
+            .map_err(ProjectWireError::Drawing)?;
+        // A bare v1 project has no asset inventory: a StoryBoard sound cannot resolve.
+        crate::object_document::resolve_sound_assets(&drawing, None)
+            .map_err(|_| ProjectWireError::Invalid)?;
         let reference = if wire.viewport_reference.get() == "null" {
             if asset.is_some() {
                 return Err(ProjectWireError::Unsupported);

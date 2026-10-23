@@ -23,6 +23,38 @@
       return a[key] === b[key];
     });
   }
+  function bounds(root,pin){var doc=root.document,el=doc.getElementById('drawing-canvas'),r=el&&el.getBoundingClientRect(),html=doc.documentElement;
+      if(!r||![r.left,r.top,r.width,r.height,pin.canvasW,pin.canvasH].every(Number.isFinite)||r.width<=0||r.height<=0||pin.canvasW<=0||pin.canvasH<=0||r.left<0||r.top<0||r.left+r.width>html.clientWidth||r.top+r.height>html.clientHeight||!html.classList.contains('nemo-native-underlay'))return null;
+      var edges=[r.left,r.top,r.left+r.width,r.top+r.height];
+      if(typeof html.style.getPropertyValue!=='function'||!['left','top','right','bottom'].every(function(k,i){return parseFloat(html.style.getPropertyValue('--nemo-native-'+k))===edges[i];}))return null;
+      return {left:r.left,top:r.top,width:r.width,height:r.height};}
+  function transform(c,inverse){
+    var v=c.presentation&&c.presentation.view;if(v===undefined)return [1,0,0,1,0,0];
+    var m=v[inverse?'compositionToDocument':'documentToComposition'];
+    if(!['canvas','stored-camera'].includes(v.mode)||!Array.isArray(m)||m.length!==6||!m.every(Number.isFinite))throw new Error('Native presented coordinates are unavailable');
+    return m;
+  }
+  function mapped(p,c,inverse){var m=transform(c,inverse);return {x:m[0]*p.x+m[2]*p.y+m[4],y:m[1]*p.x+m[3]*p.y+m[5]};}
+  function matchesView(root,p){if(!p||(p.view?p.view.mode:'canvas')!==(root.state&&root.state.cameraView===true?'stored-camera':'canvas'))return false;var project=root.NemoNativeObjectProject,session=project&&typeof project.desktop==='function'&&project.desktop(root);if(!session||typeof session.readPresentedObjectSession!=='function')return !(p.view&&p.view.navigation&& (p.view.navigation.zoom!==1||p.view.navigation.pan.some(function(n){return n!==0;})));var shown=session.readPresentedObjectSession();return !!shown&&!!shown.presentation&&['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration','frame','workId','viewGeneration'].every(function(k){return shown.presentation[k]===p[k];})&&JSON.stringify(shown.presentation.view)===JSON.stringify(p.view);}
+  function point(e,c){
+    var m=transform(c,false),inverse=transform(c,true),nativeDet=m[0]*m[3]-m[1]*m[2];
+    if(!Number.isFinite(nativeDet)||nativeDet===0)throw new Error('Native presented coordinates are unavailable');
+    var expected=[m[3]/nativeDet,-m[1]/nativeDet,-m[2]/nativeDet,m[0]/nativeDet,
+      (m[2]*m[5]-m[3]*m[4])/nativeDet,(m[1]*m[4]-m[0]*m[5])/nativeDet];
+    if(!inverse.every(function(n,i){return n===expected[i];}))throw new Error('Native presented coordinates are unavailable');
+    // Compose the same CSS affine as screen(), then remove its origin before
+    // inversion. Applying a translated composition inverse after rescaling
+    // introduces avoidable cancellation even for exact integer world points.
+    var a=m[0]*c.bounds.width/c.canvasW,b=m[1]*c.bounds.height/c.canvasH,
+      d=m[2]*c.bounds.width/c.canvasW,f=m[3]*c.bounds.height/c.canvasH,
+      tx=m[4]*c.bounds.width/c.canvasW,ty=m[5]*c.bounds.height/c.canvasH,
+      x=e.clientX-c.bounds.left-tx,y=e.clientY-c.bounds.top-ty,det=a*f-b*d;
+    if(![a,b,d,f,tx,ty,x,y,det].every(Number.isFinite)||det===0)throw new Error('Native presented coordinates are unavailable');
+    var result={x:(f*x-d*y)/det,y:(a*y-b*x)/det};
+    if(!Number.isFinite(result.x)||!Number.isFinite(result.y))throw new Error('Native presented coordinates are unavailable');
+    return result;
+  }
+  function screen(p,c){var q=mapped(p,c,false);return {x:c.bounds.left+q.x*c.bounds.width/c.canvasW,y:c.bounds.top+q.y*c.bounds.height/c.canvasH};}
   function create(ports) {
     var element = ports.document.documentElement, style = element.style;
     if (element.classList.contains(className)) throw new Error('Native underlay already has an owner');
@@ -30,7 +62,7 @@
       return { property: property, value: style.getPropertyValue(property),
         priority: style.getPropertyPriority(property) };
     });
-    var owner = null, disposed = false;
+    var owner = null, disposed = false, backdropHidden = false;
     function clear(expected) {
       if (expected !== undefined && !same(owner, expected)) return false;
       element.classList.remove(className);
@@ -39,6 +71,7 @@
         else style.removeProperty(item.property);
       });
       owner = null;
+      if (backdropHidden) { backdropHidden = false; ports.setBackdropHidden(false); }
       return true;
     }
     function measure() {
@@ -61,6 +94,9 @@
         next = identity(value);
         var edges = measure();
         properties.forEach(function (property, index) { style.setProperty(property, edges[index] + 'px'); });
+        if (typeof ports.setBackdropHidden === 'function') {
+          backdropHidden = true; ports.setBackdropHidden(true);
+        }
         owner = next;
         element.classList.add(className);
         return true;
@@ -73,7 +109,21 @@
     });
   }
   function desktop(root) {
-    var underlay = null, bounds = null;
+    var underlay = null, bounds = null, backdrop = null;
+    // The stage is a non-document Paper backdrop; retain all other Paper/DOM overlays.
+    function setBackdropHidden(hidden) {
+      if (hidden) {
+        var stage = root.stageLayer, view = root.paper && root.paper.view;
+        if (!stage || typeof stage.visible !== 'boolean' || !view || typeof view.update !== 'function')
+          throw new Error('Native presentation stage backdrop is unavailable');
+        if (backdrop && backdrop.stage !== stage) throw new Error('Native presentation stage changed');
+        if (!backdrop) backdrop = { stage: stage, visible: stage.visible, view: view };
+        if (stage.visible) { stage.visible = false; view.update(); }
+      } else if (backdrop) {
+        var previous = backdrop; backdrop = null;
+        previous.stage.visible = previous.visible; previous.view.update();
+      }
+    }
     return Object.freeze({
       projectionReady: function (info) {
         return !!root.NemoNativeObjectProjectFile && root.NemoNativeObjectProjectFile.projectionMatches(root, info);
@@ -88,11 +138,11 @@
       },
       surfaceChanged: function (presentation, mapping) {
         if (!presentation) { if (underlay) underlay.clear(); bounds = null; return; }
-        if (!underlay) underlay = create({ document: root.document, measure: function () { return bounds; } });
+        if (!underlay) underlay = create({ document: root.document, measure: function () { return bounds; }, setBackdropHidden: setBackdropHidden });
         bounds = { left: mapping.x, top: mapping.y, width: mapping.width, height: mapping.height };
         underlay.present(presentation);
       }
     });
   }
-  return Object.freeze({ create: create, desktop: desktop });
+  return Object.freeze({ create: create, desktop: desktop, canvasMapping: Object.freeze({bounds:bounds,point:point,screen:screen,transform:transform,matchesView:matchesView}) });
 }));

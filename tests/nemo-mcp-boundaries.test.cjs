@@ -24,6 +24,11 @@ test('all MCP transport and desktop-host Rust modules have actual size enforceme
     'src-tauri/src/application_mcp_diagnostics_tests.rs',
     'src-tauri/src/application_mcp_reproduction_tests.rs',
     'src-tauri/src/native_application_reservations.rs',
+    'src-tauri/src/native_font_source.rs',
+    'src-tauri/src/native_font_source_tests.rs',
+    'src-tauri/src/native_raster_image_dispatch.rs',
+    'src-tauri/src/native_raster_image_dispatch_tests.rs',
+    'src-tauri/src/native_raster_image_source.rs',
     'src-tauri/src/native_revision_sync.rs',
     'src-tauri/src/native_revision_sync_tests.rs',
   ].sort();
@@ -62,6 +67,11 @@ test('opacity application slice declares native workflows, compatibility, bootst
     assert.deepEqual(module.publicApi, module.files);
     return module;
   });
+  // The real bootstrap now binds the existing UI composition adapter explicitly.
+  for(const id of ['app.native.object.ui.adapter','app.native.layer.playhead.cut.contract']){
+    const dependency=applicationProfile.modules.find(module=>module.id===id);
+    assert.ok(dependency,id);modules.push(dependency);
+  }
   const result = checkProfile({ ...applicationProfile, modules, exceptions: [] }, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   const size = checkSourceSizes({ ...applicationProfile, modules, exceptions: [] }, { root });

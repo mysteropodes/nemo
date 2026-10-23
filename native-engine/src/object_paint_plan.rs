@@ -1,6 +1,10 @@
 //! Pinned CPU commands join existing numeric order to retained real contours.
+use crate::evaluation::object_scene_style_kernels::object_scene_style_item::{
+    style_of_record_at_frame, SceneItemStyle, StyleUnavailable,
+};
 use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
+use crate::object_render_scene::mask_inputs::ObjectMaskInputs;
 use crate::object_render_scene::object_scene_producer_contour;
 use crate::object_render_scene::{
     validate_pins, ObjectRenderEntry, ObjectRenderScene, ObjectSceneError,
@@ -9,6 +13,7 @@ use crate::render_geometry::ClosedCubicPath;
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use vello::kurbo::BezPath;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectPaintPlanError {
@@ -17,10 +22,11 @@ pub enum ObjectPaintPlanError {
     InvalidOrder,
 }
 
-/// Borrow original source paint, without quantization or premultiplication.
+/// Borrow pinned paint, without quantization or premultiplication.
 #[derive(Debug, Clone, Copy)]
 pub struct ObjectPaintCommand<'a> {
     entry: ObjectRenderEntry<'a>,
+    packet: &'a ObjectFramePacket,
 }
 impl<'a> ObjectPaintCommand<'a> {
     pub fn source(&self) -> ObjectFrameRecord<'a> {
@@ -29,21 +35,37 @@ impl<'a> ObjectPaintCommand<'a> {
     pub fn contour(&self) -> &'a ClosedCubicPath {
         self.entry.contour()
     }
+    /// The geometry to draw: the vector record's open or closed path, otherwise the closed contour's path (L01-I).
+    pub(crate) fn path(&self) -> &'a BezPath {
+        self.entry.path()
+    }
     pub fn paint(&self) -> [&'a Number; 4] {
-        // Paint commands exist only for closed-solid-fill-cubic-path records: the scene compiler refuses every
-        // other family and the codec requires a solid fill for that one.
-        let paint = self
-            .entry
-            .source()
-            .record()
-            .solid_fill()
-            .expect("paint commands come from records with a solid fill");
-        [&paint.r, &paint.g, &paint.b, &paint.a]
+        // A sampled layer factor changes the retained primary paint, including SVG's legacy fill.
+        if self.entry.layer_opacity() != 1.0 {
+            return self.entry.solid().channels();
+        }
+        // The fill of the source record when it has one (the legacy family always does), otherwise the retained primary solid
+        // of the entry (L01-I): an unfilled vector retains its stroke paint, an item without any paint a transparent solid.
+        match self.entry.source().record().solid_fill() {
+            Some(paint) => [&paint.r, &paint.g, &paint.b, &paint.a],
+            None => self.entry.solid().channels(),
+        }
     }
     /// Typed straight-RGBA paint (L07-A `SceneSolid`) retained with the contour;
-    /// equal by value to `paint()`, which keeps borrowing the immutable source fill.
+    /// Raw layer opacity is already folded in. At factor one `paint()` retains
+    /// its original source-fill borrowing contract.
     pub(crate) fn solid(&self) -> &'a SceneSolid {
         self.entry.solid()
+    }
+    /// Typed item style (L07-I): the retained L07-A solid for the legacy family, otherwise the one
+    /// record-to-style function (stroke, paint order, opacity). The scene admits legacy contours only
+    /// today; the second arm is the join point for the vector family.
+    pub(crate) fn style(&self) -> Result<SceneItemStyle, StyleUnavailable> {
+        let record = self.entry.source().record();
+        if record.vector().is_none() {
+            return Ok(SceneItemStyle::solid_fill(self.solid().clone()));
+        }
+        style_of_record_at_frame(record, self.entry.layer_opacity(), self.packet)
     }
 }
 
@@ -51,7 +73,9 @@ impl<'a> ObjectPaintCommand<'a> {
 #[derive(Debug, Clone)]
 pub struct ObjectPaintPlan {
     scene: Arc<ObjectRenderScene>,
+    masks: Arc<ObjectMaskInputs>,
     indices: Arc<[usize]>,
+    mixed: Arc<[PaintIndex]>,
 }
 impl ObjectPaintPlan {
     pub fn packet(&self) -> &ObjectFramePacket {
@@ -60,6 +84,7 @@ impl ObjectPaintPlan {
     pub fn commands(&self) -> impl ExactSizeIterator<Item = ObjectPaintCommand<'_>> + '_ {
         // Allocation-free indexed borrows; no record/paint copies or second sort.
         self.indices.iter().map(|&index| ObjectPaintCommand {
+            packet: self.packet(),
             entry: self
                 .scene
                 .entry(index)
@@ -67,6 +92,10 @@ impl ObjectPaintPlan {
         })
     }
 }
+
+#[path = "object_raster_paint_join.rs"]
+pub(crate) mod raster;
+use raster::PaintIndex;
 
 type LayerSequence = Vec<(usize, Vec<usize>)>;
 
@@ -79,11 +108,29 @@ pub fn prepare_object_paint_plan(
     // Authored v2. v1/no-plan and all Reference/nonroot inputs are unavailable.
     // L07-F: the retained scene is reported as the contour producer output and joined
     // through the pinned registry (pin check once, NumericOrderPlan order).
-    let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
-    let indices = join(scene, &sequence)?;
+    let (indices, mixed) = if scene.rasters.is_empty()
+        && scene.texts.entries.is_empty()
+        && scene.components.scene.is_none()
+        && scene.brush_paints_empty()
+    {
+        let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
+        let indices = join(scene, &sequence)?;
+        let mixed = indices.iter().copied().map(PaintIndex::Contour).collect();
+        (indices, mixed)
+    } else {
+        raster::prepare(scene, expected)?
+    };
+    let (mut indices, mut mixed) =
+        crate::object_render_scene::duplicator_scene::expand_order(scene, indices, mixed)?;
+    // Original producer coverage/order is proved ABOVE before mask extraction.
+    let masks = Arc::new(ObjectMaskInputs::from_scene(scene).map_err(ObjectPaintPlanError::Pins)?);
+    masks.exclude_mask_paint(scene, &mut indices, &mut mixed);
+    let mixed = crate::object_render_scene::media_scene::insert_slots(scene, mixed)?;
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),
+        masks,
         indices: indices.into(),
+        mixed: mixed.into(),
     })
 }
 

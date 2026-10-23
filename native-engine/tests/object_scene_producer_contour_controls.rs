@@ -248,8 +248,10 @@ fn the_compositor_converts_paint_through_the_typed_scene_solid() {
     // Text drift guard: the GPU path cannot run in this harness, so the wiring is pinned
     // by source. The conversion itself is pinned by `rgba_f32` literals and by the L07-A
     // oracle, so the compositor must not carry a second copy of the channel rule.
-    assert!(COMPOSITOR.contains(".solid()"));
-    assert!(COMPOSITOR.contains(".rgba_f32()"));
+    // L07-I moved the conversion into object_scene_style_emit.rs, still through the kernel's rgba_f32.
+    let emit = include_str!("../src/object_scene_style_emit.rs");
+    assert!(emit.contains(".rgba_f32()"));
+    assert!(COMPOSITOR.contains(".style()"));
     assert!(COMPOSITOR.contains("CompositorError::new(error.message())"));
     assert!(!COMPOSITOR.contains("as_f64()"));
     assert!(!COMPOSITOR.contains("(0.0..=1.0).contains"));

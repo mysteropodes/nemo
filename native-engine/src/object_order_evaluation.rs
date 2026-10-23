@@ -1,12 +1,15 @@
 //! Partial numeric Order producer; no expression interpreter or renderer policy.
 use crate::animation_curve::{evaluate_curve, CurveSample};
+use crate::evaluation::object_component_kernels::object_context_resolver::{
+    ContextKind, ContextSource,
+};
 use crate::object_document::{
-    AuthoredOrder, FrameScope, FrameScopeKind, OrderContext, OrderCurvePoint,
+    AuthoredOrder, FrameScope, FrameScopeKind, ItemRecords, OrderContext, OrderCurvePoint,
 };
 use crate::object_frame_packet::ObjectFrameError;
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct NumericElementOrder {
@@ -106,13 +109,18 @@ fn default_curve() -> Vec<CurveSample> {
     .collect()
 }
 pub(super) fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFrameError> {
+    numeric_at(order, f64::from(frame))
+}
+pub(super) fn numeric_at(order: &AuthoredOrder, frame: f64) -> Result<f64, ObjectFrameError> {
+    if !frame.is_finite() {
+        return Err(ObjectFrameError::FrameOutOfRange);
+    }
     let Some(track) = order.track.value().filter(|t| !t.keys.is_empty()) else {
         return order
             .static_value
             .value()
             .map_or(Ok(0.0), |v| number(&v[0]));
     };
-    let frame = f64::from(frame);
     let first = &track.keys[0];
     let last = &track.keys[track.keys.len() - 1];
     if frame <= number(&first.frame)? {
@@ -227,7 +235,17 @@ pub(crate) fn prepare(
     sources: &[Option<u32>],
     exposure: bool,
 ) -> Result<NumericOrderPlan, ObjectFrameError> {
-    prepare_with_resolver(snapshot, frame, sources, exposure, |_, _, _| {
+    prepare_context(snapshot, "scene-root", frame, sources, exposure)
+}
+
+pub(super) fn prepare_context(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    frame: u32,
+    sources: &[Option<u32>],
+    exposure: bool,
+) -> Result<NumericOrderPlan, ObjectFrameError> {
+    prepare_context_with_resolver(snapshot, context_id, frame, sources, exposure, |_, _, _| {
         Err(ObjectFrameError::Unavailable)
     })
 }
@@ -239,6 +257,28 @@ pub(super) fn prepare_with_resolver<E, F>(
     frame: u32,
     source_frames: &[Option<u32>],
     exposure: bool,
+    resolver: F,
+) -> Result<NumericOrderPlan, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnMut(u32, &str, Option<&str>) -> Result<f64, E>,
+{
+    prepare_context_with_resolver(
+        snapshot,
+        "scene-root",
+        frame,
+        source_frames,
+        exposure,
+        resolver,
+    )
+}
+
+pub(super) fn prepare_context_with_resolver<E, F>(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    frame: u32,
+    source_frames: &[Option<u32>],
+    exposure: bool,
     mut resolver: F,
 ) -> Result<NumericOrderPlan, E>
 where
@@ -246,16 +286,22 @@ where
     F: FnMut(u32, &str, Option<&str>) -> Result<f64, E>,
 {
     let doc = snapshot.document();
-    let plan = doc
-        .composition_order
-        .value()
-        .ok_or(ObjectFrameError::Unavailable)?;
-    let context = plan
-        .contexts
-        .iter()
-        .find(|c| c.context_id == "scene-root")
-        .ok_or(ObjectFrameError::Unavailable)?;
-    let source: HashMap<_, _> = doc
+    let selected = ContextSource::of_document(doc)
+        .context(context_id)
+        .map_err(|_| ObjectFrameError::InvalidContext)?;
+    let context = doc.composition_order.value().and_then(|plan| {
+        plan.contexts
+            .iter()
+            .find(|context| context.context_id == context_id)
+    });
+    let Some(context) = context else {
+        if selected.kind() == ContextKind::Component {
+            return natural_component(&selected, doc.item_records(), source_frames)
+                .map_err(Into::into);
+        }
+        return Err(ObjectFrameError::Unavailable.into());
+    };
+    let source: HashMap<_, _> = selected
         .layers()
         .iter()
         .enumerate()
@@ -263,8 +309,9 @@ where
         .collect();
     // Snapshot admission already rejects duplicate full scoped targets. Borrow
     // their immutable identities once; per-element lookup never scans geometry.
+    let records = selected.objects();
     let mut sources = SourceIndices::new();
-    for (index, record) in doc.objects().iter().enumerate() {
+    for (index, record) in records.iter().enumerate() {
         let target = &record.target;
         let key = (
             target.context_id.as_str(),
@@ -276,6 +323,20 @@ where
             return Err(ObjectFrameError::InvalidSource.into());
         }
     }
+    if let Some(items) = doc.item_records() {
+        for (index, target) in items.targets().enumerate() {
+            let key = (
+                target.context_id.as_str(),
+                &target.frame_scope,
+                target.layer_uid.as_str(),
+                target.stroke_id.as_str(),
+            );
+            if sources.insert(key, records.len() + index).is_some() {
+                return Err(ObjectFrameError::InvalidSource.into());
+            }
+        }
+    }
+
     let mut entries: Vec<_> = context.layers.iter().collect();
     entries.sort_by_key(|l| l.natural_position);
     let mut layers = Vec::new();
@@ -333,4 +394,71 @@ where
     }
     front.reverse();
     Ok(NumericOrderPlan { layers: front })
+}
+
+// The existing entered-component producer uses its own native layer/stroke
+// encounter order when no explicit context OrderPlan exists. This is a read
+// projection of that admitted owner, never synthesized persisted order data.
+fn natural_component(
+    context: &crate::evaluation::object_component_kernels::object_context_resolver::ResolvedContext<
+        '_,
+    >,
+    items: Option<&ItemRecords>,
+    sources: &[Option<u32>],
+) -> Result<NumericOrderPlan, ObjectFrameError> {
+    if sources.len() != context.layers().len() {
+        return Err(ObjectFrameError::InvalidSource);
+    }
+    let layer_indices: HashMap<_, _> = context
+        .layers()
+        .iter()
+        .enumerate()
+        .map(|(index, layer)| (layer.layer_uid(), index))
+        .collect();
+    let mut layer_elements: Vec<Vec<NumericElementOrder>> =
+        context.layers().iter().map(|_| Vec::new()).collect();
+    // Match the packet's retained source space: local objects, then the complete global
+    // raster table, then the complete global text table. Filter only after enumeration so
+    // another context's items never shift this context's raster/text provenance indices.
+    let targets = context
+        .objects()
+        .iter()
+        .map(|record| record.target())
+        .chain(items.into_iter().flat_map(|items| items.targets()));
+    let mut seen = HashSet::new();
+    for (source_object_index, target) in targets.enumerate() {
+        if target.context_id() != context.id() || target.scope_kind() != &FrameScopeKind::Authored {
+            continue;
+        }
+        if !seen.insert(target) || target.frame() >= context.total_frames() {
+            return Err(ObjectFrameError::InvalidSource);
+        }
+        let index = *layer_indices
+            .get(target.layer_uid())
+            .ok_or(ObjectFrameError::InvalidSource)?;
+        if sources[index] == Some(target.frame()) {
+            layer_elements[index].push(NumericElementOrder {
+                source_object_index,
+                value: 0.0,
+            });
+        }
+    }
+    let layers = context
+        .layers()
+        .iter()
+        .enumerate()
+        .map(|(index, _)| {
+            let elements = std::mem::take(&mut layer_elements[index]);
+            Ok(NumericLayerOrder {
+                source_layer_index: index,
+                natural_position: index
+                    .try_into()
+                    .map_err(|_| ObjectFrameError::InvalidSource)?,
+                value: (context.layers().len() - index) as f64,
+                explicit: false,
+                elements,
+            })
+        })
+        .collect::<Result<Vec<_>, ObjectFrameError>>()?;
+    Ok(NumericOrderPlan { layers })
 }

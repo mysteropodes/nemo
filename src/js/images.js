@@ -1,5 +1,11 @@
 // ---- BITMAP IMPORT (single images or auto-detected numbered sequences) ----
 (function(){
+  function nativeMedia(files,kind){
+    var router=window.NemoNativeImportDrop;
+    if(router&&typeof router.desktopMedia==='function')return router.desktopMedia(window,files,kind);
+    if(window.showToast)window.showToast('Native media import is unavailable.');
+    return Promise.resolve({status:'unavailable',reason:'native_media_route_absent'});
+  }
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
   function extOf(name){var m=/\.([^.]+)$/.exec(name);return m?m[1].toLowerCase():'';}
   // svg/avif added (2026-07, user request "gestion de tout format image") —
@@ -226,6 +232,7 @@
   }
 
   async function importImages(){
+    var native=nativeMedia(null,'image');if(native)return native;
     if(!tauriOk()){
       // Web + linked mode (2026-08-29, linked-media.js): the classic
       // <input type=file> below gives back plain File objects with no
@@ -301,6 +308,7 @@
   // pipeline" applies here even though this codebase already tolerates a
   // couple of small JS/Rust math pairs staying separate).
   async function importImageFiles(files){
+    var native=nativeMedia(files,'image');if(native)return native;
     if(!files.length)return;
     var names=files.map(function(f){return f.name;});
     var seq=files.length>=2?detectSequence(names):{isSeq:false};
@@ -342,8 +350,8 @@
     }
   }
   document.getElementById('image-input').addEventListener('change',function(e){
-    var files=Array.prototype.slice.call(e.target.files);e.target.value='';
-    importImageFiles(files);
+    if(!window.NemoNativeImportDrop)return nativeMedia(null,'image');
+    return window.NemoNativeImportDrop.fileInput(e,'image',importImageFiles);
   });
 
   document.getElementById('btn-import-img').addEventListener('click',importImages);
@@ -528,6 +536,7 @@
   }
 
   async function importVideoFile(file){
+    var native=nativeMedia([file],'video');if(native)return native;
     // WebCodecs instant-import path (2026-07, browser-only — the Tauri
     // path above this function is untouched): same "instant import + live
     // scrub" architecture as native-video-bridge.js's Tauri backend, just
@@ -595,18 +604,12 @@
     }
   }
   async function importVideoFiles(files,pickInfos){
-    var okN=0,failed=[];
-    for(var i=0;i<files.length;i++){
-      try{
-        if(pickInfos&&pickInfos[i])await importVideoPicked(pickInfos[i]);
-        else await importVideoFile(files[i]);
-        okN++;
-      }catch(e){failed.push((files[i]&&files[i].name)||('#'+(i+1)));}
-    }
-    if(files.length>1)showToast(failed.length?(okN+'/'+files.length+' vidéos importées — échec : '+failed.join(', ')):(okN+' vidéos importées'),failed.length?'warn':'success');
-    else if(failed.length)showToast('Import vidéo échoué : '+failed[0],'warn');
+    var native=nativeMedia(files,'video');if(native)return native;
+    return window.NemoNativeImportDrop.videoFiles(files,pickInfos,
+      importVideoPicked,importVideoFile,showToast);
   }
   async function importVideo(){
+    var native=nativeMedia(null,'video');if(native)return native;
     if(!tauriOk()){
       // Web + linked mode (2026-08-30, feedback #154) — same dispatch shape
       // as importImages above: the classic <input type=file> below hands
@@ -696,12 +699,8 @@
     }
   }
   document.getElementById('video-input')&&document.getElementById('video-input').addEventListener('change',function(e){
-    var files=Array.prototype.slice.call(e.target.files);e.target.value='';if(!files.length)return;
-    // One at a time, not Promise.all (2026-09, feedback #806): each import
-    // creates a layer, decodes and writes frames through the same shared
-    // state — running them concurrently would interleave those writes. The
-    // sequential loop keeps the picked order in the layer stack too.
-    importVideoFiles(files);
+    if(!window.NemoNativeImportDrop)return nativeMedia(null,'video');
+    return window.NemoNativeImportDrop.fileInput(e,'video',importVideoFiles);
   });
   document.getElementById('btn-import-video')&&document.getElementById('btn-import-video').addEventListener('click',importVideo);
 

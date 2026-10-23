@@ -1,7 +1,7 @@
 //! Typed, frame-independent Motion holders in the existing object document.
 use crate::object_document::{
-    object_deserialize, FrameScopeKind, ObjectLayer, ObjectRecord, OrderExpression, OrderPlan,
-    OrderTrack, Presence,
+    object_deserialize, ComponentTables, FrameScopeKind, ObjectLayer, ObjectRecord,
+    OrderExpression, OrderPlan, OrderTrack, Presence,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
@@ -9,6 +9,14 @@ use std::collections::HashSet;
 
 #[path = "object_property_catalog.rs"]
 mod catalog;
+#[path = "object_property_names.rs"]
+mod names;
+#[path = "object_property_targets.rs"]
+mod targets;
+
+#[path = "object_expression_holder.rs"]
+mod expression_holder;
+pub(crate) use expression_holder::ExpressionHolder;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -22,16 +30,27 @@ object_deserialize!(PropertyHolderTarget {
     context_id: String, layer_uid: String, #[serde(default)] stroke_id: Presence<String>
 });
 
+/// Explicit retained mesh provenance; public selector identity remains unchanged.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct MeshSource {
+    mesh_id: String,
+}
+object_deserialize!(MeshSource { mesh_id: String });
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PropertyHolder {
     pub(crate) target: PropertyHolderTarget,
     #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) mesh_source: Presence<MeshSource>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) controls: Presence<Vec<ExpressionControl>>,
     pub(crate) properties: Vec<PropertyRecord>,
 }
 object_deserialize!(PropertyHolder {
-    target: PropertyHolderTarget, #[serde(default)] controls: Presence<Vec<ExpressionControl>>,
+    target: PropertyHolderTarget, #[serde(default)] mesh_source: Presence<MeshSource>,
+    #[serde(default)] controls: Presence<Vec<ExpressionControl>>,
     properties: Vec<PropertyRecord>
 });
 
@@ -120,6 +139,19 @@ impl PropertyHolder {
     }
 }
 impl PropertyRecord {
+    /// Reuse the ordinary scalar track/curve/expression admission for selector holders.
+    pub(crate) fn validate_scalar(&self) -> Result<(), PropertyAdmissionError> {
+        property(
+            self,
+            &PropertyMetadata {
+                dimension: 1,
+                unit: "",
+                default_value: None,
+                animatable: true,
+                control_type: None,
+            },
+        )
+    }
     pub fn property(&self) -> &str {
         &self.property
     }
@@ -155,20 +187,16 @@ fn vector(values: &[Number], dimension: usize) -> Result<(), PropertyAdmissionEr
     }
     Ok(())
 }
-// Match the baseline JavaScript String.trim whitespace, including BOM.
-fn control_name(name: &str) -> String {
-    name.trim_matches(|c| {
-        matches!(c, '\u{0009}'..='\u{000D}' | ' ' | '\u{00A0}'
-        | '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{2028}' | '\u{2029}'
-        | '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}')
-    })
-    .to_lowercase()
+impl PropertyHolder {
+    pub(crate) fn normalized_control_name(name: &str) -> String {
+        names::normalize(name)
+    }
 }
 fn controls(holder: &PropertyHolder) -> Result<(), PropertyAdmissionError> {
     let mut keys = HashSet::new();
     let mut names = HashSet::new();
     for control in holder.controls.value().into_iter().flatten() {
-        let name = control_name(&control.name);
+        let name = PropertyHolder::normalized_control_name(&control.name);
         if control.key.is_empty() || name.is_empty() {
             return Err(invalid("empty control identity"));
         }
@@ -236,67 +264,142 @@ pub(crate) fn validate_property_holders(
     layers: &[ObjectLayer],
     records: &[ObjectRecord],
     plan: Option<&OrderPlan>,
+    tables: Option<&ComponentTables>,
 ) -> Result<(), PropertyAdmissionError> {
-    let layer_ids: HashSet<_> = layers.iter().map(ObjectLayer::layer_uid).collect();
-    let contexts: HashSet<_> = plan.map_or_else(
-        || HashSet::from(["scene-root"]),
-        |p| p.contexts.iter().map(|c| c.context_id.as_str()).collect(),
-    );
-    // Element identity deliberately excludes authored frame; one holder spans
-    // every keyed drawing of the same stable element.
-    let elements: HashSet<_> = records
-        .iter()
-        .filter(|r| r.target.frame_scope.kind == FrameScopeKind::Authored)
-        .map(|r| {
-            (
-                r.target.context_id.as_str(),
-                r.target.layer_uid.as_str(),
-                r.target.stroke_id.as_str(),
-            )
-        })
-        .collect();
-    let mut identities = HashSet::new();
-    for holder in holders.value().into_iter().flatten() {
-        let target = &holder.target;
-        if !contexts.contains(target.context_id.as_str())
-            || !layer_ids.contains(target.layer_uid.as_str())
-        {
-            return Err(invalid("unresolved property holder context or layer"));
-        }
-        if let Some(stroke_id) = target.stroke_id.value() {
-            if stroke_id.is_empty()
-                || !elements.contains(&(
-                    target.context_id.as_str(),
-                    target.layer_uid.as_str(),
-                    stroke_id.as_str(),
-                ))
-            {
-                return Err(invalid("unresolved property holder element"));
-            }
-        }
-        if !identities.insert((
-            target.context_id.as_str(),
-            target.layer_uid.as_str(),
-            target.stroke_id(),
-        )) {
-            return Err(duplicate("duplicate property holder identity"));
-        }
-        controls(holder)?;
-        let mut properties = HashSet::new();
-        for record in &holder.properties {
-            if !properties.insert(record.property.as_str()) {
-                return Err(duplicate("duplicate holder property"));
-            }
-            if matches!(record.property.as_str(), "order" | "timeRemap") {
-                return Err(unsupported(
-                    "property belongs to its existing order or remap owner",
+    PropertyHolder::validate_with_items(holders, layers, records, plan, tables, None, None)
+}
+
+impl PropertyHolder {
+    pub(crate) fn validate_with_items(
+        holders: &Presence<Vec<PropertyHolder>>,
+        layers: &[ObjectLayer],
+        records: &[ObjectRecord],
+        plan: Option<&OrderPlan>,
+        tables: Option<&ComponentTables>,
+        items: Option<&crate::object_document::ItemRecords>,
+        meshes: Option<&crate::object_document::ImageMeshStore>,
+    ) -> Result<(), PropertyAdmissionError> {
+        let layer_ids: HashSet<_> = layers.iter().map(ObjectLayer::layer_uid).collect();
+        let contexts: HashSet<_> = plan.map_or_else(
+            || HashSet::from(["scene-root"]),
+            |p| p.contexts.iter().map(|c| c.context_id.as_str()).collect(),
+        );
+        // Element identity deliberately excludes authored frame; one holder spans
+        // every keyed drawing of the same stable element.
+        let elements: HashSet<_> = records
+            .iter()
+            .filter(|r| r.target.frame_scope.kind == FrameScopeKind::Authored)
+            .map(|r| {
+                (
+                    r.target.context_id.as_str(),
+                    r.target.layer_uid.as_str(),
+                    r.target.stroke_id.as_str(),
+                )
+            })
+            .collect();
+        let components = tables.and_then(|tables| tables.components.value());
+        let mut identities = HashSet::new();
+        for holder in holders.value().into_iter().flatten() {
+            let target = &holder.target;
+            let retained_mesh = holder.has_retained_mesh_source();
+            if !holder.mesh_source.missing() && !retained_mesh {
+                return Err(invalid(
+                    "meshSource requires a nonempty matching element identity",
                 ));
             }
-            let meta = holder
-                .metadata(&record.property)
-                .ok_or_else(|| unsupported("unknown property"))?;
-            property(record, &meta)?;
+            // A declared component owns its inner identities; never search root
+            // tables or another component when a local layer/element is absent.
+            // Legacy order-only contexts retain their previous storage admission.
+            let component = components.and_then(|set| set.component(&target.context_id));
+            if targets::ambiguous(
+                items,
+                meshes,
+                component.map_or(records, |c| c.objects()),
+                target,
+                retained_mesh,
+            ) {
+                return Err(unsupported("ambiguous path/item and mesh holder identity"));
+            }
+            let layer_exists = component.map_or_else(
+                || {
+                    contexts.contains(target.context_id.as_str())
+                        && layer_ids.contains(target.layer_uid.as_str())
+                },
+                |component| {
+                    component
+                        .layers()
+                        .iter()
+                        .any(|layer| layer.layer_uid() == target.layer_uid)
+                },
+            );
+            if retained_mesh && component.is_none() && target.context_id() != "scene-root" {
+                return Err(invalid("meshSource requires a real context"));
+            }
+            if !layer_exists {
+                return Err(invalid("unresolved property holder context or layer"));
+            }
+            if let Some(stroke_id) = target.stroke_id.value() {
+                let element_exists = component.map_or_else(
+                    || {
+                        elements.contains(&(
+                            target.context_id.as_str(),
+                            target.layer_uid.as_str(),
+                            stroke_id.as_str(),
+                        ))
+                    },
+                    |component| {
+                        component.objects().iter().any(|record| {
+                            let item = &record.target;
+                            item.context_id == target.context_id
+                                && item.layer_uid == target.layer_uid
+                                && item.stroke_id == *stroke_id
+                                && item.frame_scope.kind == FrameScopeKind::Authored
+                        })
+                    },
+                );
+                if stroke_id.is_empty()
+                    || !(element_exists
+                        || targets::item_target(items, target)
+                        || targets::mesh(items, meshes, target).is_some()
+                        || retained_mesh)
+                {
+                    return Err(invalid("unresolved property holder element"));
+                }
+            }
+            if !identities.insert((
+                target.context_id.as_str(),
+                target.layer_uid.as_str(),
+                target.stroke_id(),
+            )) {
+                return Err(duplicate("duplicate property holder identity"));
+            }
+            controls(holder)?;
+            let mut properties = HashSet::new();
+            for record in &holder.properties {
+                if !properties.insert(record.property.as_str()) {
+                    return Err(duplicate("duplicate holder property"));
+                }
+                if matches!(record.property.as_str(), "order" | "timeRemap") {
+                    return Err(unsupported(
+                        "property belongs to its existing order or remap owner",
+                    ));
+                }
+                if catalog::vertex_index(&record.property).is_some() {
+                    let source_records = component.map_or(records, |c| c.objects());
+                    if !retained_mesh
+                        && !targets::has_vertex_source(items, meshes, source_records, target)
+                    {
+                        return Err(unsupported(
+                            "vertex property requires its actual path or mesh source",
+                        ));
+                    }
+                }
+                let meta = holder
+                    .metadata(&record.property)
+                    .ok_or_else(|| unsupported("unknown property"))?;
+                property(record, &meta)?;
+            }
         }
+        Ok(())
     }
-    Ok(())
 }

@@ -8,13 +8,30 @@ use crate::native_application_viewport::{self as viewport_host, NativeViewportCo
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
-    desktop_viewport::{DesktopViewportHost, PresentationReceipt, SurfacePort},
+    desktop_viewport::{
+        DesktopViewportHost, ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView,
+        ObjectViewProjection, SurfacePort,
+    },
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
     scheduler::OutputSpec,
 };
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ObjectPreviewReceipt {
+    #[serde(flatten)]
+    pub(crate) preview: NativePreviewReceipt,
+    pub(crate) view: ObjectViewProjection,
+}
+impl std::ops::Deref for ObjectPreviewReceipt {
+    type Target = NativePreviewReceipt;
+    fn deref(&self) -> &Self::Target {
+        &self.preview
+    }
+}
 
 const MAX_BYTES: usize = 8192;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -53,6 +70,10 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) frame: u32,
     pub(crate) output_spec: OutputSpecInput,
     pub(crate) viewport: ViewportInput,
+    #[serde(default)]
+    pub(crate) view_mode: ObjectPreviewView,
+    #[serde(default)]
+    pub(crate) navigation: ObjectPreviewNavigation,
     pub(crate) revision_sync: Option<PreviewRevisionProof>,
     #[serde(default)]
     pub(crate) cancelled_before_dispatch: bool,
@@ -129,6 +150,10 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             ));
         }
     }
+    request
+        .navigation
+        .validate()
+        .map_err(|message| host_error("invalid_request", message))?;
     let output = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
     Ok(request)
@@ -143,13 +168,13 @@ impl ObjectPreviewConsumer<'_> {
         self,
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
-    ) -> Result<PresentationReceipt, String> {
+    ) -> Result<ObjectPresentedFrame, String> {
         self.owner
-            .present_prepared_object_preview(&self.selector, compositor, viewport)
+            .present_prepared_object_preview_view(&self.selector, compositor, viewport)
     }
 }
 impl NativeViewportConsumer for ObjectPreviewConsumer<'_> {
-    type Output = PresentationReceipt;
+    type Output = ObjectPresentedFrame;
     fn consume<P: SurfacePort>(
         self,
         compositor: &mut Compositor,
@@ -163,8 +188,8 @@ impl NativeViewportConsumer for ObjectPreviewConsumer<'_> {
 pub(crate) fn preview_with_target(
     state: &ApplicationMcp,
     request: &ObjectPreviewRequest,
-    target: impl FnOnce(ObjectPreviewConsumer<'_>) -> HostResult<PresentationReceipt>,
-) -> HostResult<NativePreviewReceipt> {
+    target: impl FnOnce(ObjectPreviewConsumer<'_>) -> HostResult<ObjectPresentedFrame>,
+) -> HostResult<ObjectPreviewReceipt> {
     let selector = request.selector();
     let output: OutputSpec = request.output_spec.admit_object()?;
     request.viewport.admit_object(&output)?;
@@ -186,19 +211,30 @@ pub(crate) fn preview_with_target(
             revision_sync,
             |owner| {
                 owner.require_project_output(output.dimensions())?;
-                owner.with_prepared_object_preview(&selector, output, |owner| {
+                let consume = |owner: &mut NativeObjectHost| {
                     Ok(target(ObjectPreviewConsumer {
                         owner,
                         selector: selector.clone(),
                     }))
-                })
+                };
+                owner.with_prepared_object_preview_for_navigation(
+                    &selector,
+                    output,
+                    request.view_mode,
+                    request.navigation,
+                    revision_sync.is_some(),
+                    consume,
+                )
             },
         )
         .map_err(|message| host_error("unavailable", message))??;
-    Ok(NativePreviewReceipt {
-        work_id: work_label(receipt.identity().work_id()),
-        view_generation: receipt.identity().view_generation().value(),
-        status: viewport_host::status_label(receipt.status()),
+    Ok(ObjectPreviewReceipt {
+        preview: NativePreviewReceipt {
+            work_id: work_label(receipt.receipt.identity().work_id()),
+            view_generation: receipt.receipt.identity().view_generation().value(),
+            status: viewport_host::status_label(receipt.receipt.status()),
+        },
+        view: receipt.view,
     })
 }
 
@@ -208,25 +244,58 @@ pub(crate) async fn nemo_native_object_preview(
     window: tauri::Window,
     state: tauri::State<'_, ApplicationMcp>,
     request_json: String,
-) -> HostResult<NativePreviewReceipt> {
+) -> HostResult<ObjectPreviewReceipt> {
     require_main(&window)?;
-    let request = admit_request(&request_json, state.instance_id())?;
-    let app_for_main = app.clone();
-    viewport_host::on_main_thread(&app, move || {
-        let state = app_for_main.state::<ApplicationMcp>();
-        preview_with_target(&state, &request, |consumer| {
-            viewport_host::with_object_target(
-                &app_for_main,
-                &request.instance_id,
-                request.lifecycle_generation,
-                request
-                    .viewport
-                    .admit_object(&request.output_spec.admit_object()?)?,
-                consumer,
-            )
-        })
-    })
-    .await
+    let request = std::sync::Arc::new(admit_request(&request_json, state.instance_id())?);
+    for attempt in 0..2 {
+        let app_for_main = app.clone();
+        let for_main = std::sync::Arc::clone(&request);
+        let (result, completion, diagnostic_ready, target_entered) =
+            viewport_host::on_main_thread(&app, move || {
+                let state = app_for_main.state::<ApplicationMcp>();
+                let mut target_entered = false;
+                let result = preview_with_target(&state, &for_main, |consumer| {
+                    target_entered = true;
+                    viewport_host::with_object_target(
+                        &app_for_main,
+                        &for_main.instance_id,
+                        for_main.lifecycle_generation,
+                        for_main
+                            .viewport
+                            .admit_object(&for_main.output_spec.admit_object()?)?,
+                        consumer,
+                    )
+                });
+                // Guards and target borrow are gone. Close diagnostic-only work
+                // before resolving this preview, even while its R1 ACK is pending.
+                let diagnostic_ready = state
+                    .seal_object_motion_diagnostics()
+                    .map_err(|error| host_error("unavailable", error))?;
+                let completion = state.spawn_object_motion_completion(&app_for_main);
+                Ok((result, completion, diagnostic_ready, target_entered))
+            })
+            .await?;
+        if result.is_err() && !target_entered && diagnostic_ready == Some(true) && attempt == 0 {
+            continue;
+        }
+        if let Some((receiver, waits_for_prior)) = completion {
+            // The matching R1 proof must return its cached fallback presentation
+            // before the consumer can ACK R1. Its independent worker waits for
+            // original settle, then notifies/awaits the R2 disable transaction.
+            if waits_for_prior {
+                return result;
+            }
+            let finalized = receiver
+                .await
+                .map_err(|_| host_error("unavailable", "native Motion completion was cancelled"))?
+                .map_err(|error| host_error("unavailable", error))?;
+            if result.is_err() && !target_entered && finalized && attempt == 0 {
+                continue;
+            }
+        }
+        return result;
+    }
+    unreachable!("bounded cached fallback retry")
 }
 
 #[cfg(test)]

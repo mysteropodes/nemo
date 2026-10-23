@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const Files=require('../src/js/adapters/native-object-project-file.js');
+const Metadata=require('../src/js/adapters/native-object-project-metadata.js');
 const Project=require('../src/js/adapters/native-object-project.js');
 const Transport=require('../src/js/adapters/application-mcp.js');
 const fs=require('node:fs'),vm=require('node:vm');
@@ -28,7 +29,9 @@ test('strict delivered matching remains false for append until the complete read
   assert.equal(Files.refreshLayerTable(root,info([A,B,C],1)),true);
   assert.equal(root.state.layers,rows);assert.equal(rows[0],first);assert.equal(rows[1],second);
   assert.equal(first.frames,frames);assert.equal(first.motion,motion);assert.deepEqual(first.uiOnly,{expanded:true});
-  assert.deepEqual(Object.keys(rows[2]).sort(),['layerUid','name','visible']);
+  assert.deepEqual(Object.keys(rows[2]).sort(),['layerUid','locked','name','shy','visible']);
+  assert.equal(rows[2].locked,false);assert.equal(rows[2].shy,false);
+  assert.equal(Object.hasOwn(C,'locked'),false);assert.equal(Object.hasOwn(C,'shy'),false);
   assert.equal(rows[2].name,'');assert.equal(Files.projectionMatches(root,info([A,B,C])),true);
   assert.equal(root.state.currentFrame,7);assert.equal(root._curFrame,7);assert.equal(root.state.waIn,3);assert.equal(root.state.waOut,19);
   assert.equal(root._waIn,3);assert.equal(root._waOut,19);assert.equal(root.state.activeLayerIdx,1);
@@ -52,14 +55,37 @@ test('last removal preserves surviving UID selection and picks a remaining UI ro
   const root=view([A,B,C]),empty=[];root._layerSel=empty;root.state.activeLayerIdx=0;
   assert.equal(Files.refreshLayerTable(root,info([A,B],1)),true);assert.equal(root._layerSel,empty);
 });
-for(const [name,layers] of [
-  ['reordered',[B,A]],['middle deletion',[B]],['replaced',[A,C]],['two appends',[A,B,C,{layerUid:'D'}]],
+// The admitted single-splice projection now supports head, middle and tail removal.
+// Require exact surviving UID/row identity and remap indices, rather than blessing deletion generally.
+for(const [at,active,selected,anchor] of [[0,1,[1],1],[1,1,[0,1],1],[2,0,[0],0]])test('single native removal at '+at+' preserves surviving UID identities and remaps the exact layer selection',()=>{
+  const root=view([A,B,C]),rows=root.state.layers,original=rows.slice(),reference=root.state.refMedia,paths=root.selectedPaths;
+  const frames=original.map(row=>row.frames),motion=original.map(row=>row.motion),next=clone([A,B,C]);next.splice(at,1);
+  root.state.activeLayerIdx=2;root._layerSel=[0,2];root._layerSelAnchor=2;
+  const beforeMetadata=JSON.stringify(next);
+  assert.equal(Files.refreshLayerTable(root,info(next,1)),true);
+  assert.strictEqual(root.state.layers,rows);assert.deepEqual(rows.map(row=>row.layerUid),next.map(row=>row.layerUid));
+  const survivors=original.filter((_,i)=>i!==at);
+  rows.forEach((row,i)=>{const old=original.indexOf(survivors[i]);assert.strictEqual(row,survivors[i]);assert.strictEqual(row.frames,frames[old]);assert.strictEqual(row.motion,motion[old]);});
+  assert.equal(root.state.activeLayerIdx,active);assert.deepEqual(root._layerSel,selected);assert.equal(root._layerSelAnchor,anchor);
+  assert.equal(root.state.currentFrame,7);assert.equal(root.state.waIn,3);assert.equal(root.state.waOut,19);
+  assert.strictEqual(root.state.refMedia,reference);assert.strictEqual(root.selectedPaths,paths);
+  assert.equal(JSON.stringify(next),beforeMetadata);assert.equal(Files.projectionMatches(root,info(next,1)),true);
+});
+test('single removal cannot reorder surviving UIDs or change rows before a confirmed revision',()=>{
+  for(const [next,revision] of [[[C,A],1],[[A,C],0]]){
+    const root=view([A,B,C]),rows=root.state.layers,original=rows.slice(),before=snapshot(root);
+    assert.equal(Files.refreshLayerTable(root,info(next,revision)),false);
+    assert.equal(snapshot(root),before);assert.strictEqual(root.state.layers,rows);original.forEach((row,i)=>assert.strictEqual(rows[i],row));
+  }
+});
+for(const [name,layers,revision=1] of [
+  ['reordered',[B,A]],['same-revision single removal',[B],0],['replaced',[A,C]],['two appends',[A,B,C,{layerUid:'D'}]],
   ['two removals',[]],['duplicate',[A,B,A]],['empty UID',[A,B,{layerUid:''}]],
   ['late malformed visibility',[{...A,visible:false},{...B,visible:'false'}]],
   ['late malformed name',[{...A,visible:false},{...B,name:null}]],['document payload',[A,B,{...C,frames:[]}]],
 ])test('unsupported '+name+' refuses without partial row, selection or reference mutation',()=>{
   const root=view(),before=snapshot(root),rows=root.state.layers,first=rows[0],second=rows[1];
-  try{assert.equal(Files.refreshLayerTable(root,info(layers,1)),false);}catch(error){if(error.code==='ERR_ASSERTION')throw error;assert.match(error.message,/Native layer/);}
+  try{assert.equal(Files.refreshLayerTable(root,info(layers,revision)),false);}catch(error){if(error.code==='ERR_ASSERTION')throw error;assert.match(error.message,/Native layer/);}
   assert.equal(snapshot(root),before);assert.equal(root.state.layers,rows);assert.equal(rows[0],first);assert.equal(rows[1],second);
 });
 for(const [key,value] of [['instanceId','foreign'],['documentId','foreign'],['lifecycleGeneration',2],['canvasW',321],['fps',30],['totalFrames',25]]){
@@ -187,4 +213,80 @@ for(const fault of ['duplicate','reordered','foreign','preview','corrupt-ui'])te
   assert.equal(h.log.includes('acknowledge'),false);assert.equal(h.session.isActive(),false);assert.equal(h.session.readPresentedObjectSession(),null);
   if(fault!=='preview')assert.equal(snapshot(h.root),before);
   assert.equal(h.calls.some(call=>call.command==='nemo_native_dispatch'),false,'no Add Layer/public command was introduced');
+});
+
+
+function decoded(layers,revision=0){
+  const request={requestId:'parent-meta',instanceId:'instance',documentId:'document'};
+  return Metadata.decode({...info(layers,revision),requestId:request.requestId},request);
+}
+test('real metadata decode copies and freezes opaque parent UIDs without normalizing their bytes',()=>{
+  for(const parent of ['opaque A:雪','親:é/🙂','  native UID : 雪  ']){
+    const rows=[{layerUid:parent},{layerUid:'child:雪',parentLayerUid:parent}];
+    const source={...info(rows),requestId:'parent-meta'},before=JSON.stringify(source);
+    const value=Metadata.decode(source,{requestId:'parent-meta',instanceId:'instance',documentId:'document'});
+    assert.equal(value.layers[1].parentLayerUid,parent);
+    assert.equal(Object.isFrozen(value),true);assert.equal(Object.isFrozen(value.layers),true);assert.equal(Object.isFrozen(value.layers[1]),true);
+    assert.notStrictEqual(value.layers,source.layers);assert.notStrictEqual(value.layers[1],source.layers[1]);
+    assert.equal(JSON.stringify(source),before);
+    source.layers[1].parentLayerUid='later input mutation';assert.equal(value.layers[1].parentLayerUid,parent);
+  }
+  const missing=decoded([{layerUid:'child'}]),nil=decoded([{layerUid:'child',parentLayerUid:null}]);
+  assert.equal(Object.hasOwn(missing.layers[0],'parentLayerUid'),false);
+  assert.equal(Object.hasOwn(nil.layers[0],'parentLayerUid'),true);assert.equal(nil.layers[0].parentLayerUid,null);
+});
+test('real metadata decode rejects late empty or nonstring parent without mutating the source table',()=>{
+  for(const parent of ['',0,false,{},[],undefined]){
+    const source={...info([{...A,parentLayerUid:'B'},{...B,parentLayerUid:parent}]),requestId:'parent-meta'};
+    const before=JSON.stringify(source);
+    assert.throws(()=>Metadata.decode(source,{requestId:'parent-meta',instanceId:'instance',documentId:'document'}),/uncorrelated/);
+    assert.equal(JSON.stringify(source),before);
+  }
+});
+test('projectView and correlated refresh preserve exact parent strings and clear null or missing links',()=>{
+  const parent='opaque A:雪',rows=[{...A,layerUid:parent},{...B,parentLayerUid:parent}];
+  const root={state:{},userLayers:[],selectedPaths:[]},initial=decoded(rows);
+  Files.projectView(root,initial);const table=root.state.layers,child=table[1],frames=child.frames,motion=child.motion;
+  assert.equal(child.parentLayerUid,parent);assert.equal(Files.projectionMatches(root,initial),true);
+  assert.equal(Files.projectionReadyForUI(root,initial),true);
+  assert.equal(Object.isFrozen(initial.layers[1]),true);assert.equal(child.layerUid,'B');
+  for(const [revision,nextParent] of [[1,null],[2,parent],[3,undefined]]){
+    const nextRows=[rows[0],{...B}];if(nextParent!==undefined)nextRows[1].parentLayerUid=nextParent;
+    const next=decoded(nextRows,revision);
+    assert.equal(Files.refreshLayerTable(root,next),true);
+    assert.strictEqual(root.state.layers,table);assert.strictEqual(table[1],child);
+    assert.strictEqual(child.frames,frames);assert.strictEqual(child.motion,motion);
+    assert.equal(child.parentLayerUid,nextParent===undefined?null:nextParent);
+    assert.equal(Files.projectionMatches(root,next),true);assert.equal(Files.projectionReadyForUI(root,next),true);
+  }
+});
+test('same-revision parent drift cannot become correlated by matching layer IDs or local row mutation',()=>{
+  const rows=[A,{...B,parentLayerUid:A.layerUid}],root={state:{},userLayers:[]};
+  const original=decoded(rows);Files.projectView(root,original);
+  for(const value of [null,'other:雪',undefined]){
+    const nextRows=[A,{...B}];if(value!==undefined)nextRows[1].parentLayerUid=value;
+    const drift=decoded(nextRows),before=snapshot(root);
+    assert.equal(Files.projectionMatches(root,drift),false);assert.equal(Files.projectionReadyForUI(root,drift),false);
+    assert.equal(Files.refreshLayerTable(root,drift),false);assert.equal(snapshot(root),before);
+  }
+  root.state.layers[1].parentLayerUid='locally invented parent';
+  const corrupted=snapshot(root);
+  assert.equal(Files.projectionMatches(root,original),false);assert.equal(Files.projectionReadyForUI(root,original),false);
+  assert.equal(Files.refreshLayerTable(root,decoded(rows,1)),false);assert.equal(snapshot(root),corrupted);
+});
+test('malformed parent tables and foreign or stale revision pins refuse atomically',()=>{
+  const rows=[A,{...B,parentLayerUid:A.layerUid}];
+  for(const parent of ['',false,0,{},[],undefined]){
+    const root={state:{},userLayers:[]};Files.projectView(root,decoded(rows));const before=snapshot(root),table=root.state.layers;
+    const bad=info([{...A,visible:false},{...B,parentLayerUid:parent}],1);
+    assert.throws(()=>Files.refreshLayerTable(root,bad),/Native layer parent/);
+    assert.equal(snapshot(root),before);assert.strictEqual(root.state.layers,table);
+    assert.throws(()=>Files.projectView(root,bad),/Native layer parent/);assert.equal(snapshot(root),before);
+  }
+  const root={state:{},userLayers:[]};Files.projectView(root,decoded(rows,2));
+  for(const mutate of [v=>v.contentRevision=1,v=>v.documentSnapshotId='foreign-same-revision',
+    v=>v.instanceId='foreign',v=>v.documentId='foreign',v=>v.lifecycleGeneration=2]){
+    const bad=info([A,{...B,parentLayerUid:null}],2);mutate(bad);const before=snapshot(root);
+    assert.equal(Files.refreshLayerTable(root,bad),false);assert.equal(snapshot(root),before);
+  }
 });

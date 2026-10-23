@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 const MAX_ID_BYTES: usize = 255;
-const MAX_FRAME_OFFSET: u64 = 9_007_199_254_740_991;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AssetError {
@@ -59,8 +58,15 @@ impl AssetKind {
     }
 }
 
+#[path = "audio_wave_admission.rs"]
+pub(crate) mod wave;
+
 #[derive(Debug, Clone, PartialEq)]
 enum SourceValue {
+    AdmittedWave {
+        allocation: Arc<Vec<u8>>,
+        metadata: wave::WaveMetadata,
+    },
     // Constructed only after the native font codec's borrowed-byte admission.
     // This type provenance is recomputed on import, never a saved runtime flag.
     #[cfg(feature = "font_asset_wire")]
@@ -82,6 +88,22 @@ enum SourceValue {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AssetSource(SourceValue);
 impl AssetSource {
+    /// Only the sealed strict container admission can construct an audio source.
+    pub(crate) fn admitted_audio(wave: wave::AdmittedWave) -> Self {
+        Self(SourceValue::AdmittedWave {
+            allocation: Arc::clone(wave.allocation()),
+            metadata: wave.metadata(),
+        })
+    }
+    pub(crate) fn has_audio_admission(&self) -> bool {
+        matches!(&self.0, SourceValue::AdmittedWave { .. })
+    }
+    pub(crate) fn audio_metadata(&self) -> Option<wave::WaveMetadata> {
+        match &self.0 {
+            SourceValue::AdmittedWave { metadata, .. } => Some(*metadata),
+            _ => None,
+        }
+    }
     /// PRECONDITION: native font codec validated this exact allocation, and the
     /// existing owner reserved CAPACITY before its byte copy. Generic embedded
     /// MIME labels cannot construct this variant. No publication occurs here.
@@ -157,7 +179,8 @@ impl AssetSource {
     }
     pub(crate) fn encoded_allocation(&self) -> Option<&Arc<Vec<u8>>> {
         match &self.0 {
-            SourceValue::Embedded { allocation, .. } => Some(allocation),
+            SourceValue::Embedded { allocation, .. }
+            | SourceValue::AdmittedWave { allocation, .. } => Some(allocation),
             #[cfg(feature = "font_asset_wire")]
             SourceValue::AdmittedFont { allocation, .. } => Some(allocation),
             SourceValue::Linked { .. } => None,
@@ -168,13 +191,14 @@ impl AssetSource {
             #[cfg(feature = "font_asset_wire")]
             SourceValue::AdmittedFont { media_type, .. } => Some(*media_type),
             SourceValue::Embedded { media_type, .. } => Some(media_type),
+            SourceValue::AdmittedWave { .. } => Some("audio/wav"),
             SourceValue::Linked { .. } => None,
         }
     }
     pub(crate) fn locator(&self) -> Option<&str> {
         match &self.0 {
             SourceValue::Linked { locator } => Some(locator),
-            SourceValue::Embedded { .. } => None,
+            SourceValue::Embedded { .. } | SourceValue::AdmittedWave { .. } => None,
             #[cfg(feature = "font_asset_wire")]
             SourceValue::AdmittedFont { .. } => None,
         }
@@ -267,43 +291,10 @@ impl AssetTarget {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AssetPlacement {
-    id: String,
-    asset_id: AssetId,
-    target: AssetTarget,
-    offset_frames: i64,
-}
-impl AssetPlacement {
-    pub(crate) fn new(
-        id: String,
-        asset_id: AssetId,
-        target: AssetTarget,
-        offset_frames: i64,
-    ) -> Result<Self, AssetError> {
-        if !valid_id(&id) || !target.valid() || offset_frames.unsigned_abs() > MAX_FRAME_OFFSET {
-            return Err(AssetError::Placement);
-        }
-        Ok(Self {
-            id,
-            asset_id,
-            target,
-            offset_frames,
-        })
-    }
-    pub(crate) fn id(&self) -> &str {
-        &self.id
-    }
-    pub(crate) fn asset_id(&self) -> &AssetId {
-        &self.asset_id
-    }
-    pub(crate) fn target(&self) -> &AssetTarget {
-        &self.target
-    }
-    pub(crate) fn offset_frames(&self) -> i64 {
-        self.offset_frames
-    }
-}
+#[path = "object_media_placement_offset.rs"]
+pub(crate) mod offset;
+
+pub(crate) use offset::AssetPlacement;
 
 #[derive(Debug, PartialEq)]
 struct InventoryValue {

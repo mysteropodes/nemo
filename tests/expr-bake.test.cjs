@@ -138,3 +138,16 @@ test('fitSegmentCurve picks the larger-delta axis as driver and ignores a flat c
   const curve = bake._fitSegmentCurve([driverSamples, flatSamples], [0, 50], [200, 50.0000005], 0.01);
   assert.ok(curve, 'expected the driver axis to still produce a fitted curve');
 });
+
+
+test('retained browser bake cannot mutate a native-owned holder', () => {
+  const previous = global.window;
+  let called = 0;
+  const holder = Object.freeze({expressions:Object.freeze({position:Object.freeze({enabled:true,code:'frame'})})});
+  try {
+    global.window = {SMMotion:{valueAtFrame(){called++;throw new Error('legacy sampling forbidden');}},
+      NemoNativeOpacityLegacyAdmission:{allow(){return false;}}};
+    assert.equal(bake.bakeExpressionToKeyframes(holder,'position',0,24),null);
+    assert.equal(called,0);
+  } finally { if(previous===undefined)delete global.window;else global.window=previous; }
+});

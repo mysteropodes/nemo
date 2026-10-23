@@ -1,3 +1,6 @@
+#[path = "native_layer_playhead_cut_wire_tests.rs"]
+mod layer_playhead_cut;
+
 use super::*;
 use serde_json::{json, Value};
 
@@ -126,8 +129,15 @@ async fn object_reader_preserves_complete_bytes_and_rejects_oversized_envelopes(
     let mut too_large = response.clone();
     let segments = &mut too_large.result.as_mut().unwrap()["object"]["geometry"]["segments"];
     *segments = Value::Array(vec![segments[0].clone(); 256]);
-    // Still a complete schema-valid record; encoded transport refuses it.
-    assert!(validate_native_response(&too_large, &request).is_ok());
+    // Inner record grammar is valid; typed envelope and raw reader BOTH enforce
+    // the unchanged ordinary object-response bound before returning bytes.
+    assert!(crate::native_contract::validate_result(
+        &request.operation,
+        &request.document_id,
+        &request.payload,
+        too_large.result.as_ref().unwrap()
+    ));
+    assert!(validate_native_response(&too_large, &request).is_err());
     let before = too_large.clone();
     let mut bytes = serde_json::to_vec(&too_large).unwrap();
     assert!(bytes.len() > NATIVE_MAX_MESSAGE_BYTES);
@@ -368,3 +378,130 @@ async fn malformed_timing_selector_refuses_before_the_mcp_wire_connects() {
             .is_err()
     );
 }
+
+#[test]
+fn an_object_edit_receipt_is_correlated_and_a_flawed_one_is_refused_as_an_invalid_response() {
+    let request: NativeApplicationRequest = serde_json::from_value(json!({
+        "apiVersion":2,"requestId":"edit-1","instanceId":"instance-A","documentId":"document-A",
+        "expectedRevision":7,"operation":"command.document.object.layer.rename",
+        "payload":{"command":"object.layer.rename","layerUid":"layer-b","name":"Ink"}}))
+    .unwrap();
+    let reply = |revision: u64, result: Value| -> NativeApplicationResponse {
+        serde_json::from_value(
+            json!({"apiVersion":2,"requestId":"edit-1","instanceId":"instance-A",
+            "documentId":"document-A","contentRevision":revision,"ok":true,"result":result}),
+        )
+        .unwrap()
+    };
+    let applied = json!({"applied":true,"historyEntriesAdded":1});
+    let noop = json!({"applied":false,"historyEntriesAdded":0});
+    assert!(validate_native_response(&reply(8, applied.clone()), &request).is_ok());
+    assert!(validate_native_response(&reply(7, noop.clone()), &request).is_ok());
+    for refused in [
+        // Not the compact command result of a rename.
+        reply(
+            8,
+            json!({"applied":true,"historyEntriesAdded":1,"layerUid":"native-layer:8:0"}),
+        ),
+        reply(8, json!({"applied":true,"historyEntriesAdded":0})),
+        // The revision does not advance by exactly the applied edit.
+        reply(7, applied.clone()),
+        reply(9, applied),
+        reply(8, noop),
+    ] {
+        let error = validate_native_response(&refused, &request).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert_eq!(error.to_string(), "invalid native application response");
+    }
+}
+
+#[test]
+fn repeat_wire_accepts_actual_catalog_counts_and_rejects_shape_revision_or_identity_drift() {
+    let catalog = crate::capabilities::native_catalog();
+    let descriptor = catalog
+        .capability_for_operation(crate::native_contract::frame_edit::REPEAT)
+        .unwrap();
+    let example = descriptor["examples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|example| {
+            example["request"]["operation"] == crate::native_contract::frame_edit::REPEAT
+        })
+        .unwrap();
+    let request: NativeApplicationRequest =
+        serde_json::from_value(example["request"].clone()).unwrap();
+    let response: NativeApplicationResponse =
+        serde_json::from_value(example["response"].clone()).unwrap();
+    assert!(request.validate_input().is_ok());
+    assert!(validate_native_response(&response, &request).is_ok());
+    let mut growth = response.clone();
+    growth.result.as_mut().unwrap()["cycledLayers"] = json!(0);
+    growth.result.as_mut().unwrap()["skippedComponentLayers"] = json!(3);
+    assert!(validate_native_response(&growth, &request).is_ok());
+    let mut noop = growth.clone();
+    noop.content_revision = request.expected_revision.unwrap();
+    noop.result.as_mut().unwrap()["applied"] = json!(false);
+    noop.result.as_mut().unwrap()["historyEntriesAdded"] = json!(0);
+    assert!(validate_native_response(&noop, &request).is_ok());
+    for mut bad in [response.clone(), noop.clone()] {
+        bad.content_revision += 1;
+        assert!(validate_native_response(&bad, &request).is_err());
+    }
+    for field in ["cycledLayers", "skippedComponentLayers"] {
+        let mut missing = response.clone();
+        missing
+            .result
+            .as_mut()
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .remove(field);
+        assert!(validate_native_response(&missing, &request).is_err());
+        for bad in [json!(-1), json!(1.5), json!(4294967296u64), json!(null)] {
+            let mut wrong = response.clone();
+            wrong.result.as_mut().unwrap()[field] = bad;
+            assert!(validate_native_response(&wrong, &request).is_err());
+        }
+    }
+    let mut extra = response.clone();
+    extra.result.as_mut().unwrap()["clipboard"] = json!(null);
+    assert!(validate_native_response(&extra, &request).is_err());
+    for field in ["requestId", "instanceId", "documentId"] {
+        let mut wrong = serde_json::to_value(&response).unwrap();
+        wrong[field] = json!("foreign");
+        let wrong: NativeApplicationResponse = serde_json::from_value(wrong).unwrap();
+        assert!(validate_native_response(&wrong, &request).is_err());
+    }
+    let insert = descriptor["examples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|example| {
+            example["request"]["operation"] == crate::native_contract::frame_edit::INSERT
+        })
+        .unwrap();
+    let insert_request: NativeApplicationRequest =
+        serde_json::from_value(insert["request"].clone()).unwrap();
+    let mut insert_response: NativeApplicationResponse =
+        serde_json::from_value(insert["response"].clone()).unwrap();
+    assert!(validate_native_response(&insert_response, &insert_request).is_ok());
+    insert_response.result = response.result;
+    assert!(validate_native_response(&insert_response, &insert_request).is_err());
+}
+
+#[cfg(test)]
+#[path = "native_frame_edit_blank_wire_tests.rs"]
+mod blank_key;
+
+#[cfg(test)]
+#[path = "native_frame_clipboard_wire_tests.rs"]
+mod clipboard;
+
+#[cfg(test)]
+#[path = "native_frame_bulk_move_wire_tests.rs"]
+mod bulk_move;
+
+#[cfg(test)]
+#[path = "native_layer_shift_wire_tests.rs"]
+mod layer_shift;

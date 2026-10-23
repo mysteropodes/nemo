@@ -6,22 +6,37 @@ const Ports=require('../src/js/adapters/native-object-project-desktop.js');
 const Underlay=require('../src/js/adapters/native-viewport-underlay.js');
 const Files=require('../src/js/adapters/native-object-project-file.js');
 const Application=require('../src/js/adapters/native-application.js');
+const CompositionUI=require('../src/js/adapters/native-composition-ui.js');
+const PaletteUI=require('../src/js/adapters/native-palette-ui.js');
+const CommentsUI=require('../src/js/adapters/native-comments-ui.js');
+const PerspectiveUI=require('../src/js/adapters/native-perspective-ui.js');
+const vm=require('node:vm'),fs=require('node:fs');
 const turn=()=>new Promise(setImmediate);
+const timerTurn=()=>new Promise(resolve=>setTimeout(resolve,0));
 function gate(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
-function fixture(){
+async function bounded(promise,label,ending='settle'){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{
+  timer=setTimeout(()=>reject(Error(label+' did not '+ending)),1000);})]);}finally{clearTimeout(timer);}}
+function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
-  const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[];
+  let paletteReplyHold=null,commentsReplyHold=null;
+  const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[],notifications=[];
+  let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
-  const document={documentElement:{clientWidth:1200,clientHeight:900,
+  const document={addEventListener(){},removeEventListener(){},documentElement:{clientWidth:1200,clientHeight:900,
     classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
     style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}},
-    getElementById:id=>{assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
+    getElementById:id=>{
+      if(['palette-grid','palette-tabs','btn-palette-new','btn-palette-add-fill','btn-palette-add-stroke',
+        'btn-palette-replace','btn-palette-swap','palette-replace-scope','fb-avatars-pop','zoom-scrub'].includes(id))return null;
+      assert.equal(id,'drawing-canvas');return {getBoundingClientRect:()=>rect};}};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId,contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,lifecycleGeneration:generation,
-    documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:[{layerUid:'drawing',visible:true}],reference:null});
-  const root={document,state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
+    documentDigest:'a'.repeat(64),byteCount:100,canvasW:320,canvasH:180,fps:24,totalFrames:4,layers:layerRows.map(row=>({...row})),reference:null});
+  const root={addEventListener(){},removeEventListener(){},document,stageLayer:{visible:true},paper:{view:{update(){}}},state:{currentFrame:0},devicePixelRatio:2,NemoNativeViewportUnderlay:Underlay,
+    NemoNativeObjectProject:Project,
     NemoNativeObjectProjectFile:{...Files,refreshLayerTable:(r,i)=>{log.push('project');return !projectionRefused&&Files.refreshLayerTable(r,i);}},
     NemoNativeApplicationAdapter:Application,NemoNativeObjectUI:{refreshTiming:r=>{assert.equal(r,root);log.push('timing');},refreshPolicy:r=>{assert.equal(r,root);log.push('policy');}},
-    NemoNativeProjectSettingsController:{willProject:i=>{assert.equal(i.documentId,documentId);log.push('willProject');},presented:()=>log.push('presented')},
+    NemoNativeProjectSettingsController:{willProject:i=>{assert.equal(i.documentId,documentId);log.push('willProject');},
+      presented:i=>{notifications.push(i);log.push('presented');}},
     SMReference:{refreshNative:()=>log.push('reference')},SMProject:{refreshActiveTabDirtyDot:()=>log.push('dirty')},
     updateUI:()=>log.push('update'),showToast:text=>log.push('toast:'+text)};
   async function invoke(command,args){
@@ -34,7 +49,11 @@ function fixture(){
     if(command==='nemo_native_dispatch'){
       log.push(r.operation);const p=r.payload;
       let result;
-      const pin=info();
+      const pin=info(),projectRead=['composition','palette','comments','perspective'].some(kind=>r.operation==='query.document.object.project.'+kind+'.read');
+      if(projectRead){
+        assert.equal(p.atRevision,pin.contentRevision);assert.equal(p.documentSnapshotId,pin.documentSnapshotId);
+        assert.equal(p.contextId,'scene-root');
+      }
       if(r.operation==='query.document.object.property.metadata'){
         if(held)await held.promise;
         result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
@@ -42,9 +61,42 @@ function fixture(){
           items:[{kind:'layer',target:{contextId:'scene-root',layerUid:'drawing'}}],nextOffset:null,
           unavailableCategories:['conditionalMotionRows','pathVerticesTrimStrokeBrushMesh','referenceOnlyElements',
             'expressionDiagnostics','layerEffectMatteReveal','propertyWrites'].map(category=>({category,state:'unavailable',reason:'not-admitted'}))};
+      }else if(r.operation==='query.document.object.project.composition.read'||r.operation==='query.document.object.project.palette.read'){
+        const composition=r.operation==='query.document.object.project.composition.read';
+        let value;
+        if(p.selector.kind==='settings'){
+          if(!composition&&paletteReplyHold)await paletteReplyHold.promise;
+          value=composition?{markersPresent:false,markerCount:0,effectiveBpm:120,effectiveBpmOffset:0,effectiveBpmShow:false}:
+            {palettesPresent:true,paletteCount:0,effectiveActivePaletteIdx:0};
+        }else{
+          assert.equal(p.selector.kind,composition?'markerPage':'palettePage');
+          assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
+          value=composition?{kind:'markerPage',markersPresent:false,markerCount:0,cursor:0,items:[],nextCursor:null}:
+            {kind:'palettePage',palettesPresent:true,paletteCount:0,cursor:0,items:[],nextCursor:null};
+        }
+        result=value;
+      }else if(r.operation==='query.document.object.project.comments.read'){
+        let value;
+        if(p.selector.kind==='settings'){
+          if(commentsReplyHold){const own=commentsReplyHold;commentsReplyHold=null;own.entered();await own.promise;}
+          value={commentsPresent:false,commentCount:0};
+        }else{
+          assert.equal(p.selector.kind,'commentsPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
+          value={kind:'projectCommentsPage',commentsPresent:false,commentCount:0,cursor:0,items:[],nextCursor:null};
+        }
+        result=value;
+      }else if(r.operation==='query.document.object.project.perspective.read'){
+        const settings={perspectiveVPsPresent:false,perspectiveVPsNull:false,perspectiveVPCount:0,effectiveVPCount:2,vpSource:'default'};
+        if(p.selector.kind==='settings')result=settings;
+        else{
+          assert.equal(p.selector.kind,'vpPage');assert.equal(p.selector.cursor,0);assert.equal(p.selector.limit,16);
+          result={kind:'perspectiveVPPage',...settings,cursor:0,items:[{ordinal:1,x:-48,y:90,locked:false},{ordinal:2,x:368,y:90,locked:false}],nextCursor:null};
+        }
       }else if(r.operation==='command.document.object.layer.policy.edit'){
         assert.equal(r.expectedRevision,revision);revision++;result={applied:true,historyEntriesAdded:1};
       }else throw Error('unexpected fake public operation');
+      if(projectRead)result={instanceId:'instance',documentId:pin.documentId,atRevision:pin.contentRevision,
+        documentSnapshotId:pin.documentSnapshotId,contextId:'scene-root',result};
       const reply={apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:pin.documentId,contentRevision:r.operation.startsWith('query.')?pin.contentRevision:revision,ok:true,result};
       if(replyMutation)replyMutation(reply);return reply;
     }
@@ -62,8 +114,11 @@ function fixture(){
     transports.push(transport);return transport;
   }};
   const session=Project.desktop(root);
-  const open=()=>session.openPath('/fake.json',{reveal:async i=>{Files.projectView(root,i);root.updateUI();}});
-  return {root,session,open,log,calls,classes,styles,transports,info,
+  const open=async()=>{const value=await session.openPath('/fake.json',{reveal:async i=>{Files.projectView(root,i);root.updateUI();}});
+    await timerTurn();return value;};
+  return {root,session,open,log,calls,classes,styles,transports,notifications,info,
+    layers:value=>{layerRows=value.map(row=>({...row}));},paletteReplyGate:value=>{paletteReplyHold=value;},
+    commentsReplyGate:value=>{commentsReplyHold=value;},
     hold:v=>held=v,foreign:v=>foreign=v,rect:v=>rect=v,refuseProjection:v=>projectionRefused=v,ackGate:v=>rawAck=v,previewGate:v=>previewHold=v,mutateReply:v=>replyMutation=v,
     async emit(){const t=transports.at(-1),from=revision;revision++;const event={...info(),requestId:'event-'+revision,fromRevision:from,toRevision:revision};return t.synchronize(event,t.binding);}};
 }
@@ -171,6 +226,111 @@ test('pending preview rejects an in-flight read immediately and does not settle 
   await assert.rejects(pending,/presentation changed/);assert.equal(finished,false);
   previewHold.resolve();await preview;assert.equal(finished,true);
 });
+function bpmEntryDOM(f){
+  const document=f.root.document,lookup=document.getElementById,pagehide=[];
+  function element(tag){const el={tagName:tag,children:[],style:{},events:{},classList:{toggle(){}},
+    setAttribute(k,v){this[k]=String(v);},addEventListener(k,fn){this.events[k]=fn;},
+    appendChild(child){child.parentNode=this;this.children.push(child);return child;},
+    focus(){document.activeElement=this;},select(){},remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(v=>v!==this);}};return el;}
+  const button=element('button');document.body=element('body');document.readyState='complete';
+  document.createElement=element;document.activeElement=null;
+  document.getElementById=id=>id==='btn-bpm'?button:id==='frame-grid'?null:lookup(id);
+  f.root.window=f.root;f.root.addEventListener=(kind,fn)=>{if(kind==='pagehide')pagehide.push(fn);};
+  f.root.NemoNativeObjectProjectDesktop=Ports;
+  return {document,button,pagehide,dialogs:()=>document.body.children.filter(v=>v.id==='bpm-settings-dialog')};
+}
+test('actual Composition recovers after a same-frame pending preview without weakening presentation guards',()=>withPendingBpmEntry(async c=>{
+  const {f,hold,composition,preview,before,frame}=c;
+    assert.equal(f.calls.filter(c=>c.command==='nemo_native_object_preview').length,c.previewCount+1);
+    assert.equal(f.session.readPresentedObjectSession(),null);
+    const refused=[];assert.equal(composition.read(code=>refused.push(code)),null);
+    assert.deepEqual(refused,['presentation-missing']);
+    assert.strictEqual(f.session.info(),before.info);assert.equal(f.root.state.currentFrame,frame);
+    hold.resolve();await preview;await timerTurn();await turn();await timerTurn();await turn();
+    const recovered=composition.read();assert.ok(recovered,'existing presented fanout must recover the complete composition projection');
+    assert.equal(recovered.composition.effectiveBpm,120);assert.equal(recovered.composition.effectiveBpmOffset,0);
+    assert.equal(recovered.composition.effectiveBpmShow,false);
+    for(const key of ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'])
+      assert.equal(recovered.info[key],before.info[key]);
+    assert.strictEqual(f.session.info(),before.info);assert.equal(f.session.readSubscriptionGeneration(),before.generation);
+    assert.equal(f.root.state.currentFrame,frame);assert.equal(f.session.isIndeterminate(),false);
+    assert.ok(f.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>c.r.frame===frame));
+    assert.ok(f.calls.filter(c=>c.command==='nemo_native_dispatch').every(c=>c.r.operation.startsWith('query.')));
+    const settled=f.calls.length;await timerTurn();await turn();assert.equal(f.calls.length,settled);
+},false));
+async function withPendingBpmEntry(check,bpm=true){
+  const f=fixture(),hold=gate(),dom=bpm?bpmEntryDOM(f):null,c={f,hold,dom,jobs:[],composition:null,replacement:null,preview:null,timer:null};
+  try{
+    await f.open();c.composition=CompositionUI.install(f.root);c.origin=await c.composition.presented();assert.ok(c.origin);
+    if(bpm)vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/bpm-grid.js'),'utf8'),f.root);
+    else {await timerTurn();await turn();}
+    c.before=retained(f);c.frame=f.root.state.currentFrame;
+    c.previewCount=f.calls.filter(call=>call.command==='nemo_native_object_preview').length;
+    assert.ok(c.composition.read());
+    f.previewGate(hold);c.preview=f.session.renderPreview(c.frame);await turn();
+    assert.equal(f.session.readPresentedObjectSession(),null);
+    await check(c);
+  }finally{
+    clearTimeout(c.timer);if(dom)dom.pagehide.forEach(fn=>fn());if(c.composition)c.composition.dispose();if(c.replacement)c.replacement.dispose();
+    hold.resolve();await Promise.allSettled([c.preview,...c.jobs]);await timerTurn();await turn();
+  }
+}
+async function ordinaryBpmEntry(requests){
+  await withPendingBpmEntry(async c=>{
+    const {f,hold,dom,composition,before,frame,preview}=c;let prevented=false;
+    for(let i=0;i<requests;i++)dom.button.events.contextmenu({preventDefault(){prevented=true;}});
+    assert.equal(prevented,true);assert.equal(dom.document.body.children.length,0,'a pending preview cannot authorize a dialog');
+    const waiting=requests>1?composition.readWhenPresented():null;
+    assert.equal(dom.dialogs().length,0);assert.strictEqual(f.session.info(),before.info);
+    hold.resolve();await preview;await timerTurn();await turn();await timerTurn();await turn();
+    assert.ok(composition.read(),'the real completion fanout recovered the composition');
+    if(waiting){
+      const value=await bounded(waiting,'duplicate entry waiter');assert.strictEqual(value,composition.read(),'duplicate requests must resolve the actual current projection');
+    }
+    assert.equal(dom.document.body.children.filter(v=>v.id==='bpm-settings-dialog').length,1,
+      'the original settings gesture must open once after its unchanged owner is presented');
+    assert.equal(dom.dialogs().length,1);assert.equal(dom.document.body.children.length,1);
+    assertRetained(f,{...before,presented:f.session.readPresentedObjectSession()});
+    assert.equal(f.root.state.currentFrame,frame);
+    assert.ok(f.calls.filter(call=>call.command==='nemo_native_dispatch').every(call=>call.r.operation.startsWith('query.')));
+    assert.equal(f.session.info().contentRevision,0);assert.equal(f.session.readSubscriptionGeneration(),before.generation);
+    const count=f.calls.length;await timerTurn();await turn();assert.equal(f.calls.length,count);
+  });
+}
+test('one ordinary BPM entry survives a same-frame pending preview without a second gesture',()=>ordinaryBpmEntry(1));
+test('duplicate ordinary BPM entries share one bounded wait and open one form without native edits',()=>ordinaryBpmEntry(4));
+
+test('deferred ordinary BPM entry cannot survive a real revision, owner, subscription, lifecycle or controller change',async()=>{
+  for(const mode of ['revision','owner','subscription','disconnected','disposed','pagehide','controller','competing-edit'])await withPendingBpmEntry(async c=>{
+    const {f,hold,dom,composition,origin,before,preview}=c;let change=null;
+    dom.button.events.contextmenu({preventDefault(){}});
+    const waiting=composition.readWhenPresented();assert.equal(dom.dialogs().length,0);
+    if(mode==='revision')change=f.emit();
+    else if(mode==='owner')change=f.session.openPath('/replacement.json',{reveal:async info=>Files.projectView(f.root,info)});
+    else if(mode==='subscription')change=f.session.openPath('/cancel.json',{confirm:async()=>false});
+    else if(mode==='disconnected')f.transports[0].disconnected(new Error('controlled genuine subscription retirement'));
+    else if(mode==='disposed')composition.dispose();
+    else if(mode==='pagehide')dom.pagehide.forEach(fn=>fn());
+    else if(mode==='controller'){const other=fixture();c.replacement=CompositionUI.install(other.root);f.root.NemoNativeCompositionController=c.replacement;}
+    else assert.equal((await composition.edit({kind:'setBpm',bpmShow:true},origin)).status,'unavailable');
+    if(change){c.jobs.push(change);change.catch(()=>{});}
+    hold.resolve();await preview;if(change)await change;
+    await timerTurn();await turn();await timerTurn();await turn();
+    // Exercise late publication through the replaced controller's real callback; the current slot remains replaced.
+    if(mode==='controller')await composition.presented();
+    const resolved=await bounded(waiting,mode+' waiter','retire');if(mode!=='controller')assert.equal(resolved,null,mode);
+    assert.equal(dom.dialogs().length,0,mode+' must not replay the old ordinary entry');
+    assert.equal(dom.document.body.children.length,0,mode);
+    assert.ok(f.calls.filter(call=>call.command==='nemo_native_dispatch').every(call=>call.r.operation.startsWith('query.')),mode);
+    if(mode==='revision')assert.equal(f.session.info().contentRevision,1);
+    else assert.equal(f.session.info().contentRevision,0);
+    if(mode==='owner')assert.notEqual(f.session.info().documentId,before.info.documentId);
+    if(mode==='subscription'){assert.strictEqual(f.session.info(),before.info);assert.ok(f.session.readSubscriptionGeneration()>before.generation);}
+    if(mode==='disconnected')assert.equal(f.session.isIndeterminate(),true);
+    const count=f.calls.length;await timerTurn();await turn();assert.equal(f.calls.length,count,mode);
+  });
+});
+
 test('readiness loss and native synchronization both refuse delayed reads without owner fencing',async()=>{
   for(const mode of ['disconnect','projection','revision']){const f=fixture();await f.open();const hold=gate();f.hold(hold);const pending=f.session.readPropertyMetadata(selector(f));await turn();
     if(mode==='disconnect')f.transports[0].connected=false;
@@ -202,10 +362,254 @@ test('factory retains policy-specific SDK dispatch and policy notifications afte
   // Test a connected factory instance directly; it still creates no Project session.
   await ports.subscribeRevisions(()=>{},()=>{});assert.equal(ports.policyAvailable(),true);
   assert.strictEqual(await ports.dispatchApplication(q),q);assert.equal(dispatched,1);
-  const before=f.log.length;ports.presented(f.session.info());assert.deepEqual(f.log.slice(before),['presented','policy']);
+  const before=f.log.length;ports.presented(f.session.info());await timerTurn();assert.deepEqual(f.log.slice(before),['presented','policy']);
 });
 
 test('SDK-valid advancing partial-page cursor is preserved without a local completeness guess',async()=>{
   const f=fixture();await f.open();f.mutateReply(r=>r.result.nextOffset=1);
   const result=await f.session.readPropertyMetadata(selector(f));assert.equal(result.nextOffset,1);assert.equal(result.items.length,1);
+});
+
+
+test('real desktop ports project frozen opaque parent metadata through revision refresh without document writers',async()=>{
+  const parent='親:雪/opaque',base=[{layerUid:parent,visible:true},{layerUid:'drawing',visible:true,parentLayerUid:parent}];
+  const f=fixture(base);await f.open();const ports=Ports.createPorts(f.root),table=f.root.state.layers,child=table[1];
+  const initial=f.session.info();assert.equal(initial.layers[1].parentLayerUid,parent);
+  assert.equal(Object.isFrozen(initial.layers[1]),true);assert.equal(child.parentLayerUid,parent);
+  assert.equal(ports.projectionReady(initial),true);
+  for(const nextRows of [[base[0],{...base[1],parentLayerUid:null}],base,[base[0],{layerUid:'drawing',visible:true}]]){
+    f.layers(nextRows);await f.emit();
+    const current=f.session.info();assert.strictEqual(f.root.state.layers,table);assert.strictEqual(table[1],child);
+    assert.equal(child.parentLayerUid,Object.hasOwn(nextRows[1],'parentLayerUid')?nextRows[1].parentLayerUid:null);
+    assert.equal(ports.projectionReady(current),true);assert.equal(Object.isFrozen(current.layers[1]),true);
+  }
+  assert.equal(f.calls.some(c=>c.r&&c.r.operation&&c.r.operation.startsWith('command.')),false);
+});
+test('actual desktop projection readiness rejects same-revision parent drift with complete UI state intact',async()=>{
+  const parent='親:雪',f=fixture([{layerUid:parent},{layerUid:'drawing',parentLayerUid:parent}]);await f.open();
+  const ports=Ports.createPorts(f.root),current=f.session.info(),before=JSON.stringify(f.root.state);
+  const changed={...current,layers:current.layers.map((row,i)=>i===1?{...row,parentLayerUid:null}:{...row})};
+  assert.equal(ports.projectionReady(changed),false);
+  assert.equal(Files.refreshLayerTable(f.root,changed),false);assert.equal(JSON.stringify(f.root.state),before);
+  assert.equal(ports.projectionReady(current),true);assert.strictEqual(f.session.info(),current);
+});
+test('real desktop metadata rejects a late malformed parent before any partial projection publication',async()=>{
+  const parent='親:雪',base=[{layerUid:parent,visible:true},{layerUid:'drawing',visible:true,parentLayerUid:parent}];
+  const f=fixture(base);await f.open();const before=JSON.stringify(f.root.state),table=f.root.state.layers;
+  f.layers([{...base[0],visible:false},{...base[1],parentLayerUid:''}]);
+  await assert.rejects(f.emit(),/metadata.*uncorrelated/i);
+  assert.equal(JSON.stringify(f.root.state),before);assert.strictEqual(f.root.state.layers,table);
+  assert.equal(f.session.isIndeterminate(),true);
+  assert.equal(f.calls.some(c=>c.r&&c.r.operation&&c.r.operation.startsWith('command.')),false);
+});
+
+test('actual desktop queue settles composition and palette read-only projections before synchronous controller fanout can hide them',async()=>{
+  const f=fixture();await f.open();f.root.NemoNativeObjectProject=Project;
+  const before=retained(f),hold=gate();f.paletteReplyGate(hold);
+  let composition=null,palette=null,paletteRead=null;
+  try{
+    composition=CompositionUI.install(f.root);palette=PaletteUI.install(f.root);
+    // The original synchronous resource-finally fanout started Palette before
+    // the composition continuation. The first result now survives that boundary.
+    const first=await composition.presented();
+    paletteRead=palette.presented();
+    assert.ok(first,'the first composition projection must survive another controller entering the real queue');
+    hold.resolve();await paletteRead;
+    const compositionValue=composition.read(),paletteValue=palette.read();
+    assert.ok(compositionValue);assert.ok(paletteValue);
+    assert.deepEqual(compositionValue.info,paletteValue.info);
+    assert.equal(compositionValue.info.contentRevision,0);
+    for(const key of ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'])
+      assert.equal(compositionValue.info[key],before.info[key]);
+    const queries=f.calls.filter(call=>call.command==='nemo_native_dispatch');
+    assert.deepEqual(queries.filter(call=>call.r.operation==='query.document.object.project.composition.read')
+      .map(call=>call.r.payload.selector.kind),['settings','markerPage']);
+    assert.deepEqual(queries.filter(call=>call.r.operation==='query.document.object.project.palette.read')
+      .map(call=>call.r.payload.selector.kind),['settings','palettePage']);
+    assert.equal(queries.length,4);
+    assert.ok(queries.every(call=>call.r.operation.startsWith('query.')&&!Object.hasOwn(call.r,'expectedRevision')));
+    assert.equal(f.transports.length,1);assertRetained(f,before);
+  }finally{
+    // Capture any already-held Palette read before disposal, even if an earlier
+    // assertion fails. Retire both controllers before releasing the fake reply
+    // so their existing presented callbacks cannot start a microtask retry loop.
+    if(palette&&!paletteRead)paletteRead=palette.presented();
+    if(composition)composition.dispose();
+    if(palette)palette.dispose();
+    hold.resolve();
+    if(paletteRead)await paletteRead;
+  }
+});
+
+test('completion notification drops stale revision, owner, subscription and same-revision presentation captures',async()=>{
+  for(const mode of ['revision','owner','subscription','presentation']){
+    const f=fixture();await f.open();const ports=Ports.createPorts(f.root),old=f.session.info();
+    const before=f.notifications.length,start=f.log.length;
+    ports.presented(old);
+    if(mode==='revision')await f.emit();
+    if(mode==='owner')await f.session.openPath('/replacement.json',{reveal:async info=>Files.projectView(f.root,info)});
+    if(mode==='subscription')assert.equal(await f.session.openPath('/cancel.json',{confirm:async()=>false}),false);
+    if(mode==='presentation')await f.session.presentPreview(2);
+    await timerTurn();
+    const fresh=f.notifications.slice(before);
+    // Revision synchronization captured a null public presentation while busy;
+    // the separately tested native ACK timer owns its final notification.
+    const expected=mode==='revision'?0:1;
+    assert.equal(fresh.length,expected,mode);
+    assert.deepEqual(f.log.slice(start).filter(value=>['presented','policy'].includes(value)),
+      expected?['presented','policy']:[],mode);
+    if(expected)assert.strictEqual(fresh[0],f.session.info());
+    if(mode==='revision')assert.equal(f.session.info().contentRevision,1);
+    if(mode==='owner')assert.notEqual(f.session.info().documentId,old.documentId);
+    if(mode==='subscription')assert.strictEqual(f.session.info(),old);
+    if(mode==='presentation'){
+      assert.strictEqual(f.session.info(),old);
+      assert.equal(f.session.readPresentedObjectSession().presentation.frame,2);
+    }
+  }
+});
+
+test('newest same-port completion is coalesced and callback exceptions cannot reject settled native work',async()=>{
+  const f=fixture();await f.open();const ports=Ports.createPorts(f.root),pin=retained(f);
+  const before=f.notifications.length,start=f.log.length;
+  ports.presented(pin.info);ports.presented(pin.info);await timerTurn();
+  assert.equal(f.notifications.length-before,1);
+  assert.deepEqual(f.log.slice(start),['presented','policy']);assertRetained(f,pin);
+  let attempted=0;
+  f.root.NemoNativeProjectSettingsController.presented=()=>{attempted++;throw Error('controlled advisory callback failure');};
+  await f.session.presentPreview(1);await timerTurn();
+  assert.equal(attempted,1);
+  assert.equal(f.session.info().contentRevision,0);
+  assert.equal(f.session.readPresentedObjectSession().presentation.frame,1);
+  assert.equal(f.session.isIndeterminate(),false);
+});
+
+test('fresh fenced completion with two null presentations still renders disabled lifecycle UI',async()=>{
+  const f=fixture();await f.open();const ports=Ports.createPorts(f.root),info=f.session.info(),disabled=[];
+  const original=f.root.NemoNativeProjectSettingsController.presented;
+  f.root.NemoNativeProjectSettingsController.presented=value=>{
+    disabled.push(f.session.isIndeterminate()&&f.session.readPresentedObjectSession()===null);original(value);
+  };
+  const before=f.notifications.length,start=f.log.length;
+  ports.presented(info);
+  f.transports[0].disconnected(new Error('controlled subscription loss'));
+  assert.equal(f.session.isIndeterminate(),true);
+  assert.equal(f.session.readPresentedObjectSession(),null);
+  ports.presented(f.session.info());await timerTurn();
+  assert.deepEqual(disabled,[true]);assert.equal(f.notifications.length-before,1);
+  assert.strictEqual(f.notifications.at(-1),info);
+  assert.deepEqual(f.log.slice(start).filter(value=>['presented','policy'].includes(value)),['presented','policy']);
+  assert.equal(f.session.readPresentedObjectSession(),null);
+});
+
+test('unknown current owner and lookalike metadata cannot receive completion notification',async()=>{
+  const f=fixture();await f.open();const ports=Ports.createPorts(f.root),info=f.session.info();
+  const before=f.notifications.length,start=f.log.length,calls=f.calls.length;
+  ports.presented(info);delete f.root.NemoNativeObjectProject;await timerTurn();
+  assert.equal(f.notifications.length,before);assert.deepEqual(f.log.slice(start),[]);
+  f.root.NemoNativeObjectProject=Project;
+  ports.presented({...info});await timerTurn();
+  assert.equal(f.notifications.length,before);assert.equal(f.calls.length,calls);
+});
+
+
+// Positive original-consumer oracle: native and DOM replies are controlled,
+// while Project/Desktop notification, SDK, models and controllers are production.
+test('ordinary Open readonly lifecycle converges and composition recovers after Comments queue settlement',async()=>{
+  const f=fixture(),compositionPublications=[],commentPublications=[],refusals=[];
+  let composition=null,comments=null;
+  function readGate(){const held=gate(),started=gate();return {...held,started:started.promise,entered:started.resolve};}
+  const first=readGate(),second=readGate(),firstCommentPublication=gate();
+  // Capture only complete readbacks through the existing controller repaint ports.
+  f.root.SMBpm={refresh(){const value=composition&&composition.read();if(value)compositionPublications.push(value);}};
+  f.root.refreshFbAvatars=()=>{const value=comments&&comments.read();if(value){
+    if(commentPublications[commentPublications.length-1]!==value)commentPublications.push(value);
+    firstCommentPublication.resolve(value);}};
+  try{
+    composition=CompositionUI.install(f.root);comments=CommentsUI.install(f.root);
+    await turn(); // Original inactive installation settles before the ordinary user Open.
+    f.commentsReplyGate(first);await f.open();await bounded(first.started,'first Comments settings');
+    assert.equal(compositionPublications.length,1,'ordinary Open must publish the complete composition before Comments enters');
+    const shown=compositionPublications[0],owner=f.session.info();
+    assert.equal(shown.composition.effectiveBpm,120);assert.equal(shown.composition.effectiveBpmOffset,0);
+    assert.equal(shown.composition.effectiveBpmShow,false);assert.deepEqual(shown.composition.markers,[]);
+    assert.equal(Object.isFrozen(shown),true);assert.equal(shown.info.contentRevision,0);
+    assert.equal(f.session.readPresentedObjectSession(),null,'held native queue work must remain unavailable');
+    assert.equal(composition.read(code=>refusals.push(code)),null,'a busy reader cannot expose the hidden presentation');
+    assert.equal(composition.read(code=>refusals.push(code)),null,'repeated busy reads must remain unavailable');
+    // No direct presented() or manual refresh requests any later work. Hold a
+    // repeated query if production issues one, so a failing oracle cannot loop.
+    f.commentsReplyGate(second);first.resolve();
+    await bounded(firstCommentPublication.promise,'first complete Comments projection');
+    await timerTurn();await turn(); // Drain the existing post-completion callback, not a delay-based retry.
+    const recovered=composition.read(code=>refusals.push(code));
+    const queries=f.calls.filter(call=>call.command==='nemo_native_dispatch');
+    const commentQueries=queries.filter(call=>call.r.operation==='query.document.object.project.comments.read');
+    assert.equal(commentQueries.filter(call=>call.r.payload.selector.kind==='settings').length,1,
+      'current same-pin Comments must not start another read; refusal observations='+JSON.stringify(refusals));
+    assert.deepEqual(commentQueries.map(call=>call.r.payload.selector.kind),['settings','commentsPage']);
+    assert.ok(recovered,'BPM composition must recover after readonly queue completion without a manual refresh');
+    assert.deepEqual(recovered.info,shown.info);assert.deepEqual(recovered.composition,shown.composition);
+    assert.equal(f.session.info(),owner);assert.ok(f.session.readPresentedObjectSession());
+    assert.equal(commentPublications.length,1);assert.deepEqual(commentPublications[0].info,shown.info);
+    assert.ok(queries.every(call=>call.r.operation.startsWith('query.')&&!Object.hasOwn(call.r,'expectedRevision')));
+    const count=queries.length;await timerTurn();await turn();
+    assert.equal(f.calls.filter(call=>call.command==='nemo_native_dispatch').length,count,'settled callbacks must converge; observations='+JSON.stringify({refusals:refusals,
+      dispatches:f.calls.filter(call=>call.command==='nemo_native_dispatch').map(call=>({operation:call.r.operation,
+        selectorKind:call.r.payload&&call.r.payload.selector&&call.r.payload.selector.kind,atRevision:call.r.payload&&call.r.payload.atRevision})),
+      infoRevision:f.session.info().contentRevision,publicPresented:!!f.session.readPresentedObjectSession()}));
+    assert.equal(f.session.info().contentRevision,0);assert.equal(f.transports.length,1);assert.equal(f.session.isIndeterminate(),false);
+  }finally{
+    // Retire actual controllers before release so failed assertions cannot leak a timer/query loop.
+    if(composition)composition.dispose();if(comments)comments.dispose();
+    first.resolve();second.resolve();await turn();await timerTurn();await turn();
+  }
+});
+
+test('ordinary Open metadata settles when Perspective repaint re-enters the actual coalescing native preview queue',async()=>{
+  const f=fixture(),published=gate(),renders=new Set(),seen=new Set();
+  let composition=null,comments=null,perspective=null,repaints=0,timer,off=null,opening=null;
+  function observed(kind,value){if(value){seen.add(kind);if(seen.size===3)published.resolve();}}
+  f.root.SMBpm={refresh(){observed('composition',composition&&composition.read());}};
+  f.root.refreshFbAvatars=()=>observed('comments',comments&&comments.read());
+  // Preserve Project's actual wantedFrame/rendering coalescing without limiting finite repaints.
+  f.root.SMEngineBridge={renderNow(){repaints++;
+    const job=f.session.renderPreview(f.root.state.currentFrame);renders.add(job);return job;}};
+  try{
+    composition=CompositionUI.install(f.root);comments=CommentsUI.install(f.root);perspective=PerspectiveUI.install(f.root);
+    off=perspective.onRead(value=>observed('perspective',value));
+    await turn();opening=f.open();
+    await Promise.race([opening.then(()=>published.promise),new Promise((_,reject)=>{
+      timer=setTimeout(()=>{f.root.SMEngineBridge.renderNow=()=>{};
+        reject(Error('ordinary Open metadata did not settle with Perspective preview re-entry: '+JSON.stringify({seen:[...seen],repaints,
+          calls:f.calls.slice(-12).map(call=>({command:call.command,operation:call.r&&call.r.operation,
+            selector:call.r&&call.r.payload&&call.r.payload.selector&&call.r.payload.selector.kind}))})));},1000);})]);
+    clearTimeout(timer);await timerTurn();await turn();
+    const owner=f.session.info(),before=retained(f);
+    const values=[composition.read(),comments.read(),perspective.read()];
+    assert.ok(values.every(Boolean),'all ordinary metadata controllers must remain readable after publication');
+    for(const value of values)assert.deepEqual(value.info,values[0].info);
+    assert.equal(values[0].composition.effectiveBpm,120);assert.equal(values[0].composition.effectiveBpmOffset,0);
+    assert.equal(values[0].composition.effectiveBpmShow,false);
+    assert.deepEqual(values[2].perspective.items,[{ordinal:1,x:-48,y:90,locked:false},{ordinal:2,x:368,y:90,locked:false}]);
+    assert.strictEqual(f.session.info(),owner);assert.ok(f.session.readPresentedObjectSession());
+    const count=f.calls.length,renderCount=repaints;await timerTurn();await turn();await timerTurn();await turn();
+    assert.equal(f.calls.length,count,'stable metadata must not schedule further native preview or query work');
+    assert.equal(repaints,renderCount,'stable notifications must not repaint into the preview queue');
+    assert.ok(f.calls.filter(call=>call.command==='nemo_native_dispatch').every(call=>call.r.operation.startsWith('query.')));
+    assert.equal(owner.contentRevision,0);assert.equal(f.transports.length,1);assertRetained(f,before);
+  }finally{
+    clearTimeout(timer);f.root.SMEngineBridge.renderNow=()=>{};
+    if(off)off();if(perspective)perspective.dispose();if(composition)composition.dispose();if(comments)comments.dispose();
+    await Promise.allSettled([...renders,opening]);await timerTurn();await turn();
+  }
+});
+
+test('desktop reads only existing session Camera View choice and keeps the native UI lock hook',()=>{
+ const seen=[],root={state:{cameraView:false},__TAURI__:{core:{invoke(){throw Error('no host request');}}},NemoNativeViewportUnderlay:Underlay,
+  SMCamera:{renderNativeViewLock(){seen.push('lock');}}};
+ const ports=Ports.createPorts(root);assert.equal(ports.viewMode(),'canvas');root.state.cameraView=true;assert.equal(ports.viewMode(),'stored-camera');
+ Ports.didPaintUI(root,{bindPolicyEntries(){seen.push('policy');}});assert.deepEqual(seen,['policy','lock']);
+ Object.defineProperties(root.state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera keys read');}}});
+ assert.equal(ports.viewMode(),'stored-camera');
 });

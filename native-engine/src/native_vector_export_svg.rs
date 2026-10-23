@@ -1,16 +1,20 @@
 //! Native SVG frame serializer over the pinned `ObjectPaintPlan` (G43 kernel).
 //!
-//! One `<path>` per paint command, in the plan's paint order, from the SAME plan
-//! the PNG compositor consumes. Path data is the retained closed cubic contour
-//! (absolute `M` + one `C` per segment, the closing curve included, then `Z`);
-//! fill is the original straight RGBA, never quantized to 8 bits. The document
+//! One `<path>` per retained contour in the SAME mixed paint order the PNG
+//! compositor consumes, including Text glyphs and decorations. Path data is the
+//! retained closed cubic contour (absolute `M`, every closing `C`, then `Z`).
+//! Vector straight RGBA stays unquantized; Text uses the provider's already
+//! composed straight RGBA8, without applying its opacity a second time. The document
 //! wrapper is byte-identical to `svgDocument` in baseline
 //! `src/js/adapters/export-svg-frame.js`. Plan geometry/paint outside what the
 //! plan can carry today is a typed `Unsupported`, never dropped, never Paper.
 //!
 //! Output is detached (owned bytes and pin strings). The byte cap is checked by
 //! an exact counting pass BEFORE the output buffer is allocated.
-use crate::object_render_scene::{ObjectPaintCommand, ObjectPaintPlan};
+use crate::object_render_scene::{
+    ordered_entries, ObjectPaintCommand, ObjectPaintPlan, PaintEntry,
+};
+use crate::render_geometry::ClosedCubicPath;
 use crate::scheduler::OutputSpec;
 
 pub(crate) const XML_PREAMBLE: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -18,6 +22,8 @@ pub(crate) const XML_PREAMBLE: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?
 pub(crate) const MAX_SVG_BYTES: usize = 64 * 1024 * 1024;
 const DOCUMENT_TAIL: &str = "\n</svg>";
 const FAMILY: &str = "closed-solid-fill-cubic-path";
+#[path = "native_vector_export_camera.rs"]
+mod camera;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SvgExportError {
@@ -28,6 +34,11 @@ pub(crate) enum SvgExportError {
     /// A record the plan can carry but SVG has no representation for yet.
     Unsupported {
         source_object_index: usize,
+        reason: &'static str,
+    },
+    /// A placed component has layer/inner-target provenance, not a root object index.
+    UnsupportedComponent {
+        source_layer_index: usize,
         reason: &'static str,
     },
     /// A straight RGBA channel is not a finite number in 0..=1.
@@ -199,6 +210,7 @@ struct Sink {
     cap: usize,
     len: usize,
     out: Option<Vec<u8>>,
+    camera: Option<camera::Camera>,
 }
 
 impl Sink {
@@ -217,6 +229,7 @@ impl Sink {
         self.put(&format_number(value))
     }
     fn point(&mut self, point: [f64; 2]) -> Result<(), SvgExportError> {
+        let point = camera::point(self.camera, point)?;
         self.number(point[0])?;
         self.put(",")?;
         self.number(point[1])
@@ -229,6 +242,12 @@ fn emit_command(
     command: ObjectPaintCommand<'_>,
 ) -> Result<(), SvgExportError> {
     let record = command.source().record();
+    if record.has_enabled_effects() {
+        return Err(SvgExportError::Unsupported {
+            source_object_index,
+            reason: "per-element effects have no admitted SVG representation",
+        });
+    }
     admit_record(
         source_object_index,
         &RecordFacts {
@@ -241,11 +260,34 @@ fn emit_command(
         },
     )?;
     let rgba = straight_rgba(source_object_index, command)?;
-    let segments = command.contour().segments();
-    let first = segments.first().ok_or(SvgExportError::Unsupported {
-        source_object_index,
-        reason: "empty contour",
-    })?;
+    emit_contour(sink, source_object_index, command.contour(), rgba)
+}
+
+fn emit_contour(
+    sink: &mut Sink,
+    source_object_index: usize,
+    contour: &ClosedCubicPath,
+    rgba: [f64; 4],
+) -> Result<(), SvgExportError> {
+    emit_contour_with_error(
+        sink,
+        contour,
+        rgba,
+        SvgExportError::Unsupported {
+            source_object_index,
+            reason: "empty contour",
+        },
+    )
+}
+
+fn emit_contour_with_error(
+    sink: &mut Sink,
+    contour: &ClosedCubicPath,
+    rgba: [f64; 4],
+    invalid: SvgExportError,
+) -> Result<(), SvgExportError> {
+    let segments = contour.segments();
+    let first = segments.first().ok_or(invalid)?;
     sink.put("<path d=\"M")?;
     sink.point(first.point)?;
     for (index, from) in segments.iter().enumerate() {
@@ -275,19 +317,148 @@ fn emit_command(
     sink.put("\" fill-rule=\"nonzero\"/>")
 }
 
+fn unsupported_raster(plan: &ObjectPaintPlan, index: usize) -> SvgExportError {
+    // The sealed mixed plan validates every index when it joins its producers.
+    SvgExportError::Unsupported {
+        source_object_index: plan.raster_sources()[index].source_index,
+        reason: "retained raster paint has no SVG representation",
+    }
+}
+
+/// T12: a decoded video frame is a bitmap; SVG export refuses it like a raster.
+fn unsupported_video(plan: &ObjectPaintPlan, index: usize) -> SvgExportError {
+    SvgExportError::UnsupportedComponent {
+        source_layer_index: plan.video_slots()[index].layer_index,
+        reason: "video paint has no SVG representation",
+    }
+}
+
 fn emit_frame(
     plan: &ObjectPaintPlan,
     spec: &SvgFrameSpec,
     sink: &mut Sink,
 ) -> Result<usize, SvgExportError> {
-    sink.put(&document_head(spec.width, spec.height))?;
-    let mut count = 0;
-    for command in plan.commands() {
-        if count > 0 {
-            sink.put("\n")?;
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    if let Some(source_object_index) = plan.first_brush_source() {
+        return Err(SvgExportError::Unsupported {
+            source_object_index,
+            reason: "retained bitmap brush paint has no SVG representation",
+        });
+    }
+    // Unsupported mixed content must refuse the whole frame before even the
+    // document header is counted, never disappear behind a successful subset.
+    if let Some(index) = ordered_entries(plan).find_map(|entry| match entry {
+        PaintEntry::Raster(index) => Some(index),
+        _ => None,
+    }) {
+        return Err(unsupported_raster(plan, index));
+    }
+    // Refuse an unsupported component paint before counting/writing ANY header,
+    // matching the existing all-or-nothing mixed raster policy.
+    for entry in ordered_entries(plan) {
+        if let PaintEntry::Video(index) = entry {
+            return Err(unsupported_video(plan, index));
         }
-        emit_command(sink, command.source().source_object_index(), command)?;
-        count += 1;
+        if let PaintEntry::Duplicator(copy) = entry {
+            if copy.svg_contour.is_none() || copy.svg_rgba.is_none() {
+                return Err(SvgExportError::Unsupported {
+                    source_object_index: copy.source_index,
+                    reason: "duplicator style has no admitted SVG representation",
+                });
+            }
+        }
+        if let PaintEntry::Component(component) = entry {
+            if component.contour.is_none() || component.svg_rgba.is_none() {
+                return Err(SvgExportError::UnsupportedComponent {
+                    source_layer_index: component.host_layer_index,
+                    reason: "component style has no admitted SVG representation",
+                });
+            }
+        }
+    }
+    if let Some(mask) = plan
+        .mask_inputs()
+        .layers()
+        .iter()
+        .flat_map(|layer| layer.masks())
+        .next()
+    {
+        return Err(SvgExportError::Unsupported {
+            source_object_index: mask.source_object_index(),
+            reason: "native vector masks have no SVG representation",
+        });
+    }
+    let head = document_head(spec.width, spec.height);
+    let head = if sink.camera.is_some() {
+        head.replacen(" viewBox=", " overflow=\"hidden\" viewBox=", 1)
+    } else {
+        head
+    };
+    sink.put(&head)?;
+    if let Some(camera) = sink.camera {
+        camera::begin(sink, camera)?;
+    }
+    let mut count = 0;
+    for entry in ordered_entries(plan) {
+        match entry {
+            PaintEntry::Contour(command) => {
+                if count > 0 {
+                    sink.put("\n")?;
+                }
+                emit_command(sink, command.source().source_object_index(), command)?;
+                count += 1;
+            }
+            PaintEntry::Text(text) => {
+                for (contour, rgba8) in text.item.painted() {
+                    if count > 0 {
+                        sink.put("\n")?;
+                    }
+                    // The shared provider already applies glyph/layer opacity
+                    // and rounds the straight color to RGBA8 for native paint.
+                    let rgba = rgba8.map(|channel| f64::from(channel) / 255.0);
+                    emit_contour(sink, text.source_index, &contour.contour, rgba)?;
+                    count += 1;
+                }
+            }
+            PaintEntry::Component(component) => {
+                let refusal = SvgExportError::UnsupportedComponent {
+                    source_layer_index: component.host_layer_index,
+                    reason: "component style has no admitted SVG representation",
+                };
+                let contour = component.contour.as_ref().ok_or(refusal)?;
+                let rgba = component.svg_rgba.ok_or(refusal)?;
+                if count > 0 {
+                    sink.put("\n")?;
+                }
+                emit_contour_with_error(sink, contour, rgba, refusal)?;
+                count += 1;
+            }
+            PaintEntry::Duplicator(copy) => {
+                let refusal = SvgExportError::Unsupported {
+                    source_object_index: copy.source_index,
+                    reason: "duplicator style has no admitted SVG representation",
+                };
+                let contour = copy.svg_contour.as_ref().ok_or(refusal)?;
+                let rgba = copy.svg_rgba.ok_or(refusal)?;
+                if count > 0 {
+                    sink.put("\n")?;
+                }
+                emit_contour_with_error(sink, contour, rgba, refusal)?;
+                count += 1;
+            }
+            PaintEntry::Raster(index) => return Err(unsupported_raster(plan, index)),
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            PaintEntry::Brush(_) => {
+                return Err(SvgExportError::Unsupported {
+                    source_object_index: plan.first_brush_source().expect("admitted brush paint"),
+                    reason: "retained bitmap brush paint has no SVG representation",
+                })
+            }
+            PaintEntry::Video(index) => return Err(unsupported_video(plan, index)),
+        }
+    }
+    if sink.camera.is_some() {
+        sink.put("\n</g>")?;
     }
     sink.put(DOCUMENT_TAIL)?;
     Ok(count)
@@ -302,6 +473,7 @@ pub(crate) fn measure_svg_frame(
         cap: spec.max_bytes,
         len: 0,
         out: None,
+        camera: camera::for_plan(plan)?,
     };
     emit_frame(plan, &spec, &mut sink)?;
     Ok(sink.len)
@@ -316,6 +488,7 @@ pub(crate) fn serialize_svg_frame(
         cap: spec.max_bytes,
         len: 0,
         out: Some(Vec::with_capacity(exact)),
+        camera: camera::for_plan(plan)?,
     };
     let path_count = emit_frame(plan, &spec, &mut sink)?;
     debug_assert_eq!(sink.len, exact);
@@ -346,7 +519,7 @@ mod fixture;
 mod oracle;
 #[cfg(test)]
 #[path = "../tests/native_vector_export_svg_reader.rs"]
-mod reader;
+pub(crate) mod reader;
 #[cfg(test)]
 #[path = "../tests/native_vector_export_svg.rs"]
 mod tests;

@@ -1,4 +1,4 @@
-//! Private main-window object PNG route; no SDK/MCP capability activation.
+//! Private main-window object PNG/SVG route; no SDK/MCP capability activation.
 use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::{
     bounded_id, host_error, reconcile_export, require_api_instance, require_main, HostResult,
@@ -33,6 +33,14 @@ const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 const MAX_PNG_BYTES: usize = 4 * 1024 * 1024;
 const OUTPUT_HANDLE: &str = "object-output";
 
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum ObjectExportFormat {
+    #[default]
+    Png,
+    Svg,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ObjectExportRequest {
@@ -52,6 +60,8 @@ struct ObjectExportRequest {
     viewport: ViewportInput,
     destination_directory: String,
     maximum_encoded_bytes: usize,
+    #[serde(default)]
+    format: ObjectExportFormat,
     #[serde(default)]
     cancelled_before_dispatch: bool,
 }
@@ -79,7 +89,7 @@ struct AdmittedExport {
     mapping: ViewportMapping,
 }
 
-/// The destination is a new directory containing the exact PNG manifest.
+/// The destination is a new directory containing the exact ordinal frame manifest.
 fn admit_request(
     raw: &str,
     instance: &str,
@@ -231,13 +241,32 @@ struct ObjectExportConsumer<'a> {
     request_id: String,
     output: OutputSpec,
     maximum_encoded_bytes: usize,
+    format: ObjectExportFormat,
     destination: PathBuf,
     staging_root: PathBuf,
 }
 impl ObjectExportConsumer<'_> {
     fn run(self, compositor: &mut Compositor) -> Result<ObjectHostExportOutcome, String> {
-        let mut port =
-            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination);
+        let mut port = if self.format == ObjectExportFormat::Svg {
+            LazyDesktopArtifactPort::new_svg(
+                self.staging_root,
+                OUTPUT_HANDLE.into(),
+                self.destination,
+            )
+        } else {
+            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination)
+        };
+        if self.format == ObjectExportFormat::Svg {
+            return self.owner.export_pinned_object_svg_frames(
+                &self.selector,
+                &self.frames,
+                self.request_id,
+                OUTPUT_HANDLE.into(),
+                self.output,
+                self.maximum_encoded_bytes,
+                &mut port,
+            );
+        }
         self.owner.export_pinned_object_png_frames(
             &self.selector,
             &self.frames,
@@ -283,6 +312,7 @@ fn export_with_target(
                 request_id: admitted.request.request_id.clone(),
                 output: admitted.output.clone(),
                 maximum_encoded_bytes: admitted.request.maximum_encoded_bytes,
+                format: admitted.request.format,
                 destination: admitted.destination.clone(),
                 staging_root,
             }))
@@ -299,32 +329,66 @@ pub(crate) async fn nemo_native_object_export(
     request_json: String,
 ) -> HostResult<ObjectExportReceipt> {
     require_main(&window)?;
-    let admitted = admit_request(&request_json, state.instance_id(), |path| {
-        window
-            .try_fs_scope()
-            .is_some_and(|scope| scope.is_allowed(path))
-    })?;
+    let admitted =
+        std::sync::Arc::new(admit_request(&request_json, state.instance_id(), |path| {
+            window
+                .try_fs_scope()
+                .is_some_and(|scope| scope.is_allowed(path))
+        })?);
     let staging_root = app
         .path()
         .app_cache_dir()
         .map_err(|_| host_error("unavailable", "native staging root unavailable"))?
         .join("native-export-staging");
-    let app_for_main = app.clone();
-    viewport_host::on_main_thread(&app, move || {
-        let state = app_for_main.state::<ApplicationMcp>();
-        export_with_target(&state, &admitted, staging_root, |consumer| {
-            viewport_host::with_object_target(
-                &app_for_main,
-                &admitted.request.instance_id,
-                admitted.request.lifecycle_generation,
-                admitted.mapping,
-                consumer,
-            )
-        })
-    })
-    .await
+    for attempt in 0..2 {
+        let app_for_main = app.clone();
+        let for_main = std::sync::Arc::clone(&admitted);
+        let staging = staging_root.clone();
+        let (result, completion, diagnostic_ready) =
+            viewport_host::on_main_thread(&app, move || {
+                let state = app_for_main.state::<ApplicationMcp>();
+                let result = export_with_target(&state, &for_main, staging, |consumer| {
+                    viewport_host::with_object_target(
+                        &app_for_main,
+                        &for_main.request.instance_id,
+                        for_main.request.lifecycle_generation,
+                        for_main.mapping,
+                        consumer,
+                    )
+                });
+                // Ordered CPU effect preflight finished before artifact staging.
+                // Native/revision/GPU borrows have returned before this callback.
+                let diagnostic_ready = state
+                    .seal_object_motion_diagnostics()
+                    .map_err(|error| host_error("unavailable", error))?;
+                let completion = state.spawn_object_motion_completion(&app_for_main);
+                Ok((result, completion, diagnostic_ready))
+            })
+            .await?;
+        if result.is_err() && diagnostic_ready == Some(true) && attempt == 0 {
+            continue;
+        }
+        if let Some((receiver, waits_for_prior)) = completion {
+            if waits_for_prior {
+                return result;
+            }
+            let finalized = receiver
+                .await
+                .map_err(|_| host_error("unavailable", "native Motion completion was cancelled"))?
+                .map_err(|error| host_error("unavailable", error))?;
+            if result.is_err() && finalized && attempt == 0 {
+                continue;
+            }
+        }
+        return result;
+    }
+    unreachable!("bounded cached fallback retry")
 }
 
 #[cfg(test)]
 #[path = "native_object_desktop_export_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_object_svg_desktop_export_tests.rs"]
+mod svg_tests;

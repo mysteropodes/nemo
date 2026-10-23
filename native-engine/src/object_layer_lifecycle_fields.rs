@@ -18,7 +18,7 @@ pub(crate) fn plan_rename(
     if document.layers[index].name.value().map(String::as_str) == Some(name) {
         return Ok(LifecyclePlan::unchanged(document, None));
     }
-    consult(policy, LayerOp::Rename, &document.layers[index])?;
+    consult(document, policy, LayerOp::Rename, &document.layers[index])?;
     let mut candidate = document.clone();
     candidate.layers[index].name = Presence::Present(name.to_string());
     Ok(LifecyclePlan {
@@ -66,7 +66,7 @@ pub(crate) fn plan_recolor(
         return Ok(LifecyclePlan::unchanged(document, None));
     }
     for &index in &targets {
-        consult(policy, LayerOp::Recolor, &document.layers[index])?;
+        consult(document, policy, LayerOp::Recolor, &document.layers[index])?;
     }
     let mut candidate = document.clone();
     for &index in &targets {

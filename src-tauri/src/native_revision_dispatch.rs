@@ -10,6 +10,18 @@ impl RevisionSync {
         external: bool,
         object_client: bool,
     ) -> Result<Delivery, String> {
+        if is_import_batch_sources(&request) {
+            return self
+                .dispatch_import_batch_step(
+                    instance,
+                    native,
+                    request,
+                    external,
+                    object_client,
+                    ImportBatchPhase::Probe,
+                )?
+                .ok_or_else(|| "import batch sources require async application dispatch".into());
+        }
         self.dispatch_font_step(
             instance,
             native,
@@ -28,6 +40,39 @@ impl RevisionSync {
         external: bool,
         object_client: bool,
         font_phase: FontPhase<'_>,
+    ) -> Result<Option<Delivery>, String> {
+        let phase = if request.operation == crate::application_mcp::font_source::IMPORT {
+            ResourcePhase::Font(font_phase)
+        } else {
+            ResourcePhase::Regular
+        };
+        self.dispatch_resource_step(instance, native, request, external, object_client, phase)
+    }
+    pub(super) fn dispatch_image_step(
+        &self,
+        instance: &str,
+        native: &NativeState,
+        request: NativeApplicationRequest,
+        external: bool,
+        phase: ImagePhase<'_>,
+    ) -> Result<Option<Delivery>, String> {
+        self.dispatch_resource_step(
+            instance,
+            native,
+            request,
+            external,
+            false,
+            ResourcePhase::Image(phase),
+        )
+    }
+    pub(super) fn dispatch_resource_step(
+        &self,
+        instance: &str,
+        native: &NativeState,
+        request: NativeApplicationRequest,
+        external: bool,
+        object_client: bool,
+        resource_phase: ResourcePhase<'_>,
     ) -> Result<Option<Delivery>, String> {
         let mut authority = native
             .lock()
@@ -52,7 +97,9 @@ impl RevisionSync {
             }
         };
         let application = authority.active_mut(generation)?;
-        if request.operation == crate::application_mcp::font_source::IMPORT
+        if (request.operation == crate::application_mcp::font_source::IMPORT
+            || is_image_import(&request)
+            || is_import_batch_sources(&request))
             && request
                 .payload
                 .get("lifecycleGeneration")
@@ -64,7 +111,13 @@ impl RevisionSync {
                     &request,
                     instance,
                     application.content_revision(),
-                    "native font lifecycle generation is stale",
+                    if is_import_batch_sources(&request) {
+                        "native import batch lifecycle generation is stale"
+                    } else if is_image_import(&request) {
+                        "native image lifecycle generation is stale"
+                    } else {
+                        "native font lifecycle generation is stale"
+                    },
                     false,
                 ),
                 notification: None,
@@ -118,6 +171,33 @@ impl RevisionSync {
                     retained), notification: None }));
                 }
             }
+            if !request.cancelled_before_dispatch
+                && state.motion_reservation.as_ref().is_some_and(|reserved| {
+                    reserved.matches_owner(
+                        generation,
+                        application.instance_id(),
+                        application.document_id(),
+                        before,
+                    )
+                })
+            {
+                let retained = state
+                    .motion_reservation
+                    .as_ref()
+                    .is_some_and(|reserved| reserved.retains_request(&request.request_id));
+                if retained {
+                    let response = invoke_dispatch(application, &request)?;
+                    if !response.ok {
+                        return Ok(Some(Delivery {
+                            response,
+                            notification: None,
+                        }));
+                    }
+                }
+                return Ok(Some(Delivery { response: unavailable(&request, instance, before,
+                    "native retained Motion effects await trusted completion; command was not dispatched",
+                    retained), notification: None }));
+            }
             if external && state.subscriber.is_none() && !request.cancelled_before_dispatch {
                 return Ok(Some(Delivery {
                     response: unavailable(
@@ -131,13 +211,22 @@ impl RevisionSync {
                 }));
             }
         }
-        let response = if request.operation == crate::application_mcp::font_source::IMPORT {
-            match invoke_font(application, &request, font_phase)? {
+        let response = match resource_phase {
+            ResourcePhase::Font(phase) => match invoke_font(application, &request, phase)? {
                 Some(response) => response,
                 None => return Ok(None),
+            },
+            ResourcePhase::Image(phase) => match invoke_image(application, &request, phase)? {
+                Some(response) => response,
+                None => return Ok(None),
+            },
+            ResourcePhase::ImportBatch(phase) => {
+                match invoke_import_batch(application, &request, phase)? {
+                    Some(response) => response,
+                    None => return Ok(None),
+                }
             }
-        } else {
-            invoke_dispatch(application, &request)?
+            ResourcePhase::Regular => invoke_dispatch(application, &request)?,
         };
         let after = application.content_revision();
         let notification = if external && response.ok && after > before {
@@ -149,14 +238,7 @@ impl RevisionSync {
                 to_revision: after,
                 request_id: request.request_id,
             };
-            let (sender, receiver) = oneshot::channel();
-            state.pending = Some(PendingRevision {
-                event: event.clone(),
-                sender: Some(sender),
-                acknowledged: false,
-                failed: false,
-            });
-            Some((event, receiver))
+            Some(state.begin_event(event))
         } else {
             None
         };
@@ -277,3 +359,43 @@ mod property_track_tests;
 #[cfg(test)]
 #[path = "native_property_read_dispatch_tests.rs"]
 mod property_read_tests;
+
+#[cfg(test)]
+#[path = "native_property_edit_dispatch_tests.rs"]
+mod property_edit_tests;
+
+#[cfg(test)]
+#[path = "native_property_bake_dispatch_tests.rs"]
+mod property_bake_tests;
+
+#[cfg(test)]
+#[path = "native_image_mesh_binding_public_tests.rs"]
+mod image_mesh_binding_public_tests;
+
+#[cfg(test)]
+#[path = "native_composition_dispatch_tests.rs"]
+mod composition_tests;
+
+#[cfg(test)]
+#[path = "native_shadow_dispatch_tests.rs"]
+mod shadow_tests;
+
+#[cfg(test)]
+#[path = "native_perspective_dispatch_tests.rs"]
+mod perspective_tests;
+
+#[cfg(test)]
+#[path = "native_workspace_dispatch_tests.rs"]
+mod workspace_tests;
+
+#[cfg(test)]
+#[path = "native_custom_brush_dispatch_tests.rs"]
+mod custom_brush_tests;
+
+#[cfg(test)]
+#[path = "native_comments_dispatch_tests.rs"]
+mod comments_tests;
+
+#[cfg(test)]
+#[path = "native_import_batch_dispatch_tests.rs"]
+mod import_batch_tests;

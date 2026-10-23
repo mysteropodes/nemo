@@ -104,6 +104,19 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     ))
     .unwrap();
     assert_eq!(command_schema["$defs"]["nativeFontAssets"], native_fonts);
+    let native_items: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-object-item-v1.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(command_schema["$defs"]["nativeObjectItem"], native_items);
+    let native_brush: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-bitmap-brush-resources-v1.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        command_schema["$defs"]["nativeBitmapBrushResources"],
+        native_brush
+    );
     assert_eq!(command_schema["type"], "object");
     for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
         assert!(
@@ -145,50 +158,8 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     let validator = jsonschema::draft202012::new(&command_schema)
         .expect("advertised command schema compiles with a standard validator");
     property_read_schema::check(|value| validator.is_valid(value));
-    // This exercises the schema emitted by the actual server, including D12's
-    // inline native definitions; no separate test-only schema is substituted.
-    let track = json!({"apiVersion":2,"requestId":"track-schema","instanceId":"instance-a",
-        "documentId":"native-object-document-1","expectedRevision":0,
-        "operation":"command.document.object.property.track.edit","payload":{
-        "command":"object.property.track.edit","selections":[{"target":{"contextId":"scene-root","layerUid":"opaque layer:α"},"property":"opacity","frame":-0.25}],
-        "action":{"kind":"preset","preset":"ease"}}});
-    for action in [
-        json!({"kind":"preset","preset":"linear"}),
-        json!({"kind":"preset","preset":"ease"}),
-        json!({"kind":"preset","preset":"easeIn"}),
-        json!({"kind":"preset","preset":"easeOut"}),
-        json!({"kind":"preset","preset":"hold"}),
-        json!({"kind":"subdivide"}),
-        json!({"kind":"influence","side":"in","percent":-1000.5}),
-        json!({"kind":"influence","side":"out","percent":1000.5}),
-    ] {
-        let mut r = track.clone();
-        r["payload"]["action"] = action;
-        assert!(validator.is_valid(&r), "advertised D12 accepts {r}");
-    }
-    let mut duplicate = track.clone();
-    let selection = duplicate["payload"]["selections"][0].clone();
-    duplicate["payload"]["selections"] = json!([selection.clone(), selection]);
-    assert!(
-        validator.is_valid(&duplicate),
-        "native owner rejects semantic duplicate selections"
-    );
-    let mut missing = track.clone();
-    missing.as_object_mut().unwrap().remove("expectedRevision");
-    assert!(!validator.is_valid(&missing));
-    for pointer in [
-        "/payload",
-        "/payload/selections/0",
-        "/payload/selections/0/target",
-        "/payload/action",
-    ] {
-        let mut bad = track.clone();
-        bad.pointer_mut(pointer).unwrap()["extra"] = json!(true);
-        assert!(!validator.is_valid(&bad), "closed advertised D12 {pointer}");
-    }
-    let mut bad = track.clone();
-    bad["payload"]["action"] = json!({"kind":"subdivide","preset":"linear"});
-    assert!(!validator.is_valid(&bad));
+    property_edit_schema::check(|value| validator.is_valid(value));
+    property_edit_schema::check_track(|value| validator.is_valid(value));
     let metadata_query = json!({
         "apiVersion": 2, "requestId": "metadata-page-0", "instanceId": "instance-a",
         "documentId": "native-object-document-1",
@@ -400,7 +371,9 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         object["operations"],
         json!([
             "query.document.object",
-            "command.document.object.layer.visibility.set"
+            "command.document.object.layer.visibility.set",
+            "command.document.object.undo",
+            "command.document.object.redo"
         ])
     );
     let visibility = json!({
@@ -498,3 +471,6 @@ mod property_read_schema;
 
 #[path = "support/native_layer_policy_schema.rs"]
 mod native_layer_policy_schema;
+
+#[path = "support/native_property_edit_schema.rs"]
+mod property_edit_schema;

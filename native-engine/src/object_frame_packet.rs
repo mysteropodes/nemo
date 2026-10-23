@@ -1,11 +1,40 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
-use crate::object_document::{AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord};
+use crate::evaluation::object_vector_kernels::render_vector_eval::holders_fully_consumed;
+pub(crate) use crate::object_document::{
+    AuthoredOrder, BitmapBrushFields, FrameScopeKind, ObjectLayer, ObjectRecord, ObjectTarget,
+    Presence, PropertyHolderTarget, SolidFill, VECTOR_FAMILY,
+};
 use crate::revision::ObjectSnapshot;
-use std::collections::HashMap;
+pub(crate) use property_sampling::frame_motion::MotionValues;
+#[path = "object_expression_holder_source.rs"]
+pub(crate) mod expression_sources;
+#[path = "object_frame_motion_receipts.rs"]
+pub(crate) mod motion_receipts;
+#[path = "object_frame_projection.rs"]
+pub(crate) mod projection;
+#[path = "object_frame_text_selectors.rs"]
+mod text_selectors;
+
+#[path = "object_frame_context.rs"]
+mod context;
+#[path = "object_duplicator_snapshot_sources.rs"]
+pub(crate) mod duplicator_sources;
+#[path = "object_duplicator_frame.rs"]
+pub(crate) mod duplicators;
+#[path = "object_frame_sources.rs"]
+mod sources;
+use context::FrameContext;
+#[path = "object_frame_prepare.rs"]
+mod prepare;
+use prepare::prepare_frame_with_order;
 
 #[path = "object_order_evaluation.rs"]
 mod order;
+#[path = "object_text_frame.rs"]
+pub(crate) mod text;
+#[path = "object_frame_video.rs"]
+pub(crate) mod video;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
 #[path = "object_property_sampling.rs"]
 mod property_sampling;
@@ -87,7 +116,16 @@ pub(crate) fn raw_expression_order<'a>(
                     && target.layer_uid() == layer_uid
                     && target.stroke_id() == stroke_id
             });
-            if !matching_record {
+            let matching_item = document.item_records().is_some_and(|items| {
+                items.targets().any(|target| {
+                    target.context_id() == context_id
+                        && target.scope_kind() == scope_kind
+                        && target.frame() == source_frame
+                        && target.layer_uid() == layer_uid
+                        && target.stroke_id() == stroke_id
+                })
+            });
+            if !matching_record && !matching_item {
                 return Err(ObjectFrameError::InvalidSource);
             }
             context
@@ -140,18 +178,79 @@ struct ObjectFrameIndices {
 }
 
 /// No mutable fields, renderer resources, jobs or publication identities.
+#[derive(Debug, Clone, Copy)]
+struct ObjectFrameRasterIndex {
+    layer: usize,
+    entry: usize,
+}
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ObjectFrameRasterRecord<'a> {
+    layer: usize,
+    global_index: usize,
+    entry: &'a crate::object_document::RasterEntry,
+}
+impl<'a> ObjectFrameRasterRecord<'a> {
+    pub(crate) fn layer_index(&self) -> usize {
+        self.layer
+    }
+    pub(crate) fn source_index(&self) -> usize {
+        self.global_index
+    }
+    pub(crate) fn entry(&self) -> &'a crate::object_document::RasterEntry {
+        self.entry
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ObjectFramePacket {
     snapshot: ObjectSnapshot,
     context_id: String,
+    context: FrameContext,
     scope_kind: FrameScopeKind,
     frame: u32,
     records: Vec<ObjectFrameIndices>,
+    raster_records: Vec<ObjectFrameRasterIndex>,
+    text_records: Vec<text::TextIndex>,
+    video_records: Vec<video::VideoIndex>,
+    duplicators: Vec<duplicators::LayerCopies>,
     source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
+    motion_receipts: Vec<motion_receipts::MotionReceipt>,
+    selector_receipts: Vec<text_selectors::SelectorReceipt>,
 }
 
 impl ObjectFramePacket {
+    pub(crate) fn raster_records(
+        &self,
+    ) -> impl ExactSizeIterator<Item = ObjectFrameRasterRecord<'_>> + '_ {
+        let entries = self
+            .snapshot
+            .document()
+            .item_records()
+            .map(|items| items.raster_entries())
+            .unwrap_or(&[]);
+        let offset = self.source_objects().len();
+        self.raster_records
+            .iter()
+            .map(move |index| ObjectFrameRasterRecord {
+                layer: index.layer,
+                global_index: offset + index.entry,
+                entry: &entries[index.entry],
+            })
+    }
+    pub(crate) fn selected_source_indices(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.records()
+            .map(|record| (record.source_object_index(), record.source_layer_index()))
+            .chain(
+                self.raster_records()
+                    .map(|record| (record.source_index(), record.layer_index())),
+            )
+            .chain(
+                self.text_records()
+                    .map(|record| (record.source_index(), record.layer_index())),
+            )
+    }
+
     /// Read-side consumers borrow the same retained source that passed selection.
     pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
         &self.snapshot
@@ -188,6 +287,27 @@ impl ObjectFramePacket {
     pub fn frame(&self) -> u32 {
         self.frame
     }
+    /// Same stored camera provider for trusted export and locked-view consumers.
+    pub(crate) fn stored_camera_matrix(&self) -> Result<Option<[f64; 6]>, ObjectFrameError> {
+        self.snapshot
+            .sampled_camera_matrix(f64::from(self.frame))
+            .map_err(|_| ObjectFrameError::Unavailable)
+    }
+    /// Raw layer opacity at evaluation time, never the held drawing's source frame.
+    /// Packet admission has already refused unconsumed holders and enabled expressions.
+    pub(crate) fn layer_opacity(&self, index: usize) -> Result<f64, ObjectFrameError> {
+        let layer = self
+            .source_layers()
+            .get(index)
+            .ok_or(ObjectFrameError::InvalidSource)?;
+        let target = PropertyHolderTarget {
+            context_id: self.context_id.clone(),
+            layer_uid: layer.layer_uid().to_owned(),
+            stroke_id: Presence::Missing,
+        };
+        let values = self.sampled_motion_values(&target)?;
+        Ok((values.opacity / 100.0).max(0.0))
+    }
     /// Selected authored source for this layer; packet.frame() remains evaluation time.
     /// An unexposed layer (or invalid index) has no selected source.
     pub fn source_frame_for_layer(&self, index: usize) -> Option<u32> {
@@ -195,7 +315,10 @@ impl ObjectFramePacket {
     }
     /// Original layer table, including layers with no matching records.
     pub fn source_layers(&self) -> &[ObjectLayer] {
-        self.snapshot.document().layers()
+        self.context.layers(self.snapshot.document())
+    }
+    fn source_objects(&self) -> &[ObjectRecord] {
+        self.context.objects(self.snapshot.document())
     }
     /// Borrow one selected provenance position in constant time, not paint rank.
     pub(crate) fn record_at(&self, index: usize) -> Option<ObjectFrameRecord<'_>> {
@@ -203,11 +326,7 @@ impl ObjectFramePacket {
         Some(ObjectFrameRecord {
             source_layer_index: indices.source_layer_index,
             source_object_index: indices.source_object_index,
-            record: self
-                .snapshot
-                .document()
-                .objects()
-                .get(indices.source_object_index)?,
+            record: self.source_objects().get(indices.source_object_index)?,
         })
     }
     /// Source encounter order conveys provenance, never a paint-order promise.
@@ -216,9 +335,20 @@ impl ObjectFramePacket {
             source_layer_index: indices.source_layer_index,
             source_object_index: indices.source_object_index,
             // Private indices were selected from this same immutable document.
-            record: &self.snapshot.document().objects()[indices.source_object_index],
+            record: &self.source_objects()[indices.source_object_index],
         })
     }
+}
+
+/// Reuse the scoped order producer with a caller-validated source selection.
+/// Placed symbols intentionally select timing without entered-layer range gates.
+pub(crate) fn prepare_scoped_order_from_sources(
+    snapshot: &ObjectSnapshot,
+    context_id: &str,
+    frame: u32,
+    sources: &[Option<u32>],
+) -> Result<NumericOrderPlan, ObjectFrameError> {
+    order::prepare_context(snapshot, context_id, frame, sources, true)
 }
 
 /// Explicit exact-scoped native query, not a temporal desktop fallback.
@@ -227,7 +357,7 @@ pub fn prepare_object_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    prepare_frame_with_order(snapshot, selector, false, order::prepare)
+    prepare_frame_with_order(snapshot, selector, false, order::prepare_context, None)
 }
 
 /// Desktop drawing exposure requires explicit timing for every admitted layer.
@@ -236,7 +366,7 @@ pub fn prepare_object_exposure_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    prepare_frame_with_order(snapshot, selector, true, order::prepare)
+    prepare_frame_with_order(snapshot, selector, true, order::prepare_context, None)
 }
 
 /// Explicit exact-scoped resolver; its authored source equals the selector frame.
@@ -253,11 +383,17 @@ where
         snapshot,
         selector,
         false,
-        |snapshot, frame, sources, exposure| {
-            order::prepare_with_resolver(snapshot, frame, sources, exposure, |_, layer, stroke| {
-                resolver(layer, stroke)
-            })
+        |snapshot, context_id, frame, sources, exposure| {
+            order::prepare_context_with_resolver(
+                snapshot,
+                context_id,
+                frame,
+                sources,
+                exposure,
+                |_, layer, stroke| resolver(layer, stroke),
+            )
         },
+        None,
     )
 }
 
@@ -275,117 +411,30 @@ where
         snapshot,
         selector,
         true,
-        |snapshot, frame, sources, exposure| {
-            order::prepare_with_resolver(snapshot, frame, sources, exposure, resolver)
+        |snapshot, context_id, frame, sources, exposure| {
+            order::prepare_context_with_resolver(
+                snapshot, context_id, frame, sources, exposure, resolver,
+            )
         },
+        None,
     )
-}
-
-fn prepare_frame_with_order<E, F>(
-    snapshot: &ObjectSnapshot,
-    selector: &ObjectFrameSelector<'_>,
-    exposure: bool,
-    prepare_order: F,
-) -> Result<ObjectFramePacket, E>
-where
-    E: From<ObjectFrameError>,
-    F: FnOnce(&ObjectSnapshot, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
-{
-    if selector.instance_id != snapshot.instance_id() {
-        return Err(ObjectFrameError::WrongInstance.into());
-    }
-    if selector.document_id != snapshot.document_id() {
-        return Err(ObjectFrameError::WrongDocument.into());
-    }
-    if selector.content_revision != snapshot.content_revision() {
-        return Err(ObjectFrameError::WrongRevision.into());
-    }
-    if selector.document_snapshot_id != snapshot.snapshot_id() {
-        return Err(ObjectFrameError::WrongSnapshot.into());
-    }
-    let v2 = snapshot.document().format_version() == 2;
-    if (exposure || v2)
-        && (selector.context_id != "scene-root" || selector.scope_kind != FrameScopeKind::Authored)
-    {
-        return Err(ObjectFrameError::Unavailable.into());
-    }
-    if selector.context_id != "scene-root" {
-        return Err(ObjectFrameError::InvalidContext.into());
-    }
-    let document = snapshot.document();
-    if selector.frame >= document.total_frames() {
-        return Err(ObjectFrameError::FrameOutOfRange.into());
-    }
-    // The typed holder table is admitted for persistence and native reads.
-    // Until its sampled values reach this producer, never paint unmodified
-    // geometry while silently ignoring authored Motion properties.
-    if document
-        .property_holders()
-        .is_some_and(|holders| !holders.is_empty())
-    {
-        return Err(ObjectFrameError::Unavailable.into());
-    }
-    let source_frames: Vec<_> = document
-        .layers()
-        .iter()
-        .map(|layer| {
-            if exposure {
-                layer
-                    .timing
-                    .value()
-                    .map(|timing| timing.exposure(selector.frame).1)
-                    .ok_or(ObjectFrameError::Unavailable)
-            } else {
-                Ok(Some(selector.frame))
-            }
-        })
-        .collect::<Result<_, _>>()?;
-    let numeric_order = if v2 {
-        Some(prepare_order(
-            snapshot,
-            selector.frame,
-            &source_frames,
-            exposure,
-        )?)
-    } else {
-        None
-    };
-    let layers: HashMap<_, _> = document
-        .layers()
-        .iter()
-        .enumerate()
-        .map(|(index, layer)| (layer.layer_uid(), index))
-        .collect();
-    let mut records = Vec::new();
-    for (source_object_index, record) in document.objects().iter().enumerate() {
-        let target = record.target();
-        if target.context_id() == selector.context_id && target.scope_kind() == &selector.scope_kind
-        {
-            let source_layer_index = *layers
-                .get(target.layer_uid())
-                .ok_or(ObjectFrameError::InvalidSource)?;
-            if source_frames[source_layer_index] != Some(target.frame())
-                || !document.layers()[source_layer_index].visible()
-            {
-                continue;
-            }
-            records.push(ObjectFrameIndices {
-                source_layer_index,
-                source_object_index,
-            });
-        }
-    }
-    Ok(ObjectFramePacket {
-        snapshot: snapshot.clone(),
-        context_id: selector.context_id.to_owned(),
-        scope_kind: selector.scope_kind.clone(),
-        frame: selector.frame,
-        records,
-        source_frames,
-        numeric_order,
-    })
 }
 
 #[cfg(all(test, feature = "codec"))]
 #[path = "../tests/object_exposure.rs"]
 mod exposure_tests;
+#[cfg(test)]
+#[path = "../tests/render_vector_eval_guard.rs"]
+mod render_vector_eval_guard;
+
+#[cfg(all(test, feature = "history", feature = "compositor"))]
+#[path = "../tests/object_layer_opacity_scene.rs"]
+mod layer_opacity_tests;
+
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+#[path = "../tests/object_layer_opacity_raster.rs"]
+mod layer_opacity_raster_tests;
+
+#[cfg(all(test, feature = "codec"))]
+#[path = "../tests/object_context_frame_packet.rs"]
+mod context_frame_tests;

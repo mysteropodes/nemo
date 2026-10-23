@@ -8,6 +8,7 @@
 //!   the empty string; the owner allocates `native-stroke:{next revision}:{n}` and the caller cannot choose it.
 //! - `object.vector.replace`: `record` replaces the record with the same full target, in place.
 //! - `object.vector.delete`: `stableTarget` names the record to remove.
+//! - `object.vector.mask.edit`: `stableTarget` and `maskEdit` change only original Path mask tags.
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
     object_deserialize, FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, Presence,
@@ -19,8 +20,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
+#[path = "object_mask_edit.rs"]
+mod mask_edit;
 #[path = "object_vector_edit_order.rs"]
 pub(crate) mod order;
+use crate::object_document::object_group_kernels::object_fill_trace_ops::regenerate::regenerate;
 use order::OrderEditError;
 
 /// Operation-specific bound on the FULL serialized request envelope of the vector edit operation only
@@ -33,11 +37,13 @@ struct VectorPayload {
     command: String,
     record: Presence<ObjectRecord>,
     stable_target: Presence<ObjectTarget>,
+    mask_edit: Presence<mask_edit::MaskEdit>,
 }
 object_deserialize!(VectorPayload {
     command: String,
     #[serde(default)] record: Presence<ObjectRecord>,
-    #[serde(default)] stable_target: Presence<ObjectTarget>
+    #[serde(default)] stable_target: Presence<ObjectTarget>,
+    #[serde(default)] mask_edit: Presence<mask_edit::MaskEdit>
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +51,7 @@ pub(crate) enum VectorEditKind {
     Create,
     Replace,
     Delete,
+    Mask,
 }
 impl VectorEditKind {
     fn label(self) -> &'static str {
@@ -52,6 +59,7 @@ impl VectorEditKind {
             Self::Create => "create",
             Self::Replace => "replace",
             Self::Delete => "delete",
+            Self::Mask => "mask.edit",
         }
     }
 }
@@ -107,7 +115,10 @@ fn order_code(error: OrderEditError) -> DispatchErrorCode {
 }
 
 /// Vector drawing edits require an authored target; reference records remain readable storage.
-fn check_target(document: &ObjectDocument, target: &ObjectTarget) -> Result<(), DispatchErrorCode> {
+pub(super) fn check_target(
+    document: &ObjectDocument,
+    target: &ObjectTarget,
+) -> Result<(), DispatchErrorCode> {
     if !document.valid_target(target) || target.frame() >= document.total_frames() {
         return Err(DispatchErrorCode::InvalidRequest);
     }
@@ -118,8 +129,10 @@ fn check_target(document: &ObjectDocument, target: &ObjectTarget) -> Result<(), 
 }
 
 /// Reuse the persisted F06 flag for Drawing edits only. Shy and visibility do not lock content,
-/// and this helper never participates in generic Motion property/track preparation.
-fn check_drawing_layer(
+/// and this helper never participates in generic Motion property/track preparation. A layer whose
+/// ordered path-effect stack has an active entry is refused too (baseline `editRefusalReason`): the
+/// geometry on screen is the deformed one, so a drawing edit there would be written over the original.
+pub(super) fn check_drawing_layer(
     document: &ObjectDocument,
     target: &ObjectTarget,
 ) -> Result<(), DispatchErrorCode> {
@@ -128,13 +141,16 @@ fn check_drawing_layer(
         .iter()
         .find(|layer| layer.layer_uid() == target.layer_uid())
         .ok_or(DispatchErrorCode::NotFound)?;
-    if layer.locked() {
+    if document.layer_is_locked(layer.layer_uid()) {
+        return Err(DispatchErrorCode::Unavailable);
+    }
+    if crate::commands::object_fill_owner::path_effects_edit::layer_has_active_path_fx(layer) {
         return Err(DispatchErrorCode::Unavailable);
     }
     Ok(())
 }
 
-fn is_vector_record(record: &ObjectRecord) -> bool {
+pub(super) fn is_vector_record(record: &ObjectRecord) -> bool {
     record.schema_version == 1 && record.family == VECTOR_FAMILY
 }
 
@@ -202,7 +218,7 @@ fn same_integer_float(integer: &serde_json::Number, float: f64) -> bool {
 
 /// Exact integers retain their precision; 10 and 10.0 compare equal, but 0 and -0.0 do not.
 /// Every other member compares structurally, extension members included.
-fn same_value(before: &Value, after: &Value) -> bool {
+pub(super) fn same_value(before: &Value, after: &Value) -> bool {
     match (before, after) {
         (Value::Number(x), Value::Number(y)) => {
             if let (Some(x), Some(y)) = (x.as_u64(), y.as_u64()) {
@@ -229,7 +245,7 @@ fn same_value(before: &Value, after: &Value) -> bool {
         _ => before == after,
     }
 }
-fn same_record(before: &ObjectRecord, after: &ObjectRecord) -> bool {
+pub(super) fn same_record(before: &ObjectRecord, after: &ObjectRecord) -> bool {
     match (serde_json::to_value(before), serde_json::to_value(after)) {
         (Ok(before), Ok(after)) => same_value(&before, &after),
         _ => false,
@@ -328,22 +344,60 @@ impl ObjectFillOwner {
         let payload: VectorPayload =
             serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
         let origin = self.current_snapshot();
-        let edit = match (
+        let target = payload
+            .record
+            .value()
+            .map(|r| r.target.clone())
+            .or_else(|| payload.stable_target.value().cloned());
+        let mut edit = match (
             payload.command.as_str(),
             payload.record,
             payload.stable_target,
+            payload.mask_edit,
         ) {
-            ("object.vector.create", Presence::Present(record), Presence::Missing) => {
-                create(&origin, record)?
-            }
-            ("object.vector.replace", Presence::Present(record), Presence::Missing) => {
-                replace(&origin, record)?
-            }
-            ("object.vector.delete", Presence::Missing, Presence::Present(target)) => {
-                delete(&origin, target)?
-            }
+            (
+                "object.vector.create",
+                Presence::Present(record),
+                Presence::Missing,
+                Presence::Missing,
+            ) => create(&origin, record)?,
+            (
+                "object.vector.replace",
+                Presence::Present(record),
+                Presence::Missing,
+                Presence::Missing,
+            ) => replace(&origin, record)?,
+            (
+                "object.vector.delete",
+                Presence::Missing,
+                Presence::Present(target),
+                Presence::Missing,
+            ) => delete(&origin, target)?,
+            (
+                "object.vector.mask.edit",
+                Presence::Missing,
+                Presence::Present(target),
+                Presence::Present(intent),
+            ) => mask_edit::apply(&origin, target, intent)?,
             _ => return Err(DispatchErrorCode::InvalidRequest),
         };
+        // Mask tags do not move source geometry or invalidate fill provenance.
+        if edit.changed && edit.kind != VectorEditKind::Mask {
+            let target = target.ok_or(DispatchErrorCode::InvalidRequest)?;
+            let scope =
+                crate::object_document::object_group_kernels::object_boolean_ops::stack::Scope {
+                    context_id: target.context_id,
+                    layer_uid: target.layer_uid,
+                    frame: target.frame_scope.frame,
+                };
+            edit.document = regenerate(
+                edit.document,
+                &scope,
+                &edit.stroke_id,
+                origin.content_revision(),
+            )
+            .map_err(|error| Self::fill_plan_error(&error))?;
+        }
         ObjectSnapshot::validate_drawing(&edit.document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedVectorEdit {
