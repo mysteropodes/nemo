@@ -83,6 +83,7 @@ pub(crate) fn piece_holder(
         return None;
     }
     Some(PropertyHolder {
+        mesh_source: Presence::Missing,
         target: PropertyHolderTarget {
             context_id: context_id.to_string(),
             layer_uid: piece_uid.to_string(),

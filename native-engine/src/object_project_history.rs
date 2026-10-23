@@ -295,7 +295,7 @@ impl NativeObjectHistory {
         prepared: PreparedProjectReplacement,
     ) -> Result<(), DispatchErrorCode> {
         self.validate_project_replacement(&prepared)?;
-        self.owner.replace_admitted_snapshot(prepared.next);
+        self.owner.replace_admitted_snapshot(prepared.next)?;
         self.undo.clear();
         self.redo.clear();
         self.receipts = StageReceipts::default();

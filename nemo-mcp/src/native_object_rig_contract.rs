@@ -1,16 +1,16 @@
 //! L03-T closed public contract of the lane-3 native object operations: image mesh edit, widget create / write /
 //! settings, rig edit and rig pose. Pure shape and receipt validation: execution, storage, history and replay stay in
-//! the native owner. The shape table is generated from `tools/spec.js` of the leaf, the same table that generates
-//! `src/js/adapters/native-object-rig-contract.js`, the transport schema defs and the descriptors; the agreement
-//! corpus `tests/native-object-rig-fixtures/public-corpus.json` is run through both validators.
+//! the native owner. The legacy shape table came from the leaf's historical `tools/spec.js`. Binding shapes are
+//! source-derived additions shared with the JS adapter, transport schema and descriptor; the historical generator
+//! is absent. The original agreement corpus remains unchanged and binding agreement is checked separately.
 use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
 use serde_json::{Map, Value};
 use std::sync::OnceLock;
 
 const PREFIX: &str = "command.document.object.";
-/// Generated from tools/spec.js (one operation per line); parsed once, an unparsable table admits nothing.
+/// Legacy generated shapes plus source-derived binding shapes; an unparsable table admits nothing.
 const SPEC: &str = r####"{
-"image.mesh.edit": {"command":"object.image.mesh.edit","result":"command","node":{"t":"obj","req":{"meshId":{"t":"str","min":1,"max":128},"action":{"t":"union","by":"kind","cases":{"setOffset":{"req":{"index":{"t":"int","min":0,"max":4294967295},"du":{"t":"num","abs":1000000000},"dv":{"t":"num","abs":1000000000}}},"resetOffsets":{"req":{}},"setOutline":{"req":{"outline":{"t":"arr","of":{"t":"pair","abs":4},"min":3,"max":512,"perimeter":16}},"opt":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}},"setDensity":{"req":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}}}}}}},
+"image.mesh.edit": {"command":"object.image.mesh.edit","result":"command","node":{"t":"oneOf","cases":[{"t":"obj","req":{"meshId":{"t":"str","min":1,"max":128},"action":{"t":"union","by":"kind","cases":{"setOffset":{"req":{"index":{"t":"int","min":0,"max":4294967295},"du":{"t":"num","abs":1000000000},"dv":{"t":"num","abs":1000000000}}},"resetOffsets":{"req":{}},"setOutline":{"req":{"outline":{"t":"arr","of":{"t":"pair","abs":4},"min":3,"max":512,"perimeter":16}},"opt":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}},"setDensity":{"req":{"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}}}}}},{"t":"obj","req":{"action":{"t":"union","by":"kind","cases":{"attach":{"req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1},"frameScope":{"t":"obj","req":{"kind":{"t":"enum","v":["authored","reference"]},"frame":{"t":"int","min":0,"max":4294967295}}},"layerUid":{"t":"str","min":1},"strokeId":{"t":"str","min":1}}},"mesh":{"t":"obj","req":{"outline":{"t":"arr","of":{"t":"pair"},"min":0},"verts":{"t":"arr","of":{"t":"pair"},"min":0},"tris":{"t":"arr","of":{"t":"int","min":0,"max":4294967295},"min":0}},"opt":{"offsets":{"t":"arr","of":{"t":"pair"},"min":0},"cols":{"t":"int","min":1,"max":64},"rows":{"t":"int","min":1,"max":64}}}}},"detach":{"req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1},"frameScope":{"t":"obj","req":{"kind":{"t":"enum","v":["authored","reference"]},"frame":{"t":"int","min":0,"max":4294967295}}},"layerUid":{"t":"str","min":1},"strokeId":{"t":"str","min":1}}}}},"propagate":{"req":{"target":{"t":"obj","req":{"contextId":{"t":"str","min":1},"frameScope":{"t":"obj","req":{"kind":{"t":"enum","v":["authored","reference"]},"frame":{"t":"int","min":0,"max":4294967295}}},"layerUid":{"t":"str","min":1},"strokeId":{"t":"str","min":1}}},"meshId":{"t":"oneOf","cases":[{"t":"str","min":0},{"t":"null"}]}}},"releaseIfUnused":{"req":{"meshId":{"t":"str","min":0}}},"duplicate":{"req":{"contextId":{"t":"str","min":1},"layerUid":{"t":"str","min":1}}}}}}}]}},
 "widget.create": {"command":"object.widget.create","result":"created","node":{"t":"obj","req":{"kind":{"t":"enum","v":["joystick","slider"]},"name":{"t":"str","min":0},"pos":{"t":"pair","abs":1000000000}}}},
 "widget.write": {"command":"object.widget.write","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1},"frame":{"t":"num"},"to":{"t":"union","by":"kind","cases":{"local":{"req":{"point":{"t":"pair","abs":1000000000}}},"world":{"req":{"point":{"t":"pair","abs":1000000000},"anchor":{"t":"pair","abs":1000000000},"angleDegrees":{"t":"num","abs":1000000000}}},"rest":{"req":{}}}}}}},
 "widget.settings": {"command":"object.widget.settings","result":"command","node":{"t":"obj","req":{"layerUid":{"t":"str","min":1},"set":{"t":"obj","opt":{"pos":{"t":"pair","abs":1000000000},"size":{"t":"pair","abs":1000000000},"x":{"t":"obj","opt":{"min":{"t":"num","abs":1000000000},"max":{"t":"num","abs":1000000000},"rest":{"t":"num","abs":1000000000},"label":{"t":"str","min":0}},"minMembers":1},"y":{"t":"obj","opt":{"min":{"t":"num","abs":1000000000},"max":{"t":"num","abs":1000000000},"rest":{"t":"num","abs":1000000000},"label":{"t":"str","min":0}},"minMembers":1}},"minMembers":1}}}},
@@ -187,6 +187,11 @@ fn check(node: &Value, value: &Value) -> bool {
     match node.get("t").and_then(Value::as_str) {
         Some("obj") => object_ok(node, value, None),
         Some("union") => union_ok(node, value),
+        Some("oneOf") => node
+            .get("cases")
+            .and_then(Value::as_array)
+            .is_some_and(|cases| cases.iter().filter(|case| check(case, value)).count() == 1),
+        Some("null") => value.is_null(),
         Some("str") => str_ok(node, value),
         Some("int") => int_ok(node, value),
         Some("num") => number_ok(node, value),
@@ -221,7 +226,7 @@ fn request_with_table(spec: &Map<String, Value>, operation: &str, payload: &Valu
     body.remove("command");
     entry
         .get("node")
-        .is_some_and(|node| object_ok(node, &Value::Object(body), None))
+        .is_some_and(|node| check(node, &Value::Object(body)))
 }
 
 /// The compact command result; a widget creation additionally names the layer it minted.

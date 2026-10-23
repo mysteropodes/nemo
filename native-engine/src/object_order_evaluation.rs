@@ -4,12 +4,12 @@ use crate::evaluation::object_component_kernels::object_context_resolver::{
     ContextKind, ContextSource,
 };
 use crate::object_document::{
-    AuthoredOrder, FrameScope, FrameScopeKind, OrderContext, OrderCurvePoint,
+    AuthoredOrder, FrameScope, FrameScopeKind, ItemRecords, OrderContext, OrderCurvePoint,
 };
 use crate::object_frame_packet::ObjectFrameError;
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct NumericElementOrder {
@@ -296,7 +296,8 @@ where
     });
     let Some(context) = context else {
         if selected.kind() == ContextKind::Component {
-            return natural_component(&selected, source_frames).map_err(Into::into);
+            return natural_component(&selected, doc.item_records(), source_frames)
+                .map_err(Into::into);
         }
         return Err(ObjectFrameError::Unavailable.into());
     };
@@ -402,6 +403,7 @@ fn natural_component(
     context: &crate::evaluation::object_component_kernels::object_context_resolver::ResolvedContext<
         '_,
     >,
+    items: Option<&ItemRecords>,
     sources: &[Option<u32>],
 ) -> Result<NumericOrderPlan, ObjectFrameError> {
     if sources.len() != context.layers().len() {
@@ -415,14 +417,26 @@ fn natural_component(
         .collect();
     let mut layer_elements: Vec<Vec<NumericElementOrder>> =
         context.layers().iter().map(|_| Vec::new()).collect();
-    // Traverse retained geometry once, preserving each layer's encounter order.
-    for (source_object_index, record) in context.objects().iter().enumerate() {
-        let Some(index) = layer_indices.get(record.target().layer_uid()).copied() else {
+    // Match the packet's retained source space: local objects, then the complete global
+    // raster table, then the complete global text table. Filter only after enumeration so
+    // another context's items never shift this context's raster/text provenance indices.
+    let targets = context
+        .objects()
+        .iter()
+        .map(|record| record.target())
+        .chain(items.into_iter().flat_map(|items| items.targets()));
+    let mut seen = HashSet::new();
+    for (source_object_index, target) in targets.enumerate() {
+        if target.context_id() != context.id() || target.scope_kind() != &FrameScopeKind::Authored {
             continue;
-        };
-        if record.target().scope_kind() == &FrameScopeKind::Authored
-            && sources[index] == Some(record.target().frame())
-        {
+        }
+        if !seen.insert(target) || target.frame() >= context.total_frames() {
+            return Err(ObjectFrameError::InvalidSource);
+        }
+        let index = *layer_indices
+            .get(target.layer_uid())
+            .ok_or(ObjectFrameError::InvalidSource)?;
+        if sources[index] == Some(target.frame()) {
             layer_elements[index].push(NumericElementOrder {
                 source_object_index,
                 value: 0.0,

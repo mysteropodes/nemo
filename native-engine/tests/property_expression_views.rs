@@ -65,6 +65,7 @@ pub(crate) fn target(layer: &str, stroke: Option<&str>) -> PropertyHolderTarget 
 pub(crate) fn holder(target: PropertyHolderTarget) -> PropertyHolder {
     PropertyHolder {
         target,
+        mesh_source: Presence::Missing,
         controls: Presence::Missing,
         properties: vec![],
     }
