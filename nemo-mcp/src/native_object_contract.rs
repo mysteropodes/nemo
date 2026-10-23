@@ -29,6 +29,9 @@ fn target(value: &Value) -> bool {
 }
 
 pub(super) fn request(value: &Value) -> bool {
+    if image_mesh::image_mesh_view(value) {
+        return image_mesh::image_mesh_request(value);
+    }
     exact(value, &["atRevision", "stableTarget"], &[]).is_some_and(|value| {
         revision(value.get("atRevision")).is_some() && value.get("stableTarget").is_some_and(target)
     })
@@ -268,6 +271,9 @@ fn record(value: &Value) -> bool {
 }
 
 pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if image_mesh::image_mesh_view(payload) {
+        return image_mesh::image_mesh_result(document_id, payload, result);
+    }
     request(payload)
         && exact(result, &["atRevision", "documentSnapshotId", "object"], &[]).is_some_and(
             |value| {
@@ -292,3 +298,10 @@ mod tests;
 mod layer_placement;
 #[path = "native_layer_range_contract.rs"]
 mod layer_range;
+
+#[path = "native_image_mesh_read_contract.rs"]
+mod image_mesh;
+
+#[cfg(test)]
+#[path = "native_image_mesh_read_contract_tests.rs"]
+mod image_mesh_tests;

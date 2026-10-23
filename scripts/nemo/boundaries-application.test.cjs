@@ -383,14 +383,14 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
   const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
   assert.equal(runtime.length, 1); assert.equal(data.length, 1);
-  assert.equal(runtime[0].ordinal, 120); assert.equal(data[0].ordinal, 121);
+  assert.equal(runtime[0].ordinal, 121); assert.equal(data[0].ordinal, 122);
   assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 120);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 121);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};
@@ -421,8 +421,8 @@ function assertF06Bootstrap(html) {
     assert.equal(selected[0].tag, '<script src="' + source + '"></script>', source + ' must be synchronous classic');
     return scripts.indexOf(selected[0]);
   });
-  assert.deepEqual(positions, [14, 16, 17, 18, 19, 20, 21, 22, 24, 25],
-    'underlay → parser → properties → desktop → Exposure → Export → Project → ProjectFile → UI must remain in that order');
+  assert.deepEqual(positions, [14, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26],
+    'underlay → parser → reads → properties → desktop → Exposure → Export → Project → ProjectFile → UI must remain in that order');
   const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
     const selected = scripts.filter((entry) => entry.src === source);
     assert.equal(selected.length, 1, source + ' must remain unique');
@@ -471,7 +471,7 @@ test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFi
 
 test('F06 real browser exports initialize in declared order and missing parser refuses before Project export', () => {
   const vm = require('node:vm'), html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
-  const names = ['native-object-project-metadata', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+  const names = ['native-object-project-metadata', 'native-object-project-reads', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const load = (context, name) => vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters', name + '.js'), 'utf8'), context, {filename: name});
   const context = vm.createContext({});
   const actual = [...html.matchAll(/<script src="js\/adapters\/([^"/]+)\.js"><\/script>/g)]
