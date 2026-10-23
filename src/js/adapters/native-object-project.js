@@ -20,7 +20,7 @@
   function create(ports){
     if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     if(!Exposure||typeof Exposure.navigation!=='function'||typeof Exposure.previewScheduling!=='function')throw new Error('Native project view ports are unavailable');
-    var view=Exposure.navigation(ports.viewMode,openDiagnostic),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
+    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){try{if(typeof ports.openDiagnostic==='function')ports.openDiagnostic(event,code);}catch(_){} }
@@ -213,7 +213,7 @@
     }
     function previewFailure(detail,error){
       if(openAttempt&&['first-preview','second-preview'].includes(openAttempt.stage))openAttempt.stage+='-'+detail;
-      return error;
+      if(error&&typeof error==='object')previewFailures.set(error,detail);return error;
     }
     function frameRequest(frame,pin){
       pin=pin||requireActive();if(!integer(frame,0)||frame>=pin.totalFrames)throw previewFailure('frame-range',new Error('Frame is outside the native project'));
@@ -242,7 +242,7 @@
       try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),false);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
       if(receipt.failure){
-        presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented'));
+        presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(receipt.failure,new Error('Native project frame was not presented ('+receipt.failure+')'));
       }
       presentation=freeze(Exposure.presentedFrame(receipt,request,frame));
       presentationBounds=bounds;if(ports.surfaceChanged)ports.surfaceChanged(presentation,bounds);
@@ -263,7 +263,7 @@
     var presentPreview = previewScheduling.presentPreview;
     var renderPreview = previewScheduling.renderPreview;
     function changed(){if(ports.changed)ports.changed(info);}
-    function mutation(makeRequest,command,needsPresentation){
+    function mutation(makeRequest,command,needsPresentation,historyAction){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
       if(synchronizing)return Promise.reject(new Error('Native object revision synchronization is in progress'));
       var submitted=epoch(info),origin=needsPresentation?freeze(presentedSession()):null,ticket=subscriptionTicket;return enqueue(async function(){
@@ -273,14 +273,14 @@
       try{receipt=await raw(command,request);}catch(error){
         // A transport error cannot establish whether a native command committed.
         try{await inspect();changed();}catch(unknown){throw fence(unknown);}
-        try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(ports.notice)ports.notice(unpresented.message);}
+        try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(!historyAction&&ports.notice)ports.notice(unpresented.message);}
         throw error;
       }
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==pin.instanceId||
         receipt.documentId!==pin.documentId||!integer(receipt.contentRevision,pin.contentRevision)||typeof receipt.ok!=='boolean')throw fence(new Error('Native mutation response is uncorrelated'));
       try{await inspect();changed();}catch(unknown){throw fence(unknown);}
       if(!receipt.ok){
-        try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(ports.notice)ports.notice(unpresented.message);}
+        try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(!historyAction&&ports.notice)ports.notice(unpresented.message);}
         throw new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable'));
       }
       await present(ports.frame?ports.frame():0);return receipt;
@@ -304,7 +304,9 @@
       documentSnapshotId:pin.documentSnapshotId,action:typeof action==='function'?action(pin.reference):action};},'nemo_native_object_reference');}
     function history(action){if(action!=='undo'&&action!=='redo')return Promise.reject(new Error('Unsupported history action'));
       return mutation(function(pin){return {apiVersion:2,requestId:requestId(action),instanceId:pin.instanceId,documentId:pin.documentId,
-        operation:'command.document.object.'+action,expectedRevision:pin.contentRevision,payload:{command:'object.'+action}};},'nemo_native_object_dispatch');}
+        operation:'command.document.object.'+action,expectedRevision:pin.contentRevision,payload:{command:'object.'+action}};},'nemo_native_object_dispatch',false,action).catch(function(error){
+        try{var reason=previewFailures.get(error)||(['invalid_request','unavailable','stale_revision','stale_owner','wrong_instance','wrong_document','cancelled_before_dispatch'].includes(error&&error.code)?error.code:'unavailable');
+          if(phase!=='indeterminate'&&ports.notice)ports.notice('Native '+(action==='undo'?'Undo':'Redo')+' could not be confirmed ('+reason+').');}catch(_){}throw error;});}
     function visibilityIntent(layerUid,value){
       return mutation(function(pin){
         var matches=pin.layers.filter(function(layer){return layer.layerUid===layerUid;});
