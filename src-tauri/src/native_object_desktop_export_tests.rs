@@ -413,102 +413,91 @@ fn authored_sequence_publishes_two_decoded_frames_once_and_repeats_without_histo
     assert_eq!(read(), before);
 }
 
-#[cfg(target_os = "macos")]
-struct SequenceFault {
-    inner: LazyDesktopArtifactPort,
-    mode: u8,
-    writes: usize,
-}
-#[cfg(target_os = "macos")]
-impl StagedArtifactPort for SequenceFault {
-    fn begin_staging(&mut self, job: &str, target: &str) -> Result<(), String> {
-        self.inner.begin_staging(job, target)
-    }
-    fn write_frame(&mut self, job: &str, name: &str, bytes: &[u8]) -> Result<(), String> {
-        self.writes += 1;
-        self.inner.write_frame(job, name, bytes)?;
-        if self.mode == 0 && self.writes == 2 {
-            return Err("second write acknowledgement lost".into());
+#[path = "native_object_desktop_sequence_tests.rs"]
+mod sequence_tests;
+
+#[test]
+fn contiguous_png_range_admission_stays_lazy_and_preserves_the_explicit_frame_bound() {
+    let scratch = Scratch::new();
+    let (state, raw) = fixture(&scratch);
+    for format in [None, Some("png")] {
+        let mut ranged = raw.clone();
+        ranged["frameRange"] = json!({"start":0,"end":119});
+        if let Some(format) = format {
+            ranged["format"] = json!(format);
         }
-        Ok(())
+        let admitted = admit_request(&ranged.to_string(), state.instance_id(), |_| true).unwrap();
+        assert!(
+            admitted.request.frames.is_none(),
+            "range admission must not expand an explicit list"
+        );
+        assert_eq!(admitted.request.frame, 0);
     }
-    fn publish(&mut self, job: &str, to: &str, files: &[String]) -> Result<ExportArtifact, String> {
-        self.inner.publish(job, to, files)?;
-        Err("lost publication acknowledgement".into())
-    }
-    fn cleanup(&mut self, job: &str) -> Result<(), String> {
-        if self.mode == 2 {
-            Err("retained private staging".into())
-        } else {
-            self.inner.cleanup(job)
-        }
-    }
+    // Raw admission has no owner document; source-length validation remains owner preflight.
+    let mut boundary = raw.clone();
+    boundary["frameRange"] = json!({"start":0,"end":9998});
+    assert!(admit_request(&boundary.to_string(), state.instance_id(), |_| true).is_ok());
+    let mut explicit = raw.clone();
+    explicit["frames"] = json!((0..32).collect::<Vec<u32>>());
+    assert!(admit_request(&explicit.to_string(), state.instance_id(), |_| true).is_ok());
+    explicit["frames"] = json!((0..33).collect::<Vec<u32>>());
+    assert!(admit_request(&explicit.to_string(), state.instance_id(), |_| true).is_err());
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
 }
 
 #[test]
-#[cfg(target_os = "macos")]
-fn later_sequence_failure_retains_honest_release_and_never_claims_partial_success() {
-    for mode in 0..=2 {
-        let scratch = Scratch::new();
-        let (state, mut raw) = fixture_document(&scratch, sequence_document());
-        raw["frames"] = json!([0, 1]);
-        let admitted = admit_request(&raw.to_string(), state.instance_id(), |_| true).unwrap();
-        let mut gpu = Compositor::new().unwrap();
-        let mut port = SequenceFault {
-            inner: LazyDesktopArtifactPort::new(
-                scratch.stage(),
-                "object-output".into(),
-                scratch.destination(),
-            ),
-            mode,
-            writes: 0,
-        };
-        let result = export_with_target(&state, &admitted, scratch.stage(), |consumer| {
-            let outcome = consumer
-                .owner
-                .export_pinned_object_png_frames(
-                    &consumer.selector,
-                    &consumer.frames,
-                    consumer.request_id,
-                    "object-output".into(),
-                    consumer.output,
-                    consumer.maximum_encoded_bytes,
-                    &mut port,
-                    &mut gpu,
-                )
-                .map_err(|e| host_error("unavailable", e))?;
-            assert_eq!(consumer.owner.export_test_state().unwrap(), (0, (0, 0)));
-            Ok(outcome)
+fn malformed_or_conflicting_ranges_refuse_before_scope_or_artifact_effects() {
+    let scratch = Scratch::new();
+    let (state, raw) = fixture(&scratch);
+    let scope_calls = Cell::new(0);
+    for range in [
+        json!(null),
+        json!([]),
+        json!({"start":0}),
+        json!({"end":119}),
+        json!({"start":0,"end":119,"extra":true}),
+        json!({"start":1,"end":0}),
+        json!({"start":0,"end":9999}),
+        json!({"start":-1,"end":1}),
+        json!({"start":0,"end":0.5}),
+        json!({"start":0,"end":4294967296u64}),
+    ] {
+        let mut changed = raw.clone();
+        if range["start"] == json!(1) {
+            changed["frame"] = json!(1);
+        }
+        changed["frameRange"] = range;
+        let error = admit_request(&changed.to_string(), state.instance_id(), |_| {
+            scope_calls.set(scope_calls.get() + 1);
+            true
         })
+        .err()
         .unwrap();
-        assert!(!result.published);
-        assert_eq!(result.status, "failed");
-        assert_eq!(port.writes, 2);
-        if mode == 0 {
-            assert_eq!(result.external_effect_disposition, "none");
-            assert!(result.cleanup_complete);
-            assert!(!scratch.destination().exists());
-            assert_eq!(fs::read_dir(scratch.stage()).unwrap().count(), 0);
-        } else {
-            assert_eq!(result.external_effect_disposition, "indeterminate");
-            assert!(!result.cleanup_complete);
-            assert_eq!(fs::read_dir(scratch.destination()).unwrap().count(), 2);
-        }
-        if mode == 2 {
-            assert_eq!(result.cleanup_status, "failed");
-        }
-        let next = Scratch::new();
-        let mut retry = raw.clone();
-        retry["requestId"] = json!("fresh-after-failure");
-        retry["destinationDirectory"] = json!(next.destination());
-        let retry = admit_request(&retry.to_string(), state.instance_id(), |_| true).unwrap();
-        assert!(
-            export_with_target(&state, &retry, next.stage(), |consumer| consumer
-                .run(&mut gpu)
-                .map_err(|e| host_error("unavailable", e)))
-            .is_err()
-        );
-        assert!(!next.stage().exists());
-        assert!(!next.destination().exists());
+        assert_eq!(error.code, "invalid_request");
     }
+    for (field, value) in [
+        ("frame", json!(1)),
+        ("frames", json!([0])),
+        ("frames", json!([])),
+        ("format", json!("svg")),
+    ] {
+        let mut changed = raw.clone();
+        changed["frameRange"] = json!({"start":0,"end":119});
+        changed[field] = value;
+        assert_eq!(
+            admit_request(&changed.to_string(), state.instance_id(), |_| {
+                scope_calls.set(scope_calls.get() + 1);
+                true
+            })
+            .err()
+            .unwrap()
+            .code,
+            "invalid_request",
+            "{field}"
+        );
+    }
+    assert_eq!(scope_calls.get(), 0);
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
 }

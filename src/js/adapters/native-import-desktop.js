@@ -1,7 +1,4 @@
-/* L10-J desktop composition of the native importers: the ports of native-import-core.js from the presented native Project session, the
- * Paper / REST / ag-psd / dialog ports, the drop, paste, menu, PSD and Figma panel bindings of the baseline `init()` functions, and a
- * `SMSvgImport`-shaped facade so the two legacy callers (timeline.js: menu entry and the Cmd+V paste fallback) reach the native adapter
- * without any legacy importer script. UI intent only: every outcome is a typed status; there is no legacy fallback writer. */
+/* Desktop native import ports and baseline UI bindings; typed outcomes with no legacy fallback writer. */
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -10,8 +7,6 @@
   'use strict';
   const installed = new WeakMap();
   const TOKEN_KEY = 'sm-figma-token';
-
-  // The user-visible line for a typed status that is not a success (success wording is the baseline's own toast, raised by the adapters).
   function noticeFor(result) {
     if (!result) return null;
     if (result.reason === 'native_mixed_import_batch_unavailable') return 'Import PNG images separately from other file groups. Nothing was imported.';
@@ -37,12 +32,10 @@
       default: return null;
     }
   }
-
-  // `overrides` replaces named ports (readPsd, pickFile, resizeCanvas, readText) and exists for the tests of the composition only.
   function install(root, overrides) {
     if (installed.has(root)) return installed.get(root);
     overrides = overrides || {};
-    // The importer modules are classic scripts loaded before this one; this file reads them from the window, it requires nothing.
+    // Importer modules and optional diagnostics are supplied through the root.
     const m = { core: root.NemoNativeImportCore, svg: root.NemoNativeImportSvg, drop: root.NemoNativeImportDrop, figma: root.NemoNativeImportFigma,
       psd: root.NemoNativeImportPsd, montage: root.NemoNativeImportMontage };
     if (!Object.values(m).every(Boolean)) throw new Error('Native importer modules are unavailable');
@@ -65,7 +58,13 @@
     });
     const t = (key) => (root.SM && typeof root.SM.t === 'function' ? root.SM.t(key) : key);
     const notify = (message) => { try { if (typeof root.showToast === 'function') root.showToast(message); } catch (_) { /* a toast never fails an import */ } };
+    let diagnostic = null;
+    try {
+      const module = root.NemoNativeImportDiagnostic;
+      if (module) diagnostic = module.create({ root, current, selection, state: () => ({ routeDeclared: imageDeclared, routeRetired: imageRetired, imagePending }) });
+    } catch (_) { /* Optional diagnostics never prevent importer installation. */ }
     const surface = (result) => {
+      try { if (diagnostic) diagnostic.observe(result); } catch (_) { /* observations never affect import */ }
       const retained = result && result.staging && result.staging.status === 'retained' ? result : null;
       if (retained) notify(retained.status === 'imported'
         ? 'The import is confirmed, but temporary resources still need cleanup.'
@@ -114,8 +113,7 @@
       importText: (text, opts) => svgRaw.importText(text, opts).then(surface), importFiles: (files, opts) => svgRaw.importFiles(files, opts).then(surface),
       importTexts: (items, opts) => svgRaw.importTexts(items, opts).then(surface), openFile: (opts) => svgRaw.openFile(opts).then(surface),
     });
-    // The ordinary image menu keeps its native picker; DOM PNGs use owned staging for one batch.
-    // PNG placement uses the declared native route; tests may explicitly disable it.
+    // The image menu keeps its native picker; DOM PNGs use owned staging and the declared route.
     const imageDeclared = overrides.imageRoute === undefined || overrides.imageRoute === true;
     let imagePending = false, imageRetired = false, imageUncertain = null;
     const pinKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
@@ -223,7 +221,10 @@
             return uncertainImageStatus() || { status: 'unconfirmed', code: code || 'native_image_failed', requestId: error && error.requestId };
           }
           if (code === 'stale_revision' || code === 'stale_owner') return { status: 'stale', code };
-          if (code === 'unavailable') return { status: 'unavailable', code };
+          if (code === 'unavailable') {
+            try { if (diagnostic) return diagnostic.unavailable(error); } catch (_) { /* optional */ }
+            return { status: 'unavailable', code };
+          }
           if (code === 'invalid_request') return { status: 'invalid', code };
           return { status: 'refused', code };
         } finally { imagePending = false; }
@@ -235,14 +236,11 @@
       cancelPasteFallback: () => { if (root._svgPasteFallback) { root.clearTimeout(root._svgPasteFallback); root._svgPasteFallback = null; } },
     });
     const figma = m.figma.create({ paper: paper(), core, stage, readCatalog: () => root.NemoFontAssets && root.NemoFontAssets.readCatalog(), t, notify, resizeCanvas, fetch: (...a) => root.fetch(...a) });
-    // ag-psd stays an unprofiled vendor module: its one literal dynamic import lives in the retained legacy loader psd-import-bridge.js
-    // (patch 13), which hands the cached module promise over as `window.SMAgPsdLoader.load`. This profiled adapter carries no dynamic import.
+    // The legacy loader owns ag-psd's sole vendor import; this adapter uses its cached promise.
     const loadAgPsd = () => (root.SMAgPsdLoader && typeof root.SMAgPsdLoader.load === 'function'
       ? root.SMAgPsdLoader.load() : Promise.reject(new Error('The ag-psd loader is unavailable')));
     const psd = m.psd.create({ core, stage, t, notify, readPsd: overrides.readPsd || m.psd.readerFor(loadAgPsd) });
     const montage = m.montage.create({ declared: () => false });
-
-    // The panel wiring of the baseline psd-import-bridge.js and figma-import.js `init()` (same ids, same strings).
     function bindPanels(doc) {
       const detach = [];
       const on = (el, type, fn) => { el.addEventListener(type, fn); detach.push(() => el.removeEventListener(type, fn)); };

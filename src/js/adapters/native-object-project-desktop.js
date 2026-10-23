@@ -25,6 +25,8 @@
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
     'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
   function safeCode(event,code){
+    if(event==='camera-control')return ['native-refused','selected-canvas','selected-stored-camera'].includes(code)?code:'unknown';
+    if(event==='camera-presented')return ['canvas','stored-camera'].includes(code)?code:'unknown';
     if(event==='bpm-settings-refused')return ['controller-missing','cache-empty','retired','generation-stale',
       'session-replaced','inactive','five-pin-stale','subscription-stale','presentation-missing',
       'presentation-mismatch','projection-unready','exception'].includes(code)?code:'unknown';
@@ -61,7 +63,7 @@
   function openDiagnostic(root,event,code){
     if(!['file-open-started','file-new-started','file-completed','file-cancelled','file-failed','file-stage',
       'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','bpm-settings-refused',
-      'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update'].includes(event))return;
+      'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented'].includes(event))return;
     try{
       var log=openLogs.get(root);if(!log){log={startedAt:Date.now(),events:[],serial:0,attempt:0,writing:false,pending:null};openLogs.set(root,log);}
       if(event==='file-open-started'||event==='file-new-started')log.attempt++;
@@ -84,12 +86,21 @@
     }catch(_){}
     // Preserve the existing optional fixture observer; it is never required to collect production evidence.
     try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,
-      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update'].includes(event)?safeCode(event,code):code);}catch(_){}
+      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented'].includes(event)?safeCode(event,code):code);}catch(_){}
   }
   // The captured read proof exists only during this action's synchronous guard.
   function withActionPresentation(origin,current,action){
     var running=true,lease=Object.freeze({readPresentedObjectSession:function(){return running&&origin&&current()===true?origin:null;}});
     try{return action(lease);}finally{running=false;}
+  }
+  // Inspect only own data slots of the already-correlated presentation. Never
+  // invoke an accessor just to observe mode; no owner/frame/geometry is logged.
+  function cameraPresentedCode(presentation) {
+    try {
+      var view=Object.getOwnPropertyDescriptor(presentation,'view');
+      var mode=view&&Object.prototype.hasOwnProperty.call(view,'value')&&Object.getOwnPropertyDescriptor(view.value,'mode');
+      return mode&&Object.prototype.hasOwnProperty.call(mode,'value')&&['canvas','stored-camera'].includes(mode.value)?mode.value:'unknown';
+    } catch (_) { return 'unknown'; }
   }
   var cameraUIBindings = new WeakMap();
   function cameraSession(root) {
@@ -117,13 +128,19 @@
     var document = root.document, button = document.getElementById('btn-camera');
     cameraUIBindings.set(root, document);
     if (button) button.addEventListener('click', function () {
-      var session = cameraSession(root);
+      var selectedCameraView, session = cameraSession(root);
       if (nativeCameraUI(root, session)) {
         var shown = session && session.readPresentedObjectSession(), presentation = shown && shown.presentation;
-        if (!presentation || !presentation.view || presentation.view.cameraAvailable !== true) return;
-        root.state.cameraView = !root.state.cameraView;
+        if (!presentation || !presentation.view || presentation.view.cameraAvailable !== true) {
+          openDiagnostic(root,'camera-control','native-refused');return;
+        }
+        // Capture the existing assignment value without another state read.
+        root.state.cameraView = selectedCameraView = !root.state.cameraView;
         var preview = session.renderPreview(root.state.currentFrame);
         renderCameraViewLock(root);
+        // This witnesses a selected value after the existing synchronous path,
+        // not native completion. Preserve the original return/promise unchanged.
+        openDiagnostic(root,'camera-control',selectedCameraView?'selected-stored-camera':'selected-canvas');
         return preview;
       }
       legacy.toggle();
@@ -233,6 +250,7 @@
           settingsNotice('presented',info);
           renderCameraViewLock(root);
           if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshPolicy)root.NemoNativeObjectUI.refreshPolicy(root);
+          if(shown)openDiagnostic(root,'camera-presented',cameraPresentedCode(shown));
         }catch(_){}},0);
       },
       changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);

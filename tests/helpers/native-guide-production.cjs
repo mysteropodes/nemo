@@ -5,13 +5,14 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const clone = value => JSON.parse(JSON.stringify(value));
 
-function fixture({ composition = false, shadow = false } = {}) {
+function fixture({ composition = false, shadow = false, palette = false } = {}) {
   const events = new WeakMap(), trace = [], calls = [], notices = [], diagnostics = [], labels = [], timers = new Set(), frames = [];
   const nativeListeners = new Map(), observers = new Set(), previewReleases = new Set();
   let source = 'fixture', context, root, disposed = false, installed = false, generation = 0, serial = 0, previewHold = null;
   let compositionReadHold = null, compositionUnavailable = false;
   let shadowReadHold = null, shadowUnavailable = false;
   let canonicalPorts = null;
+  let metadataControl = null;
   let rect = { left: 66, top: 102, width: 1038, height: 504 };
   const nativeDocument = { canvasW: 320, canvasH: 180, fps: 24, totalFrames: 40 };
   const originalDocument = JSON.stringify(nativeDocument);
@@ -53,7 +54,7 @@ function fixture({ composition = false, shadow = false } = {}) {
   function dispatch(target, kind, extra = {}) {
     let stopped = false, immediate = false;
     const event = { type: kind, target, currentTarget: null, eventPhase: 0, bubbles: true, defaultPrevented: false,
-      pointerId: 1, button: 0, clientX: 466, clientY: 111, ...extra,
+      pointerId: 1, button: 0, clientX: 466, clientY: 111, results: [], ...extra,
       preventDefault() { this.defaultPrevented = true; }, stopPropagation() { stopped = true; },
       stopImmediatePropagation() { immediate = true; stopped = true; } };
     const path = []; for (let element = target; element; element = element.parentNode) path.push(element);
@@ -64,7 +65,7 @@ function fixture({ composition = false, shadow = false } = {}) {
         if (!(events.get(element) || []).includes(record)) continue;
         trace.push({ kind, target: target.id, current: element.id || element.tagName, phase, source: record.source });
         const prior = source; source = record.source;
-        try { record.fn.call(element, event); } finally { source = prior; }
+        try { event.results.push(record.fn.call(element, event)); } finally { source = prior; }
         if (record.once) element.removeEventListener(kind, record.fn, record.capture);
         if (immediate) break;
       }
@@ -140,11 +141,30 @@ function fixture({ composition = false, shadow = false } = {}) {
       const guideRead = request.operation === 'query.document.object.project.guide.read';
       const compositionRead = request.operation === 'query.document.object.project.composition.read';
       const shadowRead = request.operation === 'query.document.object.project.shadow.read';
-      assert(guideRead || composition && compositionRead || shadow && shadowRead,
+      const paletteRead = request.operation === 'query.document.object.project.palette.read';
+      assert(guideRead || composition && compositionRead || shadow && shadowRead || palette && paletteRead,
         'Cancellation must never dispatch an edit');
       const pin = info(), payload = request.payload, selector = payload.selector;
       assert.equal(payload.atRevision, 0); assert.equal(payload.documentSnapshotId, pin.documentSnapshotId);
       assert.equal(payload.contextId, 'scene-root');
+      if (metadataControl) {
+        const control = metadataControl, key = request.operation + ':' + JSON.stringify(selector);
+        const count = (control.counts.get(key) || 0) + 1; control.counts.set(key, count);
+        if (count > 1) {
+          control.repeated({ operation: request.operation, selector: clone(selector) });
+          // Hold an overrun until disposal so a failing regression cannot spin the real completion queue.
+          await control.overrun;
+          return realm({ apiVersion: 2, requestId: request.requestId, instanceId: pin.instanceId,
+            documentId: pin.documentId, contentRevision: 0, ok: false,
+            error: { code: 'unavailable', message: 'Controlled metadata budget refusal' } });
+        }
+        if (paletteRead && selector.kind === 'settings') {
+          control.entered(); await control.wait;
+          if (control.refuse) return realm({ apiVersion: 2, requestId: request.requestId,
+            instanceId: pin.instanceId, documentId: pin.documentId, contentRevision: 0, ok: false,
+            error: { code: 'unavailable', message: 'Controlled native Palette read refusal' } });
+        }
+      }
       if (compositionRead && selector.kind === 'settings') {
         if (compositionReadHold) {
           const held = compositionReadHold; compositionReadHold = null; held.entered(); await held.wait;
@@ -162,7 +182,13 @@ function fixture({ composition = false, shadow = false } = {}) {
           error: { code: 'unavailable', message: 'Controlled native Shadow read refusal' } });
       }
       let result;
-      if (shadowRead) {
+      if (paletteRead) {
+        if (selector.kind === 'settings') result = { palettesPresent: false, paletteCount: 0, effectiveActivePaletteIdx: 0 };
+        else {
+          assert.equal(selector.kind, 'palettePage'); assert.equal(selector.cursor, 0); assert.equal(selector.limit, 16);
+          result = { kind: 'palettePage', palettesPresent: false, paletteCount: 0, cursor: 0, items: [], nextCursor: null };
+        }
+      } else if (shadowRead) {
         if (selector.kind === 'settings') result = { shadowPalettePresent: false, shadowColorCount: 0 };
         else {
           assert.equal(selector.kind, 'palettePage'); assert.equal(selector.cursor, 0); assert.equal(selector.limit, 16);
@@ -232,13 +258,15 @@ function fixture({ composition = false, shadow = false } = {}) {
     'js/application/native-opacity-operations.js', 'js/adapters/native-opacity-legacy-surface.js',
     'js/draw-bridge.js', 'js/adapters/native-object-shape-tool.js', 'js/rulers-bridge.js',
     ...(composition ? ['js/adapters/native-composition-contract.js'] : []),
+    ...(palette ? ['js/adapters/native-palette-contract.js'] : []),
     'js/adapters/native-guide-contract.js',
     ...(shadow ? ['js/adapters/native-shadow-contract.js'] : []),
     'js/adapters/native-application.js',
     ...(composition ? ['js/adapters/native-composition-desktop.js', 'js/adapters/native-composition-ui.js'] : []),
+    ...(palette ? ['js/adapters/native-palette-desktop.js'] : []),
     'js/adapters/native-guide-desktop.js',
     ...(shadow ? ['js/adapters/native-shadow-desktop.js'] : []),
-    'js/adapters/native-guide-ui.js',
+    ...(palette ? ['js/adapters/native-palette-ui.js'] : []), 'js/adapters/native-guide-ui.js',
     ...(shadow ? ['js/adapters/native-shadow-ui.js'] : []),
     'js/application/native-edit-guard.js', 'js/adapters/application-mcp.js'
   ];
@@ -323,6 +351,38 @@ function fixture({ composition = false, shadow = false } = {}) {
     await new Promise(setImmediate);
   }
   return { root: browser, document, area, h, v, session, calls, trace, notices, diagnostics, labels, prepare, settle, open, tick, dispose,
+    installImageMenu() {
+      const button = node('button'); button.id = 'btn-import-img'; body.appendChild(button);
+      for (const id of ['image-input', 'video-input', 'btn-import-video']) {
+        const element = node(); element.id = id; body.appendChild(element);
+      }
+      for (const [name, file] of Object.entries({ Core: 'core', Svg: 'svg', Drop: 'drop', Figma: 'figma', Psd: 'psd', Montage: 'montage' })) {
+        browser['NemoNativeImport' + name] = require('../../src/js/adapters/native-import-' + file + '.js');
+      }
+      browser.NemoNativeObjectRasterAsset = require('../../src/js/adapters/native-object-raster-asset.js');
+      require('../../src/js/adapters/native-import-desktop.js').install(browser);
+      source = 'js/images.js';
+      vm.runInContext(fs.readFileSync(require.resolve('../../src/js/images.js'), 'utf8'), context, { filename: source });
+      source = 'fixture';
+      return async function click() {
+        const event = dispatch(button, 'click');
+        assert.equal(event.results.length, 1, 'The ordinary image button has exactly one real listener');
+        return event.results[0];
+      };
+    },
+    holdPaletteRead({ refuse = false } = {}) {
+      assert(palette && !metadataControl);
+      let entered, release, repeated, stopOverrun;
+      const started = new Promise(resolve => { entered = resolve; });
+      const wait = new Promise(resolve => { release = resolve; });
+      const overrun = new Promise(resolve => { stopOverrun = resolve; });
+      const repeatedQuery = new Promise(resolve => { repeated = resolve; });
+      const cleanup = () => { release(); stopOverrun(); previewReleases.delete(cleanup); };
+      previewReleases.add(cleanup);
+      metadataControl = { entered, wait, overrun, repeated, refuse, counts: new Map() };
+      return { started, repeated: repeatedQuery, release,
+        counts: () => Array.from(metadataControl.counts.values()) };
+    },
     dispatch, saved: () => JSON.stringify(nativeDocument), originalDocument,
     ghosts: () => descendants(document).filter(element => element.style.opacity === '.6'),
     edits: () => calls.filter(call => call.request && String(call.request.operation).startsWith('command.')),

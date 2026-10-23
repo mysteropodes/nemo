@@ -11,8 +11,8 @@ const ROOT = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const json = (rel) => JSON.parse(read(rel));
 const OP = 'command.document.object.import.batch';
-const FILES = ['native-import-contract.js', 'native-import-seam.js', 'native-import-core.js', 'native-import-svg.js', 'native-import-figma.js', 'native-import-drop.js', 'native-import-psd.js', 'native-import-montage.js', 'native-import-desktop.js'];
-const LAYERS = { 'native-import-contract.js': 'domain', 'native-import-seam.js': 'domain', 'native-import-core.js': 'application', 'native-import-svg.js': 'application' };
+const FILES = ['native-import-contract.js', 'native-import-seam.js', 'native-import-core.js', 'native-import-svg.js', 'native-import-figma.js', 'native-import-drop.js', 'native-import-psd.js', 'native-import-montage.js', 'native-import-diagnostic.js', 'native-import-desktop.js'];
+const LAYERS = { 'native-import-contract.js': 'domain', 'native-import-seam.js': 'domain', 'native-import-core.js': 'application', 'native-import-svg.js': 'application', 'native-import-diagnostic.js': 'adapters' };
 
 test('the transport schema declares the closed payload, the receipt, the revisioned request branch and the result entry', () => {
   const schema = json('engineering/application/native-transport-v2.schema.json');
@@ -91,7 +91,7 @@ test('the nemo-mcp validators are wired: module, request arm, result arm, revisi
   assert.ok(json('engineering/boundaries/profiles/rust.coverage.json').provenance.nativeImportPublicContractRegistration);
 });
 
-test('the app-js profile declares the nine modules with their layers and the load order puts contract and seam before the SDK', () => {
+test('the app-js profile declares the ten modules with their layers and loads the diagnostic immediately before desktop', () => {
   const profile = json('engineering/boundaries/profiles/app-js.profile.json');
   for (const file of FILES) {
     const rows = profile.modules.filter((m) => m.files.includes(file));
@@ -103,9 +103,10 @@ test('the app-js profile declares the nine modules with their layers and the loa
   const html = read('src/index.html');
   const at = (file) => html.indexOf(`<script src="js/adapters/${file}"></script>`);
   const order = [at('native-font-contract.js'), at('native-import-contract.js'), at('native-import-seam.js'), at('native-application.js'), at('native-import-core.js'), at('native-import-svg.js'), at('native-import-drop.js'),
-    at('native-import-figma.js'), at('native-import-psd.js'), at('native-import-montage.js'), at('native-import-desktop.js')];
+    at('native-import-figma.js'), at('native-import-psd.js'), at('native-import-montage.js'), at('native-import-diagnostic.js'), at('native-import-desktop.js')];
   assert.ok(order.every((i) => i >= 0), 'every script tag exists once');
-  assert.deepEqual([...order].sort((a, b) => a - b), order, 'font contract < contract < seam < SDK < core < svg < drop < figma < psd < montage < desktop');
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'font contract < contract < seam < SDK < core < svg < drop < figma < psd < montage < diagnostic < desktop');
+  assert.match(html, /<script src="js\/adapters\/native-import-diagnostic\.js"><\/script>\s*<script src="js\/adapters\/native-import-desktop\.js"><\/script>/, 'the diagnostic script immediately precedes desktop composition');
   for (const file of FILES) assert.equal(html.split(`js/adapters/${file}"`).length, 2, `${file} is loaded once`);
 });
 

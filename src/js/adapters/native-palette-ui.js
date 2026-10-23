@@ -10,7 +10,7 @@
   function install(root) {
     if (installed.has(root)) return installed.get(root);
     var retired = false, loading = null, pending = false, drag = null, highlight = null;
-    var projectionEpoch = 0, refreshNeeded = false, busyStamp = null;
+    var projectionEpoch = 0, refreshNeeded = false, busyStamp = null, failedRead = null;
     var identityKeys = ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId'];
     var document = root.document;
     function native() { return !!(root.__TAURI__ && root.__TAURI__.core); }
@@ -35,6 +35,21 @@
     function changed(stamp, next) {
       return !stamp || stamp.session !== next.session || stamp.epoch !== next.epoch || stamp.ticket !== next.ticket ||
         identityKeys.some(function (key) { return stamp.pin[key] !== next.pin[key]; });
+    }
+    function sameReadOwner(stamp) {
+      try {
+        var next = identity();
+        return !retired && !pending && !!next && !changed(stamp, next) && available(next.session, next.info);
+      } catch (_) { return false; }
+    }
+    function readStamp() {
+      var stamp = identity(), shown;
+      if (!stamp || !available(stamp.session, stamp.info)) return null;
+      shown = stamp.session.readPresentedObjectSession();
+      var p = shown && shown.presentation;
+      if (!p || p.owner !== 'native' || p.status !== 'presented' ||
+          !identityKeys.every(function (key) { return shown[key] === stamp.pin[key] && p[key] === stamp.pin[key]; })) return null;
+      stamp.presentation = p; return stamp;
     }
     function settled() {
       busyStamp = null;
@@ -165,15 +180,26 @@
         if (next && changed(busyStamp, next) && available(next.session, next.info)) refreshNeeded = true;
         return loading || Promise.resolve(null);
       }
-      if (model.read()) return Promise.resolve(model.read());
-      busyStamp = identity();
-      loading = model.refresh().catch(function () { return null; }).finally(function () { loading = null; settled(); });
+      var stamp;
+      try { stamp = readStamp(); } catch (_) {}
+      // A different queued resource's public fence is not a fresh read attempt.
+      if (!stamp) return Promise.resolve(null);
+      var value = model.read(); if (value) return Promise.resolve(value);
+      if (failedRead && sameReadOwner(failedRead) && failedRead.presentation === stamp.presentation) return Promise.resolve(null);
+      failedRead = null; busyStamp = stamp;
+      loading = model.refresh().then(function (value) {
+        if (sameReadOwner(stamp)) failedRead = null;
+        return value;
+      }).catch(function () {
+        try { if (sameReadOwner(stamp)) failedRead = stamp; } catch (_) {}
+        return null;
+      }).finally(function () { loading = null; settled(); });
       render(); return loading;
     }
     var controller = Object.freeze({ read: model.read, edit: edit, create: create, append: append, render: render,
       presented: presented, isPending: function () { return pending || !!loading; },
-      willProject: function () { projectionEpoch++; drag = null; if (!pending) model.invalidate(); render(); },
-      dispose: function () { retired = true; refreshNeeded = false; drag = null; model.dispose(); render(); }
+      willProject: function () { projectionEpoch++; failedRead = null; drag = null; if (!pending) model.invalidate(); render(); },
+      dispose: function () { retired = true; failedRead = null; refreshNeeded = false; drag = null; model.dispose(); render(); }
     });
     installed.set(root, controller); root.NemoNativePaletteController = controller;
     if (typeof root.addEventListener === 'function') root.addEventListener('pagehide', controller.dispose, { once: true });
