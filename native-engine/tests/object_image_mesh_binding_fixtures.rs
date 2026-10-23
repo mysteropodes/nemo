@@ -280,7 +280,6 @@ pub(super) fn refused_envelopes() -> [(&'static str, &'static str, Value, &'stat
 
 #[cfg(feature = "application")]
 pub(super) mod pixel_consumer {
-    use crate::compositor::object_compositor::ObjectOutputSpec;
     use crate::compositor::Compositor;
     use crate::export_job::{
         export_one_object_frame, ExportArtifact, JobStatus, ObjectHostExportRequest,
@@ -297,10 +296,12 @@ pub(super) mod pixel_consumer {
     use crate::object_render_scene::{
         prepare_object_composition, prepare_object_navigated_viewport_composition,
         prepare_object_paint_plan, prepare_object_render_scene,
-        prepare_object_viewport_composition,
+        prepare_object_viewport_composition, prepare_scheduled_object_composition_from_witness,
     };
     use crate::revision::ObjectSnapshot;
-    use crate::scheduler::{FrameScheduler, ObjectSchedulePins, ObjectScheduleScope, OutputSpec};
+    use crate::scheduler::{
+        EvaluationKey, FrameScheduler, ObjectSchedulePins, ObjectScheduleScope, OutputSpec,
+    };
     use serde_json::{json, Value};
     use std::{io::Cursor, sync::Arc};
 
@@ -368,13 +369,45 @@ pub(super) mod pixel_consumer {
         }
     }
     pub(crate) fn pixels(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
-        let image = gpu
-            .compose_object(
-                witness,
-                ObjectOutputSpec::new(1920, 1080, "white-srgb-normal-rgba8-area").unwrap(),
+        let snapshot = witness.plan().packet().snapshot();
+        let mut scheduler = FrameScheduler::new();
+        let resources = witness
+            .scene_resources()
+            .map(|r| r.declared_versions())
+            .unwrap_or_default();
+        let key = EvaluationKey::new(
+            snapshot.snapshot_id(),
+            "scene-root",
+            witness.frame(),
+            witness.expected_quality(),
+            OutputSpec::new("frame", "rgba8", 1920, 1080, "srgb", "straight").unwrap(),
+            resources,
+        )
+        .unwrap();
+        let work = scheduler
+            .schedule_object(
+                snapshot.clone(),
+                ObjectSchedulePins {
+                    instance_id: snapshot.instance_id().into(),
+                    document_id: snapshot.document_id().into(),
+                    content_revision: snapshot.content_revision(),
+                    document_snapshot_id: snapshot.snapshot_id().into(),
+                    context_id: "scene-root".into(),
+                    frame: witness.frame(),
+                    scope: ObjectScheduleScope::Authored,
+                },
+                key,
             )
             .unwrap();
-        gpu.readback_object_rgba8(&image).unwrap().bytes().to_vec()
+        let live =
+            prepare_scheduled_object_composition_from_witness(&scheduler, &work, witness).unwrap();
+        let image = gpu.compose_scheduled_object(&live).unwrap();
+        let readback = gpu.readback_scheduled_object_rgba8(&image, &live).unwrap();
+        let bytes = readback.bytes(&live).unwrap().to_vec();
+        drop(live);
+        scheduler.succeed(work.work_id()).unwrap();
+        assert_eq!(scheduler.lease_counters().live(), 0);
+        bytes
     }
 
     pub(crate) fn fixture(with_widget: bool) -> (NativeObjectHistory, Value) {
