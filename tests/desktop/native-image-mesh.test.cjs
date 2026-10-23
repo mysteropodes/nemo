@@ -414,8 +414,6 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       expectedMcpDocument.drawing.imageMeshes[meshId].offsets[mcpIndex] = mcpOffset;
       assert.deepEqual(stableDocument(mcpDoc), expectedMcpDocument, 'MCP preserves the complete project except the requested mesh offset');
       assert.equal((await status()).contentRevision, afterMcp.contentRevision, 'post-MCP Save As must not add a revision');
-      const mcpExit = await mcp.close(); mcp = null;
-      assert.equal(mcpExit.code, 0, 'bundled MCP process must close cleanly');
       report.checks.push({ checkpoint: 'bundled-mcp', binarySha256: mcpBinarySha256,
         request: mcpRequest, response: nativeReply, contentRevision: afterMcp.contentRevision,
         frameBindings: 24, changedOffsetIndex: mcpIndex });
@@ -432,6 +430,8 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       assertSameDocument(baselineDoc, savedDocument(files.detached), 'detach');
       report.checks.push({ checkpoint: 'detach', contentRevision: detachedStatus.contentRevision,
         limitation: 'Rust MCP serializer remains unavailable for Mesh; project-file persistence was verified through the actual UI Save As consumer.' });
+      const mcpExit = await mcp.close(); mcp = null;
+      assert.equal(mcpExit.code, 0, 'bundled MCP process must close cleanly');
       report.result = 'protocol-pass-pending-visual-review';
     } catch (error) {
       failure = error; report.result = 'fail'; report.error = error.message;
