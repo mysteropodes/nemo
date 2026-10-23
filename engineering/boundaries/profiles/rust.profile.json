@@ -2151,6 +2151,7 @@
         "native_object_svg_export_tests.rs",
         "native_object_svg_desktop_export_tests.rs",
         "native_object_desktop_preview_extent_tests.rs",
+        "native_object_desktop_preview_camera_return_tests.rs",
         "native_object_desktop_export_extent_tests.rs",
         "native_object_desktop_export_text_tests.rs",
         "native_object_project_tests.rs",

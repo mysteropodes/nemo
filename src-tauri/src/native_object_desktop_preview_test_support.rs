@@ -46,6 +46,7 @@ pub(super) struct Trace {
     pub(super) dispositions: usize,
     pub(super) mode: u8,
     pub(super) color: [u8; 4],
+    pub(super) pixel_check: Option<fn(&SurfacePresentation<'_>)>,
 }
 struct Port {
     context: (wgpu::Instance, wgpu::Adapter, wgpu::Device, wgpu::Queue),
@@ -69,7 +70,11 @@ impl SurfacePort for Port {
         assert_eq!(source.texture.width(), 320);
         let mut trace = self.trace.borrow_mut();
         trace.acquisitions += 1;
-        crate::native_object_desktop_preview::tests::pixel(&source, trace.color);
+        if let Some(check) = trace.pixel_check {
+            check(&source);
+        } else {
+            crate::native_object_desktop_preview::tests::pixel(&source, trace.color);
+        }
         match trace.mode {
             1 => SurfaceAttempt::Timeout,
             2 => panic!("desktop preview callback unwind"),
