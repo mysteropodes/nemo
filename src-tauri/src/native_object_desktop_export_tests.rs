@@ -413,7 +413,6 @@ fn authored_sequence_publishes_two_decoded_frames_once_and_repeats_without_histo
     assert_eq!(read(), before);
 }
 
-#[cfg(target_os = "macos")]
 #[path = "native_object_desktop_sequence_tests.rs"]
 mod sequence_tests;
 
@@ -499,23 +498,6 @@ fn malformed_or_conflicting_ranges_refuse_before_scope_or_artifact_effects() {
         );
     }
     assert_eq!(scope_calls.get(), 0);
-    assert!(!scratch.stage().exists());
-    assert!(!scratch.destination().exists());
-}
-
-#[test]
-fn cancelled_and_unscoped_contiguous_ranges_do_not_create_a_stage_or_destination() {
-    let scratch = Scratch::new();
-    let (state, mut raw) = fixture(&scratch);
-    raw["frameRange"] = json!({"start":0,"end":119});
-    assert!(admit_request(&raw.to_string(), state.instance_id(), |_| false).is_err());
-    raw["cancelledBeforeDispatch"] = json!(true);
-    let error = admit_request(&raw.to_string(), state.instance_id(), |_| {
-        panic!("cancellation must precede destination scope")
-    })
-    .err()
-    .unwrap();
-    assert_eq!(error.code, "cancelled_before_dispatch");
     assert!(!scratch.stage().exists());
     assert!(!scratch.destination().exists());
 }

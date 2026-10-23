@@ -1,6 +1,24 @@
 //! Existing sequence controls plus the new additive adversarial table.
 use super::*;
 
+#[test]
+fn cancelled_and_unscoped_contiguous_ranges_do_not_create_a_stage_or_destination() {
+    let scratch = Scratch::new();
+    let (state, mut raw) = fixture(&scratch);
+    raw["frameRange"] = json!({"start":0,"end":119});
+    assert!(admit_request(&raw.to_string(), state.instance_id(), |_| false).is_err());
+    raw["cancelledBeforeDispatch"] = json!(true);
+    let error = admit_request(&raw.to_string(), state.instance_id(), |_| {
+        panic!("cancellation must precede destination scope")
+    })
+    .err()
+    .unwrap();
+    assert_eq!(error.code, "cancelled_before_dispatch");
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
+}
+
+#[cfg(target_os = "macos")]
 struct SequenceFault {
     inner: LazyDesktopArtifactPort,
     mode: u8,

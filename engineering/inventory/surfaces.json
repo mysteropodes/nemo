@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "5806db2728416a0a177283bf8a7225fa1112b3b0",
-  "describe": "v0.7.0-alpha.4-2910-g5806db27-dirty"
+  "head": "1220fbda7b9b0f6fc55894dcb2bf3b27be85d6b7",
+  "describe": "v0.7.0-alpha.4-2912-g1220fbda-dirty"
  },
- "inputsDigest": "181ccf844eb64247159b3bc94f414ddf84cb5c568b94306ae39f293122942eb7",
+ "inputsDigest": "d2559e6666c52f8e896ea62cf86bf74a4a348a1a8cea3f401e1924d2b26d008b",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 249,
+   "native": 245,
    "export": 5,
    "animation": 443,
    "history": 355,
@@ -2642,7 +2642,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 277,
+    "functionsVisited": 278,
     "via": "chain",
     "references": [
      "src/js/images.js:705",
@@ -2711,10 +2711,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1620",
@@ -2724,7 +2722,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 17,
+    "functionsVisited": 16,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9154 action()"
@@ -4961,10 +4959,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2194",
@@ -7352,10 +7348,9 @@
    "consumers": {
     "persist": 1,
     "export": 1,
-    "animation": 3,
-    "native": 3
+    "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1679",
@@ -12812,10 +12807,9 @@
     "history": 2,
     "selection": 2,
     "render": 2,
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:929",
@@ -12827,7 +12821,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 98,
+    "functionsVisited": 97,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6326 paintStrokeSwatches()"
