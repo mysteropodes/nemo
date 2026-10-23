@@ -268,6 +268,7 @@ test('installed native image mesh: binding, gesture, history and project-file pe
         contentRevisionAfter: baselineStatus.contentRevision, note: 'Save As may materialize workspace before establishing the Mesh baseline.' });
       const baselineDoc = savedDocument(files.baseline), baselineState = meshState(baselineDoc);
       assert.deepEqual(baselineState, { links: Array(24).fill(null), meshes: {} });
+      assert.equal(Object.hasOwn(baselineDoc.drawing, 'imageMeshes'), false, 'baseline preserves the absent mesh store');
       const baselinePresentation = await presentation(baselineStatus);
       const initialSelection = await sdk.dispatch(meshRead(baselineStatus, baselinePresentation, 'L0', { kind: 'selection' }));
       assert.equal(initialSelection.ok, true, 'strict imageMesh selection query must use the public shared SDK');
@@ -427,7 +428,10 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       assert.equal((await status()).contentRevision, detachedStatus.contentRevision);
       const detachedState = meshState(savedDocument(files.detached));
       assert.deepEqual(detachedState, baselineState, 'detach clears all 24 links and releases the unreferenced mesh');
-      assertSameDocument(baselineDoc, savedDocument(files.detached), 'detach');
+      // A real attach/detach authors the store; releasing its last mesh preserves present-empty.
+      const expectedDetachedDocument = structuredClone(baselineDoc);
+      expectedDetachedDocument.drawing.imageMeshes = {};
+      assertSameDocument(expectedDetachedDocument, savedDocument(files.detached), 'detach');
       report.checks.push({ checkpoint: 'detach', contentRevision: detachedStatus.contentRevision,
         limitation: 'Rust MCP serializer remains unavailable for Mesh; project-file persistence was verified through the actual UI Save As consumer.' });
       const mcpExit = await mcp.close(); mcp = null;

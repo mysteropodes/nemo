@@ -158,6 +158,11 @@ pub(super) fn presented_project() -> Value {
         .unwrap()
         .push(second);
     for entry in value["drawing"]["items"]["raster"].as_array_mut().unwrap() {
+        // The fixed PNG is blue then white. Raster x/y are its centre, so this
+        // rect is [3,5,20,10]: the borrowed surface's (8,8) samples blue,
+        // while its independent (40,40) background sample stays outside.
+        entry["item"]["x"] = json!(13);
+        entry["item"]["y"] = json!(10);
         entry["item"]["meshId"] = json!("im_1");
     }
     value["drawing"]["imageMeshes"] = json!({"im_1":{"outline":[[0,0],[1,0],[1,1],[0,1]],
@@ -216,8 +221,8 @@ fn assert_selected(response: &Value, request: &Value) {
         "frameScope":{"kind":"authored","frame":0}})
     );
     for (field, expected) in [
-        ("x", -7.),
-        ("y", 0.),
+        ("x", 3.),
+        ("y", 5.),
         ("width", 20.),
         ("height", 10.),
         ("rotation", 0.),

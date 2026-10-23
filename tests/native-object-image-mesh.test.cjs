@@ -4,6 +4,7 @@
 // baseline oracle (tests/native-object-rig-fixtures/baseline-rules.json, tools/gen_rules.js at fbe4b8a3).
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const Mesh = require('../src/js/adapters/native-object-image-mesh.js');
+const { createNativeApplicationAdapter } = require('../src/js/adapters/native-application.js');
 const { createFixture, forbidLegacyWriters, refused, LEGACY } = require('./native-object-rig-support.cjs');
 
 const rules = JSON.parse(fs.readFileSync(path.join(__dirname, 'native-object-rig-fixtures/baseline-rules.json'), 'utf8'));
@@ -270,7 +271,7 @@ function meshDocument(){const nodes=new Map();for(const id of ['layer-list','fra
   nodes.get('start-screen').classList.add('hid');const doc={nodes,body:meshElement(),created:0,activeElement:null,readyState:'complete',
     getElementById(id){if(nodes.has(id))return nodes.get(id);function find(node){if(node.id===id)return node;for(const child of node.children){const found=find(child);if(found)return found;}return null;}for(const node of nodes.values()){const found=find(node);if(found)return found;}return null;},
     createElement(){doc.created++;return meshElement();},createComment:()=>meshElement(),addEventListener(){},removeEventListener(){}};return doc;}
-function composedMesh(geometry = false) {
+function composedMesh(geometry = false, meshValue) {
   const root = { state: { tool: 'select', playing: false }, userLayers: [], document: meshDocument(), addEventListener() {}, requestAnimationFrame: f => setImmediate(f) };
   const doc = root.document, calls = [], minted = [], messages = [];
   for (const id of ['p-imagemesh-sec', 'p-imagemesh-on', 'p-imagemesh-edit', 'p-imagemesh-body',
@@ -285,7 +286,7 @@ function composedMesh(geometry = false) {
   root.showToast = message => messages.push(message);
   root.NemoNativeObjectUI = ComposedUI;
   let active = false, revision = 0, documentId = 'document', generation = 1, liveSession;
-  let mesh = { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 };
+  let mesh = meshValue || { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 };
   const metadata = () => ({ apiVersion: 2, instanceId: 'instance', documentId, lifecycleGeneration: generation,
     contentRevision: revision, documentSnapshotId: `native-object:${documentId}:${revision}`, documentDigest: 'a'.repeat(64), byteCount: 1000,
     canvasW: 320, canvasH: 180, fps: 24, totalFrames: 24, reference: null, undoDepth: revision, redoDepth: 0,
@@ -304,7 +305,8 @@ function composedMesh(geometry = false) {
       assert.equal(v.workId, `work-${generation}-${revision}`); assert.equal(v.viewGeneration, generation);
       assert.deepEqual([v.contextId, v.layerUid, v.frame], ['scene-root', 'L0', 0]);
       const target = { contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 0 }, strokeId: 'raster-0' };
-      const meta = mesh && { meshId: 'im_1', outlineCount: 4, vertexCount: 4, triangleIndexCount: 6, offsetsPresent: true, cols: 1, rows: 1 };
+      const meta = mesh && { meshId: 'im_1', outlineCount: mesh.outline.length, vertexCount: mesh.verts.length,
+        triangleIndexCount: mesh.tris.length, offsetsPresent: true, cols: 1, rows: 1 };
       let page = { kind: 'selection' };
       if (p.kind !== 'selection') {
         assert.equal(p.meshId, 'im_1'); assert.equal(p.limit, 16);
@@ -401,6 +403,38 @@ test('ordinary checkbox composes real UI proof, native pages, leased Mesh comman
   assert.equal(checkbox.checked, false); assert.deepEqual(h.messages, []);
   assert.deepEqual(new Set(h.calls.filter(r => r.operation === 'query.document.object').map(r => r.payload.view.page.kind)),
     new Set(['selection', 'outline', 'verts', 'tris', 'offsets']));
+});
+
+test('valid empty triangle topology passes the SDK and completes Project pagination', async () => {
+  const noTriangles = { outline: OUTLINE, verts: OUTLINE, tris: [], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 };
+  const h = composedMesh(false, noTriangles); await h.open();
+  const proof = ComposedUI.readImageMeshSelection(h.root);
+  const read = await proof.session.readImageMesh(proof.selector, proof.info);
+  assert.deepEqual(read.mesh.tris, [], 'Project assembles a genuine zero-index native page');
+  assert.deepEqual(read.mesh.outline, OUTLINE); assert.deepEqual(read.mesh.verts, OUTLINE);
+  const request = h.calls.find(r => r.operation === 'query.document.object' && r.payload.view.page.kind === 'tris');
+  assert.ok(request); assert.deepEqual(request.payload.view.page, { kind: 'tris', meshId: 'im_1', cursor: 0, limit: 16 });
+  const sdk = createNativeApplicationAdapter('empty-triangle-sdk', { dispatch: async r => ({
+    apiVersion: 2, requestId: r.requestId, instanceId: r.instanceId, documentId: r.documentId,
+    contentRevision: r.payload.atRevision, ok: true,
+    result: { kind: 'imageMesh', atRevision: r.payload.atRevision, documentSnapshotId: r.payload.documentSnapshotId,
+      contextId: r.payload.view.contextId, layerUid: r.payload.view.layerUid, frame: r.payload.view.frame,
+      workId: r.payload.view.workId, viewGeneration: r.payload.view.viewGeneration,
+      target: read.target, rect: read.rect,
+      mesh: { meshId: 'im_1', outlineCount: OUTLINE.length, vertexCount: OUTLINE.length,
+        triangleIndexCount: 0, offsetsPresent: true, cols: 1, rows: 1 },
+      page: { kind: 'tris', cursor: 0, total: 0, nextCursor: null, items: [] } },
+  }) });
+  const admitted = await sdk.dispatch(request);
+  assert.equal(admitted.ok, true);
+  assert.equal(admitted.result.page.total, 0); assert.deepEqual(admitted.result.page.items, []);
+
+  const emptyMesh = { outline: [], verts: [], tris: [], offsets: [], cols: 1, rows: 1 };
+  const empty = composedMesh(false, emptyMesh); await empty.open();
+  const emptyProof = ComposedUI.readImageMeshSelection(empty.root);
+  const emptyRead = await emptyProof.session.readImageMesh(emptyProof.selector, emptyProof.info);
+  assert.deepEqual(emptyRead.mesh, { outline: [], verts: [], tris: [], offsets: [], cols: 1, rows: 1 },
+    'Project must preserve an admitted mesh whose native topology arrays are all empty');
 });
 
 test('actual UI selection proofs reject stale selection, frame and session leases before mint or dispatch', async () => {

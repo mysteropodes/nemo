@@ -31,7 +31,7 @@
   function meshMeta(v) {
     if (v === null) return true;
     if (!exact(v, ['meshId', 'outlineCount', 'vertexCount', 'triangleIndexCount', 'offsetsPresent'], ['cols', 'rows']) ||
-      !text(v.meshId) || !integer(v.outlineCount, 3) || !integer(v.vertexCount, 3) || !integer(v.triangleIndexCount, 3) ||
+      !text(v.meshId) || !integer(v.outlineCount, 0) || !integer(v.vertexCount, 0) || !integer(v.triangleIndexCount, 0) ||
       v.triangleIndexCount % 3 !== 0 || typeof v.offsetsPresent !== 'boolean' || v.outlineCount > v.vertexCount) return false;
     return (!own(v, 'cols') || integer(v.cols, 1, 64)) && (!own(v, 'rows') || integer(v.rows, 1, 64));
   }
