@@ -2626,6 +2626,7 @@
       "files": [
         "native-object-project.js",
         "native-object-project-desktop.js",
+        "native-object-project-reads.js",
         "native-object-project-properties.js",
         "native-object-open-exposure.js",
         "native-object-project-export.js"

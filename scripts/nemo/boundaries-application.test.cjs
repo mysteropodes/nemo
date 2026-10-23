@@ -205,6 +205,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-object-project-properties.js',
     'src/js/adapters/native-object-project-desktop.js',
     'src/js/adapters/native-object-project-export.js',
+    'src/js/adapters/native-object-project-reads.js',
     'src/js/adapters/native-object-project.js',
     'src/js/adapters/native-object-project-file.js',
     'src/js/adapters/native-object-ui.js',
@@ -412,7 +413,7 @@ function assertF06Bootstrap(html) {
     tag: match[0], src: match[1].match(/\bsrc=["']([^"']+)/)?.[1],
   }));
   const sources = ['native-font-panel', 'native-viewport-underlay', 'native-object-project-metadata',
-    'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+    'native-object-project-reads', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const positions = sources.map((name) => {
     const source = 'js/adapters/' + name + '.js';
     const selected = scripts.filter((entry) => entry.src === source);
