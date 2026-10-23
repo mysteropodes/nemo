@@ -159,7 +159,7 @@
         var options={requestId:session.requestId('save'),pinRequestId:session.requestId('save-pin'),project:true};
         var ticket=saved.begin({saveRequestId:options.requestId,serializerRequestId:options.pinRequestId}),serialization;
         options.isCurrent=function(){return saved.isCurrent(ticket);};
-        var written=await workflow.run({readPresentedObjectSession:session.readPresentedObjectSession,
+        var written=await workflow.run({readPresentedObjectSession:session.captureSaveSession(),
           acquirePin:async function(request){serialization=await session.acquirePin(request);return serialization;},
           pickDestination:ports.pick,savePinned:session.savePinned},options);
         var result=await saved.acknowledge(ticket,{written:written,serialization:serialization},options);
