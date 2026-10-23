@@ -24,7 +24,7 @@ const BLOCKED=Object.freeze([
   // The ordinary UI route now exists (T12 point 8 JS slice); this driver's ordered witnesses do not drive it yet.
   Object.freeze({step:'import-video',finding:'installed-step-not-driven',
     evidence:['src/js/images.js:611-612 importVideo -> nativeMedia(null,"video") -> native-import-drop.js openMedia("video")',
-      'src/js/adapters/native-import-desktop.js:233 providers:{image, video}; native-import-video.js openFile -> native-video-asset.js importPicked',
+      'src/js/adapters/native-import-desktop.js:236 providers:{image, video}; native-import-video.js openFile -> native-video-asset.js importPicked',
       'tests/desktop/video-installed-policy.cjs:189 witnessAction orders open/save/reopen/export only: no video-picker witness'],
     substitute:'Open Project… on a driver-authored native project that links staged source A (fixture open, not import)'}),
   Object.freeze({step:'preview',finding:'no-exact-installed-preview-readback',

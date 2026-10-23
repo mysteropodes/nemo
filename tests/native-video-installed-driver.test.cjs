@@ -73,7 +73,7 @@ test('offset mapping mirrors the host test clamps; the reachable plan is A at of
 test('blocked steps carry source evidence that still exists at the cited lines',()=>{
   assert.deepEqual(P.BLOCKED.map(x=>x.step),['import-video','preview','replace-source','offset','time-remap']);
   const cite=/^([\w./-]+):(\d+)(?:-(\d+))?/;
-  const probes={'src/js/images.js:611':'async function importVideo','src/js/adapters/native-import-desktop.js:233':'providers: { image, video }','src/js/adapters/native-time-remap-ui.js:285':'replace.disabled=!routed',
+  const probes={'src/js/images.js:611':'async function importVideo','src/js/adapters/native-import-desktop.js:236':'providers: { image, video }','src/js/adapters/native-time-remap-ui.js:285':'replace.disabled=!routed',
     'src/js/adapters/native-time-remap-ui.js:272':'c.video.replaceActive(p.placementId)','tests/desktop/video-installed-policy.cjs:189':'function witnessAction',
     'src/js/layer-kind.js:110':'ld.nativeVideo','src/js/motion.js:2805':"n20AllowLegacyWrite('motion-toggle-animated')",
     'src/js/adapters/native-time-remap-ui.js:262':'own.toggleTimeRemap(active())','src/js/adapters/native-time-remap-ui.js:168':'function timeRemapKeyIntent','src/js/adapters/native-project-placement-contract.js:39':'setTimeRemapKey',
