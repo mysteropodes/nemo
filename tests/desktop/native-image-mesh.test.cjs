@@ -92,7 +92,7 @@ test('installed native image mesh: binding, gesture, history and project-file pe
         'Public Rust MCP document serialization remains opacity-only; exact state assertions use actual Save As project files.',
         'This raster fixture does not establish scene-component reference release or deduplication.',
         'Screenshots and operator observations establish presentation/input evidence and await independent visual review.',
-      ], pendingInputEvidence: ['genuine platform pointercancel or lostpointercapture for the cancellation checkpoint'] };
+      ], pendingInputEvidence: ['observed held-drag cancellation through the ordinary frame-change action'] };
     const controller = createController({ root: ROOT, app: app.bundle });
     let instance, mcp, sdk, mcpInstanceId, registry, stage = 'launch';
     let serverStarted = false;
@@ -319,11 +319,15 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       assert.equal(changedOffsets.length, 1, 'one gesture changes exactly one vertex offset');
       report.checks.push({ checkpoint: 'sculpt', contentRevision: sculptedStatus.contentRevision });
 
-      const cancelEvidence = await capture('cancel-action', 'Start another handle drag and move it, then produce a genuine platform pointer cancellation or lost-pointer-capture. Record cancellationMethod as pointercancel or lostpointercapture; do not use Escape or inject an event.',
+      const cancelEvidence = await capture('cancel-action', 'A human must press a mesh handle, move it, and keep the mouse button held. With focus outside a text field, press . (Next frame). Wait for displayed frame 2 and the staged drag to clear BEFORE releasing the mouse. Then release, press , (Previous frame), and restore the same selection and Edit points if needed. Record cancellationMethod as frame-change and the actual cancellationObservation; do not infer a pointercancel/lostpointercapture event, use Escape, inject events, or substitute an atomic completed drag.',
         undefined, { selectedLayer: '$observed', underlyingFrame: 0, displayedFrame: 1, meshAttached: true, meshEditing: true });
-      assert.ok(['pointercancel', 'lostpointercapture'].includes(cancelEvidence.cancellationMethod),
-        'cancellation evidence must identify a genuine pointercancel or lostpointercapture');
-      report.pendingInputEvidence = report.pendingInputEvidence.filter(item => !item.startsWith('genuine platform pointercancel'));
+      assert.equal(cancelEvidence.cancellationMethod, 'frame-change', 'record the actual application cancellation action');
+      assert.deepEqual(cancelEvidence.cancellationObservation, {
+        pointerMovedBeforeFrameChange: true, pointerHeldUntilPreviewCleared: true,
+        displayedFrameWhileHeld: 2, stagedPreviewClearedBeforeRelease: true,
+      }, 'operator must witness the moved, still-held drag being discarded by frame navigation');
+      report.pendingInputEvidence = report.pendingInputEvidence.filter(item =>
+        item !== 'observed held-drag cancellation through the ordinary frame-change action');
       const cancelledStatus = await status(); assert.equal(cancelledStatus.contentRevision, sculptedStatus.contentRevision);
       await capture('cancel-save', 'Save As after the real cancelled gesture to the path shown in phase.json.', files.cancelled);
       assert.equal((await status()).contentRevision, cancelledStatus.contentRevision, 'cancel and its Save As add no revision');
