@@ -366,3 +366,134 @@ fn public_duplicate_workflow_preserves_all_destination_tags_and_receipts_through
     history_command(&mut reopened, "public-undo-reopened-copy", true);
     assert_eq!(support::bytes(&reopened), sculpted);
 }
+
+fn rgb(bytes: &[u8], x: usize, y: usize, expected: [u8; 3]) {
+    let offset = (y * 1920 + x) * 4;
+    for channel in 0..3 {
+        assert!(
+            bytes[offset + channel].abs_diff(expected[channel]) <= 2,
+            "pixel {x},{y} channel {channel}: {} != {}",
+            bytes[offset + channel],
+            expected[channel]
+        );
+    }
+}
+
+#[test]
+fn original_mesh_pixels_reach_the_real_metal_viewport_compositor_and_png_at_three_frames() {
+    use crate::compositor::Compositor;
+    use fixtures::pixel_consumer::{composition, exported, fixture, pixels};
+    let (mut owner, mesh) = fixture(false);
+    let mut gpu = Compositor::new().expect("the original pixel criterion requires real Metal");
+    assert_eq!(gpu.adapter().get_info().backend, wgpu::Backend::Metal);
+    let plain = pixels(
+        &mut gpu,
+        &composition(&owner.acquire_snapshot(0).unwrap(), 0, true, 1.),
+    );
+    let (widget_owner, _) = fixture(true);
+    assert_eq!(
+        plain,
+        pixels(
+            &mut gpu,
+            &composition(&widget_owner.acquire_snapshot(0).unwrap(), 0, true, 1.)
+        ),
+        "a native widget contributes zero pixels over all 1920x1080 pixels"
+    );
+    let plain_zoomed = pixels(
+        &mut gpu,
+        &composition(&owner.acquire_snapshot(0).unwrap(), 0, true, 0.75),
+    );
+    for (stage, action) in [
+        (
+            "rest",
+            json!({"command":"object.image.mesh.edit","action":{"kind":"attach","target":at(13),"mesh":mesh}}),
+        ),
+        (
+            "deformed",
+            json!({"command":"object.image.mesh.edit","meshId":"im_1","action":{"kind":"setOffset","index":8,"du":0.1,"dv":0}}),
+        ),
+        (
+            "mask",
+            json!({"command":"object.image.mesh.edit","meshId":"im_1","action":{"kind":"setOffset","index":0,"du":0.25,"dv":0.25}}),
+        ),
+    ] {
+        mesh_command(&mut owner, stage, action);
+        let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
+        for frame in [0, 12, 23] {
+            let viewport = composition(&snapshot, frame, true, 1.);
+            assert!(
+                viewport.raster_image(0).is_none(),
+                "a native mesh cannot expose the flat-image draw"
+            );
+            let rendered = pixels(&mut gpu, &viewport);
+            assert_eq!(rendered.len(), 1920 * 1080 * 4);
+            if stage == "rest" {
+                let differing = plain
+                    .chunks_exact(4)
+                    .zip(rendered.chunks_exact(4))
+                    .filter(|(a, b)| a != b)
+                    .count();
+                assert!(
+                    differing <= 52,
+                    "original rest tolerance: {differing}/2073600 pixels"
+                );
+                assert!(plain
+                    .iter()
+                    .zip(&rendered)
+                    .all(|(a, b)| a.abs_diff(*b) <= 1));
+            }
+            rgb(&rendered, 240, 180, [220, 30, 30]);
+            rgb(&rendered, 400, 180, [30, 60, 220]);
+            rgb(&rendered, 150, 180, [255, 255, 255]);
+            rgb(
+                &rendered,
+                330,
+                180,
+                if stage == "rest" {
+                    [30, 60, 220]
+                } else {
+                    [220, 30, 30]
+                },
+            );
+            if stage == "mask" {
+                rgb(&rendered, 230, 90, [255, 255, 255]);
+            }
+            if frame == 0 {
+                let zoomed = pixels(&mut gpu, &composition(&snapshot, frame, true, 0.75));
+                if stage == "rest" {
+                    let differing = plain_zoomed
+                        .chunks_exact(4)
+                        .zip(zoomed.chunks_exact(4))
+                        .filter(|(a, b)| a != b)
+                        .count();
+                    assert!(differing <= 52, "zoomed rest seam tolerance: {differing}");
+                    assert!(plain_zoomed
+                        .iter()
+                        .zip(&zoomed)
+                        .all(|(a, b)| a.abs_diff(*b) <= 1));
+                }
+                // z=.75 about canvas centre (960,540), applied once.
+                rgb(&zoomed, 420, 270, [220, 30, 30]);
+                rgb(&zoomed, 540, 270, [30, 60, 220]);
+                rgb(&zoomed, 353, 270, [255, 255, 255]);
+                rgb(
+                    &zoomed,
+                    488,
+                    270,
+                    if stage == "rest" {
+                        [30, 60, 220]
+                    } else {
+                        [220, 30, 30]
+                    },
+                );
+                if stage == "mask" {
+                    rgb(&zoomed, 413, 203, [255, 255, 255]);
+                }
+            }
+            assert_eq!(
+                rendered,
+                exported(&owner, &mut gpu, &snapshot, frame, stage)
+            );
+        }
+    }
+}

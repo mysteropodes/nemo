@@ -277,3 +277,198 @@ pub(super) fn refused_envelopes() -> [(&'static str, &'static str, Value, &'stat
         ("foreign", "documentId", json!("foreign"), "wrong_document"),
     ]
 }
+
+#[cfg(feature = "application")]
+pub(super) mod pixel_consumer {
+    use crate::compositor::object_compositor::ObjectOutputSpec;
+    use crate::compositor::Compositor;
+    use crate::export_job::{
+        export_one_object_frame, ExportArtifact, JobStatus, ObjectHostExportRequest,
+        StagedArtifactPort,
+    };
+    use crate::history::NativeObjectHistory;
+    use crate::object_codec::decode_storage_project;
+    use crate::object_document::{
+        AssetId, AssetInventory, AssetKind, AssetRecord, AssetSource, FrameScopeKind,
+        ProjectEnvelope, ProjectMetadata,
+    };
+    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameSelector};
+    use crate::object_render_scene::ObjectCompositionWitness;
+    use crate::object_render_scene::{
+        prepare_object_composition, prepare_object_navigated_viewport_composition,
+        prepare_object_paint_plan, prepare_object_render_scene,
+        prepare_object_viewport_composition,
+    };
+    use crate::revision::ObjectSnapshot;
+    use crate::scheduler::{FrameScheduler, ObjectSchedulePins, ObjectScheduleScope, OutputSpec};
+    use serde_json::{json, Value};
+    use std::{io::Cursor, sync::Arc};
+
+    #[derive(Default)]
+    struct Png(Vec<u8>);
+    impl StagedArtifactPort for Png {
+        fn begin_staging(&mut self, _: &str, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+        fn write_frame(&mut self, _: &str, name: &str, bytes: &[u8]) -> Result<(), String> {
+            assert_eq!(name, "frame_0001.png");
+            assert!(self.0.is_empty());
+            self.0.extend_from_slice(bytes);
+            Ok(())
+        }
+        fn publish(
+            &mut self,
+            _: &str,
+            target: &str,
+            files: &[String],
+        ) -> Result<ExportArtifact, String> {
+            assert_eq!(files, ["frame_0001.png"]);
+            assert!(self.0.starts_with(b"\x89PNG\r\n\x1a\n"));
+            Ok(ExportArtifact {
+                target: target.into(),
+                files: files.to_vec(),
+            })
+        }
+        fn cleanup(&mut self, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+    }
+    pub(crate) fn composition(
+        snapshot: &ObjectSnapshot,
+        frame: u32,
+        viewport: bool,
+        zoom: f64,
+    ) -> ObjectCompositionWitness {
+        let selector = ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "scene-root",
+            scope_kind: FrameScopeKind::Authored,
+            frame,
+        };
+        let packet = prepare_object_frame(snapshot, &selector).unwrap();
+        let scene = prepare_object_render_scene(&packet, &selector).unwrap();
+        let plan = prepare_object_paint_plan(&scene, &selector).unwrap();
+        if viewport && zoom != 1. {
+            prepare_object_navigated_viewport_composition(
+                &plan,
+                &selector,
+                None,
+                false,
+                zoom,
+                [0., 0.],
+            )
+            .unwrap()
+        } else if viewport {
+            prepare_object_viewport_composition(&plan, &selector, None).unwrap()
+        } else {
+            prepare_object_composition(&plan, &selector).unwrap()
+        }
+    }
+    pub(crate) fn pixels(gpu: &mut Compositor, witness: &ObjectCompositionWitness) -> Vec<u8> {
+        let image = gpu
+            .compose_object(
+                witness,
+                ObjectOutputSpec::new(1920, 1080, "white-srgb-normal-rgba8-area").unwrap(),
+            )
+            .unwrap();
+        gpu.readback_object_rgba8(&image).unwrap().bytes().to_vec()
+    }
+
+    pub(crate) fn fixture(with_widget: bool) -> (NativeObjectHistory, Value) {
+        let baseline: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/mesh/project.json")).unwrap();
+        let mut mesh = baseline["imageMeshes"]["im_1"].clone();
+        mesh["offsets"][8] = json!([0, 0]);
+        let target = |frame| {
+            json!({"contextId":"scene-root","layerUid":"L0",
+            "frameScope":{"kind":"authored","frame":frame},"strokeId":format!("raster-{frame}")})
+        };
+        let scopes: Vec<_> = (0..24).map(|frame| json!({"frameScope":{"kind":"authored","frame":frame},
+            "elements":[{"layerUid":"L0","strokeId":format!("raster-{frame}"),"naturalPosition":0,"order":{}}]})).collect();
+        let mut drawing = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":24,
+            "layers":[{"layerUid":"L0"}],"objects":[],"items":{"raster":(0..24).map(|frame|
+                json!({"target":target(frame),"item":{"assetId":"img-1","x":320,"y":180,"width":200,"height":200}})).collect::<Vec<_>>()},
+            "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+                "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
+                "layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],"scopes":scopes}]}});
+        if with_widget {
+            drawing["layers"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"layerUid":"W",
+                "widget":{"kind":"slider","x":{"key":"k","min":0,"max":1}}}));
+            drawing["compositionOrder"]["contexts"][0]["layers"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"layerUid":"W","naturalPosition":1,"order":{}}));
+        }
+        let source = AssetSource::admitted_embedded(
+            "image/png".into(),
+            Arc::new(include_bytes!("../../tests/fixtures/mesh/assets/image.png").to_vec()),
+            1 << 20,
+        )
+        .unwrap();
+        let asset = Arc::new(
+            AssetRecord::new(
+                AssetId::new("img-1".into()).unwrap(),
+                "image.png".into(),
+                AssetKind::Image,
+                source,
+            )
+            .unwrap(),
+        );
+        let inventory = AssetInventory::new(vec![asset], Vec::new(), 16, 0).unwrap();
+        let project = ProjectEnvelope::no_media(
+            ProjectMetadata::new(1920, 1080, 24.).unwrap(),
+            decode_storage_project(drawing.to_string().as_bytes()).unwrap(),
+        )
+        .with_asset_inventory(Some(inventory));
+        let owner = NativeObjectHistory::from_admitted_project("mesh-gpu", project).unwrap();
+        (owner, mesh)
+    }
+
+    pub(crate) fn exported(
+        owner: &NativeObjectHistory,
+        gpu: &mut Compositor,
+        snapshot: &ObjectSnapshot,
+        frame: u32,
+        stage: &str,
+    ) -> Vec<u8> {
+        let mut scheduler = FrameScheduler::new();
+        let mut port = Png::default();
+        let outcome = export_one_object_frame(
+            owner,
+            &mut scheduler,
+            &mut port,
+            gpu,
+            ObjectHostExportRequest {
+                request_id: format!("mesh-{stage}-{frame}"),
+                target: "png".into(),
+                pins: ObjectSchedulePins {
+                    instance_id: snapshot.instance_id().into(),
+                    document_id: snapshot.document_id().into(),
+                    content_revision: snapshot.content_revision(),
+                    document_snapshot_id: snapshot.snapshot_id().into(),
+                    context_id: "scene-root".into(),
+                    frame,
+                    scope: ObjectScheduleScope::Authored,
+                },
+                output: OutputSpec::new("frame", "rgba8", 1920, 1080, "srgb", "straight").unwrap(),
+                maximum_encoded_bytes: 4 << 20,
+            },
+            composition(snapshot, frame, false, 1.),
+        );
+        assert_eq!(outcome.receipt.unwrap().status, JobStatus::Succeeded);
+        assert!(outcome.release.cleanup_complete);
+        assert_eq!(scheduler.lease_counters().live(), 0);
+        let mut decoder = png::Decoder::new(Cursor::new(port.0)).read_info().unwrap();
+        let mut decoded = vec![0; decoder.output_buffer_size().unwrap()];
+        let info = decoder.next_frame(&mut decoded).unwrap();
+        assert_eq!((info.width, info.height), (1920, 1080));
+        decoded.truncate(info.buffer_size());
+        decoded
+    }
+}
