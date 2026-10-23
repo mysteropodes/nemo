@@ -99,6 +99,92 @@ fn project_file(owner: &NativeObjectHistory) -> Vec<u8> {
 }
 
 #[test]
+fn public_binding_reaches_the_native_scene_for_every_scrub_frame_after_history_and_reopen() {
+    use crate::object_document::FrameScopeKind;
+    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameSelector};
+    use crate::object_render_scene::{
+        prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
+    };
+    use crate::object_snapshot::object_raster_asset_resources::AssetPixels;
+
+    let mut value = drawing(24, None);
+    value["formatVersion"] = json!(2);
+    value["compositionOrder"] = json!({"format":"nemo.native-object-order-plan","formatVersion":1,
+        "documentFormatVersion":2,"migration":"explicit-plan-required","referencePolicy":"unresolved",
+        "contexts":[{"contextId":"scene-root","layers":[
+            {"layerUid":"L0","naturalPosition":0,"order":{}},
+            {"layerUid":"L2","naturalPosition":1,"order":{}}],
+            "scopes":(0..24).map(|frame| scope(frame,vec![element("L0",&format!("raster-{frame}"),0)])).collect::<Vec<_>>()}]});
+    let mut owner = support::owner(&value);
+    mesh_command(&mut owner, "scene-attach", attach(at(13)));
+    let attached = support::head(&owner);
+    let saved = project_file(&owner);
+    history_command(&mut owner, "scene-undo", true);
+    let undone = support::head(&owner);
+    history_command(&mut owner, "scene-redo", false);
+    let redone = support::head(&owner);
+    let reopened = NativeObjectHistory::from_project_file("scene-reopened", &saved).unwrap();
+    let mut version = None;
+    // The unbound state establishes the real fixture/asset/order route first.
+    // Tagged states must use that same production consumer, never a flat-image fallback.
+    for (label, snapshot, expected) in [
+        ("undo", undone, None),
+        ("attached", attached, Some("im_1")),
+        ("redo", redone, Some("im_1")),
+        ("reopened", support::head(&reopened), Some("im_1")),
+    ] {
+        for frame in 0..24 {
+            let selector = ObjectFrameSelector {
+                instance_id: snapshot.instance_id(),
+                document_id: snapshot.document_id(),
+                content_revision: snapshot.content_revision(),
+                document_snapshot_id: snapshot.snapshot_id(),
+                context_id: "scene-root",
+                scope_kind: FrameScopeKind::Authored,
+                frame,
+            };
+            let packet = prepare_object_frame(&snapshot, &selector).unwrap();
+            assert_eq!(packet.raster_records().len(), 1, "{label}/{frame}");
+            let raster = packet.raster_records().next().unwrap().entry();
+            assert_eq!(serde_json::to_value(&raster.target).unwrap(), at(frame));
+            assert_eq!(raster.item.mesh_id(), expected, "{label}/{frame}");
+            assert_eq!(raster.item.asset_id().as_str(), "img-1");
+            let retained = snapshot
+                .document()
+                .item_records()
+                .unwrap()
+                .raster_entries()
+                .iter()
+                .find(|entry| entry.target == raster.target)
+                .unwrap();
+            assert!(
+                std::ptr::eq(raster, retained),
+                "retained identity at {label}/{frame}"
+            );
+            let scene = prepare_object_render_scene(&packet, &selector)
+                .unwrap_or_else(|error| panic!("native mesh scene {label}/{frame}: {error:?}"));
+            let plan = prepare_object_paint_plan(&scene, &selector).unwrap();
+            let resources = plan.scene_resource_versions().unwrap();
+            assert_eq!(resources.len(), 1, "one retained image at {label}/{frame}");
+            assert_eq!(resources[0].0, "raster-asset:img-1");
+            if let Some(version) = &version {
+                assert_eq!(&resources[0].1, version);
+            } else {
+                version = Some(resources[0].1.clone());
+            }
+            let composition = prepare_object_composition(&plan, &selector).unwrap();
+            assert!(
+                composition.has_scene_images(),
+                "native image at {label}/{frame}"
+            );
+            let pixels = AssetPixels::retain_for_scene(&snapshot, "img-1", &[]).unwrap();
+            assert_eq!(pixels.encoded_png(), support::png());
+            assert_eq!(pixels.snapshot().snapshot_id(), snapshot.snapshot_id());
+        }
+    }
+}
+
+#[test]
 fn public_wrapper_attaches_detaches_and_releases_only_the_last_reference_across_24_frames() {
     let mut value = drawing(24, None);
     for frame in 0..24 {
