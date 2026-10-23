@@ -136,7 +136,7 @@ async fn round_trip(
     .unwrap();
     (response.unwrap(), events)
 }
-fn presented_project() -> Value {
+pub(super) fn presented_project() -> Value {
     let mut value = project();
     value["project"]["canvasH"] = json!(64);
     value["drawing"]["formatVersion"] = json!(2);
@@ -165,7 +165,7 @@ fn presented_project() -> Value {
         "offsets":[[0,0],[0,0],[0,0],[0,0]],"cols":1,"rows":1}});
     value
 }
-fn host_info(owner: &NativeObjectHost) -> Value {
+pub(super) fn host_info(owner: &NativeObjectHost) -> Value {
     let pin = snapshot(owner);
     json!({"instanceId":owner.instance_id(),"documentId":owner.document_id(),
         "contentRevision":owner.content_revision(),"documentSnapshotId":pin.snapshot_id()})
@@ -180,7 +180,7 @@ fn query(info: &Value, shown: &PresentationReceipt, frame: u32, page: Value) -> 
             "workId":format!("native-work-{}",identity.work_id().value()),
             "viewGeneration":identity.view_generation().value(),"page":page}}})
 }
-fn host_read(owner: &mut NativeObjectHost, request: &Value) -> Value {
+pub(super) fn host_read(owner: &mut NativeObjectHost, request: &Value) -> Value {
     assert!(request.to_string().len() <= 4096);
     let response = owner
         .dispatch(serde_json::from_value(request.clone()).unwrap())
@@ -189,7 +189,7 @@ fn host_read(owner: &mut NativeObjectHost, request: &Value) -> Value {
     assert!(response.to_string().len() <= 4096);
     response
 }
-fn host_saved(owner: &NativeObjectHost) -> Vec<u8> {
+pub(super) fn host_saved(owner: &NativeObjectHost) -> Vec<u8> {
     let pin = snapshot(owner);
     owner
         .project_file_snapshot(owner.content_revision(), pin.snapshot_id())
@@ -230,7 +230,7 @@ fn assert_selected(response: &Value, request: &Value) {
         "triangleIndexCount":6,"offsetsPresent":true,"cols":1,"rows":1})
     );
 }
-fn mutate(owner: &mut NativeObjectHost, id: &str, undo: bool) {
+pub(super) fn mutate(owner: &mut NativeObjectHost, id: &str, undo: bool) {
     let (operation, payload) = if undo {
         (
             "command.document.object.undo",
@@ -383,6 +383,21 @@ async fn gpu_presented_original_application_owner_serves_authenticated_mesh_read
         .present_object_preview(generation, &selected, output(), &mut gpu, &mut surface)
         .unwrap();
     assert_eq!(shown.status(), &ViewportStatus::Presented);
+    let bootstrap = json!({"apiVersion":2,"requestId":"fresh-public-presentation","instanceId":state.instance_id(),
+        "documentId":id,"operation":"query.document.object","payload":{"atRevision":info["contentRevision"],"view":{"kind":"presentation"}}});
+    let command = nemo_mcp::wire::decode_native_request(bootstrap.to_string().as_bytes()).unwrap();
+    let (acquired, events) = round_trip(&state, command, None).await;
+    assert_eq!(events, 0);
+    assert!(acquired.ok);
+    let acquired = acquired.result.unwrap();
+    assert_eq!(
+        acquired["workId"],
+        format!("native-work-{}", shown.identity().work_id().value())
+    );
+    assert_eq!(
+        acquired["viewGeneration"],
+        shown.identity().view_generation().value()
+    );
     for page in [
         json!({"kind":"selection"}),
         json!({"kind":"outline","meshId":"im_1","cursor":0,"limit":16}),
@@ -390,7 +405,11 @@ async fn gpu_presented_original_application_owner_serves_authenticated_mesh_read
         json!({"kind":"tris","meshId":"im_1","cursor":0,"limit":16}),
         json!({"kind":"offsets","meshId":"im_1","cursor":0,"limit":16}),
     ] {
-        let request = query(&info, &shown, 0, page);
+        let request = json!({"apiVersion":2,"requestId":format!("public-mesh-{}",page["kind"].as_str().unwrap()),
+            "instanceId":state.instance_id(),"documentId":id,"operation":"query.document.object","payload":{
+            "atRevision":acquired["atRevision"],"documentSnapshotId":acquired["documentSnapshotId"],"view":{
+            "kind":"imageMesh","contextId":acquired["contextId"],"frame":acquired["frame"],"layerUid":"L0",
+            "workId":acquired["workId"],"viewGeneration":acquired["viewGeneration"],"page":page}}});
         let raw = request.to_string();
         assert!(raw.len() <= 4096);
         let command = nemo_mcp::wire::decode_native_request(raw.as_bytes()).unwrap();

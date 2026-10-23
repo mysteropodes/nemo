@@ -463,7 +463,7 @@
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
-              queryContract.correlate(outbound.payload, response.result);
+              queryContract.correlate(outbound.payload, response.result, undefined, outbound.documentId);
             }
             if (response.ok && outbound.operation==='query.document.object.property.metadata') property.metadataCorrelated(outbound.payload,response.result);
             if (response.ok && outbound.operation === readOperation) property.readCorrelated(outbound.payload, response.result);

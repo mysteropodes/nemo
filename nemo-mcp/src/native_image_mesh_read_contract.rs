@@ -1,4 +1,4 @@
-//! Closed bounded Mesh view for the existing common object query.
+//! Closed bounded Mesh and presentation views for the existing common object query.
 use super::{exact, frame, revision};
 use serde_json::Value;
 
@@ -243,4 +243,259 @@ pub(super) fn image_mesh_result(document_id: &str, payload: &Value, result: &Val
     counts.is_some_and(|counts| {
         image_mesh_page_result(&view["page"], &value["page"], &value["mesh"], &counts)
     })
+}
+
+/// Presentation discovery shares the existing query operation, with no supplied
+/// work token or caller-selected frame. Only the host can provide the result.
+pub(super) fn presentation_view(value: &Value) -> bool {
+    value.pointer("/view/kind").and_then(Value::as_str) == Some("presentation")
+}
+pub(super) fn presentation_request(value: &Value) -> bool {
+    exact(value, &["atRevision", "view"], &[]).is_some_and(|payload| {
+        revision(payload.get("atRevision")).is_some()
+            && exact(&payload["view"], &["kind"], &[])
+                .is_some_and(|view| view["kind"] == "presentation")
+    })
+}
+pub(super) fn presentation_result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if !presentation_request(payload) {
+        return false;
+    }
+    exact(
+        result,
+        &[
+            "kind",
+            "atRevision",
+            "documentSnapshotId",
+            "contextId",
+            "frame",
+            "workId",
+            "viewGeneration",
+        ],
+        &[],
+    )
+    .is_some_and(|value| {
+        value["kind"] == "presentation"
+            && revision(value.get("atRevision")) == revision(payload.get("atRevision"))
+            && ["documentSnapshotId", "contextId", "workId"]
+                .iter()
+                .all(|key| {
+                    value
+                        .get(*key)
+                        .and_then(Value::as_str)
+                        .is_some_and(crate::contract::bounded_identifier)
+                })
+            && value["documentSnapshotId"].as_str()
+                == Some(
+                    format!(
+                        "native-object:{document_id}:{}",
+                        payload["atRevision"].as_u64().unwrap()
+                    )
+                    .as_str(),
+                )
+            && frame(value.get("frame")).is_some()
+            && revision(value.get("viewGeneration")).is_some_and(|generation| generation > 0)
+    })
+}
+
+#[cfg(test)]
+mod presentation_tests {
+    use super::*;
+    use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
+    use serde_json::json;
+
+    // Literal contract fixtures only; these tests do not establish native surface authority.
+    fn payload() -> Value {
+        json!({"atRevision":7,"view":{"kind":"presentation"}})
+    }
+    fn details() -> Value {
+        json!({"kind":"presentation","atRevision":7,"documentSnapshotId":"native-object:document:7",
+            "contextId":"scene-root","frame":12,"workId":"native-work-9","viewGeneration":3})
+    }
+    fn request() -> NativeApplicationRequest {
+        serde_json::from_value(
+            json!({"apiVersion":2,"requestId":"presentation-read","instanceId":"instance",
+            "documentId":"document","operation":"query.document.object","payload":payload()}),
+        )
+        .unwrap()
+    }
+    fn response() -> NativeApplicationResponse {
+        serde_json::from_value(
+            json!({"apiVersion":2,"requestId":"presentation-read","instanceId":"instance",
+            "documentId":"document","contentRevision":7,"ok":true,"result":details()}),
+        )
+        .unwrap()
+    }
+    fn accepts(value: &Value) -> bool {
+        presentation_result("document", &payload(), value)
+    }
+    fn edited(original: &Value, path: &str, replacement: Value) -> Value {
+        let mut value = original.clone();
+        *value.pointer_mut(path).unwrap() = replacement;
+        value
+    }
+    #[test]
+    fn presentation_runtime_shapes_are_closed_pinned_and_bounded() {
+        assert!(request().validate_input().is_ok());
+        assert!(crate::wire::validate_native_response(&response(), &request()).is_ok());
+        for bad in [
+            Value::Null,
+            json!([]),
+            json!({"view":{"kind":"presentation"}}),
+            json!({"atRevision":7,"view":null}),
+            json!({"atRevision":7,"view":{"kind":"presentation","frame":0}}),
+            json!({"atRevision":7,"view":{"kind":"presentation"},"documentSnapshotId":"caller-snapshot"}),
+        ] {
+            assert!(!crate::native_contract::validate_request(
+                "query.document.object",
+                &bad
+            ));
+        }
+        for revision in [
+            json!(-1),
+            json!(0.5),
+            json!(9_007_199_254_740_992u64),
+            Value::Null,
+        ] {
+            assert!(!presentation_request(&edited(
+                &payload(),
+                "/atRevision",
+                revision
+            )));
+        }
+        for (path, value) in [
+            ("/kind", json!("imageMesh")),
+            ("/atRevision", json!(8)),
+            ("/documentSnapshotId", json!("native-object:other:7")),
+            ("/contextId", json!("bad context")),
+            ("/contextId", json!("x".repeat(129))),
+            ("/frame", json!(4_294_967_296u64)),
+            ("/workId", json!("bad work")),
+            ("/viewGeneration", json!(0)),
+            ("/viewGeneration", json!(9_007_199_254_740_992u64)),
+        ] {
+            assert!(!accepts(&edited(&details(), path, value)), "{path}");
+        }
+        for key in details().as_object().unwrap().keys() {
+            let mut missing = details();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(!accepts(&missing), "missing {key}");
+        }
+        let mut extra = details();
+        extra["mesh"] = json!({});
+        assert!(!accepts(&extra));
+        let mut boundary = details();
+        boundary["frame"] = json!(u32::MAX);
+        boundary["viewGeneration"] = json!(9_007_199_254_740_991u64);
+        assert!(accepts(&boundary));
+        let mut mismatched = response();
+        mismatched.content_revision = 8;
+        assert!(crate::wire::validate_native_response(&mismatched, &request()).is_err());
+        let mut write = request();
+        write.expected_revision = Some(7);
+        assert!(write.validate_input().is_err());
+    }
+    #[test]
+    fn presentation_original_bytes_keep_duplicate_malformed_and_4096_guards() {
+        let raw = serde_json::to_string(&request()).unwrap();
+        assert!(crate::wire::decode_native_request(raw.as_bytes()).is_ok());
+        for (needle, replacement) in [
+            (
+                "\"requestId\":",
+                "\"requestId\":\"duplicate\",\"requestId\":",
+            ),
+            ("\"atRevision\":", "\"atRevision\":7,\"atRevision\":"),
+            (
+                "\"view\":",
+                "\"view\":{\"kind\":\"presentation\"},\"view\":",
+            ),
+            (
+                "\"kind\":\"presentation\"",
+                "\"kind\":\"presentation\",\"kind\":\"presentation\"",
+            ),
+        ] {
+            assert!(raw.contains(needle));
+            assert!(crate::wire::decode_native_request(
+                raw.replacen(needle, replacement, 1).as_bytes()
+            )
+            .is_err());
+        }
+        assert!(crate::wire::decode_native_request(raw[..raw.len() - 1].as_bytes()).is_err());
+        assert!(crate::wire::decode_native_request(
+            format!("{}{raw}", " ".repeat(4096)).as_bytes()
+        )
+        .is_err());
+    }
+    fn schema() -> jsonschema::Validator {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../engineering/application/native-transport-v2.schema.json"
+        ))
+        .unwrap();
+        let mut resources = jsonschema::Registry::new();
+        for text in [
+            include_str!(
+                "../../engineering/application/native-bitmap-brush-resources-v1.schema.json"
+            ),
+            include_str!("../../engineering/application/native-object-item-v1.schema.json"),
+            include_str!("../../engineering/application/native-font-assets-v1.schema.json"),
+            include_str!("../../engineering/application/native-property-metadata-v1.schema.json"),
+        ] {
+            let resource: Value = serde_json::from_str(text).unwrap();
+            resources = resources
+                .add(
+                    resource["$id"].as_str().unwrap().to_owned(),
+                    jsonschema::Resource::from_contents(resource),
+                )
+                .unwrap();
+        }
+        jsonschema::draft202012::options()
+            .with_registry(&resources.prepare().unwrap())
+            .build(&schema)
+            .unwrap()
+    }
+    #[test]
+    fn presentation_canonical_schema_preserves_legacy_and_mesh_disjoint_branches() {
+        let validator = schema();
+        let base = serde_json::to_value(request()).unwrap();
+        let reply = serde_json::to_value(response()).unwrap();
+        assert!(validator.is_valid(&base));
+        assert!(validator.is_valid(&reply));
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../engineering/application/examples/native-object-v1/cases.json"
+        ))
+        .unwrap();
+        let mut legacy = base.clone();
+        legacy["payload"] = json!({"atRevision":7,"stableTarget":corpus["records"][0]["target"]});
+        assert!(validator.is_valid(&legacy));
+        let mut legacy_reply = reply.clone();
+        legacy_reply["result"] = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","object":corpus["records"][0]});
+        assert!(validator.is_valid(&legacy_reply));
+        let mut mesh = base.clone();
+        mesh["payload"] = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7","view":{
+            "kind":"imageMesh","contextId":"scene-root","layerUid":"L0","frame":12,"workId":"native-work-9",
+            "viewGeneration":3,"page":{"kind":"selection"}}});
+        assert!(validator.is_valid(&mesh));
+        assert!(crate::native_contract::validate_request(
+            "query.document.object",
+            &mesh["payload"]
+        ));
+        for (path, value) in [
+            ("/payload/view", Value::Null),
+            ("/payload/view", json!({"kind":"presentation","page":{}})),
+            (
+                "/payload",
+                json!({"atRevision":7,"view":{"kind":"presentation"},"stableTarget":corpus["records"][0]["target"]}),
+            ),
+        ] {
+            assert!(!validator.is_valid(&edited(&base, path, value)));
+        }
+        for key in details().as_object().unwrap().keys() {
+            let mut missing = reply.clone();
+            missing["result"].as_object_mut().unwrap().remove(key);
+            assert!(!validator.is_valid(&missing), "missing {key}");
+        }
+        let mut extra = reply;
+        extra["result"]["target"] = json!({});
+        assert!(!validator.is_valid(&extra));
+    }
 }

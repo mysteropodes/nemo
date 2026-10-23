@@ -448,3 +448,44 @@ fn real_sparse_exposure_keeps_held_source_target_and_the_presented_frame() {
     assert_eq!(value["mesh"]["meshId"], "im_1");
     assert_eq!(support::state(&owner), before);
 }
+
+#[test]
+fn presentation_bootstrap_without_a_host_is_closed_unavailable_and_does_not_spend() {
+    let (owner, _) = fixture(false);
+    let before = support::state(&owner);
+    let snapshot = support::head(&owner);
+    let request = |payload| {
+        serde_json::from_value(json!({"apiVersion":2,"requestId":"bootstrap-read",
+        "instanceId":snapshot.instance_id(),"documentId":snapshot.document_id(),
+        "operation":"query.document.object","payload":payload}))
+        .unwrap()
+    };
+    let payload = json!({"atRevision":snapshot.content_revision(),"view":{"kind":"presentation"}});
+    let response = snapshot.dispatch(request(payload.clone())).unwrap();
+    assert_eq!(response.error.unwrap().code, DispatchErrorCode::Unavailable);
+    let mut stale = payload.clone();
+    stale["atRevision"] = json!(snapshot.content_revision() + 1);
+    assert_eq!(
+        snapshot
+            .dispatch(request(stale))
+            .unwrap()
+            .error
+            .unwrap()
+            .code,
+        DispatchErrorCode::StaleRevision
+    );
+    for path in ["", "/view"] {
+        let mut extra = payload.clone();
+        extra.pointer_mut(path).unwrap()["unknown"] = json!(true);
+        assert_eq!(
+            snapshot
+                .dispatch(request(extra))
+                .unwrap()
+                .error
+                .unwrap()
+                .code,
+            DispatchErrorCode::InvalidRequest
+        );
+    }
+    assert_eq!(support::state(&owner), before);
+}

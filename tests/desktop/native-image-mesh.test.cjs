@@ -4,12 +4,13 @@
 // nativeStatus are the state oracles; screenshots establish presentation only
 // and remain pending visual review. Project workspace metadata is presentation-owned.
 const test = require('node:test'), assert = require('node:assert/strict');
-const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), net = require('node:net');
+const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../..');
 const { createController, packagedApp, hash } = require(path.join(ROOT, 'tests/desktop/native-harness.cjs'));
 const { McpClient } = require(path.join(ROOT, 'tests/mcp-parity/mcp-client.cjs'));
+const { createNativeApplicationAdapter } = require(path.join(ROOT, 'src/js/adapters/native-application.js'));
 const runtime = require(path.join(ROOT, 'scripts/nemo/lib/native-runtime.cjs'));
 const identity = require(path.join(ROOT, 'scripts/nemo/lib/identity.cjs'));
 const PNG_ORACLE = 'native-engine/tests/fixtures/object-raster-asset-attach/oracle.txt';
@@ -18,8 +19,8 @@ const OWNED = new Set(['tests/desktop/native-image-mesh.test.cjs']);
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2), { mode: 0o600 });
-function structured(response) {
-  if (response?.result?.isError) throw new Error('bundled MCP tool returned an error');
+function structured(response, allowError = false) {
+  if (response?.result?.isError && !allowError) throw new Error('bundled MCP tool returned an error');
   if (response?.result?.structuredContent) return response.result.structuredContent;
   for (const item of response?.result?.content || []) {
     if (item.type === 'text') { try { return JSON.parse(item.text); } catch { /* inspect next block */ } }
@@ -51,27 +52,6 @@ function fixture() {
       compositionOrder: { format: 'nemo.native-object-order-plan', formatVersion: 1, documentFormatVersion: 2,
         migration: 'explicit-plan-required', referencePolicy: 'unresolved',
         contexts: [{ contextId: 'scene-root', layers: [{ layerUid: 'L0', naturalPosition: 0, order: {} }], scopes }] } } };
-}
-
-function wire(endpoint, member, request) {
-  return new Promise((resolve, reject) => {
-    let bytes = '', done = false;
-    const socket = net.connect(endpoint.port, '127.0.0.1');
-    const finish = (error, value) => { if (done) return; done = true; socket.destroy(); error ? reject(error) : resolve(value); };
-    socket.setTimeout(15000, () => finish(new Error('installed request timed out')));
-    socket.on('error', () => finish(new Error('installed request transport unavailable')));
-    socket.on('close', () => { if (!done) finish(new Error('installed response closed before a complete frame')); });
-    socket.on('connect', () => socket.write(JSON.stringify({ secret: endpoint.secret, [member]: request }) + '\n'));
-    socket.on('data', chunk => {
-      bytes += chunk; if (bytes.length > 65536) return finish(new Error('installed response exceeded bound'));
-      const end = bytes.indexOf('\n'); if (end < 0) return;
-      try { const response = JSON.parse(bytes.slice(0, end));
-        assert.equal(response.apiVersion, request.apiVersion);
-        assert.equal(response.requestId, request.requestId); assert.equal(response.instanceId, request.instanceId);
-        finish(null, response);
-      } catch (error) { finish(error); }
-    });
-  });
 }
 
 test('installed native image mesh: binding, gesture, history and project-file persistence',
@@ -112,7 +92,7 @@ test('installed native image mesh: binding, gesture, history and project-file pe
         'Screenshots and operator observations establish presentation/input evidence and await independent visual review.',
       ], pendingInputEvidence: ['genuine platform pointercancel or lostpointercapture for the cancellation checkpoint'] };
     const controller = createController({ root: ROOT, app: app.bundle });
-    let instance, endpoint, mcp, stage = 'launch', sequence = 0;
+    let instance, mcp, sdk, mcpInstanceId, registry, stage = 'launch';
     let serverStarted = false;
     const cleanup = { serverClosed: false, appStopped: false, launcherStopped: false, reservationsReleased: false, mcpClosed: true };
     const captureToken = randomUUID();
@@ -133,8 +113,32 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       });
     });
     captureServer.requestTimeout = 15000; captureServer.headersTimeout = 10000; captureServer.timeout = 15000;
-    async function status() { return wire(endpoint, 'nativeStatus', { apiVersion: 2,
-      requestId: `t11-mesh-status-${++sequence}`, instanceId: endpoint.instanceId }); }
+    async function discover() {
+      const result = structured(await mcp.callTool('nemo_discover', {}));
+      assert.equal(result.instances?.length, 1, 'the isolated MCP registry must expose exactly one application');
+      const found = result.instances[0];
+      if (mcpInstanceId) assert.equal(found.instanceId, mcpInstanceId, 'MCP owner identity changed');
+      mcpInstanceId ||= found.instanceId;
+      const native = found.nativeHostStatus;
+      assert.ok(native && native.instanceId === mcpInstanceId, 'discovery must include actual nativeStatus');
+      return { apiVersion: native.apiVersion, requestId: native.requestId, instanceId: native.instanceId,
+        available: native.available, documentId: native.documentId, contentRevision: native.contentRevision };
+    }
+    async function status() { return discover(); }
+    async function presentation(pin) {
+      const request = { apiVersion: 2, requestId: randomUUID(), instanceId: pin.instanceId, documentId: pin.documentId,
+        operation: 'query.document.object', payload: { atRevision: pin.contentRevision, view: { kind: 'presentation' } } };
+      const reply = await sdk.dispatch(request);
+      assert.equal(reply.ok, true, 'public presentation bootstrap must return the current tuple');
+      assert.equal(reply.contentRevision, pin.contentRevision);
+      return reply.result;
+    }
+    function meshRead(pin, view, layerUid, page) {
+      return { apiVersion: 2, requestId: randomUUID(), instanceId: pin.instanceId, documentId: pin.documentId,
+        operation: 'query.document.object', payload: { atRevision: view.atRevision, documentSnapshotId: view.documentSnapshotId,
+          view: { kind: 'imageMesh', contextId: view.contextId, layerUid, frame: view.frame,
+            workId: view.workId, viewGeneration: view.viewGeneration, page } } };
+    }
     async function until(check, label, timeout = 300000) {
       const end = Date.now() + timeout;
       do { if (t.signal.aborted) throw new Error('installed acceptance timed out or was cancelled');
@@ -234,12 +238,22 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       instance = await controller.start(`t11-mesh-${process.pid}-${Date.now()}`, ['desktop-input', 'gpu-reference']);
       const owned = await controller.status(instance); assert.equal(owned.code, 0); instance.snapshot = owned.value;
       assert.equal(fs.realpathSync(instance.snapshot.app.executable), app.executable);
-      const registry = path.join(instance.info.roots.tauriDataDir, 'mcp');
+      registry = path.join(instance.info.roots.tauriDataDir, 'mcp');
       await until(() => fs.existsSync(registry) && fs.readdirSync(registry).some(name => name.endsWith('.json')), 'app registration');
       const registrations = fs.readdirSync(registry).filter(name => name.endsWith('.json'));
       assert.equal(registrations.length, 1, 'exactly one owned application registration is expected');
-      endpoint = read(path.join(registry, registrations[0]));
-      assert.ok(Number.isInteger(endpoint.port) && typeof endpoint.secret === 'string' && endpoint.secret.length > 0);
+      mcp = new McpClient(mcpBinary, [], { NEMO_MCP_REGISTRY: registry });
+      const initialized = await mcp.initialize();
+      assert.ok(initialized.result?.protocolVersion, 'bundled process must complete MCP initialization');
+      const toolList = await mcp.listTools();
+      assert.equal((toolList.result?.tools || []).filter(tool => tool.name === 'nemo_command').length, 1,
+        'bundled process must expose exactly one command endpoint');
+      const discovery = structured(await mcp.callTool('nemo_discover', {}));
+      assert.equal(discovery.instances?.length, 1, 'bundled process must discover exactly the one owned app');
+      mcpInstanceId = discovery.instances[0].instanceId;
+      sdk = createNativeApplicationAdapter('installed-mcp', {
+        dispatch: async request => structured(await mcp.callTool('nemo_command', request), true),
+      });
       await capture('open-fixture', 'Open the supplied 24-frame blue-2x1 native JSON; select raster L0. Source frame 0 appears as displayed frame 1.',
         undefined, { selectedLayer: '$observed', underlyingFrame: 0, displayedFrame: 1, meshAttached: false, meshEditing: false });
       report.selectedLayerLabel = selectedLayerLabel;
@@ -252,6 +266,10 @@ test('installed native image mesh: binding, gesture, history and project-file pe
         contentRevisionAfter: baselineStatus.contentRevision, note: 'Save As may materialize workspace before establishing the Mesh baseline.' });
       const baselineDoc = savedDocument(files.baseline), baselineState = meshState(baselineDoc);
       assert.deepEqual(baselineState, { links: Array(24).fill(null), meshes: {} });
+      const baselinePresentation = await presentation(baselineStatus);
+      const initialSelection = await sdk.dispatch(meshRead(baselineStatus, baselinePresentation, 'L0', { kind: 'selection' }));
+      assert.equal(initialSelection.ok, true, 'strict imageMesh selection query must use the public shared SDK');
+      assert.equal(initialSelection.result.mesh, null, 'newly admitted raster begins unbound');
 
       await capture('attach-action', 'Enable Mesh for the selected raster and wait for the native receipt.',
         undefined, { selectedLayer: '$observed', underlyingFrame: 0, displayedFrame: 1, meshAttached: true, meshEditing: false });
@@ -262,6 +280,18 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       const attached = savedDocument(files.attached), attachedState = meshState(attached);
       assertPreservedExceptMesh(baselineDoc, attached, 'attach');
       const meshId = attachedState.links[0]; assert.ok(meshId); assertBinding(attached, meshId);
+      const staleSelection = await sdk.dispatch(meshRead(baselineStatus, baselinePresentation, 'L0', { kind: 'selection' }));
+      assert.equal(staleSelection.ok, false, 'the pre-mutation presentation tuple must become stale');
+      assert.equal(staleSelection.error?.code, 'stale_revision',
+        'stale bootstrap tuple must be explicitly refused');
+      const attachedPresentation = await presentation(attachedStatus);
+      const attachedSelection = await sdk.dispatch(meshRead(attachedStatus, attachedPresentation, 'L0', { kind: 'selection' }));
+      assert.equal(attachedSelection.ok, true);
+      assert.equal(attachedSelection.result.mesh.meshId, meshId, 'presentation tuple resolves the actual attached mesh');
+      const outlinePage = await sdk.dispatch(meshRead(attachedStatus, attachedPresentation, 'L0',
+        { kind: 'outline', meshId, cursor: 0, limit: 16 }));
+      assert.equal(outlinePage.ok, true, 'strict outline page is read through production query validation');
+      assert.ok(outlinePage.result.page.items.length > 0);
       report.checks.push({ checkpoint: 'attach', contentRevision: attachedStatus.contentRevision, meshId, frameBindings: 24 });
 
       await capture('scrub', 'Scrub source frames 0, 7 and 23 (displayed frames 1, 8 and 24); verify binding, then return to source frame 0/displayed frame 1.',
@@ -345,6 +375,13 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       const reopenedDoc = savedDocument(files.reopened);
       equalState(files.reopened, sculptedState, 'new post-reopen Save As preserves exact binding, store and offsets');
       assertSameDocument(sculptedDoc, reopenedDoc, 'post-reopen save');
+      const oldDocumentRead = await sdk.dispatch(meshRead(baselineStatus, baselinePresentation, 'L0', { kind: 'selection' }));
+      assert.equal(oldDocumentRead.ok, false, 'the old document presentation must not survive project replacement');
+      assert.equal(oldDocumentRead.error?.code, 'wrong_document');
+      const reopenedPresentation = await presentation(reopenedStatus);
+      const reopenedSelection = await sdk.dispatch(meshRead(reopenedStatus, reopenedPresentation, 'L0', { kind: 'selection' }));
+      assert.equal(reopenedSelection.ok, true, 'a fresh public bootstrap recovers the current document presentation');
+      assert.equal(reopenedSelection.result.mesh.meshId, meshId, 'fresh presentation reads the persisted mesh binding');
       report.checks.push({ checkpoint: 'save-reopen', documentIdChanged: true, contentRevision: reopenedStatus.contentRevision });
 
       const mcpBefore = await status();
@@ -353,23 +390,12 @@ test('installed native image mesh: binding, gesture, history and project-file pe
       const mcpOffset = [0.125, -0.0625];
       const mcpIndex = reopenedMesh.offsets.findIndex(point => JSON.stringify(point) !== JSON.stringify(mcpOffset));
       assert.ok(mcpIndex >= 0, 'choose a mesh vertex whose existing offset differs from the fixed MCP offset');
-      const mcpRequest = { apiVersion: 2, requestId: randomUUID(), instanceId: endpoint.instanceId,
+      const mcpRequest = { apiVersion: 2, requestId: randomUUID(), instanceId: mcpInstanceId,
         documentId: mcpBefore.documentId, expectedRevision: mcpBefore.contentRevision,
         operation: 'command.document.object.image.mesh.edit',
         payload: { command: 'object.image.mesh.edit', meshId,
           action: { kind: 'setOffset', index: mcpIndex, du: mcpOffset[0], dv: mcpOffset[1] } } };
-      mcp = new McpClient(mcpBinary, [], { NEMO_MCP_REGISTRY: registry });
-      const initialized = await mcp.initialize();
-      assert.ok(initialized.result?.protocolVersion, 'bundled process must complete MCP initialization');
-      const toolList = await mcp.listTools();
-      const tools = toolList.result?.tools || [];
-      assert.equal(tools.filter(tool => tool.name === 'nemo_command').length, 1, 'discover exactly one command endpoint');
-      const discovery = structured(await mcp.callTool('nemo_discover', {}));
-      assert.equal(discovery.instances?.length, 1, 'bundled process must discover exactly the one owned app');
-      assert.equal(discovery.instances[0].instanceId, endpoint.instanceId, 'discovery must resolve the owned application');
-      const mcpResponse = await mcp.callTool('nemo_command', mcpRequest);
-      assert.equal(mcpResponse.error, undefined, 'MCP JSON-RPC call must not return an error');
-      const nativeReply = structured(mcpResponse);
+      const nativeReply = await sdk.dispatch(mcpRequest);
       assert.equal(nativeReply.apiVersion, 2); assert.equal(nativeReply.requestId, mcpRequest.requestId);
       assert.equal(nativeReply.instanceId, mcpRequest.instanceId); assert.equal(nativeReply.documentId, mcpRequest.documentId);
       assert.equal(nativeReply.ok, true, 'native command owner must acknowledge the MCP command');

@@ -60,6 +60,10 @@ pub(crate) mod widget_read;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;
+enum ReadAdmission {
+    Accepted(Vec<u8>),
+    Refused(ResponseEnvelope),
+}
 #[path = "object_image_mesh_snapshot.rs"]
 mod image_mesh_read;
 pub use image_mesh_read::{ImageMeshReadFailure, ImageMeshReadProjection};
@@ -237,56 +241,16 @@ impl ObjectSnapshot {
         request: OpacityRequest,
         image_mesh_view: Result<&ImageMeshReadProjection, ImageMeshReadFailure>,
     ) -> Result<ResponseEnvelope, DispatchErrorCode> {
-        if [
-            request.request_id.as_str(),
-            request.instance_id.as_str(),
-            request.document_id.as_str(),
-            self.instance_id(),
-            self.document_id(),
-        ]
-        .iter()
-        .any(|value| !envelope_identifier(value))
-        {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
-        let encoded =
-            serde_json::to_vec(&request).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let encoded = match self.read_admission(&request)? {
+            ReadAdmission::Accepted(bytes) => bytes,
+            ReadAdmission::Refused(response) => return Ok(response),
+        };
         let failure = |code, message| Ok(self.read_failure(&request, code, message));
-        if request.api_version != APPLICATION_API_VERSION
-            || !envelope_identifier(&request.operation)
-            || !request.payload.is_object()
-            || encoded.len() > MAX_MESSAGE_BYTES
-        {
-            return failure(
-                DispatchErrorCode::InvalidRequest,
-                "Invalid bounded object read request.",
-            );
-        }
-        if request.instance_id != self.instance_id() {
-            return failure(
-                DispatchErrorCode::WrongInstance,
-                "Object read targets a different instance.",
-            );
-        }
-        if request.document_id != self.document_id() {
-            return failure(
-                DispatchErrorCode::WrongDocument,
-                "Object read targets a different document.",
-            );
-        }
-        if request.cancelled_before_dispatch {
-            return failure(
-                DispatchErrorCode::CancelledBeforeDispatch,
-                "Object read was cancelled before dispatch.",
-            );
-        }
-        if request.expected_revision.is_some() {
-            return failure(
-                DispatchErrorCode::InvalidRequest,
-                "Only pinned object reads without expectedRevision are supported.",
-            );
-        }
         if request.operation == "query.document.object" && request.payload.get("view").is_some() {
+            if request.payload["view"]["kind"] == "presentation" {
+                return self
+                    .dispatch_presentation_read(&request, Err(ImageMeshReadFailure::Unpresented));
+            }
             return self.dispatch_image_mesh_read(&request, image_mesh_view);
         }
         if request.operation == "query.document.object.text" {
@@ -409,6 +373,63 @@ impl ObjectSnapshot {
             );
         }
         Ok(response)
+    }
+
+    fn read_admission(&self, request: &OpacityRequest) -> Result<ReadAdmission, DispatchErrorCode> {
+        if [
+            request.request_id.as_str(),
+            request.instance_id.as_str(),
+            request.document_id.as_str(),
+            self.instance_id(),
+            self.document_id(),
+        ]
+        .iter()
+        .any(|value| !envelope_identifier(value))
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let encoded =
+            serde_json::to_vec(&request).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let failure = |code, message| {
+            Ok(ReadAdmission::Refused(
+                self.read_failure(request, code, message),
+            ))
+        };
+        if request.api_version != APPLICATION_API_VERSION
+            || !envelope_identifier(&request.operation)
+            || !request.payload.is_object()
+            || encoded.len() > MAX_MESSAGE_BYTES
+        {
+            return failure(
+                DispatchErrorCode::InvalidRequest,
+                "Invalid bounded object read request.",
+            );
+        }
+        if request.instance_id != self.instance_id() {
+            return failure(
+                DispatchErrorCode::WrongInstance,
+                "Object read targets a different instance.",
+            );
+        }
+        if request.document_id != self.document_id() {
+            return failure(
+                DispatchErrorCode::WrongDocument,
+                "Object read targets a different document.",
+            );
+        }
+        if request.cancelled_before_dispatch {
+            return failure(
+                DispatchErrorCode::CancelledBeforeDispatch,
+                "Object read was cancelled before dispatch.",
+            );
+        }
+        if request.expected_revision.is_some() {
+            return failure(
+                DispatchErrorCode::InvalidRequest,
+                "Only pinned object reads without expectedRevision are supported.",
+            );
+        }
+        Ok(ReadAdmission::Accepted(encoded))
     }
 
     fn read_failure(

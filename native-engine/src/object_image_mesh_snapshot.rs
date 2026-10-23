@@ -1,6 +1,6 @@
 //! Bounded immutable Mesh view; the scene producer supplies the actual raster projection.
 use crate::object_codec::{object_deserialize, ObjectTarget};
-use crate::object_snapshot::{ObjectSnapshot, MAX_MESSAGE_BYTES};
+use crate::object_snapshot::{ObjectSnapshot, ReadAdmission, MAX_MESSAGE_BYTES};
 use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use serde::Deserialize;
 use serde_json::json;
@@ -91,6 +91,21 @@ impl ImageMeshReadFailure {
 }
 
 #[derive(Debug)]
+struct PresentationSelector {
+    at_revision: u64,
+    view: PresentationView,
+}
+object_deserialize!(PresentationSelector {
+    at_revision: u64,
+    view: PresentationView
+});
+#[derive(Debug)]
+struct PresentationView {
+    kind: String,
+}
+object_deserialize!(PresentationView { kind: String });
+
+#[derive(Debug)]
 struct Selector {
     at_revision: u64,
     document_snapshot_id: String,
@@ -179,6 +194,88 @@ impl Page {
 }
 
 impl ObjectSnapshot {
+    /// The host supplies only its current retained successful presentation tuple.
+    pub fn dispatch_presentation_view(
+        &self,
+        request: OpacityRequest,
+        presented: Result<(&str, u32, &str, u64), ImageMeshReadFailure>,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        if let ReadAdmission::Refused(response) = self.read_admission(&request)? {
+            return Ok(response);
+        }
+        self.dispatch_presentation_read(&request, presented)
+    }
+    pub(super) fn dispatch_presentation_read(
+        &self,
+        request: &OpacityRequest,
+        presented: Result<(&str, u32, &str, u64), ImageMeshReadFailure>,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        use DispatchErrorCode::{InvalidRequest, StaleRevision, Unavailable};
+        let fail = |code, message| Ok(self.read_failure(request, code, message));
+        let selected: PresentationSelector = match serde_json::from_value(request.payload.clone()) {
+            Ok(value) => value,
+            Err(_) => {
+                return fail(
+                    InvalidRequest,
+                    "Invalid closed native presentation selector.",
+                )
+            }
+        };
+        if request.operation != "query.document.object"
+            || selected.view.kind != "presentation"
+            || selected.at_revision > 9_007_199_254_740_991
+        {
+            return fail(
+                InvalidRequest,
+                "Invalid native presentation selector values.",
+            );
+        }
+        if selected.at_revision != self.content_revision() {
+            return fail(StaleRevision, "Native presentation snapshot changed.");
+        }
+        let (context, frame, work, generation) = match presented {
+            Ok(value) => value,
+            Err(reason) => {
+                let (code, message) = reason.response();
+                return fail(code, message);
+            }
+        };
+        if ![self.snapshot_id(), context, work]
+            .iter()
+            .all(|v| crate::object_snapshot::envelope_identifier(v))
+            || !(1..=9_007_199_254_740_991).contains(&generation)
+        {
+            return fail(
+                Unavailable,
+                "Native presentation tuple cannot be represented.",
+            );
+        }
+        let response = ResponseEnvelope {
+            api_version: request.api_version,
+            request_id: request.request_id.clone(),
+            instance_id: self.instance_id().into(),
+            document_id: self.document_id().into(),
+            content_revision: self.content_revision(),
+            ok: true,
+            error: None,
+            result: Some(
+                json!({"kind":"presentation","atRevision":self.content_revision(),
+                "documentSnapshotId":self.snapshot_id(),"contextId":context,"frame":frame,
+                "workId":work,"viewGeneration":generation}),
+            ),
+        };
+        if serde_json::to_vec(&response)
+            .map_err(|_| Unavailable)?
+            .len()
+            > MAX_MESSAGE_BYTES
+        {
+            return fail(
+                Unavailable,
+                "Native presentation response exceeds the unchanged byte bound.",
+            );
+        }
+        Ok(response)
+    }
     pub(super) fn dispatch_image_mesh_read(
         &self,
         request: &OpacityRequest,

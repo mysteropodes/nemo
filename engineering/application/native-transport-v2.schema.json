@@ -1210,8 +1210,36 @@
         },
         {
           "$ref": "#/$defs/ObjectImageMeshQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectPresentationQueryPayload"
         }
       ]
+    },
+    "ObjectPresentationQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "presentation"
+            }
+          }
+        }
+      }
     },
     "ObjectStableTargetQueryPayload": {
       "type": "object",
@@ -4657,8 +4685,50 @@
         },
         {
           "$ref": "#/$defs/ObjectImageMeshQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectPresentationQueryResult"
         }
       ]
+    },
+    "ObjectPresentationQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "frame",
+        "workId",
+        "viewGeneration"
+      ],
+      "properties": {
+        "kind": {
+          "const": "presentation"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "workId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "description": "Bounded actual successful native presentation discovery. The unchanged complete-envelope limit is 4096 bytes. Rust correlates atRevision with the request and outer contentRevision and requires native-object:<documentId>:<atRevision>; the host supplies the actual context, frame, work and view generation. Historical generator absent; this additive shape is source-derived."
     },
     "ObjectStableTargetQueryResult": {
       "type": "object",

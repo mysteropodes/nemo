@@ -48,6 +48,15 @@
     return exact(v, ['atRevision', 'documentSnapshotId', 'view'], []) && integer(v.atRevision, 0) &&
       text(v.documentSnapshotId) && imageView(v.view) || fail('invalid image-mesh query payload');
   }
+  function presentationPayload(v) {
+    return exact(v, ['atRevision', 'view'], []) && integer(v.atRevision, 0) &&
+      exact(v.view, ['kind'], []) && v.view.kind === 'presentation' || fail('invalid presentation query payload');
+  }
+  function presentationResult(v) {
+    return exact(v, ['kind', 'atRevision', 'documentSnapshotId', 'contextId', 'frame', 'workId', 'viewGeneration'], []) &&
+      v.kind === 'presentation' && integer(v.atRevision, 0) && bounded(v.documentSnapshotId) && bounded(v.contextId) &&
+      integer(v.frame, 0, 4294967295) && bounded(v.workId) && integer(v.viewGeneration, 1) || fail('invalid presentation query result');
+  }
   function pageResult(p, v) {
     if (!exact(v, ['kind', 'cursor', 'total', 'nextCursor', 'items'], []) || v.kind !== p.kind ||
       !integer(v.cursor, 0, 4294967295) || !integer(v.total, 0) ||
@@ -76,6 +85,7 @@
     return true;
   }
   function payload(value, legacyValidator) {
+    if (object(value) && object(value.view) && value.view.kind === 'presentation') return presentationPayload(value);
     if (object(value) && object(value.view) && value.view.kind === 'imageMesh') return imagePayload(value);
     if (typeof legacyValidator === 'function') return legacyValidator(value);
     if (legacyValidator) {
@@ -86,6 +96,7 @@
     fail('legacy project-read payload validator is required');
   }
   function result(value, legacyValidator) {
+    if (object(value) && value.kind === 'presentation') return presentationResult(value);
     if (object(value) && value.kind === 'imageMesh') { if (!imageResult(value)) fail('invalid image-mesh query result'); return; }
     if (typeof legacyValidator === 'function') return legacyValidator(value);
     if (legacyValidator) {
@@ -96,7 +107,14 @@
     }
     fail('legacy project-read result validator is required');
   }
-  function correlate(p, value, legacyCorrelator) {
+  function correlate(p, value, legacyCorrelator, documentId) {
+    if (object(p) && object(p.view) && p.view.kind === 'presentation') {
+      presentationPayload(p); presentationResult(value);
+      if (value.atRevision !== p.atRevision) fail('presentation query result does not match its request');
+      if (documentId !== undefined && value.documentSnapshotId !== `native-object:${documentId}:${p.atRevision}`)
+        fail('presentation snapshot mismatch');
+      return true;
+    }
     if (!object(p) || !object(p.view) || p.view.kind !== 'imageMesh') {
       if (typeof legacyCorrelator === 'function') return legacyCorrelator(p, value);
       const expected = p.stableTarget, actual = value.object.target;
@@ -116,7 +134,8 @@
   const paths = new Set(['payload.stableTarget.layerUid', 'payload.stableTarget.strokeId',
     'result.object.target.layerUid', 'result.object.target.strokeId', 'payload.documentSnapshotId', 'payload.view.contextId',
     'payload.view.layerUid', 'payload.view.workId', 'payload.view.page.meshId', 'result.documentSnapshotId', 'result.contextId',
-    'result.layerUid', 'result.workId', 'result.target.contextId', 'result.target.layerUid', 'result.target.strokeId', 'result.mesh.meshId']);
+    'result.layerUid', 'result.workId', 'result.target.contextId', 'result.target.layerUid',
+    'result.target.strokeId', 'result.mesh.meshId']);
   paths.has = paths.has.bind(paths);
   return Object.freeze({ payload, result, correlate, paths });
 }));
