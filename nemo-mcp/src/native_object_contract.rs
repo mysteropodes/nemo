@@ -29,6 +29,12 @@ fn target(value: &Value) -> bool {
 }
 
 pub(super) fn request(value: &Value) -> bool {
+    if image_mesh::presentation_view(value) {
+        return image_mesh::presentation_request(value);
+    }
+    if image_mesh::image_mesh_view(value) {
+        return image_mesh::image_mesh_request(value);
+    }
     exact(value, &["atRevision", "stableTarget"], &[]).is_some_and(|value| {
         revision(value.get("atRevision")).is_some() && value.get("stableTarget").is_some_and(target)
     })
@@ -268,6 +274,12 @@ fn record(value: &Value) -> bool {
 }
 
 pub(super) fn result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if image_mesh::presentation_view(payload) {
+        return image_mesh::presentation_result(document_id, payload, result);
+    }
+    if image_mesh::image_mesh_view(payload) {
+        return image_mesh::image_mesh_result(document_id, payload, result);
+    }
     request(payload)
         && exact(result, &["atRevision", "documentSnapshotId", "object"], &[]).is_some_and(
             |value| {
@@ -292,3 +304,78 @@ mod tests;
 mod layer_placement;
 #[path = "native_layer_range_contract.rs"]
 mod layer_range;
+
+#[path = "native_image_mesh_read_contract.rs"]
+mod image_mesh;
+
+#[cfg(test)]
+#[path = "native_image_mesh_read_contract_tests.rs"]
+mod image_mesh_tests;
+
+#[cfg(test)]
+mod presentation_transport_tests {
+    use crate::contract::{NativeApplicationRequest, NativeApplicationResponse};
+    use serde_json::json;
+
+    // Literal transport contracts establish no native surface presentation authority.
+    fn request() -> NativeApplicationRequest {
+        serde_json::from_value(json!({
+            "apiVersion":2,"requestId":"presentation-read","instanceId":"instance",
+            "documentId":"document","operation":"query.document.object",
+            "payload":{"atRevision":7,"view":{"kind":"presentation"}}
+        }))
+        .unwrap()
+    }
+
+    fn response() -> NativeApplicationResponse {
+        serde_json::from_value(json!({
+            "apiVersion":2,"requestId":"presentation-read","instanceId":"instance",
+            "documentId":"document","contentRevision":7,"ok":true,
+            "result":{"kind":"presentation","atRevision":7,
+                "documentSnapshotId":"native-object:document:7","contextId":"scene-root",
+                "frame":12,"workId":"native-work-9","viewGeneration":3}
+        }))
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn presentation_wire_rejects_foreign_common_envelope_identity() {
+        use crate::wire;
+        for key in [
+            None,
+            Some("requestId"),
+            Some("instanceId"),
+            Some("documentId"),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let endpoint = crate::registry::Endpoint {
+                instance_id: "instance".into(),
+                port: listener.local_addr().unwrap().port(),
+                secret: "presentation-contract".into(),
+                build_id: "contract-test".into(),
+            };
+            let mut value = serde_json::to_value(response()).unwrap();
+            if let Some(key) = key {
+                value[key] = json!("foreign");
+            }
+            let server = async {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let envelope: wire::AuthenticatedWireRequest =
+                    wire::read_json(&mut stream).await.unwrap();
+                let wire::AuthenticatedWireRequest::Native(message) = envelope else {
+                    panic!("non-native request")
+                };
+                assert_eq!(message.secret, endpoint.secret);
+                assert_eq!(message.native_request, request());
+                wire::write_json(&mut stream, &value).await.unwrap();
+            };
+            let client = wire::call_native(&endpoint, request(), wire::CancellationToken::new());
+            let (_, result) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                tokio::join!(server, client)
+            })
+            .await
+            .unwrap();
+            assert_eq!(result.is_ok(), key.is_none());
+        }
+    }
+}

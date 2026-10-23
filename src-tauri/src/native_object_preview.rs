@@ -30,6 +30,8 @@ use std::collections::BTreeSet;
 #[path = "native_object_preview_prepare.rs"]
 mod prepare;
 use prepare::PreparedObjectPreview;
+#[path = "native_object_image_mesh_read.rs"]
+mod image_mesh_read;
 
 #[derive(Default)]
 pub(super) struct ObjectPreview {
@@ -37,6 +39,7 @@ pub(super) struct ObjectPreview {
     pub(super) brush_runtime: ObjectBrushRuntime,
     prepared: Option<PreparedObjectPreview>,
     reference_cache: Option<ObjectCompositionWitness>,
+    presented_mesh_view: Option<PresentationReceipt>,
     // Required original C02 effects remain at this actual owner. They never
     // become a render-time history edit or disappear into an error string.
     pub(super) motion_control: ObjectMotionFrameControl,
@@ -110,6 +113,7 @@ impl ObjectPreview {
         Ok(())
     }
     pub(super) fn invalidate(&mut self) {
+        self.presented_mesh_view = None;
         self.prepared = None;
         if let Err(error) = self.cancel_pending() {
             self.blocked = Some(error);
@@ -256,6 +260,7 @@ impl NativeObjectHost {
             .prepared
             .take()
             .ok_or("native object preview has no current CPU preparation")?;
+        self.preview.presented_mesh_view = None;
         if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
             return Err("native object preview owner requires cleanup or was released".into());
         }
@@ -432,6 +437,9 @@ impl NativeObjectHost {
         if !media_released {
             // A leaked decoded frame blocks the next preview until cleanup.
             self.preview.blocked = Some("preview video frames were not released".into());
+        }
+        if media_released && receipt.status() == &ViewportStatus::Presented {
+            self.preview.presented_mesh_view = Some(receipt.clone());
         }
         Ok(ObjectPresentedFrame { receipt, view })
     }

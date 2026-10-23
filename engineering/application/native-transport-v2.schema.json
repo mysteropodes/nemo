@@ -1204,6 +1204,44 @@
       ]
     },
     "ObjectQueryPayload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectStableTargetQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectImageMeshQueryPayload"
+        },
+        {
+          "$ref": "#/$defs/ObjectPresentationQueryPayload"
+        }
+      ]
+    },
+    "ObjectPresentationQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "view": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "presentation"
+            }
+          }
+        }
+      }
+    },
+    "ObjectStableTargetQueryPayload": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -1216,6 +1254,118 @@
         },
         "stableTarget": {
           "$ref": "#/$defs/ObjectTarget"
+        }
+      }
+    },
+    "ObjectImageMeshQueryId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ObjectImageMeshSelectionPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "selection"
+        }
+      }
+    },
+    "ObjectImageMeshDataPageRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "meshId",
+        "cursor",
+        "limit"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "outline",
+            "verts",
+            "tris",
+            "offsets"
+          ]
+        },
+        "meshId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "cursor": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      }
+    },
+    "ObjectImageMeshQueryView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "contextId",
+        "layerUid",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "page"
+      ],
+      "properties": {
+        "kind": {
+          "const": "imageMesh"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "workId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "page": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectImageMeshSelectionPage"
+            },
+            {
+              "$ref": "#/$defs/ObjectImageMeshDataPageRequest"
+            }
+          ]
+        }
+      }
+    },
+    "ObjectImageMeshQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "view"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "view": {
+          "$ref": "#/$defs/ObjectImageMeshQueryView"
         }
       }
     },
@@ -4529,6 +4679,58 @@
       "description": "Compact receipt: outer contentRevision equals expectedRevision plus one iff applied. Every declared layer, vector/raster/text object, retained asset, source asset and skip is accounted for. Optional assets maps retained assets then sources in declaration order to newly minted assetIds and is omitted by the owner when empty. The serialized result is limited to 3072 bytes."
     },
     "ObjectQueryResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectStableTargetQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectImageMeshQueryResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectPresentationQueryResult"
+        }
+      ]
+    },
+    "ObjectPresentationQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "frame",
+        "workId",
+        "viewGeneration"
+      ],
+      "properties": {
+        "kind": {
+          "const": "presentation"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "contextId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "workId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "description": "Bounded actual successful native presentation discovery. The unchanged complete-envelope limit is 4096 bytes. Rust correlates atRevision with the request and outer contentRevision and requires native-object:<documentId>:<atRevision>; the host supplies the actual context, frame, work and view generation. Historical generator absent; this additive shape is source-derived."
+    },
+    "ObjectStableTargetQueryResult": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -4555,6 +4757,316 @@
         }
       },
       "description": "Staged immutable common-envelope result: atRevision equals outer contentRevision; snapshot token is native-object:<documentId>:<atRevision>. Complete envelope is limited to 4096 bytes."
+    },
+    "ObjectImageMeshQueryTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "layerUid",
+        "frameScope",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        }
+      }
+    },
+    "ObjectImageMeshQueryRect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height",
+        "rotation"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rotation": {
+          "type": "number"
+        }
+      }
+    },
+    "ObjectImageMeshQueryMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meshId",
+        "outlineCount",
+        "vertexCount",
+        "triangleIndexCount",
+        "offsetsPresent"
+      ],
+      "properties": {
+        "meshId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "outlineCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "vertexCount": {
+          "$ref": "#/$defs/Revision"
+        },
+        "triangleIndexCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "multipleOf": 3
+        },
+        "offsetsPresent": {
+          "type": "boolean"
+        },
+        "cols": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    },
+    "ObjectImageMeshPointPageResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "cursor",
+        "total",
+        "nextCursor",
+        "items"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "outline",
+            "verts",
+            "offsets"
+          ]
+        },
+        "cursor": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "total": {
+          "$ref": "#/$defs/Revision"
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "ObjectImageMeshIndexPageResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "cursor",
+        "total",
+        "nextCursor",
+        "items"
+      ],
+      "properties": {
+        "kind": {
+          "const": "tris"
+        },
+        "cursor": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "total": {
+          "$ref": "#/$defs/Revision"
+        },
+        "nextCursor": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/ObjectFrame"
+          }
+        }
+      }
+    },
+    "ObjectImageMeshDataPageResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObjectImageMeshPointPageResult"
+        },
+        {
+          "$ref": "#/$defs/ObjectImageMeshIndexPageResult"
+        }
+      ]
+    },
+    "ObjectImageMeshQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "workId",
+        "viewGeneration",
+        "target",
+        "rect",
+        "mesh",
+        "page"
+      ],
+      "properties": {
+        "kind": {
+          "const": "imageMesh"
+        },
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "contextId": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectImageMeshQueryId"
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        },
+        "workId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "viewGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectImageMeshQueryTarget"
+        },
+        "rect": {
+          "$ref": "#/$defs/ObjectImageMeshQueryRect"
+        },
+        "mesh": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/ObjectImageMeshQueryMetadata"
+            }
+          ]
+        },
+        "page": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectImageMeshSelectionPage"
+            },
+            {
+              "$ref": "#/$defs/ObjectImageMeshDataPageResult"
+            }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "page": {
+              "$ref": "#/$defs/ObjectImageMeshSelectionPage"
+            }
+          }
+        },
+        {
+          "properties": {
+            "mesh": {
+              "$ref": "#/$defs/ObjectImageMeshQueryMetadata"
+            },
+            "page": {
+              "$ref": "#/$defs/ObjectImageMeshDataPageResult"
+            }
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "page": {
+                "properties": {
+                  "kind": {
+                    "const": "offsets"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "mesh": {
+                "properties": {
+                  "offsetsPresent": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Source-derived bounded immutable image-mesh view. The complete envelope remains limited to 4096 bytes. Rust validates exact request/presentation/snapshot and full target correlation, held source frame <= presented frame, metadata/count relationships, triangle bounds and cursor progress; JSON Schema shape acceptance alone does not prove them."
     },
     "SerializeQueryPayload": {
       "type": "object",

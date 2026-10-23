@@ -75,7 +75,8 @@ test('the shared schema carries the definitions, one Request branch per operatio
   }
   const results = schema.$defs.ResponseBase.properties.result.oneOf.map((entry) => entry.$ref);
   assert.equal(results.filter((ref) => ref === '#/$defs/ObjectVectorEditResult').length, 1);
-  assert.deepEqual(schema.$defs.ObjectQueryResult.properties.object.oneOf.map((entry) => entry.$ref), ['#/$defs/ObjectRecord', '#/$defs/ObjectVectorRecord']);
+  assert.deepEqual(schema.$defs.ObjectQueryResult.oneOf[0], { $ref: '#/$defs/ObjectStableTargetQueryResult' });
+  assert.deepEqual(schema.$defs.ObjectStableTargetQueryResult.properties.object.oneOf.map((entry) => entry.$ref), ['#/$defs/ObjectRecord', '#/$defs/ObjectVectorRecord']);
   assert.equal(schema.$defs.ObjectRecord.properties.family.const, 'closed-solid-fill-cubic-path', 'the legacy family is untouched');
 });
 

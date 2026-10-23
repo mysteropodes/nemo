@@ -5,11 +5,12 @@
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
   var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
   var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
+  var readBinding=typeof module==='object'&&module.exports?require('./native-object-project-reads.js'):root.NemoNativeObjectProjectReads;
   var exportBinding=typeof module==='object'&&module.exports?require('./native-object-project-export.js'):root.NemoNativeObjectProjectExport;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,exportBinding);
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,exportBinding,readBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports,Reads){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -368,34 +369,12 @@
         return observed===queue&&ticket===subscriptionTicket&&!openingRequested&&same(info,pin)?presentedSession():null;
       };
     }
-    async function readLayerView(layerUid,frame,pin,view){
-      async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
-      function ready(){var value=presentedSession();return !openingRequested&&same(info,pin)&&value&&value.presentation.frame===frame&&
-        integer(frame,0)&&frame<pin.totalFrames&&pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length===1;}
-      try{
-        await settled();if(!ready())return null;
-        var ticket=subscriptionTicket,request={apiVersion:2,requestId:requestId(view||'timing'),instanceId:pin.instanceId,documentId:pin.documentId,
-          operation:'query.document.object.layer.timing',payload:{atRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,
-            contextId:'scene-root',layerUid:layerUid,frame:frame}};
-        if(view)request.payload.view=view;
-        var response=await raw('nemo_native_dispatch',request);await settled();
-        if(ticket!==subscriptionTicket||!ready()||!response||response.ok!==true||response.instanceId!==pin.instanceId||
-          response.documentId!==pin.documentId||response.contentRevision!==pin.contentRevision)return null;
-        var result=response.result;
-        if(!result||Object.keys(result).length!==(view?9:11)||result.instanceId!==pin.instanceId||result.documentId!==pin.documentId||
-          ['atRevision','documentSnapshotId','contextId','layerUid','frame'].some(function(k){return result[k]!==request.payload[k];}))return null;
-        if(view==='placement'&&!(result.kind==='layerPlacement'&&typeof result.placement==='object'))return null;
-        if(view==='range'){
-          var range=result.range,fields=['rawInPoint','rawOutPoint','inPoint','outPoint','hasCustomRange','hasTimeLink'];
-          if(result.kind!=='layerRange'||!range||Object.keys(range).length!==6||!fields.every(function(k){return Object.prototype.hasOwnProperty.call(range,k);})||
-            !fields.slice(0,4).every(function(k){return Number.isFinite(range[k]);})||typeof range.hasCustomRange!=='boolean'||typeof range.hasTimeLink!=='boolean')return null;
-        }
-        return freeze(view?JSON.parse(JSON.stringify(result)):Object.assign({},result));
-      }catch(_){return null;} // A refused read never fences, mutates or revives an owner.
-    }
-    function readLayerTiming(layerUid,frame,pin){return readLayerView(layerUid,frame,pin);}
-    function readLayerRange(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'range');}
-    function readLayerPlacement(layerUid,frame,pin){return readLayerView(layerUid,frame,pin,'placement');}
+    var reads=Reads.create({requestId:requestId,
+      settled:async function(){var observed;do{observed=queue;await observed;}while(observed!==queue);},
+      dispatch:function(request){return raw('nemo_native_dispatch',request);},
+      state:function(){return {info:info,presented:presentedSession(),ticket:subscriptionTicket,active:active(),
+        opening:openingRequested,pending:pending,synchronizing:synchronizing,
+        projectionReady:typeof ports.projectionReady==='function'&&ports.projectionReady(info)===true};}});
     var properties=Properties.create({same:same,freeze:freeze,requestId:requestId,mutation:mutation,
       dispatchApplication:function(request){if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');return ports.dispatchApplication(request);},
       state:function(){return {info:info,presentation:presentation,ticket:subscriptionTicket,active:active(),opening:openingRequested,pending:pending,
@@ -418,7 +397,7 @@
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},
       get editProperty(){return properties.available()?properties.editProperty:undefined;},
-      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,readLayerRange:readLayerRange,readLayerPlacement:readLayerPlacement,
+      info:function(){return info;},requestId:requestId,runFontResource:runFontResource,runResourceCommand:runFontResource,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:reads.readLayerTiming,readLayerRange:reads.readLayerRange,readLayerPlacement:reads.readLayerPlacement,readImageMesh:reads.readImageMesh,
       get editLayerPolicy(){return typeof ports.dispatchApplication==='function'&&(!ports.policyAvailable||ports.policyAvailable()===true)&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editLayerPolicy:undefined;},
       get editFrames(){return FrameEdit&&typeof ports.dispatchApplication==='function'&&subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
@@ -495,5 +474,6 @@
     catch(error){return uiFailure(root,error);}
     return true; // An unconfirmed selection is consumed, never a legacy fallback.
   }
-  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI,bindUIComposition:function(root,compose){return Desktop.bindUIComposition(root,compose);}});
+  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI,
+    bindUIComposition:function(root,compose){return Desktop.bindUIComposition(root,compose);}});
 }));

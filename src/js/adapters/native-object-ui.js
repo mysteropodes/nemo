@@ -98,10 +98,12 @@
     retireMotion(root);
     retirePolicy(root);
     views.delete(root);
+    if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
     var timing=timings.get(root);if(timing){timing.latest=null;timing.serial++;timing.job=null;}
     var prior=inspectors.get(root);if(!prior)return;
     if(prior.fonts)prior.fonts.retire();
     if(prior.text)prior.text.retire();
+    if(prior.footage)prior.footage.retire();
     prior.children.forEach(function(saved){saved.node.hidden=saved.hidden;saved.node.style.display=saved.display;});
     if(prior.trigger&&prior.trigger.node.parentNode===prior.reference){
       var next=prior.trigger.next;
@@ -176,6 +178,7 @@
     });
     if(prior.fonts)prior.fonts.refresh();
     if(root.NemoNativeTextToolDesktop)prior.text=root.NemoNativeTextToolDesktop.mount(root,prior.section,{currentSession:ports.currentSession,fontResources:ports.fontResources});
+    if(root.NemoNativeTimeRemapUI&&root.NemoNativeTimeRemapUI.mountInspector)prior.footage=root.NemoNativeTimeRemapUI.mountInspector(root,prior.section,{currentSession:ports.currentSession});
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
     paintMotion(root,ports,prior);
   }
@@ -308,6 +311,7 @@
     if(root.updateWaBar&&root.document.getElementById('wa-bar'))root.updateWaBar();
     ['info-badge','info-strokes','info-sel'].forEach(function(id){var el=root.document.getElementById(id);if(el){el.textContent='Unavailable';if(id==='info-badge')el.style.display='none';}});
     requestTiming(root,info,ports);refreshPolicy(root);
+    if(root.SMImageMeshUI&&typeof root.SMImageMeshUI.refresh==='function')root.SMImageMeshUI.refresh();
     return true;
   }
   // Ordinary native policy entries bind on paint and dispose when the UI retires.
@@ -403,6 +407,26 @@
       !!presented.presentation&&presented.presentation.owner==='native'&&presented.presentation.status==='presented'&&presented.presentation.frame===root.state.currentFrame&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return presented.presentation[k]===info[k];});
   }
+  function readImageMeshSelection(root){
+    var view=views.get(root),ports=view&&view.ports,session=ports&&ports.currentSession(),info=session&&session.info();
+    var shown=session&&session.readPresentedObjectSession(),presentation=shown&&shown.presentation;
+    var index=root.state.activeLayerIdx,layer=info&&info.layers[index],ticket=session&&session.readSubscriptionGeneration();
+    function selection(){return Array.isArray(root._layerSel)&&root._layerSel.length===1&&root._layerSel[0]===index&&root.state.activeLayerIdx===index;}
+    if(!view||!info||!layer||!session.isActive()||root.state.playing||!['select','subselect'].includes(root.state.tool)||!sameTimingPin(view.pin,info)||!selection()||
+      ports.projectionReady(info)!==true||!confirmed(root,info,shown)||presentation.contextId!=='scene-root')return null;
+    var selector=Object.freeze({contextId:presentation.contextId,layerUid:layer.layerUid,frame:presentation.frame});
+    function current(lease){
+      try{
+        var live=ports.currentSession(),pin=live&&live.info(),value=lease&&typeof lease.readPresentedObjectSession==='function'?
+          lease.readPresentedObjectSession():live&&live.readPresentedObjectSession();
+        return views.get(root)===view&&live===session&&live.isActive()&&!root.state.playing&&['select','subselect'].includes(root.state.tool)&&sameTimingPin(pin,info)&&
+          sameTimingPin(view.pin,info)&&live.readSubscriptionGeneration()===ticket&&selection()&&
+          pin.layers[index].layerUid===selector.layerUid&&ports.projectionReady(pin)===true&&
+          confirmed(root,pin,value)&&value.presentation===presentation;
+      }catch(_){return false;}
+    }
+    return Object.freeze({session:session,info:info,selector:selector,current:current});
+  }
   function toggleVisibility(root,uid,expected,ports){
     function refused(){try{if(root.showToast)root.showToast('Native layer visibility was not confirmed.');}catch(_){}return false;}
     try{
@@ -453,5 +477,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,readImageMeshSelection:readImageMeshSelection,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
 }));

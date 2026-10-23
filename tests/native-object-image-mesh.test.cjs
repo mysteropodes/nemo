@@ -4,6 +4,7 @@
 // baseline oracle (tests/native-object-rig-fixtures/baseline-rules.json, tools/gen_rules.js at fbe4b8a3).
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const Mesh = require('../src/js/adapters/native-object-image-mesh.js');
+const { createNativeApplicationAdapter } = require('../src/js/adapters/native-application.js');
 const { createFixture, forbidLegacyWriters, refused, LEGACY } = require('./native-object-rig-support.cjs');
 
 const rules = JSON.parse(fs.readFileSync(path.join(__dirname, 'native-object-rig-fixtures/baseline-rules.json'), 'utf8'));
@@ -38,6 +39,28 @@ test('every action sends exactly its closed members', async () => {
   assert.deepEqual(fx.owner.log.received.map((r) => r.expectedRevision), [7, 8, 9, 10], 'each call reads the pin at execution');
 });
 
+test('binding methods send the admitted native action shapes through the existing serialized route', async () => {
+  const fx = createFixture({});
+  const adapter = Mesh.create(fx.session);
+  const target = { contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 13 }, strokeId: 'raster-13' };
+  const destination = { ...target, layerUid: 'L2', frameScope: { kind: 'authored', frame: 7 }, strokeId: 'copy-7' };
+  const mesh = { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3],
+    offsets: [[0, 0], [0, 0], [0, 0], [0, 0]], cols: 1, rows: 1 };
+  await adapter.attach(target, mesh);
+  await adapter.propagate(destination, 'im_1');
+  await adapter.duplicate('scene-root', 'L2');
+  await adapter.detach(target);
+  await adapter.releaseIfUnused('im_1');
+  assert.deepEqual(fx.owner.log.received.map((r) => r.payload), [
+    { command: 'object.image.mesh.edit', action: { kind: 'attach', target, mesh } },
+    { command: 'object.image.mesh.edit', action: { kind: 'propagate', target: destination, meshId: 'im_1' } },
+    { command: 'object.image.mesh.edit', action: { kind: 'duplicate', contextId: 'scene-root', layerUid: 'L2' } },
+    { command: 'object.image.mesh.edit', action: { kind: 'detach', target } },
+    { command: 'object.image.mesh.edit', action: { kind: 'releaseIfUnused', meshId: 'im_1' } },
+  ]);
+  assert.deepEqual(fx.owner.log.received.map((r) => r.expectedRevision), [7, 8, 9, 10, 11]);
+});
+
 test('a falsy density option is left out exactly like the baseline setOutline ignores it', async () => {
   const fx = createFixture({});
   const mesh = Mesh.create(fx.session);
@@ -51,6 +74,22 @@ test('two calls queued back to back send revisions 7 then 8 (the pin is read at 
   const mesh = Mesh.create(fx.session);
   await Promise.all([mesh.setOffset('im_1', 1, 0.5, 0), mesh.setOffset('im_1', 2, 0.25, 0)]);
   assert.deepEqual(fx.owner.log.received.map((r) => [r.requestId, r.expectedRevision]), [['project-mesh-1', 7], ['project-mesh-2', 8]]);
+});
+
+test('a queued binding from a stale native view mints no request id and sends no command', async () => {
+  const fx = createFixture({});
+  const mesh = Mesh.create(fx.session);
+  const target = { contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 13 }, strokeId: 'raster-13' };
+  const capturedRevision = fx.state.revision;
+  const current = (pin) => pin.contentRevision === capturedRevision;
+  const earlier = mesh.resetOffsets('im_1');
+  const stale = mesh.detach(target, current);
+  await earlier;
+  const error = await refused(stale);
+  assert.equal(error.code, 'stale_revision');
+  assert.equal(error.reason, 'mesh_selection_stale');
+  assert.deepEqual(fx.events.ids, ['project-mesh-1'], 'the rejected binding does not mint a request id');
+  assert.deepEqual(fx.owner.log.received.map((r) => r.payload.action), [{ kind: 'resetOffsets' }], 'the rejected binding sends no native command');
 });
 
 test('a no-op edit is an unapplied receipt on the same revision', async () => {
@@ -100,10 +139,10 @@ test('a request above the public 4096-byte bound is refused locally and never sp
   assert.equal(fx.owner.log.received.length, 0);
 });
 
-test('attach, detach and animated vertex keys have no native operation: typed unavailability, zero requests', async () => {
+test('video binding and animated vertex keys remain unavailable with zero requests', async () => {
   const fx = createFixture({});
   const mesh = Mesh.create(fx.session);
-  assert.deepEqual(Mesh.UNAVAILABLE, { attach: 'mesh_binding_unavailable', detach: 'mesh_binding_unavailable', attachToVideoLayer: 'mesh_binding_unavailable',
+  assert.deepEqual(Mesh.UNAVAILABLE, { attachToVideoLayer: 'mesh_binding_unavailable',
     detachFromVideoLayer: 'mesh_binding_unavailable', setVertexKey: 'mesh_vertex_animation_unavailable' });
   for (const [name, reason] of Object.entries(Mesh.UNAVAILABLE)) {
     const error = await refused(mesh[name]({}));
@@ -200,4 +239,288 @@ test('desktop() is the same thin client per host and absent unless the native pr
   const first = Mesh.desktop(h);
   assert.equal(typeof first.setOffset, 'function');
   assert.equal(Mesh.desktop(h), first);
+});
+
+// The real Project/UI/Reads/bridge composition, with literal native I/O replies.
+// This Node control does not establish native Rust or installed desktop acceptance.
+const ComposedProject = require('../src/js/adapters/native-object-project.js');
+const ComposedFiles = require('../src/js/adapters/native-object-project-file.js');
+const ComposedUI = require('../src/js/adapters/native-object-ui.js');
+const meshVm = require('node:vm');
+const meshTurn = () => new Promise(setImmediate);
+const meshGate = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+function meshElement(){
+  const listeners={},classes=new Set();
+  const el={children:[],style:{},dataset:{},attributes:{},value:'',max:0,textContent:'',className:'',type:'',offsetWidth:200,offsetHeight:120,
+    classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle(x,on){if(on===undefined)on=!classes.has(x);if(on)classes.add(x);else classes.delete(x);return on;}},
+    setAttribute(k,v){this.attributes[k]=v;},addEventListener(k,f){listeners[k]=f;},
+    replaceChildren(...children){this.children.forEach(child=>{child.parentNode=null;});this.children=[];children.forEach(child=>this.appendChild(child));},
+    appendChild(child){if(child.parentNode)child.parentNode.removeChild(child);this.children.push(child);child.parentNode=this;return child;},
+    insertBefore(child,next){if(child.parentNode)child.parentNode.removeChild(child);const i=next?this.children.indexOf(next):this.children.length;assert.ok(i>=0);this.children.splice(i,0,child);child.parentNode=this;return child;},
+    removeChild(child){const i=this.children.indexOf(child);assert.ok(i>=0);this.children.splice(i,1);child.parentNode=null;},
+    dispatch(type,event={}){return listeners[type]?.({target:this,preventDefault(){},stopPropagation(){},...event});},click(){return this.dispatch('click');},listener:type=>listeners[type],scrollIntoView(){},
+    contains(child){while(child){if(child===this)return true;child=child.parentNode;}return false;},
+    querySelector(selector){for(const child of this.children){if(selector[0]==='.'&&child.className.split(' ').includes(selector.slice(1)))return child;const nested=child.querySelector(selector);if(nested)return nested;}return null;},
+    getBoundingClientRect:()=>({left:0,top:0,width:320,height:180,bottom:180})};
+  Object.defineProperty(el,'nextSibling',{get(){if(!this.parentNode)return null;return this.parentNode.children[this.parentNode.children.indexOf(this)+1]||null;}});
+  Object.defineProperty(el,'firstChild',{get(){return this.children[0]||null;}});
+  Object.defineProperty(el,'isConnected',{get(){return !!this.parentNode;}});
+  Object.defineProperty(el,'innerHTML',{set(){this.replaceChildren();}});
+  return el;
+}
+function meshDocument(){const nodes=new Map();for(const id of ['layer-list','frame-hdr','frame-grid','tl-cf','tl-tf','info-frame','info-badge','info-strokes','info-sel','drawing-canvas','start-screen'])nodes.set(id,meshElement());
+  nodes.get('start-screen').classList.add('hid');const doc={nodes,body:meshElement(),created:0,activeElement:null,readyState:'complete',
+    getElementById(id){if(nodes.has(id))return nodes.get(id);function find(node){if(node.id===id)return node;for(const child of node.children){const found=find(child);if(found)return found;}return null;}for(const node of nodes.values()){const found=find(node);if(found)return found;}return null;},
+    createElement(){doc.created++;return meshElement();},createComment:()=>meshElement(),addEventListener(){},removeEventListener(){}};return doc;}
+function composedMesh(geometry = false, meshValue, beforeDispatch = async () => {}, desktopCompletion = false) {
+  const root = { state: { tool: 'select', playing: false }, userLayers: [], document: meshDocument(), addEventListener() {}, requestAnimationFrame: f => setImmediate(f) };
+  const doc = root.document, calls = [], minted = [], messages = [];
+  for (const id of ['p-imagemesh-sec', 'p-imagemesh-on', 'p-imagemesh-edit', 'p-imagemesh-body',
+    'p-imagemesh-cols', 'p-imagemesh-rows', 'p-imagemesh-info', 'btn-imagemesh-reset']) doc.nodes.set(id, meshElement());
+  doc.createElementNS = () => meshElement();
+  const captures = new Map();
+  doc.addEventListener = (type, handler, options) => { assert.equal(options.capture, true); captures.set(type, handler); };
+  const area = meshElement(); doc.nodes.set('canvas-area', area); area.appendChild(doc.nodes.get('drawing-canvas'));
+  let pointer = null;
+  area.setPointerCapture = id => { pointer = id; }; area.hasPointerCapture = id => pointer === id;
+  area.releasePointerCapture = () => { pointer = null; };
+  root.showToast = message => messages.push(message);
+  root.NemoNativeObjectUI = ComposedUI;
+  let active = false, revision = 0, documentId = 'document', generation = 1, liveSession;
+  let mesh = meshValue === undefined ? { outline: OUTLINE, verts: OUTLINE, tris: [0, 1, 2, 0, 2, 3], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 } : meshValue;
+  const metadata = () => ({ apiVersion: 2, instanceId: 'instance', documentId, lifecycleGeneration: generation,
+    contentRevision: revision, documentSnapshotId: `native-object:${documentId}:${revision}`, documentDigest: 'a'.repeat(64), byteCount: 1000,
+    canvasW: 320, canvasH: 180, fps: 24, totalFrames: 24, reference: null, undoDepth: revision, redoDepth: 0,
+    layers: [{ layerUid: 'L0', name: 'Raster', visible: true }, { layerUid: 'L2', name: 'Other', visible: true }] });
+  function response(r, result) {
+    return { apiVersion: 2, requestId: r.requestId, instanceId: r.instanceId, documentId: r.documentId,
+      contentRevision: revision, ok: true, result };
+  }
+  async function dispatch(r) {
+    calls.push(r); minted.push(r.requestId); await beforeDispatch(r);
+    if (r.operation === 'query.document.object.project.workspace.read') return response(r, { instanceId: r.instanceId, documentId,
+      atRevision: revision, documentSnapshotId: metadata().documentSnapshotId, contextId: 'scene-root', result: { workspacePresent: false } });
+    if (r.operation === 'query.document.object.layer.timing') return { ...response(r, null), ok: false,
+      error: { code: 'unavailable', message: 'This literal transport does not provide timing' } };
+    if (r.operation === 'query.document.object') {
+      const v = r.payload.view, p = v.page;
+      assert.equal(v.kind, 'imageMesh'); assert.equal(r.payload.documentSnapshotId, metadata().documentSnapshotId);
+      assert.equal(v.workId, `work-${generation}-${revision}`); assert.equal(v.viewGeneration, generation);
+      assert.deepEqual([v.contextId, v.layerUid, v.frame], ['scene-root', 'L0', 0]);
+      const target = { contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 0 }, strokeId: 'raster-0' };
+      const meta = mesh && { meshId: 'im_1', outlineCount: mesh.outline.length, vertexCount: mesh.verts.length,
+        triangleIndexCount: mesh.tris.length, offsetsPresent: true, cols: 1, rows: 1 };
+      let page = { kind: 'selection' };
+      if (p.kind !== 'selection') {
+        assert.equal(p.meshId, 'im_1'); assert.equal(p.limit, 16);
+        const items = mesh[p.kind].slice(p.cursor, p.cursor + p.limit), end = p.cursor + items.length;
+        page = { kind: p.kind, cursor: p.cursor, total: mesh[p.kind].length, nextCursor: end === mesh[p.kind].length ? null : end, items };
+      }
+      return response(r, { kind: 'imageMesh', atRevision: revision, documentSnapshotId: metadata().documentSnapshotId,
+        contextId: v.contextId, layerUid: v.layerUid, frame: v.frame, workId: v.workId, viewGeneration: v.viewGeneration,
+        target, rect: { x: 160, y: 90, width: 200, height: 100, rotation: 0 }, mesh: meta, page });
+    }
+    assert.equal(r.operation, OP); assert.equal(r.expectedRevision, revision);
+    assert.equal(liveSession.readPresentedObjectSession(), null, 'the actual public getter is fenced during serialized command execution');
+    const action = r.payload.action;
+    if (action.kind === 'detach') mesh = null;
+    else { assert.equal(action.kind, 'setOffset'); mesh = { ...mesh, offsets: mesh.offsets.map((p, i) => i === action.index ? [action.du, action.dv] : p) }; }
+    revision++;
+    return response(r, { applied: true, historyEntriesAdded: 1 });
+  }
+  async function invoke(command, args) {
+    const r = args && JSON.parse(args.requestJson);
+    if (r) minted.push(r.requestId);
+    if (command === 'nemo_native_object_client_status') return { ...metadata(), available: active };
+    if (command === 'nemo_native_object_bootstrap') {
+      if (active) { generation++; documentId = `replacement-${generation}`; revision = 0; }
+      active = true;
+      return { ...metadata(), requestId: r.requestId, resourceCount: 0, viewportAvailable: false };
+    }
+    if (command === 'nemo_native_object_reference') return { ...metadata(), requestId: r.requestId };
+    assert.equal(command, 'nemo_native_object_preview');
+    return { status: 'presented', workId: `work-${generation}-${revision}`, viewGeneration: generation };
+  }
+  let projected = false;
+  const uiPorts = {
+    currentSession: () => liveSession, projectionReady: info => ComposedFiles.projectionReadyForUI(root, info),
+    selectLayer: (index, preserve, uid) => ComposedUI.select(root, liveSession.info(), index, preserve, uid, liveSession.readPresentedObjectSession(), uiPorts),
+    repaint: () => ComposedUI.render(root, liveSession.info(), false, uiPorts),
+  };
+  const ports = { invoke, dispatchApplication: dispatch, frame: () => root.state.currentFrame || 0,
+    mapping: () => ({ cssBounds: { x: 0, y: 0, width: 320, height: 180 }, physicalExtent: { width: 320, height: 180 },
+      compositionExtent: { width: 320, height: 180 }, reportedDpr: 1 }),
+    projectionReady: uiPorts.projectionReady,
+    changed(info) { if (!projected) { ComposedFiles.projectView(root, info); projected = true; }
+      else assert.equal(ComposedFiles.refreshLayerTable(root, info), true);
+      ComposedUI.render(root, info, false, uiPorts); },
+  };
+  if (geometry) {
+    require('./helpers/native-viewport-underlay.cjs').install(root);
+    ports.surfaceChanged = root.NemoNativeViewportUnderlay.desktop(root).surfaceChanged;
+  }
+  const session = ComposedProject.create(ports); liveSession = session;
+  root.NemoNativeObjectProject = { desktop: () => liveSession };
+  root.NemoNativeObjectImageMesh = Mesh;
+  if (desktopCompletion) {
+    Object.assign(root, { __TAURI__: { core: { invoke } }, removeEventListener() {}, NemoNativeObjectProjectFile: ComposedFiles,
+      NemoNativeViewportUnderlay: require('../src/js/adapters/native-viewport-underlay.js'),
+      NemoNativeWorkspaceDesktop: require('../src/js/adapters/native-workspace-desktop.js') });
+    const workspaceUI = require('../src/js/adapters/native-workspace-ui.js');
+    workspaceUI.presentation(root, { order: () => [], applyOrder() {} }); workspaceUI.install(root);
+    ports.presented = require('../src/js/adapters/native-object-project-desktop.js').createPorts(root).presented;
+  }
+  const context = meshVm.createContext({ window: root, document: doc, state: root.state, console });
+  if (geometry) {
+    meshVm.runInContext(fs.readFileSync(path.join(__dirname, '../src/js/image-mesh.js'), 'utf8'), context);
+    context.SMImageMesh = root.SMImageMesh;
+  }
+  meshVm.runInContext(fs.readFileSync(path.join(__dirname, '../src/js/image-mesh-bridge.js'), 'utf8'), context);
+  async function open(settle = true) {
+    await session.openPath('/native-mesh.json');
+    assert.equal(ComposedUI.select(root, session.info(), 1, false, 'L2', session.readPresentedObjectSession(), uiPorts), true);
+    assert.equal(ComposedUI.select(root, session.info(), 0, false, 'L0', session.readPresentedObjectSession(), uiPorts), true);
+    if (settle) { await root.SMImageMeshUI.refresh(); await meshTurn(); }
+  }
+  return { root, session, calls, minted, messages, open, uiPorts,
+    async settle() { await meshTurn(); await root.SMImageMeshUI.refresh(); await meshTurn(); },
+    replaceSession() { liveSession = ComposedProject.create(ports); },
+    pointer(type, x, y) { let stopped = false; captures.get(type)({ target: doc.nodes.get('drawing-canvas'), pointerId: 7,
+      clientX: x, clientY: y, preventDefault() {}, stopImmediatePropagation() { stopped = true; } }); return stopped; },
+    captured: () => pointer,
+  };
+}
+
+test('unbound mesh admission recovers through actual desktop completion and workspace fanout', { timeout: 2000 }, async () => {
+  const selection = meshGate(), entered = meshGate(), workspace = meshGate(), workspaceEntered = meshGate(); let hold = true;
+  const h = composedMesh(false, null, async r => {
+    if (r.operation === 'query.document.object' && hold) { hold = false; entered.resolve(); await selection.promise; }
+    if (r.operation === 'query.document.object.project.workspace.read') { workspaceEntered.resolve(); await workspace.promise; }
+  }, true);
+  await h.open(false); await entered.promise;
+  const proof = ComposedUI.readImageMeshSelection(h.root), shown = h.session.readPresentedObjectSession();
+  assert.ok(proof); assert.equal(proof.current(), true);
+  const initial = h.root.SMImageMeshUI.refresh(), checkbox = h.root.document.getElementById('p-imagemesh-on');
+  await workspaceEntered.promise; // Project completion -> real desktop timer -> actual Workspace controller -> native read.
+  assert.equal(h.session.readPresentedObjectSession(), null); assert.equal(proof.current(), false);
+  selection.resolve(); assert.equal(await initial, null, 'the initial read cannot publish through the real queue fence');
+  assert.equal(checkbox.disabled, true); assert.equal(h.calls.filter(r => r.operation === OP).length, 0);
+  workspace.resolve();
+  await meshTurn(); await new Promise(resolve => setTimeout(resolve, 0)); await meshTurn(); // Drain the known desktop completion timer.
+  assert.ok(h.root.NemoNativeWorkspaceController.read(), 'the actual workspace controller finished its native read');
+  assert.equal(h.session.readPresentedObjectSession().presentation, shown.presentation); assert.equal(proof.current(), true);
+  assert.equal(checkbox.disabled, false, 'queue completion must recover admission without a manual Mesh refresh');
+  assert.equal(checkbox.checked, false); assert.equal(h.root.SMImageMeshUI.hasMesh(), false);
+  assert.equal(h.calls.filter(r => r.operation === 'query.document.object').length, 2, 'completion starts one new unbound selection read');
+  assert.equal(h.calls.filter(r => r.operation === OP).length, 0); assert.deepEqual(h.messages, []);
+});
+
+test('ordinary checkbox composes real UI proof, native pages, leased Mesh command and Project reconciliation', async () => {
+  const h = composedMesh(); await h.open();
+  const proof = ComposedUI.readImageMeshSelection(h.root);
+  assert.ok(proof); assert.equal(proof.current(), true);
+  const read = await proof.session.readImageMesh(proof.selector, proof.info);
+  assert.deepEqual(read.mesh.verts, OUTLINE);
+  assert.deepEqual(read.mesh.offsets, OUTLINE.map(() => [0, 0]));
+  assert.deepEqual(read.target, { contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 0 }, strokeId: 'raster-0' });
+  assert.equal(h.root.SMImageMeshUI.hasMesh(), true);
+  const checkbox = h.root.document.getElementById('p-imagemesh-on');
+  assert.equal(checkbox.disabled, false); assert.equal(checkbox.checked, true);
+  checkbox.checked = false; checkbox.dispatch('change'); await h.settle();
+  const commands = h.calls.filter(r => r.operation === OP);
+  assert.equal(commands.length, 1);
+  assert.deepEqual(commands[0].payload, { command: 'object.image.mesh.edit', action: { kind: 'detach', target: read.target } });
+  assert.equal(commands[0].expectedRevision, 0);
+  assert.equal(h.session.info().contentRevision, 1);
+  assert.equal(h.session.info().documentSnapshotId, 'native-object:document:1');
+  assert.equal(h.session.readPresentedObjectSession().presentation.workId, 'work-1-1');
+  assert.equal(h.root.SMImageMeshUI.hasMesh(), false);
+  assert.equal(checkbox.checked, false); assert.deepEqual(h.messages, []);
+  assert.deepEqual(new Set(h.calls.filter(r => r.operation === 'query.document.object').map(r => r.payload.view.page.kind)),
+    new Set(['selection', 'outline', 'verts', 'tris', 'offsets']));
+});
+
+test('valid empty triangle topology passes the SDK and completes Project pagination', async () => {
+  const noTriangles = { outline: OUTLINE, verts: OUTLINE, tris: [], offsets: OUTLINE.map(() => [0, 0]), cols: 1, rows: 1 };
+  const h = composedMesh(false, noTriangles); await h.open();
+  const proof = ComposedUI.readImageMeshSelection(h.root);
+  const read = await proof.session.readImageMesh(proof.selector, proof.info);
+  assert.deepEqual(read.mesh.tris, [], 'Project assembles a genuine zero-index native page');
+  assert.deepEqual(read.mesh.outline, OUTLINE); assert.deepEqual(read.mesh.verts, OUTLINE);
+  const request = h.calls.find(r => r.operation === 'query.document.object' && r.payload.view.page.kind === 'tris');
+  assert.ok(request); assert.deepEqual(request.payload.view.page, { kind: 'tris', meshId: 'im_1', cursor: 0, limit: 16 });
+  const sdk = createNativeApplicationAdapter('empty-triangle-sdk', { dispatch: async r => ({
+    apiVersion: 2, requestId: r.requestId, instanceId: r.instanceId, documentId: r.documentId,
+    contentRevision: r.payload.atRevision, ok: true,
+    result: { kind: 'imageMesh', atRevision: r.payload.atRevision, documentSnapshotId: r.payload.documentSnapshotId,
+      contextId: r.payload.view.contextId, layerUid: r.payload.view.layerUid, frame: r.payload.view.frame,
+      workId: r.payload.view.workId, viewGeneration: r.payload.view.viewGeneration,
+      target: read.target, rect: read.rect,
+      mesh: { meshId: 'im_1', outlineCount: OUTLINE.length, vertexCount: OUTLINE.length,
+        triangleIndexCount: 0, offsetsPresent: true, cols: 1, rows: 1 },
+      page: { kind: 'tris', cursor: 0, total: 0, nextCursor: null, items: [] } },
+  }) });
+  const admitted = await sdk.dispatch(request);
+  assert.equal(admitted.ok, true);
+  assert.equal(admitted.result.page.total, 0); assert.deepEqual(admitted.result.page.items, []);
+
+  const emptyMesh = { outline: [], verts: [], tris: [], offsets: [], cols: 1, rows: 1 };
+  const empty = composedMesh(false, emptyMesh); await empty.open();
+  const emptyProof = ComposedUI.readImageMeshSelection(empty.root);
+  const emptyRead = await emptyProof.session.readImageMesh(emptyProof.selector, emptyProof.info);
+  assert.deepEqual(emptyRead.mesh, { outline: [], verts: [], tris: [], offsets: [], cols: 1, rows: 1 },
+    'Project must preserve an admitted mesh whose native topology arrays are all empty');
+});
+
+test('actual UI selection proofs reject stale selection, frame and session leases before mint or dispatch', async () => {
+  for (const stale of ['selection', 'frame', 'owner']) {
+    const h = composedMesh(); await h.open();
+    const proof = ComposedUI.readImageMeshSelection(h.root), adapter = Mesh.desktop(h.root);
+    assert.ok(proof); assert.equal(proof.current(), true);
+    await h.settle();
+    const before = h.session.requestId('probe'), sent = h.calls.length;
+    const queued = adapter.detach({ contextId: 'scene-root', layerUid: 'L0', frameScope: { kind: 'authored', frame: 0 }, strokeId: 'raster-0' },
+      (pin, ctx) => proof.current(ctx));
+    if (stale === 'selection') { h.root.state.activeLayerIdx = 1; h.root._layerSel = [1]; }
+    if (stale === 'frame') h.root.state.currentFrame = 1;
+    if (stale === 'owner') h.replaceSession();
+    const error = await refused(queued);
+    assert.equal(error.code, 'stale_revision', stale); assert.equal(error.reason, 'mesh_selection_stale', stale);
+    assert.equal(h.calls.length, sent, stale + ' sends no read or mutation');
+    const after = h.session.requestId('probe');
+    assert.equal(Number(after.split('-').at(-1)), Number(before.split('-').at(-1)) + 1, stale + ' consumes no request id');
+    assert.equal(h.calls.filter(r => r.operation === OP).length, 0);
+  }
+});
+
+test('real capture handlers cancel without a command and commit one leased pointer offset on release', async () => {
+  const h = composedMesh(true); await h.open();
+  Object.defineProperty(h.root.state, 'imageMeshes', { get() { throw Error('LEGACY MESH STORE'); } });
+  h.root.SMImageMeshUI.toggleEditing();
+  assert.equal(h.root.SMImageMeshUI.isEditing(), true);
+  const before = h.session.requestId('probe'), sent = h.calls.length;
+  assert.equal(h.pointer('pointerdown', 160, 90), true);
+  assert.equal(h.captured(), 7);
+  assert.equal(h.pointer('pointermove', 180, 100), true);
+  h.pointer('pointercancel', 180, 100);
+  assert.equal(h.captured(), null);
+  h.pointer('pointerup', 180, 100);
+  await meshTurn();
+  assert.equal(h.calls.length, sent);
+  const after = h.session.requestId('probe');
+  assert.equal(Number(after.split('-').at(-1)), Number(before.split('-').at(-1)) + 1);
+  assert.equal(h.pointer('pointerdown', 160, 90), true);
+  assert.equal(h.pointer('pointermove', 180, 100), true);
+  assert.equal(h.calls.filter(r => r.operation === OP).length, 0, 'drag preview owns no native mutation');
+  assert.equal(h.pointer('pointerup', 180, 100), true);
+  await h.settle();
+  const commands = h.calls.filter(r => r.operation === OP);
+  assert.equal(commands.length, 1);
+  assert.deepEqual(commands[0].payload, { command: 'object.image.mesh.edit', meshId: 'im_1',
+    action: { kind: 'setOffset', index: 0, du: 0.09999999999999998, dv: 0.09999999999999998 } });
+  assert.equal(h.captured(), null); assert.equal(h.session.info().contentRevision, 1);
+  const proof = ComposedUI.readImageMeshSelection(h.root);
+  const read = await proof.session.readImageMesh(proof.selector, proof.info);
+  assert.deepEqual(read.mesh.offsets[0], [0.09999999999999998, 0.09999999999999998]);
+  assert.deepEqual(h.messages, []);
 });
