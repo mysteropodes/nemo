@@ -411,7 +411,6 @@ async fn actual_owner_release_during_source_resolution_prevents_late_batch_publi
     assert!(native.lock().unwrap().active().is_none());
 }
 
-
 #[tokio::test]
 async fn discovered_generation_admits_real_source_batch_after_owner_replacement() {
     let state = state();
@@ -421,9 +420,13 @@ async fn discovered_generation_admits_real_source_batch_after_owner_replacement(
     let status = serde_json::to_value(state.native_status(serde_json::from_value(json!({
         "apiVersion":2,"requestId":"batch-generation-discovery","instanceId":state.instance_id()
     })).unwrap()).unwrap()).unwrap();
-    let generation = status["lifecycleGeneration"].as_u64()
+    let generation = status["lifecycleGeneration"]
+        .as_u64()
         .expect("An official client must discover the actual source-batch lifecycle pin");
-    assert!(generation > old_generation, "a guessed initial generation cannot qualify");
+    assert!(
+        generation > old_generation,
+        "a guessed initial generation cannot qualify"
+    );
     let file = ScopedPng::new();
     let mut command = mixed(&state, "discovered-source-batch", file.0.to_str().unwrap());
     command.document_id = status["documentId"].as_str().unwrap().into();
@@ -435,20 +438,39 @@ async fn discovered_generation_admits_real_source_batch_after_owner_replacement(
     let mut stale = command.clone();
     stale.request_id = "retired-source-batch".into();
     stale.payload["lifecycleGeneration"] = json!(old_generation);
-    let refused = state.revisions.dispatch_import_batch_using(
-        state.instance_id(), &state.native_state(), stale, false, |_| async {
-            panic!("retired generation must refuse before resolving any source");
-            #[allow(unreachable_code)]
-            Ok(SourceBytes::Font(crate::application_mcp::font_source::FontBytes::Bundled(FONT)))
-        }
-    ).await.unwrap().response;
+    let refused = state
+        .revisions
+        .dispatch_import_batch_using(
+            state.instance_id(),
+            &state.native_state(),
+            stale,
+            false,
+            |_| async {
+                panic!("retired generation must refuse before resolving any source");
+                #[allow(unreachable_code)]
+                Ok(SourceBytes::Font(
+                    crate::application_mcp::font_source::FontBytes::Bundled(FONT),
+                ))
+            },
+        )
+        .await
+        .unwrap()
+        .response;
     assert!(!refused.ok);
     assert_eq!(saved(&state, &id), initial);
     let allowed = file.0.canonicalize().unwrap();
-    let response = state.revisions.dispatch_scoped(
-        state.instance_id(), &state.native_state(), command, false,
-        Some(Arc::new(move |path| path == allowed.as_path()))
-    ).await.unwrap().response;
+    let response = state
+        .revisions
+        .dispatch_scoped(
+            state.instance_id(),
+            &state.native_state(),
+            command,
+            false,
+            Some(Arc::new(move |path| path == allowed.as_path())),
+        )
+        .await
+        .unwrap()
+        .response;
     assert!(response.ok, "{response:?}");
     assert_eq!(response.content_revision, 1);
     let result = response.result.unwrap();

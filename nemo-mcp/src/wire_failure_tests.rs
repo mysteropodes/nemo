@@ -135,20 +135,26 @@ fn native_status_fixture_response(change: &str, request: &NativeStatusRequest) -
     let mut response = serde_json::to_value(NativeHostStatus::unavailable(
         request,
         "fixture has no native owner",
-    )).unwrap();
+    ))
+    .unwrap();
     if !matches!(change, "none" | "request" | "instance" | "invalid") {
         response = serde_json::json!({"apiVersion":2,"requestId":"status","instanceId":"instance",
             "available":true,"documentId":"native-document","contentRevision":23,"lifecycleGeneration":37});
     }
     match change {
         "request" | "available-wrong-request" => response["requestId"] = serde_json::json!("other"),
-        "instance" | "available-wrong-instance" => response["instanceId"] = serde_json::json!("other"),
+        "instance" | "available-wrong-instance" => {
+            response["instanceId"] = serde_json::json!("other")
+        }
         "invalid" => response["apiVersion"] = serde_json::json!(1),
         "generation-boundary" => {
             response["lifecycleGeneration"] = serde_json::json!(9_007_199_254_740_991u64);
         }
         "missing-generation" => {
-            response.as_object_mut().unwrap().remove("lifecycleGeneration");
+            response
+                .as_object_mut()
+                .unwrap()
+                .remove("lifecycleGeneration");
         }
         "null-generation" => response["lifecycleGeneration"] = Value::Null,
         "zero-generation" => response["lifecycleGeneration"] = serde_json::json!(0),
@@ -201,7 +207,10 @@ async fn native_status_transport_rejects_uncorrelated_or_invalid_host_status() {
         let result = native_status_fixture_roundtrip(change).await;
         if change == "none" {
             let status = result.unwrap();
-            assert_eq!(status.reason.as_deref(), Some("fixture has no native owner"));
+            assert_eq!(
+                status.reason.as_deref(),
+                Some("fixture has no native owner")
+            );
             assert_eq!(status.lifecycle_generation, None);
         } else {
             assert!(result.is_err(), "{change}");
@@ -212,10 +221,17 @@ async fn native_status_transport_rejects_uncorrelated_or_invalid_host_status() {
 #[tokio::test]
 async fn native_status_transport_requires_correlated_bounded_generation() {
     for change in [
-        "available", "generation-boundary", "available-wrong-request",
-        "available-wrong-instance", "missing-generation", "null-generation",
-        "zero-generation", "fractional-generation", "string-generation",
-        "unsafe-generation", "unavailable-generation",
+        "available",
+        "generation-boundary",
+        "available-wrong-request",
+        "available-wrong-instance",
+        "missing-generation",
+        "null-generation",
+        "zero-generation",
+        "fractional-generation",
+        "string-generation",
+        "unsafe-generation",
+        "unavailable-generation",
     ] {
         let result = native_status_fixture_roundtrip(change).await;
         if matches!(change, "available" | "generation-boundary") {
@@ -223,11 +239,14 @@ async fn native_status_transport_requires_correlated_bounded_generation() {
             assert!(status.available);
             assert_eq!(status.document_id.as_deref(), Some("native-document"));
             assert_eq!(status.content_revision, Some(23));
-            assert_eq!(status.lifecycle_generation, Some(if change == "available" {
-                37
-            } else {
-                9_007_199_254_740_991
-            }));
+            assert_eq!(
+                status.lifecycle_generation,
+                Some(if change == "available" {
+                    37
+                } else {
+                    9_007_199_254_740_991
+                })
+            );
         } else {
             assert!(result.is_err(), "{change}");
         }

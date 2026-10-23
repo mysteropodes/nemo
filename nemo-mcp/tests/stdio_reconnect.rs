@@ -332,7 +332,10 @@ async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) 
                 "available" => {}
                 "unavailable" => {
                     status["available"] = json!(false);
-                    status.as_object_mut().unwrap().remove("lifecycleGeneration");
+                    status
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("lifecycleGeneration");
                     status["reason"] = json!("native authority inactive");
                     // The closed status DTO permits optional pins when unavailable;
                     // discovery must still expose no active document/revision.
@@ -346,12 +349,19 @@ async fn native_only_discovery(legacy_silent: bool, native_reply: &'static str) 
                 }
                 "unknown-member" => status["injected"] = json!(true),
                 "unsafe-revision" => status["contentRevision"] = json!(9_007_199_254_740_992u64),
-                "missing-generation" => { status.as_object_mut().unwrap().remove("lifecycleGeneration"); }
+                "missing-generation" => {
+                    status
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("lifecycleGeneration");
+                }
                 "null-generation" => status["lifecycleGeneration"] = Value::Null,
                 "zero-generation" => status["lifecycleGeneration"] = json!(0),
                 "fractional-generation" => status["lifecycleGeneration"] = json!(1.5),
                 "string-generation" => status["lifecycleGeneration"] = json!("37"),
-                "unsafe-generation" => status["lifecycleGeneration"] = json!(9_007_199_254_740_992u64),
+                "unsafe-generation" => {
+                    status["lifecycleGeneration"] = json!(9_007_199_254_740_992u64)
+                }
                 "unavailable-generation" => {
                     status["available"] = json!(false);
                     status["reason"] = json!("native authority inactive");
