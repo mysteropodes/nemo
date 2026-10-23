@@ -334,13 +334,8 @@ pub(super) mod pixel_consumer {
             Ok(())
         }
     }
-    pub(crate) fn composition(
-        snapshot: &ObjectSnapshot,
-        frame: u32,
-        viewport: bool,
-        zoom: f64,
-    ) -> ObjectCompositionWitness {
-        let selector = ObjectFrameSelector {
+    fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
+        ObjectFrameSelector {
             instance_id: snapshot.instance_id(),
             document_id: snapshot.document_id(),
             content_revision: snapshot.content_revision(),
@@ -348,7 +343,15 @@ pub(super) mod pixel_consumer {
             context_id: "scene-root",
             scope_kind: FrameScopeKind::Authored,
             frame,
-        };
+        }
+    }
+    pub(crate) fn composition(
+        snapshot: &ObjectSnapshot,
+        frame: u32,
+        viewport: bool,
+        zoom: f64,
+    ) -> ObjectCompositionWitness {
+        let selector = selector(snapshot, frame);
         let packet = prepare_object_frame(snapshot, &selector).unwrap();
         let scene = prepare_object_render_scene(&packet, &selector).unwrap();
         let plan = prepare_object_paint_plan(&scene, &selector).unwrap();
@@ -409,6 +412,12 @@ pub(super) mod pixel_consumer {
         assert_eq!(scheduler.lease_counters().live(), 0);
         bytes
     }
+    pub(crate) fn plain_frames(gpu: &mut Compositor, owner: &NativeObjectHistory) -> Vec<Vec<u8>> {
+        let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
+        [0, 12, 23]
+            .map(|frame| pixels(gpu, &composition(&snapshot, frame, true, 1.)))
+            .to_vec()
+    }
 
     pub(crate) fn fixture(with_widget: bool) -> (NativeObjectHistory, Value) {
         let baseline: Value =
@@ -427,6 +436,9 @@ pub(super) mod pixel_consumer {
             "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
                 "migration":"explicit-plan-required","referencePolicy":"unresolved","contexts":[{"contextId":"scene-root",
                 "layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],"scopes":scopes}]}});
+        drawing["propertyHolders"] = json!([{"target":{"contextId":"scene-root","layerUid":"L0"},
+            "properties":[{"property":"position","static":[0,0],"track":{"keys":[
+                {"frame":0,"v":[0,0]},{"frame":12,"v":[40,20]},{"frame":23,"v":[80,40]}]}}]}]);
         if with_widget {
             drawing["layers"]
                 .as_array_mut()
@@ -466,10 +478,11 @@ pub(super) mod pixel_consumer {
     pub(crate) fn exported(
         owner: &NativeObjectHistory,
         gpu: &mut Compositor,
-        snapshot: &ObjectSnapshot,
+        viewport: &ObjectCompositionWitness,
         frame: u32,
         stage: &str,
     ) -> Vec<u8> {
+        let snapshot = viewport.plan().packet().snapshot();
         let mut scheduler = FrameScheduler::new();
         let mut port = Png::default();
         let outcome = export_one_object_frame(
@@ -492,7 +505,7 @@ pub(super) mod pixel_consumer {
                 output: OutputSpec::new("frame", "rgba8", 1920, 1080, "srgb", "straight").unwrap(),
                 maximum_encoded_bytes: 4 << 20,
             },
-            composition(snapshot, frame, false, 1.),
+            prepare_object_composition(viewport.plan(), &selector(snapshot, frame)).unwrap(),
         );
         assert_eq!(outcome.receipt.unwrap().status, JobStatus::Succeeded);
         assert!(outcome.release.cleanup_complete);

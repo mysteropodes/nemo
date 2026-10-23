@@ -382,17 +382,14 @@ fn rgb(bytes: &[u8], x: usize, y: usize, expected: [u8; 3]) {
 #[test]
 fn original_mesh_pixels_reach_the_real_metal_viewport_compositor_and_png_at_three_frames() {
     use crate::compositor::Compositor;
-    use fixtures::pixel_consumer::{composition, exported, fixture, pixels};
+    use fixtures::pixel_consumer::{composition, exported, fixture, pixels, plain_frames};
     let (mut owner, mesh) = fixture(false);
     let mut gpu = Compositor::new().expect("the original pixel criterion requires real Metal");
     assert_eq!(gpu.adapter().get_info().backend, wgpu::Backend::Metal);
-    let plain = pixels(
-        &mut gpu,
-        &composition(&owner.acquire_snapshot(0).unwrap(), 0, true, 1.),
-    );
+    let plain = plain_frames(&mut gpu, &owner);
     let (widget_owner, _) = fixture(true);
     assert_eq!(
-        plain,
+        plain[0],
         pixels(
             &mut gpu,
             &composition(&widget_owner.acquire_snapshot(0).unwrap(), 0, true, 1.)
@@ -419,7 +416,10 @@ fn original_mesh_pixels_reach_the_real_metal_viewport_compositor_and_png_at_thre
     ] {
         mesh_command(&mut owner, stage, action);
         let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
-        for frame in [0, 12, 23] {
+        for (index, (frame, dx, dy)) in [(0, 0, 0), (12, 40, 20), (23, 80, 40)]
+            .into_iter()
+            .enumerate()
+        {
             let viewport = composition(&snapshot, frame, true, 1.);
             assert!(
                 viewport.raster_image(0).is_none(),
@@ -428,6 +428,7 @@ fn original_mesh_pixels_reach_the_real_metal_viewport_compositor_and_png_at_thre
             let rendered = pixels(&mut gpu, &viewport);
             assert_eq!(rendered.len(), 1920 * 1080 * 4);
             if stage == "rest" {
+                let plain = &plain[index];
                 let differing = plain
                     .chunks_exact(4)
                     .zip(rendered.chunks_exact(4))
@@ -442,13 +443,13 @@ fn original_mesh_pixels_reach_the_real_metal_viewport_compositor_and_png_at_thre
                     .zip(&rendered)
                     .all(|(a, b)| a.abs_diff(*b) <= 1));
             }
-            rgb(&rendered, 240, 180, [220, 30, 30]);
-            rgb(&rendered, 400, 180, [30, 60, 220]);
-            rgb(&rendered, 150, 180, [255, 255, 255]);
+            rgb(&rendered, 240 + dx, 180 + dy, [220, 30, 30]);
+            rgb(&rendered, 400 + dx, 180 + dy, [30, 60, 220]);
+            rgb(&rendered, 150 + dx, 180 + dy, [255, 255, 255]);
             rgb(
                 &rendered,
-                330,
-                180,
+                330 + dx,
+                180 + dy,
                 if stage == "rest" {
                     [30, 60, 220]
                 } else {
@@ -456,7 +457,7 @@ fn original_mesh_pixels_reach_the_real_metal_viewport_compositor_and_png_at_thre
                 },
             );
             if stage == "mask" {
-                rgb(&rendered, 230, 90, [255, 255, 255]);
+                rgb(&rendered, 230 + dx, 90 + dy, [255, 255, 255]);
             }
             if frame == 0 {
                 let zoomed = pixels(&mut gpu, &composition(&snapshot, frame, true, 0.75));
@@ -492,7 +493,7 @@ fn original_mesh_pixels_reach_the_real_metal_viewport_compositor_and_png_at_thre
             }
             assert_eq!(
                 rendered,
-                exported(&owner, &mut gpu, &snapshot, frame, stage)
+                exported(&owner, &mut gpu, &viewport, frame, stage)
             );
         }
     }
