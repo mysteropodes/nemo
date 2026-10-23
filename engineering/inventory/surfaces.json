@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "8dac2119a8262b65d849836cb548cdb06c1010a3",
-  "describe": "v0.7.0-alpha.4-2975-g8dac2119-dirty"
+  "head": "9067b4935ebcada6d20a11909677c95243fad474",
+  "describe": "v0.7.0-alpha.4-2979-g9067b493-dirty"
  },
- "inputsDigest": "68d27af4f6921a4e0d73088f55e73fd53aeed83335e2ec1c6c614a50b0ecd9fb",
+ "inputsDigest": "eec6f54c31b32125692b36cc65b8a5e2e9f172e7be4a0409913f3121b4b99768",
  "states": [
   "inventoried",
   "characterized",
@@ -176,7 +176,7 @@
   },
   "SMImageMeshUI": {
    "file": "src/js/image-mesh-bridge.js",
-   "line": 304,
+   "line": 306,
    "members": 7
   },
   "SM": {
@@ -2483,7 +2483,7 @@
    "capability": "Reset shape",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:290 init()"
+    "src/js/image-mesh-bridge.js:292 init()"
    ],
    "events": [
     "click"
@@ -10870,7 +10870,7 @@
    "capability": "imagemesh cols",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:288 init()"
+    "src/js/image-mesh-bridge.js:290 init()"
    ],
    "events": [
     "change"
@@ -10896,8 +10896,8 @@
     "functionsVisited": 36,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:123 setDensity()",
-     "src/js/image-mesh-bridge.js:153 paintPanel()"
+     "src/js/image-mesh-bridge.js:125 setDensity()",
+     "src/js/image-mesh-bridge.js:155 paintPanel()"
     ]
    },
    "fixtures": [
@@ -10916,7 +10916,7 @@
    "capability": "imagemesh edit",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:286 init()"
+    "src/js/image-mesh-bridge.js:288 init()"
    ],
    "events": [
     "change"
@@ -10940,7 +10940,7 @@
     "functionsVisited": 11,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:149 paintPanel()"
+     "src/js/image-mesh-bridge.js:151 paintPanel()"
     ]
    },
    "fixtures": [
@@ -10959,7 +10959,7 @@
    "capability": "imagemesh on",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:284 init()"
+    "src/js/image-mesh-bridge.js:286 init()"
    ],
    "events": [
     "change"
@@ -10983,7 +10983,7 @@
     "functionsVisited": 21,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:148 paintPanel()"
+     "src/js/image-mesh-bridge.js:150 paintPanel()"
     ]
    },
    "fixtures": [
@@ -11002,7 +11002,7 @@
    "capability": "imagemesh rows",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/image-mesh-bridge.js:289 init()"
+    "src/js/image-mesh-bridge.js:291 init()"
    ],
    "events": [
     "change"
@@ -11028,8 +11028,8 @@
     "functionsVisited": 36,
     "via": "helper el()",
     "references": [
-     "src/js/image-mesh-bridge.js:123 setDensity()",
-     "src/js/image-mesh-bridge.js:153 paintPanel()"
+     "src/js/image-mesh-bridge.js:125 setDensity()",
+     "src/js/image-mesh-bridge.js:155 paintPanel()"
     ]
    },
    "fixtures": [
