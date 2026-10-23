@@ -139,7 +139,15 @@ async fn round_trip(
 fn presented_project() -> Value {
     let mut value = project();
     value["project"]["canvasH"] = json!(64);
+    value["drawing"]["formatVersion"] = json!(2);
     value["drawing"]["totalFrames"] = json!(2);
+    value["drawing"]["compositionOrder"] = json!({"format":"nemo.native-object-order-plan",
+        "formatVersion":1,"documentFormatVersion":2,"migration":"explicit-plan-required","referencePolicy":"unresolved",
+        "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],
+            "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[
+                {"layerUid":"L0","strokeId":"pixels-0","naturalPosition":0,"order":{}}]},
+                {"frameScope":{"kind":"authored","frame":1},"elements":[
+                    {"layerUid":"L0","strokeId":"pixels-1","naturalPosition":0,"order":{}}]}]}]});
     value["drawing"]["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,
         "family":"drawing","contextId":"scene-root","keys":[{"frame":0},{"frame":1}],"samples":[]});
     let mut second = value["drawing"]["items"]["raster"][0].clone();
