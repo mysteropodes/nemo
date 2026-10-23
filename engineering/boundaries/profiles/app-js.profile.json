@@ -2163,6 +2163,18 @@
       ]
     },
     {
+      "id": "app.native.object.query.contract",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-query-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-query-contract.js"
+      ]
+    },
+    {
       "id": "app.native.application.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
