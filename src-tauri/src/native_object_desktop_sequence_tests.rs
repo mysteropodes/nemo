@@ -489,3 +489,7 @@ mod adversarial_120_frames {
         }
     }
 }
+
+#[cfg(target_os = "macos")]
+#[path = "native_object_desktop_sequence_undo_tests.rs"]
+mod undo_tests;

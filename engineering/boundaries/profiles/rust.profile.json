@@ -2139,6 +2139,7 @@
         "native_object_export_tests.rs",
         "native_object_desktop_export_tests.rs",
         "native_object_desktop_sequence_tests.rs",
+        "native_object_desktop_sequence_undo_tests.rs",
         "native_object_svg_export_tests.rs",
         "native_object_svg_desktop_export_tests.rs",
         "native_object_desktop_preview_extent_tests.rs",
