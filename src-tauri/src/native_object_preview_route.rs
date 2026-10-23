@@ -45,6 +45,43 @@ impl ApplicationMcp {
         revision_sync: Option<(&str, &serde_json::Value)>,
         operation: impl FnOnce(&mut NativeObjectHost) -> Result<T, String>,
     ) -> Result<T, String> {
+        self.with_object_read_owner(
+            lifecycle_generation,
+            expected,
+            &[expected.frame],
+            revision_sync,
+            operation,
+        )
+    }
+
+    /// A bounded export can replay its first frame from the finalized cache
+    /// while capturing later frames. Reserve the actual pending effects from
+    /// its whole admitted frame set, not only the first-frame selector.
+    pub(crate) fn with_object_export_owner<T>(
+        &self,
+        lifecycle_generation: u64,
+        expected: &ObjectFrameSelector<'_>,
+        frames: &[u32],
+        operation: impl FnOnce(&mut NativeObjectHost) -> Result<T, String>,
+    ) -> Result<T, String> {
+        if frames.is_empty()
+            || frames.len() > native_engine::export_job::MAX_OBJECT_EXPORT_FRAMES
+            || frames.first() != Some(&expected.frame)
+            || frames.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err("native object export owner frames are invalid".into());
+        }
+        self.with_object_read_owner(lifecycle_generation, expected, frames, None, operation)
+    }
+
+    fn with_object_read_owner<T>(
+        &self,
+        lifecycle_generation: u64,
+        expected: &ObjectFrameSelector<'_>,
+        requested_frames: &[u32],
+        revision_sync: Option<(&str, &serde_json::Value)>,
+        operation: impl FnOnce(&mut NativeObjectHost) -> Result<T, String>,
+    ) -> Result<T, String> {
         if expected.instance_id != self.instance_id() {
             return Err("object preview application instance is stale".into());
         }
@@ -107,7 +144,7 @@ impl ApplicationMcp {
                 Err("native object preview panicked; owner cleanup is required".into())
             });
         let frames = owner.pending_object_motion_frames();
-        if frames.contains(&expected.frame)
+        if frames.iter().any(|frame| requested_frames.contains(frame))
             && owner.matches_project_snapshot(expected.document_snapshot_id)
         {
             revisions.reserve_motion(

@@ -2512,6 +2512,18 @@
       ]
     },
     {
+      "id": "app.native.import.diagnostic.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-import-diagnostic.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-import-diagnostic.js"
+      ]
+    },
+    {
       "id": "app.native.import.desktop.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
@@ -2615,7 +2627,8 @@
         "native-object-project.js",
         "native-object-project-desktop.js",
         "native-object-project-properties.js",
-        "native-object-open-exposure.js"
+        "native-object-open-exposure.js",
+        "native-object-project-export.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
