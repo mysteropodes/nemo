@@ -186,7 +186,10 @@ for (const stage of ['entry', 'release']) {
       assert.equal(f.root.NemoNativeGuideController.read(), null);
       release(); await pending; await f.settle();
       assert.strictEqual(f.root.NemoNativeGuideController.read(), origin);
-      assert.equal(f.diagnostics.length, 1); assert.equal(f.saved(), f.originalDocument);
+      assert.deepEqual(f.diagnostics, [
+        ['guide-' + stage + '-refused', 'presentation-missing'],
+        ['camera-presented', 'canvas']
+      ]); assert.equal(f.saved(), f.originalDocument);
     } finally { if (release) release(); if (pending) await pending; await f.dispose(); }
   });
 }
@@ -344,7 +347,9 @@ test('real completion fanout converges after one refused Composition read while 
     assert.equal(queries().at(-1).request.payload.selector.kind, 'settings');
     assert.equal(f.session.readPresentedObjectSession(), null);
     f.dispatch(f.h, 'pointerdown');
-    assert.deepEqual(f.diagnostics, [['guide-entry-refused', 'presentation-missing']]);
+    assert.deepEqual(f.diagnostics, [
+      ['camera-presented', 'canvas'], ['guide-entry-refused', 'presentation-missing']
+    ]);
     assert.equal(f.notices.length, 1); assert.equal(f.ghosts().length, 0); assert.equal(f.edits().length, 0);
     refusal.release(); await f.settle();
     assert.equal(queries().length, before + 1,
@@ -387,7 +392,9 @@ test('real completion fanout converges after one refused Shadow read while prese
     assert.equal(f.calls.at(-1).request.payload.selector.kind, 'settings');
     assert.equal(f.session.readPresentedObjectSession(), null);
     f.dispatch(f.h, 'pointerdown');
-    assert.deepEqual(f.diagnostics, [['guide-entry-refused', 'presentation-missing']]);
+    assert.deepEqual(f.diagnostics, [
+      ['camera-presented', 'canvas'], ['guide-entry-refused', 'presentation-missing']
+    ]);
     assert.equal(f.notices.length, 1); assert.equal(f.ghosts().length, 0); assert.equal(f.edits().length, 0);
     refusal.release(); await f.settle();
     assert.equal(reads(shadowOperation), before + 1,
