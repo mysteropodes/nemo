@@ -79,9 +79,11 @@ test('installed native image mesh: binding, gesture, history and project-file pe
     const reportDir = path.resolve(process.env.NEMO_DESKTOP_REPORT_DIR, `t11-mesh-${Date.now()}-${process.pid}`);
     fs.mkdirSync(reportDir, { recursive: true, mode: 0o700 });
     const fixturePath = path.join(reportDir, 'blue-2x1.native.json');
+    const projectDir = path.join(reportDir, 'projects');
+    fs.mkdirSync(projectDir, { mode: 0o700 });
     const files = Object.fromEntries(['baseline', 'attached', 'sculpted', 'cancelled', 'undo-sculpt', 'redo-sculpt',
-      'undo-binding', 'redo-binding', 'pre-reopen', 'reopened', 'detached'].map(name => [name, path.join(reportDir, name + '.nemo')]));
-    files.mcpSculpted = path.join(reportDir, 'mcp-sculpted.nemo');
+      'undo-binding', 'redo-binding', 'pre-reopen', 'reopened', 'detached'].map(name => [name, path.join(projectDir, name + '.json')]));
+    files.mcpSculpted = path.join(projectDir, 'mcp-sculpted.json');
     write(fixturePath, fixture());
     const report = { schema: 'nemo.t11-image-mesh-installed/1', result: 'in-progress',
       sourceSha: source.head, buildSourceSha: proof.details.source.head, executableSha256: app.executableSha256,
