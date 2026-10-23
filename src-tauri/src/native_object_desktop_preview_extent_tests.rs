@@ -158,3 +158,6 @@ fn preview_project_size_and_bare_drawing_compatibility_refuse_before_target() {
     assert_eq!(f.creations.get(), 0);
     assert_eq!(f.trace.borrow().acquisitions, 0);
 }
+
+#[path = "native_object_desktop_preview_camera_return_tests.rs"]
+mod camera_return_tests;
