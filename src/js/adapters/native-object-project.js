@@ -5,10 +5,11 @@
   var desktopBinding=typeof module==='object'&&module.exports?require('./native-object-project-desktop.js'):root.NemoNativeObjectProjectDesktop;
   var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
   var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding);
+  var exportBinding=typeof module==='object'&&module.exports?require('./native-object-project-export.js'):root.NemoNativeObjectProjectExport;
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,exportBinding);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -394,24 +395,12 @@
         get subscriptionActive(){return typeof ports.subscriptionActive==='function'&&ports.subscriptionActive()===true;}};}});
     function exportFrames(destination,frames,onProgress,signal,format){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
-      var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
-      guardEpoch(submitted);
-      var pin=requireActive();
-      if(!requested||requested.length===0||requested.length>32||!requested.every(function(frame,i){
-        return integer(frame,0)&&frame<pin.totalFrames&&(i===0||requested[i-1]<frame);
-      }))throw new Error('Native object export frame range is invalid');
-      if(signal&&signal.aborted)return {status:'cancelled'};
-      var request=frameRequest(requested[0]);if(requested.length>1)request.frames=requested;
-      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.'+format;});
-      if(format==='svg')request.format='svg';
-      request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
-      var receipt=await raw('nemo_native_object_export',request);
-      if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId||receipt.documentId!==request.documentId||
-        receipt.contentRevision!==request.contentRevision||receipt.documentSnapshotId!==request.documentSnapshotId||receipt.published!==true||receipt.cleanupComplete!==true||
-        receipt.status!=='succeeded'||receipt.cleanupStatus!=='complete'||receipt.externalEffectDisposition!=='committed'||receipt.errorCode!==null||
-        !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
-      if(onProgress)onProgress(requested.length,requested.length);return receipt;
-    });}
+      if(!Exports||typeof Exports.run!=='function')return Promise.reject(new Error('Native object export adapter is unavailable'));
+      var submitted=epoch(info);return Exports.run({
+        enqueue:function(action){return enqueue(function(){guardEpoch(submitted);return action(requireActive());});},
+        frameRequest:frameRequest,invoke:function(request){return raw('nemo_native_object_export',request);}
+      },destination,frames,onProgress,signal,format);
+    }
     function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}
     function exportSvg(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'svg');}
     return Object.freeze({openPath:openPath,newProject:newProject,cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},

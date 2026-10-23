@@ -27,8 +27,9 @@ function harness(native, options = {}) {
     console, Date, Math, Promise, Error, AbortController, parseFloat, setTimeout() {},
     Blob: class { constructor(parts, meta) { calls.push(['browser-blob',parts[0],meta.type]); } },
     URL: { createObjectURL: () => 'blob:svg-fixture', revokeObjectURL: (url) => calls.push(['browser-revoke',url]) },
-    state: { totalFrames: 21, waIn: 0, waOut: 20, fps: 24, canvasW: 320, canvasH: 180 },
-    rangeSel: { value: 'all' }, fmtSel: { value: options.format || 'png' },
+    state: { totalFrames: options.totalFrames || 21, waIn: 0, waOut: (options.totalFrames || 21) - 1,
+      fps: 24, canvasW: 320, canvasH: 180 },
+    rangeSel: { value: options.range || 'all' }, fmtSel: { value: options.format || 'png' },
     ALPHA_FORMATS: ['png'], currentExportScale: () => options.scale || 1,
     progEl: { style: {}, textContent: '' }, cancelBtn: { style: {}, disabled: false,
       addEventListener: (_event, fn) => { ctx.cancel = fn; } },
@@ -44,7 +45,7 @@ function harness(native, options = {}) {
   };
   ctx.window = ctx;
   elements['exp-cancel'] = ctx.cancelBtn;
-  if (native) ctx.NemoNativeOpacityCutover = {
+  if (native) ctx.NemoNativeOpacityCutover = options.nativeAuthority || {
     blocksLegacy: () => true,
     isActive: () => options.active !== false,
     identity: () => options.identity ? options.identity() : ({instanceId:'instance',documentId:'document',contentRevision:0,documentSnapshotId:'snapshot-0',lifecycleGeneration:1}),
@@ -88,6 +89,57 @@ test('visible native PNG command exports all 21 frames without a Paper save or r
     ['picker', ['native-export', 21]]);
   assert.deepEqual(calls[1][1], Array.from({ length: 21 }, (_, i) => i));
   assert.equal(ctx.progEl.textContent, 'exportDone');
+});
+
+test('ordinary 120-frame Work area PNG command reaches the actual object session and full manifest', async () => {
+  const Project = require('../src/js/adapters/native-object-project.js');
+  let installed = false;
+  const exports = [];
+  const metadata = {
+    apiVersion: 2, instanceId: 'instance', documentId: 'blank-document', lifecycleGeneration: 1,
+    documentSnapshotId: 'blank-snapshot', contentRevision: 0, canvasW: 64, canvasH: 64,
+    fps: 24, totalFrames: 120, waIn: 0, waOut: 119, canvasBg: '#ffffff',
+    documentDigest: 'a'.repeat(64), byteCount: 904, layers: [{ layerUid: 'layer-1' }],
+    reference: null, undoDepth: 0, redoDepth: 0,
+  };
+  const manifest = Array.from({ length: 120 }, (_, i) => `frame_${String(i + 1).padStart(4, '0')}.png`);
+  const project = Project.create({
+    mapping: () => ({ cssBounds: { x: 0, y: 0, width: 64, height: 64 },
+      physicalExtent: { width: 64, height: 64 }, compositionExtent: { width: 64, height: 64 }, reportedDpr: 1 }),
+    frame: () => 0,
+    invoke: async (command, args) => {
+      const request = args && JSON.parse(args.requestJson);
+      if (command === 'nemo_native_object_client_status') return { ...metadata, available: installed };
+      if (command === 'nemo_native_object_bootstrap') {
+        installed = true;
+        return { ...metadata, requestId: request.requestId, resourceCount: 0, viewportAvailable: false };
+      }
+      if (command === 'nemo_native_object_reference' && request.action.kind === 'inspect') {
+        return { ...metadata, requestId: request.requestId };
+      }
+      if (command === 'nemo_native_object_preview') return { status: 'presented', workId: 'blank-preview', viewGeneration: 1 };
+      assert.equal(command, 'nemo_native_object_export');
+      exports.push(request);
+      return { apiVersion: 2, requestId: request.requestId, instanceId: metadata.instanceId,
+        documentId: metadata.documentId, contentRevision: 0, documentSnapshotId: metadata.documentSnapshotId,
+        status: 'succeeded', cleanupStatus: 'complete', externalEffectDisposition: 'committed',
+        errorCode: null, artifactFiles: manifest, published: true, cleanupComplete: true };
+    },
+  });
+  await project.openPath('/blank-120.json');
+  const before = JSON.stringify(project.info());
+  const { ctx, calls } = harness(true, { totalFrames: 120, range: 'work', nativeAuthority: project });
+  await ctx.click();
+  assert.equal(ctx.progEl.textContent, 'exportDone');
+  assert.equal(exports.length, 1);
+  assert.equal(exports[0].contentRevision, 0);
+  assert.equal(exports[0].documentSnapshotId, 'blank-snapshot');
+  assert.equal(exports[0].lifecycleGeneration, 1);
+  assert.deepEqual(exports[0].frameRange, { start: 0, end: 119 });
+  assert.equal(exports[0].frame, 0);
+  assert.equal(Object.hasOwn(exports[0], 'frames'), false);
+  assert.equal(JSON.stringify(project.info()), before);
+  assert.deepEqual(calls, ['picker']);
 });
 
 test('native scaled and transparent PNG requests reject before picker or legacy release', async () => {

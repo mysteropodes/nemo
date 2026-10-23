@@ -27,6 +27,8 @@ use tauri_plugin_fs::FsExt;
 #[path = "native_object_desktop_export_port.rs"]
 mod port;
 use port::LazyDesktopArtifactPort;
+#[path = "native_object_desktop_sequence.rs"]
+mod sequence;
 
 const MAX_REQUEST_BYTES: usize = 8192;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -56,6 +58,8 @@ struct ObjectExportRequest {
     frame: u32,
     #[serde(default, deserialize_with = "non_null_frames")]
     frames: Option<Vec<u32>>,
+    #[serde(default, deserialize_with = "sequence::non_null_range")]
+    frame_range: Option<sequence::FrameRange>,
     output_spec: OutputSpecInput,
     viewport: ViewportInput,
     destination_directory: String,
@@ -116,6 +120,7 @@ fn admit_request(
         || request.scope_kind != FrameScopeKind::Authored
         || request.maximum_encoded_bytes == 0
         || request.maximum_encoded_bytes > MAX_PNG_BYTES
+        || !sequence::valid_range(&request)
         || request.frames.as_ref().is_some_and(|frames| {
             frames.is_empty()
                 || frames.len() > MAX_OBJECT_EXPORT_FRAMES
@@ -249,13 +254,24 @@ impl ObjectExportConsumer<'_> {
     fn run(self, compositor: &mut Compositor) -> Result<ObjectHostExportOutcome, String> {
         let mut port = if self.format == ObjectExportFormat::Svg {
             LazyDesktopArtifactPort::new_svg(
-                self.staging_root,
+                self.staging_root.clone(),
                 OUTPUT_HANDLE.into(),
-                self.destination,
+                self.destination.clone(),
             )
         } else {
-            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination)
+            LazyDesktopArtifactPort::new(
+                self.staging_root.clone(),
+                OUTPUT_HANDLE.into(),
+                self.destination.clone(),
+            )
         };
+        self.run_with_port(compositor, &mut port)
+    }
+    fn run_with_port<P: native_engine::export_job::StagedArtifactPort>(
+        self,
+        compositor: &mut Compositor,
+        port: &mut P,
+    ) -> Result<ObjectHostExportOutcome, String> {
         if self.format == ObjectExportFormat::Svg {
             return self.owner.export_pinned_object_svg_frames(
                 &self.selector,
@@ -264,7 +280,7 @@ impl ObjectExportConsumer<'_> {
                 OUTPUT_HANDLE.into(),
                 self.output,
                 self.maximum_encoded_bytes,
-                &mut port,
+                port,
             );
         }
         self.owner.export_pinned_object_png_frames(
@@ -274,7 +290,7 @@ impl ObjectExportConsumer<'_> {
             OUTPUT_HANDLE.into(),
             self.output,
             self.maximum_encoded_bytes,
-            &mut port,
+            port,
             compositor,
         )
     }
@@ -290,26 +306,39 @@ impl NativeViewportConsumer for ObjectExportConsumer<'_> {
     }
 }
 
-/// Authority and revision remain held through the original viewport/GPU borrow.
-fn export_with_target(
+/// Each caller retains exactly one original-owner/GPU borrow for one bounded child.
+fn with_export_consumer<T>(
     state: &ApplicationMcp,
     admitted: &AdmittedExport,
     staging_root: PathBuf,
-    target: impl FnOnce(ObjectExportConsumer<'_>) -> HostResult<ObjectHostExportOutcome>,
-) -> HostResult<ObjectExportReceipt> {
-    let selector = admitted.request.selector();
-    let outcome = state
+    frame: u32,
+    frames: Vec<u32>,
+    request_id: String,
+    target: impl FnOnce(ObjectExportConsumer<'_>) -> HostResult<T>,
+) -> HostResult<T> {
+    let mut selector = admitted.request.selector();
+    selector.frame = frame;
+    state
         .with_object_preview_owner(admitted.request.lifecycle_generation, &selector, |owner| {
+            if !owner.matches_project_snapshot(&admitted.request.document_snapshot_id) {
+                return Err("native object export snapshot is stale".into());
+            }
             owner.require_project_output(admitted.output.dimensions())?;
+            if let Some(range) = admitted.request.frame_range {
+                let info = owner.project_file_info()?;
+                if info
+                    .get("totalFrames")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_none_or(|total| u64::from(range.end) >= total)
+                {
+                    return Err("native object sequence range exceeds the pinned document".into());
+                }
+            }
             Ok(target(ObjectExportConsumer {
                 owner,
                 selector: selector.clone(),
-                frames: admitted
-                    .request
-                    .frames
-                    .clone()
-                    .unwrap_or_else(|| vec![selector.frame]),
-                request_id: admitted.request.request_id.clone(),
+                frames,
+                request_id,
                 output: admitted.output.clone(),
                 maximum_encoded_bytes: admitted.request.maximum_encoded_bytes,
                 format: admitted.request.format,
@@ -317,7 +346,28 @@ fn export_with_target(
                 staging_root,
             }))
         })
-        .map_err(|message| host_error("unavailable", message))??;
+        .map_err(|message| host_error("unavailable", message))?
+}
+fn export_with_target(
+    state: &ApplicationMcp,
+    admitted: &AdmittedExport,
+    staging_root: PathBuf,
+    target: impl FnOnce(ObjectExportConsumer<'_>) -> HostResult<ObjectHostExportOutcome>,
+) -> HostResult<ObjectExportReceipt> {
+    let frames = admitted
+        .request
+        .frames
+        .clone()
+        .unwrap_or_else(|| vec![admitted.request.frame]);
+    let outcome = with_export_consumer(
+        state,
+        admitted,
+        staging_root,
+        admitted.request.frame,
+        frames,
+        admitted.request.request_id.clone(),
+        target,
+    )?;
     receipt(&admitted.request, outcome)
 }
 
@@ -340,6 +390,9 @@ pub(crate) async fn nemo_native_object_export(
         .app_cache_dir()
         .map_err(|_| host_error("unavailable", "native staging root unavailable"))?
         .join("native-export-staging");
+    if admitted.request.frame_range.is_some() {
+        return sequence::run(&app, admitted, staging_root).await;
+    }
     for attempt in 0..2 {
         let app_for_main = app.clone();
         let for_main = std::sync::Arc::clone(&admitted);
