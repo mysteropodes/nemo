@@ -60,6 +60,9 @@ pub(crate) mod widget_read;
 use serde::{Deserialize, Serialize};
 pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;
+#[path = "object_image_mesh_snapshot.rs"]
+mod image_mesh_read;
+pub use image_mesh_read::{ImageMeshReadFailure, ImageMeshReadProjection};
 
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 #[path = "object_project_admission.rs"]
@@ -225,6 +228,15 @@ impl ObjectSnapshot {
     /// return a typed error rather than echoing unbounded IDs or fabricating IDs.
     /// This typed entry cannot detect duplicate members already lost in a Value.
     pub fn dispatch(&self, request: OpacityRequest) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        self.dispatch_with_image_mesh_view(request, Err(ImageMeshReadFailure::Unpresented))
+    }
+
+    /// A native retained-scene projection is a read port, never execution authority.
+    pub fn dispatch_with_image_mesh_view(
+        &self,
+        request: OpacityRequest,
+        image_mesh_view: Result<&ImageMeshReadProjection, ImageMeshReadFailure>,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
         if [
             request.request_id.as_str(),
             request.instance_id.as_str(),
@@ -273,6 +285,9 @@ impl ObjectSnapshot {
                 DispatchErrorCode::InvalidRequest,
                 "Only pinned object reads without expectedRevision are supported.",
             );
+        }
+        if request.operation == "query.document.object" && request.payload.get("view").is_some() {
+            return self.dispatch_image_mesh_read(&request, image_mesh_view);
         }
         if request.operation == "query.document.object.text" {
             return self.dispatch_text_read(&request);

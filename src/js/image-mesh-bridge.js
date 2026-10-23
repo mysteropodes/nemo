@@ -1,511 +1,317 @@
-// ---- IMAGE MESH EDITOR (2026-08-30) ----
-//
-// The on-canvas half of the image mesh (data model + rendering: image-mesh.js
-// and engine.rs's draw_image_mesh). Select an imported image with the
-// Selection tool, turn "Mesh" on in the right panel, drag the dots.
-//
-// Deliberately NOT a 24th toolbar button. The mesh belongs to the image, not
-// to a global mode — so it follows the gradient gizmo's pattern
-// (gradient-bridge.js): a panel section that appears for the one selected
-// item that can have one, plus a capture-phase pointer intercept that only
-// arms while that item is selected and the mode is on. Same reason the
-// gradient's angle is dragged on canvas rather than typed: position is a
-// gesture, not a number.
-//
-// ---- THE OUTLINE IS THE MASK ----
-//
-// verts[0 .. outline.length-1] ARE the outline, in order (image-mesh.js's
-// index invariant). So dragging one of those vertices reshapes the MASK and
-// the deformation at once — there is no separate "edit the mask" mode to
-// switch into, which is the whole point of Cyril's "the mask outline is also
-// the mesh boundary" rule. The editor says this out loud rather than leaving
-// it to be discovered: outline vertices are drawn as squares in the accent
-// orange, interior vertices as blue circles, and the outline edge is drawn
-// heavier than the interior wireframe.
-//
-// ---- HANDLE CONVENTIONS ----
-//
-// Copied from buildNodeHandleItems (engine-bridge.js), not invented here:
-// sizes in 1/view.zoom so they stay screen-constant, blue [74,158,255] for
-// an idle handle, accent orange [255,184,108] for a selected/special one,
-// white 1px stroke, and thin [120,170,255] guide lines. A parallel visual
-// language for one feature is how an app starts feeling like several apps.
+// Native image-mesh panel and presentation-only canvas handles.
 (function () {
   'use strict';
 
-  var IDLE = [74, 158, 255, 255];
-  var ACCENT = [255, 184, 108, 255];
-  var WHITE = [255, 255, 255, 255];
-  var WIRE = [120, 170, 255, 130];
-  var OUTLINE = [255, 184, 108, 220];
+  var SVG = 'http://www.w3.org/2000/svg';
+  var IDLE = 'rgba(74,158,255,1)';
+  var ACCENT = 'rgba(255,184,108,1)';
+  var WHITE = 'rgba(255,255,255,1)';
+  var WIRE = 'rgba(120,170,255,.51)';
+  var OUTLINE = 'rgba(255,184,108,.86)';
+  var editing = false;
+  var cached = null;
+  var serial = 0;
+  var readQueue = Promise.resolve();
+  var overlay = null;
+  var paintQueued = false;
+  var drag = null;
 
-  var editing = false;      // the panel's "Mesh" mode toggle
-  var dragIdx = -1;         // vertex being dragged, -1 = none
-  var dragMoved = false;
-
-  function engineOn() { return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && !state.playing; }
-
-  // The one selected item that can carry a mesh. Same shape as
-  // gradient-bridge's singleTarget, restricted to Rasters.
-  function singleRaster() {
-    if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length !== 1) return null;
-    var p = selectedPaths[0];
-    if (typeof Raster === 'undefined' || !(p instanceof Raster)) return null;
-    // A selection entry can outlive the object it points at: loadFrame,
-    // undo/redo and importJSON all rebuild every Paper item, and
-    // selectedPaths isn't always rebound in the same tick. A detached
-    // Raster still passes `instanceof` and still carries data.meshId, so
-    // without this check the panel would offer to edit a ghost — and
-    // detach() would delete the live tag while SMImageMesh.propagate
-    // silently no-oped (no parent = no layer = no frames to untag),
-    // leaving the mesh half-removed: gone on screen, back on the next
-    // loadFrame. Found live, driving the real checkbox after an import.
-    if (typeof userLayers === 'undefined' || !p.parent || userLayers.indexOf(p.parent) < 0) return null;
-    return p;
-  }
-  // The selected NATIVE VIDEO layer, when that is what the canvas selection
-  // is (2026-09, feedback #779: "le mesh sur une video ne persiste pas a la
-  // lecture ou scrub"). A video draws no Paper item at all, so singleRaster
-  // can structurally never see one and the whole mesh feature was silently
-  // image-only. select-bridge arms window._nvSelectedLayer for exactly this
-  // selection, and it is the same flag the transform gizmo reads.
-  function singleVideoLayer() {
-    if (state.tool !== 'select' && state.tool !== 'subselect') return -1;
-    if (window.selectedPaths && selectedPaths.length) return -1; // a stroke selection wins, same priority as the click hit-test
-    var li = window._nvSelectedLayer;
-    if (li == null) return -1;
-    var ld = state.layers[li];
-    if (!ld || !ld.nativeVideo || ld.locked || !ld.visible) return -1;
-    return li;
-  }
-  // ONE target shape for both kinds, so everything downstream (panel,
-  // overlay, drag) is written once. `raster` is null for a video; `li` is
-  // the layer either way.
-  function currentTarget() {
-    var r = singleRaster();
-    if (r) return { kind: 'raster', raster: r, li: state.activeLayerIdx };
-    var vli = singleVideoLayer();
-    if (vli >= 0) return { kind: 'video', raster: null, li: vli };
-    return null;
-  }
-  function meshIdOfTarget(t) {
-    if (!t) return null;
-    if (t.kind === 'video') return state.layers[t.li] && state.layers[t.li].videoMeshId || null;
-    return (t.raster && t.raster.data && t.raster.data.meshId) || null;
-  }
-  // The rect the mesh is normalized against. For an image that is the
-  // raster's own display rect and the layer's Motion still has to be applied
-  // on top (motionMap below); for a video, displayRect ALREADY composes
-  // Motion and the whole parent chain, so applying it again would double
-  // every transform.
-  function rectOfTarget(t) {
-    if (!t) return null;
-    if (t.kind === 'video') return window.SMNativeVideo ? SMNativeVideo.displayRect(t.li) : null;
-    return (window.SMEngineBridge && SMEngineBridge.rasterImageRect) ? SMEngineBridge.rasterImageRect(t.raster) : null;
-  }
-  function targetMesh() {
-    var t = currentTarget();
-    var id = meshIdOfTarget(t);
-    if (!t || !id || !window.SMImageMesh) return null;
-    var mesh = SMImageMesh.get(id);
-    return mesh ? { raster: t.raster, kind: t.kind, li: t.li, mesh: mesh, meshId: id } : null;
-  }
-
-  // Vertex positions in RENDERED space. Two mappings are involved and both
-  // already exist elsewhere — the raster's own display rect (engine-bridge's
-  // rasterImageRect, shared rather than re-derived) and the layer's
-  // render-time-only Motion transform (SMMotion.layerMotionPointMap, exactly
-  // what buildNodeHandleItems does for path handles, and for the same
-  // reason: without it the handles sit at the shape's pre-transform position
-  // while the picture is somewhere else).
-  function motionMap(t) {
-    if (!window.SMMotion) return null;
-    // A video's rect comes out of displayRect with Motion already folded in
-    // (see rectOfTarget) — mapping again would move the handles off the
-    // picture by exactly one extra transform.
-    if (t && t.kind === 'video') return null;
-    var li = t ? t.li : state.activeLayerIdx;
-    var m = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(li) : null;
-    if (!m && SMMotion.layerMotion3DPointMap) m = SMMotion.layerMotion3DPointMap(li);
-    return m;
-  }
-  // The animated pose for this mesh at the current frame, or null when it
-  // has no vertex tracks at all. Identical to what buildSceneJson feeds the
-  // renderer (engine-bridge.js) — the handles have to sit on the picture,
-  // so both sides read the same thing rather than the overlay quietly
-  // showing the rest sculpt while the image renders its animated pose.
-  function poseAtFor(t) {
-    if (!window.SMMotion || !SMMotion.hasMeshVertexMotionFor) return null;
-    var li = t.li != null ? t.li : state.activeLayerIdx;
-    if (!SMMotion.hasMeshVertexMotionFor(li, t.meshId)) return null;
-    return function (vi) { return SMMotion.meshVertexOffsetAt(li, t.meshId, vi, state.currentFrame); };
-  }
-  function renderedVerts(t) {
-    var rect = rectOfTarget(t);
-    if (!rect) return null;
-    var pts = SMImageMesh.worldVerts(t.mesh, rect, poseAtFor(t));
-    if (!pts) return null;
-    var mm = motionMap(t);
-    if (mm) pts = pts.map(function (p) { return mm.fwd(p[0], p[1]); });
-    return { pts: pts, rect: rect, mm: mm };
-  }
-
-  // ---- overlay ---------------------------------------------------------
-  function lineItem(a, b, color, w) {
-    return { segments: [{ point: [a[0], a[1]] }, { point: [b[0], b[1]] }], closed: false, fillColor: null, strokeColor: color, strokeWidth: w, strokeCap: 'butt' };
-  }
-  function dotItem(p, r, fill) {
-    // 12-gon, same approximation gradient-bridge uses for its own round
-    // handle — a circle here would need bezier handles for no visible gain
-    // at handle size.
-    var segs = [];
-    for (var i = 0; i < 12; i++) { var a = (i / 12) * Math.PI * 2; segs.push({ point: [p[0] + Math.cos(a) * r, p[1] + Math.sin(a) * r] }); }
-    return { segments: segs, closed: true, fillColor: fill, strokeColor: WHITE, strokeWidth: r * 0.25 };
-  }
-  function squareItem(p, r, fill) {
-    return {
-      segments: [{ point: [p[0] - r, p[1] - r] }, { point: [p[0] + r, p[1] - r] }, { point: [p[0] + r, p[1] + r] }, { point: [p[0] - r, p[1] + r] }],
-      closed: true, fillColor: fill, strokeColor: WHITE, strokeWidth: r * 0.25,
-    };
-  }
-
-  function buildImageMeshOverlayItems() {
-    if (!editing || !engineOn()) return [];
-    var t = targetMesh();
-    if (!t) return [];
-    var rv = renderedVerts(t);
-    if (!rv) return [];
-    var pts = rv.pts, mesh = t.mesh;
-    var zs = 1 / view.zoom;
-    var items = [];
-    // Interior wireframe first, so vertices sit on top of it. Every triangle
-    // edge is drawn once per triangle (so shared edges are drawn twice) —
-    // deliberate: de-duplicating would need an edge set built per frame for
-    // a purely cosmetic gain on a translucent stroke.
-    for (var k = 0; k + 2 < mesh.tris.length; k += 3) {
-      var a = pts[mesh.tris[k]], b = pts[mesh.tris[k + 1]], c = pts[mesh.tris[k + 2]];
-      if (!a || !b || !c) continue;
-      items.push(lineItem(a, b, WIRE, 1 * zs));
-      items.push(lineItem(b, c, WIRE, 1 * zs));
-      items.push(lineItem(c, a, WIRE, 1 * zs));
-    }
-    // The mask boundary, heavier and in the accent colour — this is the line
-    // that decides what is visible, so it should not read as one more
-    // wireframe edge.
-    for (var o = 0; o < mesh.outline.length; o++) {
-      var p0 = pts[o], p1 = pts[(o + 1) % mesh.outline.length];
-      if (p0 && p1) items.push(lineItem(p0, p1, OUTLINE, 1.6 * zs));
-    }
-    for (var i = 0; i < pts.length; i++) {
-      var isOutline = SMImageMesh.isOutlineVertex(mesh, i);
-      var isDrag = (i === dragIdx);
-      var r = (isDrag ? 5 : 3.5) * zs;
-      items.push(isOutline ? squareItem(pts[i], r, isDrag ? WHITE : ACCENT)
-                           : dotItem(pts[i], r, isDrag ? WHITE : IDLE));
-    }
-    return items;
-  }
-  window.buildImageMeshOverlayItems = buildImageMeshOverlayItems;
-
-  // ---- drag interaction ------------------------------------------------
-  function onDown(e) {
-    if (!editing || !engineOn()) return;
-    var t = targetMesh();
-    if (!t) return;
-    var rv = renderedVerts(t);
-    if (!rv) return;
-    var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    // Screen-space tolerance, like every other handle hit-test in the app —
-    // a world-space one would be unusable when zoomed out.
-    var tol = 10 / view.zoom;
-    var best = -1, bestD = tol;
-    for (var i = 0; i < rv.pts.length; i++) {
-      var d = Math.hypot(rv.pts[i][0] - w[0], rv.pts[i][1] - w[1]);
-      if (d < bestD) { bestD = d; best = i; }
-    }
-    if (best < 0) return;
-    dragIdx = best; dragMoved = false;
-    e.stopImmediatePropagation(); e.preventDefault();
-    pushUndo();
-    SMEngineBridge.suspend();
-  }
-  function onMove(e) {
-    if (dragIdx < 0) return;
-    var t = targetMesh();
-    if (!t) { dragIdx = -1; return; }
-    e.stopImmediatePropagation(); e.preventDefault();
-    var rect = rectOfTarget(t);
-    if (!rect) { dragIdx = -1; return; }
-    var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    // Back through the layer's Motion transform first, into the raw space
-    // the rect itself lives in, then into the rect's normalized space —
-    // the exact reverse of renderedVerts' forward chain.
-    var mm = motionMap(t);
-    if (mm && mm.inv) { var iv = mm.inv(w[0], w[1]); w = [iv[0], iv[1]]; }
-    var uv = SMImageMesh.normalizedOf(rect, w[0], w[1]);
-    var rest = t.mesh.verts[dragIdx];
-    // Where the drag lands depends on the stopwatch, exactly like every
-    // other Motion property: an ANIMATED vertex records a key (or a static
-    // override) on its vtxN track, an un-animated one edits the mesh's own
-    // rest sculpt. The track value is a deviation ON TOP of the sculpt, so
-    // it is measured from rest+sculpt rather than from rest.
-    var li = t.li != null ? t.li : state.activeLayerIdx;
-    if (window.SMMotion && SMMotion.isMeshVertexAnimated && SMMotion.isMeshVertexAnimated(li, t.meshId, dragIdx)) {
-      var sculpt = (t.mesh.offsets && t.mesh.offsets[dragIdx]) || [0, 0];
-      SMMotion.setMeshVertexOffset(li, t.meshId, dragIdx, uv[0] - rest[0] - sculpt[0], uv[1] - rest[1] - sculpt[1]);
-      // feedback #211 — same cheap in-place field sync every other canvas
-      // drag now does; this mesh vertex row (CLAUDE.md §12ter) is keyed
-      // through the identical vtxN track machinery.
-      if (SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
-    } else {
-      SMImageMesh.setOffset(t.meshId, dragIdx, uv[0] - rest[0], uv[1] - rest[1]);
-    }
-    dragMoved = true;
-    SMEngineBridge.renderNow();
-  }
-  function onUp(e) {
-    if (dragIdx < 0) return;
-    e.stopImmediatePropagation(); e.preventDefault();
-    // A drag that landed on a vtxN track may have created a keyframe, which
-    // only shows up once the timeline re-renders — the panel/grid pair is
-    // rebuilt wholesale (motion.js), never incrementally, so nothing else
-    // would repaint it until the next unrelated UI event.
-    var tUp = targetMesh();
-    if (dragMoved && tUp && window.SMMotion && SMMotion.isMeshVertexAnimated
-        && SMMotion.isMeshVertexAnimated(tUp.li != null ? tUp.li : state.activeLayerIdx, tUp.meshId, dragIdx)
-        && typeof updateUI === 'function') updateUI();
-    dragIdx = -1;
-    SMEngineBridge.resume();
-    // The mesh lives in state.imageMeshes, not in the frame's strokes, so
-    // there is nothing for saveActiveLayerFrame to write here — the undo
-    // snapshot taken in onDown is what makes the edit revertible (see
-    // layersSnapshotNow, tweens.js, which now carries imageMeshes), and
-    // SMProject.isDirty() picks the change up on its own since it diffs a
-    // fresh exportJSON() against the last saved one.
-    dragMoved = false;
-    SMEngineBridge.renderNow();
-  }
-
-  // ---- panel -----------------------------------------------------------
   function el(id) { return document.getElementById(id); }
-  function renderImageMeshPanel() {
-    var sec = el('p-imagemesh-sec');
-    if (!sec) return;
-    var tgt = currentTarget();
-    // NOT `editing = false` here. This runs from updateUI, which fires on
-    // every frame change — and loadFrame rebuilds the Paper items, so
-    // singleRaster() is transiently null in the middle of an ordinary
-    // scrub. Clearing the mode there turned edit mode off the instant the
-    // playhead moved, which makes animating a mesh (key a vertex, scrub,
-    // key it again) impossible. Found live doing exactly that. `editing`
-    // is a sticky preference; with no valid target the overlay returns []
-    // and the pointer handlers bail on their own, so leaving it on costs
-    // nothing. It is cleared only when the mesh is genuinely gone (below).
-    if (!tgt) { sec.style.display = 'none'; return; }
-    sec.style.display = '';
-    var curId = meshIdOfTarget(tgt);
-    var has = !!(curId && SMImageMesh.get(curId));
-    if (!has) editing = false;
-    var onCb = el('p-imagemesh-on');
-    if (onCb) onCb.checked = has;
-    var editCb = el('p-imagemesh-edit');
-    if (editCb) { editCb.checked = editing; editCb.disabled = !has; }
-    var body = el('p-imagemesh-body');
-    if (body) body.style.display = has ? '' : 'none';
-    if (has) {
-      var mesh = SMImageMesh.get(curId);
-      var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
-      if (cols) cols.value = mesh.cols;
-      if (rows) rows.value = mesh.rows;
-      var info = el('p-imagemesh-info');
-      if (info) info.textContent = mesh.verts.length + ' / ' + (mesh.tris.length / 3);
-    }
+  function toast(message) { if (window.showToast) window.showToast(message, 'warn'); }
+  function samePin(a, b) {
+    return !!a && !!b && ['instanceId', 'documentId', 'lifecycleGeneration', 'contentRevision', 'documentSnapshotId']
+      .every(function (k) { return a[k] === b[k]; });
   }
-  window.renderImageMeshPanel = renderImageMeshPanel;
-
+  function proofNow() {
+    var ui = window.NemoNativeObjectUI;
+    if (!ui || typeof ui.readImageMeshSelection !== 'function') return null;
+    try {
+      var proof = ui.readImageMeshSelection(window);
+      if (!proof || !proof.session || typeof proof.session.readImageMesh !== 'function' ||
+          !proof.selector || typeof proof.selector.contextId !== 'string' || typeof proof.selector.layerUid !== 'string' ||
+          !Number.isSafeInteger(proof.selector.frame) || proof.selector.frame < 0 || !proof.info || !proof.info.instanceId ||
+          !proof.info.documentId || !Number.isSafeInteger(proof.info.contentRevision) || !Number.isSafeInteger(proof.info.lifecycleGeneration) ||
+          !proof.info.documentSnapshotId || typeof proof.current !== 'function' || proof.current() !== true) return null;
+      return proof;
+    } catch (_) { return null; }
+  }
+  function keyOf(proof) {
+    var i = proof.info, s = proof.selector;
+    return [s.contextId, s.layerUid, s.frame, i.instanceId, i.documentId, i.lifecycleGeneration,
+      i.contentRevision, i.documentSnapshotId];
+  }
+  function sameKey(a, b) { return !!a && !!b && a.key.length === b.length && a.key.every(function (v, i) { return v === b[i]; }); }
+  function currentCache() { return cached && cached.proof.current() === true ? cached : null; }
+  function refresh() {
+    var proof = proofNow(), key = proof && keyOf(proof), prior = currentCache();
+    if (!proof) {
+      if (cached) { serial++; cached = null; cancelDrag(); }
+      paintPanel(); schedulePaint(); return Promise.resolve(null);
+    }
+    if (prior && sameKey(prior, key)) { cached.proof = proof; paintPanel(); schedulePaint(); return prior.promise || Promise.resolve(prior.read); }
+    if (cached) cancelDrag();
+    serial++;
+    var token = serial;
+    var entry = { proof: proof, key: key, read: null, promise: null };
+    cached = entry;
+    paintPanel(); schedulePaint();
+    entry.promise = readQueue.catch(function () {}).then(function () {
+      if (token !== serial || proof.current() !== true) return null;
+      return proof.session.readImageMesh(proof.selector, proof.info);
+    }).then(function (read) {
+      if (token !== serial || cached !== entry || proof.current() !== true || !read || !samePin(read.info, proof.info)) return null;
+      entry.read = read;
+      paintPanel(); schedulePaint();
+      return read;
+    }).catch(function (error) {
+      if (token === serial && cached === entry) { entry.error = error; paintPanel(); schedulePaint(); }
+      return null;
+    }).finally(function () { if (cached === entry) entry.promise = null; });
+    readQueue = entry.promise.catch(function () {});
+    return entry.promise;
+  }
+  function usable() {
+    var entry = currentCache();
+    return entry && entry.read && samePin(entry.read.info, entry.proof.info) ? entry : null;
+  }
+  function adapter() {
+    var module = window.NemoNativeObjectImageMesh;
+    return module && typeof module.desktop === 'function' ? module.desktop(window) : null;
+  }
+  function liveGuard(entry) {
+    return function (pin, ctx) { return entry.proof.current(ctx) === true && samePin(pin, entry.read.info); };
+  }
+  function invoke(name, args, entry) {
+    var api = adapter();
+    if (!api || typeof api[name] !== 'function') return Promise.reject(Object.assign(new Error('Native image mesh is unavailable'), { code: 'unavailable' }));
+    args.push(liveGuard(entry));
+    return Promise.resolve(api[name].apply(api, args));
+  }
+  function showFailure(error) {
+    var message = error && error.message ? error.message : 'Native image mesh is unavailable.';
+    if (error && error.code) message += ' (' + error.code + (error.reason ? ': ' + error.reason : '') + ')';
+    toast(message);
+  }
+  function refreshAfter(receipt) {
+    if (receipt && receipt.applied === false) return refresh();
+    return refresh();
+  }
   function toggleMesh(on) {
-    var tgt = currentTarget();
-    if (!tgt) return;
-    pushUndo();
-    // attach/detach write BOTH the live Raster's data.meshId and every
-    // frame's stored dict (SMImageMesh.propagate), so there is nothing left
-    // for loadFrame to bring in — and calling it here was actively harmful:
-    // it rebuilds every Paper item, which leaves selectedPaths pointing at
-    // the removed Raster, so the very next click on this panel found no
-    // valid target and silently did nothing while the checkbox had already
-    // flipped. Found live, toggling the real checkbox twice in a row.
-    // A video keeps its id on the LAYER — there is no Raster to tag and no
-    // per-frame dict to propagate into, which is also why it cannot go out
-    // of step with the frames (#779).
-    if (tgt.kind === 'video') {
-      if (on) SMImageMesh.attachToVideoLayer(tgt.li, { cols: 4, rows: 4 });
-      else { SMImageMesh.detachFromVideoLayer(tgt.li); editing = false; }
-    } else if (on) SMImageMesh.attach(tgt.raster, { cols: 4, rows: 4 });
-    else { SMImageMesh.detach(tgt.raster); editing = false; }
-    renderImageMeshPanel();
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    var entry = usable();
+    if (!entry) { refresh(); return Promise.resolve(false); }
+    var read = entry.read, target = read.target;
+    if (!target || read.meshId !== null && !read.meshId) { toast('Native image mesh target is unavailable.'); return Promise.resolve(false); }
+    var operation;
+    if (on) {
+      if (read.meshId) return Promise.resolve(true);
+      if (!window.SMImageMesh || typeof SMImageMesh.createMesh !== 'function') return Promise.resolve(false);
+      var initial = SMImageMesh.createMesh({ cols: 4, rows: 4 });
+      operation = invoke('attach', [target, initial], entry);
+    } else {
+      if (!read.meshId) { editing = false; refresh(); return Promise.resolve(true); }
+      operation = invoke('detach', [target], entry).then(function (receipt) { editing = false; return receipt; });
+    }
+    return operation.then(refreshAfter).then(function () { return true; }).catch(function (error) { showFailure(error); refresh(); return false; });
+  }
+  function densityOf(raw) {
+    var module = window.NemoNativeObjectImageMesh;
+    return module && typeof module.densityOf === 'function' ? module.densityOf(raw) : Math.max(1, Math.min(32, parseInt(raw, 10) || 4));
   }
   function setDensity() {
-    var t = targetMesh();
-    if (!t) return;
-    var cols = Math.max(1, Math.min(32, parseInt(el('p-imagemesh-cols').value, 10) || 4));
-    var rows = Math.max(1, Math.min(32, parseInt(el('p-imagemesh-rows').value, 10) || 4));
-    pushUndo();
-    t.mesh.cols = cols; t.mesh.rows = rows;
-    // Retopology resets the pose — vertex indices are not stable across a
-    // rebuild, so carrying the old offsets onto new vertices would scramble
-    // the deformation (image-mesh.js's rebuild says the same thing).
-    // Rebuilding from the CURRENT outline keeps the mask the user drew.
-    SMImageMesh.setOutline(t.meshId, t.mesh.outline, { cols: cols, rows: rows });
-    renderImageMeshPanel();
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    var entry = usable();
+    if (!entry || !entry.read.meshId) { refresh(); return Promise.resolve(false); }
+    var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
+    var c = densityOf(cols && cols.value), r = densityOf(rows && rows.value);
+    return invoke('setDensity', [entry.read.meshId, c, r], entry).then(refreshAfter).then(function () { return true; })
+      .catch(function (error) { showFailure(error); refresh(); return false; });
   }
   function resetPose() {
-    var t = targetMesh();
-    if (!t) return;
-    pushUndo();
-    SMImageMesh.resetOffsets(t.meshId);
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    var entry = usable();
+    if (!entry || !entry.read.meshId) { refresh(); return Promise.resolve(false); }
+    return invoke('resetOffsets', [entry.read.meshId], entry).then(refreshAfter).then(function () { return true; })
+      .catch(function (error) { showFailure(error); refresh(); return false; });
   }
+  function setEditing(value) {
+    var entry = usable();
+    editing = !!value && !!(entry && entry.read.meshId);
+    paintPanel(); schedulePaint();
+  }
+  function paintPanel() {
+    var section = el('p-imagemesh-sec');
+    if (!section) return;
+    var entry = currentCache();
+    if (!entry) { section.style.display = 'none'; return; }
+    section.hidden = false;
+    section.style.display = '';
+    var read = entry.read, has = !!(read && read.meshId);
+    if (!has) editing = false;
+    var on = el('p-imagemesh-on'); if (on) { on.checked = has; on.disabled = !read; }
+    var edit = el('p-imagemesh-edit'); if (edit) { edit.checked = editing; edit.disabled = !has; }
+    var body = el('p-imagemesh-body'); if (body) body.style.display = has ? '' : 'none';
+    if (!has) return;
+    var mesh = read.mesh;
+    var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
+    if (cols && document.activeElement !== cols) cols.value = mesh.cols === undefined ? 4 : mesh.cols;
+    if (rows && document.activeElement !== rows) rows.value = mesh.rows === undefined ? 4 : mesh.rows;
+    var info = el('p-imagemesh-info');
+    if (info) info.textContent = mesh.verts.length + ' / ' + (mesh.tris.length / 3);
+  }
+  window.renderImageMeshPanel = refresh;
+
+  function mappingFor(read, info) {
+    var mod = window.NemoNativeViewportUnderlay, map = mod && mod.canvasMapping;
+    if (!map || !map.bounds || !map.point || !map.screen || !map.matchesView || !map.matchesView(window, read.presentation)) return null;
+    var bounds = map.bounds(window, info);
+    if (!bounds) return null;
+    return { api: map, bounds: bounds, presentation: read.presentation,
+      canvasW: info.canvasW, canvasH: info.canvasH };
+  }
+  function effectiveMesh(read) {
+    if (!drag || drag.entry.read !== read || !drag.moved) return read.mesh;
+    var source = read.mesh, offsets = source.offsets ? source.offsets.map(function (p) { return p.slice(); }) :
+      source.verts.map(function () { return [0, 0]; });
+    offsets[drag.index] = drag.offset.slice();
+    return { outline: source.outline, verts: source.verts, tris: source.tris, offsets: offsets };
+  }
+  function screenPoints(entry, read, map) {
+    var mesh = effectiveMesh(read), world = window.SMImageMesh && SMImageMesh.worldVerts(mesh, read.rect);
+    if (!world) return null;
+    return world.map(function (p) { return map.api.screen({ x: p[0], y: p[1] }, map); });
+  }
+  function ensureOverlay() {
+    if (overlay && overlay.isConnected) return overlay;
+    overlay = document.createElementNS(SVG, 'svg');
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.style.position = 'fixed'; overlay.style.left = '0'; overlay.style.top = '0';
+    overlay.style.width = '100vw'; overlay.style.height = '100vh'; overlay.style.overflow = 'visible';
+    overlay.style.pointerEvents = 'none'; overlay.style.zIndex = '900';
+    (document.body || document.documentElement).appendChild(overlay);
+    return overlay;
+  }
+  function node(name, attrs) {
+    var n = document.createElementNS(SVG, name);
+    Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+  function drawLine(root, a, b, color, width) {
+    root.appendChild(node('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: color, 'stroke-width': width, 'vector-effect': 'non-scaling-stroke' }));
+  }
+  function drawOverlay() {
+    var svg = ensureOverlay();
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var entry = usable();
+    if (!editing || !entry || !entry.read.mesh || !window.SMImageMesh) return;
+    var read = entry.read, map = mappingFor(read, entry.proof.info), pts = map && screenPoints(entry, read, map), mesh = effectiveMesh(read);
+    if (!pts) return;
+    for (var i = 0; i + 2 < mesh.tris.length; i += 3) {
+      var a = pts[mesh.tris[i]], b = pts[mesh.tris[i + 1]], c = pts[mesh.tris[i + 2]];
+      if (!a || !b || !c) continue;
+      drawLine(svg, a, b, WIRE, 1); drawLine(svg, b, c, WIRE, 1); drawLine(svg, c, a, WIRE, 1);
+    }
+    for (var o = 0; o < mesh.outline.length; o++) drawLine(svg, pts[o], pts[(o + 1) % mesh.outline.length], OUTLINE, 1.6);
+    pts.forEach(function (p, index) {
+      var r = drag && drag.index === index ? 5 : 3.5;
+      if (SMImageMesh.isOutlineVertex(mesh, index)) svg.appendChild(node('rect', {
+        x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r, rx: 0.5,
+        fill: drag && drag.index === index ? WHITE : ACCENT, stroke: WHITE, 'stroke-width': 1,
+      }));
+      else svg.appendChild(node('circle', {
+        cx: p.x, cy: p.y, r: r, fill: drag && drag.index === index ? WHITE : IDLE, stroke: WHITE, 'stroke-width': 1,
+      }));
+    });
+  }
+  function schedulePaint() {
+    if (paintQueued) return;
+    paintQueued = true;
+    window.requestAnimationFrame(function () { paintQueued = false; drawOverlay(); });
+  }
+  function areaFor(e) {
+    var area = document.getElementById('canvas-area');
+    return area && e.target && area.contains(e.target) ? area : null;
+  }
+  function cancelDrag() {
+    if (!drag) return;
+    var old = drag; drag = null;
+    try { if (old.area && old.area.hasPointerCapture && old.area.hasPointerCapture(old.pointerId)) old.area.releasePointerCapture(old.pointerId); } catch (_) {}
+    schedulePaint();
+  }
+  function onDown(e) {
+    if (drag || !editing || !areaFor(e)) return;
+    var entry = usable();
+    if (!entry || !entry.read.mesh || entry.proof.current() !== true || !window.SMImageMesh) return;
+    var map = mappingFor(entry.read, entry.proof.info), pts = map && screenPoints(entry, entry.read, map);
+    if (!pts) return;
+    var best = -1, distance = 10;
+    pts.forEach(function (p, index) {
+      var d = Math.hypot(p.x - e.clientX, p.y - e.clientY);
+      if (d < distance) { best = index; distance = d; }
+    });
+    if (best < 0) return;
+    drag = { entry: entry, pointerId: e.pointerId, index: best, area: areaFor(e), map: map,
+      startOffset: entry.read.mesh.offsets && entry.read.mesh.offsets[best] ? entry.read.mesh.offsets[best].slice() : [0, 0],
+      offset: null, moved: false };
+    try { if (drag.area.setPointerCapture) drag.area.setPointerCapture(e.pointerId); } catch (_) {}
+    e.stopImmediatePropagation(); e.preventDefault();
+  }
+  function onMove(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    var entry = drag.entry, read = entry.read;
+    if (cached !== entry || entry.proof.current() !== true || !samePin(read.info, entry.proof.info)) { cancelDrag(); return; }
+    try {
+      var world = drag.map.api.point(e, drag.map), uv = SMImageMesh.normalizedOf(read.rect, world.x, world.y);
+      var rest = read.mesh.verts[drag.index];
+      if (!uv || !rest || !uv.every(Number.isFinite)) { cancelDrag(); return; }
+      drag.offset = [uv[0] - rest[0], uv[1] - rest[1]];
+      drag.moved = Math.hypot(drag.offset[0] - drag.startOffset[0], drag.offset[1] - drag.startOffset[1]) > 1e-12;
+      schedulePaint();
+    } catch (_) { cancelDrag(); }
+  }
+  function onUp(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    var done = drag; drag = null;
+    try { if (done.area.hasPointerCapture && done.area.hasPointerCapture(done.pointerId)) done.area.releasePointerCapture(done.pointerId); } catch (_) {}
+    schedulePaint();
+    if (!done.moved || !done.offset || done.entry.proof.current() !== true || cached !== done.entry) return;
+    invoke('setOffset', [done.entry.read.meshId, done.index, done.offset[0], done.offset[1]], done.entry)
+      .then(refreshAfter).catch(function (error) { showFailure(error); refresh(); });
+  }
+  function onCancel(e) { if (drag && e.pointerId === drag.pointerId) cancelDrag(); }
 
   function init() {
-    var onCb = el('p-imagemesh-on');
-    if (onCb) onCb.addEventListener('change', function () { toggleMesh(this.checked); });
-    var editCb = el('p-imagemesh-edit');
-    if (editCb) editCb.addEventListener('change', function () { editing = this.checked; if (window.SMEngineBridge) SMEngineBridge.renderNow(); });
+    var on = el('p-imagemesh-on');
+    if (on) on.addEventListener('change', function () { toggleMesh(on.checked); });
+    var edit = el('p-imagemesh-edit');
+    if (edit) edit.addEventListener('change', function () { setEditing(edit.checked); });
     var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
     if (cols) cols.addEventListener('change', setDensity);
     if (rows) rows.addEventListener('change', setDensity);
-    var rst = el('btn-imagemesh-reset');
-    if (rst) rst.addEventListener('click', resetPose);
-    // Capture phase on DOCUMENT, not on #canvas-area.
-    //
-    // gradient-bridge/perspective-bridge/symmetry-bridge all listen on
-    // #canvas-area, and that is enough for them because nothing else
-    // competes for the same gesture. It is NOT enough here: motion.js also
-    // has a capture-phase pointerdown on #canvas-area (its own canvas drag
-    // that moves a layer), and among listeners on the SAME element capture
-    // order is registration order — motion.js loads first, so it won.
-    // Found live in Motion mode: dragging a mesh vertex silently moved the
-    // whole layer instead, leaving ld.motionStatic.position at exactly the
-    // drag delta and no key on the vertex.
-    //
-    // A capture listener on an ANCESTOR always runs before one on a
-    // descendant, whatever the registration order — the same trick tweens.js
-    // documents for its reassign-click intercept ("registered on document,
-    // to steal a click before any per-tool bridge on #canvas-area sees it").
-    // The target check keeps this scoped to the canvas exactly as before,
-    // and every handler bails without stopping propagation unless it is
-    // really taking the gesture.
-    function inCanvas(e) {
-      var area = document.getElementById('canvas-area');
-      return !!(area && e.target && area.contains(e.target));
-    }
-    document.addEventListener('pointerdown', function (e) { if (inCanvas(e)) onDown(e); }, { capture: true });
-    document.addEventListener('pointermove', function (e) { if (dragIdx >= 0) onMove(e); }, { capture: true });
-    document.addEventListener('pointerup', function (e) { if (dragIdx >= 0) onUp(e); }, { capture: true });
-    document.addEventListener('pointercancel', function (e) { if (dragIdx >= 0) onUp(e); }, { capture: true });
+    var reset = el('btn-imagemesh-reset'); if (reset) reset.addEventListener('click', resetPose);
+    document.addEventListener('pointerdown', function (e) { if (areaFor(e)) onDown(e); }, { capture: true });
+    document.addEventListener('pointermove', function (e) { if (drag) onMove(e); }, { capture: true });
+    document.addEventListener('pointerup', function (e) { if (drag) onUp(e); }, { capture: true });
+    document.addEventListener('pointercancel', function (e) { if (drag) onCancel(e); }, { capture: true });
+    document.addEventListener('lostpointercapture', function (e) { if (drag) onCancel(e); }, { capture: true });
+    window.addEventListener('resize', schedulePaint);
+    refresh();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  // Exposed so the canvas right-click menu can offer the same two toggles the
-  // panel does (2026-08-30, Cyril: "est-ce que ça serait dans élément et au
-  // clic droit dans le canvas ?"). Deliberately NOT the whole module: these
-  // four are what an outside caller needs to ask "is this offerable, is it on"
-  // and to flip it. Everything routes through the same toggleMesh/`editing`
-  // the checkboxes use, so the two entry points can never disagree — and
-  // renderImageMeshPanel() keeps the checkboxes in step after a menu click.
-  // ---- Mask an image with a shape you drew (2026-08-30) --------------
-  // Cyril: "comment il fonctionnerait avec un bouton select dans le menu
-  // flottant quand on a select une image ? Sur les outils de tracé ?"
-  //
-  // Answer, and why it is shaped this way: rather than teaching the mesh a
-  // drawing mode of its own (which would have to re-implement the Pen, the
-  // lasso, the primitives and freehand, one by one), you draw the mask with
-  // the tools that already exist, as an ORDINARY shape, and then hand that
-  // shape to the image. Every tracing tool works for free, including ones
-  // added later, and you can refine the shape with the normal editing tools
-  // before committing it.
-  //
-  // The result is not a second masking system: the shape becomes the mesh's
-  // OUTLINE, which already IS the clip silhouette and the triangulation
-  // boundary. So the mask stays live (no baking, unlike labs/clip-mask-bake
-  // for vectors), its points stay draggable in mesh edit mode afterwards,
-  // and because outline points are ordinary mesh vertices, the mask is
-  // keyframable in Motion like anything else — an animated mask, for free.
-  //
-  // Selection is one shape + one image, the convention every app uses for
-  // "clip this with that", and unambiguous about which masks which.
-  function maskPair() {
-    if (typeof Raster === 'undefined' || !window.selectedPaths || selectedPaths.length !== 2) return null;
-    var a = selectedPaths[0], b = selectedPaths[1];
-    var ras = (a instanceof Raster) ? a : (b instanceof Raster) ? b : null;
-    var shape = (ras === a) ? b : a;
-    if (!ras || !ras.parent || !shape || !(shape instanceof Path) || !shape.segments || shape.segments.length < 3) return null;
-    return { raster: ras, shape: shape };
-  }
-  function maskImageWithShape() {
-    var pair = maskPair();
-    if (!pair) return;
-    var rect = window.SMEngineBridge && SMEngineBridge.rasterImageRect
-      ? SMEngineBridge.rasterImageRect(pair.raster) : null;
-    if (!rect) return;
-    // flatten() on a CLONE: the outline is a polygon (SMImageMesh triangulates
-    // straight edges), so a curve has to be sampled — and the user's own shape
-    // must not be modified in the process, since it may survive as art if the
-    // caller ever chooses not to consume it.
-    var tmp = pair.shape.clone({ insert: false });
-    tmp.closed = true;
-    tmp.flatten(2);
-    var poly = tmp.segments.map(function (sg) {
-      return SMImageMesh.normalizedOf(rect, sg.point.x, sg.point.y);
-    });
-    tmp.remove();
-    if (poly.length < 3) return;
-    pushUndo();
-    var mid = pair.raster.data && pair.raster.data.meshId;
-    if (!mid) { SMImageMesh.attach(pair.raster, { cols: 4, rows: 4 }); mid = pair.raster.data && pair.raster.data.meshId; }
-    if (!mid) return;
-    SMImageMesh.setOutline(mid, poly);
-    // The shape has BECOME the mask, so leaving it on the canvas would draw
-    // it twice: once as art, once as the silhouette. Removed through the
-    // app's own delete path (companions, revision-ghosting, frame save) with
-    // the selection narrowed to it, then the image is reselected so the mesh
-    // panel stays on the thing you are now editing.
-    selectedPaths = [pair.shape];
-    if (window.SM && SM.deleteSelStrokes) SM.deleteSelStrokes();
-    // Re-RESOLVE the image instead of keeping the pre-delete reference:
-    // deleteSelStrokes saves the frame, which rebuilds the Paper items, so
-    // the old object is detached by the time we get here. Holding it left
-    // selectedPaths pointing at a parentless Raster — singleRaster() then
-    // refused it (correctly, that is exactly the ghost its own comment
-    // guards against) and the mesh panel went blank the instant the mask
-    // landed. Found live, toggling Edit points right after masking. meshId
-    // is the key because we just wrote it, and it survives the rebuild.
-    var live = null, kids = userLayers[state.activeLayerIdx] && userLayers[state.activeLayerIdx].children;
-    for (var i = 0; kids && i < kids.length; i++) {
-      if (kids[i] instanceof Raster && kids[i].data && kids[i].data.meshId === mid) { live = kids[i]; break; }
-    }
-    selectedPaths = live ? [live] : [];
-    if (window.updateUI) updateUI(true);
-    renderImageMeshPanel();
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (window.showToast) showToast(SM.t('toastImageMaskedWithShape'));
-  }
-
+  // Retained only for the obsolete WASM scene hook; native presentation owns mesh rendering.
+  window.buildImageMeshOverlayItems = function () { return []; };
   window.SMImageMeshUI = {
-    canMesh: function () { return !!currentTarget(); },
-    hasMesh: function () { return !!meshIdOfTarget(currentTarget()); },
-    toggleMesh: function () { var t = currentTarget(); if (t) toggleMesh(!meshIdOfTarget(t)); },
+    refresh: refresh,
+    canMesh: function () { return !!proofNow(); },
+    hasMesh: function () { var entry = usable(); return !!(entry && entry.read.meshId); },
+    toggleMesh: function () { var entry = usable(); return toggleMesh(!(entry && entry.read.meshId)); },
     isEditing: function () { return editing; },
-    canMaskWithShape: function () { return !!maskPair(); },
-    maskImageWithShape: maskImageWithShape,
-    toggleEditing: function () {
-      if (!meshIdOfTarget(currentTarget())) return;
-      editing = !editing;
-      renderImageMeshPanel();
-      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    canMaskWithShape: function () { return false; },
+    maskImageWithShape: function () {
+      var e = Object.assign(new Error('Native shape selection is unavailable'), { code: 'unavailable', reason: 'native_shape_selection_unavailable' });
+      showFailure(e); return Promise.resolve({ ok: false, code: e.code, reason: e.reason });
     },
+    toggleEditing: function () { var entry = usable(); if (entry && entry.read.meshId) setEditing(!editing); },
   };
-})();
+}());

@@ -25,8 +25,8 @@
 
   function create(session) {
     const commands = Command.create(session, 'mesh');
-    const guarded = (build, current) => (pin) => {
-      if (current !== undefined && (typeof current !== 'function' || current(pin) !== true)) {
+    const guarded = (build, current) => (pin, context) => {
+      if (current !== undefined && (typeof current !== 'function' || current(pin, context) !== true)) {
         throw Command.fault('stale_revision', 'Native mesh selection changed', { reason: 'mesh_selection_stale' });
       }
       return build();

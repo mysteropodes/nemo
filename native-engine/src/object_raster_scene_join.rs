@@ -299,6 +299,12 @@ mod retained {
         pub(crate) fn images(&self) -> impl Iterator<Item = &ImageData> {
             self.assets.values().map(|asset| &asset.image)
         }
+        pub(crate) fn final_rect(
+            &self,
+            index: usize,
+        ) -> Option<crate::evaluation::motion_parent_chain::ImageRect> {
+            Some(self.draws.get(index)?.rect())
+        }
         pub(crate) fn matches(&self, plan: &ObjectPaintPlan) -> bool {
             let expected: std::collections::BTreeSet<_> = plan
                 .raster_sources()
@@ -352,6 +358,51 @@ pub(super) fn attach(
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 impl crate::object_render_scene::ObjectCompositionWitness {
+    /// Read the exact raster target and final D30 rectangle used by this retained preview.
+    /// Source indices only join native provenance; they never become an external identity.
+    pub fn image_mesh_read_projection(
+        &self,
+        layer_uid: &str,
+    ) -> Result<
+        crate::object_snapshot::ImageMeshReadProjection,
+        crate::object_snapshot::ImageMeshReadFailure,
+    > {
+        use crate::object_snapshot::{ImageMeshReadFailure as Failure, ImageMeshReadProjection};
+        if !self.is_viewport() {
+            return Err(Failure::Unsupported);
+        }
+        let packet = self.plan().packet();
+        let mut selected =
+            self.plan()
+                .raster_sources()
+                .iter()
+                .enumerate()
+                .filter_map(|(index, source)| {
+                    packet
+                        .raster_records()
+                        .find(|record| {
+                            record.source_index() == source.source_index
+                                && record.entry().target.layer_uid() == layer_uid
+                        })
+                        .map(|record| (index, source, record))
+                });
+        let (index, source, record) = selected.next().ok_or(Failure::Missing)?;
+        if selected.next().is_some() {
+            return Err(Failure::Ambiguous);
+        }
+        let rect = self
+            .rasters
+            .as_ref()
+            .and_then(|images| images.final_rect(index))
+            .ok_or(Failure::Unsupported)?;
+        Ok(ImageMeshReadProjection::raster(
+            packet.snapshot(),
+            packet.frame(),
+            record.entry().target.clone(),
+            source.mesh_id.clone(),
+            [rect.x, rect.y, rect.width, rect.height, rect.rotation],
+        ))
+    }
     pub fn has_scene_images(&self) -> bool {
         self.reference.is_some() || self.rasters.is_some() || self.plan.has_brushes()
     }
