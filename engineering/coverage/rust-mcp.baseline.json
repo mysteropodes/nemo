@@ -693,6 +693,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "T12 placement contract: derived by the original buildBaseline from the canonical cargo-llvm-cov report at clean 46bf022fdf911e8500f61a5257e401390a37512b (MCP source unchanged at the current head), booking 1062/6312708003 on Cyrill's Mac, 439 tests/0 failed across 20 binaries. Report SHA256 8f9a0ad5e2165c5af30dd3af63eb9655814bf743db79d60c87dfd2eb8ad42c07. Only these two entries are added; all existing entries, aggregate floors, exclusions and recorded provenance are preserved."
+    },
+    "nemo-mcp/src/native_history_read_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "#1959: measured clean source 19cb9d52539ab5799ed2db6abf69472be3b8d252, MCP tree ec32555219c28a7185e73026997f729145ea14f6; pinned cargo-llvm-cov 0.9.1 named test:coverage-rust, 458 tests/0 failed across 21 binaries. Report reports/png1959-history-19cb9d52/coverage.json SHA256 a85a7d7649c4d52332d91cbf96d8da73768f49f733e57bf019edff91afedaa12. Entry derived by the existing buildBaseline from the actual export. Only these two new source entries are added; all prior file and aggregate floors, exclusions, tool pin and historical metadata are preserved. All existing floors held; the measurement's only two violations were these missing entries. No installed acceptance is implied."
+    },
+    "nemo-mcp/src/native_history_read_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#1959: measured clean source 19cb9d52539ab5799ed2db6abf69472be3b8d252, MCP tree ec32555219c28a7185e73026997f729145ea14f6; pinned cargo-llvm-cov 0.9.1 named test:coverage-rust, 458 tests/0 failed across 21 binaries. Report reports/png1959-history-19cb9d52/coverage.json SHA256 a85a7d7649c4d52332d91cbf96d8da73768f49f733e57bf019edff91afedaa12. Entry derived by the existing buildBaseline from the actual export. Only these two new source entries are added; all prior file and aggregate floors, exclusions, tool pin and historical metadata are preserved. All existing floors held; the measurement's only two violations were these missing entries. No installed acceptance is implied."
     }
   },
   "nativeObjectContractRegistration": {
