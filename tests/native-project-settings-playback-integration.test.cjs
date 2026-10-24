@@ -9,6 +9,7 @@ const Files = require('../src/js/adapters/native-object-project-file.js');
 const Motion = require('../src/js/adapters/native-opacity-motion-surface.js');
 const Desktop = require('../src/js/adapters/native-project-settings-desktop.js');
 const Intent = require('../src/js/adapters/native-project-settings-intent.js');
+const TextRead = require('../src/js/adapters/native-text-read.js');
 const turn = () => new Promise(setImmediate);
 function deferred() {let resolve; const promise = new Promise(r => {resolve = r;}); return {promise, resolve};}
 function shipped(file, name) {
@@ -18,7 +19,7 @@ function shipped(file, name) {
   return source.slice(start, end + 2);
 }
 async function fixture() {
-  let installed = false, revision = 0, fps = 31.5, now = 0, serial = 0, frameWork = 0, previewGate = null, writeGate = null;
+  let installed = false, revision = 0, fps = 31.5, now = 0, serial = 0, frameWork = 0, previewGate = null, writeGate = null, readGate = null;
   const callbacks = new Map(), writes = [], notices = [];
   const info = () => ({apiVersion: 2, instanceId: 'instance', documentId: 'document', lifecycleGeneration: 1,
     contentRevision: revision, documentSnapshotId: 'snapshot-' + revision, documentDigest: 'a'.repeat(64), byteCount: 1000,
@@ -56,6 +57,13 @@ async function fixture() {
     changed(value) {controller.willProject(value); assert.equal(Files.refreshLayerTable(root, value), true);},
     presented() {if (controller) setImmediate(() => controller.presented());},
     dispatchApplication: async request => {
+      if (request.operation === 'query.document.object.text') {
+        if (readGate) {const gate = readGate; readGate = null; gate.entered.resolve(); await gate.release.promise;}
+        return {apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: request.documentId,
+          contentRevision: revision, ok: true, result: {instanceId: request.instanceId, documentId: request.documentId,
+            atRevision: revision, documentSnapshotId: info().documentSnapshotId, kind: 'targets',
+            scope: request.payload.view.scope, offset: 0, total: 0, items: [], nextOffset: null}};
+      }
       assert.equal(request.operation, 'command.document.object.project.settings.edit');
       assert.equal(request.expectedRevision, revision); writes.push(request);
       if (writeGate) {writeGate.entered.resolve(); await writeGate.release.promise;}
@@ -66,7 +74,12 @@ async function fixture() {
   root.NemoNativeObjectProject = {desktop: () => session};
   root.NemoNativeOpacityCutover = session;
   const context = vm.createContext({window: root, state: root.state, document, NemoNativeOpacityMotionSurface: Motion,
-    performance: {now: () => now}, showToast: root.showToast, updateUI() {}, renderOS() {}, renderArcs() {},
+    performance: {now: () => now}, showToast: root.showToast,
+    // The ordinary Text inspector refreshes its authored-frame list after paint.
+    // Use that production read path and Project queue, without synthetic latency.
+    updateUI() {TextRead.create(session).listPage({contextId: 'scene-root', layerUid: 'drawing',
+      frameScope: {kind: 'authored', frame: root.state.currentFrame}}, 0, 8, session.info()).catch(() => {});},
+    renderOS() {}, renderArcs() {},
     cancelAnimationFrame: root.cancelAnimationFrame, clearInterval});
   vm.runInContext('var playInt=null,playRaf=null,nativePlayScheduler=null,_nativeFrameNavigator=null;\n' +
     shipped('app.js', 'goToFrame') + '\n' +
@@ -78,6 +91,7 @@ async function fixture() {
     async tick(time, settle = true) {now = time; const entry = [...callbacks].at(-1); assert.ok(entry); callbacks.delete(entry[0]); entry[1](now); if (settle) await turn();},
     holdPreview() {previewGate = {entered: deferred(), release: deferred()}; return previewGate;},
     holdWrite() {writeGate = {entered: deferred(), release: deferred()}; return writeGate;},
+    holdRead() {readGate = {entered: deferred(), release: deferred()}; return readGate;},
     navigate: context.goToFrame};
 }
 test('FPS change joins actual native frame restoration before settings dispatch and resumes playback', async () => {
@@ -88,6 +102,21 @@ test('FPS change joins actual native frame restoration before settings dispatch 
   assert.equal(f.writes.length, 1); assert.equal(f.session.info().contentRevision, 1);
   assert.equal(f.root.state.currentFrame, 3); assert.equal(f.root.state.fps, 48);
   assert.equal(f.root.state.playing, true); await f.tick(200); assert.equal(f.root.state.currentFrame, 7);
+});
+
+for (const change of ['none', 'owner', 'selection', 'frame']) test('FPS edit waits for painted text reads and preserves ' + change + ' context guard', {timeout: 2000}, async () => {
+  const f = await fixture(); f.root.startPlay(); await f.tick(100);
+  const gate = f.holdRead(), edit = f.controller.edit({kind: 'setFps', fps: 48});
+  await gate.entered.promise;
+  assert.equal(f.writes.length, 0, 'settings cannot overtake the inspector read');
+  if (change === 'owner') f.root.NemoNativeObjectProject.desktop = () => ({...f.session});
+  if (change === 'selection') f.root._layerSel = [];
+  const navigation = change === 'frame' ? f.navigate(9) : null;
+  gate.release.resolve();
+  const result = await edit;
+  assert.equal(result.status, change === 'none' ? 'applied-presented' : 'unavailable');
+  assert.equal(f.writes.length, change === 'none' ? 1 : 0);
+  if (navigation) assert.equal(await navigation, true);
 });
 for (let continuation = 0; continuation < 16; continuation++) test('FPS edit preserves a completing native playback frame, continuation ' + continuation, async () => {
   const f = await fixture(); f.root.startPlay(); const gate = f.holdPreview();

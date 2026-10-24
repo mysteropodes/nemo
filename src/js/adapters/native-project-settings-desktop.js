@@ -76,9 +76,19 @@
         // Retire the clock and supersede its pending frame in this same turn.
         // Deferring Stop lets that frame publish after plan captured its context.
         var stopped;try{stopped=root.stopPlay('native-settings-intent');}catch(error){stopped=Promise.reject(error);}paintPlayback();
-        Promise.resolve(stopped).then(function(receipt){
+        Promise.resolve(stopped).then(async function(receipt){
+          if(preparing!==work)return;
+          // Restoring a frame paints its inspectors, which can enqueue native
+          // reads. Join that exact captured queue before admitting the edit;
+          // the capture refuses a replaced queue, owner, revision or subscriber.
+          var shown=null;
+          if(receipt&&receipt.presented===true&&typeof session.capturePresentationSession==='function')
+            shown=await session.capturePresentationSession()();
           if(preparing!==work)return;preparing=null;
           if(retired||!receipt||receipt.presented!==true||!receipt.token||!receipt.token.wasNative||!owns(plan,current(),current().info())||root.state.playing===true){
+            setResume(null);refresh=null;work.items.forEach(function(item){item.resolve(unavailable());});return;
+          }
+          if(typeof session.capturePresentationSession==='function'&&(!shown||!same(plan.info,shown)||!same(plan.info,session.info()))){
             setResume(null);refresh=null;work.items.forEach(function(item){item.resolve(unavailable());});return;
           }
           plan.token=receipt.token;setResume(plan.cancelled?null:plan);work.items.forEach(function(item){item.resolve(submit(item.action));});
