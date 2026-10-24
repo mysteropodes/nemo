@@ -57,9 +57,10 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
       return dirtyDot && selector.startsWith('.project-tab[data-tab=') ? dot : null;
     } };
   let rejectNextImport = false;
-  const window = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
+  const window = { document, location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
     NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'),
     NemoNativeObjectInactiveProjectTabs: require('../src/js/adapters/native-object-inactive-project-tabs.js'),
+    NemoNativeObjectProjectTabsUI: require('../src/js/adapters/native-object-project-tabs-ui.js'),
     addEventListener(type, callback) { windowEvents[type] = callback; }, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
@@ -68,8 +69,7 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
   window.NemoProjectNativeSave = require('../src/js/adapters/project-native-save.js');
   window.NemoProjectDirtyBaseline = require('../src/js/adapters/project-dirty-baseline.js');
   window.NemoProjectNativeVersionRestore = require('../src/js/adapters/project-native-version-restore.js');
-  class Reader { readAsText(file) { if (file.error) this.onerror(new Error('read failed')); else this.onload({ target: { result: file.text } }); } }
-  const context = { window, SM: window.SM, document, FileReader: Reader, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
+  const context = { window, SM: window.SM, document, FileReader: class Reader { readAsText(file) { if (file.error) this.onerror(new Error('read failed')); else this.onload({ target: { result: file.text } }); } }, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
     localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : writes.findLast(([saved]) => saved === key)?.[1] || null; }, setItem(key, value) { writes.push([key, value]); }, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
     requestAnimationFrame(fn) { if (deferFrames) frames.push(fn); else fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() {
       if (nativeGuard) window.NemoNativeOpacityLegacySurface.requireLegacyWrite(window, 'save-all-layer-frames');
