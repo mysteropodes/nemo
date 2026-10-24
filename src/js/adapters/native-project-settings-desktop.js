@@ -67,6 +67,22 @@
         if(prior)prior.resolve({status:'superseded'});preparing.items.set(kind,item);
       });
     }
+    function joinRead(action,session){
+      var plan,capture;try{plan=context(session,session.info());capture=session.capturePresentationSession();}
+      catch(_){return Promise.resolve(unavailable());}
+      var work={items:new Map()};preparing=work;var result=prepare(action);
+      // A valid inspector read can still own the queue after the input edit
+      // presents. Join only that captured queue; never retry on a new owner.
+      Promise.resolve().then(function(){return capture();}).then(function(shown){
+        if(preparing!==work)return;preparing=null;
+        var live=current(),info=live&&live.info();
+        if(retired||root.state.playing===true||!owns(plan,live,info)||!shown||!same(plan.info,shown)||!same(plan.info,info)){
+          work.items.forEach(function(item){item.resolve(unavailable());});return;
+        }
+        work.items.forEach(function(item){item.resolve(submit(item.action));});
+      }).catch(function(){if(preparing===work)preparing=null;work.items.forEach(function(item){item.resolve(unavailable());});});
+      return result;
+    }
     function edit(action){
       observe('intent',{kind:action&&action.kind});
       if(retired)return Promise.resolve(unavailable());if(preparing)return prepare(action);
@@ -94,6 +110,13 @@
           plan.token=receipt.token;setResume(plan.cancelled?null:plan);work.items.forEach(function(item){item.resolve(submit(item.action));});
         }).catch(function(){if(preparing===work)preparing=null;setResume(null);refresh=null;work.items.forEach(function(item){item.resolve(unavailable());});});
         return result;
+      }
+      if(!intent.isPending()&&root.state.playing!==true){
+        var idle=current(),reason;
+        if(idle&&typeof idle.capturePresentationSession==='function'){
+          idle.readPresentedObjectSession(function(code){reason=code;});
+          if(reason==='queue-pending')return joinRead(action,idle);
+        }
       }
       return submit(action);
     }

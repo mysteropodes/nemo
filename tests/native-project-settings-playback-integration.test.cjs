@@ -19,11 +19,11 @@ function shipped(file, name) {
   return source.slice(start, end + 2);
 }
 async function fixture() {
-  let installed = false, revision = 0, fps = 31.5, now = 0, serial = 0, frameWork = 0, previewGate = null, writeGate = null, readGate = null;
+  let installed = false, revision = 0, canvasW = 320, canvasH = 180, fps = 31.5, now = 0, serial = 0, frameWork = 0, previewGate = null, writeGate = null, readGate = null;
   const callbacks = new Map(), writes = [], notices = [];
   const info = () => ({apiVersion: 2, instanceId: 'instance', documentId: 'document', lifecycleGeneration: 1,
     contentRevision: revision, documentSnapshotId: 'snapshot-' + revision, documentDigest: 'a'.repeat(64), byteCount: 1000,
-    canvasW: 320, canvasH: 180, fps, totalFrames: 24, reference: null, layers: [{layerUid: 'drawing'}]});
+    canvasW, canvasH, fps, totalFrames: 24, reference: null, layers: [{layerUid: 'drawing'}]});
   const fields = new Map();
   const document = {getElementById(id) {
     if (!fields.has(id)) fields.set(id, {value: '', innerHTML: '', classList: {add() {}, remove() {}}});
@@ -67,9 +67,13 @@ async function fixture() {
       assert.equal(request.operation, 'command.document.object.project.settings.edit');
       assert.equal(request.expectedRevision, revision); writes.push(request);
       if (writeGate) {writeGate.entered.resolve(); await writeGate.release.promise;}
-      fps = request.payload.action.fps; revision++;
+      const action = request.payload.action;
+      const applied = action.kind === 'setFps' ? fps !== action.fps : canvasW !== action.width || canvasH !== action.height;
+      if (action.kind === 'setFps') fps = action.fps;
+      else {assert.equal(action.kind, 'setCanvasSize'); canvasW = action.width; canvasH = action.height;}
+      if (applied) revision++;
       return {apiVersion: 2, requestId: request.requestId, instanceId: 'instance', documentId: 'document',
-        contentRevision: revision, ok: true, result: {applied: true, historyEntriesAdded: 1}};
+        contentRevision: revision, ok: true, result: {applied, historyEntriesAdded: applied ? 1 : 0}};
     }});
   root.NemoNativeObjectProject = {desktop: () => session};
   root.NemoNativeOpacityCutover = session;
@@ -170,4 +174,43 @@ for (const phase of ['restoration', 'dispatch']) test('ordinary Stop during pend
   assert.equal(f.root.state.fps, 48); assert.equal(f.root.state.currentFrame, 3);
   f.root.togglePlay(); assert.equal(f.root.state.playing, true);
   await f.tick(200); assert.equal(f.root.state.currentFrame, 7);
+});
+
+for (const change of ['none', 'owner', 'selection', 'frame', 'disposed', 'queue']) test('idle settings joins the captured inspector read and preserves ' + change, {timeout: 2000}, async () => {
+  const f = await fixture(); f.root.state.playing = false;
+  const gate = f.holdRead();
+  const read = TextRead.create(f.session).listPage({contextId: 'scene-root', layerUid: 'drawing',
+    frameScope: {kind: 'authored', frame: 0}}, 0, 8, f.session.info());
+  await gate.entered.promise;
+  let reason; assert.equal(f.session.readPresentedObjectSession(value => {reason = value;}), null);
+  assert.equal(reason, 'queue-pending');
+  const edit = f.controller.edit({kind: 'setCanvasSize', width: 640, height: 360});
+  assert.equal(f.writes.length, 0, 'settings must not overtake the real inspector read');
+  if (change === 'owner') f.root.NemoNativeObjectProject.desktop = () => ({...f.session});
+  if (change === 'selection') f.root._layerSel = [];
+  if (change === 'disposed') f.controller.dispose();
+  const navigation = change === 'frame' ? f.navigate(9) : null;
+  const nextRead = change === 'queue' ? TextRead.create(f.session).listPage({contextId: 'scene-root', layerUid: 'drawing',
+    frameScope: {kind: 'authored', frame: 0}}, 0, 8, f.session.info()) : null;
+  gate.release.resolve(); await Promise.allSettled([read, navigation, nextRead]);
+  assert.equal((await edit).status, change === 'none' ? 'applied-presented' : 'unavailable');
+  assert.equal(f.writes.length, change === 'none' ? 1 : 0);
+  assert.equal(f.root.state.playing, false);
+  if (change === 'none') {
+    assert.equal(f.session.info().canvasW, 640); assert.equal(f.session.info().canvasH, 360);
+    assert.deepEqual(f.notices, []);
+  }
+});
+test('ordinary duplicate size commit waits for inspector read and adds no second history entry', {timeout: 2000}, async () => {
+  const f = await fixture(); f.root.state.playing = false;
+  const action = {kind: 'setCanvasSize', width: 640, height: 360};
+  assert.equal((await f.controller.edit(action)).status, 'applied-presented');
+  const gate = f.holdRead();
+  const read = TextRead.create(f.session).listPage({contextId: 'scene-root', layerUid: 'drawing',
+    frameScope: {kind: 'authored', frame: 0}}, 0, 8, f.session.info());
+  await gate.entered.promise;
+  const edit = f.controller.edit(action); gate.release.resolve(); await read;
+  assert.equal((await edit).status, 'unchanged');
+  assert.equal(f.session.info().contentRevision, 1); assert.equal(f.writes.length, 2);
+  assert.deepEqual(f.notices, []);
 });
