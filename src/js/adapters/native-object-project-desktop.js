@@ -21,10 +21,12 @@
     return bound.compose(base,policy);
   }
   var stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
-  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view',
+  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view','display-filter',
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
     'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
   function safeCode(event,code){
+    if(event==='tab-capture-refused')return ['inactive','synchronizing','subscription-inactive','presentation-missing',
+      'view-mismatch','owner-mismatch','queue-pending','capture-superseded','tab-unavailable','capture-unavailable','ui-changed'].includes(code)?code:'unknown';
     if(event==='camera-control')return ['native-refused','selected-canvas','selected-stored-camera'].includes(code)?code:'unknown';
     if(event==='camera-presented')return ['canvas','stored-camera'].includes(code)?code:'unknown';
     if(event==='bpm-settings-refused')return ['controller-missing','cache-empty','retired','generation-stale',
@@ -63,7 +65,7 @@
   function openDiagnostic(root,event,code){
     if(!['file-open-started','file-new-started','file-completed','file-cancelled','file-failed','file-stage',
       'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','bpm-settings-refused',
-      'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented'].includes(event))return;
+      'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented','tab-capture-refused'].includes(event))return;
     try{
       var log=openLogs.get(root);if(!log){log={startedAt:Date.now(),events:[],serial:0,attempt:0,writing:false,pending:null};openLogs.set(root,log);}
       if(event==='file-open-started'||event==='file-new-started')log.attempt++;
@@ -86,7 +88,7 @@
     }catch(_){}
     // Preserve the existing optional fixture observer; it is never required to collect production evidence.
     try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,
-      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented'].includes(event)?safeCode(event,code):code);}catch(_){}
+      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented','tab-capture-refused'].includes(event)?safeCode(event,code):code);}catch(_){}
   }
   // The captured read proof exists only during this action's synchronous guard.
   function withActionPresentation(origin,current,action){
@@ -190,6 +192,7 @@
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
       viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
+      displayFilter:function(){return root.SMLabs&&typeof root.SMLabs.getViewFilter==='function'?root.SMLabs.getViewFilter():'none';},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
         var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
         var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';
