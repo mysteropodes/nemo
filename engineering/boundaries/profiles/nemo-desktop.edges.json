@@ -262,7 +262,8 @@
           "desktop_viewport::ViewportError",
           "desktop_viewport::ViewportMapping",
           "render_scene::ScheduledFrameIdentity",
-          "scheduler::WorkId"
+          "scheduler::WorkId",
+          "desktop_viewport::ViewportDisplayFilter"
         ],
         "rust.desktop.native.application.ports": [
           "application::ExportResourceResolver",
@@ -351,7 +352,8 @@
           "desktop_viewport::ObjectPreviewView",
           "desktop_viewport::ObjectPreviewNavigation",
           "desktop_viewport::ObjectViewProjection",
-          "desktop_viewport::ObjectPresentedFrame"
+          "desktop_viewport::ObjectPresentedFrame",
+          "desktop_viewport::ViewportDisplayFilter"
         ],
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",
@@ -406,7 +408,8 @@
           "scheduler::OutputSpec",
           "object_codec::encode_storage_project",
           "desktop_viewport::ObjectPreviewView",
-          "object_render_scene::prepare_object_camera_viewport_composition"
+          "object_render_scene::prepare_object_camera_viewport_composition",
+          "desktop_viewport::ViewportDisplayFilter"
         ],
         "rust.desktop.native.dispatch": [
           "application::ApplicationReleaseReceipt",
@@ -475,7 +478,8 @@
           "application::ObjectBrushRuntime",
           "object_render_scene::ObjectBrushAdmission",
           "export_job::export_object_frames_with_materializer",
-          "history::ImportAssetSource"
+          "history::ImportAssetSource",
+          "desktop_viewport::ViewportDisplayFilter"
         ],
         "rust.desktop.media": [
           "native_media_frame_export::NativeVideoDecoder",

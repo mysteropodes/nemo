@@ -19,7 +19,7 @@
   function create(ports){
     if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     if(!Exposure||typeof Exposure.navigation!=='function'||typeof Exposure.previewScheduling!=='function')throw new Error('Native project view ports are unavailable');
-    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
+    var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
     var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){try{if(typeof ports.openDiagnostic==='function')ports.openDiagnostic(event,code);}catch(_){} }
@@ -228,11 +228,11 @@
     async function present(frame,pin,revisionSync,exposure,allowSuperseded){
       var request;
       try{request=frameRequest(frame,pin);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
-      var selected=view.read(pin||requireActive()),mode=selected.mode;if(mode!=='canvas')request.viewMode=mode;if(!view.identity(selected.navigation))request.navigation=selected.navigation;
+      var selected=view.read(pin||requireActive()),mode=selected.mode;Exposure.requestView(request,selected);
       if(revisionSync)request.revisionSync=revisionSync;
       var bounds=Object.assign({},request.viewport.cssBounds);
       var receipt;
-      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||view.read(info).mode===mode&&JSON.stringify(view.read(info).navigation)===JSON.stringify(selected.navigation)),allowDeferred,mode,selected.navigation);}
+      function inspect(value,allowDeferred){try{return Exposure.inspectReceipt(value,['opening','native'].includes(phase)&&same(info,request)&&(allowSuperseded||Exposure.sameView(selected,view.read(info))),allowDeferred,mode,selected.navigation,selected.displayFilter);}
         catch(error){throw previewFailure('receipt-access',error);}}
       try{receipt=exposure?await exposure.run(function(){return raw('nemo_native_object_preview',request);},function(){return verifyOwner(pin);},inspect):inspect(await raw('nemo_native_object_preview',request),false);}
       catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
