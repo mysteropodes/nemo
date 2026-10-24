@@ -176,8 +176,17 @@ mod object_selection_edit_atomic;
 #[path = "../tests/object_selection_edit_clipboard.rs"]
 mod object_selection_edit_clipboard;
 #[cfg(test)]
+#[path = "../tests/object_selection_clipboard_groups.rs"]
+mod object_selection_clipboard_groups;
+#[cfg(test)]
 #[path = "../tests/object_selection_clipboard_dispatch.rs"]
 mod object_selection_clipboard_dispatch;
+#[cfg(test)]
+#[path = "../tests/object_linked_fill_codec.rs"]
+mod object_linked_fill_codec;
+#[cfg(test)]
+#[path = "../tests/object_selection_compound.rs"]
+mod object_selection_compound;
 #[cfg(test)]
 #[path = "../tests/object_selection_edit_controls.rs"]
 mod object_selection_edit_controls;

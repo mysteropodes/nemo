@@ -15,7 +15,7 @@
   // Members the record owns; everything else a dictionary carries is reported (UNMAPPED) or refuses the mapping (REFUSED).
   const CARRIED = ['segments', 'closed', 'strokeColor', 'hasRealStroke', 'strokeWidth', 'strokeCap', 'strokeJoin', 'miterLimit', 'fillColor',
     'opacity', 'dashArray', 'dashOffset', 'paintOrder', 'isVectorBrush', 'centerSegments', 'widthProfile', 'strokeProfile', 'profileBase',
-    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather'];
+    'strokeId', 'boxAngle', 'paramShape', 'fillGradient', 'fillSeed', 'fillSeeds', 'fillWalls', 'fillGapPx', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion'];
   // Look-changing members with no record slot: mapping them as a plain path would lose the look without a word.
   const REFUSED = ['strokeGradientAlongPath', 'bitmapBrushSpec', 'brushTexturePreset', 'isBrushTextureCopy', 'isText', 'isTextRoot',
     'isVectorText', 'effects'];
@@ -131,6 +131,11 @@
       if(!ok)refuse('invalid_dict','invalid '+key);
       out[key]=JSON.parse(JSON.stringify(v));
     });
+    for (const key of ['linkedFillId', 'isLinkedFillCompanion']) {
+      if (!has(dict,key)) continue;
+      if (key === 'linkedFillId' ? typeof dict[key] !== 'string' || !dict[key].length : typeof dict[key] !== 'boolean') refuse('invalid_dict','invalid '+key);
+      out[key]=dict[key];
+    }
     return out;
   }
 
@@ -170,6 +175,16 @@
       ['miterLimit', 'dashArray', 'dashOffset', 'paintOrder'].forEach((key) => { if (n[key] !== undefined) vector[key] = n[key]; });
       vector.opacity = n.opacity;
       const ext = {};
+      if (has(dict, 'linkedFillId')) {
+        if (typeof dict.linkedFillId !== 'string' || !dict.linkedFillId.length || (typeof TextEncoder === 'function' ? new TextEncoder().encode(dict.linkedFillId).length : unescape(encodeURIComponent(dict.linkedFillId)).length) > 128 || /[\u0000-\u001f\u007f-\u009f]/.test(dict.linkedFillId)) refuse('unavailable', 'invalid linked fill identity');
+        ext.linkedFillId = dict.linkedFillId;
+      }
+      if (has(dict, 'isLinkedFillCompanion')) {
+        if (typeof dict.isLinkedFillCompanion !== 'boolean') refuse('unavailable', 'invalid linked fill role');
+        ext.isLinkedFillCompanion = dict.isLinkedFillCompanion;
+      }
+      if (dict.isLinkedFillCompanion === true && (!has(ext, 'linkedFillId') || n.isVectorBrush || !n.fillColor)) refuse('unavailable', 'invalid separate linked fill companion');
+      if (has(ext, 'linkedFillId') && dict.isLinkedFillCompanion !== true && (!n.isVectorBrush || !Array.isArray(n.centerSegments) || n.centerSegments.length < 2)) refuse('unavailable', 'linked fill primary needs its actual pressure centerline');
       if (n.isVectorBrush) {
         const pressure = {};
         if (n.centerSegments !== undefined) pressure.centerSegments = n.centerSegments.map(ribbonAnchor);
@@ -240,7 +255,7 @@
     }
     if (record.target.strokeId) out.strokeId = record.target.strokeId;
     if (x.boxAngle) out.boxAngle = x.boxAngle;
-    for (const key of ['isMask', 'maskMode', 'maskFeather']) if (has(x, key)) out[key] = x[key];
+    for (const key of ['isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion']) if (has(x, key)) out[key] = x[key];
     if (x.paramShape) out.paramShape = JSON.parse(JSON.stringify(x.paramShape));
     if (x.fillGradient) out.fillGradient = gradient(x.fillGradient);
     if(x.fillTrace)[['seed','fillSeed'],['seeds','fillSeeds'],['walls','fillWalls'],['gapPx','fillGapPx']].forEach(([stored,key])=>{

@@ -15,7 +15,7 @@
 //! hold promotion uses the existing L05 frame kernel inside the same detached
 //! candidate, so promotion and the selected edit publish together.
 use crate::commands::object_fill_owner::object_frame_edit_document::{
-    promote_cells, DocumentEdit, FrameEditError,
+    clone_cell, drop_cells,
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::object_group_kernels::object_selection_edit_clones::RevisionIds;
@@ -28,7 +28,7 @@ use crate::object_document::object_group_kernels::object_selection_edit_plan::{
 use crate::object_document::object_group_kernels::object_selection_edit_split::{
     plan_split, SplitLabels, SplitRequest,
 };
-use crate::object_document::ObjectDocument;
+use crate::object_document::{FrameScopeKind, ItemRecords, ObjectDocument, Presence, TimingEdit};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 
@@ -41,6 +41,10 @@ use wire::{
     edit_mode, labels_ok, parse, refusal_code, strokes_ok, target_ok, SelectionPayload,
     SplitPayload,
 };
+
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_selection_companion_owner.rs"]
+mod companion_owner_tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SelectionEditKind {
@@ -62,13 +66,40 @@ impl HeldFramePromotion for RealHeldFramePromotion {
         layer_uid: &str,
         frame: u32,
     ) -> Result<ObjectDocument, PromotionRefusal> {
-        match promote_cells(document, layer_uid, &[frame]) {
-            Ok(DocumentEdit::Changed(document)) => Ok(document),
-            Err(FrameEditError::Unsupported | FrameEditError::MissingTiming) => {
-                Err(PromotionRefusal::Unavailable)
+        let index = document.layers.iter().position(|layer| layer.layer_uid == layer_uid)
+            .ok_or(PromotionRefusal::Invalid)?;
+        let timing = document.layers[index].timing.value().ok_or(PromotionRefusal::Unavailable)?;
+        let (kind, source, _) = timing.exposure(frame);
+        let TimingEdit::Changed(promoted) = timing.promote_cell(frame, document.total_frames)
+            .map_err(|_| PromotionRefusal::Invalid)? else { return Err(PromotionRefusal::Invalid); };
+        let mut next = document.clone();
+        next.layers[index].timing = Presence::Present(promoted);
+        if kind != "interpolated" {
+            // The existing L05 operations own path/timing/order behavior. Join the
+            // same cell's item records before final admission, including unselected
+            // items, so promoting a hold cannot split a compound or lose content.
+            drop_cells(&mut next, layer_uid, &|at| at == frame);
+            if let Some(from) = source { clone_cell(&mut next, layer_uid, from, frame); }
+            if let Some(items) = document.items.value() {
+                let in_cell = |target: &crate::object_document::ObjectTarget, at| {
+                    target.context_id == "scene-root" && target.layer_uid == layer_uid
+                        && target.frame_scope.kind == FrameScopeKind::Authored && target.frame_scope.frame == at
+                };
+                let mut rasters = items.raster_entries().iter().filter(|e| !in_cell(&e.target, frame)).cloned().collect::<Vec<_>>();
+                let mut text = items.text_entries().iter().filter(|e| !in_cell(&e.target, frame)).cloned().collect::<Vec<_>>();
+                if let Some(from) = source {
+                    rasters.extend(items.raster_entries().iter().filter(|e| in_cell(&e.target, from)).cloned().map(|mut e| {
+                        e.target.frame_scope.frame = frame; e
+                    }));
+                    text.extend(items.text_entries().iter().filter(|e| in_cell(&e.target, from)).cloned().map(|mut e| {
+                        e.target.frame_scope.frame = frame; e
+                    }));
+                }
+                next.items = ItemRecords::normalized(rasters, text);
             }
-            Ok(DocumentEdit::NoChange) | Err(_) => Err(PromotionRefusal::Invalid),
         }
+        ObjectSnapshot::validate_drawing(&next).map_err(|_| PromotionRefusal::Invalid)?;
+        Ok(next)
     }
 }
 
@@ -131,6 +162,9 @@ impl PreparedSelectionEdit {
         plan: Result<SelectionPlan, SelectionError>,
     ) -> Result<Self, DispatchErrorCode> {
         let plan = plan.map_err(|error| refusal_code(&error))?;
+        if !plan.publication().matches(origin.document(), &plan.document) {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
         if plan.changed {
             ObjectSnapshot::validate_drawing(&plan.document)
                 .map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -248,8 +282,12 @@ impl ObjectFillOwner {
         if !candidate.plan.changed {
             return Ok(self.content_revision());
         }
+        let proof = candidate.plan.publication();
+        if !proof.matches(current.document(), &candidate.plan.document) {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
         self.revisions
-            .publish(candidate.plan.document)
+            .publish_selection(&candidate.origin, proof)
             .map_err(|_| DispatchErrorCode::Unavailable)
     }
 }

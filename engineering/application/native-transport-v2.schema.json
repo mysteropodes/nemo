@@ -737,6 +737,12 @@
               "type": "null"
             }
           ]
+        },
+        "linkedFillId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "isLinkedFillCompanion": {
+          "type": "boolean"
         }
       },
       "minProperties": 1,
@@ -3148,9 +3154,28 @@
         },
         "groups": {
           "type": "object"
+        },
+        "rasters": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectClipboardRaster"
+          }
+        },
+        "source": {
+          "$ref": "#/$defs/ObjectClipboardSource"
         }
       },
-      "description": "Detached copied selection carried inline. Bounded structural declaration only: the native owner validates every record and remaps every reference atomically. The 4096-byte request envelope bounds the clip."
+      "description": "Detached copied selection carried inline. Bounded structural declaration only: the native owner validates every record and remaps every reference atomically. The 4096-byte request envelope bounds the clip.",
+      "dependentRequired": {
+        "rasters": [
+          "source"
+        ],
+        "source": [
+          "rasters"
+        ]
+      }
     },
     "ObjectLayerDeletePayload": {
       "type": "object",
@@ -15603,7 +15628,7 @@
               "$ref": "#/$defs/ObjectVectorBody"
             },
             "vectorExt": {
-              "$ref": "#/$defs/ObjectVectorExt"
+              "$ref": "#/$defs/ObjectClipboardVectorExt"
             },
             "effects": {
               "anyOf": [
@@ -15726,6 +15751,234 @@
         }
       ],
       "description": "Clipboard preserves the native authored record including optional effects; execution validates stored effect parameters and keys in the sole native owner."
+    },
+    "ObjectClipboardBitmapBrushSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tip",
+        "size",
+        "spacing",
+        "scatter",
+        "opacity",
+        "color",
+        "pressure",
+        "seed"
+      ],
+      "properties": {
+        "tip": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "At most 255 UTF-8 bytes, no NUL; native storage validates exact authored spelling."
+        },
+        "size": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "spacing": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "scatter": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "opacity": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "seed": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "color": {
+          "type": "string"
+        },
+        "pressure": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ObjectClipboardBitmapBrush": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bitmapBrushSpec",
+        "brushGroupId"
+      ],
+      "properties": {
+        "bitmapBrushSpec": {
+          "$ref": "#/$defs/ObjectClipboardBitmapBrushSpec"
+        },
+        "brushGroupId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "At most 255 UTF-8 bytes, no NUL; native storage validates exact authored spelling."
+        },
+        "preTextureStroke": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preTextureOpacity": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "bitmapPressureProfile": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            }
+          }
+        }
+      }
+    },
+    "ObjectClipboardVectorExt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "pressure": {
+          "$ref": "#/$defs/ObjectVectorPressure"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShape"
+        },
+        "boxAngle": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "fillGradient": {
+          "$ref": "#/$defs/ObjectVectorFillGradient"
+        },
+        "fillTrace": {
+          "$ref": "#/$defs/ObjectFillTrace"
+        },
+        "isMask": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maskMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maskFeather": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkedFillId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "isLinkedFillCompanion": {
+          "type": "boolean"
+        },
+        "bitmapBrush": {
+          "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        }
+      },
+      "minProperties": 1,
+      "description": "Omitted when empty.",
+      "not": {
+        "required": [
+          "pressure",
+          "fillGradient"
+        ]
+      }
+    },
+    "ObjectClipboardRaster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "item"
+      ],
+      "properties": {
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contextId",
+            "frameScope",
+            "layerUid",
+            "strokeId"
+          ],
+          "properties": {
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frameScope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "frame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "authored"
+                },
+                "frame": {
+                  "$ref": "#/$defs/ObjectFrame"
+                }
+              }
+            },
+            "layerUid": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The source id of a layer in this batch, or the uid of an existing layer."
+            },
+            "strokeId": {
+              "$ref": "#/$defs/ObjectEditId"
+            }
+          }
+        },
+        "item": {
+          "$ref": "#/$defs/ObjectImportRasterItem"
+        }
+      }
+    },
+    "ObjectClipboardSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "contentRevision",
+        "strokeIds"
+      ],
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "documentId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "contentRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "strokeIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {
+            "$ref": "#/$defs/ObjectEditId"
+          }
+        }
+      }
     }
   }
 }

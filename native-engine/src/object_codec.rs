@@ -220,7 +220,9 @@ pub fn decode_storage_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCode
         version: u32,
     }
     if serde_json::from_slice::<StorageVersion>(bytes).is_ok_and(|wire| wire.version == 2) {
-        return decode_ordered_project(bytes).map(|document| document.into_storage());
+        let document = decode_ordered_project(bytes)?.into_storage();
+        object_vector_ext_codec::validate_linked_pairs(&document)?;
+        return Ok(document);
     }
     decode_project(bytes)
 }
@@ -232,6 +234,7 @@ pub fn encode_storage_project(document: &ObjectDocument) -> Result<Vec<u8>, Obje
 }
 
 pub(crate) fn validate_storage(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    object_vector_ext_codec::validate_linked_pairs(document)?;
     if document.format_version == 1 {
         return validate(document);
     }
@@ -265,6 +268,7 @@ pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecE
 }
 
 pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    object_vector_ext_codec::validate_linked_pairs(document)?;
     order::validate_audio_tracks(document.audio_tracks.value())?;
     use ObjectCodecErrorKind::Unsupported;
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);

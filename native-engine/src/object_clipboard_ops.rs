@@ -24,6 +24,9 @@ use crate::object_document::object_group_kernels::object_selection_edit_plan::{
 };
 use crate::request_receipts::DispatchErrorCode;
 
+#[path = "object_clipboard_provenance.rs"]
+mod provenance;
+
 /// Where a clip lands, by stable identity (typed callers).
 #[derive(Debug, Clone)]
 pub(crate) struct PasteDestination {
@@ -48,14 +51,17 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let origin = self.current_snapshot();
-        copy_selection(
+        let mut clip = copy_selection(
             origin.document(),
             &payload.context_id,
             &payload.layer_uid,
             payload.frame,
             &payload.stroke_ids,
         )
-        .map_err(|error| refusal_code(&error))
+        .map_err(|error| refusal_code(&error))?;
+        provenance::stamp(&mut clip, &origin, &payload.stroke_ids);
+        if let Some(packet) = &clip { provenance::verify(packet, &origin, &self.revisions)?; }
+        Ok(clip)
     }
 
     /// `pasteSelection` of a typed clip.
@@ -68,6 +74,7 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let origin = self.current_snapshot();
+        provenance::verify(clip, &origin, &self.revisions)?;
         let revision = origin
             .content_revision()
             .checked_add(1)
@@ -124,7 +131,7 @@ impl ObjectFillOwner {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let origin = self.current_snapshot();
-        let clip = copy_selection(
+        let mut clip = copy_selection(
             origin.document(),
             &payload.context_id,
             &payload.layer_uid,
@@ -132,6 +139,8 @@ impl ObjectFillOwner {
             &payload.stroke_ids,
         )
         .map_err(|error| refusal_code(&error))?;
+        provenance::stamp(&mut clip, &origin, &payload.stroke_ids);
+        if let Some(packet) = &clip { provenance::verify(packet, &origin, &self.revisions)?; }
         let request = SelectionRequest {
             context_id: &payload.context_id,
             layer_uid: &payload.layer_uid,

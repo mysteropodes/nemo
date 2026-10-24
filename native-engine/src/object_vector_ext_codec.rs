@@ -12,6 +12,10 @@
 #[path = "object_bitmap_brush_codec.rs"]
 pub(crate) mod bitmap_brush;
 
+#[path = "object_linked_fill_codec.rs"]
+mod linked_fill;
+pub(crate) use linked_fill::validate_linked_pairs;
+
 use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::{
     ObjectLayer, ObjectRecord, ParamShape, PressureFields, PARAM_SHAPE_KINDS, PATH_FX_TYPE_IDS,
@@ -55,6 +59,7 @@ pub(crate) fn validate_vector_ext(record: &ObjectRecord) -> Result<(), ObjectCod
     if ext.fill_trace.value().is_some_and(|trace| !trace.valid()) {
         return Err(invalid("invalid fill trace provenance"));
     }
+    linked_fill::validate_record(record)?;
     bitmap_brush::validate(record)?;
     if let Some(gradient) = ext.fill_gradient.value() {
         if !gradient.valid() {

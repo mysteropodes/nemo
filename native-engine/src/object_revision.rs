@@ -29,6 +29,10 @@ mod image_import;
 #[path = "native_import_transaction_assets_revision.rs"]
 mod import_assets;
 
+#[cfg(feature = "history")]
+#[path = "object_selection_revision.rs"]
+mod selection;
+
 static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]
 const MAX_CONTENT_REVISION: u64 = 9_007_199_254_740_991;

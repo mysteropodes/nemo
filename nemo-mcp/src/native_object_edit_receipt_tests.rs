@@ -356,3 +356,40 @@ fn clipboard_effect_presence_survives_both_result_and_paste_admission() {
         assert!(request(&format!("{P}clipboard.paste"), &paste));
     }
 }
+
+
+#[test]
+fn asset_clipboard_provenance_is_closed_bounded_and_required_in_both_directions() {
+    let mut packet = literal_clip();
+    packet["rasters"] = json!([{"target":{"contextId":"scene-root","layerUid":"layer-a",
+        "strokeId":"ink","frameScope":{"kind":"authored","frame":0}},
+        "item":{"assetId":"image-1","x":16,"y":16,"width":8,"height":8,"isBitmapBrush":true,"brushGroupId":"brush-1"}}]);
+    packet["source"] = json!({"instanceId":"instance-A","documentId":"document-A","contentRevision":7,"strokeIds":["anchor"]});
+    let admitted = |clip: &Value| {
+        let mut paste = valid().into_iter().find(|(name, _)| *name == "clipboard.paste").unwrap().1;
+        paste["clip"] = clip.clone();
+        request(&format!("{P}clipboard.paste"), &paste)
+            && result(&format!("{P}clipboard.copy"), &json!({"applied":false,"historyEntriesAdded":0,"clipboard":clip}))
+    };
+    assert!(admitted(&packet));
+    for case in 0..14 {
+        let mut bad = packet.clone();
+        match case {
+            0 => { bad.as_object_mut().unwrap().remove("source"); },
+            1 => { bad.as_object_mut().unwrap().remove("rasters"); },
+            2 => bad["rasters"] = json!([]),
+            3 => bad["rasters"] = Value::Null,
+            4 => bad["rasters"][0]["extra"] = json!(true),
+            5 => bad["rasters"][0]["target"]["frameScope"]["extra"] = json!(true),
+            6 => bad["rasters"][0]["item"]["encodedBytes"] = json!("not admitted"),
+            7 => bad["source"]["extra"] = json!(true),
+            8 => bad["source"]["instanceId"] = json!(""),
+            9 => bad["source"]["documentId"] = json!(""),
+            10 => bad["source"]["contentRevision"] = json!(-1),
+            11 => bad["source"]["contentRevision"] = json!(9_007_199_254_740_992u64),
+            12 => bad["source"]["strokeIds"] = json!([]),
+            _ => bad["source"]["strokeIds"] = json!([""]),
+        }
+        assert!(!admitted(&bad), "case {case}");
+    }
+}

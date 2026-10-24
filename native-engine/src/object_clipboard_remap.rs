@@ -20,6 +20,7 @@ mod layer;
 
 #[allow(unused_imports)]
 pub(crate) use groups::GroupRemap;
+pub(crate) use groups::{remap as remap_clone_groups, validate as validate_clone_groups};
 #[allow(unused_imports)]
 pub(crate) use layer::{plan_layer_duplicate, AdmittedKinds, LayerPlan, LayerSource};
 

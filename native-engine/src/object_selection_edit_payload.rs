@@ -108,6 +108,12 @@ pub(super) fn strokes_ok(strokes: &[String]) -> bool {
 
 pub(super) fn clip_ok(clip: &ClipPayload) -> bool {
     target_ok(&clip.context_id, &clip.layer_uid) && clip.records.len() <= MAX_SELECTION
+        && clip.rasters.value().is_none_or(|entries| !entries.is_empty() && entries.len() <= MAX_SELECTION)
+        && clip.source.value().is_none_or(|source| {
+            target_ok(&source.instance_id, &source.document_id)
+                && source.content_revision <= crate::object_document::object_group_kernels::object_selection_edit_plan::MAX_REVISION
+                && !source.stroke_ids.is_empty() && strokes_ok(&source.stroke_ids)
+        })
 }
 
 pub(super) fn labels_ok(labels: &LabelsPayload) -> bool {

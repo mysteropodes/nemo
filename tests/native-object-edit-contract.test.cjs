@@ -258,3 +258,30 @@ test('authored effect presence survives clipboard output and paste input admissi
     assert.deepEqual(record.effects, effects);
   }
 });
+
+
+test('asset-bearing clipboard packets require bounded closed provenance in both directions', () => {
+  const packet = { ...cell, records: [], rasters: [{
+    target: { contextId: 'scene-root', layerUid: 'layer-a', strokeId: 'ink', frameScope: { kind: 'authored', frame: 0 } },
+    item: { assetId: 'image-1', x: 16, y: 16, width: 8, height: 8, isBitmapBrush: true, brushGroupId: 'brush-1' },
+  }], source: { instanceId: 'instance-A', documentId: 'document-A', contentRevision: 7, strokeIds: ['anchor'] } };
+  const request = (clip) => envelope('clipboard.paste', { command: 'object.clipboard.paste', ...cell, mode: 'motion', clip });
+  const result = (clip) => ({ applied: false, historyEntriesAdded: 0, clipboard: clip });
+  SDK.validateRequest(request(packet));
+  contract.result(P + 'clipboard.copy', result(packet));
+  const flaws = [
+    (v) => { delete v.source; }, (v) => { delete v.rasters; },
+    (v) => { v.rasters = []; }, (v) => { v.rasters[0].extra = true; },
+    (v) => { v.rasters[0].target.frameScope.extra = true; },
+    (v) => { v.rasters[0].item.encodedBytes = 'not admitted'; },
+    (v) => { v.source.extra = true; }, (v) => { v.source.instanceId = ''; },
+    (v) => { v.source.documentId = ''; }, (v) => { v.source.contentRevision = -1; },
+    (v) => { v.source.contentRevision = 9007199254740992; },
+    (v) => { v.source.strokeIds = []; }, (v) => { v.source.strokeIds = ['']; },
+  ];
+  for (const flaw of flaws) {
+    const bad = JSON.parse(JSON.stringify(packet)); flaw(bad);
+    assert.throws(() => SDK.validateRequest(request(bad)), TypeError);
+    assert.throws(() => contract.result(P + 'clipboard.copy', result(bad)), TypeError);
+  }
+});

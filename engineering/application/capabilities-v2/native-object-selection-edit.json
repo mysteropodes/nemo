@@ -47,9 +47,9 @@
   "resourceBoundary": {
     "maxRequestBytes": 4096,
     "maxReadResponseBytes": 4096,
-    "policy": "Complete correlated retained receipt or typed refusal. Full original request and full response are limited to4096 encoded bytes; never split or truncate. Copy/cut may return only the bounded shape clipboard."
+    "policy": "Complete correlated retained receipt or typed refusal. Full original request and full response are limited to 4096 encoded bytes; never split or truncate. Bitmap packets carry existing raster records and retained-origin identity, never encoded media."
   },
-  "semantics": "Delete or duplicate selected shapes, split a layer into one layer per element, or copy/cut/paste a bounded inline clip, by stable identity, atomically with element Motion, groups and references. Copy returns the pinned snapshot clip without revision, history or redo changes. Cut preflights the complete correlated response before committing its deletion. Nonempty successful cut adds one revision and one undo entry; empty selection returns null with no edit. Replay returns the original retained clipboard and disposition. Animation2D edits promote a held frame; Motion edits the inherited key. Unsupported family references refuse atomically. No JS/Paper writer or optimistic mutation.",
+  "semantics": "Delete or duplicate selected elements, split a layer into one layer per independent element, or copy/cut/paste a bounded inline clip, atomically with groups and references. A pressure linked-fill path and a bitmap-brush raster companion travel with their primary; each retains its actual geometry and paint-order entry. Copies receive fresh stroke, linked-fill, brush-group and combine-group identities. Asset-bearing paste reconstructs the complete packet from its same-owner retained source revision and requires the same current encoded asset allocation. Copy changes no revision, history or redo. Cut preflights the complete correlated response before one deletion revision/undo entry; empty selection returns null without editing. Replay returns the original retained clipboard and disposition. Animation2D promotes the complete held cell once; Motion edits its inherited key. Unsupported family references refuse atomically. No JS/Paper writer or optimistic mutation.",
   "commonErrorCodes": [
     "invalid_request",
     "wrong_instance",

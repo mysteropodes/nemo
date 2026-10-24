@@ -65,10 +65,24 @@
   }
   // Bounded structural pre-check only; the native owner re-validates every record (deny_unknown_fields).
   function clip(value, label) {
-    exact(value, ['contextId', 'layerUid', 'frame', 'records'], ['groups'], label);
+    exact(value, ['contextId', 'layerUid', 'frame', 'records'], ['groups', 'rasters', 'source'], label);
     text(value.contextId, MAX_ID, `${label}.contextId`); text(value.layerUid, MAX_ID, `${label}.layerUid`); frame(value.frame, `${label}.frame`);
     list(value.records, `${label}.records`, 0, MAX_ITEMS, clipRecord);
     if (has(value, 'groups')) exact(value.groups, ['contextId', 'entries', 'members'], [], `${label}.groups`);
+    if (has(value, 'rasters') !== has(value, 'source')) fail(`${label} requires raster provenance`);
+    if (has(value, 'rasters')) {
+      list(value.rasters, `${label}.rasters`, 1, MAX_ITEMS, (entry, at) => {
+        exact(entry, ['target', 'item'], [], at);
+        exact(entry.target, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], `${at}.target`);
+        exact(entry.target.frameScope, ['kind', 'frame'], [], `${at}.target.frameScope`);
+        exact(entry.item, ['assetId', 'x', 'y', 'width', 'height'],
+          ['opacity', 'rotation', 'isBitmapBrush', 'brushGroupId', 'isBrushTextureCopy', 'meshId'], `${at}.item`);
+      });
+      exact(value.source, ['instanceId', 'documentId', 'contentRevision', 'strokeIds'], [], `${label}.source`);
+      ['instanceId', 'documentId'].forEach((key) => text(value.source[key], MAX_ID, `${label}.source.${key}`));
+      if (!Number.isSafeInteger(value.source.contentRevision) || value.source.contentRevision < 0) fail(`${label}.source.contentRevision invalid`);
+      list(value.source.strokeIds, `${label}.source.strokeIds`, 1, MAX_ITEMS, (id, at) => text(id, MAX_ID, at));
+    }
   }
 
   const uid = (v, at) => text(v, MAX_ID, at), layerUid = opaque;
