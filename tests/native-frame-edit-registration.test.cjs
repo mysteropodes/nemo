@@ -75,7 +75,7 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.ok(sdk.split('\n').filter((line) => line.trim()).length <= 500, 'native-application.js stays within its 500 nonblank-line hard maximum');
   const project = text('src/js/adapters/native-object-project.js');
   assert.equal(count(project, "require('./native-frame-edit-contract.js')"), 1);
-  assert.match(project, /function\(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports\)\{/);
+  assert.match(project, /function\(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports,Entry\)\{/);
   assert.ok(project.split('\n').filter((line) => line.trim()).length <= 500, 'native-object-project.js stays within its 500 nonblank-line hard maximum');
   assert.match(project, /get editFrames\(\)\{return FrameEdit&&typeof ports\.dispatchApplication==='function'&&subscription/);
   assert.match(project, /'nemo_native_dispatch',typeof current==='function'\);\}\n\s*function editProjectSettings/, 'the frame edit goes through the public application client only');

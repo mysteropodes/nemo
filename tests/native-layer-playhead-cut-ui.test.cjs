@@ -220,7 +220,8 @@ function browserProjectBeforeCut(){
     NemoNativeObjectProjectDesktop:require('../src/js/adapters/native-object-project-desktop.js'),
     NemoNativeObjectProjectProperties:require('../src/js/adapters/native-object-project-properties.js'),
     NemoNativeFrameEditContract:require('../src/js/adapters/native-frame-edit-contract.js'),
-    NemoNativeObjectOpenExposure:require('../src/js/adapters/native-object-open-exposure.js')};
+    NemoNativeObjectOpenExposure:require('../src/js/adapters/native-object-open-exposure.js'),
+    NemoNativeObjectProjectEntryContract:require('../src/js/adapters/native-object-project-entry-contract.js')};
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/js/adapters/native-object-project.js'),'utf8'),context);
   assert.equal(context.NemoNativeLayerPlayheadCutUI,undefined,'actual Project classic script loads before optional cut UI');
