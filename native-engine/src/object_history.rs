@@ -1,4 +1,10 @@
 //! Staged object edits/history authority; no transport, retries or replacement port.
+#[path = "object_history_read.rs"]
+mod history_read;
+#[cfg(test)]
+#[path = "../tests/object_history_read.rs"]
+mod history_read_tests;
+
 use crate::commands::{
     ObjectFillOwner, PreparedLayerCreate, PreparedLayerVisibility, PreparedObjectFill,
     PreparedPropertyEdit, PreparedReferenceEdit, PreparedVectorEdit, PreparedWidgetEdit,
