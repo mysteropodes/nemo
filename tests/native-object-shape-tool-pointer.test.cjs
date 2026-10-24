@@ -195,9 +195,9 @@ test('all 43 retained bootstrap identities match their explicit amended ordinal 
  assert.equal(scripts.filter(s=>s.src==='js/adapters/native-frame-edit-desktop.js').length,1);
  assert.deepEqual(['native-application','native-frame-edit-desktop','native-text-read'].map(name=>scripts.find(s=>s.src==='js/adapters/'+name+'.js').ordinal),[248,249,252]);
  assert.equal(scripts.find(s=>s.src==='js/adapters/native-fill-desktop.js').ordinal,250);
- assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,122);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,123);
- assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 122/);
- assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 22, 24, 25\]/);
+ assert.equal(scripts.find(s=>s.src==='js/adapters/i18n-runtime.js').ordinal,121);assert.equal(scripts.find(s=>s.src==='js/i18n.js').ordinal,122);
+ assert.match(fixture,/retained\.loadSites\[0\]\.scriptOrdinal, 121/);
+ assert.match(fixture,/assert\.deepEqual\(positions, \[14, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26\]/);
 });
 
 test('native drawing refuses unavailable, stale and enabled Perspective projections before a document command',async()=>{

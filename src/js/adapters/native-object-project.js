@@ -6,10 +6,10 @@
   var propertyBinding=typeof module==='object'&&module.exports?require('./native-object-project-properties.js'):root.NemoNativeObjectProjectProperties;
   var exposureBinding=typeof module==='object'&&module.exports?require('./native-object-open-exposure.js'):root.NemoNativeObjectOpenExposure;
   var exportBinding=typeof module==='object'&&module.exports?require('./native-object-project-export.js'):root.NemoNativeObjectProjectExport;
-  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,exportBinding);
+  var api=factory(typeof module==='object'&&module.exports?require('./native-object-project-metadata.js'):root.NemoNativeObjectProjectMetadata,desktopBinding,propertyBinding,typeof module==='object'&&module.exports?require('./native-frame-edit-contract.js'):root.NemoNativeFrameEditContract,exposureBinding,exportBinding,typeof module==='object'&&module.exports?require('./native-object-project-entry-contract.js'):root.NemoNativeObjectProjectEntryContract);
   if(typeof module==='object'&&module.exports)module.exports=api;
   else root.NemoNativeObjectProject=api;
-}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports){
+}(typeof globalThis==='object'?globalThis:this,function(Metadata,Desktop,Properties,FrameEdit,Exposure,Exports,Entry){
   'use strict';
   function id(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(v);}
   function integer(v,min){return Number.isSafeInteger(v)&&v>=min;}
@@ -135,6 +135,10 @@
         return Promise.reject(localRefusal('Native New Project scalar intent is invalid'));
       return enterProject({newProject:{canvasW:intent.canvasW,canvasH:intent.canvasH,fps:intent.fps}},transition);
     }
+    function activateProject(target,transition){
+      try{target=Entry.target(target);}catch(error){return Promise.reject(localRefusal(error.message));}
+      return enterProject({retainedProject:target},transition);
+    }
     function enterProject(source,transition){
       if(openingRequested||phase!=='idle'&&phase!=='native')return Promise.reject(new Error('Native project Open is unavailable'));
       openingRequested=true;openingCancelled=false;previewScheduling.clearWanted();
@@ -157,33 +161,25 @@
               (previous?before.available!==true||before.instanceId!==previous.instanceId||before.documentId!==previous.documentId||
                 before.contentRevision!==previous.contentRevision||before.lifecycleGeneration!==previous.lifecycleGeneration:before.available!==false))
             throw localRefusal('Native project slot changed before Open');
-          var rid=requestId(source.newProject?'new':'open'),request=Object.assign({apiVersion:2,requestId:rid,instanceId:before.instanceId},source);
-          if(previous)request.replace={documentId:previous.documentId,expectedRevision:previous.contentRevision,
-            documentSnapshotId:previous.documentSnapshotId,lifecycleGeneration:previous.lifecycleGeneration};
+          var retained=source.retainedProject,rid=requestId(retained?'activate':source.newProject?'new':'open');
+          var request=Entry.request(source,before,previous,rid);
           current();dispatched=true;inBootstrap=true;
-          var receipt=await openExposure.join(function(){return raw('nemo_native_object_bootstrap',request);});inBootstrap=false;
+          var receipt=await openExposure.join(function(){return raw(retained?'nemo_native_object_inactive_project':'nemo_native_object_bootstrap',request);});inBootstrap=false;
           if(typeof ports.openDiagnostic==='function')openAttempt={stage:'receipt',invokeErrors:new Set()};
-          if(!receipt||receipt.apiVersion!==2||receipt.requestId!==rid||receipt.instanceId!==before.instanceId||
-              !id(receipt.documentId)||receipt.contentRevision!==0||!integer(receipt.resourceCount,0)||
-              receipt.resourceCount>1||receipt.viewportAvailable!==false||previous&&receipt.documentId===previous.documentId)
-            throw new Error('Native project Open could not be reconciled');
+          var revision=Entry.receipt(receipt,before,previous,rid,retained);
           openStage('installed-status');var installed=await openExposure.join(status);
-          if(!installed||installed.apiVersion!==2||installed.available!==true||installed.documentId!==receipt.documentId||
-              installed.instanceId!==before.instanceId||installed.contentRevision!==0||
-              !integer(installed.lifecycleGeneration,previous?previous.lifecycleGeneration+1:1))
-            throw new Error('Native project installation is uncorrelated');
+          Entry.installed(installed,before,previous,receipt,revision,retained);
           openStage('metadata');var candidate=await openExposure.join(function(){return inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
-            contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});});
-          if(source.newProject&&(candidate.canvasW!==source.newProject.canvasW||candidate.canvasH!==source.newProject.canvasH||
-            candidate.fps!==source.newProject.fps||receipt.resourceCount!==0))throw new Error('Native New Project metadata is uncorrelated');
+            contentRevision:revision,lifecycleGeneration:installed.lifecycleGeneration});});
+          var entryFrame=Entry.candidate(candidate,source,receipt);
           info=candidate;current();
-          openStage('first-preview');await present(0,candidate,null,openExposure);openStage('first-owner');await openExposure.join(function(){return verifyOwner(candidate);});
+          openStage('first-preview');await present(entryFrame,candidate,null,openExposure);openStage('first-owner');await openExposure.join(function(){return verifyOwner(candidate);});
           current();
-          if(transition&&transition.reveal){openStage('reveal');await openExposure.join(function(){return transition.reveal(candidate);});
-            openStage('second-preview');await present(0,candidate,null,openExposure);openStage('second-owner');await openExposure.join(function(){return verifyOwner(candidate);});}
+          if(transition&&transition.reveal){openStage('reveal');await openExposure.join(function(){return transition.reveal(candidate,retained&&retained.view);});
+            openStage('second-preview');await present(entryFrame,candidate,null,openExposure);openStage('second-owner');await openExposure.join(function(){return verifyOwner(candidate);});}
           openExposure.detach();
           current();phase='native';
-          openStage('ui-commit');if(transition&&transition.commit)await openExposure.join(function(){return transition.commit(candidate);});
+          openStage('ui-commit');if(transition&&transition.commit)await openExposure.join(function(){return transition.commit(candidate,receipt);});
           current();
           openStage('publication');changed();openStage('subscriber');await openExposure.join(attachSubscription);
           current();
@@ -413,7 +409,7 @@
     }
     function exportPng(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'png');}
     function exportSvg(destination,frames,onProgress,signal){return exportFrames(destination,frames,onProgress,signal,'svg');}
-    return Object.freeze({openPath:openPath,newProject:newProject,cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
+    return Object.freeze({openPath:openPath,newProject:newProject,activateProject:activateProject,cancelOpen:function(){if(!openingRequested)return false;openingCancelled=true;if(openExposure)openExposure.cancel();return true;},isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       readSubscriptionGeneration:function(){return subscriptionTicket;},
       readPropertyMetadata:properties.readPropertyMetadata,readProperty:properties.readProperty,
       get editPropertyTrack(){return properties.available()?properties.editPropertyTrack:undefined;},

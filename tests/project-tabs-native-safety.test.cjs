@@ -36,9 +36,10 @@ function fixture({ populated = true, nativePorts = null, nativeFileAdapter = nul
       const row = match ? elements.get('project-tabs-list')?.children.find(row => row.dataset.tab === match[1]) : null;
       return selector.endsWith(' .pt-name') ? row?.children.find(child => child.className === 'pt-name') : row;
     } };
-  const root = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
+  const root = { document, location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
     addEventListener() {}, requestAnimationFrame(callback) { callback(); },
     NemoNativeObjectInactiveProjectTabs: require('../src/js/adapters/native-object-inactive-project-tabs.js'),
+    NemoNativeObjectProjectTabsUI: require('../src/js/adapters/native-object-project-tabs-ui.js'),
     NemoNativeOpacityProjectEntry: require('../src/js/adapters/native-opacity-project-entry.js'),
     NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'),
     NemoProjectNativeSave: require('../src/js/adapters/project-native-save.js'),
