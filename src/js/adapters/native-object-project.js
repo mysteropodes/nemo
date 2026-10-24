@@ -354,15 +354,18 @@
       return {apiVersion:2,requestId:request.requestId,instanceId:value.instanceId,documentId:value.documentId,contentRevision:value.contentRevision,ok:true,
         result:{atRevision:value.contentRevision,documentSnapshotId:value.documentSnapshotId,documentDigest:value.documentDigest,byteCount:value.byteCount}};
     }
-    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&view.matches(presentation,info)&&same(info,presentation)&&pending===0?
-      Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
-    function captureSaveSession(){
-      var pin=info,observed=queue,ticket=subscriptionTicket;
-      return async function(){
-        if(!active()||openingRequested||synchronizing||!same(info,pin))return null;
-        await observed;
-        return observed===queue&&ticket===subscriptionTicket&&!openingRequested&&same(info,pin)?presentedSession():null;
-      };
+    function presentedSession(onRefusal){
+      var reason=!active()?'inactive':synchronizing?'synchronizing':
+        subscription&&typeof ports.subscriptionActive==='function'&&!ports.subscriptionActive()?'subscription-inactive':
+        !presentation?'presentation-missing':!view.matches(presentation,info)?'view-mismatch':
+        !same(info,presentation)?'owner-mismatch':pending!==0?'queue-pending':null;
+      if(reason){if(typeof onRefusal==='function')try{onRefusal(reason);}catch(_){}return null;}
+      return Object.assign({available:true,kind:'native-object',presentation:presentation},info);
+    }
+    function capturePresentationSession(){
+      return Entry.capturePresentation({same:same,readPresented:presentedSession,state:function(){
+        return {active:active(),opening:openingRequested,synchronizing:synchronizing,
+          info:info,queue:queue,ticket:subscriptionTicket};}});
     }
     async function readLayerView(layerUid,frame,pin,view){
       async function settled(){var observed;do{observed=queue;await observed;}while(observed!==queue);}
@@ -428,7 +431,7 @@
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
       beginViewportNavigation:function(kind,point){return active()&&!openingRequested&&!synchronizing&&presentation&&same(info,presentation)&&(!ports.projectionReady||ports.projectionReady(info))&&(!ports.subscriptionActive||ports.subscriptionActive())?view.begin(presentation,info,ports.frame(),ports.mapping(info),presentationBounds,kind,point):(openDiagnostic('navigation-begin','owner-unavailable'),null);},updateViewportNavigation:function(token,point,factor,target){try{if(!active()||openingRequested||synchronizing||!presentation||!same(info,presentation)||ports.projectionReady&&!ports.projectionReady(info)||ports.subscriptionActive&&!ports.subscriptionActive())throw new Error('Native navigation owner is unavailable');view.update(token,info,ports.frame(),ports.mapping(info),point,factor,target);openDiagnostic('navigation-update','view-updated');return renderPreview(ports.frame());}catch(error){openDiagnostic('navigation-update','rejected');return Promise.reject(error);}},presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,exportSvg:exportSvg,readPresentedObjectSession:presentedSession,
-      captureSaveSession:captureSaveSession,acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
+      captureSaveSession:capturePresentationSession,capturePresentationSession:capturePresentationSession,acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
       identity:requireActive,requestRelease:function(){return false;},releaseCurrent:function(){return false;},
       persistenceJSON:function(){throw new Error('Native project files must be saved through the native file command');}});

@@ -148,3 +148,24 @@ test('BPM entry refusal uses only fixed collector vocabulary and never records c
   assert.doesNotMatch(JSON.stringify(records),/PRIVATE|Users|secret|document-id|stack/);
   assert.deepEqual(f.commands,[]);assert.deepEqual(f.effects,[]);
 });
+
+test('tab capture refusal records a bounded fixed vocabulary without caller or project detail',async()=>{
+  const f=fixture(),observed=[];
+  f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>observed.push([event,code]);
+  const codes=['inactive','synchronizing','subscription-inactive','presentation-missing','view-mismatch',
+    'owner-mismatch','queue-pending','capture-superseded','capture-unavailable','tab-unavailable','ui-changed'];
+  for(const code of codes)Desktop.openDiagnostic(f.root,'tab-capture-refused',code);
+  for(const code of ['PRIVATE /Users/secret/name.json',null,{documentId:'PRIVATE'}])
+    Desktop.openDiagnostic(f.root,'tab-capture-refused',code);
+  const records=await f.records();
+  assert.deepEqual(records.map(record=>record.code),[...codes,'unknown','unknown','unknown']);
+  assert.ok(records.every(record=>record.event==='tab-capture-refused'));
+  assert.deepEqual(observed.map(record=>record[1]),[...codes,'unknown','unknown','unknown']);
+  assert.doesNotMatch(JSON.stringify(records),/PRIVATE|Users|secret|name.json|documentId/);
+  for(let i=0;i<40;i++)Desktop.openDiagnostic(f.root,'tab-capture-refused','queue-pending');
+  assert.equal((await f.records()).length,32);
+  f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=()=>{throw Error('PRIVATE observer failure');};
+  assert.doesNotThrow(()=>Desktop.openDiagnostic(f.root,'tab-capture-refused','ui-changed'));
+  assert.equal((await f.records()).at(-1).code,'ui-changed');
+  assert.deepEqual(f.commands,[]);assert.deepEqual(f.effects,[]);
+});
