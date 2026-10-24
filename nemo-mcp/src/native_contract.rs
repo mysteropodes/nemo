@@ -51,6 +51,8 @@ pub(crate) mod comments;
 mod diagnostics;
 #[path = "native_frame_edit_contract.rs"]
 pub(crate) mod frame_edit;
+#[path = "native_history_read_contract.rs"]
+pub(crate) mod history_read;
 #[path = "native_import_contract.rs"]
 pub(crate) mod import;
 #[path = "native_item_contract.rs"]
@@ -121,6 +123,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
         "query.document.object"
+            | history_read::OP
             | text_read::OP
             | metadata::OP
             | property_read::OP
@@ -148,6 +151,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
 
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
+        history_read::OP => history_read::request(payload),
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
         "query.document.object" => object::request(payload),
@@ -322,6 +326,9 @@ pub(crate) fn validate_result(
     payload: &Value,
     result: &Value,
 ) -> bool {
+    if operation == history_read::OP {
+        return history_read::result(payload, result);
+    }
     if !validate_request(operation, payload) {
         return false;
     }

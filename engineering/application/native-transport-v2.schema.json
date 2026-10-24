@@ -7200,6 +7200,23 @@
               }
             }
           ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ForbiddenRevisionRequest"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "query.document.object.history"
+                },
+                "payload": {
+                  "$ref": "#/$defs/ObjectHistoryReadPayload"
+                }
+              }
+            }
+          ]
         }
       ],
       "examples": [
@@ -8065,6 +8082,9 @@
             },
             {
               "$ref": "#/$defs/ObjectQueryResult"
+            },
+            {
+              "$ref": "#/$defs/ObjectHistoryReadResult"
             },
             {
               "$ref": "#/$defs/ObjectVideoLinkResult"
@@ -15364,6 +15384,47 @@
           }
         }
       ]
+    },
+    "ObjectHistoryReadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        }
+      }
+    },
+    "ObjectHistoryReadResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "undoDepth",
+        "redoDepth"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "undoDepth": {
+          "$ref": "#/$defs/Revision"
+        },
+        "redoDepth": {
+          "$ref": "#/$defs/Revision"
+        }
+      },
+      "description": "Live current-owner depths only; atRevision and documentSnapshotId must equal the request and current owner. No retained-snapshot stack semantics."
     }
   }
 }

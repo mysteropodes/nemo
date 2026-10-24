@@ -129,7 +129,9 @@
         "src/native_custom_brush_contract_tests.rs",
         "src/native_comments_contract.rs",
         "src/native_comments_contract_tests.rs",
-        "src/native_mask_contract_tests.rs"
+        "src/native_mask_contract_tests.rs",
+        "src/native_history_read_contract.rs",
+        "src/native_history_read_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
