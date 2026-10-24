@@ -12,6 +12,78 @@ fn response() -> Value {
         "documentSnapshotId":"native-object:document:7","undoDepth":2,"redoDepth":1}})
 }
 #[test]
+fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-transport-v2.schema.json"
+    ))
+    .unwrap();
+    let requests = schema["$defs"]["Request"]["oneOf"].as_array().unwrap();
+    let matching: Vec<_> = requests
+        .iter()
+        .filter(|branch| branch["allOf"][1]["properties"]["operation"]["const"] == OP)
+        .collect();
+    assert_eq!(matching.len(), 1);
+    assert_eq!(
+        matching[0]["allOf"][0],
+        json!({"$ref":"#/$defs/ForbiddenRevisionRequest"})
+    );
+    let mut request_schema = matching[0].clone();
+    request_schema["$defs"] = schema["$defs"].clone();
+    let input = jsonschema::draft202012::options()
+        .build(&request_schema)
+        .unwrap();
+    let output_schema = json!({"$ref":"#/$defs/ObjectHistoryReadResult", "$defs":schema["$defs"]});
+    let output = jsonschema::draft202012::options()
+        .build(&output_schema)
+        .unwrap();
+    assert!(input.is_valid(&envelope()));
+    assert!(output.is_valid(&response()["result"]));
+    let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
+        .as_array()
+        .unwrap();
+    assert_eq!(branches.len(), 38);
+    assert_eq!(
+        branches[37],
+        json!({"$ref":"#/$defs/ObjectHistoryReadResult"})
+    );
+    for field in ["atRevision", "documentSnapshotId"] {
+        let mut bad = envelope();
+        bad["payload"].as_object_mut().unwrap().remove(field);
+        assert!(!input.is_valid(&bad));
+    }
+    for (field, value) in [
+        ("extra", json!(true)),
+        ("atRevision", json!(-1)),
+        ("atRevision", json!(9007199254740992u64)),
+        ("documentSnapshotId", json!("")),
+    ] {
+        let mut bad = envelope();
+        bad["payload"][field] = value;
+        assert!(!input.is_valid(&bad));
+    }
+    let mut bad = envelope();
+    bad["expectedRevision"] = json!(7);
+    assert!(!input.is_valid(&bad));
+    for field in ["undoDepth", "redoDepth"] {
+        for value in [
+            json!(-1),
+            json!(0.5),
+            json!(true),
+            json!(9007199254740992u64),
+        ] {
+            let mut bad = response()["result"].clone();
+            bad[field] = value;
+            assert!(!output.is_valid(&bad));
+        }
+        let mut bad = response()["result"].clone();
+        bad.as_object_mut().unwrap().remove(field);
+        assert!(!output.is_valid(&bad));
+    }
+    let mut bad = response()["result"].clone();
+    bad["extra"] = json!(true);
+    assert!(!output.is_valid(&bad));
+}
+#[test]
 fn registered_public_input_is_closed_bounded_and_duplicate_safe() {
     let r: NativeApplicationRequest =
         decode_native_request(envelope().to_string().as_bytes()).unwrap();
