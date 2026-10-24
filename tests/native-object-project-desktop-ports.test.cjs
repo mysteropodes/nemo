@@ -469,6 +469,22 @@ test('completion notification drops stale revision, owner, subscription and same
   }
 });
 
+test('Motion completion repaint requires the captured owner, document, frame and active mode',async()=>{
+  for(const mode of ['current','frame','mode','owner','document','unconfirmed']){
+    const f=fixture();await f.open();const ports=Ports.createPorts(f.root),paints=[];
+    f.root.state.appMode='motion';
+    f.root.NemoNativeObjectUI.paintMotionInspector=root=>paints.push(root);
+    ports.presented(f.session.info());
+    if(mode==='frame')f.root.state.currentFrame=1;
+    if(mode==='mode')f.root.state.appMode='animation';
+    if(mode==='owner')delete f.root.NemoNativeObjectProject;
+    if(mode==='document')f.root.document={...f.root.document};
+    if(mode==='unconfirmed')f.transports[0].disconnected(new Error('controlled subscription loss'));
+    await timerTurn();
+    assert.deepEqual(paints,mode==='current'?[f.root]:[],mode);
+  }
+});
+
 test('newest same-port completion is coalesced and callback exceptions cannot reject settled native work',async()=>{
   const f=fixture();await f.open();const ports=Ports.createPorts(f.root),pin=retained(f);
   const before=f.notifications.length,start=f.log.length;
