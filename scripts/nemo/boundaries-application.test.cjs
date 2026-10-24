@@ -240,21 +240,24 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 24, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36, 37, 131, 132, 133, 134, 135, 181, 245, 246, 288, 289, 290, 291, 294, 295, 296, 297]);
+    [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 23, 25, 27, 28, 29, 30, 31, 32, 34, 35, 36, 37, 38, 132, 133, 134, 135, 136, 182, 247, 248, 290, 291, 292, 293, 296, 297, 298, 299]);
   // Custom brush catalog adds its UI before tools.js, its contract before SDK and its native model afterward. All 43 identities and adjacency stay fixed; Comments adds its four ordinary source members.
-  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 247);
-  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 247);
+  assert.equal(actual.get('src/js/adapters/native-frame-edit-desktop.js').scriptOrdinal, 249);
+  assert.equal(actual.get('src/js/adapters/native-application.js').scriptOrdinal + 1, 249);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
+  assert.equal(actual.get('src/js/adapters/native-object-project-entry-contract.js').scriptOrdinal + 1, actual.get('src/js/adapters/native-object-project.js').scriptOrdinal);
+  assert.equal(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal + 1, actual.get('src/js/adapters/native-object-project-tabs-ui.js').scriptOrdinal);
+  assert.equal(actual.get('src/js/adapters/native-object-project-tabs-ui.js').scriptOrdinal + 1, actual.get('src/js/project.js').scriptOrdinal);
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
   const entry = policy.retainedSources.find((record) => record.path === projectEntry);
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 178);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 179);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 180);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 182);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 179);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 180);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 181);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 184);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
@@ -382,14 +385,14 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
   const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
   assert.equal(runtime.length, 1); assert.equal(data.length, 1);
-  assert.equal(runtime[0].ordinal, 120); assert.equal(data[0].ordinal, 121);
+  assert.equal(runtime[0].ordinal, 121); assert.equal(data[0].ordinal, 122);
   assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 120);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 121);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};
@@ -412,7 +415,7 @@ function assertF06Bootstrap(html) {
     tag: match[0], src: match[1].match(/\bsrc=["']([^"']+)/)?.[1],
   }));
   const sources = ['native-font-panel', 'native-viewport-underlay', 'native-object-project-metadata',
-    'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+    'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project-entry-contract', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const positions = sources.map((name) => {
     const source = 'js/adapters/' + name + '.js';
     const selected = scripts.filter((entry) => entry.src === source);
@@ -420,8 +423,8 @@ function assertF06Bootstrap(html) {
     assert.equal(selected[0].tag, '<script src="' + source + '"></script>', source + ' must be synchronous classic');
     return scripts.indexOf(selected[0]);
   });
-  assert.deepEqual(positions, [14, 16, 17, 18, 19, 20, 21, 22, 24, 25],
-    'underlay → parser → properties → desktop → Exposure → Export → Project → ProjectFile → UI must remain in that order');
+  assert.deepEqual(positions, [14, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26],
+    'underlay → parser → properties → desktop → Exposure → Export → Entry → Project → ProjectFile → UI must remain in that order');
   const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
     const selected = scripts.filter((entry) => entry.src === source);
     assert.equal(selected.length, 1, source + ' must remain unique');
@@ -439,6 +442,7 @@ test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFi
   const desktop = '<script src="js/adapters/native-object-project-desktop.js"></script>';
   const exposure = '<script src="js/adapters/native-object-open-exposure.js"></script>';
   const exporter = '<script src="js/adapters/native-object-project-export.js"></script>';
+  const entry = '<script src="js/adapters/native-object-project-entry-contract.js"></script>';
   const project = '<script src="js/adapters/native-object-project.js"></script>';
   for (const broken of [
     html.replace(fonts, ''),
@@ -449,13 +453,16 @@ test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFi
     html.replace(parser, parser.replace('<script ', '<script async ')),
     html.replace(parser, parser.replace('<script ', '<script defer ')),
     html.replace(parser, parser.replace('<script ', '<script type="module" ')),
-    html.replace(desktop + '\n' + exposure + '\n' + exporter + '\n' + project,
-      project + '\n' + exporter + '\n' + exposure + '\n' + desktop),
+    html.replace(desktop + '\n' + exposure + '\n' + exporter + '\n' + entry + '\n' + project,
+      project + '\n' + entry + '\n' + exporter + '\n' + exposure + '\n' + desktop),
     html.replace(exposure, ''),
     html.replace(exposure, exposure + '\n' + exposure),
     html.replace(exposure, exposure.replace('<script ', '<script async ')),
     html.replace(exposure, exposure.replace('<script ', '<script defer ')),
     html.replace(exposure, exposure.replace('<script ', '<script type="module" ')),
+    html.replace(entry, ''),
+    html.replace(entry, entry + '\n' + entry),
+    html.replace(entry, entry.replace('<script ', '<script async ')),
     html.replace(exporter, ''),
     html.replace(exporter, exporter + '\n' + exporter),
     html.replace(exporter, exporter.replace('<script ', '<script async ')),
@@ -470,7 +477,7 @@ test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFi
 
 test('F06 real browser exports initialize in declared order and missing parser refuses before Project export', () => {
   const vm = require('node:vm'), html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
-  const names = ['native-object-project-metadata', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+  const names = ['native-object-project-metadata', 'native-object-project-properties', 'native-object-project-desktop', 'native-object-open-exposure', 'native-object-project-export', 'native-object-project-entry-contract', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
   const load = (context, name) => vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters', name + '.js'), 'utf8'), context, {filename: name});
   const context = vm.createContext({});
   const actual = [...html.matchAll(/<script src="js\/adapters\/([^"/]+)\.js"><\/script>/g)]

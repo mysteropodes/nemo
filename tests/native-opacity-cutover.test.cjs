@@ -495,6 +495,7 @@ test('classic startup loads frozen guard modules before the production first-lay
     'js/adapters/native-object-project-desktop.js',
     'js/adapters/native-object-open-exposure.js',
     'js/adapters/native-object-project-export.js',
+    'js/adapters/native-object-project-entry-contract.js',
     'js/adapters/native-object-project.js',
     'js/adapters/native-object-layer-splice.js',
     'js/adapters/native-object-project-file.js',

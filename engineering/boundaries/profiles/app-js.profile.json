@@ -2336,11 +2336,13 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-inactive-project-tabs.js"
+        "native-object-inactive-project-tabs.js",
+        "native-object-project-tabs-ui.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-inactive-project-tabs.js"
+        "native-object-inactive-project-tabs.js",
+        "native-object-project-tabs-ui.js"
       ]
     },
     {
@@ -2628,11 +2630,13 @@
         "native-object-project-desktop.js",
         "native-object-project-properties.js",
         "native-object-open-exposure.js",
-        "native-object-project-export.js"
+        "native-object-project-export.js",
+        "native-object-project-entry-contract.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
-        "native-object-project.js"
+        "native-object-project.js",
+        "native-object-project-entry-contract.js"
       ]
     },
     {
