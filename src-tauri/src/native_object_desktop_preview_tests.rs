@@ -7,6 +7,8 @@ use native_engine::{
     object_codec::decode_storage_project,
 };
 use serde_json::json;
+#[path = "native_object_display_filter_tests.rs"]
+mod display_filter_tests;
 #[path = "native_object_desktop_preview_extent_tests.rs"]
 mod extent_tests;
 #[path = "native_object_desktop_preview_test_support.rs"]

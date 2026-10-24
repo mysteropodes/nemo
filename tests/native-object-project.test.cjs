@@ -743,8 +743,8 @@ test('session view change invalidates the original pending action lease before a
  assert.equal(inspect(dormant,true,false,'stored-camera').failure,null);
 });
 
-function navigationFixture(){
- const h=host(),invoke=h.invoke,hold=deferred();let mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
+function navigationFixture(initialFilter='none'){
+ const h=host(),invoke=h.invoke,hold=deferred();let filter=initialFilter,mode='canvas',frame=0,pause=false,tamper=null,rect={x:0,y:0,width:320,height:180};
  const literals=new Map([
   ['1:0,0',[[2,0,0,2,-160,-90],[.5,0,0,.5,80,45]]],
   ['1:10,-5',[[2,0,0,2,-180,-80],[.5,0,0,.5,90,40]]],
@@ -753,12 +753,13 @@ function navigationFixture(){
   ['2:-30,-15',[[4,0,0,4,-360,-210],[.25,0,0,.25,90,52.5]]],
  ]);
  h.invoke=async(command,args)=>{const result=await invoke(command,args),q=args&&JSON.parse(args.requestJson);
+  if(command==='nemo_native_object_preview')result.displayFilter=q.displayFilter||'none';
   if(command!=='nemo_native_object_preview'||q.viewMode!=='stored-camera')return result;
   const n=q.navigation||{zoom:1,pan:[0,0]},pair=literals.get(n.zoom+':'+n.pan.join(','));assert.ok(pair,'independent authored navigation literal');
   if(pause)await hold.promise;
   const reply={...result,view:{mode:'stored-camera',navigation:n,cameraAvailable:true,documentToComposition:pair[0],compositionToDocument:pair[1]}};return tamper?tamper(reply):reply;};
- const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode});
- return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
+ const s=Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{...rect},physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>frame,viewMode:()=>mode,displayFilter:()=>filter});
+ return {h,s,async open(){await s.openPath('/project.json');mode='stored-camera';await s.presentPreview(frame);},set filter(value){filter=value;},set frame(value){frame=value;},set mode(value){mode=value;},set rect(value){rect=value;},pause(){pause=true;},release(){pause=false;hold.resolve();},tamper(fn){tamper=fn;}};
 }
 test('native session hand and zoom retain exact view intent through scrub while excluding export and source/history',async()=>{
  const f=navigationFixture();await f.open();const before=JSON.stringify(f.s.info());
@@ -802,4 +803,37 @@ test('native view receipt refuses mismatched or non-closed navigation without a 
   const f=navigationFixture();f.tamper(reply=>({...reply,view:{...reply.view,navigation}}));
   await assert.rejects(f.open());assert.equal(f.s.readPresentedObjectSession(),null);assert.equal(f.s.info().contentRevision,0);
  }
+});
+
+test('native first preview carries persisted filter; toggles preserve navigation and exclude export/document history',async()=>{
+ const f=navigationFixture('values');await f.open();const before=JSON.stringify(f.s.info());
+ assert.ok(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').every(c=>c.r.displayFilter==='values'));
+ const hand=f.s.beginViewportNavigation('pan',{x:100,y:60});await f.s.updateViewportNavigation(hand,{x:80,y:70});
+ const view=f.s.readPresentedObjectSession().presentation.view;
+ for(const filter of ['dim','none','values']){
+  f.filter=filter;assert.equal(f.s.readPresentedObjectSession(),null);await f.s.renderPreview(0);
+  const shown=f.s.readPresentedObjectSession().presentation;assert.equal(shown.displayFilter,filter);assert.deepEqual(shown.view,view);
+ }
+ await f.s.exportPng('/unfiltered',[0]);
+ assert.equal(Object.hasOwn(f.h.calls.filter(c=>c.command==='nemo_native_object_export').at(-1).r,'displayFilter'),false);
+ assert.equal(JSON.stringify(f.s.info()),before);
+});
+
+test('native rapid filter changes coalesce to the newest intent and never expose stale tool proof',async()=>{
+ const f=navigationFixture();await f.open();f.pause();f.filter='values';
+ const first=f.s.renderPreview(0);await turn();f.filter='dim';const latest=f.s.renderPreview(0);
+ assert.equal(f.s.readPresentedObjectSession(),null);f.release();await Promise.all([first,latest]);
+ assert.equal(f.s.readPresentedObjectSession().presentation.displayFilter,'dim');
+ assert.deepEqual(f.h.calls.filter(c=>c.command==='nemo_native_object_preview').slice(-2).map(c=>c.r.displayFilter),['values','dim']);
+});
+
+test('native filter receipts reject wrong/missing/unknown values and late direct presentation',async()=>{
+ for(const value of ['none','dim',undefined,null,'blur(2px)']){
+  const f=navigationFixture();await f.open();f.filter='values';f.tamper(reply=>({...reply,displayFilter:value}));
+  await assert.rejects(f.s.presentPreview(0),/display-filter/);assert.equal(f.s.readPresentedObjectSession(),null);
+ }
+ const f=navigationFixture();await f.open();f.pause();f.filter='values';
+ const pending=f.s.presentPreview(0);await turn();f.filter='dim';f.release();
+ await assert.rejects(pending,/owner/);assert.equal(f.s.readPresentedObjectSession(),null);
+ await f.s.renderPreview(0);assert.equal(f.s.readPresentedObjectSession().presentation.displayFilter,'dim');
 });

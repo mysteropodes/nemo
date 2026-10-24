@@ -196,7 +196,7 @@
         var verified=safeProject(v.project,result.request,held.preparationRequestId);
         if(!verified.documentId||verified.documentId!==held.documentId||verified.documentSnapshotId!==held.documentSnapshotId||
             verified.contentRevision!==held.contentRevision||verified.digest!==held.digest)throw new Error('Native retained target changed');
-        capture=ports.capture(held);
+        capture=await ports.capture(held);
         var activated=await ports.activate(held,{
           isCurrent:function(){return !uncertain&&(committed?held===outgoing:held===original)&&ports.isCurrent(capture,committed,projecting)===true;},
           projecting:function(){projecting=true;},
@@ -221,7 +221,7 @@
             if(ports.publish(original,outgoing,capture)!==true)throw new Error('Native tab UI publication is unconfirmed');
             held=outgoing;committed=true;return true;
           }
-        });
+        },capture);
         if(activated&&activated.notDispatched===true)return {status:'refused',meta:held};
         if(!activated||!committed)throw new Error('Native tab activation was not confirmed');
         show('Switched to '+meta.name);return {status:'activated',meta:held};

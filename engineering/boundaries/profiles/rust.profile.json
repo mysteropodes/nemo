@@ -1991,6 +1991,7 @@
       "files": [
         "native_viewport.rs",
         "native_viewport_appkit.rs",
+        "native_viewport_display_filter.rs",
         "native_viewport_appkit_binding.rs",
         "native_viewport_appkit_occlusion.rs"
       ],
@@ -2108,7 +2109,8 @@
       "files": [
         "native_application_tests.rs",
         "native_application_release_tests.rs",
-        "native_viewport_borrow_tests.rs"
+        "native_viewport_borrow_tests.rs",
+        "native_viewport_display_filter_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2146,6 +2148,7 @@
         "native_object_preview_route_test_support.rs",
         "native_object_desktop_preview_tests.rs",
         "native_object_desktop_preview_test_support.rs",
+        "native_object_display_filter_tests.rs",
         "native_object_export_tests.rs",
         "native_object_desktop_export_tests.rs",
         "native_object_desktop_sequence_tests.rs",

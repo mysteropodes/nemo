@@ -1,4 +1,4 @@
-/* Pure entry validation; New/Open and retained activation keep distinct contracts. */
+/* Read-only entry validation; New/Open and retained activation keep distinct contracts. */
 (function(root,factory){
   var api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -87,5 +87,20 @@
     if(!integer(frame,0)||frame>=info.totalFrames)throw new Error('Native retained frame is unavailable');
     return frame;
   }
-  return Object.freeze({target:target,request:request,receipt:receipt,installed:installed,candidate:candidate});
+  // Await only the captured owner's existing queue. New work or any changed
+  // revision/subscription supersedes this proof; this helper owns no queue/state.
+  function capturePresentation(ports){
+    var captured=ports.state();
+    function refused(onRefusal){if(typeof onRefusal==='function')try{onRefusal('capture-superseded');}catch(_){}return null;}
+    return async function(onRefusal){
+      var current=ports.state();
+      if(!current.active||current.opening||current.synchronizing||!ports.same(current.info,captured.info))return refused(onRefusal);
+      await captured.queue;
+      current=ports.state();
+      if(current.queue!==captured.queue||current.ticket!==captured.ticket||current.opening||
+          !ports.same(current.info,captured.info))return refused(onRefusal);
+      return ports.readPresented(onRefusal);
+    };
+  }
+  return Object.freeze({target:target,request:request,receipt:receipt,installed:installed,candidate:candidate,capturePresentation:capturePresentation});
 }));

@@ -27,7 +27,7 @@ class Element {
   dispatch(name,event={}){return this.events[name]&&this.events[name](event);}
 }
 function host(){
-  let active=null,inactive=null,generation=0,serial=0,mode=null;
+  let active=null,inactive=null,generation=0,serial=0,mode=null,previewHold=null;
   const calls=[],copies=[];
   function document(letter,w=320,h=180,fps=24){return {letter,documentId:'native-'+letter,revision:0,w,h,fps};}
   function info(doc=active){
@@ -63,6 +63,7 @@ function host(){
         contentRevision:active.revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
     }
     if(command==='nemo_native_object_preview'){
+      if(previewHold){const hold=previewHold;previewHold=null;hold.entered.resolve();await hold.release.promise;}
       assert.equal(r.documentId,active.documentId);assert.equal(r.contentRevision,active.revision);
       return {status:mode==='preview-after-switch'&&generation>1?'failed':'presented',workId:'work-'+(++serial),viewGeneration:serial};
     }
@@ -111,16 +112,20 @@ function host(){
     if(mode==='outgoing-digest')value.inactiveProject.documentDigest='e'.repeat(64);
     return value;
   }
-  return {invoke,info,calls,copies,setMode:value=>{mode=value;}};
+  return {invoke,info,calls,copies,setMode:value=>{mode=value;},holdPreview(){
+    previewHold={entered:deferred(),release:deferred()};return previewHold;}};
 }
-function fixture(){
+function fixture(afterCapture){
   const h=host(),list=new Element('div'),add=new Element('button'),notices=[],renders=[];
   const document={getElementById:id=>id==='project-tabs-list'?list:id==='project-tab-add'?add:null,
     createElement:tag=>new Element(tag),querySelector:()=>null};
   const root={document,SM:{t:value=>value},state:{activeSymbolId:null,currentFrame:0,totalFrames:8,layers:[],activeLayerIdx:0},
     _layerSel:[],_layerSelAnchor:-1,selectedPaths:[],userLayers:[],crypto:{randomUUID:(()=>{let i=0;return ()=> 'tabs-'+(++i);})()},
     __TAURI__:{core:{invoke:h.invoke}},SMProjectDocument:{baseName:path=>path.split('/').at(-1).replace(/\.json$/i,'')},
-    NemoNativeObjectInactiveProjectTabs:Tabs};
+    NemoNativeObjectInactiveProjectTabs:{create(root,ports){
+      if(afterCapture){const capture=ports.capture;ports.capture=async meta=>{
+        const result=await capture(meta);afterCapture({session,current,root,h});return result;};}
+      return Tabs.create(root,ports);}}};
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/project-entry.js'),'utf8'),{window:root});
   let current={activeTabId:'tab-A',path:null,name:'Untitled',tabs:[{id:'tab-A',name:'Untitled',path:null,json:null}]};
   let files,tabs,lastAction,nextPath='/saved.json',tabSerial=0;
@@ -193,6 +198,58 @@ test('an in-flight Save As blocks tab activation before native dispatch and keep
   picker.resolve('/A-current.json');assert.equal((await save).acknowledged,true);
   assert.equal((await f.click(b.id)).status,'activated');
 });
+
+test('ordinary tab click waits the current preview queue and activates once after its confirmed presentation',async()=>{
+  const f=fixture();await f.open();const b=await f.prepare(),hold=f.h.holdPreview();
+  const preview=f.session.presentPreview(0);await hold.entered.promise;
+  assert.equal(f.session.readPresentedObjectSession(),null);
+  let finished=false;const switching=f.click(b.id).then(value=>{finished=true;return value;});await turn();
+  assert.equal(finished,false);assert.equal(f.current.activeTabId,'tab-A');
+  assert.equal(f.h.calls.filter(c=>c.r&&c.r.action&&c.r.action.kind==='activate').length,0);
+  hold.release.resolve();await preview;assert.equal((await switching).status,'activated');
+  assert.equal(f.current.activeTabId,b.id);assert.equal(f.h.info().documentId,'native-B');
+  assert.equal(f.h.calls.filter(c=>c.r&&c.r.action&&c.r.action.kind==='activate').length,1);
+});
+
+for(const [name,change] of Object.entries({
+  path:f=>{f.current.path='/changed.json';},name:f=>{f.current.name='Changed';},
+  frame:f=>{f.root.state.currentFrame=1;},selection:f=>{f.root._layerSel=[1];},
+  activeLayer:f=>{f.root.state.activeLayerIdx=1;},anchor:f=>{f.root._layerSelAnchor=1;},
+  activeTab:(f,b)=>{f.current.activeTabId=b.id;},target:(f,b)=>{b.nativeInactiveProject={...b.nativeInactiveProject};},
+  targetRow:(f,b)=>{f.current.tabs=f.current.tabs.map(t=>t===b?{...t}:t);},
+  activeRow:f=>{f.current.tabs=f.current.tabs.filter(t=>t.id!=='tab-A');},
+  session:f=>{f.root.NemoNativeObjectProject.desktop=()=>null;},
+  newQueue:f=>f.session.presentPreview(0),revision:f=>f.session.reference({kind:'attach',id:'new',sourcePath:'/new.png'})
+})){
+  test('waiting tab capture rejects changed '+name+' before activation',async()=>{
+    const f=fixture();await f.open();const b=await f.prepare(),hold=f.h.holdPreview(),diagnostics=[];
+    f.root.NemoNativeObjectProjectDesktop={openDiagnostic:(root,event,reason)=>diagnostics.push([event,reason])};
+    const preview=f.session.presentPreview(0);await hold.entered.promise;
+    const switching=f.click(b.id);await turn();const work=change(f,b);hold.release.resolve();
+    await preview;const result=await switching;await work;
+    assert.equal(result.status,'indeterminate');assert.equal(f.h.info().documentId,'native-A');
+    assert.equal(f.h.calls.filter(c=>c.r&&c.r.action&&c.r.action.kind==='activate').length,0);
+    assert.equal(diagnostics.length,1);assert.equal(diagnostics[0][0],'tab-capture-refused');
+    assert.ok(['ui-changed','owner-mismatch','capture-superseded'].includes(diagnostics[0][1]));
+  });
+}
+
+for(const changed of ['preview','revision','path','frame','target']){
+  test('synchronous tab admission rejects '+changed+' arriving after async capture',async()=>{
+    let work,hold;
+    const f=fixture(({session,current,root,h})=>{
+      if(changed==='path')current.path='/later.json';
+      else if(changed==='frame')root.state.currentFrame=1;
+      else if(changed==='target')current.tabs.find(t=>t.nativeInactiveProject).nativeInactiveProject={};
+      else {hold=h.holdPreview();work=changed==='preview'?session.presentPreview(0):session.reference({kind:'attach',id:'new',sourcePath:'/new.png'});}
+    });
+    await f.open();const b=await f.prepare();assert.equal((await f.click(b.id)).status,'refused');
+    assert.equal(f.h.calls.filter(c=>c.r&&c.r.action&&c.r.action.kind==='activate').length,0);
+    assert.equal(f.current.activeTabId,'tab-A');assert.equal(f.h.info().documentId,'native-A');
+    if(hold){hold.release.resolve();await work;}
+    assert.equal(f.files.isDirty(),changed==='revision');assert.equal(f.h.copies.length,0);
+  });
+}
 
 for(const mode of ['lose-after','wrong-receipt','preview-after-switch']){
   test('uncertain '+mode+' retains both UI rows and fences saving without retry or fake rollback',async()=>{

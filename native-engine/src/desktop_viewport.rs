@@ -20,6 +20,7 @@ pub use object_consumer::ObjectViewportFrame;
 mod object_viewport_projection;
 pub use object_viewport_projection::{
     ObjectPresentedFrame, ObjectPreviewNavigation, ObjectPreviewView, ObjectViewProjection,
+    ViewportDisplayFilter,
 };
 
 #[rustfmt::skip]
@@ -114,6 +115,7 @@ pub struct SurfacePresentation<'a> {
     pub source_extent: PhysicalExtent,
     pub surface_extent: PhysicalExtent,
     pub scale_policy: SurfaceScalePolicy,
+    pub display_filter: ViewportDisplayFilter,
     pub identity: &'a ScheduledFrameIdentity,
 }
 
@@ -170,6 +172,7 @@ fn acquire_source<P: SurfacePort>(port: &mut P, source: &SurfacePresentation<'_>
         source_extent: source.source_extent,
         surface_extent: source.surface_extent,
         scale_policy: source.scale_policy,
+        display_filter: source.display_filter,
         identity: source.identity,
     }))
 }
@@ -179,6 +182,7 @@ pub struct DesktopViewportHost<P> {
     mapping: ViewportMapping,
     pending: BTreeMap<WorkId, ScheduledFrameIdentity>,
     receipts: BTreeMap<WorkId, PresentationReceipt>,
+    display_filters: BTreeMap<WorkId, ViewportDisplayFilter>,
     newest_generation: Option<ViewGeneration>,
     fatal: Option<FatalAction>,
     disposed: bool,
@@ -192,6 +196,7 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
             mapping,
             pending: BTreeMap::new(),
             receipts: BTreeMap::new(),
+            display_filters: BTreeMap::new(),
             newest_generation: None,
             fatal: None,
             disposed: false,
@@ -205,9 +210,6 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
     }
     pub fn fatal_action(&self) -> Option<FatalAction> {
         self.fatal
-    }
-    pub fn register(&mut self, identity: ScheduledFrameIdentity) -> Result<(), ViewportError> {
-        self.register_as(identity.work_id(), identity)
     }
     pub fn resize(&mut self, mapping: ViewportMapping) -> Result<(), ViewportError> {
         self.ensure_active()?;
@@ -256,6 +258,7 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
             },
             surface_extent: self.mapping.physical_extent(),
             scale_policy: SurfaceScalePolicy::StretchToSurface,
+            display_filter: ViewportDisplayFilter::None,
             identity: result.scheduled_identity(),
         })
     }
@@ -284,6 +287,7 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
             source_extent: actual,
             surface_extent: self.mapping.physical_extent(),
             scale_policy: SurfaceScalePolicy::StretchToSurface,
+            display_filter: self.display_filter(source.identity.work_id()),
             identity: source.identity,
         })
     }
@@ -301,6 +305,9 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
         source: SurfacePresentation<'_>,
     ) -> Result<PresentationReceipt, ViewportError> {
         let identity = source.identity.clone();
+        if self.display_filter(identity.work_id()) != source.display_filter {
+            return Err(ViewportError::IdentityMismatch(identity.work_id()));
+        }
         if let Some(receipt) = self.prepare_present(identity.clone())? {
             return Ok(receipt);
         }
@@ -311,21 +318,13 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
     pub fn pending_work_ids(&self) -> Vec<WorkId> {
         self.pending.keys().copied().collect()
     }
-    /// Retire exactly the scheduler work terminalized by document replacement
-    /// without disposing the still-valid surface or replaying presentation.
-    pub fn reconcile_replaced(&mut self, work_ids: &[WorkId]) -> Vec<WorkId> {
-        work_ids
-            .iter()
-            .copied()
-            .filter(|work_id| self.pending.remove(work_id).is_some())
-            .collect()
-    }
     pub fn dispose(&mut self) -> Vec<WorkId> {
         if self.disposed {
             return Vec::new();
         }
         let pending = self.pending_work_ids();
         self.pending.clear();
+        self.display_filters.clear();
         self.port.dispose();
         self.disposed = true;
         pending

@@ -14,6 +14,17 @@
     return {zoom:value.zoom,pan:value.pan.map(function(n){return n===0?0:n;})};
   }
   function equalNav(a,b){return a.zoom===b.zoom&&a.pan.every(function(n,i){return n===b.pan[i];});}
+  function displayFilter(value){
+    if(value===undefined)return 'none';
+    if(!['none','values','contrast','dim'].includes(value))throw new Error('Native display filter is unavailable');
+    return value;
+  }
+  function requestView(request,selected){
+    if(selected.mode!=='canvas')request.viewMode=selected.mode;
+    if(!equalNav(selected.navigation,nav()))request.navigation=selected.navigation;
+    if(selected.displayFilter!=='none')request.displayFilter=selected.displayFilter;
+  }
+  function sameView(a,b){return a.mode===b.mode&&equalNav(a.navigation,b.navigation)&&a.displayFilter===b.displayFilter;}
   function projection(value,mode,navigation){
     if(!['canvas','stored-camera'].includes(mode))return null;
     var wanted;try{wanted=nav(navigation);}catch(_){return null;}
@@ -31,7 +42,7 @@
     var result={mode:mode,cameraAvailable:available,documentToComposition:forward,compositionToDocument:inverse};if(navigationValue!==undefined)result.navigation=actual;return result;
   }
   // The existing session owns desired presentation only. No geometry/camera keys live here.
-  function navigation(readMode,observe){
+  function navigation(readMode,observe,readFilter){
     var owner=null,mode=null,desired=nav(),gesture=null;
     function observedBegin(kind,code){
       var tag=kind==='pan'?'pan':kind==='zoom'?'zoom':'other';
@@ -40,9 +51,9 @@
     function identity(info){return JSON.stringify([info.instanceId,info.documentId,info.lifecycleGeneration]);}
     function read(info){var next=viewMode(readMode),key=identity(info);
       if(owner!==key||mode!==next){owner=key;mode=next;desired=nav();gesture=null;}
-      return {mode:mode,navigation:nav(desired)};
+      return {mode:mode,navigation:nav(desired),displayFilter:displayFilter(readFilter?readFilter():undefined)};
     }
-    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation);}catch(_){return false;}}
+    function matches(p,info){try{var value=read(info);return !!p&&!!p.view&&p.view.mode===value.mode&&equalNav(nav(p.view.navigation),value.navigation)&&displayFilter(p.displayFilter)===value.displayFilter;}catch(_){return false;}}
     function begin(p,info,frame,mapping,shownBounds,kind,point){
       var selected=read(info),b=mapping&&mapping.cssBounds;
       if(!p||p.frame!==frame||p.view.mode!==selected.mode||!b||!shownBounds||!['x','y','width','height'].every(function(k){return Number.isFinite(b[k])&&b[k]===shownBounds[k];})||b.width<=0||b.height<=0||!['pan','zoom'].includes(kind)){
@@ -145,7 +156,7 @@
       clearWanted: function () { wanted = null; }
     });
   }
-  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation){
+  function inspectReceipt(receipt,ownerMatches,allowDeferred,viewMode,navigation,filter){
     if(!ownerMatches)return {failure:'owner'};
     if(!receipt)return {failure:'receipt'};
     var status=receipt.status;
@@ -157,11 +168,12 @@
     var viewGeneration=receipt.viewGeneration;
     if(!Number.isSafeInteger(viewGeneration)||viewGeneration<1)return {failure:'view-generation'};
     var view=projection(receipt.view,viewMode||'canvas',navigation);if(!view)return {failure:'view'};
-    return {failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view};
+    var actual;try{actual=displayFilter(receipt.displayFilter);if(actual!==displayFilter(filter))return {failure:'display-filter'};}catch(_){return {failure:'display-filter'};}
+    return {failure:null,status:status,workId:workId,viewGeneration:viewGeneration,view:view,displayFilter:actual};
   }
   function presentedFrame(receipt,request,frame){
     return {owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
-      viewGeneration:receipt.viewGeneration,view:receipt.view,instanceId:request.instanceId,documentId:request.documentId,
+      viewGeneration:receipt.viewGeneration,view:receipt.view,displayFilter:receipt.displayFilter,instanceId:request.instanceId,documentId:request.documentId,
       contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration};
   }
   function create(subscribe,guard){
@@ -224,5 +236,5 @@
     return Object.freeze({connect:connect,join:join,run:run,cancel:cancel,detach:detach,close:close,
       assertActive:assertActive,isStopped:function(){return !active;}});
   }
-  return Object.freeze({create:create,inspectReceipt:inspectReceipt,presentedFrame:presentedFrame,viewMode:viewMode,matchesView:matchesView,navigation:navigation,previewScheduling:previewScheduling});
+  return Object.freeze({create:create,inspectReceipt:inspectReceipt,presentedFrame:presentedFrame,viewMode:viewMode,matchesView:matchesView,navigation:navigation,requestView:requestView,sameView:sameView,previewScheduling:previewScheduling});
 }));

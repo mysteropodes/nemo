@@ -35,14 +35,37 @@
         var tabs=ports.read().tabs,index=tabs.findIndex(function(x){return x.nativeInactiveProject&&x.nativeInactiveProject.preparationToken===meta.preparationToken;});
         if(index<0)return false;tabs.splice(index,1);ports.render();return true;
       },
-      capture:function(meta){
-        var current=ports.read(),session=root.NemoNativeObjectProject.desktop(root),pin=session.readPresentedObjectSession();
+      capture:async function(meta){
+        function refused(reason){var diagnostic=root.NemoNativeObjectProjectDesktop;
+          if(diagnostic&&typeof diagnostic.openDiagnostic==='function')diagnostic.openDiagnostic(root,'tab-capture-refused',reason);}
+        var current=ports.read(),session=root.NemoNativeObjectProject.desktop(root);
         var incoming=current.tabs.find(function(t){return t.nativeInactiveProject===meta;});
-        if(!pin||pin.documentId!==meta.ownerDocumentId||pin.lifecycleGeneration!==meta.lifecycleGeneration||
-            !incoming||incoming.id===current.activeTabId||!current.tabs.some(function(t){return t.id===current.activeTabId;}))
-          throw new Error('Native tab UI owner is unavailable');
-        return Object.freeze({activeTabId:current.activeTabId,targetTabId:incoming.id,path:current.path,name:current.name,
+        if(!incoming||incoming.id===current.activeTabId||!current.tabs.some(function(t){return t.id===current.activeTabId;})){
+          refused('tab-unavailable');throw new Error('Native tab UI owner is unavailable');}
+        var captured=Object.freeze({activeTabId:current.activeTabId,targetTabId:incoming.id,path:current.path,name:current.name,
           dirty:ports.dirty(),view:view(root),targetView:meta.view});
+        if(!session||typeof session.capturePresentationSession!=='function'){
+          refused('capture-unavailable');throw new Error('Native tab UI owner is unavailable');}
+        var pin=await session.capturePresentationSession()(refused),latest=ports.read();
+        if(!pin||session!==root.NemoNativeObjectProject.desktop(root)||pin.documentId!==meta.ownerDocumentId||
+            pin.lifecycleGeneration!==meta.lifecycleGeneration){
+          if(pin)refused('owner-mismatch');throw new Error('Native tab UI owner is unavailable');}
+        function sameUI(latest){return latest.activeTabId===captured.activeTabId&&latest.path===captured.path&&latest.name===captured.name&&
+            latest.tabs.find(function(t){return t.id===captured.targetTabId;})===incoming&&incoming.nativeInactiveProject===meta&&
+            latest.tabs.some(function(t){return t.id===captured.activeTabId;})&&ports.dirty()===captured.dirty&&
+            sameView(view(root),captured.view);}
+        if(!sameUI(latest)){
+          refused('ui-changed');throw new Error('Native tab view changed while waiting');}
+        // The caller awaits capture. Recheck synchronously at actual admission,
+        // before File/Project set their opening guards; no stale queued intent.
+        return Object.freeze(Object.assign({},captured,{admit:function(){
+          var current=session.readPresentedObjectSession(refused);
+          if(!current||session!==root.NemoNativeObjectProject.desktop(root)||
+              !['instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration'].every(function(k){return current[k]===pin[k];})){
+            if(current)refused('owner-mismatch');return false;
+          }
+          if(!sameUI(ports.read())){refused('ui-changed');return false;}return true;
+        }}));
       },
       isCurrent:function(capture,committed,projecting){
         var current=ports.read();
@@ -51,7 +74,7 @@
         return sameView(view(root),projecting?capture.targetView:capture.view);
       },
       canActivate:function(){var file=ports.file();return !!file&&typeof file.activateProject==='function';},
-      activate:function(meta,transition){var file=ports.file();return file&&typeof file.activateProject==='function'?
+      activate:function(meta,transition,capture){var file=ports.file();return file&&typeof file.activateProject==='function'&&capture.admit()===true?
         file.activateProject(meta,transition):{notDispatched:true};},
       publish:function(incoming,outgoing,capture){
         var current=ports.read(),from=current.tabs.find(function(t){return t.id===capture.activeTabId;});

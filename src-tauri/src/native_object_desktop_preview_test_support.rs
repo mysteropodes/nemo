@@ -47,6 +47,7 @@ pub(super) struct Trace {
     pub(super) mode: u8,
     pub(super) color: [u8; 4],
     pub(super) pixel_check: Option<fn(&SurfacePresentation<'_>)>,
+    pub(super) filters: Vec<native_engine::desktop_viewport::ViewportDisplayFilter>,
 }
 struct Port {
     context: (wgpu::Instance, wgpu::Adapter, wgpu::Device, wgpu::Queue),
@@ -70,6 +71,7 @@ impl SurfacePort for Port {
         assert_eq!(source.texture.width(), 320);
         let mut trace = self.trace.borrow_mut();
         trace.acquisitions += 1;
+        trace.filters.push(source.display_filter);
         if let Some(check) = trace.pixel_check {
             check(&source);
         } else {
@@ -78,6 +80,14 @@ impl SurfacePort for Port {
         match trace.mode {
             1 => SurfaceAttempt::Timeout,
             2 => panic!("desktop preview callback unwind"),
+            3 => {
+                trace.mode = 0;
+                SurfaceAttempt::Lost
+            }
+            4 => {
+                trace.mode = 0;
+                SurfaceAttempt::Outdated
+            }
             _ => SurfaceAttempt::Acquired(Frame),
         }
     }
@@ -167,6 +177,18 @@ impl Fixture {
                 )
                 .unwrap(),
         )
+    }
+    pub(super) fn fail_cancel(&self, fail: bool) {
+        let native = self.state.native_state();
+        let mut guard = native.lock().unwrap();
+        let generation = guard.active_generation().unwrap();
+        guard
+            .active_mut(generation)
+            .unwrap()
+            .as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
+            .unwrap()
+            .fail_preview_cancel_for_test(fail);
     }
     pub(super) fn request(&self, operation: &str, payload: Value) -> String {
         json!({"apiVersion":2,"requestId":format!("desktop-command-{}",self.raw["contentRevision"]),"instanceId":self.raw["instanceId"],
