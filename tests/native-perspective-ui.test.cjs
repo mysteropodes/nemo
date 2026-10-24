@@ -209,6 +209,36 @@ test('actual VP drag uses a transient ghost and submits one absolute native move
   h.pointer('pointerup', 80, 75); await h.settled(); assert.deepEqual(h.edits()[0].payload.action, { kind: 'move', ordinal: 1, x: 80, y: 75 });
   assert.equal(h.historyEntries(), 1); assert.deepEqual(h.engine(), { suspends: 1, resumes: 1 });
 });
+test('native child pointerleave does not enqueue a repaint during an unrelated Drawing gesture', async () => {
+  const h = fixture({ metadata: {} }); await h.ready();
+  const before = h.metadata(), calls = h.calls.length; let renders = 0;
+  h.root.SMEngineBridge.renderNow = () => { renders++; };
+  assert.equal(h.pointer('pointerdown', 40, 90).stopped, false);
+  // Capturing a drawing pointer on canvas-area can retarget it away from
+  // drawing-canvas. The ancestor's capture listener receives that leave.
+  h.pointer('pointerleave', 40, 90, { target: h.elements['drawing-canvas'] });
+  assert.equal(renders, 0, 'a legacy repaint would hide the native drawing presentation as queue-pending');
+  assert.equal(h.calls.length, calls); assert.deepEqual(h.metadata(), before);
+  assert.equal(h.historyEntries(), 0); assert.deepEqual(h.engine(), { suspends: 0, resumes: 0 });
+});
+test('native Perspective leave cancels its ghost with one controller-owned repaint', async () => {
+  const h = fixture(); await h.ready(); let renders = 0;
+  h.root.SMEngineBridge.renderNow = () => { renders++; };
+  h.pointer('pointerdown', 60, 60); h.pointer('pointermove', 80, 75); renders = 0;
+  h.pointer('pointerleave', 80, 75);
+  assert.equal(renders, 1); assert.deepEqual(h.engine(), { suspends: 1, resumes: 1 });
+  h.pointer('pointerup', 80, 75); await h.settled();
+  assert.equal(h.edits().length, 0); assert.equal(h.historyEntries(), 0);
+});
+test('legacy Perspective leave retains its cursor repaint', () => {
+  const canvas = node(), events = node(); let renders = 0;
+  const root = { document: Object.assign(node('document'), { readyState: 'complete', getElementById: () => canvas }),
+    addEventListener: events.addEventListener.bind(events), removeEventListener: events.removeEventListener.bind(events),
+    SMEngineBridge: { renderNow() { renders++; } } };
+  root.window = root;
+  vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/perspective-bridge.js'), 'utf8'), root);
+  canvas.fire('pointerleave'); assert.equal(renders, 1);
+});
 test('whole horizon drag translates unlocked VPs and preserves omitted/true locked fields', async () => {
   const h = fixture(); await h.ready(); h.pointer('pointerdown', 160, 60); h.pointer('pointermove', 170, 70);
   const markers = h.root.buildPerspectiveGuideItems().filter(item => item.strokeWidth === 2);
