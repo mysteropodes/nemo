@@ -70,8 +70,8 @@ async function fixture() {
     cancelAnimationFrame: root.cancelAnimationFrame, clearInterval});
   vm.runInContext('var playInt=null,playRaf=null,nativePlayScheduler=null,_nativeFrameNavigator=null;\n' +
     shipped('app.js', 'goToFrame') + '\n' +
-    ['startNativePlay', 'advancePlayFrame', 'startPlay', 'stopPlay'].map(name => shipped('timeline.js', name)).join('\n'), context);
-  root.startPlay = context.startPlay; root.stopPlay = context.stopPlay;
+    ['startNativePlay', 'advancePlayFrame', 'startPlay', 'stopPlay', 'togglePlay'].map(name => shipped('timeline.js', name)).join('\n'), context);
+  root.startPlay = context.startPlay; root.stopPlay = context.stopPlay; root.togglePlay = context.togglePlay;
   controller = Desktop.install(root);
   await session.openPath('/synthetic-settings.json', {reveal(value) {Files.projectView(root, value);}});
   return {root, session, controller, writes, notices,
@@ -123,4 +123,22 @@ test('a synchronous Stop failure releases all preparing intents without a write'
   const latest = f.controller.edit({kind: 'setFps', fps: 30});
   assert.equal((await first).status, 'superseded'); assert.equal((await latest).status, 'unavailable');
   assert.equal(f.controller.isPending(), false); assert.equal(f.writes.length, 0);
+});
+
+for (const phase of ['restoration', 'dispatch']) test('ordinary Stop during pending FPS ' + phase + ' cancels resume and later Play works', async () => {
+  const f = await fixture(); f.root.startPlay(); await f.tick(100);
+  const gate = phase === 'restoration' ? f.holdPreview() : f.holdWrite();
+  const edit = f.controller.edit({kind: 'setFps', fps: 48});
+  await gate.entered.promise;
+  assert.equal(f.root.state.playing, false);
+  assert.ok(f.root.document.getElementById('btn-play').innerHTML.includes('\u{e034}'), 'pending playback still offers Stop');
+  f.root.togglePlay();
+  assert.equal(f.root.state.playing, false, 'ordinary Stop must not restart the old clock');
+  assert.ok(f.root.document.getElementById('btn-play').innerHTML.includes('\u{e037}'));
+  gate.release.resolve();
+  assert.equal((await edit).status, 'applied-presented', JSON.stringify(f.notices));
+  assert.equal(f.writes.length, 1); assert.equal(f.root.state.playing, false);
+  assert.equal(f.root.state.fps, 48); assert.equal(f.root.state.currentFrame, 3);
+  f.root.togglePlay(); assert.equal(f.root.state.playing, true);
+  await f.tick(200); assert.equal(f.root.state.currentFrame, 7);
 });

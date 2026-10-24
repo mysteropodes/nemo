@@ -198,7 +198,7 @@
   }
   function createPorts(root){
     var nativeInvoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null,presentationVersion=0;
-    function invoke(command,args){
+    function invokeProjectObserved(command,args){
       var pin;
       if(command==='nemo_native_object_export')try{pin=JSON.parse(args.requestJson);settingsDiagnostic(root,'export-request',pin);}catch(_){}
       var response=nativeInvoke(command,args);
@@ -227,7 +227,7 @@
       if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();
       return true;
     }
-    return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
+    return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invokeProjectObserved,publishRevision:publishRevision,
       viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
       displayFilter:function(){return root.SMLabs&&typeof root.SMLabs.getViewFilter==='function'?root.SMLabs.getViewFilter():'none';},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
@@ -244,7 +244,7 @@
       subscribeRevisions:async function(synchronize,disconnected,trackedInvoke,isCurrent){
         if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
           return null; // Private file Open remains usable; no toggle/subscriber is advertised.
-        var call=trackedInvoke||invoke;
+        var call=trackedInvoke||invokeProjectObserved;
         var ownTransport=transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(function(command,args){
           var response=call(command,args);
           if(command==='nemo_native_revision_sync'&&args&&args.request.action==='acknowledge')
