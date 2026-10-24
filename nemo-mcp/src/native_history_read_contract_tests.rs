@@ -27,17 +27,27 @@ fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
         matching[0]["allOf"][0],
         json!({"$ref":"#/$defs/ForbiddenRevisionRequest"})
     );
-    let mut request_schema = matching[0].clone();
-    request_schema["$defs"] = schema["$defs"].clone();
-    let input = jsonschema::draft202012::options()
-        .build(&request_schema)
+    // Compile the complete shipped schema with its actual referenced resources.
+    let mut resources = jsonschema::Registry::new();
+    for text in [
+        include_str!("../../engineering/application/native-bitmap-brush-resources-v1.schema.json"),
+        include_str!("../../engineering/application/native-object-item-v1.schema.json"),
+        include_str!("../../engineering/application/native-font-assets-v1.schema.json"),
+        include_str!("../../engineering/application/native-property-metadata-v1.schema.json"),
+    ] {
+        let document: Value = serde_json::from_str(text).unwrap();
+        let id = document["$id"].as_str().unwrap().to_owned();
+        resources = resources
+            .add(id, jsonschema::Resource::from_contents(document))
+            .unwrap();
+    }
+    let registry = resources.prepare().unwrap();
+    let validator = jsonschema::draft202012::options()
+        .with_registry(&registry)
+        .build(&schema)
         .unwrap();
-    let output_schema = json!({"$ref":"#/$defs/ObjectHistoryReadResult", "$defs":schema["$defs"]});
-    let output = jsonschema::draft202012::options()
-        .build(&output_schema)
-        .unwrap();
-    assert!(input.is_valid(&envelope()));
-    assert!(output.is_valid(&response()["result"]));
+    assert!(validator.is_valid(&envelope()));
+    assert!(validator.is_valid(&response()));
     let branches = schema["$defs"]["ResponseBase"]["properties"]["result"]["oneOf"]
         .as_array()
         .unwrap();
@@ -49,7 +59,7 @@ fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
     for field in ["atRevision", "documentSnapshotId"] {
         let mut bad = envelope();
         bad["payload"].as_object_mut().unwrap().remove(field);
-        assert!(!input.is_valid(&bad));
+        assert!(!validator.is_valid(&bad));
     }
     for (field, value) in [
         ("extra", json!(true)),
@@ -59,11 +69,11 @@ fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
     ] {
         let mut bad = envelope();
         bad["payload"][field] = value;
-        assert!(!input.is_valid(&bad));
+        assert!(!validator.is_valid(&bad));
     }
     let mut bad = envelope();
     bad["expectedRevision"] = json!(7);
-    assert!(!input.is_valid(&bad));
+    assert!(!validator.is_valid(&bad));
     for field in ["undoDepth", "redoDepth"] {
         for value in [
             json!(-1),
@@ -71,17 +81,17 @@ fn published_history_schema_keeps_existing_branches_and_closes_new_shapes() {
             json!(true),
             json!(9007199254740992u64),
         ] {
-            let mut bad = response()["result"].clone();
-            bad[field] = value;
-            assert!(!output.is_valid(&bad));
+            let mut bad = response();
+            bad["result"][field] = value;
+            assert!(!validator.is_valid(&bad));
         }
-        let mut bad = response()["result"].clone();
-        bad.as_object_mut().unwrap().remove(field);
-        assert!(!output.is_valid(&bad));
+        let mut bad = response();
+        bad["result"].as_object_mut().unwrap().remove(field);
+        assert!(!validator.is_valid(&bad));
     }
-    let mut bad = response()["result"].clone();
-    bad["extra"] = json!(true);
-    assert!(!output.is_valid(&bad));
+    let mut bad = response();
+    bad["result"]["extra"] = json!(true);
+    assert!(!validator.is_valid(&bad));
 }
 #[test]
 fn registered_public_input_is_closed_bounded_and_duplicate_safe() {
