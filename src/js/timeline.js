@@ -184,7 +184,10 @@ function manualBakeCache(){
     else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
   });
 }
-function stopPlay(mode){if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
+function stopPlay(mode){
+  try{var diagnostics=window.NemoNativeObjectProjectDesktop,session=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);
+    if(diagnostics&&diagnostics.settingsDiagnostic)diagnostics.settingsDiagnostic(window,'stop',Object.assign({},session&&session.info(),{kind:mode||'user',frame:state.currentFrame}));}catch(_){}
+  if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   var nativeStop=nativePlayScheduler&&nativePlayScheduler.stop();
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}

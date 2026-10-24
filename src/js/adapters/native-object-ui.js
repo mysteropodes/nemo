@@ -132,6 +132,9 @@
         parent.insertBefore(marker,node);row.appendChild(node);node.hidden=false;node.style.display='';box.appendChild(row);prior.settings.moves.push(saved);
         function begin(){saved.gesture=Object.assign({},prior.settings.pin);}
         function guard(event){var dimension=entry[0]==='p-cw'||entry[0]==='p-ch',value=Number(node.value);
+          try{var diagnostic=root.NemoNativeObjectProjectDesktop;if(diagnostic&&diagnostic.settingsDiagnostic){
+            var session=ports.currentSession();diagnostic.settingsDiagnostic(root,event.type,Object.assign({},session&&session.info(),{
+              kind:dimension?'setCanvasSize':entry[0]==='proj-fps'?'setFps':entry[0]==='p-cbg'?'setCanvasBackground':undefined}));}}catch(_){}
           var invalid=dimension&&(!Number.isInteger(value)||value<1||value>4294967295||parseInt(node.value,10)!==value);
           if(invalid||saved.gesture&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return saved.gesture[k]===prior.settings.pin[k];})){
           if(event.preventDefault)event.preventDefault();if(event.stopImmediatePropagation)event.stopImmediatePropagation();}}

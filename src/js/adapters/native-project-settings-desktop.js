@@ -7,6 +7,8 @@
   function install(root){if(installed.has(root))return installed.get(root);
     var resume=null,refresh=null,retired=false,preparing=null;
     function current(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
+    function observe(event,value){try{var session=current(),info=session&&session.info(),api=root.NemoNativeObjectProjectDesktop;
+      if(api&&api.settingsDiagnostic)api.settingsDiagnostic(root,event,Object.assign({},info,value));}catch(_){} }
     function selection(){var state=root.state,indices=root._layerSel;if(!state||!Array.isArray(state.layers)||!Array.isArray(indices))return null;
       var uids=indices.map(function(i){return Number.isSafeInteger(i)&&i>=0&&state.layers[i]&&state.layers[i].layerUid;});
       return uids.every(function(uid){return typeof uid==='string'&&uid;})&&new Set(uids).size===uids.length?uids:null;}
@@ -38,7 +40,7 @@
         catch(_){resume=null;notice('FPS changed; the audio timeline could not refresh.');return false;}
       }
       if(resume){var restart=resume;resume=null;
-        if(owns(restart,session,info)&&same(restart.info,info)&&root.state.playing!==true&&restart.token.canResume()&&typeof root.startPlay==='function'){root.startPlay();if(root.state.playing!==true){notice('FPS changed; playback remains paused.');return false;}}
+        if(owns(restart,session,info)&&same(restart.info,info)&&root.state.playing!==true&&restart.token.canResume()&&typeof root.startPlay==='function'){observe('resume',{kind:'setFps'});root.startPlay();if(root.state.playing!==true){notice('FPS changed; playback remains paused.');return false;}}
       }
       return true;
     }
@@ -51,7 +53,7 @@
       else if(result.status!=='superseded'){resume=null;refresh=null;}
       if(!['applied-presented','unchanged','superseded'].includes(result.status))notice(
         result.status==='unavailable'?'Native project settings are unavailable.':'Project settings were not confirmed. Wait for synchronization before continuing.');
-      return result;}
+      observe('outcome',{kind:action&&action.kind,status:result.status});return result;}
     function unavailable(){return {status:'unavailable'};}
     function prepare(action){
       return new Promise(function(resolve){var kind=action&&action.kind;
@@ -61,11 +63,15 @@
       });
     }
     function edit(action){
+      observe('intent',{kind:action&&action.kind});
       if(retired)return Promise.resolve(unavailable());if(preparing)return prepare(action);
       if(action&&action.kind==='setFps'&&Number.isFinite(action.fps)&&root.state.playing===true){
         var session=current(),info=session&&session.info();if(!session||!info||typeof root.stopPlay!=='function')return Promise.resolve(unavailable());
         var plan=context(session,info),work={items:new Map()};resume=plan;preparing=work;var result=prepare(action);
-        Promise.resolve().then(function(){return root.stopPlay('native-settings-intent');}).then(function(receipt){
+        // Retire the clock and supersede its pending frame in this same turn.
+        // Deferring Stop lets that frame publish after plan captured its context.
+        var stopped;try{stopped=root.stopPlay('native-settings-intent');}catch(error){stopped=Promise.reject(error);}
+        Promise.resolve(stopped).then(function(receipt){
           if(preparing!==work)return;preparing=null;
           if(retired||!receipt||receipt.presented!==true||!receipt.token||!receipt.token.wasNative||!owns(plan,current(),current().info())||root.state.playing===true){
             resume=null;refresh=null;work.items.forEach(function(item){item.resolve(unavailable());});return;

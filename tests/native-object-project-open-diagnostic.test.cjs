@@ -6,6 +6,39 @@ const Project=require('../src/js/adapters/native-object-project.js');
 const Workflow=require('../src/js/application/native-object-save-as-workflow.js');
 const Ack=require('../src/js/application/native-object-saved-acknowledgement.js');
 const turn=()=>new Promise(setImmediate);
+test('settings chronology is bounded, correlated, sanitized and independent of the Open ring',async()=>{
+  const files=new Map(),writes=[],root={__TAURI__:{path:{appDataDir:async()=>'/isolated/'},fs:{mkdir:async()=>{},
+    writeTextFile:async(path,bytes)=>{files.set(path,bytes);writes.push(path);},
+    rename:async(from,to)=>{files.set(to,files.get(from));files.delete(from);}}}};
+  const pin={instanceId:'41fe5026-a1ec-4a5d-9cbd-e88d5860402e',documentId:'native-object-document-2',
+    documentSnapshotId:'native-object:native-object-document-2:9',contentRevision:9,lifecycleGeneration:2};
+  Desktop.settingsDiagnostic(root,'input',{...pin,kind:'setCanvasSize'});
+  Desktop.settingsDiagnostic(root,'dispatch',{...pin,requestId:'project-project-settings-7',expectedRevision:9,kind:'setCanvasSize'});
+  Desktop.settingsDiagnostic(root,'change',{...pin,kind:'setCanvasSize'});
+  Desktop.settingsDiagnostic(root,'metadata',{...pin,contentRevision:10});
+  Desktop.settingsDiagnostic(root,'acknowledged',{...pin,fromRevision:9,toRevision:10});
+  await turn();const file='/isolated/diagnostics/native-settings.json',first=JSON.parse(files.get(file));
+  assert.deepEqual(first.events.map(row=>row.event),['input','dispatch','change','metadata','acknowledged']);
+  assert.deepEqual(first.events.map(row=>row.sequence),[1,2,3,4,5]);
+  assert.equal(first.events[1].requestId,'project-project-settings-7');assert.equal(first.events[4].toRevision,10);
+  for(let i=0;i<150;i++)Desktop.openDiagnostic(root,'camera-presented','canvas');
+  await turn();assert.equal(files.get(file),JSON.stringify(first));
+  let getterCalls=0;const hostile={get documentId(){getterCalls++;throw Error('PRIVATE');},instanceId:'/Users/private',
+    documentSnapshotId:'private document',requestId:'PRIVATE PATH',kind:'PRIVATE',status:'PRIVATE',contentRevision:NaN};
+  for(let i=0;i<150;i++)Desktop.settingsDiagnostic(root,'outcome',hostile);
+  Desktop.settingsDiagnostic(root,'PRIVATE EVENT',hostile);await turn();
+  const last=files.get(file),value=JSON.parse(last);assert.equal(value.events.length,128);assert.equal(value.events.at(-1).sequence,155);
+  assert.equal(getterCalls,0);assert.doesNotMatch(last,/PRIVATE|Users|private document/);
+  assert.ok(writes.every(path=>path.endsWith('.pending.json')));
+});
+test('settings diagnostic missing, failing and hung sinks never delay or throw to the caller',async()=>{
+  for(const fail of['missing','throw','reject','hang']){
+    let writes=0;const root=fail==='missing'?{}:{__TAURI__:{path:{appDataDir:async()=>'/isolated'},fs:{mkdir:async()=>{},
+      writeTextFile(){writes++;if(fail==='throw')throw Error('PRIVATE');if(fail==='reject')return Promise.reject(Error('PRIVATE'));return new Promise(()=>{});},rename:async()=>{}}}};
+    for(let i=0;i<200;i++)assert.equal(Desktop.settingsDiagnostic(root,'intent',{kind:'setFps'}),undefined);
+    await turn();assert.equal(writes,fail==='missing'?0:1);
+  }
+});
 function fixture(mode){
   let installed=false,previews=0,visible=true,pendingBytes=null;
   const writes=[],commands=[],effects=[],notices=[];
