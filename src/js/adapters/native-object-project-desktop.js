@@ -21,7 +21,7 @@
     return bound.compose(base,policy);
   }
   var stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
-  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view',
+  var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view','display-filter',
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
     'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
   function safeCode(event,code){
@@ -190,6 +190,7 @@
     }
     return Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
       viewMode:function(){return root.state&&root.state.cameraView===true?'stored-camera':'canvas';},
+      displayFilter:function(){return root.SMLabs&&typeof root.SMLabs.getViewFilter==='function'?root.SMLabs.getViewFilter():'none';},
       subscribeWindowOcclusion:root.__TAURI__.event&&typeof root.__TAURI__.event.listen==='function'?async function(hint,cancel){
         var closing=function(){cancel(new Error('Native project window closed'));},remove,detached=false;
         var observesClose=typeof root.addEventListener==='function'&&typeof root.removeEventListener==='function';

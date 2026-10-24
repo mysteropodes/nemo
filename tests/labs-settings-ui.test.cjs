@@ -37,11 +37,28 @@ function fixture(mode,file,options={}){
  for(const name of ['ensureSymmetryAxis','ensureSymmetryRadialCenter','syncSymmetryPanelVisibility','resetSymmetryGuide','resetPerspectiveVPs'])context[name]=function(){assert.equal(this,win);trace.push(['guide',name]);};
  context.setSymmetryMode=function(v){assert.equal(this,win);state.symmetryMode=v;trace.push(['symmode',v]);};context.setPerspectiveMode=function(v){assert.equal(this,win);state.perspectiveMode=v;trace.push(['perspmode',v]);};
  context.renderLabsPanel=()=>trace.push(['other-settings']);context.renderLabsFloatPanel=()=>trace.push(['other-floating']);
+ if(options.actualFilter)vm.runInContext(fs.readFileSync(path.join(ROOT,'src/js/labs/view-filter.js'),'utf8'),context,{filename:'view-filter.js'});
  vm.runInContext(source(file),context,{filename:file});
  const snapshotNode=n=>({tag:n.tag,value:n.value,text:n.textContent,html:n.innerHTML,class:n.className,checked:n.checked,disabled:n.disabled,style:n.style,dataset:n.dataset,children:n.children.map(snapshotNode)});
  return {context,state,L,nodes,trace,storage,document,timers,vps,boot(){for(const fn of events['doc:DOMContentLoaded']||[])fn();},load(){for(const fn of events.load||[])fn();},resize(){for(const fn of events.resize||[])fn();},snapshot(){return copy({trace,state,vps,storage:[...storage],nodes:[...nodes].map(([id,n])=>[id,snapshotNode(n)])});},all(id){return descendants(nodes.get(id));}};
 }
 function parity(file,options,scenario){const results=modes.map(mode=>{const f=fixture(mode,file,options);scenario(f);return f;});if(results.length===2)assert.deepEqual(results[1].snapshot(),results[0].snapshot());return results.at(-1);}
+
+test('actual Settings filter selector restores its preset and applies grayscale/dim through the real provider',()=>{
+ const f=fixture('actual','labs-panel.js',{actualFilter:true,storage:{'nemo-labs-viewfilter':'1','nemo-labs-viewfilter-preset':'contrast'}});
+ f.context.renderLabsPanel();
+ const select=()=>f.all('labs-tools-list').find(n=>n.tag==='select'&&n.children.some(c=>c.value==='values'));
+ assert.equal(select().value,'contrast');
+ select().value='values';select().fire('change');
+ assert.equal(f.nodes.get('canvas-area').style.filter,'grayscale(1)');
+ f.context.renderLabsPanel();assert.equal(select().value,'values');
+ select().value='dim';select().fire('change');
+ assert.equal(f.nodes.get('canvas-area').style.filter,'brightness(.55)');
+ const row=f.nodes.get('labs-tools-list').children.find(n=>descendants(n).some(c=>c.textContent==='en:labsPanelLabelViewFilter'));
+ const checkbox=descendants(row).find(n=>n.type==='checkbox');checkbox.checked=false;checkbox.fire('change');
+ assert.equal(f.L.getViewFilter(),'none');assert.equal(f.nodes.get('canvas-area').style.filter,'');
+ assert.equal(select(),undefined);
+});
 
 test('settings exposes original renderer without early rendering and defers language registration',()=>{parity('labs-panel.js',{},f=>{assert.equal(f.nodes.get('labs-tools-list').children.length,0);assert.equal((f.context.SM.afterI18n||[]).length,0);f.load();assert.equal(f.context.SM.afterI18n.length,1);f.context.SM.afterI18n[0]();assert.ok(f.nodes.get('labs-tools-list').children.length>10);});});
 test('settings checkbox invokes same registry receiver and refreshes both entry points',()=>{const f=parity('labs-panel.js',{},f=>{f.context.renderLabsPanel();const cb=f.all('labs-tools-list').find(n=>n.tag==='input'&&n.type==='checkbox');cb.checked=true;cb.fire('change');assert.equal(f.L.isOn('predictive-stroke'),true);assert.ok(f.trace.some(x=>x[0]==='other-floating'));});assert.ok(f.trace.some(x=>x[0]==='enable'));});
