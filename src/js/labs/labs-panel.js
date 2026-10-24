@@ -125,10 +125,10 @@
       extra: function (c) {
         var row = subRow();
         var sel = mkSelect([
-          { value: 'grayscale', label: SM.t('labsPanelOptGrayscale') },
+          { value: 'values', label: SM.t('labsPanelOptGrayscale') },
           { value: 'contrast', label: SM.t('labsPanelOptContrast') },
           { value: 'dim', label: SM.t('labsPanelOptDim') },
-        ], 'grayscale');
+        ], window.SMLabs.getViewFilter() === 'none' ? 'values' : window.SMLabs.getViewFilter());
         sel.addEventListener('change', function () { window.SMLabs.setViewFilter(sel.value); });
         row.appendChild(sel);
         c.appendChild(row);
