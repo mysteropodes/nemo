@@ -429,7 +429,10 @@
     else onUp(event);
   }
   function onLeave() {
-    cursorWorld = null; if (native()) cancelNative();
+    cursorWorld = null;
+    // Native cancellation redraws its own active ghost. A legacy repaint
+    // here can invalidate another tool's captured presentation on child leave.
+    if (native()) { cancelNative(); return; }
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function dispose() {
