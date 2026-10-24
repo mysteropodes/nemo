@@ -66,6 +66,7 @@
         "src/native_import_contract.rs",
         "src/native_import_contract_tests.rs",
         "src/native_object_edit_contract.rs",
+        "src/native_object_edit_clipboard.rs",
         "src/native_object_edit_contract_tests.rs",
         "src/native_object_edit_receipt_tests.rs",
         "src/native_item_contract.rs",

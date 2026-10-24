@@ -15,6 +15,7 @@
   const SHAPE = {
     deleteShapes: ['selection.delete', 'selection-delete'], duplicateShapes: ['selection.duplicate', 'selection-duplicate'],
     splitLayer: ['layer.split', 'layer-split'], pasteShapes: ['clipboard.paste', 'clipboard-paste'],
+    copyShapes: ['clipboard.copy', 'clipboard-copy'], cutShapes: ['clipboard.cut', 'clipboard-cut'],
   };
   const has = (value, key) => !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
 
@@ -88,9 +89,6 @@
       duplicateLayer: (input) => layerEdit('layer.duplicate', 'layer-duplicate', input, (b) => [b.layerUid], false),
       renameLayer: (input) => layerEdit('layer.rename', 'layer-rename', input, (b) => [b.layerUid], false),
       reorderLayers: (input) => layerEdit('layer.reorder', 'layer-reorder', input, (b) => (Array.isArray(b.layerUids) ? b.layerUids : []), true),
-      // The compact receipt cannot carry a clip, so the native declaration has no copy/cut operation to call.
-      copyShapes: () => Promise.resolve(fail('clipboard.copy', 'unavailable', { reason: 'native_declaration_absent' })),
-      cutShapes: () => Promise.resolve(fail('clipboard.cut', 'unavailable', { reason: 'native_declaration_absent' })),
       selectShapes: editor.select,
       shapeSelection: editor.selection,
     };
@@ -98,6 +96,6 @@
     return Object.freeze(api);
   }
   return Object.freeze({ createLayerLifecycleIntent, OPERATIONS: Object.freeze([
-    'layer.delete', 'layer.duplicate', 'layer.rename', 'layer.reorder', 'selection.delete', 'selection.duplicate', 'layer.split', 'clipboard.paste',
+    'layer.delete', 'layer.duplicate', 'layer.rename', 'layer.reorder', 'selection.delete', 'selection.duplicate', 'layer.split', 'clipboard.paste', 'clipboard.copy', 'clipboard.cut',
   ].map((suffix) => PREFIX + suffix)) });
 }));

@@ -1,5 +1,5 @@
 /* L02-J closed declarations of the native object edit operations (layer lifecycle, groups, selection edit,
- * clipboard paste, boolean/erase/flatten). Pure validation with the interface of the font contract (admitted,
+ * clipboard copy/cut/paste, boolean/erase/flatten). Pure validation with the interface of the font contract (admitted,
  * requiresRevision, payload, result, correlate, paths); `compose(base)` joins another contract of that interface.
  * native-object-edit-seam.js performs the single composition the common v2 SDK injects.
  * No owner, no writer, no host. */
@@ -58,7 +58,7 @@
     });
   }
   function clipRecord(value, label) {
-    exact(value, ['schemaVersion', 'family', 'target', 'geometry'], ['fill', 'vector', 'vectorExt'], label);
+    exact(value, ['schemaVersion', 'family', 'target', 'geometry'], ['fill', 'vector', 'vectorExt', 'effects'], label);
     exact(value.target, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], `${label}.target`);
     exact(value.target.frameScope, ['kind', 'frame'], [], `${label}.target.frameScope`);
     if (!plain(value.geometry)) fail(`${label}.geometry must be a plain object`);
@@ -106,6 +106,8 @@
     'boolean.erase': ['object.boolean.erase', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['strokeId', 'strokeId'], ['footprint', 'footprint']]],
     'boolean.flatten': ['object.boolean.flatten', 'command', [['layerUid', 'uid'], ['contextId', 'contextId'], ['frame', 'frame'], ['groupId', 'groupId']]],
     'fill.trace':['object.fill.trace','command',[['layerUid','uid'],['contextId','contextId'],['frame','frame'],['point','point'],['color','color'],['opacity','opacity'],['remove','flag']]],
+    'clipboard.copy': ['object.clipboard.copy', 'clipboard-copy', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
+    'clipboard.cut': ['object.clipboard.cut', 'clipboard-cut', [['contextId', 'contextId'], ['layerUid', 'uid'], ['frame', 'frame'], ['mode', 'editMode'], ['strokeIds', 'strokeIds0']]],
   };
   const OPERATIONS = Object.freeze(Object.keys(SPEC).map((suffix) => PREFIX + suffix));
   const spec = (operation) => (typeof operation === 'string' && operation.startsWith(PREFIX) && has(SPEC, operation.slice(PREFIX.length)) ? SPEC[operation.slice(PREFIX.length)] : null);
@@ -121,6 +123,14 @@
   function result(operation, value) {
     const entry = spec(operation);
     if (!entry) fail('native object edit operation is not declared');
+    if (entry[1] === 'clipboard-copy' || entry[1] === 'clipboard-cut') {
+      exact(value, ['applied', 'historyEntriesAdded', 'clipboard'], [], 'clipboard result');
+      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) fail('invalid clipboard disposition');
+      if (entry[1] === 'clipboard-copy' && value.applied !== false) fail('copy cannot change document history');
+      if (entry[1] === 'clipboard-cut' && value.applied !== (value.clipboard !== null)) fail('cut disposition must match clipboard presence');
+      if (value.clipboard !== null) clip(value.clipboard, 'clipboard result.clipboard');
+      return;
+    }
     if (entry[1] === 'created') {
       exact(value, ['applied', 'historyEntriesAdded', 'layerUid'], [], 'layer duplicate result');
       if (value.applied !== true || value.historyEntriesAdded !== 1) fail('invalid layer duplicate disposition');
@@ -136,10 +146,14 @@
     if (response.documentId !== request.documentId && !replaced) fail('object edit response document mismatch');
     if (!response.ok) return;
     if (response.contentRevision !== request.expectedRevision + (response.result.applied ? 1 : 0)) fail('object edit receipt revision mismatch');
+    if (/\.clipboard\.(?:copy|cut)$/.test(request.operation) && response.result.clipboard !== null &&
+        ['contextId', 'layerUid', 'frame'].some((key) => response.result.clipboard[key] !== request.payload[key])) fail('clipboard source selector mismatch');
   }
   // Every opaque authored string may legitimately start with data: or blob:; the SDK only inspects it as text.
   const OPAQUE = Object.freeze({ has: (at) => /^payload\./.test(at) || at === 'result.layerUid' });
-  const own = Object.freeze({ admitted, requiresRevision: admitted, payload, result, correlate, paths: (operation) => (admitted(operation) ? OPAQUE : null) });
+  const CLIP_OPAQUE = Object.freeze({ has: (at) => OPAQUE.has(at) || /^result\.clipboard(?:\.|$)/.test(at) });
+  const paths = (operation) => admitted(operation) ? (/\.clipboard\.(?:copy|cut)$/.test(operation) ? CLIP_OPAQUE : OPAQUE) : null;
+  const own = Object.freeze({ admitted, requiresRevision: admitted, payload, result, correlate, paths });
 
   // Same interface as the font contract, so one injected seam serves both.
   function compose(base) {
@@ -150,7 +164,7 @@
       payload: (op, value, envelope) => (admitted(op) ? payload(op, value) : base.payload(op, value, envelope)),
       result: (op, value) => (admitted(op) ? result(op, value) : base.result(op, value)),
       correlate: (request, response) => (admitted(request.operation) ? correlate(request, response) : base.correlate(request, response)),
-      paths: (op) => (admitted(op) ? OPAQUE : base.paths(op)),
+      paths: (op) => (admitted(op) ? paths(op) : base.paths(op)),
     });
   }
   function commandOf(operation) { const entry = spec(operation); return entry ? entry[0] : null; }

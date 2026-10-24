@@ -12,7 +12,7 @@ function createHarness(options = {}) {
     revision: options.revision === undefined ? 7 : options.revision,
     layers: (options.layers || ['layer-a', 'layer-b', 'layer-c']).slice(),
     strokes: clone(options.strokes || {}),
-    sent: [], pins: 0, submits: 0, declaredChecks: 0, counter: 0,
+    sent: [], pins: 0, submits: 0, declaredChecks: 0, strokeReads: 0, counter: 0,
   };
   const step = options.step || (() => ({ applied: true }));
   const transport = {
@@ -22,9 +22,10 @@ function createHarness(options = {}) {
       if (plan.drop) throw new Error(plan.drop);
       const base = { apiVersion: 2, requestId: request.requestId, instanceId: 'instance-A', documentId: 'document-A' };
       if (plan.error) return Object.assign(base, { contentRevision: state.revision, ok: false, error: plan.error });
-      const applied = plan.applied !== false;
+      const applied = plan.applied !== false && request.operation !== 'command.document.object.clipboard.copy';
       const revision = request.expectedRevision + (applied ? 1 : 0);
-      const result = plan.result || { applied, historyEntriesAdded: applied ? 1 : 0 };
+      const clipboard = /\.clipboard\.(?:copy|cut)$/.test(request.operation);
+      const result = plan.result || (clipboard ? { applied, historyEntriesAdded: applied ? 1 : 0, clipboard: plan.clipboard === undefined ? null : plan.clipboard } : { applied, historyEntriesAdded: applied ? 1 : 0 });
       const response = Object.assign(base, { contentRevision: plan.revision === undefined ? revision : plan.revision, ok: true, result });
       // The owner publishes on a later turn, so two unserialized intents would read the same pin.
       return new Promise((resolve) => setImmediate(() => {
@@ -56,7 +57,7 @@ function createHarness(options = {}) {
     requestId(label) { state.counter += 1; return label + '-' + state.counter; },
   };
   if (!options.noStrokeProjection) {
-    ports.strokeIds = (target) => (Array.isArray(state.strokes[target.layerUid]) ? state.strokes[target.layerUid].slice() : null);
+    ports.strokeIds = (target) => { state.strokeReads += 1; return Array.isArray(state.strokes[target.layerUid]) ? state.strokes[target.layerUid].slice() : null; };
   }
   return { ports, state, adapter };
 }

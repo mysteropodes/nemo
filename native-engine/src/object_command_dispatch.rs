@@ -333,7 +333,7 @@ impl NativeObjectHistory {
             } else if Self::boolean_operation(&request.operation) {
                 self.dispatch_boolean(&request.operation, &request.payload)
             } else if Self::selection_edit_operation(&request.operation) {
-                self.dispatch_selection_edit(&request.operation, &request.payload)
+                self.dispatch_selection_edit(request)
             } else if request.operation == OP_IMAGE_MESH_EDIT {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;

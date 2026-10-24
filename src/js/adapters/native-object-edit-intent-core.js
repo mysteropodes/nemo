@@ -75,6 +75,19 @@
       if (!response || response.requestId !== request.requestId || typeof response.ok !== 'boolean') {
         return failure(operation, 'transport_failed', { requestId: request.requestId, indeterminate: true, message: 'uncorrelated native response' });
       }
+      const clipboardOperation = operation === 'command.document.object.clipboard.copy' || operation === 'command.document.object.clipboard.cut';
+      if (clipboardOperation) {
+        try {
+          const fields = ['apiVersion', 'requestId', 'instanceId', 'documentId', 'contentRevision', 'ok', response.ok ? 'result' : 'error'];
+          if (response.apiVersion !== 2 || !safeRevision(response.contentRevision) ||
+              Object.keys(response).length !== fields.length || fields.some((key) => !Object.prototype.hasOwnProperty.call(response, key)) ||
+              contract.bytes(JSON.stringify(response)) > MAX_REQUEST_BYTES) throw new TypeError('invalid bounded clipboard response');
+          if (response.ok) contract.result(operation, response.result);
+          contract.correlate(request, response);
+        } catch (error) {
+          return failure(operation, 'transport_failed', { requestId: request.requestId, indeterminate: true, message: String(error && error.message || error) });
+        }
+      }
       if (!response.ok) {
         const code = response.error && response.error.code || 'unavailable';
         return failure(operation, code, { requestId: request.requestId, revision: response.contentRevision, stale: code === 'stale_revision', message: response.error && response.error.message });
@@ -90,6 +103,7 @@
         synchronized: pinOk(after) && after.contentRevision === response.contentRevision,
       };
       if (typeof response.result.layerUid === 'string') outcome.layerUid = response.result.layerUid;
+      if (clipboardOperation) outcome.clipboard = JSON.parse(JSON.stringify(response.result.clipboard));
       return Object.freeze(outcome);
     }
     // One pinned mutation at a time. `exclusive(body)` runs `body(exec)` in the runner's turn, so the caller's own reads

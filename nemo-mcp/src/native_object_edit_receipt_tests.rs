@@ -7,6 +7,17 @@ use serde_json::{json, Value};
 fn receipts_are_the_compact_command_result_and_a_duplicate_names_its_minted_layer() {
     for (suffix, _) in valid() {
         let operation = format!("{P}{suffix}");
+        if suffix == "clipboard.copy" || suffix == "clipboard.cut" {
+            assert!(result(
+                &operation,
+                &json!({"applied":false,"historyEntriesAdded":0,"clipboard":null})
+            ));
+            assert!(!result(
+                &operation,
+                &json!({"applied":false,"historyEntriesAdded":0})
+            ));
+            continue;
+        }
         if suffix == "layer.duplicate" {
             assert!(result(
                 &operation,
@@ -60,7 +71,14 @@ fn the_shared_result_check_routes_the_object_edit_operations_through_this_module
         let shared = |body: &Value, receipt: &Value| {
             crate::native_contract::validate_result(&operation, "document-A", body, receipt)
         };
-        if suffix == "layer.duplicate" {
+        if suffix == "clipboard.copy" || suffix == "clipboard.cut" {
+            assert!(shared(
+                &payload,
+                &json!({"applied":false,"historyEntriesAdded":0,"clipboard":null})
+            ));
+            assert!(!shared(&payload, &applied));
+            assert!(!shared(&payload, &noop));
+        } else if suffix == "layer.duplicate" {
             assert!(shared(&payload, &minted), "{suffix}");
             for flawed in [
                 &applied,
@@ -164,9 +182,12 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
             "native.object.layer-lifecycle"
         }
         s if s.starts_with("group.") => "native.object.group",
-        "selection.delete" | "selection.duplicate" | "layer.split" | "clipboard.paste" => {
-            "native.object.selection-edit"
-        }
+        "selection.delete"
+        | "selection.duplicate"
+        | "layer.split"
+        | "clipboard.paste"
+        | "clipboard.copy"
+        | "clipboard.cut" => "native.object.selection-edit",
         "fill.trace" => "native.object.fill",
         _ => "native.object.boolean",
     };
@@ -183,7 +204,7 @@ fn the_catalog_declares_each_operation_once_under_five_owner_descriptors() {
         assert_eq!(descriptor["resourceBoundary"]["maxRequestBytes"], 4096);
         declared += 1;
     }
-    assert_eq!(declared, 18);
+    assert_eq!(declared, 20);
 }
 
 #[test]
@@ -224,5 +245,114 @@ fn every_descriptor_example_is_a_valid_request_with_a_correlated_valid_response(
             seen += 1;
         }
     }
-    assert_eq!(seen, 18, "one copyable example per declared operation");
+    assert_eq!(seen, 20, "one copyable example per declared operation");
+}
+
+fn literal_clip() -> Value {
+    json!({"contextId":"scene-root","layerUid":"layer-a","frame":2,"records":[{
+        "schemaVersion":1,"family":"closed-solid-fill-cubic-path",
+        "target":{"contextId":"scene-root","layerUid":"layer-a","strokeId":"stroke-1","frameScope":{"kind":"authored","frame":0}},
+        "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative","segments":[{"point":{"x":0,"y":0},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}},{"point":{"x":10,"y":10},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}}]},
+        "fill":{"kind":"solid","r":1,"g":0,"b":0,"a":1}
+    }]})
+}
+
+#[test]
+fn clipboard_results_are_closed_and_copy_and_cut_have_distinct_dispositions() {
+    let packet = literal_clip();
+    for suffix in ["clipboard.copy", "clipboard.cut"] {
+        let op = format!("{P}{suffix}");
+        let applied = suffix == "clipboard.cut";
+        let good =
+            json!({"applied":applied,"historyEntriesAdded":u64::from(applied),"clipboard":packet});
+        assert!(result(&op, &good));
+        let mut mutations = vec![
+            json!({"applied":true,"historyEntriesAdded":1,"clipboard":null}),
+            json!({"applied":false,"historyEntriesAdded":1,"clipboard":packet}),
+            json!({"applied":true,"historyEntriesAdded":0,"clipboard":packet}),
+            json!({"applied":"false","historyEntriesAdded":0,"clipboard":packet}),
+            json!({"applied":false,"historyEntriesAdded":0,"clipboard":{}}),
+        ];
+        for key in ["applied", "historyEntriesAdded", "clipboard"] {
+            let mut missing = good.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            mutations.push(missing);
+        }
+        let mut extra = good.clone();
+        extra["extra"] = json!(true);
+        mutations.push(extra);
+        let mut extra = good.clone();
+        extra["clipboard"]["extra"] = json!(true);
+        mutations.push(extra);
+        let mut extra = good.clone();
+        extra["clipboard"]["records"][0]["extra"] = json!(true);
+        mutations.push(extra);
+        let mut opposite = good.clone();
+        opposite["applied"] = json!(!applied);
+        opposite["historyEntriesAdded"] = json!(u64::from(!applied));
+        mutations.push(opposite);
+        for bad in mutations {
+            assert!(!result(&op, &bad), "{suffix}: {bad}");
+        }
+    }
+}
+
+#[test]
+fn clipboard_correlation_uses_requested_cell_not_the_inherited_record_frame() {
+    for suffix in ["clipboard.copy", "clipboard.cut"] {
+        let payload = valid()
+            .into_iter()
+            .find(|(name, _)| *name == suffix)
+            .unwrap()
+            .1;
+        let command = envelope(suffix, payload);
+        let applied = suffix == "clipboard.cut";
+        let good = json!({"apiVersion":2,"requestId":"edit-1","instanceId":"instance-A","documentId":"document-A",
+            "contentRevision":7+u64::from(applied),"ok":true,"result":{"applied":applied,"historyEntriesAdded":u64::from(applied),"clipboard":literal_clip()}});
+        assert!(response_matches(&command, &response(good.clone())));
+        for (key, wrong) in [
+            ("contextId", json!("foreign-context")),
+            ("layerUid", json!("foreign-layer")),
+            ("frame", json!(0)),
+        ] {
+            let mut bad = good.clone();
+            bad["result"]["clipboard"][key] = wrong;
+            assert!(!response_matches(&command, &response(bad)), "{key}");
+        }
+        let mut bad = good.clone();
+        bad["result"]["clipboard"]["unexpected"] = json!(true);
+        assert!(!response_matches(&command, &response(bad)));
+        let mut bad = good;
+        bad["contentRevision"] = json!(9);
+        assert!(!response_matches(&command, &response(bad)));
+    }
+}
+
+#[test]
+fn clipboard_effect_presence_survives_both_result_and_paste_admission() {
+    for effects in [
+        None,
+        Some(Value::Null),
+        Some(json!([])),
+        Some(json!([{"type":"blur","enabled":false,"p1":null,"p2":0,"keys":null}])),
+    ] {
+        let mut packet = literal_clip();
+        if let Some(effects) = effects {
+            packet["records"][0]["effects"] = effects;
+        }
+        for suffix in ["clipboard.copy", "clipboard.cut"] {
+            let applied = suffix == "clipboard.cut";
+            assert!(result(
+                &format!("{P}{suffix}"),
+                &json!({"applied":applied,"historyEntriesAdded":u64::from(applied),"clipboard":packet})
+            ));
+        }
+        let mut paste = valid()
+            .into_iter()
+            .find(|(name, _)| *name == "clipboard.paste")
+            .unwrap()
+            .1;
+        paste["clip"] = packet;
+        assert!(request(&format!("{P}clipboard.paste"), &paste));
+    }
 }

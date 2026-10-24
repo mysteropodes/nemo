@@ -6,7 +6,7 @@ const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const nonblank = (text) => text.split('\n').filter((line) => line.trim()).length;
 const FAMILIES = ['layer-lifecycle', 'group', 'selection-edit', 'boolean', 'fill'];
-const RUST = ['src/native_object_edit_contract.rs', 'src/native_object_edit_contract_tests.rs', 'src/native_object_edit_receipt_tests.rs'];
+const RUST = ['src/native_object_edit_contract.rs', 'src/native_object_edit_clipboard.rs', 'src/native_object_edit_contract_tests.rs', 'src/native_object_edit_receipt_tests.rs'];
 const MODULES = [
   ['app.native.object.edit.contract', 'domain', 'native-object-edit-contract.js', 'Domain/application'],
   ['app.native.object.edit.intent.core', 'domain', 'native-object-edit-intent-core.js', 'Domain/application'],
@@ -32,7 +32,7 @@ function assertBootstrap(html) {
   assert.equal(new Set(positions).size, ORDER.length);
 }
 
-test('the five capability descriptors are embedded exactly once and declare 18 unique operations', () => {
+test('the five capability descriptors are embedded exactly once and declare 20 unique operations', () => {
   const rust = read('nemo-mcp/src/capabilities.rs');
   const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
   assert.ok(start >= 0);
@@ -46,12 +46,12 @@ test('the five capability descriptors are embedded exactly once and declare 18 u
   const operations = descriptors.flatMap((entry) => entry.operations);
   assert.equal(new Set(operations).size, operations.length, 'a native operation is declared by one descriptor only');
   assert.equal(new Set(descriptors.map((entry) => entry.id)).size, descriptors.length);
-  assert.equal(operations.filter((operation) => /^command\.document\.object\.(?:layer\.(?:delete|duplicate|rename|reorder|split)|group\.|selection\.|clipboard\.paste|boolean\.|fill\.trace)/.test(operation)).length, 18);
+  assert.equal(operations.filter((operation) => /^command\.document\.object\.(?:layer\.(?:delete|duplicate|rename|reorder|split)|group\.|selection\.|clipboard\.(?:copy|cut|paste)|boolean\.|fill\.trace)/.test(operation)).length, 20);
   const policy = descriptors.find((entry) => entry.id === 'native.layer-policy');
   assert.deepEqual(policy.operations, ['command.document.object.layer.policy.edit'], 'the F06 declaration is untouched');
 });
 
-test('the Rust contract and its two test children are members of the MCP transport module in both Rust profiles and exist', () => {
+test('the Rust contract and its clipboard and test children are members of the MCP transport module in both Rust profiles and exist', () => {
   const profile = JSON.parse(read('engineering/boundaries/profiles/mcp-rust.profile.json'));
   const transport = profile.modules.filter((module) => module.id === 'mcp.transport');
   assert.equal(transport.length, 1);
