@@ -25,7 +25,12 @@
     },
     notice:tabAddNotice
   });
-  var nativeInactiveTabs=window.NemoNativeObjectInactiveProjectTabs.create(window,{owner:function(){var s=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);return s&&s.identity();},invoke:function(c,a){return window.__TAURI__.core.invoke(c,a);},requestId:function(){return window.crypto.randomUUID();},baseName:function(p){return window.SMProjectDocument.baseName(p);},commit:function(m){var t=tabs.find(function(x){return x.nativeInactiveProject&&x.nativeInactiveProject.preparationToken===m.preparationToken;});if(t){t.nativeInactiveProject=m;t.name=m.name;t.path=m.path;renderTabBar();return true;}tabs.push({id:makeTabId(),name:m.name,path:m.path,json:null,nativeInactiveProject:m});renderTabBar();return true;},remove:function(m){var i=tabs.findIndex(function(x){return x.nativeInactiveProject&&x.nativeInactiveProject.preparationToken===m.preparationToken;});if(i<0)return false;tabs.splice(i,1);renderTabBar();return true;},notice:tabAddNotice});
+  var nativeTabsUI=window.NemoNativeObjectProjectTabsUI;
+  function readNativeTabsUI(){return {tabs:tabs,activeTabId:activeTabId,path:currentPath,name:currentName};}
+  var nativeInactiveTabs=nativeTabsUI.bind(window,{read:readNativeTabsUI,makeId:makeTabId,
+    file:function(){return nativeSavedUI&&nativeSavedUI.nativeObject;},dirty:isDirty,notice:tabAddNotice,render:renderTabBar,
+    activateTab:function(id,path,name){activeTabId=id;currentPath=path;currentName=name;updateCurrentLabel();}
+  });
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
@@ -618,19 +623,8 @@
     }
     return afterMaybe(releaseNative('tab-close'),enterBlank);
   }
-  function startTabRename(id){
-    var el=document.querySelector('.project-tab[data-tab="'+id+'"] .pt-name');if(!el)return;
-    var t=tabs.find(function(t){return t.id===id;});if(!t)return;
-    var input=document.createElement('input');input.className='pt-rename-input';input.value=t.name;
-    el.replaceWith(input);input.focus();input.select();
-    function commit(){
-      var v=input.value.trim()||t.name;t.name=v;
-      if(id===activeTabId){currentName=v;updateCurrentLabel();}
-      renderTabBar();
-    }
-    input.addEventListener('blur',commit);
-    input.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')input.blur();else if(e.key==='Escape'){input.value=t.name;input.blur();}});
-  }
+  function startTabRename(id){return nativeTabsUI.rename(window,id,{read:readNativeTabsUI,render:renderTabBar,
+    renameActive:function(value){currentName=value;updateCurrentLabel();}});}
   // Per-tab "unsaved changes" dirty state. The active tab's own document
   // lives in live `state`, not in its tab.json (that only gets refreshed on
   // switch-away by snapshotActiveIntoTab) — so it needs isDirty()'s live
@@ -640,30 +634,16 @@
   function tabIsDirty(t){
     return t.id===activeTabId?isDirty():!!t.dirty;
   }
-  function renderTabBar(){
-    var add=document.getElementById('project-tab-add');
-    if(add&&nativeSavedUI&&nativeSavedUI.nativeObject){add.setAttribute('data-i18n-title','newProjectHdr');add.title=SM.t('newProjectHdr');}
-    SMProjectEntry.renderTabs(document,{
-      readRows:function(){
-        return tabs.map(function(t){
-          return {id:t.id,name:t.name,active:t.id===activeTabId,dirty:tabIsDirty(t)};
-        });
-      },
-      switchTab:switchToTab,
-      closeTab:closeTab,
-      renameTab:startTabRename
-    });
-  }
+  function renderTabBar(){return nativeTabsUI.render(window,{read:readNativeTabsUI,dirty:tabIsDirty,
+    native:function(){return !!(nativeSavedUI&&nativeSavedUI.nativeObject);},switchTab:switchToTab,closeTab:closeTab,renameTab:startTabRename});}
   // Cheap DOM-only refresh for the active tab's dot, called from the
   // existing 30s autosave tick (timeline.js) — reuses the exportJSON() it
   // already pays for instead of triggering a second full-document
   // serialization just to keep this indicator current while the user
   // keeps editing the same tab without switching/saving/adding another.
-  function refreshActiveTabDirtyDot(liveJson){
-    var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
-    if(!el)return;
-    el.classList.toggle('dirty',nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive()?isDirty():!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson));
-  }
+  function refreshActiveTabDirtyDot(liveJson){return nativeTabsUI.refreshDirty(window,activeTabId,function(){
+    return nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive()?isDirty():!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson);
+  });}
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 
   // ---- Start screen ----

@@ -11,6 +11,9 @@ use serde_json::{json, Value};
 use std::path::Path;
 use tauri_plugin_fs::FsExt;
 
+#[path = "native_object_retained_activation.rs"]
+mod activation;
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Request {
@@ -342,11 +345,15 @@ fn request_with(
 
 #[tauri::command]
 pub(crate) async fn nemo_native_object_inactive_project(
+    app: tauri::AppHandle,
     window: tauri::Window,
     state: tauri::State<'_, ApplicationMcp>,
     request_json: String,
 ) -> HostResult<Value> {
     require_main(&window)?;
+    if activation::is_request(&request_json) {
+        return activation::execute(&app, &state, &request_json, window.label()).await;
+    }
     request_with(
         &state,
         &request_json,
