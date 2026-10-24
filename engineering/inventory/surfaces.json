@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "78580dd3b92e1eb2c5d7d689f24d6a2b7aa76779",
-  "describe": "v0.7.0-alpha.4-2973-g78580dd3-dirty"
+  "head": "a53723eabdcbdccb5e5339fc4de0f91c8087270b",
+  "describe": "v0.7.0-alpha.4-2980-ga53723ea-dirty"
  },
- "inputsDigest": "da1bb3971bf8541e32444b51287ee99dd918786f77360bde05a52474e5ed4187",
+ "inputsDigest": "1f7211b3bc907aacc3a0092a2e0b2c9582faac3bec84ef5bcded84bc799a2aa4",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 249,
+   "native": 250,
    "export": 5,
    "animation": 444,
    "history": 355,
@@ -17449,7 +17449,7 @@
     "functionsVisited": 263,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:248 presented()",
+     "src/js/adapters/native-object-project-desktop.js:249 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7109 show()"
     ]
@@ -22162,7 +22162,7 @@
    "capability": "Value check: SMLabs.setViewFilter('values'|'contrast'|'dim'|'none'|cssFilter) — display only, the drawing stays untouched",
    "area": "labs",
    "handler": [
-    "src/js/labs/view-filter.js:36"
+    "src/js/labs/view-filter.js:46"
    ],
    "events": [],
    "exposure": [
@@ -22171,13 +22171,15 @@
    ],
    "mcp": "none (R14)",
    "sdk": "SMLabs",
-   "consumers": {},
+   "consumers": {
+    "native": 2
+   },
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/view-filter.js:36",
+   "source": "src/js/labs/view-filter.js:46",
    "meta": {
-    "functionsVisited": 9
+    "functionsVisited": 29
    },
    "fixtures": []
   },

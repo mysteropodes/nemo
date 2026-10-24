@@ -1,5 +1,5 @@
 //! Closed session-only viewport choices and proof of the actual painted affine.
-use crate::desktop_viewport::PresentationReceipt;
+use crate::desktop_viewport::{DesktopViewportHost, PresentationReceipt, SurfacePort, ViewportError};
 use serde::{Deserialize, Serialize};
 
 /// Session-only color check applied to the final surface, never to export pixels.
@@ -13,11 +13,11 @@ pub enum ViewportDisplayFilter {
     Dim,
 }
 
-impl<P: super::SurfacePort> super::DesktopViewportHost<P> {
+impl<P: SurfacePort> DesktopViewportHost<P> {
     pub fn register(
         &mut self,
         identity: crate::render_scene::ScheduledFrameIdentity,
-    ) -> Result<(), super::ViewportError> {
+    ) -> Result<(), ViewportError> {
         self.register_with_display_filter(identity, ViewportDisplayFilter::None)
     }
 
@@ -46,7 +46,7 @@ impl<P: super::SurfacePort> super::DesktopViewportHost<P> {
         &mut self,
         identity: crate::render_scene::ScheduledFrameIdentity,
         filter: ViewportDisplayFilter,
-    ) -> Result<(), super::ViewportError> {
+    ) -> Result<(), ViewportError> {
         self.ensure_active()?;
         let id = identity.work_id();
         if self
@@ -54,7 +54,7 @@ impl<P: super::SurfacePort> super::DesktopViewportHost<P> {
             .get(&id)
             .is_some_and(|old| *old != filter)
         {
-            return Err(super::ViewportError::IdentityMismatch(id));
+            return Err(ViewportError::IdentityMismatch(id));
         }
         self.register_as(id, identity)?;
         self.display_filters.insert(id, filter);
