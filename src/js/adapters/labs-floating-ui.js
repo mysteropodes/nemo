@@ -259,6 +259,8 @@
     // mouse to wander off.
     var busy = dragging || (document.activeElement && paramsWrap.contains(document.activeElement));
     paramsWrap.style.display = (hasParams && (hovering || busy)) ? 'flex' : 'none';
+    // Rendering a tool context or showing its options changes the strip size.
+    applyFixedPos();
   }
 
   function setupHover() {
@@ -288,13 +290,22 @@
   function savePos(p) { try { ports.setItem(POS_KEY, JSON.stringify(p)); } catch (e) {} }
 
   var relPos = null; // {left, top} relative to #canvas-area's rect
+  function clampedPos(p, ar, panel) {
+    return {
+      left: Math.max(2, Math.min(ar.width - panel.offsetWidth - 2, p.left)),
+      top: Math.max(2, Math.min(ar.height - panel.offsetHeight - 2, p.top)),
+    };
+  }
   function applyFixedPos() {
     var panel = document.getElementById('labs-float-panel');
     var area = document.getElementById('canvas-area');
     if (!panel || !area || !relPos) return;
     var ar = area.getBoundingClientRect();
-    panel.style.left = (ar.left + relPos.left) + 'px';
-    panel.style.top = (ar.top + relPos.top) + 'px';
+    // Keep the handle reachable after resize or restoring a position from a
+    // larger window. Preserve the preferred relative position for expansion.
+    var visiblePos = clampedPos(relPos, ar, panel);
+    panel.style.left = (ar.left + visiblePos.left) + 'px';
+    panel.style.top = (ar.top + visiblePos.top) + 'px';
   }
 
   function setupDrag() {
@@ -309,7 +320,8 @@
     handle.addEventListener('pointerdown', function (e) {
       dragging = true;
       startX = e.clientX; startY = e.clientY;
-      startLeft = relPos.left; startTop = relPos.top;
+      var visiblePos = clampedPos(relPos, area.getBoundingClientRect(), panel);
+      startLeft = visiblePos.left; startTop = visiblePos.top;
       handle.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
@@ -321,9 +333,7 @@
       // Clamped to stay fully inside the canvas area — "drop partout" means
       // anywhere in the drawing zone, not off past its edges where it'd be
       // unreachable.
-      nl = Math.max(2, Math.min(ar.width - panel.offsetWidth - 2, nl));
-      nt = Math.max(2, Math.min(ar.height - panel.offsetHeight - 2, nt));
-      relPos = { left: nl, top: nt };
+      relPos = clampedPos({ left: nl, top: nt }, ar, panel);
       applyFixedPos();
     });
     handle.addEventListener('pointerup', function (e) {

@@ -52,3 +52,70 @@ test('drag persists clamped relative coordinates with capture, resize and hover/
 test('malformed saved position and missing root preserve fallback/no-op initialization',()=>{parity('labs-float-panel.js',{storage:{'nemo-labs-float-pos':'{'}},f=>{f.boot();assert.equal(f.nodes.get('labs-float-panel').style.top,'110px');});parity('labs-float-panel.js',{missing:['labs-float-panel']},f=>{f.boot();f.load();f.context.SM.afterI18n[0]();});});
 
 test('plain presentation factory creates without calling provider ports',()=>{const module=require('../src/js/adapters/labs-floating-ui.js');assert.doesNotThrow(()=>module.create(new Proxy({}, {get(target,key){if(['document','tools','actions','contexts','realFeatures','always','names','icons','params','symModes','perspModes','perspLabels','symLabels'].includes(key))return undefined;throw Error('early provider '+String(key));}})));});
+
+test('floating panel remains reachable after a boundary drag and smaller window',()=>{
+ const f=fixture('actual','labs-float-panel.js',{state:{tool:'hand'}});
+ f.boot();
+ const panel=f.nodes.get('labs-float-panel'),handle=f.nodes.get('labs-float-handle');
+ const initialState=copy(f.state);
+ handle.fire('pointerdown',{clientX:10,clientY:20,pointerId:9});
+ handle.fire('pointermove',{clientX:9999,clientY:9999,pointerId:9});
+ handle.fire('pointerup',{pointerId:9});
+ const saved=f.storage.get('nemo-labs-float-pos');
+ assert.deepEqual(JSON.parse(saved),{left:538,top:448});
+ f.document.rect.width=300;f.document.rect.height=180;f.resize();
+ assert.equal(panel.style.left,'238px');assert.equal(panel.style.top,'178px');
+ assert.equal(f.storage.get('nemo-labs-float-pos'),saved,'resize preserves the chosen position');
+ assert.deepEqual(f.state,initialState,'positioning does not edit the document');
+ f.document.rect.width=700;f.document.rect.height=500;f.resize();
+ assert.equal(panel.style.left,'638px');assert.equal(panel.style.top,'498px');
+});
+
+test('restored floating position is clamped for the current canvas, including a smaller-than-panel canvas',()=>{
+ const saved=JSON.stringify({left:538,top:448});
+ const f=fixture('actual','labs-float-panel.js',{state:{tool:'hand'},storage:{'nemo-labs-float-pos':saved}});
+ f.document.rect.width=300;f.document.rect.height=180;f.boot();
+ const panel=f.nodes.get('labs-float-panel');
+ assert.equal(panel.style.left,'238px');assert.equal(panel.style.top,'178px');
+ f.document.rect.width=100;f.document.rect.height=40;f.resize();
+ assert.equal(panel.style.left,'102px');assert.equal(panel.style.top,'52px');
+ assert.equal(f.storage.get('nemo-labs-float-pos'),saved);
+});
+
+test('dragging a clamped panel starts from its visible position',()=>{
+ const f=fixture('actual','labs-float-panel.js',{state:{tool:'hand'},storage:{'nemo-labs-float-pos':JSON.stringify({left:538,top:448})}});
+ f.document.rect.width=300;f.document.rect.height=180;f.boot();
+ const panel=f.nodes.get('labs-float-panel'),handle=f.nodes.get('labs-float-handle');
+ handle.fire('pointerdown',{clientX:245,clientY:185,pointerId:10});
+ handle.fire('pointermove',{clientX:235,clientY:175,pointerId:10});
+ handle.fire('pointerup',{pointerId:10});
+ assert.equal(panel.style.left,'228px');assert.equal(panel.style.top,'168px');
+ assert.deepEqual(JSON.parse(f.storage.get('nemo-labs-float-pos')),{left:128,top:118});
+});
+
+test('restore and hover expansion clamp using visible panel dimensions',()=>{
+ const saved=JSON.stringify({left:538,top:448});
+ const f=fixture('actual','labs-float-panel.js',{state:{tool:'hand'},storage:{'flag-canvas-grid':'1','nemo-labs-float-pos':saved}});
+ const panel=f.nodes.get('labs-float-panel'),params=f.nodes.get('labs-float-params');
+ panel.style.display='none';
+ Object.defineProperty(panel,'offsetWidth',{get(){return panel.style.display==='none'?0:160;}});
+ Object.defineProperty(panel,'offsetHeight',{get(){return panel.style.display==='none'?0:params.style.display==='flex'?140:50;}});
+ f.document.rect.width=300;f.document.rect.height=180;f.boot();
+ assert.equal(panel.style.left,'238px');assert.equal(panel.style.top,'178px');
+ panel.fire('mouseenter');
+ assert.equal(params.style.display,'flex');assert.equal(panel.style.top,'88px');
+ panel.fire('mouseleave');
+ assert.equal(params.style.display,'none');assert.equal(panel.style.top,'178px');
+ assert.equal(f.storage.get('nemo-labs-float-pos'),saved);
+});
+
+test('tool-context rebuild reclamps a wider strip without a window resize',()=>{
+ const f=fixture('actual','labs-float-panel.js',{state:{tool:'hand'},storage:{'nemo-labs-float-pos':JSON.stringify({left:538,top:60})}});
+ const panel=f.nodes.get('labs-float-panel');
+ Object.defineProperty(panel,'offsetWidth',{get(){return f.state.tool==='hand'?160:520;}});
+ f.boot();assert.equal(panel.style.left,'638px');
+ f.state.tool='draw';f.context.renderLabsFloatPanel();
+ assert.equal(panel.style.left,'278px');
+ f.state.tool='hand';f.context.renderLabsFloatPanel();
+ assert.equal(panel.style.left,'638px');
+});
