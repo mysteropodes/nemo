@@ -395,7 +395,8 @@
         "object_audio_track_edit_command.rs",
         "native_import_transaction_assets.rs",
         "native_import_transaction_sources.rs",
-        "native_import_transaction_source_types.rs"
+        "native_import_transaction_source_types.rs",
+        "object_history_read.rs"
       ],
       "publicApi": [
         "history.rs",
@@ -1740,7 +1741,8 @@
         "object_bitmap_brush_transition.rs",
         "native_import_transaction_assets.rs",
         "native_import_transaction_asset_controls.rs",
-        "native_import_transaction_sources.rs"
+        "native_import_transaction_sources.rs",
+        "object_history_read.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1897,7 +1899,9 @@
         "src/native_comments_contract_tests.rs",
         "src/native_mask_contract_tests.rs",
         "src/native_import_asset_contract.rs",
-        "src/native_import_asset_contract_tests.rs"
+        "src/native_import_asset_contract_tests.rs",
+        "src/native_history_read_contract.rs",
+        "src/native_history_read_contract_tests.rs"
       ],
       "publicApi": [
         "src/capabilities.rs",
@@ -1933,7 +1937,8 @@
         "server_failure_paths.rs",
         "support/native_property_read_schema.rs",
         "support/native_layer_policy_schema.rs",
-        "support/native_property_edit_schema.rs"
+        "support/native_property_edit_schema.rs",
+        "native_history_read_stdio.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -2119,6 +2124,7 @@
         "native_object_host_read_tests.rs",
         "native_object_host_command_tests.rs",
         "native_object_host_history_tests.rs",
+        "native_object_history_read_tests.rs",
         "native_object_client_tests.rs",
         "native_object_timing_tests.rs",
         "native_object_client_admission_tests.rs",

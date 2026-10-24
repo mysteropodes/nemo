@@ -289,6 +289,12 @@ impl NativeDispatch for NativeObjectHost {
         if self.released.is_some() {
             return Err("native object host was released".into());
         }
+        if request.operation() == "query.document.object.history" {
+            return self
+                .history
+                .dispatch_history_read(&request)
+                .map_err(|_| "native history read correlation is invalid".into());
+        }
         if request.operation() == "command.document.object.asset.remove" {
             return self
                 .remove_asset(&request)
@@ -409,3 +415,7 @@ mod asset_remove_tests;
 
 #[cfg(test)]
 pub(crate) use preview::motion_tests::{finalizer_fixture, finalizer_svg};
+
+#[cfg(test)]
+#[path = "native_object_history_read_tests.rs"]
+mod history_read_tests;

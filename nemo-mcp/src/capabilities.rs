@@ -22,6 +22,7 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
 /// catalog above. N16 consumes the feature-owned descriptor but does not add it
 /// to v1 discovery or turn it into another MCP tool.
 pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
+    include_str!("../../engineering/application/capabilities-v2/native-object-history.json"),
     include_str!("../../engineering/application/capabilities-v2/native-font-assets.json"),
     include_str!("../../engineering/application/capabilities-v2/native-opacity.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object.json"),

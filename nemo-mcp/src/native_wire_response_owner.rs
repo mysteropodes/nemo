@@ -10,7 +10,8 @@ pub(super) fn correlated(
     let property_read = request.operation == crate::native_contract::property_read::OP;
     let frame_edit_command = crate::native_contract::frame_edit::declares(&request.operation);
     let image_owner = crate::native_contract::item::placed_png_owner_matches(request, response);
-    let correlated_operation = request.operation == crate::native_contract::text_read::OP
+    let correlated_operation = request.operation == crate::native_contract::history_read::OP
+        || request.operation == crate::native_contract::text_read::OP
         || matches!(
             request.operation.as_str(),
             crate::native_contract::composition::READ
@@ -114,6 +115,7 @@ pub(super) fn pinned_read_correlated(
     (!matches!(
         request.operation.as_str(),
         "query.document.object"
+            | crate::native_contract::history_read::OP
             | "query.document.object.layer.timing"
             | crate::native_contract::metadata::OP
             | crate::native_contract::text_read::OP
