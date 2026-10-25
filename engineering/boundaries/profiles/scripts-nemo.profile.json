@@ -375,6 +375,18 @@
       "sizeProfile": "Domain/application JS or TS"
     },
     {
+      "id": "nemo.refreshAppPins",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "refresh-app-pins.cjs"
+      ],
+      "publicApi": [
+        "refresh-app-pins.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
       "id": "nemo.lib.jobs",
       "layer": "tooling-application",
       "dir": "scripts/nemo/lib",
@@ -649,6 +661,18 @@
       ],
       "publicApi": [
         "parity-matrix.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.refreshAppPins",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "refresh-app-pins.test.cjs"
+      ],
+      "publicApi": [
+        "refresh-app-pins.test.cjs"
       ],
       "sizeProfile": "Test file"
     },
