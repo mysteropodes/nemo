@@ -638,4 +638,7 @@ test('surface IDs survive inserted lines above every surface (no line-keyed IDs)
     assert.deepEqual(ids(inventory.build({ root: dir }).rows), ids(rows()));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   for (const r of rows()) assert.doesNotMatch(r.id, /@\d+$|\.js:\d+$/, r.id);
+  // Ratchet: label-text keys (DOM rows with no id or data-*) and order-only #n keys may only shrink.
+  assert.ok(rows().filter((r) => /^dom:[^#]/.test(r.id) && !r.id.includes('[data-')).length <= 4, 'more text-keyed DOM IDs');
+  assert.ok(rows().filter((r) => /#\d+$/.test(r.id)).length <= 10, 'more order-suffixed IDs');
 });

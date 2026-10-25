@@ -1,7 +1,8 @@
 'use strict';
-// CS3/#2342: IDs key on identity (container/tag/tool/label, enclosing function), never
-// a source line; identical siblings keep the existing #n suffix.
-function idKey(text) { const s = String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48); return s ? ':' + s : ''; }
+// CS3/#2342: IDs key on identity (container/tag/data-*, else label; enclosing function
+// for menus), never a source line; identical siblings keep the existing #n suffix.
+function idKey(text) { const s = String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48); return s ? ':' + s : ''; }
+function dataKey(data) { return Object.keys(data || {}).sort().map((k) => '[data-' + k + '=' + data[k] + ']').join(''); }
 // Static surface rows, area classification and document-consumer reachability.
 const path = require('node:path');
 const { CODE, matchClose, functionBodyAt, bodySpanInText, enclosingFunction,
@@ -223,8 +224,9 @@ function createSurfaces({ src, rel, domRows, i18n, idx, fnIndex, bindings, class
     const exposure = ['UI' + (r.modal ? ' (modal)' : r.hiddenAtLoad ? ' (contextual)' : '')];
     if (r.data.tool) exposure.push('keyboard (tool shortcut)');
     rows.push({
-      id: r.id ? 'dom:#' + r.id : 'dom:' + (r.container ? r.container + '>' : '') + r.tag +
-        (r.data.tool ? '[data-tool=' + r.data.tool + ']' : '') + idKey(r.i18n || r.i18nTitle || r.title || r.text || r.href || r.classes),
+      // Stable data-* attributes key the row; label text is the fallback only.
+      id: r.id ? 'dom:#' + r.id : 'dom:' + (r.container ? r.container + '>' : '') + r.tag + dataKey(r.data) +
+        (dataKey(r.data) ? '' : idKey(r.i18n || r.i18nTitle || r.title || r.text || r.href || r.classes)),
       kind: 'dom', surface: (r.container ? r.container + ' > ' : '') + r.tag + (r.type ? '[' + r.type + ']' : '') + (r.id ? '#' + r.id : ''),
       capability: label, area: areaFor(file, r.container, r.classes + ' ' + r.id, rel),
       handler: recs.length ? uniq(recs.flatMap((x) => x.sites)).slice(0, 4) : placeholder ? placeholder.handler : [],
