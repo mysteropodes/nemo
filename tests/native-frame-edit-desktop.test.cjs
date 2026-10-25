@@ -13,9 +13,9 @@ const P='command.document.object.';
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 function harness(options={}){
-  let active=false,revision=0,total=12,hold=null,preview='presented',ownerOverride=null;
+  let active=false,revision=0,total=options.total||12,hold=null,preview='presented',ownerOverride=null;
   const calls=[],navigation=[],notices=[];
-  const state={currentFrame:2,activeLayerIdx:1,totalFrames:12,layers:[{layerUid:'alpha'},{layerUid:'beta'}]};
+  const state={currentFrame:2,activeLayerIdx:1,totalFrames:total,layers:[{layerUid:'alpha'},{layerUid:'beta'}]};
   const root={state,_layerSel:[1],_sel:{frames:[{layer:0,frame:1},{layer:1,frame:2}]},
     NemoNativeFrameEditIntent:Intent,NemoNativeApplicationAdapter:SDK,showToast:m=>notices.push(m)};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
@@ -537,5 +537,47 @@ test('Project queued guard grants only its own current presentation lease and re
     assert.equal(g.commands().length,0);assert.equal(g.session.info().contentRevision,0);
     assert.equal(checked,['frame-before','projection','extra-pending'].includes(fault)?0:1);
     if(lease)assert.equal(lease.readPresentedObjectSession(),null);
+  }
+});
+
+test('ordinary native header selection reaches the original Cycle prompt from empty cells and Cancel keeps the selection',async()=>{
+  const Selection=require('../src/js/adapters/native-frame-cell-selection.js'),Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  const fixture=fs.readFileSync(require.resolve('./native-frame-cell-selection.test.cjs'),'utf8');
+  const a=fixture.indexOf('// BEGIN REUSABLE NATIVE CELL HEADER FIXTURE'),b=fixture.indexOf('// END REUSABLE NATIVE CELL HEADER FIXTURE');
+  assert.ok(a>=0&&b>a);const make=vm.compileFunction(fixture.slice(a,b)+'\nreturn selectionHarness;',['assert','Selection'])(assert,Selection);
+  const source=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8'),start=source.indexOf('function initCycleAndPropagate(){');
+  const body=source.slice(start,source.indexOf("if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCycleAndPropagate)",start));
+  const boundsStart=source.indexOf('function selBounds(){'),bounds=source.slice(boundsStart,source.indexOf('\n}',boundsStart)+2);
+  for(const input of ['2',null,'pending']){
+    const h=harness({total:input==='pending'?2048:12,repeatCounts:{cycledLayers:1,skippedComponentLayers:1}});await h.open();
+    const ui=make();Selection.retire(ui.root);h.root.document=ui.doc;h.root.FC=20;h.root._layerSel=[0,1];h.root._sel.frames=[];
+    h.root.NemoNativeFrameCellSelection=Selection;h.root.NemoNativeObjectUI=require('../src/js/adapters/native-object-ui.js');
+    h.root.setTimeout=ui.root.setTimeout;h.root.clearTimeout=ui.root.clearTimeout;
+    Selection.mount(h.root,ui.caption,h.session.info(),{currentSession:()=>h.session,projectionReady:()=>true,frameEditPending:()=>h.controller.isPending()});
+    const strip=ui.caption.children[0];strip.children[4].fire('click');strip.fire('mousedown',{clientX:110});ui.doc.fire('mousemove',{clientX:130});ui.doc.fire('mouseup',{clientX:130});
+    const cells=h.root._sel.frames;assert.deepEqual(cells,[{layer:0,frame:0},{layer:0,frame:1},{layer:1,frame:0},{layer:1,frame:1}]);
+    assert.match(strip.attributes['aria-label'],/Selected frames 1 through 2/);assert.equal(h.commands().length,0);
+    let click,pending,legacy=0,prompts=0;h.root.__TAURI__={core:{invoke(){throw Error('PRIVATE WRITER');}}};
+    h.root.NemoNativeFrameEditDesktop=Desktop;h.root.SM={importJSON(){},repeatSelection(){legacy++;}};
+    const dispose=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>false,()=>{});
+    const wrapped=h.root.SM.repeatSelection;h.root.SM.repeatSelection=value=>(pending=wrapped(value));
+    const context={window:h.root,_sel:h.root._sel,
+      prompt:()=>{prompts++;return input==='pending'?'2':input;},document:{getElementById:id=>id==='btn-cycle'?{addEventListener:(event,fn)=>{click=fn;}}:null}};
+    vm.runInNewContext(bounds+'\n'+body+'\ninitCycleAndPropagate();',context);
+    if(input==='pending'){
+      strip.fire('mousedown',{clientX:110});ui.doc.fire('mouseup',{clientX:100+1024.5*20});
+      assert.equal(Selection.isPending(h.root),true);assert.equal(h.root._sel.frames,cells);assert.equal(ui.cycle.disabled,true);
+      click();assert.equal((await pending).code,'frame_selection_pending');assert.equal(h.commands().length,0);
+      assert.match(h.notices.at(-1),/Finish or cancel/);ui.settle();assert.equal(h.root._sel.frames.length,2050);assert.equal(ui.cycle.disabled,false);
+      const completed=h.root._sel.frames,gate=h.hold();click();assert.equal(h.controller.isPending(),true);
+      strip.fire('mousedown',{clientX:130});ui.doc.fire('mouseup',{clientX:130});assert.equal(h.root._sel.frames,completed);assert.equal(Selection.isPending(h.root),false);
+      gate.resolve();assert.equal((await pending).status,'applied-presented');assert.equal(h.commands().length,1);assert.equal(h.commands()[0].q.payload.toFrame,1024);
+      assert.equal(legacy,0);dispose();Selection.retire(h.root);continue;
+    }
+    click();assert.equal(prompts,1);
+    if(input===null){assert.equal(pending,undefined);assert.equal(h.root._sel.frames,cells);assert.equal(h.commands().length,0);}
+    else{assert.equal((await pending).status,'applied-presented');assert.equal(h.commands().length,1);
+      assert.deepEqual(h.commands()[0].q.payload,{command:'object.frames.repeat',fromLayerUid:'alpha',toLayerUid:'beta',fromFrame:0,toFrame:1,times:2});}
+    assert.equal(legacy,0);dispose();Selection.retire(h.root);
   }
 });

@@ -39,7 +39,8 @@
     if(!root.NemoNativeFrameEditIntent||typeof root.NemoNativeFrameEditIntent.create!=='function')
       throw new Error('Native frame edit intent is unavailable');
     function current(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
-    function available(session,info){return !!(session&&session===current()&&session.isActive()&&
+    function selectionPending(){try{var ui=root.NemoNativeObjectUI;return !!(ui&&ui.isFrameSelectionPending&&ui.isFrameSelectionPending(root));}catch(_){return true;}}
+    function available(session,info){return !!(!selectionPending()&&session&&session===current()&&session.isActive()&&
       root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true);}
     function nativeMode(){
       try{
@@ -128,7 +129,8 @@
     function notice(result){
       var status=result&&result.status;
       var complete=status==='applied-presented'||status==='unchanged',message;
-      if(complete){
+      if(result&&result.code==='frame_selection_pending')message='Finish or cancel the frame selection first.';
+      else if(complete){
         if(!Number.isSafeInteger(result.cycledLayers)||!Number.isSafeInteger(result.skippedComponentLayers))return;
         message=result.cycledLayers===0?'No drawing layers to repeat.':
           status==='unchanged'?'Repeat left the drawing layers unchanged.':
@@ -142,6 +144,7 @@
       try{if(typeof root.showToast==='function')root.showToast(message);}catch(_){}
     }
     async function run(action){
+      if(selectionPending()){var blocked=Object.freeze({status:'busy',code:'frame_selection_pending'});notice(blocked);return blocked;}
       var before=capture(),result=await intent.run(action);
       if(mayNavigate(before,result)&&typeof root.goToFrame==='function'){
         try{await root.goToFrame(result.playhead);}catch(_){notice();}
