@@ -1,4 +1,7 @@
 'use strict';
+// CS3/#2342: IDs key on identity (container/tag/tool/label, enclosing function), never
+// a source line; identical siblings keep the existing #n suffix.
+function idKey(text) { const s = String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48); return s ? ':' + s : ''; }
 // Static surface rows, area classification and document-consumer reachability.
 const path = require('node:path');
 const { CODE, matchClose, functionBodyAt, bodySpanInText, enclosingFunction,
@@ -220,7 +223,8 @@ function createSurfaces({ src, rel, domRows, i18n, idx, fnIndex, bindings, class
     const exposure = ['UI' + (r.modal ? ' (modal)' : r.hiddenAtLoad ? ' (contextual)' : '')];
     if (r.data.tool) exposure.push('keyboard (tool shortcut)');
     rows.push({
-      id: r.id ? 'dom:#' + r.id : 'dom:' + r.tag + (r.data.tool ? '[data-tool=' + r.data.tool + ']' : '') + '@' + r.line,
+      id: r.id ? 'dom:#' + r.id : 'dom:' + (r.container ? r.container + '>' : '') + r.tag +
+        (r.data.tool ? '[data-tool=' + r.data.tool + ']' : '') + idKey(r.i18n || r.i18nTitle || r.title || r.text || r.href || r.classes),
       kind: 'dom', surface: (r.container ? r.container + ' > ' : '') + r.tag + (r.type ? '[' + r.type + ']' : '') + (r.id ? '#' + r.id : ''),
       capability: label, area: areaFor(file, r.container, r.classes + ' ' + r.id, rel),
       handler: recs.length ? uniq(recs.flatMap((x) => x.sites)).slice(0, 4) : placeholder ? placeholder.handler : [],
@@ -308,7 +312,7 @@ function createSurfaces({ src, rel, domRows, i18n, idx, fnIndex, bindings, class
       const rr = reach(body, 3);
       const line = lineOf(f.code, m.index);
       rows.push({
-        id: 'menu:' + rel(f.file).replace(/^src\/js\//, '') + ':' + line, kind: 'menu', surface: 'dynamic menu' + (fn ? ' (' + fn.name + ')' : ''), capability: label, area: areaFor(f.file, '', '', rel),
+        id: 'menu:' + rel(f.file).replace(/^src\/js\//, '') + ':' + (fn ? fn.name : 'top') + idKey(key || label), kind: 'menu', surface: 'dynamic menu' + (fn ? ' (' + fn.name + ')' : ''), capability: label, area: areaFor(f.file, '', '', rel),
         handler: [rel(f.file) + ':' + line + (fn ? ' ' + fn.name + '()' : '')], events: ['click'], exposure: ['contextual menu'], mcp: 'none (R14)', sdk: 'none',
         consumers: rr.consumers, platforms: platformFor([{ body }], rr.consumers), status: body ? 'inventoried' : 'unmapped',
         nextGate: body ? 'R12/R13: characterize against a fixture and diagnostics' : 'R03 follow-up: bind a handler or record unavailable-with-reason', source: rel(f.file) + ':' + line, meta: { i18n: key || null, functionsVisited: rr.functionsVisited },
