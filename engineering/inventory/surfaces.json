@@ -3,8 +3,8 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "943b67f0bdd612647e0d78686b7a64658a12886e",
-  "describe": "v0.7.0-alpha.4-3055-g943b67f0-dirty"
+  "head": "c539bd682aa1043d3694e60f26133fcfe6876830",
+  "describe": "v0.7.0-alpha.4-3057-gc539bd68-dirty"
  },
  "inputsDigest": "d03d4adad12bcd81940b14fda77e71b265bdc09d9b529c3e62117b0a0a1a6ddb",
  "states": [
@@ -17469,7 +17469,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:alignbottom",
+   "id": "dom:align-toolbar>button[data-align=bottom]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Align bottom",
@@ -17516,7 +17516,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:aligncenterh",
+   "id": "dom:align-toolbar>button[data-align=centerH]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Align center horizontally",
@@ -17563,7 +17563,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:aligncenterv",
+   "id": "dom:align-toolbar>button[data-align=centerV]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Align center vertically",
@@ -17610,7 +17610,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:alignleft",
+   "id": "dom:align-toolbar>button[data-align=left]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Align left",
@@ -17657,7 +17657,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:alignright",
+   "id": "dom:align-toolbar>button[data-align=right]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Align right",
@@ -17704,7 +17704,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:aligntop",
+   "id": "dom:align-toolbar>button[data-align=top]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Align top",
@@ -17751,7 +17751,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:distributehorizontal",
+   "id": "dom:align-toolbar>button[data-distribute=horizontal]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Distribute horizontally",
@@ -17798,7 +17798,7 @@
    ]
   },
   {
-   "id": "dom:align-toolbar>button:distributevertical",
+   "id": "dom:align-toolbar>button[data-distribute=vertical]",
    "kind": "dom",
    "surface": "align-toolbar > button",
    "capability": "Distribute vertically",
@@ -17845,7 +17845,7 @@
    ]
   },
   {
-   "id": "dom:app-mode-switch>button:modeanim2d",
+   "id": "dom:app-mode-switch>button[data-mode=anim2d]",
    "kind": "dom",
    "surface": "app-mode-switch > button",
    "capability": "2D Animation",
@@ -17894,7 +17894,7 @@
    ]
   },
   {
-   "id": "dom:app-mode-switch>button:modemotion",
+   "id": "dom:app-mode-switch>button[data-mode=motion]",
    "kind": "dom",
    "surface": "app-mode-switch > button",
    "capability": "Motion — property keyframes (position/rotation/scale/opacity)",
@@ -17943,7 +17943,7 @@
    ]
   },
   {
-   "id": "dom:app-mode-switch>button:storyboardfrozentitle",
+   "id": "dom:app-mode-switch>button[data-mode=storyboard]",
    "kind": "dom",
    "surface": "app-mode-switch > button",
    "capability": "StoryBoard — in development, not yet available in this build",
@@ -17992,7 +17992,7 @@
    ]
   },
   {
-   "id": "dom:comment-fb-tags>button",
+   "id": "dom:comment-fb-tags>button[data-tag=bug]",
    "kind": "dom",
    "surface": "comment-fb-tags > button[button]",
    "capability": "🐞",
@@ -18031,46 +18031,7 @@
    ]
   },
   {
-   "id": "dom:comment-fb-tags>button#2",
-   "kind": "dom",
-   "surface": "comment-fb-tags > button[button]",
-   "capability": "⚡",
-   "area": "project-lifecycle-integrations",
-   "handler": [
-    "src/js/timeline.js:7889 initCommentPopover()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:2074",
-   "meta": {
-    "data": {
-     "tag": "perf"
-    },
-    "i18n": null,
-    "container": "comment-fb-tags",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 24,
-    "via": "callback btn",
-    "references": []
-   },
-   "fixtures": [
-    "media",
-    "migration"
-   ]
-  },
-  {
-   "id": "dom:comment-fb-tags>button#3",
+   "id": "dom:comment-fb-tags>button[data-tag=idea]",
    "kind": "dom",
    "surface": "comment-fb-tags > button[button]",
    "capability": "💡",
@@ -18109,7 +18070,46 @@
    ]
   },
   {
-   "id": "dom:comment-fb-tags>button#4",
+   "id": "dom:comment-fb-tags>button[data-tag=perf]",
+   "kind": "dom",
+   "surface": "comment-fb-tags > button[button]",
+   "capability": "⚡",
+   "area": "project-lifecycle-integrations",
+   "handler": [
+    "src/js/timeline.js:7889 initCommentPopover()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:2074",
+   "meta": {
+    "data": {
+     "tag": "perf"
+    },
+    "i18n": null,
+    "container": "comment-fb-tags",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 24,
+    "via": "callback btn",
+    "references": []
+   },
+   "fixtures": [
+    "media",
+    "migration"
+   ]
+  },
+  {
+   "id": "dom:comment-fb-tags>button[data-tag=polish]",
    "kind": "dom",
    "surface": "comment-fb-tags > button[button]",
    "capability": "✨",
@@ -18148,7 +18148,7 @@
    ]
   },
   {
-   "id": "dom:p-cap-grp>button:capbutt",
+   "id": "dom:p-cap-grp>button[data-value=butt]",
    "kind": "dom",
    "surface": "p-cap-grp > button",
    "capability": "Butt",
@@ -18189,7 +18189,7 @@
    ]
   },
   {
-   "id": "dom:p-cap-grp>button:capround",
+   "id": "dom:p-cap-grp>button[data-value=round]",
    "kind": "dom",
    "surface": "p-cap-grp > button",
    "capability": "Round",
@@ -18230,7 +18230,7 @@
    ]
   },
   {
-   "id": "dom:p-cap-grp>button:capsquare",
+   "id": "dom:p-cap-grp>button[data-value=square]",
    "kind": "dom",
    "surface": "p-cap-grp > button",
    "capability": "Square",
@@ -18271,7 +18271,7 @@
    ]
   },
   {
-   "id": "dom:p-fillbrushmode-grp>button:placementabove",
+   "id": "dom:p-fillbrushmode-grp>button[data-value=above]",
    "kind": "dom",
    "surface": "p-fillbrushmode-grp > button",
    "capability": "Above — on top of existing fills",
@@ -18312,7 +18312,7 @@
    ]
   },
   {
-   "id": "dom:p-fillbrushmode-grp>button:placementbelow",
+   "id": "dom:p-fillbrushmode-grp>button[data-value=below]",
    "kind": "dom",
    "surface": "p-fillbrushmode-grp > button",
    "capability": "Below — behind existing fills (background patch)",
@@ -18353,7 +18353,7 @@
    ]
   },
   {
-   "id": "dom:p-fillbrushmode-grp>button:placementmerge",
+   "id": "dom:p-fillbrushmode-grp>button[data-value=merge]",
    "kind": "dom",
    "surface": "p-fillbrushmode-grp > button",
    "capability": "Merge — unite with any existing fill it overlaps",
@@ -18394,7 +18394,7 @@
    ]
   },
   {
-   "id": "dom:p-join-grp>button:joinbevel",
+   "id": "dom:p-join-grp>button[data-value=bevel]",
    "kind": "dom",
    "surface": "p-join-grp > button",
    "capability": "Bevel",
@@ -18435,7 +18435,7 @@
    ]
   },
   {
-   "id": "dom:p-join-grp>button:joinmiter",
+   "id": "dom:p-join-grp>button[data-value=miter]",
    "kind": "dom",
    "surface": "p-join-grp > button",
    "capability": "Miter",
@@ -18476,7 +18476,7 @@
    ]
   },
   {
-   "id": "dom:p-join-grp>button:joinround",
+   "id": "dom:p-join-grp>button[data-value=round]",
    "kind": "dom",
    "surface": "p-join-grp > button",
    "capability": "Round",
@@ -18517,7 +18517,7 @@
    ]
   },
   {
-   "id": "dom:p-paintorder-grp>button:paintorderfillfirst",
+   "id": "dom:p-paintorder-grp>button[data-value=fillFirst]",
    "kind": "dom",
    "surface": "p-paintorder-grp > button",
    "capability": "Fill in front of Stroke",
@@ -18558,7 +18558,7 @@
    ]
   },
   {
-   "id": "dom:p-paintorder-grp>button:paintorderstrokefirst",
+   "id": "dom:p-paintorder-grp>button[data-value=strokeFirst]",
    "kind": "dom",
    "surface": "p-paintorder-grp > button",
    "capability": "Stroke in front of Fill",
@@ -18735,259 +18735,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-modal>div:settings-pane",
-   "kind": "dom",
-   "surface": "settings-modal > div",
-   "capability": "",
-   "area": "preferences-workspace",
-   "handler": [
-    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (modal)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1768",
-   "meta": {
-    "data": {
-     "pane": "general"
-    },
-    "i18n": null,
-    "container": "settings-modal",
-    "modal": true,
-    "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
-    "references": []
-   },
-   "fixtures": []
-  },
-  {
-   "id": "dom:settings-modal>div:settings-pane#2",
-   "kind": "dom",
-   "surface": "settings-modal > div",
-   "capability": "",
-   "area": "preferences-workspace",
-   "handler": [
-    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (modal)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1799",
-   "meta": {
-    "data": {
-     "pane": "updates"
-    },
-    "i18n": null,
-    "container": "settings-modal",
-    "modal": true,
-    "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
-    "references": []
-   },
-   "fixtures": []
-  },
-  {
-   "id": "dom:settings-modal>div:settings-pane#3",
-   "kind": "dom",
-   "surface": "settings-modal > div",
-   "capability": "",
-   "area": "preferences-workspace",
-   "handler": [
-    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (modal)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1824",
-   "meta": {
-    "data": {
-     "pane": "collab"
-    },
-    "i18n": null,
-    "container": "settings-modal",
-    "modal": true,
-    "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
-    "references": []
-   },
-   "fixtures": []
-  },
-  {
-   "id": "dom:settings-modal>div:settings-pane#4",
-   "kind": "dom",
-   "surface": "settings-modal > div",
-   "capability": "",
-   "area": "preferences-workspace",
-   "handler": [
-    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (modal)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1850",
-   "meta": {
-    "data": {
-     "pane": "feedback"
-    },
-    "i18n": null,
-    "container": "settings-modal",
-    "modal": true,
-    "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
-    "references": []
-   },
-   "fixtures": []
-  },
-  {
-   "id": "dom:settings-modal>div:settings-pane#5",
-   "kind": "dom",
-   "surface": "settings-modal > div",
-   "capability": "",
-   "area": "preferences-workspace",
-   "handler": [
-    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (modal)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1867",
-   "meta": {
-    "data": {
-     "pane": "figma"
-    },
-    "i18n": null,
-    "container": "settings-modal",
-    "modal": true,
-    "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
-    "references": []
-   },
-   "fixtures": []
-  },
-  {
-   "id": "dom:settings-modal>div:settings-pane#6",
-   "kind": "dom",
-   "surface": "settings-modal > div",
-   "capability": "",
-   "area": "preferences-workspace",
-   "handler": [
-    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (modal)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1881",
-   "meta": {
-    "data": {
-     "pane": "shortcuts"
-    },
-    "i18n": null,
-    "container": "settings-modal",
-    "modal": true,
-    "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
-    "references": []
-   },
-   "fixtures": []
-  },
-  {
-   "id": "dom:settings-modal>div:settings-pane#7",
-   "kind": "dom",
-   "surface": "settings-modal > div",
-   "capability": "",
-   "area": "preferences-workspace",
-   "handler": [
-    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (modal)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:1889",
-   "meta": {
-    "data": {
-     "pane": "labs"
-    },
-    "i18n": null,
-    "container": "settings-modal",
-    "modal": true,
-    "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
-    "references": []
-   },
-   "fixtures": []
-  },
-  {
-   "id": "dom:settings-modal>div:settings-pane#8",
+   "id": "dom:settings-modal>div[data-pane=about]",
    "kind": "dom",
    "surface": "settings-modal > div",
    "capability": "",
@@ -19023,7 +18771,259 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstababout",
+   "id": "dom:settings-modal>div[data-pane=collab]",
+   "kind": "dom",
+   "surface": "settings-modal > div",
+   "capability": "",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (modal)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:1824",
+   "meta": {
+    "data": {
+     "pane": "collab"
+    },
+    "i18n": null,
+    "container": "settings-modal",
+    "modal": true,
+    "hiddenAtLoad": true,
+    "functionsVisited": 0,
+    "via": "container delegation #settings-modal",
+    "references": []
+   },
+   "fixtures": []
+  },
+  {
+   "id": "dom:settings-modal>div[data-pane=feedback]",
+   "kind": "dom",
+   "surface": "settings-modal > div",
+   "capability": "",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (modal)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:1850",
+   "meta": {
+    "data": {
+     "pane": "feedback"
+    },
+    "i18n": null,
+    "container": "settings-modal",
+    "modal": true,
+    "hiddenAtLoad": true,
+    "functionsVisited": 0,
+    "via": "container delegation #settings-modal",
+    "references": []
+   },
+   "fixtures": []
+  },
+  {
+   "id": "dom:settings-modal>div[data-pane=figma]",
+   "kind": "dom",
+   "surface": "settings-modal > div",
+   "capability": "",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (modal)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:1867",
+   "meta": {
+    "data": {
+     "pane": "figma"
+    },
+    "i18n": null,
+    "container": "settings-modal",
+    "modal": true,
+    "hiddenAtLoad": true,
+    "functionsVisited": 0,
+    "via": "container delegation #settings-modal",
+    "references": []
+   },
+   "fixtures": []
+  },
+  {
+   "id": "dom:settings-modal>div[data-pane=general]",
+   "kind": "dom",
+   "surface": "settings-modal > div",
+   "capability": "",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (modal)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:1768",
+   "meta": {
+    "data": {
+     "pane": "general"
+    },
+    "i18n": null,
+    "container": "settings-modal",
+    "modal": true,
+    "hiddenAtLoad": true,
+    "functionsVisited": 0,
+    "via": "container delegation #settings-modal",
+    "references": []
+   },
+   "fixtures": []
+  },
+  {
+   "id": "dom:settings-modal>div[data-pane=labs]",
+   "kind": "dom",
+   "surface": "settings-modal > div",
+   "capability": "",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (modal)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:1889",
+   "meta": {
+    "data": {
+     "pane": "labs"
+    },
+    "i18n": null,
+    "container": "settings-modal",
+    "modal": true,
+    "hiddenAtLoad": true,
+    "functionsVisited": 0,
+    "via": "container delegation #settings-modal",
+    "references": []
+   },
+   "fixtures": []
+  },
+  {
+   "id": "dom:settings-modal>div[data-pane=shortcuts]",
+   "kind": "dom",
+   "surface": "settings-modal > div",
+   "capability": "",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (modal)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:1881",
+   "meta": {
+    "data": {
+     "pane": "shortcuts"
+    },
+    "i18n": null,
+    "container": "settings-modal",
+    "modal": true,
+    "hiddenAtLoad": true,
+    "functionsVisited": 0,
+    "via": "container delegation #settings-modal",
+    "references": []
+   },
+   "fixtures": []
+  },
+  {
+   "id": "dom:settings-modal>div[data-pane=updates]",
+   "kind": "dom",
+   "surface": "settings-modal > div",
+   "capability": "",
+   "area": "preferences-workspace",
+   "handler": [
+    "src/js/adapters/settings-preferences-ui.js:27 initSettingsModal()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (modal)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:1799",
+   "meta": {
+    "data": {
+     "pane": "updates"
+    },
+    "i18n": null,
+    "container": "settings-modal",
+    "modal": true,
+    "hiddenAtLoad": true,
+    "functionsVisited": 0,
+    "via": "container delegation #settings-modal",
+    "references": []
+   },
+   "fixtures": []
+  },
+  {
+   "id": "dom:settings-tabs>button[data-tab=about]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "About",
@@ -19059,7 +19059,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstabcollab",
+   "id": "dom:settings-tabs>button[data-tab=collab]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "Collaboration",
@@ -19095,7 +19095,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstabfeedback",
+   "id": "dom:settings-tabs>button[data-tab=feedback]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "Feedback",
@@ -19131,7 +19131,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstabfigma",
+   "id": "dom:settings-tabs>button[data-tab=figma]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "Figma",
@@ -19167,7 +19167,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstabgeneral",
+   "id": "dom:settings-tabs>button[data-tab=general]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "General",
@@ -19203,7 +19203,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstablabs",
+   "id": "dom:settings-tabs>button[data-tab=labs]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "Labs",
@@ -19239,7 +19239,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstabshortcuts",
+   "id": "dom:settings-tabs>button[data-tab=shortcuts]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "Shortcuts",
@@ -19275,7 +19275,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:settings-tabs>button:settingstabupdates",
+   "id": "dom:settings-tabs>button[data-tab=updates]",
    "kind": "dom",
    "surface": "settings-tabs > button",
    "capability": "Updates",
@@ -19311,7 +19311,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:shape-tool-stack>button[data-tool=ellipse]:toolellipse",
+   "id": "dom:shape-tool-stack>button[data-tool=ellipse]",
    "kind": "dom",
    "surface": "shape-tool-stack > button",
    "capability": "Ellipse",
@@ -19358,7 +19358,7 @@
    ]
   },
   {
-   "id": "dom:shape-tool-stack>button[data-tool=line]:toolline",
+   "id": "dom:shape-tool-stack>button[data-tool=line]",
    "kind": "dom",
    "surface": "shape-tool-stack > button",
    "capability": "Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)",
@@ -19405,7 +19405,7 @@
    ]
   },
   {
-   "id": "dom:shape-tool-stack>button[data-tool=rect]:toolrect",
+   "id": "dom:shape-tool-stack>button[data-tool=rect]",
    "kind": "dom",
    "surface": "shape-tool-stack > button",
    "capability": "Rectangle",
@@ -19452,7 +19452,7 @@
    ]
   },
   {
-   "id": "dom:shape-tool-stack>button[data-tool=speechbubble]:toolspeechbubble",
+   "id": "dom:shape-tool-stack>button[data-tool=speechbubble]",
    "kind": "dom",
    "surface": "shape-tool-stack > button",
    "capability": "Speech bubble — rounded rect with an auto tail, drag to size (D)",
@@ -19499,7 +19499,7 @@
    ]
   },
   {
-   "id": "dom:shape-tool-stack>button[data-tool=star]:toolstar",
+   "id": "dom:shape-tool-stack>button[data-tool=star]",
    "kind": "dom",
    "surface": "shape-tool-stack > button",
    "capability": "Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)",
@@ -19546,7 +19546,7 @@
    ]
   },
   {
-   "id": "dom:symbol-tabs>div:scenetab",
+   "id": "dom:symbol-tabs>div[data-sym=]",
    "kind": "dom",
    "surface": "symbol-tabs > div",
    "capability": "Scene",
@@ -19581,151 +19581,7 @@
    "fixtures": []
   },
   {
-   "id": "dom:text-props-sec>button:aligncenteropt",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "Center",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8849"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:573",
-   "meta": {
-    "data": {
-     "val": "center"
-    },
-    "i18n": "alignCenterOpt",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:alignleftopt",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "Left",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8849"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:572",
-   "meta": {
-    "data": {
-     "val": "left"
-    },
-    "i18n": "alignLeftOpt",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:alignrightopt",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "Right",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8849"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:574",
-   "meta": {
-    "data": {
-     "val": "right"
-    },
-    "i18n": "alignRightOpt",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:b",
+   "id": "dom:text-props-sec>button[data-flag=bold]",
    "kind": "dom",
    "surface": "text-props-sec > button",
    "capability": "B",
@@ -19773,7 +19629,7 @@
    ]
   },
   {
-   "id": "dom:text-props-sec>button:i",
+   "id": "dom:text-props-sec>button[data-flag=italic]",
    "kind": "dom",
    "surface": "text-props-sec > button",
    "capability": "I",
@@ -19821,7 +19677,7 @@
    ]
   },
   {
-   "id": "dom:text-props-sec>button:s",
+   "id": "dom:text-props-sec>button[data-flag=strike]",
    "kind": "dom",
    "surface": "text-props-sec > button",
    "capability": "S",
@@ -19869,295 +19725,7 @@
    ]
   },
   {
-   "id": "dom:text-props-sec>button:tpcasecap",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "Ab",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8858"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:586",
-   "meta": {
-    "data": {
-     "val": "capitalize"
-    },
-    "i18n": "tpCaseCap",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:tpcaselower",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "aa",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8858"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:585",
-   "meta": {
-    "data": {
-     "val": "lower"
-    },
-    "i18n": "tpCaseLower",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:tpcasenone",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "Aa",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8858"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:583",
-   "meta": {
-    "data": {
-     "val": "none"
-    },
-    "i18n": "tpCaseNone",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:tpcaseupper",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "AA",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8858"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:584",
-   "meta": {
-    "data": {
-     "val": "upper"
-    },
-    "i18n": "tpCaseUpper",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:tpwidthauto",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "Auto width",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8864"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:605",
-   "meta": {
-    "data": {
-     "val": "auto"
-    },
-    "i18n": "tpWidthAuto",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:tpwidthfixed",
-   "kind": "dom",
-   "surface": "text-props-sec > button",
-   "capability": "Fixed width",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/timeline.js:8864"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "UI (contextual)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/index.html:606",
-   "meta": {
-    "data": {
-     "val": "fixed"
-    },
-    "i18n": "tpWidthFixed",
-    "container": "text-props-sec",
-    "modal": false,
-    "hiddenAtLoad": true,
-    "functionsVisited": 122,
-    "via": "callback b",
-    "references": []
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "dom:text-props-sec>button:u",
+   "id": "dom:text-props-sec>button[data-flag=underline]",
    "kind": "dom",
    "surface": "text-props-sec > button",
    "capability": "U",
@@ -20205,7 +19773,439 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=draw]:tooldraw",
+   "id": "dom:text-props-sec>button[data-val=auto]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "Auto width",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8864"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:605",
+   "meta": {
+    "data": {
+     "val": "auto"
+    },
+    "i18n": "tpWidthAuto",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=capitalize]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "Ab",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8858"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:586",
+   "meta": {
+    "data": {
+     "val": "capitalize"
+    },
+    "i18n": "tpCaseCap",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=center]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "Center",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8849"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:573",
+   "meta": {
+    "data": {
+     "val": "center"
+    },
+    "i18n": "alignCenterOpt",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=fixed]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "Fixed width",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8864"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:606",
+   "meta": {
+    "data": {
+     "val": "fixed"
+    },
+    "i18n": "tpWidthFixed",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=left]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "Left",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8849"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:572",
+   "meta": {
+    "data": {
+     "val": "left"
+    },
+    "i18n": "alignLeftOpt",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=lower]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "aa",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8858"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:585",
+   "meta": {
+    "data": {
+     "val": "lower"
+    },
+    "i18n": "tpCaseLower",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=none]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "Aa",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8858"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:583",
+   "meta": {
+    "data": {
+     "val": "none"
+    },
+    "i18n": "tpCaseNone",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=right]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "Right",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8849"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:574",
+   "meta": {
+    "data": {
+     "val": "right"
+    },
+    "i18n": "alignRightOpt",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:text-props-sec>button[data-val=upper]",
+   "kind": "dom",
+   "surface": "text-props-sec > button",
+   "capability": "AA",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/timeline.js:8858"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "UI (contextual)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "selection": 2,
+    "render": 2,
+    "animation": 3,
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/index.html:584",
+   "meta": {
+    "data": {
+     "val": "upper"
+    },
+    "i18n": "tpCaseUpper",
+    "container": "text-props-sec",
+    "modal": false,
+    "hiddenAtLoad": true,
+    "functionsVisited": 122,
+    "via": "callback b",
+    "references": []
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "dom:tools-panel>button[data-tool=draw]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Brush",
@@ -20252,7 +20252,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=eraser]:tooleraser",
+   "id": "dom:tools-panel>button[data-tool=eraser]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Eraser (E in Animation 2D — Motion mode reserves E to reveal Effects)",
@@ -20299,7 +20299,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=eyedropper]:tooleyedropper",
+   "id": "dom:tools-panel>button[data-tool=eyedropper]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Eyedropper",
@@ -20346,7 +20346,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=fill]:toolfill",
+   "id": "dom:tools-panel>button[data-tool=fill]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Fill",
@@ -20393,7 +20393,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=fillbrush]:toolfillbrush",
+   "id": "dom:tools-panel>button[data-tool=fillbrush]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Fill Brush",
@@ -20440,7 +20440,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=fsselect]:toolfsselect",
+   "id": "dom:tools-panel>button[data-tool=fsselect]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Fill/Stroke Select — click a fill or a stroke segment to select it independently (M in Animation 2D — Motion mode reserves M to reveal Mattes)",
@@ -20487,7 +20487,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=hand]:toolhand",
+   "id": "dom:tools-panel>button[data-tool=hand]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Hand",
@@ -20534,7 +20534,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=pen]:toolpen",
+   "id": "dom:tools-panel>button[data-tool=pen]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Pen",
@@ -20581,7 +20581,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=rig]:toolrig",
+   "id": "dom:tools-panel>button[data-tool=rig]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Rig — 3 steps in the panel: 1. Draw (click=anchor, drag=curve) 2. Assign (link shapes to bones) 3. Move (drag an anchor to pose) (S in Animation 2D — Motion mode reserves S for Scale)",
@@ -20628,7 +20628,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=rotate]:toolrotate",
+   "id": "dom:tools-panel>button[data-tool=rotate]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Rotate canvas",
@@ -20675,7 +20675,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=select]:toolselect",
+   "id": "dom:tools-panel>button[data-tool=select]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Select",
@@ -20722,7 +20722,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=subselect]:toolsubselect",
+   "id": "dom:tools-panel>button[data-tool=subselect]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Subselect (nodes)",
@@ -20769,7 +20769,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=text]:tooltext",
+   "id": "dom:tools-panel>button[data-tool=text]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Text",
@@ -20816,7 +20816,7 @@
    ]
   },
   {
-   "id": "dom:tools-panel>button[data-tool=zoom]:toolzoom",
+   "id": "dom:tools-panel>button[data-tool=zoom]",
    "kind": "dom",
    "surface": "tools-panel > button",
    "capability": "Zoom",
@@ -20863,7 +20863,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchorbc",
+   "id": "dom:xform-anchor-grid>button[data-key=bc]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Bottom-center",
@@ -20909,7 +20909,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchorbl",
+   "id": "dom:xform-anchor-grid>button[data-key=bl]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Bottom-left",
@@ -20955,7 +20955,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchorbr",
+   "id": "dom:xform-anchor-grid>button[data-key=br]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Bottom-right",
@@ -21001,7 +21001,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchormc",
+   "id": "dom:xform-anchor-grid>button[data-key=mc]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Center",
@@ -21047,7 +21047,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchorml",
+   "id": "dom:xform-anchor-grid>button[data-key=ml]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Middle-left",
@@ -21093,7 +21093,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchormr",
+   "id": "dom:xform-anchor-grid>button[data-key=mr]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Middle-right",
@@ -21139,7 +21139,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchortc",
+   "id": "dom:xform-anchor-grid>button[data-key=tc]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Top-center",
@@ -21185,7 +21185,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchortl",
+   "id": "dom:xform-anchor-grid>button[data-key=tl]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Top-left",
@@ -21231,7 +21231,7 @@
    ]
   },
   {
-   "id": "dom:xform-anchor-grid>button:anchortr",
+   "id": "dom:xform-anchor-grid>button[data-key=tr]",
    "kind": "dom",
    "surface": "xform-anchor-grid > button",
    "capability": "Top-right",
@@ -23187,6 +23187,82 @@
    "fixtures": []
   },
   {
+   "id": "menu:layer-inout.js:buildBar:aligner-a-droite-out",
+   "kind": "menu",
+   "surface": "dynamic menu (buildBar)",
+   "capability": "Aligner à droite (out)",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/layer-inout.js:1566 buildBar()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/layer-inout.js:1566",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 39
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:layer-inout.js:buildBar:aligner-a-gauche-in",
+   "kind": "menu",
+   "surface": "dynamic menu (buildBar)",
+   "capability": "Aligner à gauche (in)",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/layer-inout.js:1564 buildBar()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/layer-inout.js:1564",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 39
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
    "id": "menu:layer-inout.js:buildBar:aligner-au-centre",
    "kind": "menu",
    "surface": "dynamic menu (buildBar)",
@@ -23225,121 +23301,7 @@
    ]
   },
   {
-   "id": "menu:layer-inout.js:buildBar:aligner-droite-out",
-   "kind": "menu",
-   "surface": "dynamic menu (buildBar)",
-   "capability": "Aligner à droite (out)",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/layer-inout.js:1566 buildBar()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/layer-inout.js:1566",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 39
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:layer-inout.js:buildBar:aligner-gauche-in",
-   "kind": "menu",
-   "surface": "dynamic menu (buildBar)",
-   "capability": "Aligner à gauche (in)",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/layer-inout.js:1564 buildBar()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/layer-inout.js:1564",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 39
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:layer-inout.js:buildBar:chelonner-stagger",
-   "kind": "menu",
-   "surface": "dynamic menu (buildBar)",
-   "capability": "Échelonner (stagger)…",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/layer-inout.js:1568 buildBar()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/layer-inout.js:1568",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 25
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:layer-inout.js:buildBar:distribuer-uniform-ment",
+   "id": "menu:layer-inout.js:buildBar:distribuer-uniformement",
    "kind": "menu",
    "surface": "dynamic menu (buildBar)",
    "capability": "Distribuer uniformément",
@@ -23366,6 +23328,44 @@
    "meta": {
     "i18n": null,
     "functionsVisited": 21
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:layer-inout.js:buildBar:echelonner-stagger",
+   "kind": "menu",
+   "surface": "dynamic menu (buildBar)",
+   "capability": "Échelonner (stagger)…",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/layer-inout.js:1568 buildBar()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/layer-inout.js:1568",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 25
    },
    "fixtures": [
     "static-props",
@@ -23415,7 +23415,7 @@
    ]
   },
   {
-   "id": "menu:layer-inout.js:buildBar:inverser-la-s-lection",
+   "id": "menu:layer-inout.js:buildBar:inverser-la-selection",
    "kind": "menu",
    "surface": "dynamic menu (buildBar)",
    "capability": "Inverser la sélection",
@@ -23450,7 +23450,7 @@
    ]
   },
   {
-   "id": "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps",
+   "id": "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps-a",
    "kind": "menu",
    "surface": "dynamic menu (buildBar)",
    "capability": "Parent in Time — lier le temps à…",
@@ -23492,7 +23492,7 @@
    ]
   },
   {
-   "id": "menu:layer-inout.js:buildBar:r-initialiser-pleine-dur-e",
+   "id": "menu:layer-inout.js:buildBar:reinitialiser-pleine-duree",
    "kind": "menu",
    "surface": "dynamic menu (buildBar)",
    "capability": "Réinitialiser (pleine durée)",
@@ -23534,7 +23534,7 @@
    ]
   },
   {
-   "id": "menu:layer-inout.js:buildBar:s-lectionner-1-sur-2",
+   "id": "menu:layer-inout.js:buildBar:selectionner-1-sur-2",
    "kind": "menu",
    "surface": "dynamic menu (buildBar)",
    "capability": "Sélectionner 1 sur 2",
@@ -23569,7 +23569,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:buildEl:aller-ce-rep-re",
+   "id": "menu:markers.js:buildEl:aller-a-ce-repere",
    "kind": "menu",
    "surface": "dynamic menu (buildEl)",
    "capability": "Aller à ce repère",
@@ -23606,7 +23606,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:buildEl:renommer-le-rep-re",
+   "id": "menu:markers.js:buildEl:renommer-le-repere",
    "kind": "menu",
    "surface": "dynamic menu (buildEl)",
    "capability": "Renommer le repère…",
@@ -23643,7 +23643,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:buildEl:supprimer-le-rep-re",
+   "id": "menu:markers.js:buildEl:supprimer-le-repere",
    "kind": "menu",
    "surface": "dynamic menu (buildEl)",
    "capability": "Supprimer le repère",
@@ -23680,7 +23680,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:initRulerMenu:ajouter-un-rep-re-ici-frame",
+   "id": "menu:markers.js:initRulerMenu:ajouter-un-repere-ici-frame",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
    "capability": "Ajouter un repère ici (frame ",
@@ -23717,7 +23717,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:initRulerMenu:ajouter-un-rep-re-nomm",
+   "id": "menu:markers.js:initRulerMenu:ajouter-un-repere-nomme",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
    "capability": "Ajouter un repère nommé…",
@@ -23789,7 +23789,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:initRulerMenu:r-duire-la-composition-la-zone-de-travail",
+   "id": "menu:markers.js:initRulerMenu:reduire-la-composition-a-la-zone-de-travail",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
    "capability": "Réduire la composition à la zone de travail",
@@ -23824,7 +23824,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:initRulerMenu:rep-re-pr-c-dent-maj",
+   "id": "menu:markers.js:initRulerMenu:repere-precedent-maj",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
    "capability": "Repère précédent  (Maj+←)",
@@ -23864,7 +23864,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:initRulerMenu:rep-re-suivant-maj",
+   "id": "menu:markers.js:initRulerMenu:repere-suivant-maj",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
    "capability": "Repère suivant  (Maj+→)",
@@ -23904,7 +23904,7 @@
    ]
   },
   {
-   "id": "menu:markers.js:initRulerMenu:supprimer-tous-les-rep-res",
+   "id": "menu:markers.js:initRulerMenu:supprimer-tous-les-reperes",
    "kind": "menu",
    "surface": "dynamic menu (initRulerMenu)",
    "capability": "Supprimer tous les repères",
@@ -27704,7 +27704,7 @@
    ]
   },
   {
-   "id": "menu:select-bridge.js:onContext:arri-re-plan",
+   "id": "menu:select-bridge.js:onContext:arriere-plan",
    "kind": "menu",
    "surface": "dynamic menu (onContext)",
    "capability": "Arrière-plan",
@@ -28092,7 +28092,7 @@
    ]
   },
   {
-   "id": "menu:select-bridge.js:onContext:exposer-l-opacit-comme-propri-t-de-component",
+   "id": "menu:select-bridge.js:onContext:exposer-l-opacite-comme-propriete-de-component",
    "kind": "menu",
    "surface": "dynamic menu (onContext)",
    "capability": "Exposer l\\'opacité comme propriété de Component…",
@@ -28129,7 +28129,7 @@
    ]
   },
   {
-   "id": "menu:select-bridge.js:onContext:exposer-la-visibilit-comme-propri-t-de-component",
+   "id": "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone",
    "kind": "menu",
    "surface": "dynamic menu (onContext)",
    "capability": "Exposer la visibilité comme propriété de Component…",
@@ -28317,7 +28317,7 @@
    ]
   },
   {
-   "id": "menu:select-bridge.js:onContext:sugg-rer-la-forme-pour",
+   "id": "menu:select-bridge.js:onContext:suggerer-la-forme-pour",
    "kind": "menu",
    "surface": "dynamic menu (onContext)",
    "capability": "Suggérer la forme pour « ",
@@ -28622,7 +28622,7 @@
    ]
   },
   {
-   "id": "menu:storyboard.js:renderSound:d-tacher-du-montage",
+   "id": "menu:storyboard.js:renderSound:detacher-du-montage",
    "kind": "menu",
    "surface": "dynamic menu (renderSound)",
    "capability": "Détacher du montage",
@@ -28742,7 +28742,7 @@
    ]
   },
   {
-   "id": "menu:storyboard.js:wireModuleMenu:d-tacher-du-montage",
+   "id": "menu:storyboard.js:wireModuleMenu:detacher-du-montage",
    "kind": "menu",
    "surface": "dynamic menu (wireModuleMenu)",
    "capability": "Détacher du montage",
@@ -28775,7 +28775,7 @@
    ]
   },
   {
-   "id": "menu:storyboard.js:wireModuleMenu:d-tacher-du-montage#2",
+   "id": "menu:storyboard.js:wireModuleMenu:detacher-du-montage#2",
    "kind": "menu",
    "surface": "dynamic menu (wireModuleMenu)",
    "capability": "Détacher du montage",
@@ -28805,7 +28805,7 @@
    ]
   },
   {
-   "id": "menu:storyboard.js:wireModuleMenu:diter-l-animation",
+   "id": "menu:storyboard.js:wireModuleMenu:editer-l-animation",
    "kind": "menu",
    "surface": "dynamic menu (wireModuleMenu)",
    "capability": "Éditer l’animation",
@@ -28876,7 +28876,7 @@
    ]
   },
   {
-   "id": "menu:storyboard.js:wireModuleMenu:r-initialiser-le-retiming",
+   "id": "menu:storyboard.js:wireModuleMenu:reinitialiser-le-retiming",
    "kind": "menu",
    "surface": "dynamic menu (wireModuleMenu)",
    "capability": "Réinitialiser le retiming",
@@ -29031,7 +29031,7 @@
    ]
   },
   {
-   "id": "menu:storyboard.js:wireSpace:aucun-composant-cr-ez-en-un-en-animation-2d",
+   "id": "menu:storyboard.js:wireSpace:aucun-composant-creez-en-un-en-animation-2d",
    "kind": "menu",
    "surface": "dynamic menu (wireSpace)",
    "capability": "(Aucun composant — créez-en un en Animation 2D)",
