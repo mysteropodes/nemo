@@ -62,6 +62,8 @@ test('fixed original-window scenario uses actual pins and exact blue/red/history
   const bootstrap = JSON.parse(result.calls.find(c => c.name === 'nemo_native_object_bootstrap').args.requestJson);
   const document = JSON.parse(bootstrap.documentJson);
   assert.equal(document.formatVersion, 2); assert.deepEqual(document.objects[0].fill, { kind: 'solid', r: 0, g: 0, b: 1, a: 1 });
+  assert.deepEqual(document.layers, [{ layerUid: 'L0', timing: { format: 'nemo.native-layer-timing', formatVersion: 1,
+    family: 'drawing', contextId: 'scene-root', keys: [{ frame: 0 }], samples: [] } }]);
   assert.equal(document.objects.length, 2); assert.equal(document.objects[1].target.strokeId, 'b');
   assert.deepEqual(document.objects[1].fill, { kind: 'solid', r: 0, g: 1, b: 0, a: 1 });
   const reads = result.calls.filter(c => c.name === 'nemo_native_object_dispatch').map(c => JSON.parse(c.args.requestJson)).filter(r => r.operation === 'query.document.object');

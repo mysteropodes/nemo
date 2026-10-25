@@ -9,7 +9,9 @@
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   const target = { contextId: 'scene-root', frameScope: { kind: 'authored', frame: 0 }, layerUid: 'L0', strokeId: 'a' };
   const document = {
-    format: 'nemo.native-object-document', formatVersion: 2, totalFrames: 1, layers: [{ layerUid: 'L0' }],
+    format: 'nemo.native-object-document', formatVersion: 2, totalFrames: 1,
+    layers: [{ layerUid: 'L0', timing: { format: 'nemo.native-layer-timing', formatVersion: 1,
+      family: 'drawing', contextId: 'scene-root', keys: [{ frame: 0 }], samples: [] } }],
     objects: [{ schemaVersion: 1, family: 'closed-solid-fill-cubic-path', target,
       geometry: { kind: 'cubic-path', closed: true, coordinateSpace: 'document-world', handleSpace: 'relative',
         segments: [[16, 16], [120, 16], [120, 120], [16, 120]].map(([x, y]) => ({ point: { x, y }, handleIn: { x: 0, y: 0 }, handleOut: { x: 0, y: 0 } })) },
