@@ -14,6 +14,63 @@ use tauri_plugin_fs::FsExt;
 const PHASES: [&str; 6] = ["ready", "blue", "red", "undo", "redo", "released"];
 const EXPORT_PHASES: [&str; 5] = ["ready", "blue", "refused", "exported", "released"];
 const MAX_BYTES: usize = 2048;
+const FAILURE_STAGES: &[&str] = &[
+    "invoke-ready",
+    "runtime-invoke",
+    "runtime-pins",
+    "ready-checkpoint",
+    "identity-invoke",
+    "identity-pins",
+    "bootstrap-invoke",
+    "bootstrap-receipt",
+    "status-invoke",
+    "status-pins",
+    "primary-query-invoke",
+    "primary-query-correlation",
+    "primary-query-snapshot",
+    "primary-query-record",
+    "sibling-query-invoke",
+    "sibling-query-correlation",
+    "sibling-query-snapshot",
+    "sibling-query-record",
+    "preview-dpr",
+    "preview-invoke",
+    "preview-receipt",
+    "blue-checkpoint",
+    "fill-invoke",
+    "fill-correlation",
+    "red-checkpoint",
+    "undo-invoke",
+    "undo-correlation",
+    "undo-checkpoint",
+    "redo-invoke",
+    "redo-correlation",
+    "redo-checkpoint",
+    "cleanup-invoke",
+    "cleanup-receipt",
+    "released-checkpoint",
+];
+const FAILURE_CODES: &[&str] = &[
+    "invalid_request",
+    "unavailable",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "stale_owner",
+    "cancelled_before_dispatch",
+    "cleanup_failed",
+    "revision_unacknowledged",
+];
+fn failure_stage_allowed(stage: &str) -> bool {
+    match stage.split_once(':') {
+        Some((base, code)) => {
+            FAILURE_STAGES.contains(&base)
+                && base.ends_with("-invoke")
+                && FAILURE_CODES.contains(&code)
+        }
+        None => FAILURE_STAGES.contains(&stage),
+    }
+}
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Packet {
@@ -207,7 +264,10 @@ impl Session {
                 || packet.work_id.is_some()
                 || packet.revision.is_some()
                 || packet.export.is_some()
-                || packet.failure_stage.is_some()
+                || !packet
+                    .failure_stage
+                    .as_deref()
+                    .is_some_and(failure_stage_allowed)
             {
                 return Err("probe failure refused");
             }
@@ -219,7 +279,9 @@ impl Session {
                 return Err("probe failure already recorded");
             }
             self.failed = true;
-            self.records.push(json!({"phase":"failed","status":"operation_failed","cleanupSucceeded":packet.cleanup_succeeded}));
+            self.records
+                .push(json!({"phase":"failed","status":"operation_failed",
+                "cleanupSucceeded":packet.cleanup_succeeded,"failureStage":packet.failure_stage}));
             self.persist()?;
             return Ok(false);
         }
