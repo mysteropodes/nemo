@@ -9,6 +9,8 @@ use native_engine::{
     document::OpacityDocument, object_document::FrameScopeKind, scheduler::OutputSpec,
 };
 use serde_json::json;
+#[path = "native_object_preview_route_split_tests.rs"]
+mod split_tests;
 #[path = "native_object_preview_route_test_support.rs"]
 mod support;
 

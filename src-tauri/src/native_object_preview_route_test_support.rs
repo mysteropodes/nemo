@@ -178,6 +178,12 @@ impl Fixture {
         Self::from_state(state)
     }
     pub(super) fn cut_project() -> Self {
+        Self::from_project(Self::selection_project(false))
+    }
+    pub(super) fn split_project() -> Self {
+        Self::from_project(Self::selection_project(true))
+    }
+    fn selection_project(split: bool) -> Value {
         let mut drawing = document();
         drawing["totalFrames"] = json!(4);
         drawing["layers"][0]["timing"]["keys"] = json!([{"frame":0},{"frame":3}]);
@@ -206,8 +212,20 @@ impl Fixture {
                 {"layerUid":"L0","strokeId":"b","naturalPosition":2,"order":{}}]},
             {"frameScope":{"kind":"authored","frame":3},"elements":[
                 {"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{}}]}]);
-        let project = json!({"format":"nemo.native-project-document","formatVersion":1,
-            "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]});
+        if split {
+            let mut d = drawing["objects"][2].clone();
+            d["target"]["strokeId"] = json!("d");
+            d["target"]["frameScope"]["frame"] = json!(3);
+            drawing["objects"].as_array_mut().unwrap().push(d);
+            drawing["compositionOrder"]["contexts"][0]["scopes"][1]["elements"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"layerUid":"L0","strokeId":"d","naturalPosition":1,"order":{}}));
+        }
+        json!({"format":"nemo.native-project-document","formatVersion":1,
+            "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]})
+    }
+    fn from_project(project: Value) -> Self {
         let state = ApplicationMcp::default();
         state
             .install_native_project_file(&serde_json::to_vec(&project).unwrap())
