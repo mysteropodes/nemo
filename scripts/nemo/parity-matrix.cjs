@@ -53,6 +53,7 @@ function outputs() {
     baseline: readJson('baseline-surfaces.json'), mapping: readJson('mapping.json'), owners: readJson('owners.json'),
     ownership: readOptional('ownership.json') };
   const problems = lib.validate(input);
+  if (!fs.existsSync(file('ownership.json'))) problems.push('ownership.json is missing');
   if (input.baseline.baseline !== input.config.baseline) problems.push('baseline-surfaces.json was frozen at a different SHA than config.json');
   const matrix = lib.buildMatrix(input);
   return { problems, matrix, files: { 'matrix.json': json(matrix), 'PARITY.md': lib.renderMarkdown(matrix) } };

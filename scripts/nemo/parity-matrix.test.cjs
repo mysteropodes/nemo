@@ -63,12 +63,15 @@ test('the CSV reader keeps quoted commas, quotes and newlines inside one field',
 
 test('curated ownership adds owners with snapshot state and is validated', () => {
   const snapshot = { owners: { F09: [{ issue: 1, state: 'closed' }] }, curatedStates: { 7: 'open' } };
-  const ownership = { tasks: { G43: [{ issue: 7, confidence: 'medium' }], F09: [{ issue: 1 }] } };
+  const ownership = { tasks: { G43: [{ issue: 7, confidence: 'medium', evidence: 'x' }], F09: [{ issue: 1, confidence: 'high', evidence: 'y' }] } };
   const owners = lib.mergedOwners(snapshot, ownership);
   assert.deepEqual(owners.G43, [{ issue: 7, state: 'open', curated: 'medium' }]);
   assert.deepEqual(owners.F09, [{ issue: 1, state: 'closed' }], 'a declared owner is not duplicated');
   const m = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: ['G43'] } } }, owners: snapshot, ownership });
-  assert.equal(m.surfaces[0].status, 'issues-open');
-  const bad = lib.validate({ tasks, baseline, mapping: { surfaces: {} }, ownership: { tasks: { Q99: [{ issue: 0 }] } } });
-  assert.ok(bad.some((p) => /ownership names unknown task Q99/.test(p)) && bad.some((p) => /invalid issue/.test(p)), bad.join(' | '));
+  assert.equal(m.surfaces[0].status, 'curated-open', 'curated-only ownership is reported apart from declared');
+  const bad = lib.validate({ tasks, baseline, owners: snapshot,
+    mapping: { surfaces: { 'dom:#a': { tasks: ['F09'], confidence: 'sure' }, 'dom:#b': { tasks: ['F09'], noTask: true } } },
+    ownership: { tasks: { Q99: [{ issue: 0 }], G43: [{ issue: 9, confidence: 'high', evidence: 'e' }, { issue: 9, confidence: 'high', evidence: '' }] } } });
+  for (const pattern of [/unknown task Q99/, /invalid issue/, /invalid confidence sure/, /noTask but lists tasks/, /lists #9 twice/,
+    /#9 has no evidence/, /#9 has no state in the owners snapshot/]) assert.ok(bad.some((p) => pattern.test(p)), pattern + ' in ' + bad.join(' | '));
 });

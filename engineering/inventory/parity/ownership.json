@@ -27,7 +27,7 @@
       {
         "issue": 2355,
         "confidence": "low",
-        "evidence": "#2355 retires shared-merge writers behind native snapshots; publish/pull not explicit"
+        "evidence": "#2355 replaces the shared-merge writer (SM.mergeRemoteSnapshot) with native-snapshot merge; confirm scope covers publish/pull"
       }
     ],
     "D07": [
@@ -361,9 +361,9 @@
     ],
     "X09": [
       {
-        "issue": 2050,
+        "issue": 2368,
         "confidence": "low",
-        "evidence": "#2050/#2058 combined temporal candidate; no explicit variants issue"
+        "evidence": "combined candidate builds precede final promotion #2368; no dedicated candidate-qualification issue (review fix)"
       }
     ],
     "X10": [
@@ -417,9 +417,9 @@
     ],
     "X17": [
       {
-        "issue": 1035,
-        "confidence": "low",
-        "evidence": "#1035 P33 accepts census against integrated evidence; cross-family regression"
+        "issue": 2346,
+        "confidence": "medium",
+        "evidence": "CS6 #2346 part 2 runs the per-family native acceptance commands (cross-family regression matrix) (review fix)"
       }
     ],
     "X18": [

@@ -2698,11 +2698,11 @@
     },
     "dom:#start-github": {
       "tasks": [
-        "U01"
+        "D04"
       ],
       "confidence": "low",
-      "note": "external repo link",
-      "proposedDisposition": "presentational external link; no document behaviour"
+      "note": "start-screen external repository link (review fix)",
+      "proposedDisposition": "external repository link; presentation only"
     },
     "dom:#start-new": {
       "tasks": [
@@ -5635,11 +5635,11 @@
     },
     "menu:timeline.js:renderLayerList:ctxmenuinsert": {
       "tasks": [
-        "F07",
-        "F06"
+        "F06",
+        "F07"
       ],
       "confidence": "low",
-      "note": "layer-list context menu"
+      "note": "insert layer/null/folder/effect/guide: layer kinds first (review fix)"
     },
     "menu:timeline.js:renderLayerList:ctxmenulfs": {
       "tasks": [
@@ -5650,10 +5650,12 @@
     },
     "menu:timeline.js:renderLayerList:ctxmenuorganise": {
       "tasks": [
-        "F07"
+        "F06",
+        "I17",
+        "I18"
       ],
-      "confidence": "low",
-      "note": "layer-list context menu"
+      "confidence": "medium",
+      "note": "organise submenu: folder hierarchy, convert to component, merge (review fix)"
     },
     "menu:timeline.js:renderLayerList:ctxmergeselectedlayers": {
       "tasks": [
