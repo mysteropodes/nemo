@@ -70,9 +70,9 @@
       var env=runtime.processEnvironment,dir=env&&env.tempDir;
       if(typeof runtime.dataDir!=='string'||!runtime.dataDir.endsWith('/tauri-data')||
          dir!==runtime.dataDir.slice(0,-11)+'/tmp'||env.NEMO_REPORT_DIR!==runtime.dataDir.slice(0,-11)+'/reports')return;
-      async function read(name){var file=dir+'/'+name,stat=await api.fs.stat(file);
-        if(!stat.isFile||stat.size>4096)throw new Error('Validation packet refused');
-        return JSON.parse(await api.fs.readTextFile(file));}
+      async function read(name){var bytes=await api.fs.readTextFile(dir+'/'+name);
+        if(typeof bytes!=='string'||bytes.length>4096||new TextEncoder().encode(bytes).length>4096)throw new Error('Validation packet refused');
+        return JSON.parse(bytes);}
       var config=await read('settings-validation-config.json');
       var gate=create(runtime,config,{
         now:function(){return Date.now();},setTimer:setTimeout,clearTimer:clearTimeout,
