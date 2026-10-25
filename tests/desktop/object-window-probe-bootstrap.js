@@ -38,6 +38,46 @@
     'stale_revision', 'stale_owner', 'cancelled_before_dispatch', 'cleanup_failed', 'revision_unacknowledged'];
   let invoke, instanceId, pins, cleanupIdentity, releaseRequest, closed = false, ordinal = 0, stage = 'invoke-ready';
   const check = value => { if (!value) throw new Error('fixed scenario refused'); };
+  let surfaceUI, aperture, canvasBounds, welcome, previousDisplay, restored = false, underlayPresented = false;
+  async function preparePresentation() {
+    stage = 'presentation-ready';
+    function ready() {
+      const dom = window.document;
+      return dom && dom.documentElement && dom.getElementById('start-screen') &&
+        dom.getElementById('drawing-canvas') &&
+        typeof window.NemoNativeViewportUnderlay?.desktop === 'function' &&
+        typeof window.stageLayer?.visible === 'boolean' && typeof window.paper?.view?.update === 'function';
+    }
+    for (let attempt = 0; attempt < 300 && !ready(); attempt++) await pause(100);
+    check(ready());
+    check(!window.document.documentElement.classList.contains('nemo-native-underlay'));
+    welcome = window.document.getElementById('start-screen');
+    previousDisplay = { value: welcome.style.getPropertyValue('display'), priority: welcome.style.getPropertyPriority('display') };
+    surfaceUI = window.NemoNativeViewportUnderlay.desktop(window);
+    // Keep .hid unchanged: first-launch tutorial polling observes that class.
+    welcome.style.setProperty('display', 'none', 'important');
+    // The read below synchronously measures layout after this fixed overlay change.
+    stage = 'presentation-geometry';
+    const r = window.document.getElementById('drawing-canvas').getBoundingClientRect(), html = window.document.documentElement;
+    check([r.left, r.top, r.width, r.height, html.clientWidth, html.clientHeight].every(Number.isFinite) &&
+      r.left >= 0 && r.top >= 0 && r.width >= 320 && r.height >= 180 &&
+      r.left + r.width <= html.clientWidth && r.top + r.height <= html.clientHeight);
+    canvasBounds = { left: r.left, top: r.top, width: r.width, height: r.height, rootWidth: html.clientWidth, rootHeight: html.clientHeight };
+    aperture = Object.freeze({ x: r.left + (r.width - 320) / 2, y: r.top + (r.height - 180) / 2, width: 320, height: 180 });
+  }
+  function restorePresentation() {
+    if (restored) return;
+    stage = 'presentation-restore';
+    try { if (surfaceUI) surfaceUI.surfaceChanged(null); }
+    finally {
+      if (previousDisplay) {
+        if (previousDisplay.value) welcome.style.setProperty('display', previousDisplay.value, previousDisplay.priority);
+        else welcome.style.removeProperty('display');
+      }
+    }
+    restored = true;
+  }
+
   async function checkpoint(phase, status, frame, failureStage) {
     const payload = { runId: config.runId, phase, status };
     if (frame) { payload.workId = frame.workId; payload.revision = pins.contentRevision; }
@@ -84,7 +124,21 @@
     }
     return result;
   }
+  function verifyPresentationGeometry() {
+    stage = 'presentation-geometry';
+    const r = window.document.getElementById('drawing-canvas').getBoundingClientRect(), html = window.document.documentElement;
+    check(['left', 'top', 'width', 'height'].every(key => r[key] === canvasBounds[key]) &&
+      html.clientWidth === canvasBounds.rootWidth && html.clientHeight === canvasBounds.rootHeight &&
+      html.classList.contains('nemo-native-underlay') === underlayPresented);
+    check([r.left, r.top, r.width, r.height].every(Number.isFinite) && aperture.x >= r.left && aperture.y >= r.top &&
+      aperture.x + aperture.width <= r.left + r.width && aperture.y + aperture.height <= r.top + r.height && aperture.x >= 0 && aperture.y >= 0 &&
+      aperture.x + aperture.width <= html.clientWidth && aperture.y + aperture.height <= html.clientHeight);
+    if (underlayPresented) check(['left', 'top', 'right', 'bottom'].every((edge, index) =>
+      parseFloat(html.style.getPropertyValue('--nemo-native-' + edge)) ===
+        [aperture.x, aperture.y, aperture.x + aperture.width, aperture.y + aperture.height][index]));
+  }
   async function present() {
+    verifyPresentationGeometry();
     stage = 'preview-dpr';
     const dpr = Number(window.devicePixelRatio) || 1;
     check(dpr >= 1 && dpr <= 4);
@@ -92,13 +146,21 @@
       documentId: pins.documentId, contentRevision: pins.contentRevision, documentSnapshotId: pins.documentSnapshotId,
       lifecycleGeneration: pins.lifecycleGeneration, contextId: 'scene-root', scopeKind: 'authored', frame: 0,
       outputSpec: { kind: 'frame', format: 'rgba8', width: 320, height: 180, colorInterpretation: 'srgb', alphaMode: 'straight' },
-      viewport: { cssBounds: { x: 32, y: 80, width: 320, height: 180 }, physicalExtent: { width: Math.round(320 * dpr), height: Math.round(180 * dpr) },
+      viewport: { cssBounds: aperture, physicalExtent: { width: Math.round(320 * dpr), height: Math.round(180 * dpr) },
         compositionExtent: { width: 320, height: 180 }, reportedDpr: dpr } };
     for (let attempt = 0; attempt < 100; attempt++) {
       stage = 'preview-invoke';
       const receipt = await invoke('nemo_native_object_preview', { requestJson: JSON.stringify(request) });
       stage = 'preview-receipt';
-      if (receipt.status === 'presented') { check(typeof receipt.workId === 'string'); return receipt; }
+      if (receipt.status === 'presented') {
+        check(typeof receipt.workId === 'string' && receipt.workId.length > 0 && receipt.workId.length <= 128 &&
+          Number.isSafeInteger(receipt.viewGeneration) && receipt.viewGeneration > 0);
+        verifyPresentationGeometry();
+        stage = 'presentation-underlay';
+        surfaceUI.surfaceChanged(Object.assign({}, request, receipt), aperture);
+        underlayPresented = true;
+        return receipt;
+      }
       check(receipt.status === 'deferred-timeout' || receipt.status === 'deferred-occluded');
       await pause(100);
     }
@@ -132,6 +194,7 @@
       stage = 'runtime-pins';
       check(runtime.pid === config.pid && runtime.taskKey === config.taskKey && runtime.windows?.length === 1 && runtime.windows[0] === 'main');
       await checkpoint('ready', 'ready');
+      await preparePresentation();
       stage = 'identity-invoke';
       const identity = await invoke('nemo_mcp_identity');
       stage = 'identity-pins'; instanceId = identity.instanceId;
@@ -151,13 +214,14 @@
       await current(2); await checkpoint('undo', 'presented', await present());
       await dispatch('command.document.object.redo', { command: 'object.redo' }, true, 'redo');
       await current(3); await checkpoint('redo', 'presented', await present());
-      await release(); await checkpoint('released', 'succeeded');
+      await release(); restorePresentation(); await checkpoint('released', 'succeeded');
     } catch (error) {
       let code;
       try { if (error && typeof error === 'object') code = Object.getOwnPropertyDescriptor(error, 'code')?.value; } catch (_) { /* Unrecognized rejection retains the stage alone. */ }
       const failureStage = stage + (stage.endsWith('-invoke') && refusalCodes.includes(code) ? ':' + code : '');
       if (invoke) {
         try { await release(); } catch (_) { /* Native/process cleanup stays open. */ }
+        try { restorePresentation(); } catch (_) { /* Original failure remains authoritative. */ }
         try { await checkpoint('failed', 'operation_failed', null, failureStage); } catch (_) { /* Never synthesize a success. */ }
       }
     }

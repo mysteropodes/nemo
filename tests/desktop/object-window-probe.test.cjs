@@ -6,13 +6,42 @@ const vm = require('node:vm');
 const path = require('node:path');
 const script = fs.readFileSync(path.join(__dirname, 'object-window-probe-bootstrap.js'), 'utf8');
 const config = { runId: '11111111-1111-4111-8111-111111111111', pid: 42, taskKey: 'a'.repeat(64), sourceSha: 'b'.repeat(40) };
+const Underlay = require('../../src/js/adapters/native-viewport-underlay.js');
+function presentationFixture(options) {
+  function style(initial = {}) {
+    const values = new Map(Object.entries(initial)), priorities = new Map();
+    return { getPropertyValue: key => values.get(key) || '', getPropertyPriority: key => priorities.get(key) || '',
+      setProperty(key, value, priority = '') {
+        if (options.failRestore && key === 'display' && value === 'flex' && values.get(key) === 'none') throw Error('restore refused');
+        values.set(key, value); priorities.set(key, priority);
+      }, removeProperty(key) { values.delete(key); priorities.delete(key); } };
+  }
+  const classes = new Set(options.preowned ? ['nemo-native-underlay'] : []);
+  const classList = { contains: key => classes.has(key), add: key => classes.add(key), remove: key => classes.delete(key) };
+  const html = { classList, style: style(), clientWidth: 1400, clientHeight: 900 };
+  html.style.setProperty('--nemo-native-left', '7px', 'important');
+  const welcomeClasses = new Set(), welcome = { style: style(), classList: {
+    contains: key => welcomeClasses.has(key), add: key => welcomeClasses.add(key), remove: key => welcomeClasses.delete(key) } };
+  if (!options.emptyDisplay) welcome.style.setProperty('display', 'flex', 'important');
+  let rect = options.rect || { left: 66, top: 102, width: 1038, height: 504 };
+  const canvas = { getBoundingClientRect: () => ({ ...rect }) }, stageLayer = { visible: true };
+  const paper = { view: { update() { if (options.failUnderlay && !stageLayer.visible || options.failRestoreBackdrop && stageLayer.visible) throw Error('backdrop refused'); } } };
+  const document = { documentElement: html, getElementById: id =>
+    options.missingUI ? null : id === 'start-screen' ? welcome : id === 'drawing-canvas' ? canvas : null };
+  return { document, welcome, html, classes, stageLayer, paper, setRect: value => { rect = value; } };
+}
 async function scenario(options = {}) {
-  const calls = [], phases = []; let revision = 0, previews = 0, release = false, resume, statusCalls = 0, sourceDocument;
+  const ui = presentationFixture(options), observations = [];
+  const calls = [], phases = []; let revision = 0, previews = 0, release = false, resume, resumePreview, statusCalls = 0, sourceDocument;
   const invoke = async (name, args) => {
     calls.push({ name, args });
     if (options.failInvoke === name) throw (Object.hasOwn(options, 'rejection') ? options.rejection : new Error('private arbitrary error must not escape'));
     if (name === 'nemo_task_runtime') return { pid: options.foreign ? 43 : 42, taskKey: config.taskKey, windows: ['main'] };
-    if (name === 'nemo_test_object_window_probe') { const payload = JSON.parse(args.payloadJson); phases.push(payload); if (payload.phase === options.failCheckpoint) throw new Error('checkpoint refused'); if (payload.phase === options.blockAt) await new Promise(resolve => { resume = resolve; }); return; }
+    if (name === 'nemo_test_object_window_probe') { const payload = JSON.parse(args.payloadJson); phases.push(payload); observations.push({ phase: payload.phase, underlay: ui.classes.has('nemo-native-underlay'),
+        display: ui.welcome.style.getPropertyValue('display'), priority: ui.welcome.style.getPropertyPriority('display'),
+        backdrop: ui.stageLayer.visible, hid: ui.welcome.classList.contains('hid'),
+        edges: ['left', 'top', 'right', 'bottom'].map(edge => ui.html.style.getPropertyValue('--nemo-native-' + edge)) });
+      if (payload.phase === options.failCheckpoint) throw new Error('checkpoint refused'); if (payload.phase === options.blockAt) await new Promise(resolve => { resume = resolve; }); return; }
     if (name === 'nemo_mcp_identity') return { instanceId: options.badIdentity ? null : 'owned-instance' };
     if (name === 'nemo_native_object_bootstrap') { const request = JSON.parse(args.requestJson); assert.equal(request.instanceId, 'owned-instance'); sourceDocument = JSON.parse(request.documentJson); return { instanceId: 'owned-instance', documentId: options.badBootstrap ? null : 'owned-doc', contentRevision: 0 }; }
     if (name === 'nemo_native_object_client_status') { statusCalls++; if (options.failStatusAlways || (options.failFirstStatus && statusCalls === 1) || (options.failStatusAfterEdit && revision > 0)) throw new Error('status unavailable'); return { available: !options.badStatus, instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: revision, lifecycleGeneration: 7 }; }
@@ -39,19 +68,24 @@ async function scenario(options = {}) {
     if (name === 'nemo_native_object_preview') {
       const request = JSON.parse(args.requestJson); assert.equal(request.contentRevision, revision); assert.equal(request.documentSnapshotId, 'snapshot-' + revision);
       assert.deepEqual(request.outputSpec, { kind: 'frame', format: 'rgba8', width: 320, height: 180, colorInterpretation: 'srgb', alphaMode: 'straight' });
-      previews++; if (options.failPreview) throw new Error('not-presented');
+      previews++;
+      if (options.delayPreview && previews === 1) await new Promise(resolve => { resumePreview = resolve; });
+      if (options.badPreviewGeneration) return { status: 'presented', workId: 'work', viewGeneration: 0 };
+      if (options.failPreview) throw new Error('not-presented');
       return { status: options.badPreviewReceipt ? 'failed-validation' : options.defer && previews === 1 ? 'deferred-timeout' : 'presented', workId: 'work-' + revision, viewGeneration: 1 };
     }
     if (name === 'nemo_native_release') { assert.equal(args.request.instanceId, 'owned-instance'); assert.equal(args.request.documentId, 'owned-doc'); assert.equal(args.request.expectedRevision, revision); if (options.failRelease) throw new Error('release unavailable'); release = true; return { status: options.badReleaseReceipt ? 'failed' : 'succeeded', reentryAvailable: true }; }
     throw new Error('unknown invoke');
   };
-  const window = { __NEMO_OBJECT_WINDOW_PROBE_CONFIG__: { ...config, ...options.config }, __TAURI__: { core: { invoke } }, devicePixelRatio: options.dpr ?? 2 };
+  const window = { document: ui.document, stageLayer: ui.stageLayer, paper: ui.paper, state: { currentFrame: 0 },
+    NemoNativeViewportUnderlay: options.missingAdapter ? null : Underlay, requestAnimationFrame: fn => Promise.resolve().then(fn),
+    __NEMO_OBJECT_WINDOW_PROBE_CONFIG__: { ...config, ...options.config }, __TAURI__: { core: { invoke } }, devicePixelRatio: options.dpr ?? 2 };
   vm.runInNewContext(script, { window, setTimeout: fn => { Promise.resolve().then(fn); return 1; } });
-  for (let tick = 0; tick < 200; tick++) {
+  for (let tick = 0; tick < 1600; tick++) {
     await Promise.resolve();
     if (phases.some(p => p.phase === 'released' || p.phase === 'failed')) break;
   }
-  return { calls, phases, previews, release, window, resume };
+  return { calls, phases, previews, release, window, resume, resumePreview, ui, observations };
 }
 test('fixed original-window scenario uses actual pins and exact blue/red/history/release order', async () => {
   const result = await scenario();
@@ -197,4 +231,87 @@ test('only actual recognized HostResult code fields suffix invoke failures and s
     const result = await scenario({ failInvoke: 'nemo_native_object_preview', rejection });
     assert.equal(result.phases.at(-1).failureStage, 'preview-invoke');
   }
+});
+
+test('real production underlay exposes exactly the latched aperture and restores original presentation', async () => {
+  for (const emptyDisplay of [false, true]) {
+    const result = await scenario({ emptyDisplay });
+    assert.equal(result.phases.at(-1).phase, 'released');
+    assert.equal(result.observations[0].underlay, false);
+    assert.equal(result.observations[0].display, emptyDisplay ? '' : 'flex');
+    const frames = result.observations.filter(row => ['blue', 'red', 'undo', 'redo'].includes(row.phase));
+    assert.equal(frames.length, 4);
+    for (const row of frames) {
+      assert.equal(row.underlay, true); assert.equal(row.display, 'none');
+      assert.equal(row.backdrop, false); assert.equal(row.hid, false);
+      assert.deepEqual(row.edges, ['425px', '264px', '745px', '444px']);
+    }
+    const requests = result.calls.filter(call => call.name === 'nemo_native_object_preview').map(call => JSON.parse(call.args.requestJson));
+    assert.ok(requests.every(request => JSON.stringify(request.viewport.cssBounds) === JSON.stringify({ x: 425, y: 264, width: 320, height: 180 })));
+    assert.equal(result.ui.welcome.style.getPropertyValue('display'), emptyDisplay ? '' : 'flex');
+    assert.equal(result.ui.welcome.style.getPropertyPriority('display'), emptyDisplay ? '' : 'important');
+    assert.equal(result.ui.stageLayer.visible, true); assert.equal(result.ui.classes.has('nemo-native-underlay'), false);
+    assert.equal(result.ui.html.style.getPropertyValue('--nemo-native-left'), '7px');
+    assert.equal(result.ui.html.style.getPropertyPriority('--nemo-native-left'), 'important');
+  }
+});
+test('presentation setup refuses unavailable UI, preowned underlay and invalid canvas before bootstrap', async () => {
+  for (const options of [{ missingUI: true }, { missingAdapter: true }, { preowned: true },
+    ...[{ left: 66, top: 102, width: 319, height: 504 }, { left: -1, top: 0, width: 400, height: 300 },
+      { left: 66, top: 102, width: NaN, height: 504 }, { left: 1200, top: 0, width: 400, height: 300 }].map(rect => ({ rect }))]) {
+    const result = await scenario(options);
+    assert.equal(result.phases.at(-1).phase, 'failed');
+    assert.ok(['presentation-ready', 'presentation-geometry'].includes(result.phases.at(-1).failureStage));
+    assert.equal(result.calls.some(call => call.name === 'nemo_native_object_bootstrap'), false);
+    assert.equal(result.ui.welcome.style.getPropertyValue('display'), 'flex');
+    assert.equal(result.ui.classes.has('nemo-native-underlay'), !!options.preowned);
+  }
+});
+test('failed native release still restores underlay, backdrop and exact welcome style', async () => {
+  const result = await scenario({ failMutation: 'object.fill.set', failRelease: true });
+  assert.equal(result.phases.at(-1).failureStage, 'fill-invoke');
+  assert.equal(result.phases.at(-1).cleanupSucceeded, false);
+  assert.equal(result.ui.classes.has('nemo-native-underlay'), false); assert.equal(result.ui.stageLayer.visible, true);
+  assert.equal(result.ui.welcome.style.getPropertyValue('display'), 'flex');
+  assert.equal(result.ui.welcome.style.getPropertyPriority('display'), 'important');
+});
+test('failed backdrop presentation or restoration cannot earn a successful checkpoint', async () => {
+  for (const [options, stage] of [[{ failUnderlay: true }, 'presentation-underlay'],
+    [{ failRestore: true }, 'presentation-restore'], [{ failRestoreBackdrop: true }, 'presentation-restore'], [{ badPreviewGeneration: true }, 'preview-receipt']]) {
+    const result = await scenario(options);
+    assert.equal(result.phases.at(-1).phase, 'failed'); assert.equal(result.phases.at(-1).failureStage, stage);
+    assert.equal(result.ui.classes.has('nemo-native-underlay'), false); assert.equal(result.ui.stageLayer.visible, true);
+  }
+});
+test('ready acknowledgment precedes layout latch and later preview refuses geometry drift', async () => {
+  const ready = await scenario({ blockAt: 'ready' });
+  assert.equal(ready.ui.welcome.style.getPropertyValue('display'), 'flex');
+  ready.ui.setRect({ left: 100, top: 120, width: 800, height: 400 });
+  ready.resume();
+  for (let tick = 0; tick < 200 && !ready.phases.some(row => row.phase === 'released'); tick++) await Promise.resolve();
+  const preview = JSON.parse(ready.calls.find(call => call.name === 'nemo_native_object_preview').args.requestJson);
+  assert.deepEqual(preview.viewport.cssBounds, { x: 340, y: 230, width: 320, height: 180 });
+  const blue = await scenario({ blockAt: 'blue' });
+  assert.equal(blue.calls.filter(call => call.name === 'nemo_native_object_dispatch' && JSON.parse(call.args.requestJson).operation.startsWith('command.')).length, 0);
+  blue.ui.setRect({ left: 67, top: 102, width: 1038, height: 504 });
+  blue.resume();
+  for (let tick = 0; tick < 200 && !blue.phases.some(row => row.phase === 'failed'); tick++) await Promise.resolve();
+  assert.equal(blue.phases.at(-1).failureStage, 'presentation-geometry');
+  assert.ok(!blue.phases.some(row => row.phase === 'red'));
+});
+
+test('geometry changed while native preview awaits cannot open the aperture or earn blue', async () => {
+  const result = await scenario({ delayPreview: true });
+  assert.equal(typeof result.resumePreview, 'function');
+  assert.deepEqual(result.phases.map(row => row.phase), ['ready']);
+  assert.equal(result.ui.classes.has('nemo-native-underlay'), false);
+  result.ui.setRect({ left: 67, top: 102, width: 1038, height: 504 });
+  result.resumePreview();
+  for (let tick = 0; tick < 200 && !result.phases.some(row => row.phase === 'failed'); tick++) await Promise.resolve();
+  assert.equal(result.phases.at(-1).failureStage, 'presentation-geometry');
+  assert.equal(result.phases.some(row => row.phase === 'blue'), false);
+  assert.ok(result.observations.every(row => row.underlay === false));
+  assert.equal(result.calls.filter(call => call.name === 'nemo_native_release').length, 1);
+  assert.equal(result.phases.at(-1).cleanupSucceeded, true);
+  assert.equal(result.ui.welcome.style.getPropertyValue('display'), 'flex');
 });
