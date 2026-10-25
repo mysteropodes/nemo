@@ -144,7 +144,7 @@
     }
   }
   function ext(value, label, hasStroke) {
-    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather'], label);
+    exact(value, [], ['pressure', 'paramShape', 'boxAngle', 'fillGradient', 'fillTrace', 'isMask', 'maskMode', 'maskFeather', 'linkedFillId', 'isLinkedFillCompanion'], label);
     if (!Object.keys(value).length) fail(`${label} must be omitted when empty`);
     if (has(value, 'pressure')) {
       pressure(value.pressure, `${label}.pressure`);
@@ -152,6 +152,10 @@
     }
     if (has(value, 'paramShape')) shapeBody(value.paramShape, `${label}.paramShape`, false);
     if (has(value, 'boxAngle')) num(value.boxAngle, `${label}.boxAngle`);
+    if (has(value, 'linkedFillId') && (typeof value.linkedFillId !== 'string' || !value.linkedFillId.length || bytes(value.linkedFillId) > 128 || /[\u0000-\u001f\u007f-\u009f]/.test(value.linkedFillId))) fail(`${label}.linkedFillId must be a bounded identity`);
+    if (has(value, 'isLinkedFillCompanion') && typeof value.isLinkedFillCompanion !== 'boolean') fail(`${label}.isLinkedFillCompanion must be a boolean`);
+    if (value.isLinkedFillCompanion === true && (!has(value, 'linkedFillId') || has(value, 'pressure'))) fail(`${label} has an invalid linked-fill companion`);
+    if (has(value, 'linkedFillId') && value.isLinkedFillCompanion !== true && (!value.pressure || !Array.isArray(value.pressure.centerSegments) || value.pressure.centerSegments.length < 2)) fail(`${label} linked-fill primary requires its centreline`);
     if (has(value, 'isMask') && value.isMask !== null && typeof value.isMask !== 'boolean') fail(`${label}.isMask must be a boolean or null`);
     if (has(value, 'maskMode') && value.maskMode !== null && typeof value.maskMode !== 'string') fail(`${label}.maskMode must be a string or null`);
     if (has(value, 'maskFeather') && value.maskFeather !== null) num(value.maskFeather, `${label}.maskFeather`);
@@ -175,6 +179,45 @@
     if (value.fill !== null) solid(value.fill, 'vector record fill');
     body(value.vector, 'vector record vector');
     if (has(value, 'vectorExt')) ext(value.vectorExt, 'vector record vectorExt', value.vector.hasRealStroke);
+    if (value.vectorExt && has(value.vectorExt, 'linkedFillId') && (value.target.frameScope.kind !== 'authored' || (value.vectorExt.isLinkedFillCompanion === true && value.fill === null))) fail('linked-fill record requires an authored scope and a filled companion');
+  }
+
+  const readPaths = Object.freeze({ has: (at) =>
+    /^(?:payload\.stableTarget|result\.object\.target)\.(?:layerUid|strokeId)$/.test(at) ||
+    at === 'result.object.vectorExt.bitmapBrush.bitmapBrushSpec.tip' ||
+    at === 'result.object.vectorExt.bitmapBrush.brushGroupId' });
+
+  // Stored bitmap anchors are readable, but generic create/replace cannot write them.
+  // Validate a detached projection with the ordinary record guard; retain the original
+  // complete response, including optional-field presence and opaque authored identities.
+  function readRecord(value) {
+    if (!plain(value) || !plain(value.vectorExt) || !has(value.vectorExt, 'bitmapBrush')) return record(value, false);
+    const fields = value.vectorExt.bitmapBrush, label = 'vector record bitmapBrush';
+    exact(fields, ['bitmapBrushSpec', 'brushGroupId'], ['preTextureStroke', 'preTextureOpacity', 'bitmapPressureProfile'], label);
+    const spec = fields.bitmapBrushSpec;
+    exact(spec, ['tip', 'size', 'spacing', 'scatter', 'opacity', 'color', 'pressure', 'seed'], [], label + '.bitmapBrushSpec');
+    const identity = (text) => typeof text === 'string' && text.length > 0 && bytes(text) <= 255 && !text.includes('\0');
+    const color = (text) => typeof text === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(text);
+    if (!identity(spec.tip) || !identity(fields.brushGroupId)) fail(label + ' has an invalid identity');
+    ['size', 'spacing', 'scatter', 'opacity', 'seed'].forEach((key) => num(spec[key], label + '.' + key));
+    if (!color(spec.color) || typeof spec.pressure !== 'boolean') fail(label + ' has an invalid colour or pressure flag');
+    if (has(fields, 'preTextureStroke') && fields.preTextureStroke !== null && !color(fields.preTextureStroke)) fail(label + ' has an invalid remembered stroke');
+    if (has(fields, 'preTextureOpacity')) num(fields.preTextureOpacity, label + '.preTextureOpacity');
+    if (has(fields, 'bitmapPressureProfile')) {
+      const profile = fields.bitmapPressureProfile;
+      if (!Array.isArray(profile) || profile.length > 4096) fail(label + ' has an invalid pressure profile');
+      profile.forEach((point) => {
+        if (!Array.isArray(point) || point.length !== 3) fail(label + ' pressure points require three numbers');
+        point.forEach((n) => num(n, label + '.bitmapPressureProfile'));
+      });
+    }
+    if (has(value.vectorExt, 'linkedFillId') || value.vectorExt.isLinkedFillCompanion === true) fail(label + ' cannot also be a linked-fill pair');
+    const projected = Object.assign({}, value, { vectorExt: Object.assign({}, value.vectorExt) });
+    delete projected.vectorExt.bitmapBrush;
+    if (!Object.keys(projected.vectorExt).length) delete projected.vectorExt;
+    record(projected, false);
+    if (value.fill === null ? value.vector.opacity !== 0 || !has(fields, 'preTextureOpacity')
+      : value.vector.stroke !== null || !has(fields, 'preTextureStroke')) fail(label + ' camouflage is inconsistent');
   }
 
   function effect(value, label) {
@@ -272,7 +315,7 @@
   const members = (command) => (has(COMMANDS, command) ? COMMANDS[command][1].slice() : null);
   const bytes = (text) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(text).length : unescape(encodeURIComponent(text)).length);
   return Object.freeze(Object.assign({
-    compose, record, target, operationOf, members, bytes, FAMILY, VECTOR, PARAMETRIC, EFFECTS,
+    compose, record, readRecord, readPaths, target, operationOf, members, bytes, FAMILY, VECTOR, PARAMETRIC, EFFECTS,
     MAX_REQUEST_BYTES, ENGINE_VECTOR_REQUEST_BYTES, requestByteLimit, FX_TYPES, SHAPE_MEMBERS,
     OPERATIONS: Object.freeze([VECTOR, PARAMETRIC, EFFECTS]),
   }, own));

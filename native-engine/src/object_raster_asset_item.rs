@@ -286,14 +286,20 @@ impl RasterItem {
     }
 
     /// Selection clone only: the same immutable bitmap moves with its anchor; never a rebake.
-    pub(crate) fn selection_companion_clone(&self, group: &str, offset: f64) -> Result<Self, RasterItemError> {
-        if !offset.is_finite() { return Err(RasterItemError::NonFinite); }
-        let mut next=self.clone();
-        next.brush_group_id=Presence::Present(group.to_string());
-        if offset!=0.0 {
-            let (x,y)=self.center();
-            next.x=Number::from_f64(x+offset).ok_or(RasterItemError::NonFinite)?;
-            next.y=Number::from_f64(y+offset).ok_or(RasterItemError::NonFinite)?;
+    pub(crate) fn selection_companion_clone(
+        &self,
+        group: &str,
+        offset: f64,
+    ) -> Result<Self, RasterItemError> {
+        if !offset.is_finite() {
+            return Err(RasterItemError::NonFinite);
+        }
+        let mut next = self.clone();
+        next.brush_group_id = Presence::Present(group.to_string());
+        if offset != 0.0 {
+            let (x, y) = self.center();
+            next.x = Number::from_f64(x + offset).ok_or(RasterItemError::NonFinite)?;
+            next.y = Number::from_f64(y + offset).ok_or(RasterItemError::NonFinite)?;
         }
         next.validate()?;
         Ok(next)

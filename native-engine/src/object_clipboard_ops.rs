@@ -60,7 +60,9 @@ impl ObjectFillOwner {
         )
         .map_err(|error| refusal_code(&error))?;
         provenance::stamp(&mut clip, &origin, &payload.stroke_ids);
-        if let Some(packet) = &clip { provenance::verify(packet, &origin, &self.revisions)?; }
+        if let Some(packet) = &clip {
+            provenance::verify(packet, &origin, &self.revisions)?;
+        }
         Ok(clip)
     }
 
@@ -140,7 +142,9 @@ impl ObjectFillOwner {
         )
         .map_err(|error| refusal_code(&error))?;
         provenance::stamp(&mut clip, &origin, &payload.stroke_ids);
-        if let Some(packet) = &clip { provenance::verify(packet, &origin, &self.revisions)?; }
+        if let Some(packet) = &clip {
+            provenance::verify(packet, &origin, &self.revisions)?;
+        }
         let request = SelectionRequest {
             context_id: &payload.context_id,
             layer_uid: &payload.layer_uid,

@@ -119,20 +119,63 @@ pub(crate) fn piece_layer(
 }
 
 /// A painted companion follows its independent anchor; per-frame anchor rank is the baseline split rule.
-pub(crate) fn compound_piece(document:&ObjectDocument,record:&crate::object_document::ObjectRecord,count:usize)->Result<usize,SelectionError> {
-    use crate::object_document::object_group_kernels::object_selection_compound::{is_companion,same_cell};
-    let anchor=if is_companion(record) {
-        let link=record.vector_ext.value().and_then(|x|x.linked_fill_id.value()).ok_or(SelectionError::ClipMismatch)?;
-        document.objects.iter().find(|r|same_cell(&r.target,&record.target)&&!is_companion(r)
-            &&r.vector_ext.value().and_then(|x|x.linked_fill_id.value())==Some(link)).ok_or(SelectionError::ClipMismatch)?
-    }else{record};
-    document.objects.iter().filter(|r|same_cell(&r.target,&anchor.target)&&!is_companion(r))
-        .position(|r|r.target.stroke_id==anchor.target.stroke_id).map(|rank|rank.min(count-1)).ok_or(SelectionError::ClipMismatch)
+pub(crate) fn compound_piece(
+    document: &ObjectDocument,
+    record: &crate::object_document::ObjectRecord,
+    count: usize,
+) -> Result<usize, SelectionError> {
+    use crate::object_document::object_group_kernels::object_selection_compound::{
+        is_companion, same_cell,
+    };
+    let anchor = if is_companion(record) {
+        let link = record
+            .vector_ext
+            .value()
+            .and_then(|x| x.linked_fill_id.value())
+            .ok_or(SelectionError::ClipMismatch)?;
+        document
+            .objects
+            .iter()
+            .find(|r| {
+                same_cell(&r.target, &record.target)
+                    && !is_companion(r)
+                    && r.vector_ext.value().and_then(|x| x.linked_fill_id.value()) == Some(link)
+            })
+            .ok_or(SelectionError::ClipMismatch)?
+    } else {
+        record
+    };
+    document
+        .objects
+        .iter()
+        .filter(|r| same_cell(&r.target, &anchor.target) && !is_companion(r))
+        .position(|r| r.target.stroke_id == anchor.target.stroke_id)
+        .map(|rank| rank.min(count - 1))
+        .ok_or(SelectionError::ClipMismatch)
 }
-pub(crate) fn raster_piece(document:&ObjectDocument,raster:&crate::object_document::RasterEntry,count:usize)->Result<usize,SelectionError> {
+pub(crate) fn raster_piece(
+    document: &ObjectDocument,
+    raster: &crate::object_document::RasterEntry,
+    count: usize,
+) -> Result<usize, SelectionError> {
     use crate::object_document::object_group_kernels::object_selection_compound::same_cell;
-    let Some(group)=raster.item.brush_group_id() else{return Ok(count-1);};
-    let anchors:Vec<_>=document.objects.iter().filter(|r|same_cell(&r.target,&raster.target))
-        .filter(|r|r.vector_ext.value().and_then(|x|x.bitmap_brush.value()).is_some_and(|b|b.brush_group_id==group)).collect();
-    match anchors.as_slice(){[]=>Ok(count-1),[anchor]=>compound_piece(document,anchor,count),_=>Err(SelectionError::ClipMismatch)}
+    let Some(group) = raster.item.brush_group_id() else {
+        return Ok(count - 1);
+    };
+    let anchors: Vec<_> = document
+        .objects
+        .iter()
+        .filter(|r| same_cell(&r.target, &raster.target))
+        .filter(|r| {
+            r.vector_ext
+                .value()
+                .and_then(|x| x.bitmap_brush.value())
+                .is_some_and(|b| b.brush_group_id == group)
+        })
+        .collect();
+    match anchors.as_slice() {
+        [] => Ok(count - 1),
+        [anchor] => compound_piece(document, anchor, count),
+        _ => Err(SelectionError::ClipMismatch),
+    }
 }

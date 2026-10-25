@@ -31,19 +31,44 @@ fn clip_record(value: &Value) -> bool {
 
 fn raster(value: &Value) -> bool {
     exact(value, &["target", "item"], &[]).is_some_and(|entry| {
-        exact(&entry["target"], &["contextId", "frameScope", "layerUid", "strokeId"], &[])
-            .is_some_and(|target| exact(&target["frameScope"], &["kind", "frame"], &[]).is_some())
-            && exact(&entry["item"], &["assetId", "x", "y", "width", "height"],
-                &["opacity", "rotation", "isBitmapBrush", "brushGroupId", "isBrushTextureCopy", "meshId"]).is_some()
+        exact(
+            &entry["target"],
+            &["contextId", "frameScope", "layerUid", "strokeId"],
+            &[],
+        )
+        .is_some_and(|target| exact(&target["frameScope"], &["kind", "frame"], &[]).is_some())
+            && exact(
+                &entry["item"],
+                &["assetId", "x", "y", "width", "height"],
+                &[
+                    "opacity",
+                    "rotation",
+                    "isBitmapBrush",
+                    "brushGroupId",
+                    "isBrushTextureCopy",
+                    "meshId",
+                ],
+            )
+            .is_some()
     })
 }
 
 fn source(value: &Value) -> bool {
-    exact(value, &["instanceId", "documentId", "contentRevision", "strokeIds"], &[])
-        .is_some_and(|source| uid(&source["instanceId"]) && uid(&source["documentId"])
-            && source["contentRevision"].as_u64().is_some_and(|n| n <= 9_007_199_254_740_991)
-            && source["strokeIds"].as_array().is_some_and(|ids| !ids.is_empty()
-                && ids.len() <= MAX_ITEMS && ids.iter().all(uid)))
+    exact(
+        value,
+        &["instanceId", "documentId", "contentRevision", "strokeIds"],
+        &[],
+    )
+    .is_some_and(|source| {
+        uid(&source["instanceId"])
+            && uid(&source["documentId"])
+            && source["contentRevision"]
+                .as_u64()
+                .is_some_and(|n| n <= 9_007_199_254_740_991)
+            && source["strokeIds"]
+                .as_array()
+                .is_some_and(|ids| !ids.is_empty() && ids.len() <= MAX_ITEMS && ids.iter().all(uid))
+    })
 }
 
 /// Bounded structural pre-check; the native owner re-validates every record.
@@ -68,8 +93,14 @@ pub(super) fn clip(value: &Value) -> bool {
             })
             && match (object.get("rasters"), object.get("source")) {
                 (None, None) => true,
-                (Some(rasters), Some(origin)) => source(origin) && rasters.as_array()
-                    .is_some_and(|items| !items.is_empty() && items.len() <= MAX_ITEMS && items.iter().all(raster)),
+                (Some(rasters), Some(origin)) => {
+                    source(origin)
+                        && rasters.as_array().is_some_and(|items| {
+                            !items.is_empty()
+                                && items.len() <= MAX_ITEMS
+                                && items.iter().all(raster)
+                        })
+                }
                 _ => false,
             }
     })

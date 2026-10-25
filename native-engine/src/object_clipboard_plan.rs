@@ -112,7 +112,11 @@ pub(crate) fn copy_selection(
         frame,
         records: selected.records,
         groups,
-        rasters: if selected.rasters.is_empty() { Presence::Missing } else { Presence::Present(selected.rasters) },
+        rasters: if selected.rasters.is_empty() {
+            Presence::Missing
+        } else {
+            Presence::Present(selected.rasters)
+        },
         source: Presence::Missing,
     }))
 }
@@ -133,53 +137,88 @@ fn validate_clip(clip: &ClipPayload) -> Result<(), SelectionError> {
         if target.frame_scope.kind != FrameScopeKind::Authored
             || target.context_id != clip.context_id
             || target.layer_uid != clip.layer_uid
-            || clip.records.first().is_some_and(|first| first.target.frame_scope.frame != target.frame_scope.frame)
+            || clip
+                .records
+                .first()
+                .is_some_and(|first| first.target.frame_scope.frame != target.frame_scope.frame)
         {
             return Err(SelectionError::ClipMismatch);
         }
         ids.push(target.stroke_id.clone());
     }
     check_ids(&ids)?;
-    if let Some(table)=clip.groups.value() { validate_clip_groups(table,&clip.context_id,&ids)?; }
+    if let Some(table) = clip.groups.value() {
+        validate_clip_groups(table, &clip.context_id, &ids)?;
+    }
     Ok(())
 }
 
 /// A detached packet carries the WHOLE source table but only selected records.
 /// Unselected stroke leaves intentionally drop during remap; group relationships
 /// are complete in the packet and must resolve before any identities are minted.
-fn validate_clip_groups(table:&GroupTable,context:&str,selected:&[String])->Result<(),SelectionError> {
-    let invalid=SelectionError::ClipTableUnreadable;
-    if table.context_id!=context {return Err(invalid);}
-    let entries=entries_of(table).ok_or(SelectionError::ClipTableUnreadable)?;
-    let tags:Vec<_>=entries.iter().map(|entry|Some(entry.gid.as_str())).collect();
-    validate_clone_groups(&entries,&tags).map_err(SelectionError::Remap)?;
-    let groups:HashMap<_,_>=table.entries.iter().map(|entry|(entry.gid.as_str(),entry)).collect();
-    let mut listed_by=HashMap::new();
+fn validate_clip_groups(
+    table: &GroupTable,
+    context: &str,
+    selected: &[String],
+) -> Result<(), SelectionError> {
+    let invalid = SelectionError::ClipTableUnreadable;
+    if table.context_id != context {
+        return Err(invalid);
+    }
+    let entries = entries_of(table).ok_or(SelectionError::ClipTableUnreadable)?;
+    let tags: Vec<_> = entries
+        .iter()
+        .map(|entry| Some(entry.gid.as_str()))
+        .collect();
+    validate_clone_groups(&entries, &tags).map_err(SelectionError::Remap)?;
+    let groups: HashMap<_, _> = table
+        .entries
+        .iter()
+        .map(|entry| (entry.gid.as_str(), entry))
+        .collect();
+    let mut listed_by = HashMap::new();
     for entry in &table.entries {
-        if entry.order.len()<2 || selected.contains(&entry.gid) {return Err(invalid);}
+        if entry.order.len() < 2 || selected.contains(&entry.gid) {
+            return Err(invalid);
+        }
         for id in &entry.order {
-            if id.is_empty() {return Err(invalid);}
-            if groups.contains_key(id.as_str()) && listed_by.insert(id.as_str(),entry.gid.as_str()).is_some() {
+            if id.is_empty() {
+                return Err(invalid);
+            }
+            if groups.contains_key(id.as_str())
+                && listed_by.insert(id.as_str(), entry.gid.as_str()).is_some()
+            {
                 return Err(invalid);
             }
         }
     }
     for entry in &table.entries {
-        if entry.parent.value().map(String::as_str)!=listed_by.get(entry.gid.as_str()).copied() {
+        if entry.parent.value().map(String::as_str) != listed_by.get(entry.gid.as_str()).copied() {
             return Err(invalid);
         }
-        let mut parent=entry.parent.value();let mut depth=0;
-        while let Some(id)=parent {
-            depth+=1;
-            if depth>16 {return Err(invalid);}
-            parent=groups.get(id.as_str()).ok_or(SelectionError::ClipTableUnreadable)?.parent.value();
+        let mut parent = entry.parent.value();
+        let mut depth = 0;
+        while let Some(id) = parent {
+            depth += 1;
+            if depth > 16 {
+                return Err(invalid);
+            }
+            parent = groups
+                .get(id.as_str())
+                .ok_or(SelectionError::ClipTableUnreadable)?
+                .parent
+                .value();
         }
     }
-    let mut tagged=HashSet::new();
+    let mut tagged = HashSet::new();
     for member in &table.members {
-        if member.stroke_id.is_empty() || groups.contains_key(member.stroke_id.as_str())
+        if member.stroke_id.is_empty()
+            || groups.contains_key(member.stroke_id.as_str())
             || !tagged.insert(member.stroke_id.as_str())
-            || !groups.get(member.group_id.as_str()).is_some_and(|group|group.order.contains(&member.stroke_id)) {
+            || !groups
+                .get(member.group_id.as_str())
+                .is_some_and(|group| group.order.contains(&member.stroke_id))
+        {
             return Err(invalid);
         }
     }
@@ -237,6 +276,15 @@ pub(crate) fn plan_paste(
         offset,
         ids,
     )?;
-    Ok(SelectionPlan::changed(document, work, frame, promoted, Vec::new(), clones.created,
-        clones.created_groups, Vec::new(), Vec::new()))
+    Ok(SelectionPlan::changed(
+        document,
+        work,
+        frame,
+        promoted,
+        Vec::new(),
+        clones.created,
+        clones.created_groups,
+        Vec::new(),
+        Vec::new(),
+    ))
 }

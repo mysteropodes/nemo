@@ -4574,7 +4574,7 @@
               "$ref": "#/$defs/ObjectRecord"
             },
             {
-              "$ref": "#/$defs/ObjectVectorRecord"
+              "$ref": "#/$defs/ObjectVectorReadRecord"
             }
           ]
         }
@@ -15979,6 +15979,103 @@
           }
         }
       }
+    },
+    "ObjectVectorReadExt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "pressure": {
+          "$ref": "#/$defs/ObjectVectorPressure"
+        },
+        "paramShape": {
+          "$ref": "#/$defs/ObjectParamShape"
+        },
+        "boxAngle": {
+          "$ref": "#/$defs/ObjectFiniteNumber"
+        },
+        "fillGradient": {
+          "$ref": "#/$defs/ObjectVectorFillGradient"
+        },
+        "fillTrace": {
+          "$ref": "#/$defs/ObjectFillTrace"
+        },
+        "isMask": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maskMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maskFeather": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectFiniteNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkedFillId": {
+          "$ref": "#/$defs/ObjectEditId"
+        },
+        "isLinkedFillCompanion": {
+          "type": "boolean"
+        },
+        "bitmapBrush": {
+          "$ref": "#/$defs/ObjectClipboardBitmapBrush"
+        }
+      },
+      "minProperties": 1,
+      "description": "Immutable stored vector extensions, including bitmap-anchor metadata. The native owner validates camouflage and linked-fill exclusion; no raster or resource bytes are returned here.",
+      "not": {
+        "required": [
+          "pressure",
+          "fillGradient"
+        ]
+      }
+    },
+    "ObjectVectorReadRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry",
+        "fill",
+        "vector"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "editable-vector-path"
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "geometry": {
+          "$ref": "#/$defs/ObjectVectorGeometry"
+        },
+        "fill": {
+          "$ref": "#/$defs/ObjectVectorFill"
+        },
+        "vector": {
+          "$ref": "#/$defs/ObjectVectorBody"
+        },
+        "vectorExt": {
+          "$ref": "#/$defs/ObjectVectorReadExt"
+        }
+      },
+      "description": "Immutable stored vector record returned by an object query. Generic vector create/replace retain ObjectVectorRecord and cannot write bitmap anchors."
     }
   }
 }

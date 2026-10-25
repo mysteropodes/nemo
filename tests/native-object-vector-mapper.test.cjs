@@ -347,6 +347,12 @@ test('linked fill mapper retains separate authored geometry and absent/false/tru
   assert.equal(Object.hasOwn(Stroke.toDict(absent.record),'isLinkedFillCompanion'),false);
   const falseOnly=Stroke.toRecord({...base,isLinkedFillCompanion:false},WHERE);
   assert.equal(falseOnly.ok,true);assert.equal(Stroke.toDict(falseOnly.record).isLinkedFillCompanion,false);
+  Contract.record(absent.record,true);Contract.record(falseOnly.record,true);
+  for (const mutate of [r=>r.vectorExt.linkedFillId=null,r=>r.vectorExt.linkedFillId='x'.repeat(129),
+    r=>r.vectorExt.linkedFillId='bad\u0000id',r=>r.vectorExt.isLinkedFillCompanion=null,
+    r=>delete r.vectorExt.linkedFillId,r=>r.fill=null,r=>r.target.frameScope.kind='evaluated']) {
+    const bad=JSON.parse(JSON.stringify(b.record));mutate(bad);assert.throws(()=>Contract.record(bad));
+  }
   for (const bad of [{...primary,linkedFillId:null},{...primary,isLinkedFillCompanion:null},
     {...primary,centerSegments:[]},{...base,linkedFillId:'linked-original'},
     {...companion,linkedFillId:''},{...companion,isVectorBrush:true,centerSegments:primary.centerSegments},

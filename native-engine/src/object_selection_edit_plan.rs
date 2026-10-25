@@ -11,8 +11,10 @@
 //! Storage admission of the candidate belongs to the transaction that seals the
 //! plan against an origin snapshot. Lock decisions beyond "a locked layer is not
 //! edited" belong to Root F06.
+use crate::object_document::object_group_kernels::{
+    object_selection_compound as compound, object_selection_compound_clones::apply_compound_clones,
+};
 use std::collections::HashSet;
-use crate::object_document::object_group_kernels::{object_selection_compound as compound, object_selection_compound_clones::apply_compound_clones};
 
 use crate::object_document::object_group_kernels::object_clipboard_remap::{
     IdSource, RemapError, DUPLICATE_OFFSET_PX,
@@ -74,14 +76,23 @@ pub(crate) struct SelectionPublication {
 }
 impl SelectionPublication {
     fn new(before: &ObjectDocument, after: &ObjectDocument) -> Self {
-        Self { before: before.clone(), after: after.clone() }
+        Self {
+            before: before.clone(),
+            after: after.clone(),
+        }
     }
     pub(crate) fn matches(&self, before: &ObjectDocument, after: &ObjectDocument) -> bool {
         self.before == *before && self.after == *after
     }
-    pub(crate) fn before(&self) -> &ObjectDocument { &self.before }
-    pub(crate) fn after(&self) -> &ObjectDocument { &self.after }
-    pub(crate) fn into_document(self) -> ObjectDocument { self.after }
+    pub(crate) fn before(&self) -> &ObjectDocument {
+        &self.before
+    }
+    pub(crate) fn after(&self) -> &ObjectDocument {
+        &self.after
+    }
+    pub(crate) fn into_document(self) -> ObjectDocument {
+        self.after
+    }
 }
 
 /// What an edit changed, for the typed in-process callers.
@@ -108,14 +119,33 @@ pub(crate) struct SelectionPlan {
 }
 
 impl SelectionPlan {
-    pub(crate) fn publication(&self) -> SelectionPublication { self.publication.clone() }
+    pub(crate) fn publication(&self) -> SelectionPublication {
+        self.publication.clone()
+    }
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn changed(before: &ObjectDocument, document: ObjectDocument,
-        content_frame: u32, promoted: bool, removed: Vec<String>, created: Vec<String>,
-        created_groups: Vec<String>, dissolved_groups: Vec<String>, created_layers: Vec<String>) -> Self {
-        Self { publication: SelectionPublication::new(before, &document), document,
-            changed: true, content_frame, promoted, removed, created, created_groups,
-            dissolved_groups, created_layers }
+    pub(super) fn changed(
+        before: &ObjectDocument,
+        document: ObjectDocument,
+        content_frame: u32,
+        promoted: bool,
+        removed: Vec<String>,
+        created: Vec<String>,
+        created_groups: Vec<String>,
+        dissolved_groups: Vec<String>,
+        created_layers: Vec<String>,
+    ) -> Self {
+        Self {
+            publication: SelectionPublication::new(before, &document),
+            document,
+            changed: true,
+            content_frame,
+            promoted,
+            removed,
+            created,
+            created_groups,
+            dissolved_groups,
+            created_layers,
+        }
     }
     pub(crate) fn unchanged(document: &ObjectDocument, frame: u32) -> Self {
         Self {
@@ -260,16 +290,27 @@ pub(crate) fn plan_delete(
     )?;
     let (context, layer) = (request.context_id, request.layer_uid);
     let selection = compound::resolve(&work, context, layer, frame, request.stroke_ids)?;
-    let all_ids: Vec<String> = selection.records.iter().map(|r|r.target.stroke_id.clone())
-        .chain(selection.rasters.iter().map(|r|r.target.stroke_id.clone())).collect();
-    let gone: Vec<String> = all_ids.iter()
+    let all_ids: Vec<String> = selection
+        .records
+        .iter()
+        .map(|r| r.target.stroke_id.clone())
+        .chain(selection.rasters.iter().map(|r| r.target.stroke_id.clone()))
+        .collect();
+    let gone: Vec<String> = all_ids
+        .iter()
         .filter(|id| {
             !work.objects.iter().any(|record| {
                 in_layer(record, context, layer)
                     && record.target.frame_scope.frame != frame
                     && record.target.stroke_id == **id
-            }) && !work.items.value().is_some_and(|items|items.targets().any(|target|
-                target.context_id==context && target.layer_uid==layer && target.frame_scope.frame!=frame && target.stroke_id==**id))
+            }) && !work.items.value().is_some_and(|items| {
+                items.targets().any(|target| {
+                    target.context_id == context
+                        && target.layer_uid == layer
+                        && target.frame_scope.frame != frame
+                        && target.stroke_id == **id
+                })
+            })
         })
         .cloned()
         .collect();
@@ -278,9 +319,15 @@ pub(crate) fn plan_delete(
         .groups
         .value()
         .is_some_and(|table| table.context_id == context);
-    let gone_paths:Vec<String>=gone.iter().filter(|id|selection.records.iter().any(|r|r.target.stroke_id==**id)).cloned().collect();
+    let gone_paths: Vec<String> = gone
+        .iter()
+        .filter(|id| selection.records.iter().any(|r| r.target.stroke_id == **id))
+        .cloned()
+        .collect();
     if has_table && !gone_paths.is_empty() {
-        let edit = GroupEdit::Detach { strokes: gone_paths };
+        let edit = GroupEdit::Detach {
+            strokes: gone_paths,
+        };
         let group_plan = plan_group_edit(&work, layer, context, &edit).map_err(group_edit_error)?;
         dissolved_groups = group_plan.removed;
         work = group_plan.document;
@@ -289,11 +336,27 @@ pub(crate) fn plan_delete(
     work.objects.retain(|record| {
         !(in_cell(record, context, layer, frame) && ids.contains(record.target.stroke_id.as_str()))
     });
-    compound::remove_rasters(&mut work, &selection.rasters.iter().map(|r|r.target.clone()).collect::<Vec<_>>());
+    compound::remove_rasters(
+        &mut work,
+        &selection
+            .rasters
+            .iter()
+            .map(|r| r.target.clone())
+            .collect::<Vec<_>>(),
+    );
     remove_elements(&mut work, context, layer, frame, &ids);
     drop_stroke_holders(&mut work, context, layer, &gone);
-    Ok(SelectionPlan::changed(document, work, frame, promoted, request.stroke_ids.to_vec(),
-        Vec::new(), Vec::new(), dissolved_groups, Vec::new()))
+    Ok(SelectionPlan::changed(
+        document,
+        work,
+        frame,
+        promoted,
+        request.stroke_ids.to_vec(),
+        Vec::new(),
+        Vec::new(),
+        dissolved_groups,
+        Vec::new(),
+    ))
 }
 
 /// `duplicateSelection`: copies of the selected shapes land on top of the same
@@ -328,7 +391,9 @@ pub(crate) fn plan_duplicate(
         .cloned();
     let (tags, entries): (Vec<Option<String>>, Option<Vec<GroupEntry>>) = match &table {
         Some(table) => (
-            records.iter().map(|record| tag_of(table, &record.target.stroke_id))
+            records
+                .iter()
+                .map(|record| tag_of(table, &record.target.stroke_id))
                 .collect(),
             Some(
                 entries_of(table)
@@ -349,6 +414,15 @@ pub(crate) fn plan_duplicate(
         DUPLICATE_OFFSET_PX,
         ids,
     )?;
-    Ok(SelectionPlan::changed(document, work, frame, promoted, Vec::new(),
-        clones.created, clones.created_groups, Vec::new(), Vec::new()))
+    Ok(SelectionPlan::changed(
+        document,
+        work,
+        frame,
+        promoted,
+        Vec::new(),
+        clones.created,
+        clones.created_groups,
+        Vec::new(),
+        Vec::new(),
+    ))
 }

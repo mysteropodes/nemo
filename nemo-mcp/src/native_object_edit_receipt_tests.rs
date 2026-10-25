@@ -357,7 +357,6 @@ fn clipboard_effect_presence_survives_both_result_and_paste_admission() {
     }
 }
 
-
 #[test]
 fn asset_clipboard_provenance_is_closed_bounded_and_required_in_both_directions() {
     let mut packet = literal_clip();
@@ -366,17 +365,28 @@ fn asset_clipboard_provenance_is_closed_bounded_and_required_in_both_directions(
         "item":{"assetId":"image-1","x":16,"y":16,"width":8,"height":8,"isBitmapBrush":true,"brushGroupId":"brush-1"}}]);
     packet["source"] = json!({"instanceId":"instance-A","documentId":"document-A","contentRevision":7,"strokeIds":["anchor"]});
     let admitted = |clip: &Value| {
-        let mut paste = valid().into_iter().find(|(name, _)| *name == "clipboard.paste").unwrap().1;
+        let mut paste = valid()
+            .into_iter()
+            .find(|(name, _)| *name == "clipboard.paste")
+            .unwrap()
+            .1;
         paste["clip"] = clip.clone();
         request(&format!("{P}clipboard.paste"), &paste)
-            && result(&format!("{P}clipboard.copy"), &json!({"applied":false,"historyEntriesAdded":0,"clipboard":clip}))
+            && result(
+                &format!("{P}clipboard.copy"),
+                &json!({"applied":false,"historyEntriesAdded":0,"clipboard":clip}),
+            )
     };
     assert!(admitted(&packet));
     for case in 0..14 {
         let mut bad = packet.clone();
         match case {
-            0 => { bad.as_object_mut().unwrap().remove("source"); },
-            1 => { bad.as_object_mut().unwrap().remove("rasters"); },
+            0 => {
+                bad.as_object_mut().unwrap().remove("source");
+            }
+            1 => {
+                bad.as_object_mut().unwrap().remove("rasters");
+            }
             2 => bad["rasters"] = json!([]),
             3 => bad["rasters"] = Value::Null,
             4 => bad["rasters"][0]["extra"] = json!(true),

@@ -13,8 +13,8 @@
 //! Motion promotes the element holder to the piece's layer holder and the layer's
 //! expressions and controls are copied to every piece; the layer's own motion
 //! tracks and statics are dropped, exactly as the baseline does.
-use std::collections::HashSet;
 use crate::object_document::object_group_kernels::object_selection_compound as compound;
+use std::collections::HashSet;
 
 use crate::object_document::object_group_kernels::object_group_record::GroupTable;
 use crate::object_document::object_group_kernels::object_selection_edit_frames::{
@@ -25,7 +25,7 @@ use crate::object_document::object_group_kernels::object_selection_edit_plan::{
     layer_index, SelectionError, SelectionPlan, MAX_REVISION,
 };
 use crate::object_document::object_group_kernels::object_selection_edit_split_parts::{
-    fresh_layer_uids, piece_holder, piece_layer, compound_piece, raster_piece,
+    compound_piece, fresh_layer_uids, piece_holder, piece_layer, raster_piece,
 };
 use crate::object_document::{
     AuthoredOrder, FrameScopeKind, ObjectDocument, ObjectLayer, ObjectRecord, OrderElement,
@@ -87,13 +87,22 @@ pub(crate) fn plan_split(
         Some(frame) => document
             .objects
             .iter()
-            .filter(|record| in_cell(record, context, uid, frame) && !compound::is_companion(record))
+            .filter(|record| {
+                in_cell(record, context, uid, frame) && !compound::is_companion(record)
+            })
             .collect(),
         None => Vec::new(),
     };
     compound::validate_document(document)?;
-    let has_compound=document.objects.iter().filter(|r|in_layer(r,context,uid)).any(|r|r.vector_ext.value()
-        .is_some_and(|x|!x.linked_fill_id.missing()||!x.bitmap_brush.missing()));
+    let has_compound = document
+        .objects
+        .iter()
+        .filter(|r| in_layer(r, context, uid))
+        .any(|r| {
+            r.vector_ext
+                .value()
+                .is_some_and(|x| !x.linked_fill_id.missing() || !x.bitmap_brush.missing())
+        });
     let n = elements.len();
     if n < 2 {
         return Err(SelectionError::NeedTwoElements);
@@ -133,15 +142,29 @@ pub(crate) fn plan_split(
 
     let mut candidate = document.clone();
     candidate.objects = objects;
-    if let Presence::Present(items)=&mut candidate.items {
-        if let Presence::Present(rasters)=&mut items.raster {
-            for raster in rasters.iter_mut().filter(|r|r.target.context_id==context && r.target.layer_uid==uid && r.target.frame_scope.kind==FrameScopeKind::Authored) {
-                raster.target.layer_uid=uids[raster_piece(document,raster,n)?].clone();
+    if let Presence::Present(items) = &mut candidate.items {
+        if let Presence::Present(rasters) = &mut items.raster {
+            for raster in rasters.iter_mut().filter(|r| {
+                r.target.context_id == context
+                    && r.target.layer_uid == uid
+                    && r.target.frame_scope.kind == FrameScopeKind::Authored
+            }) {
+                raster.target.layer_uid = uids[raster_piece(document, raster, n)?].clone();
             }
         }
     }
-    let piece_item_targets:Vec<Vec<_>>=uids.iter().map(|piece|candidate.items.value().map_or(vec![],|items|items.targets()
-        .filter(|t|t.context_id==context && t.layer_uid==*piece).cloned().collect())).collect();
+    let piece_item_targets: Vec<Vec<_>> = uids
+        .iter()
+        .map(|piece| {
+            candidate.items.value().map_or(vec![], |items| {
+                items
+                    .targets()
+                    .filter(|t| t.context_id == context && t.layer_uid == *piece)
+                    .cloned()
+                    .collect()
+            })
+        })
+        .collect();
     let _replaced: Vec<ObjectLayer> = candidate.layers.splice(index..=index, pieces).collect();
 
     // Order plan: pieces take consecutive natural slots where the layer was.
@@ -203,20 +226,53 @@ pub(crate) fn plan_split(
                     .iter_mut()
                     .filter(|scope| scope.frame_scope.kind == FrameScopeKind::Authored)
                 {
-                    let original=scope.elements.clone();
+                    let original = scope.elements.clone();
                     scope.elements.retain(|element| element.layer_uid != uid);
                     let frame = scope.frame_scope.frame;
                     for (e, records) in piece_records.iter().enumerate() {
-                        let mut targets:Vec<_>=records.iter().filter(|r|r.target.frame_scope.frame==frame).map(|r|&r.target)
-                            .chain(piece_item_targets[e].iter().filter(|t|t.frame_scope.frame==frame)).collect();
-                        if targets.iter().any(|t|piece_item_targets[e].iter().any(|item|item==*t)) || records.iter().any(compound::is_companion) {
-                            targets.sort_by_key(|t|original.iter().find(|old|old.layer_uid==uid&&old.stroke_id==t.stroke_id).map_or(u32::MAX,|old|old.natural_position));
+                        let mut targets: Vec<_> = records
+                            .iter()
+                            .filter(|r| r.target.frame_scope.frame == frame)
+                            .map(|r| &r.target)
+                            .chain(
+                                piece_item_targets[e]
+                                    .iter()
+                                    .filter(|t| t.frame_scope.frame == frame),
+                            )
+                            .collect();
+                        if targets
+                            .iter()
+                            .any(|t| piece_item_targets[e].iter().any(|item| item == *t))
+                            || records.iter().any(compound::is_companion)
+                        {
+                            targets.sort_by_key(|t| {
+                                original
+                                    .iter()
+                                    .find(|old| {
+                                        old.layer_uid == uid && old.stroke_id == t.stroke_id
+                                    })
+                                    .map_or(u32::MAX, |old| old.natural_position)
+                            });
                         }
-                        for (position,target) in targets.into_iter().enumerate() {
-                            scope.elements.push(OrderElement{layer_uid:uids[e].clone(),stroke_id:target.stroke_id.clone(),
-                                natural_position:u32::try_from(position).map_err(|_|SelectionError::ClipMismatch)?,
-                                order:if has_compound {original.iter().find(|old|old.layer_uid==uid&&old.stroke_id==target.stroke_id)
-                                    .map(|old|old.order.clone()).unwrap_or_else(default_order)}else{default_order()}});
+                        for (position, target) in targets.into_iter().enumerate() {
+                            scope.elements.push(OrderElement {
+                                layer_uid: uids[e].clone(),
+                                stroke_id: target.stroke_id.clone(),
+                                natural_position: u32::try_from(position)
+                                    .map_err(|_| SelectionError::ClipMismatch)?,
+                                order: if has_compound {
+                                    original
+                                        .iter()
+                                        .find(|old| {
+                                            old.layer_uid == uid
+                                                && old.stroke_id == target.stroke_id
+                                        })
+                                        .map(|old| old.order.clone())
+                                        .unwrap_or_else(default_order)
+                                } else {
+                                    default_order()
+                                },
+                            });
                         }
                     }
                 }
@@ -303,6 +359,15 @@ pub(crate) fn plan_split(
     }
 
     compound::validate_document(&candidate)?;
-    Ok(SelectionPlan::changed(document,candidate,shown.unwrap_or(request.frame),false,
-        Vec::new(),Vec::new(),Vec::new(),Vec::new(),uids))
+    Ok(SelectionPlan::changed(
+        document,
+        candidate,
+        shown.unwrap_or(request.frame),
+        false,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        uids,
+    ))
 }

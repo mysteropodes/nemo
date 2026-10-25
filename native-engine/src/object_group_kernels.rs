@@ -25,13 +25,13 @@ pub(crate) mod object_layer_lifecycle_plan;
 #[path = "object_clipboard_plan.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_clipboard_plan;
-#[path = "object_selection_edit_clones.rs"]
-#[allow(dead_code)]
-pub(crate) mod object_selection_edit_clones;
 #[path = "object_selection_compound.rs"]
 pub(crate) mod object_selection_compound;
 #[path = "object_selection_compound_clones.rs"]
 pub(crate) mod object_selection_compound_clones;
+#[path = "object_selection_edit_clones.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_selection_edit_clones;
 #[path = "object_selection_edit_frames.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_selection_edit_frames;

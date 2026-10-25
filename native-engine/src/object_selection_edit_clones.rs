@@ -39,14 +39,22 @@ impl RevisionIds {
         let mut taken: HashSet<String> = HashSet::new();
         for record in &document.objects {
             taken.insert(record.target.stroke_id.clone());
-            if let Some(ext)=record.vector_ext.value() {
-                if let Some(id)=ext.linked_fill_id.value(){taken.insert(id.clone());}
-                if let Some(brush)=ext.bitmap_brush.value(){taken.insert(brush.brush_group_id.clone());}
+            if let Some(ext) = record.vector_ext.value() {
+                if let Some(id) = ext.linked_fill_id.value() {
+                    taken.insert(id.clone());
+                }
+                if let Some(brush) = ext.bitmap_brush.value() {
+                    taken.insert(brush.brush_group_id.clone());
+                }
             }
         }
-        if let Some(items)=document.items.value() {
-            taken.extend(items.targets().map(|t|t.stroke_id.clone()));
-            for raster in items.raster_entries(){if let Some(id)=raster.item.brush_group_id(){taken.insert(id.to_string());}}
+        if let Some(items) = document.items.value() {
+            taken.extend(items.targets().map(|t| t.stroke_id.clone()));
+            for raster in items.raster_entries() {
+                if let Some(id) = raster.item.brush_group_id() {
+                    taken.insert(id.to_string());
+                }
+            }
         }
         for layer in &document.layers {
             if let Some(table) = layer.groups.value() {
