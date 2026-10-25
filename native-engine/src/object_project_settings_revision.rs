@@ -1,7 +1,8 @@
 //! Project settings and Repeat's compound publication use the existing revision owner.
 use crate::object_document::{ObjectDocument, ProjectMetadata};
-use crate::request_receipts::DispatchErrorCode;
-use crate::revision::object_revision::{ObjectRevisionOwner, ProjectRevisionValue};
+use crate::revision::object_revision::{
+    asset_admission, ObjectRevisionOwner, ProjectRevisionValue,
+};
 use std::sync::Arc;
 
 // L09-H (#2115): placement-only publication (G42, I16b); nested here so the
@@ -16,37 +17,22 @@ impl ObjectRevisionOwner {
     pub(crate) fn publish_frame_repeat(
         &mut self,
         document: ObjectDocument,
-    ) -> Result<u64, DispatchErrorCode> {
-        let unavailable = |_| DispatchErrorCode::Unavailable;
+        metadata: Option<ProjectMetadata>,
+    ) -> Result<u64, &'static str> {
+        let Some(metadata) = metadata else {
+            return self.publish(document);
+        };
         let current = self
             .acquire(self.content_revision)
-            .ok_or(DispatchErrorCode::Unavailable)?;
-        let Some(project) = current.project() else {
-            return self.publish(document).map_err(unavailable);
-        };
-        if document.total_frames <= current.document().total_frames {
-            return self.publish(document).map_err(unavailable);
-        }
+            .ok_or("current revision absent")?;
+        let project = current
+            .project()
+            .ok_or("bare project settings unavailable")?;
         // Keep the same resource/source guard as every drawing-only publication.
-        super::asset_admission::validate_drawing_only(current.document(), &document)
-            .map_err(unavailable)?;
-        let last = f64::from(document.total_frames - 1);
-        let (wa_in, wa_out) = project.project().work_area();
-        let effective_out = wa_out.unwrap_or(f64::from(current.document().total_frames - 1));
-        let metadata = if effective_out < last {
-            project
-                .project()
-                .clone()
-                .with_work_area(wa_in, Some(last))
-                .map_err(|_| DispatchErrorCode::InvalidRequest)?
-        } else {
-            project.project().clone()
-        };
+        asset_admission::validate_drawing_only(current.document(), &document)?;
+        // The sealed command candidate already admitted this complete pair.
         let next = project.with_drawing(document).with_metadata(metadata);
-        #[cfg(feature = "project_media_codec")]
-        crate::object_snapshot::ObjectSnapshot::check_candidate_saveable(&next)?;
         self.advance(Arc::new(ProjectRevisionValue::Project(next)))
-            .map_err(unavailable)
     }
 
     pub(crate) fn publish_project_settings(

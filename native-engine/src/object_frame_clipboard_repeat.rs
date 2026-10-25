@@ -31,7 +31,7 @@ use crate::commands::object_fill_owner::object_frame_edit_document::{
 };
 use crate::commands::ObjectFillOwner;
 use crate::object_document::{
-    ObjectDocument, ObjectRecord, OrderElement, OrderScope, Presence, TimingEdit,
+    ObjectDocument, ObjectRecord, OrderElement, OrderScope, Presence, ProjectMetadata, TimingEdit,
 };
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
@@ -238,6 +238,7 @@ pub(crate) fn repeat_cells(
 pub(crate) struct PreparedFrameRepeat {
     origin: ObjectSnapshot,
     document: Option<ObjectDocument>,
+    metadata: Option<ProjectMetadata>,
     cycled_layers: usize,
     skipped_component_layers: usize,
 }
@@ -255,6 +256,40 @@ impl PreparedFrameRepeat {
     }
 }
 
+/// Prepare growth-only settings against the same retained input as the drawing.
+/// Bare documents and edits without timeline growth keep their existing publication.
+fn repeat_project_metadata(
+    origin: &ObjectSnapshot,
+    document: Option<&ObjectDocument>,
+) -> Result<Option<ProjectMetadata>, DispatchErrorCode> {
+    let Some(document) = document.filter(|next| next.total_frames > origin.document().total_frames)
+    else {
+        return Ok(None);
+    };
+    let Some(project) = origin.project() else {
+        return Ok(None);
+    };
+    let last = f64::from(document.total_frames - 1);
+    let (wa_in, wa_out) = project.project().work_area();
+    let effective_out = wa_out.unwrap_or(f64::from(origin.document().total_frames - 1));
+    let metadata = if effective_out < last {
+        project
+            .project()
+            .clone()
+            .with_work_area(wa_in, Some(last))
+            .map_err(|_| DispatchErrorCode::InvalidRequest)?
+    } else {
+        project.project().clone()
+    };
+    #[cfg(feature = "project_media_codec")]
+    ObjectSnapshot::check_candidate_saveable(
+        &project
+            .with_drawing(document.clone())
+            .with_metadata(metadata.clone()),
+    )?;
+    Ok(Some(metadata))
+}
+
 impl ObjectFillOwner {
     pub(crate) fn prepare_frame_repeat(
         &self,
@@ -265,6 +300,7 @@ impl ObjectFillOwner {
             DocumentEdit::Changed(next) => Some(next),
             DocumentEdit::NoChange => None,
         };
+        let metadata = repeat_project_metadata(&origin, document.as_ref())?;
         // repeat_cells validated these bounds before preparing the detached result.
         let source = origin.document();
         let first =
@@ -278,6 +314,7 @@ impl ObjectFillOwner {
         Ok(PreparedFrameRepeat {
             origin,
             document,
+            metadata,
             cycled_layers,
             skipped_component_layers,
         })
@@ -311,7 +348,10 @@ impl ObjectFillOwner {
         }
         match candidate.document {
             None => Ok(self.content_revision()),
-            Some(document) => self.revisions.publish_frame_repeat(document),
+            Some(document) => self
+                .revisions
+                .publish_frame_repeat(document, candidate.metadata)
+                .map_err(|_| DispatchErrorCode::Unavailable),
         }
     }
 }
