@@ -170,8 +170,14 @@ fn closed_query_and_command_shapes_keep_private_operations_off_the_public_route(
             .unwrap();
         assert!(!response.ok);
         assert_eq!(response.request_id, r["requestId"].as_str().unwrap());
-        assert_eq!(response.instance_id, receipt["instanceId"].as_str().unwrap());
-        assert_eq!(response.document_id, receipt["documentId"].as_str().unwrap());
+        assert_eq!(
+            response.instance_id,
+            receipt["instanceId"].as_str().unwrap()
+        );
+        assert_eq!(
+            response.document_id,
+            receipt["documentId"].as_str().unwrap()
+        );
         assert_eq!(response.content_revision, 0);
         assert_eq!(response.error.unwrap().code, "unavailable");
     }
