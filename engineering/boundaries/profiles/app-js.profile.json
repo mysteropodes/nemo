@@ -3728,6 +3728,18 @@
       "publicApi": [
         "project-comments-presentation.js"
       ]
+    },
+    {
+      "id": "app.native.settings-validation.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-settings-validation-gate.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-settings-validation-gate.js"
+      ]
     }
   ],
   "layerRules": {

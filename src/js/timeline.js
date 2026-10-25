@@ -184,7 +184,12 @@ function manualBakeCache(){
     else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
   });
 }
-function stopPlay(mode){if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
+function stopPlay(mode){
+  var settings=window.NemoNativeProjectSettingsController;
+  if(mode!=='native-settings-intent'&&mode!=='native-settings-publication'&&settings&&settings.cancelPlaybackResume)settings.cancelPlaybackResume();
+  try{var diagnostics=window.NemoNativeObjectProjectDesktop,session=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);
+    if(diagnostics&&diagnostics.settingsDiagnostic)diagnostics.settingsDiagnostic(window,'stop',Object.assign({},session&&session.info(),{kind:mode||'user',frame:state.currentFrame}));}catch(_){}
+  if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   var nativeStop=nativePlayScheduler&&nativePlayScheduler.stop();
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
@@ -200,7 +205,11 @@ function stopPlay(mode){if(!state.playing){if(nativePlayScheduler)nativePlaySche
   }
   if(mode==='native-settings-publication')return nativeStop;renderOS();renderArcs();updateUI();
 }
-function togglePlay(){if(state.playing)stopPlay();else startPlay();}
+function togglePlay(){
+  var settings=window.NemoNativeProjectSettingsController;
+  var pendingStop=settings&&settings.cancelPlaybackResume&&settings.cancelPlaybackResume();
+  if(state.playing||pendingStop)stopPlay();else startPlay();
+}
 
 // Keyframe diamonds (.motion-key/.km) land at frame*FC+FC/2 in Motion —
 // CSS flex justify-content:center inside `.fc`, no explicit JS positioning
