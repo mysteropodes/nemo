@@ -623,3 +623,22 @@ test('the committed inventory is up to date (`inventory.cjs --check`)', () => {
   assert.equal(r.status, 0, 'stale inventory: ' + r.stderr + ' — run `npm run inventory` and commit engineering/inventory');
   assert.match(r.stdout, /^inventory up to date \(\d+ rows, digest [0-9a-f]{12}\)/);
 });
+
+// CS3/#2342: an edit above a surface must not rename it. Shift every source line
+// in a copy of src/ (HTML + JS) and require the identical ID set.
+test('surface IDs survive inserted lines above every surface (no line-keyed IDs)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-inventory-shift-'));
+  try {
+    fs.cpSync(path.join(ROOT, 'src'), path.join(dir, 'src'), { recursive: true,
+      filter: (f) => fs.statSync(f).isDirectory() || /\.(html|js|cjs|mjs|json)$/.test(f) });
+    for (const f of fs.readdirSync(path.join(dir, 'src'), { recursive: true }).map((r) => path.join(dir, 'src', r))) {
+      if (/\.(html|js)$/.test(f)) { const t = fs.readFileSync(f, 'utf8'); const i = t.indexOf('\n'); fs.writeFileSync(f, t.slice(0, i + 1) + '\n\n' + t.slice(i + 1)); }
+    }
+    const ids = (rows) => rows.map((r) => r.id).sort();
+    assert.deepEqual(ids(inventory.build({ root: dir }).rows), ids(rows()));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  for (const r of rows()) assert.doesNotMatch(r.id, /@\d+$|\.js:\d+$/, r.id);
+  // Ratchet: label-text keys (DOM rows with no id or data-*) and order-only #n keys may only shrink.
+  assert.ok(rows().filter((r) => /^dom:[^#]/.test(r.id) && !r.id.includes('[data-')).length <= 4, 'more text-keyed DOM IDs');
+  assert.ok(rows().filter((r) => /#\d+$/.test(r.id)).length <= 10, 'more order-suffixed IDs');
+});
