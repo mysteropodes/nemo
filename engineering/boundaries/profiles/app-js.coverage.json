@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "1c68548e28a19883d547ea9efbd198a14ac8df0b",
-    "sourceRootTree": "2f65f22957b69b7099526993171a46eed4543217",
+    "candidateCommit": "15800240c302b3df6ab69054cf2cd839f4bc8dcb",
+    "sourceRootTree": "ad223ee6eea913e3a2978cb7ab0b92a9d44429b4",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "3dd082681a633555dccc6580034d1ada1ed728e7",
-      "lastChangedCommit": "1c68548e28a19883d547ea9efbd198a14ac8df0b"
+      "gitTree": "15d48be83b71ee153d5b93a00f5aa8eb046e13d5",
+      "lastChangedCommit": "15800240c302b3df6ab69054cf2cd839f4bc8dcb"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "b56f70565bc852f4b079212e66f91cd1721fb38f",
-      "sha256": "c47444b7304241c5ac4b8454b74f42104d1baff4b6ef54899d1d919367a31b8d",
-      "lastChangedCommit": "78580dd3b92e1eb2c5d7d689f24d6a2b7aa76779"
+      "gitBlob": "976778bb8e10dbc68e29cccf29dafc14f72845a9",
+      "sha256": "7e8bad0b122f557650be2dbe93bc6d78aafa2f8e9e4f6d0d5c91034859277874",
+      "lastChangedCommit": "bf0d200e4f9bb61d3370b8949ac79b200d8a350f"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "9c34c43a7d5873fd1346b2bc1c91a009a581ac5bae9e47e9c9cfed81d082c341"
+      "value": "3e32286da9b09546ac8b672183afc2f38136e42936afa3d96ffd116697f166b9"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "ab0f2696d70a07abfde62323b4bf073b32620348",
-        "sha256": "afaf4ec5da2e7f4802b182d7b08cac6c2620cf309f0add0f9f99999ec6a22e73",
-        "moduleCount": 306,
-        "basedOnCommit": "07ab54780eada5f0b9f0ba4b335efafe442046ed"
+        "gitBlob": "542f3fa3812ae1d4592ba54ace53f14042cf4073",
+        "sha256": "5e7bb654e31417a64a8fe2f88576942a7caf9d007642a06632311bb497c7ebae",
+        "moduleCount": 307,
+        "basedOnCommit": "bf0d200e4f9bb61d3370b8949ac79b200d8a350f"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 306,
-    "externalClassicTags": 303,
+    "totalScriptTags": 307,
+    "externalClassicTags": 304,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 299,
+    "retainedClassicTags": 300,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 302,
+    "classicTagsUnderSrcJsIncludingVendors": 303,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -4698,6 +4698,18 @@
           "path": "src/index.html",
           "line": 2324,
           "scriptOrdinal": 23
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-settings-validation-gate.js",
+      "moduleId": "app.native.settings-validation.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2658,
+          "scriptOrdinal": 307
         }
       ]
     }

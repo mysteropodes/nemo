@@ -100,16 +100,20 @@ test('F04 inspector release restores original control nodes and listeners',()=>{
 test('F04 replacement blocks a gesture begun in the old document until fresh focus',()=>{const p=h.panel(),field=p.root.document.nodes.get('p-cw');let calls=0;field.addEventListener('input',()=>calls++);h.nativeRender(p);field.dispatch('pointerdown');const next={...h.metadata(),documentId:'replacement',lifecycleGeneration:2,documentSnapshotId:'replacement-snapshot-0',canvasW:640};h.Files.projectView(p.root,next);p.root.state.currentFrame=7;h.UI.render(p.root,next,false,{...h.fixturePorts(p.root),projectSettings:()=>p.root.NemoNativeProjectSettingsController});field.dispatch('input');assert.equal(calls,0);field.dispatch('focus');field.dispatch('input');assert.equal(calls,1);});
 test('F04 dirty numeric blur/change cannot write into a replacement document before fresh focus',()=>{
  for(const id of['p-cw','proj-fps'])for(const replaceDocument of[true,false]){
-  const p=h.panel(),root=p.root,field=root.document.nodes.get(id),writes=[];let current=h.metadata(),focusedValue;
+  const p=h.panel(),root=p.root,field=root.document.nodes.get(id),writes=[],events=[];let current=h.metadata(),focusedValue;
+  root.NemoNativeObjectProjectDesktop={settingsDiagnostic(_root,event,value){events.push({event,...value});}};
   root.NemoNativeProjectSettingsController={edit(action){writes.push({documentId:current.documentId,generation:current.lifecycleGeneration,action});}};
   root.SM={setCanvasSize:(w,height)=>root.NemoNativeProjectSettingsController.edit({kind:'setCanvasSize',width:w,height}),setFps:fps=>root.NemoNativeProjectSettingsController.edit({kind:'setFps',fps})};
   const listener=h.timeline.split('\n').find(line=>line.startsWith("document.getElementById('"+id+"').addEventListener('change'"));vm.runInNewContext(listener,{window:root,state:root.state,document:root.document,_dimsLockRatio:null});
-  field.focus=()=>{root.document.activeElement=field;focusedValue=field.value;field.dispatch('focus');};
-  field.blur=()=>{if(root.document.activeElement!==field)return;root.document.activeElement=null;if(field.value!==focusedValue)field.dispatch('change');field.dispatch('blur');};
+  field.focus=()=>{root.document.activeElement=field;focusedValue=field.value;field.dispatch('focus',{type:'focus'});};
+  field.blur=()=>{if(root.document.activeElement!==field)return;root.document.activeElement=null;if(field.value!==focusedValue)field.dispatch('change',{type:'change'});field.dispatch('blur',{type:'blur'});};
   h.nativeRender(p);field.focus();field.value=id==='p-cw'?'777':'29.97';
   current={...h.metadata(),documentId:replaceDocument?'replacement':'document',lifecycleGeneration:2,documentSnapshotId:'replacement-snapshot-0',canvasW:640,fps:48};
   h.Files.projectView(root,current);root.state.currentFrame=7;h.UI.render(root,current,false,{...h.fixturePorts(root),projectSettings:()=>root.NemoNativeProjectSettingsController});
   assert.equal(writes.length,0,id+' stale blur/change');assert.equal(root.document.activeElement,null);assert.equal(Number(field.value),id==='p-cw'?640:48);
+  const rejection=events.find(e=>e.event==='stale-rejected');assert.equal(rejection.field,id);assert.equal(rejection.sourceEvent,'change');
+  assert.equal(rejection.gestureDocumentId,'document');assert.equal(rejection.gestureLifecycleGeneration,1);
+  assert.ok(events.findIndex(e=>e.event==='owner')<events.indexOf(rejection));
   field.focus();field.value=id==='p-cw'?'800':'31.5';field.blur();assert.equal(writes.length,1);assert.equal(writes[0].documentId,current.documentId);assert.equal(writes[0].generation,2);assert.equal(id==='p-cw'?writes[0].action.width:writes[0].action.fps,id==='p-cw'?800:31.5);
  }
 });

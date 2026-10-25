@@ -937,6 +937,8 @@ body.mode-motion #btn-tween-curves{display:none;}
 .tb.playing{color:var(--green);}
 .tb.pingpong{color:#ffaa28;}
 .tb .material-symbols-rounded{font-size:18px;}
+/* FPS blur can repaint this icon between pointer-down and click. */
+#btn-play .material-symbols-rounded{pointer-events:none;}
 .ti{font-size:11.5px;color:rgba(236,234,231,.45);display:flex;align-items:center;gap:7px;}
 .ti b{color:var(--text);}
 .ti input[type="number"]{width:36px;background:var(--panel3);border:none;color:var(--text);border-radius:6px;padding:5px 3px;font-size:11px;font-weight:600;text-align:center;outline:none;-moz-appearance:textfield;}

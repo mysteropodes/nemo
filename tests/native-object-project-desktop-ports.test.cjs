@@ -629,3 +629,18 @@ test('desktop reads only existing session Camera View choice and keeps the nativ
  Object.defineProperties(root.state,{cameraLayerOn:{get(){throw Error('legacy camera layer read');}},cameraKeys:{get(){throw Error('legacy camera keys read');}}});
  assert.equal(ports.viewMode(),'stored-camera');
 });
+
+test('confirmed final presentation is observed before its notification resumes playback',async()=>{
+  const f=fixture();await f.open();const files=new Map();
+  f.root.state.playing=false;f.root.__TAURI__.path={appDataDir:async()=>'/isolated'};
+  f.root.__TAURI__.fs={mkdir:async()=>{},writeTextFile:async(path,bytes)=>files.set(path,bytes),
+    rename:async(from,to)=>files.set(to,files.get(from))};
+  f.root.NemoNativeProjectSettingsController.presented=()=>{
+    Ports.settingsDiagnostic(f.root,'resume',{kind:'setFps'});f.root.state.playing=true;
+  };
+  Ports.createPorts(f.root).presented(f.session.info());await timerTurn();await turn();
+  const events=JSON.parse(files.get('/isolated/diagnostics/native-settings.json')).events.slice(-2);
+  assert.deepEqual(events.map(row=>row.event),['preview-presented','resume']);
+  assert.equal(events[0].contentRevision,0);assert.equal(events[0].frame,0);
+  assert.equal(f.root.state.playing,true);
+});
