@@ -81,9 +81,9 @@ struct ShaderDef {
 /// uses — so this test exercises the actual shader shipped to users, not a
 /// hand-copied approximation that could silently drift from it.
 fn fetch_bulge_source() -> String {
-    let js = r#"const fs=require('fs'),vm=require('vm'); const window={}; vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),{window}); process.stdout.write(JSON.stringify(window.SMSHADER_EFFECTS));"#;
+    let js = r#"const fs=require('fs'),vm=require('vm'); const window={}; const context={window}; for (const file of process.argv.slice(1)) vm.runInNewContext(fs.readFileSync(file,'utf8'),context); process.stdout.write(JSON.stringify(window.SMSHADER_EFFECTS));"#;
     let output = Command::new("node")
-        .args(["-e", js, "../src/js/shader-effects-library.js"])
+        .args(["-e", js, "../src/js/adapters/shader-effect-catalog.js", "../src/js/shader-effects-library.js"])
         .output()
         .expect("Node.js is required to inspect the shader library");
     assert!(output.status.success(), "could not load shader library: {}", String::from_utf8_lossy(&output.stderr));

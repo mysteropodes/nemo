@@ -380,7 +380,7 @@ fn unavailable_unselected_mesh_bind_preserves_paths_but_selected_mesh_refuses_at
     assert!(
         matches!(prepare_object_render_scene(&packet, &selector(&snapshot, 0)),
         Err(ObjectSceneError::UnsupportedGeometry {reason, ..})
-        if reason == "raster mesh/brush producer is unavailable in the still-image join")
+        if reason == "native mesh rig pose is unavailable")
     );
 }
 
