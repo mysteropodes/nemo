@@ -207,7 +207,7 @@ impl Fixture {
             {"frameScope":{"kind":"authored","frame":3},"elements":[
                 {"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{}}]}]);
         let project = json!({"format":"nemo.native-project-document","formatVersion":1,
-            "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null});
+            "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null,"assets":[]});
         let state = ApplicationMcp::default();
         state
             .install_native_project_file(&serde_json::to_vec(&project).unwrap())
@@ -313,12 +313,18 @@ impl Fixture {
         )
     }
     pub(super) fn command(&self, operation: &str, payload: Value, external: bool) -> Delivery {
-        self.command_named(
-            &format!("preview-edit-{}", self.pins.revision),
-            operation,
-            payload,
-            external,
-        )
+        let request = json!({"apiVersion":2,"requestId":format!("preview-edit-{}",self.pins.revision),
+            "instanceId":self.pins.instance,"documentId":self.pins.document,
+            "expectedRevision":self.pins.revision,"operation":operation,"payload":payload});
+        self.state
+            .revisions
+            .dispatch_object(
+                self.state.instance_id(),
+                &self.state.native,
+                admit_raw(&request.to_string()).unwrap(),
+                external,
+            )
+            .unwrap()
     }
     pub(super) fn command_named(
         &self,
@@ -331,10 +337,10 @@ impl Fixture {
             "documentId":self.pins.document,"expectedRevision":self.pins.revision,"operation":operation,"payload":payload});
         self.state
             .revisions
-            .dispatch_object(
+            .dispatch(
                 self.state.instance_id(),
                 &self.state.native,
-                admit_raw(&request.to_string()).unwrap(),
+                serde_json::from_value(request).unwrap(),
                 external,
             )
             .unwrap()
@@ -343,7 +349,10 @@ impl Fixture {
         let request = json!({"apiVersion":2,"requestId":"preview-history","instanceId":self.pins.instance,
             "documentId":self.pins.document,"operation":"query.document.object.history",
             "payload":{"atRevision":self.pins.revision,"documentSnapshotId":self.pins.snapshot}});
-        let response = dispatch_raw(&self.state, &request.to_string()).unwrap();
+        let response = self
+            .state
+            .dispatch_native(serde_json::from_value(request).unwrap())
+            .unwrap();
         assert!(response.ok);
         response.result.unwrap()
     }

@@ -53,6 +53,15 @@ fn gpu_current_route_holds_both_guards_and_refuses_every_stale_pin_before_acquis
         .is_err());
     assert_eq!(f.calls.get(), 1);
     f.mode.set(0);
+    assert_eq!(
+        f.run().unwrap_err(),
+        "native retained Motion batch awaits its post-read finalizer"
+    );
+    assert_eq!(f.calls.get(), 1);
+    assert_eq!(
+        f.state.seal_object_motion_diagnostics().unwrap(),
+        Some(true)
+    );
     let receipt = f.run().unwrap();
     assert_eq!(receipt.identity(), first.identity());
     assert_eq!(receipt.status(), &ViewportStatus::Presented);
@@ -428,7 +437,10 @@ fn gpu_consumer_unwind_preserves_owner_debt_without_poisoning_shared_locks() {
     assert!(f.run().unwrap_err().contains("panicked"));
     assert!(f.state.native.lock().is_ok());
     assert!(f.state.revisions.0.lock().is_ok());
-    assert!(f.run().unwrap_err().contains("cleanup"));
+    assert_eq!(
+        f.run().unwrap_err(),
+        "native retained Motion batch awaits its post-read finalizer"
+    );
     assert_eq!(f.calls.get(), 1);
     let released = f.release();
     assert_eq!(released.cancelled_preview_work_ids.len(), 1);
