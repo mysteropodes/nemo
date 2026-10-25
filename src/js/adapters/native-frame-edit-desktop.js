@@ -29,7 +29,7 @@
     if(name==='removeTweenSpan')return {kind:'removeTween',layer:args[0],from:args[1],to:args[2]};
     if(name==='moveKeyframe')return {kind:'moveKey',layer:args[0],from:args[1],to:args[2]};
     if(name==='extendExposure')return {kind:'extendExposure',count:args[0]};
-    if(name==='repeatSelection')return {kind:'repeatSelection',times:args[0]};
+    if(name==='repeatSelection')return {kind:'repeatSelection',times:Math.max(1,Math.min(50,parseInt(args[0],10)||1))};
     if(name==='moveFrames')return {kind:'moveFrames',selection:args[0],layer:args[1],frame:args[2]};
     if(name==='shiftLayerFrames')return {unsupported:true};
     return {kind:shared[name]||({deleteSelectedFrames:'deleteFrames',duplicateKeyframe:'duplicateKey'})[name]||name};
@@ -127,8 +127,15 @@
     }
     function notice(result){
       var status=result&&result.status;
-      if(status==='applied-presented'||status==='unchanged')return;
-      var message=status==='unavailable'?'Native frame editing is unavailable.':
+      var complete=status==='applied-presented'||status==='unchanged',message;
+      if(complete){
+        if(!Number.isSafeInteger(result.cycledLayers)||!Number.isSafeInteger(result.skippedComponentLayers))return;
+        message=result.cycledLayers===0?'No drawing layers to repeat.':
+          status==='unchanged'?'Repeat left the drawing layers unchanged.':
+          'Repeated '+result.cycledLayers+' drawing layer'+(result.cycledLayers===1?'':'s')+'.';
+        if(result.skippedComponentLayers)message+=' Skipped '+result.skippedComponentLayers+' component layer'+
+          (result.skippedComponentLayers===1?'':'s')+'.';
+      }else message=status==='unavailable'?'Native frame editing is unavailable.':
         status==='refused'?'Native frame edit was refused.':
         status==='busy'?'A native frame edit is already pending.':
         'Native frame edit was not confirmed. Wait for synchronization.';

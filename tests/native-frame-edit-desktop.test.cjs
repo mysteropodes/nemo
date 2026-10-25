@@ -44,7 +44,7 @@ function harness(options={}){
     }
     const reply={apiVersion:2,requestId:q.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,
       ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
-    if(q.operation===P+'frames.repeat')Object.assign(reply.result,{cycledLayers:2,skippedComponentLayers:0});
+    if(q.operation===P+'frames.repeat')Object.assign(reply.result,options.repeatCounts||{cycledLayers:2,skippedComponentLayers:0});
     if(/frames\.clipboard\.(copy|cut)$/.test(q.operation))reply.result.clipboard=options.packet===null?null:
       options.packet?structuredClone(options.packet):{instanceId:'instance',documentId:'document',cells:[{relLayer:0,relFrame:0,keyframe:true,records:[],orderElements:[]}]};
     if(q.operation===P+'frames.move')reply.result.selection=applied?structuredClone(options.moveSelection===undefined?[{layerUid:'alpha',frame:3},{layerUid:'beta',frame:4}]:options.moveSelection):null;
@@ -136,6 +136,45 @@ test('moving a key on another layer preserves the active-layer prefix in the exa
   assert.equal(h.commands()[0].q.operation,P+'layer.key.move');
   assert.deepEqual({...h.commands()[0].q.payload},{command:'object.layer.key.move',layerUid:'alpha',activeLayerUid:'beta',from:1,to:4});
   assert.equal(h.root.state.activeLayerIdx,1);
+});
+
+test('ordinary Cycle button prompt crosses the real legacy wrapper with baseline count parsing and cancellation',async()=>{
+  const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  const source=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8');
+  const start=source.indexOf('function initCycleAndPropagate(){');
+  const body=source.slice(start,source.indexOf("if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCycleAndPropagate)",start));
+  for(const [input,want] of [['2',2],['2.9 rounds',2],['0',1],['-8',1],['999',50],['invalid',1],['',1],[null,null]]){
+    const h=harness();await h.open();let click,pending,legacy=0;
+    h.root.__TAURI__={core:{invoke(){throw Error('Unexpected private writer');}}};
+    h.root.NemoNativeFrameEditDesktop=Desktop;h.root.SM={importJSON(){},repeatSelection(){legacy++;}};
+    const dispose=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>false,()=>{});
+    const wrapped=h.root.SM.repeatSelection;h.root.SM.repeatSelection=value=>(pending=wrapped(value));
+    const context={window:h.root,selBounds:()=>({minF:1,maxF:2}),prompt:()=>input,
+      document:{getElementById:id=>id==='btn-cycle'?{addEventListener:(event,fn)=>{assert.equal(event,'click');click=fn;}}:null}};
+    vm.runInNewContext(body+'\ninitCycleAndPropagate();',context);click();
+    if(want===null)assert.equal(pending,undefined);
+    else{
+      assert.equal((await pending).status,'applied-presented',String(input));
+      assert.equal(h.commands()[0].q.payload.times,want,String(input));
+    }
+    assert.equal(h.commands().length,want===null?0:1);assert.equal(legacy,0);dispose();
+  }
+});
+
+test('repeat feedback distinguishes drawing cycles, component skips, semantic no-op and failed confirmation',async()=>{
+  for(const [options,expected] of [
+    [{repeatCounts:{cycledLayers:1,skippedComponentLayers:2}},'Repeated 1 drawing layer. Skipped 2 component layers.'],
+    [{repeatCounts:{cycledLayers:0,skippedComponentLayers:2}},'No drawing layers to repeat. Skipped 2 component layers.'],
+    [{noop:true,repeatCounts:{cycledLayers:1,skippedComponentLayers:0}},'Repeat left the drawing layers unchanged.'],
+    [{noop:true,repeatCounts:{cycledLayers:0,skippedComponentLayers:1}},'No drawing layers to repeat. Skipped 1 component layer.']
+  ]){
+    const h=harness(options);await h.open();await h.controller.routeWriter('timeline','repeatSelection',['2']).result;
+    assert.deepEqual(h.notices,[expected]);
+  }
+  for(const options of [{refusal:true},{badAck:true}]){
+    const h=harness(options);await h.open();await h.controller.routeWriter('timeline','repeatSelection',['2']).result;
+    assert.equal(h.notices.length,1);assert.doesNotMatch(h.notices[0],/Repeated|Skipped|No drawing/);
+  }
 });
 
 test('public Shift stays unavailable without any legacy or native write',async()=>{

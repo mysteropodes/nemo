@@ -7,7 +7,7 @@
 //! Baseline behavior kept on purpose. The selection is reduced to its bounds (first and last layer by position, first
 //! and last frame). `times` is `parseInt(times, 10) || 1` clamped to 1..50. The timeline grows to
 //! `max(total, last + 1 + span * times)`: every layer gains the same plain cells at its end, whether or not it is cycled
-//! (the work-area out point the baseline also moves is a project setting, not document content). Every layer from the
+//! (the work-area out point joins publication in the same project revision). Every layer from the
 //! first to the last selected one is cycled over the WHOLE frame range, selected cell or not, and the lock flag is never
 //! consulted (the baseline has no lock check here). A destination cell is replaced whole by a copy of its source cell: a
 //! key stays a key, an in-between stays an in-between without its manual-edit flag, a hold stays a hold, a blank key stays
@@ -311,10 +311,7 @@ impl ObjectFillOwner {
         }
         match candidate.document {
             None => Ok(self.content_revision()),
-            Some(document) => self
-                .revisions
-                .publish(document)
-                .map_err(|_| DispatchErrorCode::Unavailable),
+            Some(document) => self.revisions.publish_frame_repeat(document),
         }
     }
 }
