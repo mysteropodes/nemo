@@ -131,7 +131,7 @@
       w.timer=(root.setTimeout||setTimeout)(function(){w.timer=null;build(root,w,c);},0);return;
     }
     if(!current(root,w,c)){cancel(root);return;}
-    root._sel.frames=c.build;w.capture=null;cycle(root,w);status(w,'');paint(root,w);
+    root._sel.frames=c.build;root._layerActiveExplicit=false;w.capture=null;cycle(root,w);status(w,'');paint(root,w);
     if(typeof root.updateStatusBarHelp==='function')root.updateStatusBarHelp();
   }
   function up(root,w,event){var c=w.capture;if(works.get(root)!==w||!c||c.build)return;
