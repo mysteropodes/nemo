@@ -60,3 +60,15 @@ test('the CSV reader keeps quoted commas, quotes and newlines inside one field',
   const rows = lib.parseCsv('\uFEFFtask,title\nF09,"a, ""b""\nc"\nG43,d\n');
   assert.deepEqual(rows, [{ task: 'F09', title: 'a, "b"\nc' }, { task: 'G43', title: 'd' }]);
 });
+
+test('curated ownership adds owners with snapshot state and is validated', () => {
+  const snapshot = { owners: { F09: [{ issue: 1, state: 'closed' }] }, curatedStates: { 7: 'open' } };
+  const ownership = { tasks: { G43: [{ issue: 7, confidence: 'medium' }], F09: [{ issue: 1 }] } };
+  const owners = lib.mergedOwners(snapshot, ownership);
+  assert.deepEqual(owners.G43, [{ issue: 7, state: 'open', curated: 'medium' }]);
+  assert.deepEqual(owners.F09, [{ issue: 1, state: 'closed' }], 'a declared owner is not duplicated');
+  const m = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: ['G43'] } } }, owners: snapshot, ownership });
+  assert.equal(m.surfaces[0].status, 'issues-open');
+  const bad = lib.validate({ tasks, baseline, mapping: { surfaces: {} }, ownership: { tasks: { Q99: [{ issue: 0 }] } } });
+  assert.ok(bad.some((p) => /ownership names unknown task Q99/.test(p)) && bad.some((p) => /invalid issue/.test(p)), bad.join(' | '));
+});

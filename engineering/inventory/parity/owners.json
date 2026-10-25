@@ -34,6 +34,18 @@
         "state": "closed"
       }
     ],
+    "D07": [
+      {
+        "issue": 2380,
+        "state": "open"
+      }
+    ],
+    "D08": [
+      {
+        "issue": 2381,
+        "state": "open"
+      }
+    ],
     "D12": [
       {
         "issue": 2094,
@@ -50,6 +62,18 @@
       {
         "issue": 2278,
         "state": "closed"
+      }
+    ],
+    "D18": [
+      {
+        "issue": 2376,
+        "state": "open"
+      }
+    ],
+    "D19": [
+      {
+        "issue": 2379,
+        "state": "open"
       }
     ],
     "D20": [
@@ -140,6 +164,12 @@
         "state": "closed"
       }
     ],
+    "D34": [
+      {
+        "issue": 2377,
+        "state": "open"
+      }
+    ],
     "D35": [
       {
         "issue": 2099,
@@ -148,6 +178,36 @@
       {
         "issue": 2184,
         "state": "closed"
+      }
+    ],
+    "D36": [
+      {
+        "issue": 2377,
+        "state": "open"
+      }
+    ],
+    "D37": [
+      {
+        "issue": 2377,
+        "state": "open"
+      }
+    ],
+    "D38": [
+      {
+        "issue": 2377,
+        "state": "open"
+      }
+    ],
+    "D39": [
+      {
+        "issue": 2377,
+        "state": "open"
+      }
+    ],
+    "D40": [
+      {
+        "issue": 2377,
+        "state": "open"
       }
     ],
     "F01": [
@@ -180,6 +240,12 @@
       {
         "issue": 2086,
         "state": "closed"
+      }
+    ],
+    "F05": [
+      {
+        "issue": 2378,
+        "state": "open"
       }
     ],
     "F06": [
@@ -522,6 +588,12 @@
         "state": "closed"
       }
     ],
+    "G05": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
     "G06": [
       {
         "issue": 2155,
@@ -586,6 +658,12 @@
         "state": "closed"
       }
     ],
+    "G10": [
+      {
+        "issue": 2375,
+        "state": "open"
+      }
+    ],
     "G11": [
       {
         "issue": 2156,
@@ -594,6 +672,12 @@
       {
         "issue": 2238,
         "state": "closed"
+      }
+    ],
+    "G12": [
+      {
+        "issue": 2372,
+        "state": "open"
       }
     ],
     "G13": [
@@ -758,6 +842,18 @@
         "state": "closed"
       }
     ],
+    "G25": [
+      {
+        "issue": 2373,
+        "state": "open"
+      }
+    ],
+    "G26": [
+      {
+        "issue": 2376,
+        "state": "open"
+      }
+    ],
     "G27": [
       {
         "issue": 2069,
@@ -916,6 +1012,12 @@
         "state": "closed"
       }
     ],
+    "G39": [
+      {
+        "issue": 2376,
+        "state": "open"
+      }
+    ],
     "G41": [
       {
         "issue": 2062,
@@ -968,6 +1070,12 @@
         "state": "open"
       }
     ],
+    "G47": [
+      {
+        "issue": 2381,
+        "state": "open"
+      }
+    ],
     "G48": [
       {
         "issue": 2164,
@@ -1000,6 +1108,12 @@
       {
         "issue": 2239,
         "state": "closed"
+      }
+    ],
+    "G52": [
+      {
+        "issue": 2367,
+        "state": "open"
       }
     ],
     "I01": [
@@ -1306,6 +1420,18 @@
         "state": "open"
       }
     ],
+    "I39": [
+      {
+        "issue": 2371,
+        "state": "open"
+      }
+    ],
+    "I40": [
+      {
+        "issue": 2381,
+        "state": "open"
+      }
+    ],
     "I41": [
       {
         "issue": 2198,
@@ -1330,6 +1456,24 @@
         "state": "open"
       }
     ],
+    "I43": [
+      {
+        "issue": 2381,
+        "state": "open"
+      }
+    ],
+    "I44": [
+      {
+        "issue": 2381,
+        "state": "open"
+      }
+    ],
+    "I45": [
+      {
+        "issue": 2381,
+        "state": "open"
+      }
+    ],
     "I46": [
       {
         "issue": 2125,
@@ -1348,6 +1492,24 @@
         "state": "closed"
       }
     ],
+    "I51": [
+      {
+        "issue": 2380,
+        "state": "open"
+      }
+    ],
+    "I52": [
+      {
+        "issue": 2381,
+        "state": "open"
+      }
+    ],
+    "U01": [
+      {
+        "issue": 2369,
+        "state": "open"
+      }
+    ],
     "U02": [
       {
         "issue": 2172,
@@ -1360,15 +1522,147 @@
         "state": "closed"
       }
     ],
+    "U04": [
+      {
+        "issue": 2370,
+        "state": "open"
+      }
+    ],
+    "U05": [
+      {
+        "issue": 2370,
+        "state": "open"
+      }
+    ],
+    "U06": [
+      {
+        "issue": 2370,
+        "state": "open"
+      }
+    ],
+    "U07": [
+      {
+        "issue": 2371,
+        "state": "open"
+      }
+    ],
+    "U11": [
+      {
+        "issue": 2371,
+        "state": "open"
+      }
+    ],
+    "U12": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U13": [
+      {
+        "issue": 2371,
+        "state": "open"
+      }
+    ],
+    "U14": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U15": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U16": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U17": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U18": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U19": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U20": [
+      {
+        "issue": 2372,
+        "state": "open"
+      }
+    ],
+    "U27": [
+      {
+        "issue": 2375,
+        "state": "open"
+      }
+    ],
+    "U28": [
+      {
+        "issue": 2373,
+        "state": "open"
+      }
+    ],
+    "U29": [
+      {
+        "issue": 2373,
+        "state": "open"
+      }
+    ],
     "U30": [
       {
         "issue": 2179,
         "state": "closed"
       }
     ],
+    "U31": [
+      {
+        "issue": 2374,
+        "state": "open"
+      }
+    ],
+    "U32": [
+      {
+        "issue": 2374,
+        "state": "open"
+      }
+    ],
     "U36": [
       {
         "issue": 2362,
+        "state": "open"
+      }
+    ],
+    "U37": [
+      {
+        "issue": 2374,
+        "state": "open"
+      }
+    ],
+    "U38": [
+      {
+        "issue": 2376,
+        "state": "open"
+      }
+    ],
+    "U39": [
+      {
+        "issue": 2369,
         "state": "open"
       }
     ],
@@ -1383,6 +1677,63 @@
         "issue": 2360,
         "state": "open"
       }
+    ],
+    "X23": [
+      {
+        "issue": 2368,
+        "state": "open"
+      }
+    ],
+    "X24": [
+      {
+        "issue": 2368,
+        "state": "open"
+      }
+    ],
+    "X25": [
+      {
+        "issue": 2368,
+        "state": "open"
+      }
     ]
+  },
+  "curatedStates": {
+    "1005": "open",
+    "1035": "open",
+    "1049": "open",
+    "1573": "open",
+    "1577": "closed",
+    "1645": "closed",
+    "1647": "closed",
+    "1685": "closed",
+    "1864": "open",
+    "1959": "closed",
+    "1996": "closed",
+    "2014": "closed",
+    "2050": "closed",
+    "2056": "closed",
+    "2058": "closed",
+    "2068": "closed",
+    "2076": "closed",
+    "2077": "closed",
+    "2088": "closed",
+    "2153": "closed",
+    "2202": "closed",
+    "2219": "open",
+    "2225": "open",
+    "2234": "closed",
+    "2240": "closed",
+    "2244": "open",
+    "2246": "closed",
+    "2248": "open",
+    "2255": "open",
+    "2256": "open",
+    "2267": "open",
+    "2272": "closed",
+    "2348": "open",
+    "2355": "open",
+    "2359": "open",
+    "2362": "open",
+    "2364": "open"
   }
 }

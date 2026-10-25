@@ -83,11 +83,17 @@ function ownersFromIssues(issues, taskIds) {
   return Object.fromEntries(Object.keys(owners).sort().map((t) => [t, owners[t]]));
 }
 
-function ownersSnapshot(issues, taskIds, snapshotAt) {
-  return { schema: 'nemo.parity-owners/1', snapshotAt, owners: ownersFromIssues(issues, taskIds) };
+// Curated ownership (ownership.json: task -> [{issue, confidence, evidence}]) covers
+// issues that own a task without declaring its ID; the snapshot records their state.
+function ownersSnapshot(issues, taskIds, snapshotAt, ownership) {
+  const wanted = new Set(Object.values((ownership && ownership.tasks) || {}).flat().map((o) => o.issue));
+  const states = {};
+  for (const issue of issues) if (wanted.has(issue.number)) states[issue.number] = String(issue.state).toLowerCase();
+  return { schema: 'nemo.parity-owners/1', snapshotAt, owners: ownersFromIssues(issues, taskIds),
+    curatedStates: Object.fromEntries(Object.keys(states).sort((x, y) => x - y).map((k) => [k, states[k]])) };
 }
 
-function validate({ tasks, baseline, mapping }) {
+function validate({ tasks, baseline, mapping, ownership }) {
   const problems = [];
   const taskIds = new Set(tasks.map((t) => t.task));
   const surfaceIds = new Set();
@@ -106,6 +112,10 @@ function validate({ tasks, baseline, mapping }) {
       problems.push(`mapping for ${id} has an empty disposition`);
     }
   }
+  for (const [task, list] of Object.entries((ownership && ownership.tasks) || {})) {
+    if (!taskIds.has(task)) problems.push(`ownership names unknown task ${task}`);
+    for (const o of Array.isArray(list) ? list : []) if (!Number.isSafeInteger(o.issue) || o.issue <= 0) problems.push(`ownership for ${task} has an invalid issue`);
+  }
   return problems;
 }
 
@@ -119,8 +129,20 @@ function surfaceStatus(m, owners) {
   return states.every((s) => s === 'closed') ? 'issues-closed' : 'issues-open';
 }
 
-function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot }) {
-  const owners = snapshot.owners || {};
+function mergedOwners(snapshot, ownership) {
+  const owners = JSON.parse(JSON.stringify(snapshot.owners || {}));
+  for (const [task, list] of Object.entries((ownership && ownership.tasks) || {})) {
+    for (const o of list) {
+      if ((owners[task] || []).some((x) => x.issue === o.issue)) continue;
+      (owners[task] = owners[task] || []).push({ issue: o.issue, state: (snapshot.curatedStates || {})[o.issue] || 'unknown', curated: o.confidence || 'low' });
+    }
+    if (owners[task]) owners[task].sort((x, y) => x.issue - y.issue);
+  }
+  return owners;
+}
+
+function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot, ownership }) {
+  const owners = mergedOwners(snapshot, ownership);
   const surfaces = baseline.rows.map((r) => {
     const m = (mapping.surfaces || {})[r.id];
     return { id: r.id, kind: r.kind, area: r.area, capability: r.capability,
@@ -163,4 +185,4 @@ function renderMarkdown(matrix) {
   return out.join('\n');
 }
 
-module.exports = { SCHEMA, parseCsv, tasksFromCsv, baselineRow, issueTaskIds, ownersFromIssues, ownersSnapshot, validate, buildMatrix, renderMarkdown };
+module.exports = { SCHEMA, parseCsv, tasksFromCsv, baselineRow, issueTaskIds, ownersFromIssues, ownersSnapshot, mergedOwners, validate, buildMatrix, renderMarkdown };

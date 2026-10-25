@@ -7,14 +7,12 @@
     "surfaces": 903,
     "tasks": 228,
     "surfaceStatus": {
-      "unowned": 629,
-      "issues-open": 227,
-      "issues-closed": 47
+      "issues-open": 800,
+      "issues-closed": 103
     },
     "taskStatus": {
-      "issues-closed": 41,
-      "unowned": 113,
-      "issues-open": 74
+      "issues-closed": 70,
+      "issues-open": 158
     },
     "mappingConfidence": {
       "high": 450,
@@ -34,7 +32,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#app-menu-btn",
@@ -47,7 +45,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#assets-tab-media",
@@ -61,7 +59,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#assets-tab-presets",
@@ -74,7 +72,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#audio-file-input",
@@ -101,7 +99,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-alphabg",
@@ -114,7 +112,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-audio",
@@ -141,7 +139,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-bool-exclude",
@@ -155,7 +153,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-bool-intersect",
@@ -169,7 +167,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-bool-subtract",
@@ -183,7 +181,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-bool-unite",
@@ -197,7 +195,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-bpm",
@@ -264,7 +262,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-combine-exclude",
@@ -374,7 +372,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-comp-enter",
@@ -388,7 +386,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-comp-preview",
@@ -402,7 +400,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-convert-media",
@@ -442,7 +440,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-dl",
@@ -456,7 +454,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-dup-add-effector",
@@ -470,7 +468,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-dup-edit-source",
@@ -484,7 +482,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-dup-reseed",
@@ -498,7 +496,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-dupl",
@@ -512,7 +510,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-edit-pcurve",
@@ -551,7 +549,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-ff",
@@ -565,7 +563,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-fill-propagate",
@@ -579,7 +577,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-fit",
@@ -593,7 +591,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-footage-replace",
@@ -607,7 +605,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-ghost-all",
@@ -621,7 +619,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-ghost-select",
@@ -635,7 +633,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-grad-add-stop",
@@ -649,7 +647,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-history",
@@ -663,7 +661,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-imagemesh-reset",
@@ -677,7 +675,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-import-img",
@@ -691,7 +689,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-import-psd",
@@ -718,7 +716,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-kitsu-open",
@@ -731,7 +729,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-kitsu-publish",
@@ -744,7 +742,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-lf",
@@ -758,7 +756,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-lip-apply",
@@ -772,7 +770,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-loop",
@@ -786,7 +784,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-mask-unset",
@@ -799,7 +797,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-mblur",
@@ -812,7 +810,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-media-cleanup",
@@ -825,7 +823,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-media-import-img",
@@ -839,7 +837,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-media-import-video",
@@ -853,7 +851,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-media-mode-embedded",
@@ -893,7 +891,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-mp-new-tab",
@@ -906,7 +904,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-mp-save",
@@ -919,7 +917,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-new",
@@ -933,7 +931,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-nf",
@@ -947,7 +945,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-open",
@@ -961,7 +959,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-open-tutorial-topbar",
@@ -974,7 +972,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#btn-os",
@@ -988,7 +986,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-os-outline",
@@ -1002,7 +1000,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-palette-add-fill",
@@ -1016,7 +1014,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-palette-add-stroke",
@@ -1030,7 +1028,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-palette-new",
@@ -1044,7 +1042,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-palette-replace",
@@ -1058,7 +1056,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-palette-swap",
@@ -1072,7 +1070,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-pf",
@@ -1086,7 +1084,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-play",
@@ -1100,7 +1098,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-pt-corner",
@@ -1114,7 +1112,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-pt-smooth",
@@ -1128,7 +1126,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-pt-symmetric",
@@ -1142,7 +1140,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-ref-import",
@@ -1155,7 +1153,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-ref-remove",
@@ -1168,7 +1166,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-resetv",
@@ -1181,7 +1179,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-revision-accept",
@@ -1194,7 +1192,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-revision-reject",
@@ -1207,7 +1205,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-revision-view",
@@ -1221,7 +1219,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-rig-auto-assign",
@@ -1316,7 +1314,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-safety",
@@ -1329,7 +1327,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-save",
@@ -1382,7 +1380,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-shy",
@@ -1395,7 +1393,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-sp-size-lock",
@@ -1409,7 +1407,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-text-animate",
@@ -1423,7 +1421,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-text-split-chars",
@@ -1437,7 +1435,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-toolbar-customize",
@@ -1450,7 +1448,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-toolpreset-save",
@@ -1464,7 +1462,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-track-apply",
@@ -1477,7 +1475,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-track-pick",
@@ -1490,7 +1488,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-track-run",
@@ -1503,7 +1501,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-transplant-open",
@@ -1516,7 +1514,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-tw",
@@ -1530,7 +1528,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#btn-tw-reassign",
@@ -1557,7 +1555,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#color-fill",
@@ -1571,7 +1569,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#color-stroke",
@@ -1585,7 +1583,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-delete",
@@ -1598,7 +1596,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-fb-blocking",
@@ -1612,7 +1610,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-fb-email",
@@ -1626,7 +1624,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-fb-name",
@@ -1640,7 +1638,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-record",
@@ -1653,7 +1651,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-resolved",
@@ -1666,7 +1664,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-save",
@@ -1679,7 +1677,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-save-feedback",
@@ -1693,7 +1691,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-shot-input",
@@ -1706,7 +1704,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comment-text",
@@ -1719,7 +1717,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comp-offset",
@@ -1733,7 +1731,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comp-playmode",
@@ -1747,7 +1745,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comp-singleframe",
@@ -1761,7 +1759,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#comp-speed",
@@ -1775,7 +1773,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#curve-save-preset",
@@ -1789,7 +1787,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-anim-direction",
@@ -1803,7 +1801,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-anim-enabled",
@@ -1817,7 +1815,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-anim-offset",
@@ -1831,7 +1829,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-cols",
@@ -1845,7 +1843,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-count",
@@ -1859,7 +1857,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-mode",
@@ -1873,7 +1871,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-path-align",
@@ -1887,7 +1885,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-path-layer",
@@ -1901,7 +1899,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-radial-orient",
@@ -1915,7 +1913,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-radius",
@@ -1929,7 +1927,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-rand-hue",
@@ -1943,7 +1941,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-rand-op",
@@ -1957,7 +1955,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-rand-pos",
@@ -1971,7 +1969,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-rand-rot",
@@ -1985,7 +1983,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-rand-scale",
@@ -1999,7 +1997,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-rows",
@@ -2013,7 +2011,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-seed",
@@ -2027,7 +2025,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-source-add",
@@ -2041,7 +2039,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-spacingx",
@@ -2055,7 +2053,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-spacingy",
@@ -2069,7 +2067,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#dup-startangle",
@@ -2083,7 +2081,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-alpha",
@@ -2097,7 +2095,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-cancel",
@@ -2110,7 +2108,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-format",
@@ -2124,7 +2122,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-h",
@@ -2138,7 +2136,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-include-shadow",
@@ -2152,7 +2150,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-range",
@@ -2166,7 +2164,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-run",
@@ -2180,7 +2178,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-scale",
@@ -2194,7 +2192,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#exp-w",
@@ -2208,7 +2206,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#export-close",
@@ -2221,7 +2219,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#fb-dash-refresh",
@@ -2235,7 +2233,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#fb-dashboard-close",
@@ -2248,7 +2246,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#fb-dashboard-open",
@@ -2262,7 +2260,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#fb-pull",
@@ -2276,7 +2274,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#figma-import-btn",
@@ -2358,7 +2356,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#fill-enable-toggle-lp",
@@ -2372,7 +2370,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#footage-count",
@@ -2385,7 +2383,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#footage-h",
@@ -2398,7 +2396,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#footage-interp-mode",
@@ -2412,7 +2410,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#footage-kind",
@@ -2425,7 +2423,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#footage-name",
@@ -2438,7 +2436,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#footage-w",
@@ -2451,7 +2449,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#gh-token",
@@ -2464,7 +2462,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#gh-token-save",
@@ -2477,7 +2475,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#history-btn",
@@ -2491,7 +2489,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#history-close",
@@ -2504,7 +2502,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#image-input",
@@ -2518,7 +2516,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#kitsu-back-btn",
@@ -2531,7 +2529,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#kitsu-close",
@@ -2544,7 +2542,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#kitsu-email",
@@ -2557,7 +2555,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#kitsu-login-btn",
@@ -2570,7 +2568,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#kitsu-logout-btn",
@@ -2583,7 +2581,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#kitsu-password",
@@ -2596,7 +2594,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#kitsu-url",
@@ -2609,7 +2607,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#linked-media-banner-btn",
@@ -2649,7 +2647,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#lip-hold",
@@ -2663,7 +2661,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#lip-sens",
@@ -2677,7 +2675,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#lip-start",
@@ -2691,7 +2689,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#lip-track",
@@ -2705,7 +2703,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#lottie-preview-close",
@@ -2757,7 +2755,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#media-search",
@@ -2770,7 +2768,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#media-settings-btn",
@@ -2783,7 +2781,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#np-cancel",
@@ -2797,7 +2795,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#np-create",
@@ -2811,7 +2809,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#np-fps",
@@ -2825,7 +2823,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#np-h",
@@ -2853,7 +2851,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#np-preset",
@@ -2867,7 +2865,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#np-w",
@@ -2895,7 +2893,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#om-span-2",
@@ -2909,7 +2907,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#om-span-5",
@@ -2923,7 +2921,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#om-span-all",
@@ -2937,7 +2935,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-add-effect-btn",
@@ -2950,7 +2948,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-arc-inner",
@@ -2964,7 +2962,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-arc-start",
@@ -2991,7 +2989,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-blendmode",
@@ -3005,7 +3003,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-brushpreset",
@@ -3019,7 +3017,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-brushpreset-btn",
@@ -3033,7 +3031,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-cap-grp",
@@ -3047,7 +3045,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-cbg",
@@ -3061,7 +3059,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-ch",
@@ -3075,7 +3073,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-corner-bl",
@@ -3089,7 +3087,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-corner-br",
@@ -3103,7 +3101,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-corner-tl",
@@ -3117,7 +3115,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-corner-tr",
@@ -3131,7 +3129,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-corners-link",
@@ -3145,7 +3143,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-current-outline",
@@ -3158,7 +3156,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-cw",
@@ -3172,7 +3170,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-dashoffset",
@@ -3186,7 +3184,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-drawmode",
@@ -3228,7 +3226,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-fill-hex",
@@ -3242,7 +3240,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-fill-on",
@@ -3256,7 +3254,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-fillbrushmode-grp",
@@ -3326,7 +3324,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-grad-on",
@@ -3340,7 +3338,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-harmonize-tween",
@@ -3354,7 +3352,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-imagemesh-cols",
@@ -3424,7 +3422,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-mask-feather",
@@ -3437,7 +3435,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-mask-mode",
@@ -3450,7 +3448,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-maskmode",
@@ -3463,7 +3461,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-maskmode-type",
@@ -3476,7 +3474,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-mattemode",
@@ -3489,7 +3487,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-miterlimit",
@@ -3503,7 +3501,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-nib-angle",
@@ -3544,7 +3542,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-omode",
@@ -3557,7 +3555,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onion-shift-next",
@@ -3570,7 +3568,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onion-shift-reset",
@@ -3583,7 +3581,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onion-shift-x",
@@ -3596,7 +3594,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onion-shift-y",
@@ -3609,7 +3607,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onion-tint-next",
@@ -3622,7 +3620,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onion-tint-prev",
@@ -3635,7 +3633,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onion-tint-reset",
@@ -3648,7 +3646,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-onop",
@@ -3661,7 +3659,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-opacity",
@@ -3675,7 +3673,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-opop",
@@ -3688,7 +3686,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-paintorder-grp",
@@ -3702,7 +3700,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-pcurve",
@@ -3784,7 +3782,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-ref-offset",
@@ -3797,7 +3795,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-ref-on",
@@ -3810,7 +3808,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-ref-opacity",
@@ -3823,7 +3821,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-resamp",
@@ -3837,7 +3835,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-shadowmode",
@@ -3851,7 +3849,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-skipmanual",
@@ -3865,7 +3863,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-smooth",
@@ -3907,7 +3905,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-star-inner",
@@ -3921,7 +3919,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-star-points",
@@ -3935,7 +3933,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-step",
@@ -3949,7 +3947,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-stroke-alpha",
@@ -3963,7 +3961,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-stroke-hex",
@@ -3977,7 +3975,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-strokegrad-along",
@@ -3991,7 +3989,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-strokegrad-from",
@@ -4005,7 +4003,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-strokegrad-from-c",
@@ -4019,7 +4017,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-strokegrad-to",
@@ -4033,7 +4031,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-strokegrad-to-c",
@@ -4047,7 +4045,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-strokestyle",
@@ -4061,7 +4059,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-sw",
@@ -4075,7 +4073,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-taper",
@@ -4184,7 +4182,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-widget-xmax",
@@ -4237,7 +4235,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p-widget-ymax",
@@ -4289,7 +4287,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p2p-copy-code",
@@ -4302,7 +4300,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p2p-invite-input",
@@ -4315,7 +4313,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#p2p-my-code",
@@ -4328,7 +4326,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#palette-replace-scope",
@@ -4342,7 +4340,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#path-fx-add",
@@ -4356,7 +4354,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#pm-fill",
@@ -4370,7 +4368,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#pm-fill-c",
@@ -4384,7 +4382,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#pm-stroke",
@@ -4398,7 +4396,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#pm-stroke-c",
@@ -4412,7 +4410,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#profile-color",
@@ -4491,7 +4489,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#proj-frames",
@@ -4505,7 +4503,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#project-tab-add",
@@ -4518,7 +4516,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#project-tabs-settings",
@@ -4544,7 +4542,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#psd-input",
@@ -4570,7 +4568,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rig-drive-meshes",
@@ -4584,7 +4582,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rig-drive-shapes",
@@ -4598,7 +4596,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rig-falloff-softness",
@@ -4651,7 +4649,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rm-close",
@@ -4664,7 +4662,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rm-delete-all",
@@ -4677,7 +4675,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rm-dyn-index",
@@ -4690,7 +4688,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rm-dyn-offset",
@@ -4703,7 +4701,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#rm-render-all",
@@ -4716,7 +4714,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#settings-close",
@@ -4755,7 +4753,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sp-h",
@@ -4769,7 +4767,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sp-rot",
@@ -4783,7 +4781,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sp-w",
@@ -4797,7 +4795,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sp-x",
@@ -4811,7 +4809,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sp-y",
@@ -4825,7 +4823,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#start-discord",
@@ -4838,7 +4836,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#start-github",
@@ -4851,7 +4849,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#start-new",
@@ -4865,7 +4863,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#start-open",
@@ -4879,7 +4877,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#start-resume",
@@ -4892,7 +4890,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "dom:#stroke-enable-toggle",
@@ -4905,7 +4903,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#stroke-enable-toggle-lp",
@@ -4918,7 +4916,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sync-check",
@@ -4931,7 +4929,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sync-choose-folder",
@@ -4945,7 +4943,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sync-folder-path",
@@ -4959,7 +4957,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#sync-publish",
@@ -4972,7 +4970,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#text-align",
@@ -4986,7 +4984,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#text-apply",
@@ -5000,7 +4998,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#text-cancel",
@@ -5014,7 +5012,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#text-color",
@@ -5028,7 +5026,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#text-font",
@@ -5042,7 +5040,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#text-input",
@@ -5056,7 +5054,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#text-size",
@@ -5070,7 +5068,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tl-cf",
@@ -5084,7 +5082,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tl-fps",
@@ -5098,7 +5096,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tl-total",
@@ -5112,7 +5110,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tools-invert-btn",
@@ -5126,7 +5124,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#topbar-comment-btn",
@@ -5140,7 +5138,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-color",
@@ -5154,7 +5152,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-content",
@@ -5168,7 +5166,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-fixed-width",
@@ -5182,7 +5180,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-font",
@@ -5196,7 +5194,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-font-add-btn",
@@ -5210,7 +5208,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-font-add-confirm",
@@ -5224,7 +5222,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-font-add-input",
@@ -5238,7 +5236,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-letter-spacing",
@@ -5252,7 +5250,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-line-height",
@@ -5266,7 +5264,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-size",
@@ -5280,7 +5278,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#tp-word-spacing",
@@ -5294,7 +5292,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#track-end",
@@ -5307,7 +5305,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#track-start",
@@ -5320,7 +5318,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#track-target",
@@ -5333,7 +5331,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#track-x",
@@ -5346,7 +5344,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#track-y",
@@ -5359,7 +5357,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#transplant-file-input",
@@ -5372,7 +5370,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#video-input",
@@ -5386,7 +5384,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#web-changelog-toggle",
@@ -5400,7 +5398,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:#zoom-scrub",
@@ -5414,7 +5412,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-align=bottom]",
@@ -5428,7 +5426,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-align=centerH]",
@@ -5442,7 +5440,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-align=centerV]",
@@ -5456,7 +5454,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-align=left]",
@@ -5470,7 +5468,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-align=right]",
@@ -5484,7 +5482,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-align=top]",
@@ -5498,7 +5496,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-distribute=horizontal]",
@@ -5512,7 +5510,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:align-toolbar>button[data-distribute=vertical]",
@@ -5526,7 +5524,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:app-mode-switch>button[data-mode=anim2d]",
@@ -5540,7 +5538,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:app-mode-switch>button[data-mode=motion]",
@@ -5554,7 +5552,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:app-mode-switch>button[data-mode=storyboard]",
@@ -5567,7 +5565,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:comment-fb-tags>button[data-tag=bug]",
@@ -5581,7 +5579,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:comment-fb-tags>button[data-tag=idea]",
@@ -5595,7 +5593,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:comment-fb-tags>button[data-tag=perf]",
@@ -5609,7 +5607,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:comment-fb-tags>button[data-tag=polish]",
@@ -5623,7 +5621,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-cap-grp>button[data-value=butt]",
@@ -5637,7 +5635,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-cap-grp>button[data-value=round]",
@@ -5651,7 +5649,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-cap-grp>button[data-value=square]",
@@ -5665,7 +5663,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-fillbrushmode-grp>button[data-value=above]",
@@ -5679,7 +5677,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-fillbrushmode-grp>button[data-value=below]",
@@ -5693,7 +5691,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-fillbrushmode-grp>button[data-value=merge]",
@@ -5707,7 +5705,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-join-grp>button[data-value=bevel]",
@@ -5721,7 +5719,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-join-grp>button[data-value=miter]",
@@ -5735,7 +5733,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-join-grp>button[data-value=round]",
@@ -5749,7 +5747,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-paintorder-grp>button[data-value=fillFirst]",
@@ -5763,7 +5761,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:p-paintorder-grp>button[data-value=strokeFirst]",
@@ -5777,7 +5775,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-modal>a",
@@ -5856,7 +5854,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-modal>div[data-pane=feedback]",
@@ -5870,7 +5868,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-modal>div[data-pane=figma]",
@@ -5923,7 +5921,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-modal>div[data-pane=updates]",
@@ -5936,7 +5934,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-tabs>button[data-tab=about]",
@@ -5963,7 +5961,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-tabs>button[data-tab=feedback]",
@@ -5977,7 +5975,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-tabs>button[data-tab=figma]",
@@ -6030,7 +6028,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:settings-tabs>button[data-tab=updates]",
@@ -6043,7 +6041,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:shape-tool-stack>button[data-tool=ellipse]",
@@ -6140,7 +6138,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-flag=italic]",
@@ -6154,7 +6152,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-flag=strike]",
@@ -6168,7 +6166,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-flag=underline]",
@@ -6182,7 +6180,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=auto]",
@@ -6196,7 +6194,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=capitalize]",
@@ -6210,7 +6208,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=center]",
@@ -6224,7 +6222,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=fixed]",
@@ -6238,7 +6236,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=left]",
@@ -6252,7 +6250,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=lower]",
@@ -6266,7 +6264,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=none]",
@@ -6280,7 +6278,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=right]",
@@ -6294,7 +6292,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:text-props-sec>button[data-val=upper]",
@@ -6308,7 +6306,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=draw]",
@@ -6322,7 +6320,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=eraser]",
@@ -6336,7 +6334,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=eyedropper]",
@@ -6350,7 +6348,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=fill]",
@@ -6364,7 +6362,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=fillbrush]",
@@ -6378,7 +6376,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=fsselect]",
@@ -6392,7 +6390,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=hand]",
@@ -6406,7 +6404,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=pen]",
@@ -6420,7 +6418,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=rig]",
@@ -6434,7 +6432,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=rotate]",
@@ -6448,7 +6446,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=select]",
@@ -6462,7 +6460,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=subselect]",
@@ -6476,7 +6474,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=text]",
@@ -6490,7 +6488,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:tools-panel>button[data-tool=zoom]",
@@ -6504,7 +6502,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=bc]",
@@ -6518,7 +6516,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=bl]",
@@ -6532,7 +6530,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=br]",
@@ -6546,7 +6544,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=mc]",
@@ -6560,7 +6558,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=ml]",
@@ -6574,7 +6572,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=mr]",
@@ -6588,7 +6586,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=tc]",
@@ -6602,7 +6600,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=tl]",
@@ -6616,7 +6614,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "dom:xform-anchor-grid>button[data-key=tr]",
@@ -6630,7 +6628,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:auto-actions",
@@ -6643,7 +6641,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:boil-effect",
@@ -6669,7 +6667,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:clip-mask-bake",
@@ -6682,7 +6680,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:command-palette",
@@ -6696,7 +6694,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:flip-roll",
@@ -6709,7 +6707,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:follow-path",
@@ -6735,7 +6733,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:interval-assistant",
@@ -6748,7 +6746,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:lagoon-menu",
@@ -6762,7 +6760,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:layer-effects-bake",
@@ -6775,7 +6773,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:lipsync-assistant",
@@ -6789,7 +6787,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:mirror-check",
@@ -6802,7 +6800,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:move-to-layer",
@@ -6815,7 +6813,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:multiframe-draw",
@@ -6828,7 +6826,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:oca-export",
@@ -6841,7 +6839,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:out-of-pegs",
@@ -6854,7 +6852,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:pingpong-cycle",
@@ -6867,7 +6865,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:pose-library",
@@ -6880,7 +6878,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:predictive-stroke",
@@ -6893,7 +6891,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:reference-3d",
@@ -6906,7 +6904,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:reference-fill",
@@ -6932,7 +6930,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:rig-deform",
@@ -6946,7 +6944,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:screentone-bake",
@@ -6959,7 +6957,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:shader-effects-bake",
@@ -6973,7 +6971,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:speed-lines",
@@ -6999,7 +6997,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:timelapse",
@@ -7012,7 +7010,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:timeline-markers",
@@ -7025,7 +7023,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:timeline-zoom",
@@ -7038,7 +7036,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:vector-sculpt",
@@ -7051,7 +7049,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:vector-trim",
@@ -7064,7 +7062,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:view-filter",
@@ -7077,7 +7075,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "labs:xsheet",
@@ -7090,7 +7088,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:effects-panel.js:openCustom:new-custom-shader",
@@ -7104,7 +7102,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labs",
@@ -7118,7 +7116,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdblankkeyframe",
@@ -7132,7 +7130,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdduplicatelayer",
@@ -7146,7 +7144,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdinsertframe",
@@ -7160,7 +7158,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdinsertkeyframe",
@@ -7174,7 +7172,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdlooptoggle",
@@ -7188,7 +7186,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdnewlayer",
@@ -7202,7 +7200,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdoniontoggle",
@@ -7216,7 +7214,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdpingpongtoggle",
@@ -7230,7 +7228,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdplaystop",
@@ -7244,7 +7242,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdredo",
@@ -7258,7 +7256,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdremoveframe",
@@ -7272,7 +7270,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolbrush",
@@ -7286,7 +7284,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolbucket",
@@ -7300,7 +7298,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolcamera",
@@ -7314,7 +7312,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolcomment",
@@ -7328,7 +7326,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtooleraser",
@@ -7342,7 +7340,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolfillbrush",
@@ -7356,7 +7354,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolhand",
@@ -7370,7 +7368,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolpen",
@@ -7384,7 +7382,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolselect",
@@ -7398,7 +7396,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolsubselect",
@@ -7412,7 +7410,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtooltext",
@@ -7426,7 +7424,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdtoolzoom",
@@ -7440,7 +7438,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:labs/command-palette.js:commands:labscmdundo",
@@ -7454,7 +7452,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:layer-inout.js:buildBar:aligner-a-droite-out",
@@ -7467,7 +7465,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:aligner-a-gauche-in",
@@ -7480,7 +7478,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:aligner-au-centre",
@@ -7493,7 +7491,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:distribuer-uniformement",
@@ -7507,7 +7505,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:echelonner-stagger",
@@ -7521,7 +7519,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:inverser-l-ordre-flip",
@@ -7535,7 +7533,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:inverser-la-selection",
@@ -7549,7 +7547,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps-a",
@@ -7563,7 +7561,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:layer-inout.js:buildBar:reinitialiser-pleine-duree",
@@ -7576,7 +7574,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:layer-inout.js:buildBar:selectionner-1-sur-2",
@@ -7590,7 +7588,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:markers.js:buildEl:aller-a-ce-repere",
@@ -7682,7 +7680,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:markers.js:initRulerMenu:repere-precedent-maj",
@@ -7735,7 +7733,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:media-library.js:buildRow:ctxinsertcopyonactivelayer",
@@ -7748,7 +7746,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:media-library.js:buildRow:ctxrelinkreplacefile",
@@ -7762,7 +7760,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:media-library.js:buildRow:ctxrelinkreplacefile#2",
@@ -7776,7 +7774,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:media-library.js:buildRow:ctxremovefromlibrary",
@@ -7789,7 +7787,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:media-library.js:buildRow:ctxselectlayer",
@@ -7802,7 +7800,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion-preset-picker.js:renderTabs:renommer",
@@ -7815,7 +7813,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion-preset-picker.js:renderTabs:supprimer-l-onglet",
@@ -7828,7 +7826,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:action:ctrlmenudelete",
@@ -7841,7 +7839,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:action:ctrlmenumovedown",
@@ -7854,7 +7852,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:action:ctrlmenumoveup",
@@ -7867,7 +7865,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:action:ctrlmenurenameellipsis",
@@ -7880,7 +7878,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:action:ctxremovecolor",
@@ -7894,7 +7892,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexangleto",
@@ -7908,7 +7906,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexbounce",
@@ -7922,7 +7920,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexcontentbox",
@@ -7936,7 +7934,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexcontrol",
@@ -7950,7 +7948,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexfirstkey",
@@ -7964,7 +7962,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexfollowlayer",
@@ -7978,7 +7976,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexloopbefore",
@@ -7992,7 +7990,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexloopcycle",
@@ -8006,7 +8004,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexloopoffset",
@@ -8020,7 +8018,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexlooppingpong",
@@ -8034,7 +8032,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexoscillate",
@@ -8048,7 +8046,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexremapother",
@@ -8062,7 +8060,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexstagger",
@@ -8076,7 +8074,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexstepped",
@@ -8090,7 +8088,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexvalue",
@@ -8104,7 +8102,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildExprEditorRow:exprexwiggle",
@@ -8118,7 +8116,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildKeyLockMenuItems:ctxlockkeyframesoncolon",
@@ -8132,7 +8130,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:buildKeySelectionLockMenuItems:ctxlockkeyframesoncolon",
@@ -8146,7 +8144,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:decorateMotionPropertyRow:ctxbakeexpressionellipsis",
@@ -8159,7 +8157,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:decorateMotionPropertyRow:ctxexprcontrolsellipsis",
@@ -8172,7 +8170,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExprControlsMenu:ctrlmenuaddellipsis",
@@ -8185,7 +8183,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExprControlsMenu:ctrlmenuexistingcolon",
@@ -8198,7 +8196,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExtraMatteMenu",
@@ -8212,7 +8210,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExtraMatteMenu#2",
@@ -8226,7 +8224,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExtraMatteMenu:mattemenumodehdr",
@@ -8240,7 +8238,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExtraMatteMenu:mattemenuremove",
@@ -8254,7 +8252,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExtraMatteMenu:mattemenusourcehdr",
@@ -8268,7 +8266,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openExtraParentMenu:menuremovethisparent",
@@ -8282,7 +8280,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openMatteConfigMenu",
@@ -8296,7 +8294,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openMatteConfigMenu#2",
@@ -8310,7 +8308,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openMatteConfigMenu:mattemenumodehdr",
@@ -8324,7 +8322,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openMatteConfigMenu:mattemenuremove",
@@ -8338,7 +8336,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:openMatteConfigMenu:mattemenusourcehdr",
@@ -8352,7 +8350,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderDiscreteKeyGridRow:ctxdeletethiskey",
@@ -8366,7 +8364,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderElementsList:elementsdelete",
@@ -8380,7 +8378,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderElementsList:elementsrename",
@@ -8394,7 +8392,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderElementsList:elementsrename#2",
@@ -8408,7 +8406,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderElementsList:elementsselect",
@@ -8422,7 +8420,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderElementsList:elementsselectmembers",
@@ -8436,7 +8434,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderElementsList:elementsungroup",
@@ -8450,7 +8448,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxaddeffectorlayer",
@@ -8464,7 +8462,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxaddmarkeronlayer",
@@ -8491,7 +8489,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxconverttocomponent",
@@ -8505,7 +8503,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxcutatplayhead",
@@ -8519,7 +8517,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxexprcontrolsellipsis",
@@ -8532,7 +8530,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxinsertaudiotrack",
@@ -8585,7 +8583,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxparentintimelinktimeellipsis",
@@ -8599,7 +8597,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxremovefromfolder",
@@ -8640,7 +8638,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:ctxwidgetsettingsellipsis",
@@ -8654,7 +8652,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderLayerListMotion:elementsrename",
@@ -8668,7 +8666,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:renderTimeLinkRow:ctxunlinktime",
@@ -8682,7 +8680,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxaddkeyhere",
@@ -8696,7 +8694,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxcolorkeysellipsis",
@@ -8710,7 +8708,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxdeletethiskey",
@@ -8724,7 +8722,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxdistributeevenly",
@@ -8737,7 +8735,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxeasyeasef9",
@@ -8751,7 +8749,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxeasyeaseinshiftf9",
@@ -8765,7 +8763,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxeasyeaseoutcmdshiftf9",
@@ -8779,7 +8777,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxediteasecurve",
@@ -8793,7 +8791,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxfliporder",
@@ -8806,7 +8804,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxinvertselection",
@@ -8819,7 +8817,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxkeeprandomellipsis",
@@ -8832,7 +8830,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxlinearcmdaltk",
@@ -8846,7 +8844,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxparentintimelinktimeellipsis",
@@ -8860,7 +8858,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxselectevery2nd",
@@ -8873,7 +8871,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxselecteverynthellipsis",
@@ -8886,7 +8884,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:motion.js:trackRowHtml:ctxsubdividemidpoint",
@@ -8899,7 +8897,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:palette-panel.js:render:remplacer-dans-le-calque",
@@ -8913,7 +8911,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:palette-panel.js:render:retirer-de-la-palette",
@@ -8927,7 +8925,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:palette-panel.js:render:utiliser-comme-fill",
@@ -8941,7 +8939,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:palette-panel.js:render:utiliser-comme-stroke",
@@ -8955,7 +8953,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:palette-panel.js:renderTabs:dupliquer",
@@ -8969,7 +8967,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:palette-panel.js:renderTabs:renommer",
@@ -8983,7 +8981,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:palette-panel.js:renderTabs:supprimer",
@@ -8997,7 +8995,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:rig-widget.js:axisItem:widgetmenuaxisrangeprefix",
@@ -9011,7 +9009,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:rig-widget.js:openWidgetMenu:widgetmenusizeellipsis",
@@ -9025,7 +9023,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:select-bridge.js:onContext:accepter-la-correction",
@@ -9039,7 +9037,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:select-bridge.js:onContext:animer-le-texte",
@@ -9053,7 +9051,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:select-bridge.js:onContext:aplatir",
@@ -9081,7 +9079,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:centrer-le-point-d-ancrage",
@@ -9094,7 +9092,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:coller",
@@ -9108,7 +9106,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:coller#2",
@@ -9122,7 +9120,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:combiner-union-non-destructif",
@@ -9164,7 +9162,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:couper",
@@ -9178,7 +9176,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:ctxmaskimagewithshape",
@@ -9192,7 +9190,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:select-bridge.js:onContext:dupliquer",
@@ -9206,7 +9204,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:exposer-l-opacite-comme-propriete-de-component",
@@ -9220,7 +9218,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone",
@@ -9234,7 +9232,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:select-bridge.js:onContext:premier-plan",
@@ -9248,7 +9246,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:profil-de-contour",
@@ -9276,7 +9274,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:select-bridge.js:onContext:sortir-du-groupe",
@@ -9290,7 +9288,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "menu:select-bridge.js:onContext:suggerer-la-forme-pour",
@@ -9304,7 +9302,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:shapes-panel.js:buildShapeRow:elementsrename",
@@ -9318,7 +9316,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:shapes-panel.js:buildShapeRow:elementsselect",
@@ -9332,7 +9330,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:shapes-panel.js:renderNode:elementsexplodetext",
@@ -9346,7 +9344,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:shapes-panel.js:renderNode:elementsrename",
@@ -9360,7 +9358,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:shapes-panel.js:renderNode:elementsselectmembers",
@@ -9374,7 +9372,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:shapes-panel.js:renderNode:elementsselectmembers#2",
@@ -9388,7 +9386,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:shapes-panel.js:renderNode:elementsungroup",
@@ -9402,7 +9400,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:storyboard.js:renderSound:detacher-du-montage",
@@ -9649,7 +9647,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildFollowPathMenuItems:chemin-aucun",
@@ -9663,7 +9661,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildMatteMenuItems:matte-aucune-retirer",
@@ -9677,7 +9675,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildMatteMenuItems:source",
@@ -9691,7 +9689,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildParentMenuItems:parent-a",
@@ -9705,7 +9703,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildParentMenuItems:parent-a-aucun-parentage-libre",
@@ -9719,7 +9717,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildParentMenuItems:parent-b",
@@ -9733,7 +9731,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildParentMenuItems:parent-b-aucun",
@@ -9747,7 +9745,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildTimeLinkMenuItems:ctxlinktimetoprefix",
@@ -9761,7 +9759,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:buildTimeLinkMenuItems:ctxtimenoneunlink",
@@ -9775,7 +9773,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxbreakapartcomponent",
@@ -9986,7 +9984,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxinsertlayernull",
@@ -10013,7 +10011,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxlayerblend",
@@ -10027,7 +10025,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxmattesource",
@@ -10041,7 +10039,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxmenuappearance",
@@ -10055,7 +10053,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxmenuinsert",
@@ -10122,7 +10120,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:ctxpropagatefillotherframes",
@@ -10228,7 +10226,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderLayerList:dissoudre-le-dossier",
@@ -10281,7 +10279,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderShapeTreeRowsInto:elementsrename#2",
@@ -10295,7 +10293,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderShapeTreeRowsInto:elementsselect",
@@ -10309,7 +10307,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderShapeTreeRowsInto:elementsselectmembers",
@@ -10323,7 +10321,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderShapeTreeRowsInto:elementsungroup",
@@ -10337,7 +10335,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:renderShapeTreeRowsInto:fxdelete",
@@ -10351,7 +10349,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:top:btncopy",
@@ -10431,7 +10429,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:top:ctxinsertblankkeyframe",
@@ -10537,7 +10535,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:top:ctxinsertlayernull",
@@ -10564,7 +10562,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:top:ctxpaste",
@@ -10617,7 +10615,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:top:propager-ce-remplissage-toutes-les-frames",
@@ -10643,7 +10641,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "menu:timeline.js:top:supprimer-le-tween",
@@ -10879,7 +10877,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "sdk:nemo-script.Layer.duplicate",
@@ -10919,7 +10917,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "sdk:nemo-script.Layer.expression",
@@ -11024,7 +11022,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "sdk:nemo-script.Layer.locked",
@@ -11260,7 +11258,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "sdk:nemo-script.Layer.unlinkTime",
@@ -11274,7 +11272,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "sdk:nemo-script.Layer.visible",
@@ -11678,7 +11676,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:cmdGoStart",
@@ -11692,7 +11690,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:cmdInsertBlankKey",
@@ -11745,7 +11743,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:cmdNextKey",
@@ -11759,7 +11757,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:cmdPrevFrame",
@@ -11773,7 +11771,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:cmdPrevKey",
@@ -11787,7 +11785,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:cmdRenameLayer",
@@ -11813,7 +11811,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:cmdTween",
@@ -11840,7 +11838,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:draw",
@@ -11854,7 +11852,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:ellipse",
@@ -11869,7 +11867,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:eraser",
@@ -11883,7 +11881,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:eyedropper",
@@ -11897,7 +11895,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:fill",
@@ -11911,7 +11909,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:fillbrush",
@@ -11925,7 +11923,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:fsselect",
@@ -11939,7 +11937,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:hand",
@@ -11953,7 +11951,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:line",
@@ -11968,7 +11966,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:pen",
@@ -11982,7 +11980,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoClipboard",
@@ -12038,7 +12036,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoEscape",
@@ -12051,7 +12049,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoGroup",
@@ -12077,7 +12075,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-closed"
     },
     {
       "id": "shortcut:readonly:shortcutRoPlay",
@@ -12091,7 +12089,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoSelectAll",
@@ -12105,7 +12103,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoSplitLayer",
@@ -12132,7 +12130,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoStepLayer",
@@ -12146,7 +12144,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "low",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoUndo",
@@ -12159,7 +12157,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "high",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:readonly:shortcutRoWorkArea",
@@ -12173,7 +12171,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:rect",
@@ -12188,7 +12186,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:rig",
@@ -12203,7 +12201,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:rotate",
@@ -12217,7 +12215,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:select",
@@ -12231,7 +12229,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:speechbubble",
@@ -12246,7 +12244,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:star",
@@ -12261,7 +12259,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:subselect",
@@ -12275,7 +12273,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:text",
@@ -12290,7 +12288,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:toggleOnion",
@@ -12305,7 +12303,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     },
     {
       "id": "shortcut:zoom",
@@ -12319,7 +12317,7 @@
       "capabilityId": null,
       "disposition": null,
       "confidence": "medium",
-      "status": "unowned"
+      "status": "issues-open"
     }
   ],
   "tasks": [
@@ -12374,72 +12372,134 @@
       "outcome": "A03",
       "title": "Finish supported native multi-project/tab activation and close semantics",
       "surfaces": 9,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2272,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D04",
       "outcome": "A03",
       "title": "Reconcile start-screen resume storage and native entry lifecycle",
       "surfaces": 5,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2014,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D05",
       "outcome": "A03",
       "title": "Complete native version-history controller boundary across families",
       "surfaces": 1,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1647,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D06",
       "outcome": "A04",
       "title": "Migrate shared-folder publish/pull/merge to native snapshots",
       "surfaces": 6,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2355,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D07",
       "outcome": "A03",
       "title": "Preserve autosave heartbeat and recovery across native documents",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1577,
+          "state": "closed",
+          "curated": "medium"
+        },
+        {
+          "issue": 2380,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D08",
       "outcome": "A03",
       "title": "Complete cross-context application history routing",
       "surfaces": 10,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2256,
+          "state": "open",
+          "curated": "low"
+        },
+        {
+          "issue": 2381,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D09",
       "outcome": "A03",
       "title": "Extract history-panel presentation over immutable history queries",
       "surfaces": 3,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1647,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D10",
       "outcome": "C01",
       "title": "Admit native property metadata and holder identity model",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2068,
+          "state": "closed",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D11",
       "outcome": "C01",
       "title": "Implement generic native track/key/static editing and evaluation",
       "surfaces": 4,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2077,
+          "state": "closed",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D12",
@@ -12459,16 +12519,28 @@
       "outcome": "C04",
       "title": "Native batch key editing, clipboard and retiming transactions",
       "surfaces": 24,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2202,
+          "state": "closed",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D14",
       "outcome": "A01",
       "title": "Resolve native expression substrate async-job lifecycle boundary",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2088,
+          "state": "closed",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D15",
@@ -12501,24 +12573,40 @@
       "outcome": "C09",
       "title": "Bind comp/self/mesh and compatibility expression views",
       "surfaces": 5,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2076,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D18",
       "outcome": "B10",
       "title": "Native expression editors, controls, pickwhip and widget linking",
       "surfaces": 26,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2376,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D19",
       "outcome": "C09",
       "title": "Bake expressions into native optimized tracks",
       "surfaces": 1,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2379,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D20",
@@ -12620,8 +12708,14 @@
       "outcome": "C01",
       "title": "Native layer in/out, time links and batch bar editing",
       "surfaces": 24,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2246,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "D28",
@@ -12641,8 +12735,14 @@
       "outcome": "B02",
       "title": "Native component shape-tree and element holder consumers",
       "surfaces": 15,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2256,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D30",
@@ -12713,8 +12813,13 @@
       "outcome": "B11",
       "title": "Native Motion canvas pointer and pickwhip transactions",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2377,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D35",
@@ -12738,40 +12843,65 @@
       "outcome": "B11",
       "title": "Extract native-bound Motion properties/parent/matte panels",
       "surfaces": 14,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2377,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D37",
       "outcome": "B11",
       "title": "Extract transform/expression field and key-lock presentation",
       "surfaces": 2,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2377,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D38",
       "outcome": "B11",
       "title": "Extract elements, path/mesh/text and discrete track rows",
       "surfaces": 8,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2377,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D39",
       "outcome": "B11",
       "title": "Extract track grid, key/property selection and drag presentation",
       "surfaces": 2,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2377,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "D40",
       "outcome": "B11",
       "title": "Extract Motion overlays, row renderers and mode bootstrap",
       "surfaces": 4,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2377,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "F01",
@@ -12838,8 +12968,13 @@
       "outcome": "C01",
       "title": "Own remaining persistent project palettes, aids and workspace records natively",
       "surfaces": 5,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2378,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "F06",
@@ -13034,8 +13169,14 @@
       "outcome": "C10",
       "title": "Expose native context and target-set resolution for selection intents",
       "surfaces": 3,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2225,
+          "state": "open",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "F15",
@@ -13195,8 +13336,14 @@
       "outcome": "A03",
       "title": "Retain native per-document history and activate suspended tab state",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2272,
+          "state": "closed",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "G01",
@@ -13328,8 +13475,13 @@
       "outcome": "B06",
       "title": "Wire effect and path-effect inspectors to native commands",
       "surfaces": 4,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G06",
@@ -13428,8 +13580,13 @@
       "outcome": "B10",
       "title": "Adapt render queue and playback bake cache to native fixed-revision jobs",
       "surfaces": 7,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2375,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G11",
@@ -13453,8 +13610,13 @@
       "outcome": "B06",
       "title": "Connect color/palette tools to native batch color commands",
       "surfaces": 28,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G13",
@@ -13616,8 +13778,14 @@
       "outcome": "B03",
       "title": "Replace selection/clipboard/transform mutation callers with native transactions",
       "surfaces": 34,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2234,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "G21",
@@ -13708,16 +13876,26 @@
       "outcome": "B07",
       "title": "Extract editor chrome, scrub/range and canvas-aid presentation modules",
       "surfaces": 17,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2373,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G26",
       "outcome": "B10",
       "title": "Wire shape/history/expression/script panel presenters to native reads and commands",
       "surfaces": 6,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2376,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G27",
@@ -13774,8 +13952,14 @@
       "outcome": "B08",
       "title": "Adapt media library catalog and canvas re-insertion UI",
       "surfaces": 14,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2240,
+          "state": "closed",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "G30",
@@ -13799,8 +13983,14 @@
       "outcome": "B08",
       "title": "Adapt native-video layer placement/status/bench UI",
       "surfaces": 3,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2359,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G32",
@@ -13824,8 +14014,14 @@
       "outcome": "B08",
       "title": "Reconcile Reference presenter to accepted native media source and full baseline modes",
       "surfaces": 7,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1864,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G35",
@@ -13969,16 +14165,27 @@
       "outcome": "B10",
       "title": "Bind retained motion-preset library to native track commands",
       "surfaces": 6,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2376,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G40",
       "outcome": "B08",
       "title": "Connect rig, widget and image-mesh editors to their native model owners",
       "surfaces": 15,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2255,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G41",
@@ -14065,8 +14272,13 @@
       "outcome": "D08",
       "title": "Preserve feedback storage/transport/triage boundaries and redact task data",
       "surfaces": 15,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2381,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "G48",
@@ -14128,8 +14340,13 @@
       "outcome": "A01",
       "title": "Characterize exact dormant and known-defect dispositions before native caller migration",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2367,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I01",
@@ -14201,8 +14418,14 @@
       "outcome": "C05",
       "title": "Extract reusable affine/color/descriptor helpers with native-bound caller ports",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2153,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "I07",
@@ -14256,8 +14479,14 @@
       "outcome": "C16",
       "title": "Route duplicator setup/convert commands through native transactions",
       "surfaces": 8,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2244,
+          "state": "open",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I11",
@@ -14556,8 +14785,14 @@
       "outcome": "A07",
       "title": "Complete native application/bootstrap routing and remove obsolete writable opacity facade",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2364,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I27",
@@ -14702,32 +14937,54 @@
       "outcome": "A06",
       "title": "Migrate cross-project transplant through native import transactions",
       "surfaces": 2,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2219,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I38",
       "outcome": "A07",
       "title": "Adapt onboarding/tutorial document operations and preserve unavailable lessons",
       "surfaces": 1,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1685,
+          "state": "closed",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "I39",
       "outcome": "B11",
       "title": "Extract timeline support, taxonomy and graph-editor presentation boundaries",
       "surfaces": 1,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2371,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I40",
       "outcome": "D08",
       "title": "Preserve updater behavior and boundary without publishing a release",
       "surfaces": 5,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2381,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I41",
@@ -14772,24 +15029,39 @@
       "outcome": "D08",
       "title": "Characterize Kitsu baseline and separate service defects from native admission",
       "surfaces": 7,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2381,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I44",
       "outcome": "D08",
       "title": "Route Kitsu shot/project mutation and working-file artifacts to native services",
       "surfaces": 1,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2381,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I45",
       "outcome": "D08",
       "title": "Preserve local P2P contact model and defer absent live transport",
       "surfaces": 6,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2381,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I46",
@@ -14821,64 +15093,109 @@
       "outcome": "A07",
       "title": "Reconcile desktop shell/build metadata and bundled sidecar provenance",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1005,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I48",
       "outcome": "A07",
       "title": "Reconcile developer CLI/module boundaries and focused test entry points",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1005,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I49",
       "outcome": "A07",
       "title": "Reconcile non-code/vendor/generated/assets provenance and desktop build support",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1005,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I50",
       "outcome": "A07",
       "title": "Reconcile complete packet/field/consumer evidence into canonical scope admission",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1005,
+          "state": "open",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I51",
       "outcome": "D07",
       "title": "Resolve Rust-MCP coverage floor findings for current public adapters",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2380,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I52",
       "outcome": "D08",
       "title": "Route motion tracker frame reads and result application through native media/track ports",
       "surfaces": 8,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2381,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "I53",
       "outcome": "A04",
       "title": "Route local remote-snapshot merge and revision ghosts through native import transaction",
       "surfaces": 5,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2355,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U01",
       "outcome": "B01",
       "title": "Partition editor bootstrap and retain safe initialization",
       "surfaces": 3,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2369,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U02",
@@ -14911,208 +15228,347 @@
       "outcome": "B04",
       "title": "Retain shortcut registry and extract remap/menu dispatch UI",
       "surfaces": 25,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2370,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U05",
       "outcome": "B04",
       "title": "Partition keyboard focus, mode and clipboard arbitration",
       "surfaces": 2,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2370,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U06",
       "outcome": "B04",
       "title": "Extract temporary tool holds and ordinary brush/tool controls",
       "surfaces": 30,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2370,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U07",
       "outcome": "B05",
       "title": "Extract timeline projection, selection and scroll layout",
       "surfaces": 5,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2371,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U08",
       "outcome": "A02",
       "title": "Complete stopped selected-layer timing presenter source review/integration",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2058,
+          "state": "closed",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "U09",
       "outcome": "B05",
       "title": "Wire frame-grid drags, held-span trims and clipboard callers",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2248,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U10",
       "outcome": "B05",
       "title": "Wire layer lifecycle, duplicate/split and folder command callers",
       "surfaces": 5,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2234,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "U11",
       "outcome": "B05",
       "title": "Extract layer row/tree renderer and drag reorder presenter",
       "surfaces": 2,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2371,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U12",
       "outcome": "B06",
       "title": "Wire parent, follow-path, time-link and matte pickers",
       "surfaces": 12,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U13",
       "outcome": "B05",
       "title": "Extract timeline transport and document-timing controls over native ports",
       "surfaces": 21,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2371,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U14",
       "outcome": "B06",
       "title": "Extract properties context router and presentation helpers",
       "surfaces": 1,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U15",
       "outcome": "B06",
       "title": "Wire stroke/fill/style inspectors and selection paint commands",
       "surfaces": 52,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U16",
       "outcome": "B06",
       "title": "Wire shape geometry, masks and point/boolean controls",
       "surfaces": 33,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U17",
       "outcome": "B06",
       "title": "Replace ghost-proxy transform writers with native selection intents",
       "surfaces": 14,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U18",
       "outcome": "B06",
       "title": "Wire blend and matte preview/commit dropdowns",
       "surfaces": 4,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U19",
       "outcome": "B06",
       "title": "Wire tween span/easing displays and curve edit intents",
       "surfaces": 8,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U20",
       "outcome": "B06",
       "title": "Extract ordinary onion and ghost controls with local view settings",
       "surfaces": 21,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2372,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U21",
       "outcome": "B10",
       "title": "Extract text popover and in-place editing session UI",
       "surfaces": 9,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2267,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U22",
       "outcome": "B10",
       "title": "Wire text commit, typography, bake and character actions",
       "surfaces": 37,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2267,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U23",
       "outcome": "B08",
       "title": "Wire component, footage and lip-sync panels",
       "surfaces": 23,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2256,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U24",
       "outcome": "B08",
       "title": "Wire duplicator inspector and effectors",
       "surfaces": 25,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2256,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U25",
       "outcome": "B08",
       "title": "Wire rig, combine-group, motion-blur and shy panels",
       "surfaces": 6,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2255,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U26",
       "outcome": "B10",
       "title": "Separate document serialization/import facades and residual editing reexports",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2355,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U27",
       "outcome": "B10",
       "title": "Extract ordinary export modal and native job presentation",
       "surfaces": 11,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2375,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U28",
       "outcome": "B07",
       "title": "Extract workspace rails, view fitting and toolbar preferences",
       "surfaces": 6,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2373,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U29",
       "outcome": "B07",
       "title": "Extract feedback/comment/collaborator presentation",
       "surfaces": 20,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2373,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U30",
@@ -15132,40 +15588,68 @@
       "outcome": "B09",
       "title": "Retain Labs view-only aids and local markers",
       "surfaces": 36,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2374,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U32",
       "outcome": "B09",
       "title": "Retain 3D reference viewer and ordinary OBJ entry",
       "surfaces": 1,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2374,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U33",
       "outcome": "B09",
       "title": "Migrate Labs predictive/sculpt/french-curve/trim commits",
       "surfaces": 4,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2362,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U34",
       "outcome": "B09",
       "title": "Migrate Labs multiframe draw, move-to-layer and pose stamping",
       "surfaces": 3,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2362,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U35",
       "outcome": "B09",
       "title": "Migrate Labs ping-pong, exposure retime and interval actions",
       "surfaces": 3,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2248,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U36",
@@ -15185,168 +15669,291 @@
       "outcome": "B09",
       "title": "Disposition dormant Labs without activating prototypes",
       "surfaces": 10,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2374,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U38",
       "outcome": "B10",
       "title": "Close UI module ports, load order and legacy retirement",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2376,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "U39",
       "outcome": "B01",
       "title": "Retain confirmation adapter and desktop-only fallback disposition",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2369,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X01",
       "outcome": "A02",
       "title": "Review and publish frozen held-frame integration",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2050,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X02",
       "outcome": "A02",
       "title": "Run held-frame native, GPU and decoded PNG gates",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2050,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X03",
       "outcome": "A02",
       "title": "Integrate and release held-frame delivery",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2050,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X04",
       "outcome": "A02",
       "title": "Review timing UI and apply its four metadata files",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2058,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X05",
       "outcome": "A02",
       "title": "Run final timing UI checks",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2058,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X06",
       "outcome": "A02",
       "title": "Integrate and release timing UI",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2058,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X07",
       "outcome": "A02",
       "title": "Regenerate ordinary PNG fixture with authored timing",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2056,
+          "state": "closed",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X08",
       "outcome": "A02",
       "title": "Resolve ordinary native picker execution method",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1959,
+          "state": "closed",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X09",
       "outcome": "A02",
       "title": "Build and preflight combined temporal candidate variants",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2050,
+          "state": "closed",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X10",
       "outcome": "A02",
       "title": "Accept installed P38 populated-tab safety workflow",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1645,
+          "state": "closed",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X11",
       "outcome": "A02",
       "title": "Accept ordinary two-frame PNG export and cancellation",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1959,
+          "state": "closed",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X12",
       "outcome": "A02",
       "title": "Accept installed playback minimize and restore",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1573,
+          "state": "open",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X13",
       "outcome": "A02",
       "title": "Accept ordinary Reference persistence and export exclusion",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1864,
+          "state": "open",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X14",
       "outcome": "A02",
       "title": "Accept timing and visibility through ordinary desktop controls",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1996,
+          "state": "closed",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-closed"
     },
     {
       "task": "X15",
       "outcome": "A08",
       "title": "Accept actual installed Codex and Claude clients",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1049,
+          "state": "open",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X16",
       "outcome": "A07",
       "title": "Reconcile final fields and complete consumer matrix",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1005,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X17",
       "outcome": "A07",
       "title": "Execute combined cross-family native regression matrix",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1035,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X18",
       "outcome": "A08",
       "title": "Execute full required installed desktop family sweep",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2348,
+          "state": "open",
+          "curated": "medium"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X19",
@@ -15366,8 +15973,14 @@
       "outcome": "A07",
       "title": "Run final coverage, boundaries, schema and negative controls",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1035,
+          "state": "open",
+          "curated": "low"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X21",
@@ -15387,32 +16000,53 @@
       "outcome": "A09",
       "title": "Close final P03/P33 acceptance mapping",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 1035,
+          "state": "open",
+          "curated": "high"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X23",
       "outcome": "A09",
       "title": "Prepare final protected promotion",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2368,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X24",
       "outcome": "A09",
       "title": "Obtain final human acceptance",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2368,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     },
     {
       "task": "X25",
       "outcome": "A09",
       "title": "Perform approved promotion and final readback",
       "surfaces": 0,
-      "owners": [],
-      "status": "unowned"
+      "owners": [
+        {
+          "issue": 2368,
+          "state": "open"
+        }
+      ],
+      "status": "issues-open"
     }
   ]
 }
