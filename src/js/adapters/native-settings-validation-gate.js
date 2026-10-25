@@ -54,7 +54,7 @@
       })();
       try{await Promise.race([run,timeout]);}
       catch(_){record('failed',request).catch(function(){});}
-      finally{ended=true;ports.clearTimer(timer);}
+      finally{ended=true;try{ports.clearTimer(timer);}catch(_){}}
       // The native command already completed. Never replace its receipt or retry it.
       return value;
     }
@@ -75,8 +75,9 @@
         return JSON.parse(bytes);}
       var config=await read('settings-validation-config.json');
       var gate=create(runtime,config,{
-        now:function(){return Date.now();},setTimer:setTimeout,clearTimer:clearTimeout,
-        delay:function(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});},
+        now:function(){return Date.now();},setTimer:function(fn,ms){return root.setTimeout(fn,ms);},
+        clearTimer:function(timer){root.clearTimeout(timer);},
+        delay:function(ms){return new Promise(function(resolve){root.setTimeout(resolve,ms);});},
         read:function(){return read('settings-validation-release.json');},
         write:async function(bytes){await api.fs.writeTextFile(dir+'/settings-validation.pending.json',bytes);
           await api.fs.rename(dir+'/settings-validation.pending.json',dir+'/settings-validation.json');},

@@ -111,3 +111,25 @@ test('oversized or malformed packets fail closed using only admitted filesystem 
     const promise=Promise.resolve(f.value);assert.equal(Gate.hold(root,'settings-response',f.request,promise),promise);
   }
 });
+test('installed timing functions retain their Window receiver through hold and release',async()=>{
+  const f=fixture(),calls=[],records=[];let release=null,deadline;
+  const runtime={...f.runtime,dataDir:'/owned/tauri-data',processEnvironment:{tempDir:'/owned/tmp',NEMO_REPORT_DIR:'/owned/reports'}};
+  const root={setTimeout(fn,ms){assert.equal(this,root,'Window timer requires the real receiver');calls.push(['set',ms]);
+      if(ms===60000){deadline=fn;return 42;}return setTimeout(fn,0);},
+    clearTimeout(id){assert.equal(this,root,'Window cancellation requires the real receiver');assert.equal(id,42);calls.push(['clear',id]);},
+    __TAURI__:{core:{invoke:async()=>runtime},fs:{
+      readTextFile:async p=>JSON.stringify(p.endsWith('-config.json')?f.config:release),
+      writeTextFile:async(p,bytes)=>records.push(JSON.parse(bytes)),rename:async()=>{}}}};
+  await Gate.install(root).ready;
+  let finished=false;const result=Gate.hold(root,'settings-response',f.request,Promise.resolve(f.value)).then(value=>{finished=true;return value;});
+  await turn();assert.equal(finished,false);assert.equal(typeof deadline,'function');
+  assert.equal(records.at(-1).events.at(-1).phase,'held');
+  release={schema,taskKey:f.config.taskKey,runId:f.config.runId,requestId:f.request.requestId,action:'release'};
+  assert.equal(await result,f.value);assert.deepEqual(records.at(-1).events.map(e=>e.phase),['ready','held','released']);
+  assert.deepEqual(calls[0],['set',60000]);assert.ok(calls.some(c=>c[0]==='set'&&c[1]===100));assert.deepEqual(calls.at(-1),['clear',42]);
+});
+test('timer setup and cleanup errors cannot replace an already completed native receipt',async()=>{
+  const f=fixture('settings-response',{setTimer(){throw new TypeError('Illegal invocation');},clearTimer(){throw new TypeError('Illegal invocation');}});
+  await f.gate.ready;assert.equal(await f.gate.hold('settings-response',f.request,f.value),f.value);
+  await turn();assert.equal(f.records.at(-1).events.at(-1).phase,'failed');
+});
