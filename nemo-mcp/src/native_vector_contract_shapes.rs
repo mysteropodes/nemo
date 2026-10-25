@@ -205,6 +205,8 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
             "isMask",
             "maskMode",
             "maskFeather",
+            "linkedFillId",
+            "isLinkedFillCompanion",
         ],
     )
     .is_some_and(|object| {
@@ -214,6 +216,23 @@ fn extension(value: &Value, has_stroke: bool) -> bool {
                 .is_none_or(|v| pressure(v) && !has_stroke)
             && object.get("paramShape").is_none_or(|v| shape(v, false))
             && object.get("boxAngle").is_none_or(finite)
+            && object.get("linkedFillId").is_none_or(|value| {
+                value.as_str().is_some_and(|id| {
+                    !id.is_empty() && id.len() <= 128 && !id.chars().any(char::is_control)
+                })
+            })
+            && object
+                .get("isLinkedFillCompanion")
+                .is_none_or(Value::is_boolean)
+            && (object.get("isLinkedFillCompanion") != Some(&Value::Bool(true))
+                || (object.contains_key("linkedFillId") && !object.contains_key("pressure")))
+            && (!object.contains_key("linkedFillId")
+                || object.get("isLinkedFillCompanion") == Some(&Value::Bool(true))
+                || object
+                    .get("pressure")
+                    .and_then(|p| p.get("centerSegments"))
+                    .and_then(Value::as_array)
+                    .is_some_and(|points| points.len() >= 2))
             && object
                 .get("isMask")
                 .is_none_or(|v| v.is_null() || v.is_boolean())
@@ -250,8 +269,82 @@ pub(super) fn record_shape(value: &Value, create: bool) -> bool {
             && geometry(&value["geometry"])
             && (value["fill"].is_null() || solid(&value["fill"]))
             && body(&value["vector"])
+            && (value["vectorExt"].get("linkedFillId").is_none()
+                || (value["target"]["frameScope"]["kind"] == "authored"
+                    && (value["vectorExt"]["isLinkedFillCompanion"] != true
+                        || !value["fill"].is_null())))
             && object
                 .get("vectorExt")
                 .is_none_or(|ext| extension(ext, value["vector"]["hasRealStroke"] == true))
     })
+}
+
+#[test]
+fn linked_pair_record_shapes_preserve_roles_and_reject_invalid_metadata() {
+    use serde_json::json;
+    let point = json!({"point":{"x":0,"y":0},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}});
+    let companion = json!({"schemaVersion":1,"family":"editable-vector-path",
+        "target":{"contextId":"scene-root","layerUid":"L","strokeId":"backdrop","frameScope":{"kind":"authored","frame":0}},
+        "geometry":{"kind":"cubic-path","closed":true,"coordinateSpace":"document-world","handleSpace":"relative","segments":[point.clone(),point]},
+        "fill":{"kind":"solid","r":1,"g":0,"b":0,"a":1},
+        "vector":{"stroke":null,"hasRealStroke":false,"strokeWidth":1,"strokeCap":"round","strokeJoin":"round","opacity":1},
+        "vectorExt":{"linkedFillId":"pair","isLinkedFillCompanion":true}});
+    assert!(record_shape(&companion, false));
+    let anchor =
+        json!({"point":{"x":0,"y":0},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0},"width":1});
+    let mut primary = companion.clone();
+    primary["vectorExt"] = json!({"linkedFillId":"pair","isLinkedFillCompanion":false,"pressure":{"centerSegments":[anchor.clone(),anchor]}});
+    assert!(record_shape(&primary, false));
+    primary["vectorExt"]
+        .as_object_mut()
+        .unwrap()
+        .remove("isLinkedFillCompanion");
+    assert!(record_shape(&primary, false));
+    let mut ordinary = companion.clone();
+    ordinary["vectorExt"] = json!({"isLinkedFillCompanion":false});
+    assert!(record_shape(&ordinary, false));
+    for (path, value) in [
+        ("/vectorExt/linkedFillId", Value::Null),
+        ("/vectorExt/linkedFillId", json!("")),
+        ("/vectorExt/linkedFillId", json!("x".repeat(129))),
+        ("/vectorExt/linkedFillId", json!("bad\u{0000}id")),
+        ("/vectorExt/isLinkedFillCompanion", Value::Null),
+        ("/fill", Value::Null),
+        ("/target/frameScope/kind", json!("evaluated")),
+    ] {
+        let mut bad = companion.clone();
+        *bad.pointer_mut(path).unwrap() = value;
+        assert!(!record_shape(&bad, false), "{path}");
+    }
+    let mut missing = companion.clone();
+    missing["vectorExt"]
+        .as_object_mut()
+        .unwrap()
+        .remove("linkedFillId");
+    assert!(!record_shape(&missing, false));
+    let mut short = primary;
+    short["vectorExt"]["pressure"]["centerSegments"]
+        .as_array_mut()
+        .unwrap()
+        .pop();
+    assert!(!record_shape(&short, false));
+}
+
+#[test]
+fn ellipse_parameters_use_their_own_closed_finite_field_set() {
+    use serde_json::json;
+    let ellipse = json!({"kind":"ellipse","startAngle":-15,"sweep":240.5,"innerRadius":0.25});
+    assert!(shape(&ellipse, true));
+    let mut stored = ellipse.clone();
+    stored["box"] = json!({"x1":0,"y1":0,"x2":30,"y2":20});
+    assert!(shape(&stored, false));
+    assert!(!shape(&stored, true));
+    for key in ["startAngle", "sweep", "innerRadius"] {
+        let mut invalid = ellipse.clone();
+        invalid[key] = json!("not-a-number");
+        assert!(!shape(&invalid, true));
+    }
+    let mut foreign = ellipse;
+    foreign["tl"] = json!(1);
+    assert!(!shape(&foreign, false));
 }

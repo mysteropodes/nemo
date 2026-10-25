@@ -2,8 +2,8 @@
 //! Retained owner numeric values feed the actual whole-layer geometry and parent stages.
 use crate::evaluation::object_image_mesh_kernels::rig_pose_eval::{PosedStroke, RigPoseEvaluation};
 use crate::evaluation::object_vector_kernels::render_vector_eval::{
-    evaluate_record_rest_with_pose, has_unjoined_parent_blend, is_vector_record,
-    record_layer_has_active_path_fx, EvalSegment, EvaluatedVector,
+    common_layer_motion_target, evaluate_record_rest_with_pose, has_unjoined_parent_blend,
+    is_vector_record, record_layer_has_active_path_fx, EvalSegment, EvaluatedVector,
 };
 use crate::object_frame_packet::projection::{project_layer_3d, transform_layer_2d};
 use crate::object_frame_packet::{MotionValues, ObjectFramePacket, ObjectFrameRecord};
@@ -146,7 +146,21 @@ fn prepare_layer(
                     })
             })
         });
-    if !active && !expanded && parents.is_empty() {
+    // Identity Position still belongs to the admitted common consumer. Falling
+    // back would ask the older vector-only path to validate unrelated authored
+    // keys (including a legacy fill on a later frame of the same split piece).
+    let common_position = common_layer_motion_target(packet.snapshot().document(), &target)
+        && packet
+            .snapshot()
+            .document()
+            .property_holders()
+            .is_some_and(|holders| {
+                holders.iter().any(|h| {
+                    h.target() == &target
+                        && h.properties().iter().any(|p| p.property() == "position")
+                })
+            });
+    if !active && !expanded && parents.is_empty() && !common_position {
         return Ok(None);
     }
     let mixed = sources.iter().any(|s| {

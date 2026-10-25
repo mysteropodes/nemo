@@ -78,9 +78,34 @@ test('single removal cannot reorder surviving UIDs or change rows before a confi
     assert.equal(snapshot(root),before);assert.strictEqual(root.state.layers,rows);original.forEach((row,i)=>assert.strictEqual(rows[i],row));
   }
 });
+test('contiguous two appends and inverse two removals project complete metadata with retained UID rows',()=>{
+  const root=view(),rows=root.state.layers,original=rows.slice(),selected=root._layerSel,paths=root.selectedPaths,reference=root.state.refMedia;
+  root._layerSelAnchor=1;
+  const D={layerUid:'D',name:'Fourth',visible:false,locked:true,shy:true,color:'#123456',parentLayerUid:A.layerUid};
+  const next=[A,B,C,D];
+  assert.equal(Files.refreshLayerTable(root,info(next,1)),true);
+  assert.strictEqual(root.state.layers,rows);assert.deepEqual(rows.map(row=>row.layerUid),next.map(row=>row.layerUid));
+  original.forEach((row,i)=>assert.strictEqual(rows[i],row));
+  for(const [i,meta] of next.entries())for(const key of Object.keys(meta))assert.equal(rows[i][key],meta[key]);
+  assert.equal(Files.projectionReadyForUI(root,info(next,1)),true);
+  assert.strictEqual(root._layerSel,selected);assert.equal(root.state.activeLayerIdx,1);assert.equal(root._layerSelAnchor,1);
+  assert.equal(Files.refreshLayerTable(root,info([A,B],2)),true);
+  assert.strictEqual(root.state.layers,rows);assert.deepEqual(rows,original);original.forEach((row,i)=>assert.strictEqual(rows[i],row));
+  assert.strictEqual(root._layerSel,selected);assert.equal(root.state.activeLayerIdx,1);assert.equal(root._layerSelAnchor,1);
+  assert.strictEqual(root.selectedPaths,paths);assert.strictEqual(root.state.refMedia,reference);
+  assert.equal(Files.projectionReadyForUI(root,info([A,B],2)),true);
+});
+test('contiguous removal of both rows projects the empty native table without replacing its array',()=>{
+  const root=view(),rows=root.state.layers;root._layerSelAnchor=1;
+  assert.equal(Files.refreshLayerTable(root,info([],1)),true);
+  assert.strictEqual(root.state.layers,rows);assert.deepEqual(rows,[]);assert.deepEqual(root._layerSel,[]);
+  assert.equal(root.state.activeLayerIdx,0);assert.equal(root._layerSelAnchor,0);
+  assert.equal(Files.projectionReadyForUI(root,info([],1)),true);
+});
 for(const [name,layers,revision=1] of [
-  ['reordered',[B,A]],['same-revision single removal',[B],0],['replaced',[A,C]],['two appends',[A,B,C,{layerUid:'D'}]],
-  ['two removals',[]],['duplicate',[A,B,A]],['empty UID',[A,B,{layerUid:''}]],
+  ['reordered',[B,A]],['same-revision single removal',[B],0],['replaced',[A,C]],
+  ['noncontiguous inserts',[{layerUid:'X'},A,{layerUid:'Y'},B]],
+  ['same-revision two appends',[A,B,C,{layerUid:'D'}],0],['same-revision two removals',[],0],['duplicate',[A,B,A]],['empty UID',[A,B,{layerUid:''}]],
   ['late malformed visibility',[{...A,visible:false},{...B,visible:'false'}]],
   ['late malformed name',[{...A,visible:false},{...B,name:null}]],['document payload',[A,B,{...C,frames:[]}]],
 ])test('unsupported '+name+' refuses without partial row, selection or reference mutation',()=>{

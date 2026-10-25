@@ -56,7 +56,56 @@
   var previewDetails=['frame-range','mapping','viewport','receipt-access','owner','receipt','status','work-id','view-generation','view','display-filter',
     'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
     'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'];
+  var revisionStages=['admission','queued','inspect','publication','present','final-projection','synchronized'];
+  // Observation only: the project owner supplies current attempts and decides all
+  // stages, fencing and retirement. Preserve invoke values and rejection identity.
+  function attemptObserver(invoke,emit,readOpen,readRevision,previewFailures){
+    function errorCode(error){
+      var code='unknown';
+      try{var value=error&&error.code;if(['invalid_request','unavailable','unsupported_format','replacement_refused',
+        'stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch'].includes(value))code=value;}catch(_){}
+      return code;
+    }
+    function stage(attempt,value,event){
+      if(!attempt)return;
+      attempt.stage=value;attempt.invokeErrors=new Set();
+      if(event)emit(event,value);
+    }
+    function tracked(command,args){
+      var open=readOpen(),openStage=open&&open.stage,revision=readRevision(),revisionStage=revision&&revision.stage;
+      function rejected(error){
+        if(open&&readOpen()===open&&open.stage===openStage)open.invokeErrors.add(error);
+        if(revision&&readRevision()===revision&&revision.stage===revisionStage)revision.invokeErrors.add(error);
+        throw error;
+      }
+      var result;
+      try{result=arguments.length>1?invoke(command,args):invoke(command);}catch(error){return rejected(error);}
+      return (open||revision)&&result&&typeof result.then==='function'?result.then(function(value){return value;},rejected):result;
+    }
+    function origin(attempt,error){return attempt.invokeErrors.has(error)?'invoke-rejected':'local-refusal';}
+    function openFailure(attempt,error){
+      if(!attempt)return;
+      var code=errorCode(error),disposition='other';
+      try{if(error&&error.details&&error.details.disposition==='notDispatched')disposition='notDispatched';}catch(_){}
+      emit('post-bootstrap-failed','post-bootstrap-'+attempt.stage+':'+origin(attempt,error)+':'+code+':'+disposition);
+    }
+    function revisionFailure(attempt,error){
+      var detail=error&&typeof error==='object'?previewFailures.get(error)||'none':'none';
+      emit('revision-failed',attempt.stage+':'+origin(attempt,error)+':'+errorCode(error)+':'+detail);
+      return error;
+    }
+    return Object.freeze({invoke:tracked,stage:stage,openFailure:openFailure,revisionFailure:revisionFailure});
+  }
   function safeCode(event,code){
+    if(event==='revision-stage')return revisionStages.includes(code)?code:'unknown';
+    if(event==='revision-failed'){
+      if(typeof code!=='string')return 'unknown';
+      var revision=code.split(':');
+      return revision.length===4&&revisionStages.includes(revision[0])&&['invoke-rejected','local-refusal'].includes(revision[1])&&
+        ['unknown','invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled',
+          'wrong_instance','wrong_document','cancelled_before_dispatch'].includes(revision[2])&&
+        (revision[3]==='none'||previewDetails.includes(revision[3]))?code:'unknown';
+    }
     if(event==='tab-capture-refused')return ['inactive','synchronizing','subscription-inactive','presentation-missing',
       'view-mismatch','owner-mismatch','queue-pending','capture-superseded','tab-unavailable','capture-unavailable','ui-changed'].includes(code)?code:'unknown';
     if(event==='camera-control')return ['native-refused','selected-canvas','selected-stored-camera'].includes(code)?code:'unknown';
@@ -96,7 +145,7 @@
   // A single coalesced writer keeps the last 32 events; storage can fail or hang without delaying Open.
   function openDiagnostic(root,event,code){
     if(!['file-open-started','file-new-started','file-completed','file-cancelled','file-failed','file-stage',
-      'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','bpm-settings-refused',
+      'bootstrap-dispatched','bootstrap-resolved','bootstrap-rejected','post-bootstrap-failed','revision-stage','revision-failed','bpm-settings-refused',
       'guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented','tab-capture-refused'].includes(event))return;
     try{
       var log=openLogs.get(root);if(!log){log={startedAt:Date.now(),events:[],serial:0,attempt:0,writing:false,pending:null};openLogs.set(root,log);}
@@ -120,7 +169,7 @@
     }catch(_){}
     // Preserve the existing optional fixture observer; it is never required to collect production evidence.
     try{if(typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function')root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,
-      ['bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented','tab-capture-refused'].includes(event)?safeCode(event,code):code);}catch(_){}
+      ['revision-stage','revision-failed','bpm-settings-refused','guide-entry-refused','guide-release-refused','guide-edit-refused','navigation-begin','navigation-update','camera-control','camera-presented','tab-capture-refused'].includes(event)?safeCode(event,code):code);}catch(_){}
   }
   // The captured read proof exists only during this action's synchronous guard.
   function withActionPresentation(origin,current,action){
@@ -312,5 +361,5 @@
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
   }
-  return Object.freeze({createPorts:createPorts,didPaintUI:didPaintUI,openDiagnostic:openDiagnostic,settingsDiagnostic:settingsDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation,bindCameraUI:bindCameraUI,renderCameraViewLock:renderCameraViewLock});
+  return Object.freeze({createPorts:createPorts,attemptObserver:attemptObserver,didPaintUI:didPaintUI,openDiagnostic:openDiagnostic,settingsDiagnostic:settingsDiagnostic,bindUIComposition:bindUIComposition,composeUI:composeUI,withActionPresentation:withActionPresentation,bindCameraUI:bindCameraUI,renderCameraViewLock:renderCameraViewLock});
 }));

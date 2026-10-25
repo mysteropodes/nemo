@@ -41,6 +41,11 @@ impl RetainedDisposition {
                         applied,
                         history_entries_added,
                         clipboard,
+                    }
+                    | CompactResult::SelectionClipboard {
+                        applied,
+                        history_entries_added,
+                        clipboard,
                     } => json!({
                         "applied": applied,
                         "historyEntriesAdded": history_entries_added,

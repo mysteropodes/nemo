@@ -90,6 +90,14 @@ pub(super) fn valid() -> Vec<(&'static str, Value)> {
             json!({"command":"object.fill.trace","layerUid":"layer-a","contextId":"scene-root","frame":0,
             "point":[20,20],"color":"#336699ff","opacity":0.5,"remove":false}),
         ),
+        (
+            "clipboard.copy",
+            json!({"command":"object.clipboard.copy","contextId":"scene-root","layerUid":"layer-a","frame":2,"mode":"animation2d","strokeIds":["stroke-1"]}),
+        ),
+        (
+            "clipboard.cut",
+            json!({"command":"object.clipboard.cut","contextId":"scene-root","layerUid":"layer-a","frame":2,"mode":"motion","strokeIds":["stroke-1"]}),
+        ),
     ]
 }
 
@@ -110,7 +118,7 @@ fn patched(suffix: &str, key: &str, value: Value) -> Value {
 }
 
 #[test]
-fn the_eighteen_declared_commands_are_exactly_the_admitted_operations() {
+fn the_twenty_declared_commands_are_exactly_the_admitted_operations() {
     let expected = [
         "layer.delete",
         "layer.duplicate",
@@ -130,8 +138,10 @@ fn the_eighteen_declared_commands_are_exactly_the_admitted_operations() {
         "boolean.erase",
         "boolean.flatten",
         "fill.trace",
+        "clipboard.copy",
+        "clipboard.cut",
     ];
-    assert_eq!(SPECS.len(), 18);
+    assert_eq!(SPECS.len(), 20);
     assert_eq!(
         valid().iter().map(|(s, _)| *s).collect::<Vec<_>>(),
         expected
@@ -142,8 +152,8 @@ fn the_eighteen_declared_commands_are_exactly_the_admitted_operations() {
     for other in [
         "command.document.object.layer.create",
         "command.document.object.layer.policy.edit",
-        "command.document.object.clipboard.copy",
-        "command.document.object.clipboard.cut",
+        "command.document.object.clipboard.copy.extra",
+        "command.document.object.clipboard.cut.extra",
         "command.document.object.fill.trace.extra",
         "query.document.object",
         "command.document.object.group",

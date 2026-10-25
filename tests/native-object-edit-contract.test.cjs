@@ -1,5 +1,5 @@
 'use strict';
-// L02-J public declaration of the 18 native object edit operations: contract, common SDK, capability files and schema agree.
+// L02-J public declaration of the 20 native object edit operations: contract, common SDK, capability files and schema agree.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const contract = require('../src/js/adapters/native-object-edit-contract.js');
 const seam = require('../src/js/adapters/native-object-edit-seam.js');
@@ -30,17 +30,18 @@ const VALID = [
   ['boolean.erase', { command: 'object.boolean.erase', ...at, frame: 0, strokeId: 'stroke-1', footprint: [[0, 0], [4, 0], [4, 4]] }],
   ['boolean.flatten', { command: 'object.boolean.flatten', ...at, frame: 0, groupId: 'group-1' }],
   ['fill.trace', {command:'object.fill.trace',...cell,point:[20,20],color:'#336699ff',opacity:0.5,remove:false}],
+  ['clipboard.copy', { command: 'object.clipboard.copy', ...cell, mode: 'animation2d', strokeIds: ['stroke-1'] }],
+  ['clipboard.cut', { command: 'object.clipboard.cut', ...cell, mode: 'motion', strokeIds: [] }],
 ];
 const envelope = (suffix, payload, extra) => Object.assign({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A',
   operation: P + suffix, expectedRevision: 7, payload }, extra);
 
-test('the contract admits exactly the 18 declared operations, all revisioned commands', () => {
+test('the contract admits exactly the 20 declared operations, all revisioned commands', () => {
   const edit = contract;
   assert.deepEqual(edit.OPERATIONS, VALID.map(([s]) => P + s));
-  assert.equal(edit.OPERATIONS.length, 18);
+  assert.equal(edit.OPERATIONS.length, 20);
   for (const op of edit.OPERATIONS) { assert.equal(edit.admitted(op), true); assert.equal(edit.requiresRevision(op), true); assert.equal(seam.admitted(op), true); }
-  for (const op of ['command.document.object.layer.create', 'command.document.object.layer.policy.edit', 'command.document.object.clipboard.copy',
-    'command.document.object.clipboard.cut', 'command.document.object.fill.unknown', 'query.document.object', P + 'group', P + 'toString', '', null, undefined]) {
+  for (const op of ['command.document.object.layer.create', 'command.document.object.layer.policy.edit', 'command.document.object.fill.unknown', 'query.document.object', P + 'group', P + 'toString', '', null, undefined]) {
     assert.equal(edit.admitted(op), false, String(op));
   }
 });
@@ -88,7 +89,7 @@ test('bounds mirror the owner: ids 128 bytes, names 256, labels 64, selections 1
 });
 
 test('results: command receipts correlate applied and history count; a duplicate must name its minted layer', () => {
-  for (const [suffix] of VALID.filter(([s]) => s !== 'layer.duplicate')) {
+  for (const [suffix] of VALID.filter(([s]) => !['layer.duplicate', 'clipboard.copy', 'clipboard.cut'].includes(s))) {
     contract.result(P + suffix, { applied: true, historyEntriesAdded: 1 });
     contract.result(P + suffix, { applied: false, historyEntriesAdded: 0 });
     for (const bad of [{ applied: true, historyEntriesAdded: 0 }, { applied: false, historyEntriesAdded: 1 }, { applied: true, historyEntriesAdded: 1, layerUid: 'x' },
@@ -118,16 +119,19 @@ test('the common SDK admits each operation, requires expectedRevision, accepts o
 test('the SDK correlates each receipt: identity, document replacement and the exact revision advance', async () => {
   for (const [suffix, payload] of VALID) {
     const q = envelope(suffix, payload);
-    const result = (applied) => (suffix === 'layer.duplicate' ? { applied: true, historyEntriesAdded: 1, layerUid: 'native-layer:8:0' } : { applied, historyEntriesAdded: applied ? 1 : 0 });
+    const clipboard = { contextId: 'scene-root', layerUid: 'layer-a', frame: 0, records: [] };
+    const result = (applied) => suffix === 'clipboard.copy' ? { applied: false, historyEntriesAdded: 0, clipboard }
+      : suffix === 'clipboard.cut' ? { applied, historyEntriesAdded: applied ? 1 : 0, clipboard: applied ? clipboard : null }
+      : suffix === 'layer.duplicate' ? { applied: true, historyEntriesAdded: 1, layerUid: 'native-layer:8:0' } : { applied, historyEntriesAdded: applied ? 1 : 0 };
     const reply = (applied, mutate) => () => { const r = { apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-A',
-      contentRevision: 7 + (applied ? 1 : 0), ok: true, result: result(applied) }; if (mutate) mutate(r); return r; };
+      contentRevision: 7 + (applied && suffix !== 'clipboard.copy' ? 1 : 0), ok: true, result: result(applied) }; if (mutate) mutate(r); return r; };
     const send = (dispatch) => SDK.createNativeApplicationAdapter('c', { dispatch }).dispatch(q);
-    assert.equal((await send(reply(true))).contentRevision, 8);
+    assert.equal((await send(reply(true))).contentRevision, suffix === 'clipboard.copy' ? 7 : 8);
     if (suffix !== 'layer.duplicate') assert.equal((await send(reply(false))).contentRevision, 7);
     for (const mutate of [(r) => { r.contentRevision = suffix === 'layer.duplicate' ? 7 : 9; }, (r) => { r.instanceId = 'foreign'; }, (r) => { r.documentId = 'foreign'; }, (r) => { r.requestId = 'foreign'; }]) {
       await assert.rejects(send(reply(true, mutate)), TypeError, suffix);
     }
-    if (suffix !== 'layer.duplicate') await assert.rejects(send(reply(true, (r) => { r.contentRevision = 7; })), /revision mismatch/);
+    if (!['layer.duplicate', 'clipboard.copy'].includes(suffix)) await assert.rejects(send(reply(true, (r) => { r.contentRevision = 7; })), /revision mismatch/);
     const replaced = await send(() => ({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-B', contentRevision: 3, ok: false, error: { code: 'wrong_document', message: 'replaced' } }));
     assert.equal(replaced.error.code, 'wrong_document');
     await assert.rejects(send(() => ({ apiVersion: 2, requestId: 'edit-1', instanceId: 'instance-A', documentId: 'document-B', contentRevision: 3, ok: false, error: { code: 'not_found', message: 'x' } })), /document mismatch/);
@@ -178,7 +182,7 @@ test('capability descriptors and the closed transport schema declare exactly the
     declared.push(...d.operations);
   }
   assert.deepEqual(declared.slice().sort(), contract.OPERATIONS.slice().sort());
-  assert.equal(new Set(declared).size, 18);
+  assert.equal(new Set(declared).size, 20);
   assert.deepEqual([...ids].sort(), ['native.object.boolean', 'native.object.fill', 'native.object.group', 'native.object.layer-lifecycle', 'native.object.selection-edit']);
   for (const [suffix, payload] of VALID) {
     const branches = schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === P + suffix);
@@ -190,4 +194,94 @@ test('capability descriptors and the closed transport schema declare exactly the
     assert.equal(def.properties.command.const, payload.command);
   }
   assert.equal(schema.$defs.Request.oneOf.filter((b) => b.allOf[1].properties.operation.const === 'command.document.object.layer.policy.edit').length, 1, 'F06 branch is untouched');
+});
+
+test('copy/cut have closed clipboard receipts, copy never changes history and empty cut is null', () => {
+  const clipboard = { contextId: 'scene-root', layerUid: 'layer-a', frame: 0, records: [] };
+  for (const suffix of ['clipboard.copy', 'clipboard.cut']) {
+    const op = P + suffix, applied = suffix === 'clipboard.cut';
+    const good = { applied, historyEntriesAdded: applied ? 1 : 0, clipboard };
+    contract.result(op, good);
+    contract.result(op, { applied: false, historyEntriesAdded: 0, clipboard: null });
+    for (const key of Object.keys(good)) {
+      const missing = { ...good }; delete missing[key];
+      assert.throws(() => contract.result(op, missing), TypeError, suffix + ' missing ' + key);
+    }
+    for (const bad of [{ ...good, extra: true }, { ...good, clipboard: [] }, { ...good, clipboard: {} },
+      { ...good, clipboard: { ...clipboard, extra: true } }, { ...good, clipboard: { ...clipboard, records: [{ schemaVersion: 1 }] } },
+      { ...good, applied: 1 }, { ...good, historyEntriesAdded: 2 }]) assert.throws(() => contract.result(op, bad), TypeError);
+  }
+  assert.throws(() => contract.result(P + 'clipboard.copy', { applied: true, historyEntriesAdded: 1, clipboard }), /copy/);
+  assert.throws(() => contract.result(P + 'clipboard.cut', { applied: true, historyEntriesAdded: 1, clipboard: null }), /cut/);
+  assert.throws(() => contract.result(P + 'clipboard.cut', { applied: false, historyEntriesAdded: 0, clipboard }), /cut/);
+});
+
+test('copy/cut full responses admit authored data/blob text, reject binary/shape/owner tampering and stay4096 bytes', async () => {
+  const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/examples/native-object-v1/cases.json'), 'utf8')).records[0];
+  const clipboard = { contextId: 'scene-root', layerUid: 'layer-a', frame: 0, records: [{ ...record,
+    target: { ...record.target, strokeId: 'data:authored-stroke' } }] };
+  for (const suffix of ['clipboard.copy', 'clipboard.cut']) {
+    const applied = suffix === 'clipboard.cut';
+    const q = envelope(suffix, { command: 'object.' + suffix, ...cell, mode: 'motion', strokeIds: ['stroke-1'] });
+    const reply = () => ({ apiVersion: 2, requestId: q.requestId, instanceId: q.instanceId, documentId: q.documentId,
+      contentRevision: 7 + (applied ? 1 : 0), ok: true, result: { applied, historyEntriesAdded: applied ? 1 : 0, clipboard } });
+    const send = (mutate) => SDK.createNativeApplicationAdapter('clip-test', { dispatch: () => {
+      const r = JSON.parse(JSON.stringify(reply())); if (mutate) mutate(r); return r;
+    } }).dispatch(q);
+    assert.deepEqual((await send()).result.clipboard, clipboard);
+    await send((r) => { r.result.clipboard.records[0].target.strokeId = 'blob:authored-stroke'; });
+    for (const mutate of [(r) => { r.result.clipboard.contextId = 'foreign'; }, (r) => { r.result.clipboard.layerUid = 'foreign'; },
+      (r) => { r.result.clipboard.frame += 1; }, (r) => { r.result.clipboard.records[0].target.frameScope = ['authored', 0]; },
+      (r) => { r.result.clipboard.records[0].geometry = new Uint8Array(4); },
+      (r) => { r.result.clipboard.records[0].extra = true; },
+      (r) => { r.result.clipboard.records[0].target.strokeId = 'x'.repeat(4096); },
+      (r) => { r.requestId = 'other'; }, (r) => { r.instanceId = 'other'; }, (r) => { r.documentId = 'other'; },
+      (r) => { r.contentRevision += 1; }]) await assert.rejects(send(mutate), TypeError, suffix);
+    assert.equal(contract.paths(P + suffix).has('result.clipboard.records.0.target.strokeId'), true);
+    assert.equal(contract.paths(P + 'selection.delete').has('result.clipboard.records.0.target.strokeId'), false);
+    assert.equal(contract.paths(P + suffix).has('result.unrelated'), false);
+  }
+});
+
+
+test('authored effect presence survives clipboard output and paste input admission', () => {
+  const original = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/examples/native-object-v1/cases.json'), 'utf8')).records[0];
+  for (const effects of [undefined, null, [], [{ type: 'blur', enabled: false, p1: null, p2: 0, keys: null }]]) {
+    const record = JSON.parse(JSON.stringify(original));
+    if (effects !== undefined) record.effects = effects;
+    const clipboard = { ...cell, records: [record] };
+    for (const suffix of ['clipboard.copy', 'clipboard.cut']) {
+      const applied = suffix === 'clipboard.cut';
+      contract.result(P + suffix, { applied, historyEntriesAdded: applied ? 1 : 0, clipboard });
+    }
+    SDK.validateRequest(envelope('clipboard.paste', { command: 'object.clipboard.paste', ...cell, mode: 'motion', clip: clipboard }));
+    assert.deepEqual(record.effects, effects);
+  }
+});
+
+
+test('asset-bearing clipboard packets require bounded closed provenance in both directions', () => {
+  const packet = { ...cell, records: [], rasters: [{
+    target: { contextId: 'scene-root', layerUid: 'layer-a', strokeId: 'ink', frameScope: { kind: 'authored', frame: 0 } },
+    item: { assetId: 'image-1', x: 16, y: 16, width: 8, height: 8, isBitmapBrush: true, brushGroupId: 'brush-1' },
+  }], source: { instanceId: 'instance-A', documentId: 'document-A', contentRevision: 7, strokeIds: ['anchor'] } };
+  const request = (clip) => envelope('clipboard.paste', { command: 'object.clipboard.paste', ...cell, mode: 'motion', clip });
+  const result = (clip) => ({ applied: false, historyEntriesAdded: 0, clipboard: clip });
+  SDK.validateRequest(request(packet));
+  contract.result(P + 'clipboard.copy', result(packet));
+  const flaws = [
+    (v) => { delete v.source; }, (v) => { delete v.rasters; },
+    (v) => { v.rasters = []; }, (v) => { v.rasters[0].extra = true; },
+    (v) => { v.rasters[0].target.frameScope.extra = true; },
+    (v) => { v.rasters[0].item.encodedBytes = 'not admitted'; },
+    (v) => { v.source.extra = true; }, (v) => { v.source.instanceId = ''; },
+    (v) => { v.source.documentId = ''; }, (v) => { v.source.contentRevision = -1; },
+    (v) => { v.source.contentRevision = 9007199254740992; },
+    (v) => { v.source.strokeIds = []; }, (v) => { v.source.strokeIds = ['']; },
+  ];
+  for (const flaw of flaws) {
+    const bad = JSON.parse(JSON.stringify(packet)); flaw(bad);
+    assert.throws(() => SDK.validateRequest(request(bad)), TypeError);
+    assert.throws(() => contract.result(P + 'clipboard.copy', result(bad)), TypeError);
+  }
 });

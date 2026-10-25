@@ -3743,7 +3743,7 @@ test('L02-H selection edit and clipboard transactions stay private owner/history
   }
   const dispatchText = source('object_command_dispatch.rs');
   assert.match(dispatchText, /!Self::selection_edit_operation\(&request\.operation\)/);
-  assert.match(dispatchText, /self\.dispatch_selection_edit\(&request\.operation, &request\.payload\)/);
+  assert.match(dispatchText, /self\.dispatch_selection_edit\(request\)/);
   const oracle = fs.readFileSync(path.join(ROOT, 'native-engine/tests/fixtures/object-selection-edit/oracle.txt'), 'utf8');
   assert.equal(oracle.trim().split('\n').length, 48, 'the split oracle keeps its 48 scenarios');
   for (const [id, file] of [

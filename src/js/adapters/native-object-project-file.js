@@ -93,8 +93,8 @@
     var splice=Splice.plan(pin.layerUids,rows,next,s.activeLayerIdx,root._layerSel,root._layerSelAnchor);
     if(!splice)return false;
     // Prepare the detached UID plan before changing this read-side table.
-    if(delta>0)rows.splice(splice.at,0,splice.added);
-    else if(delta<0)rows.splice(splice.at,1);
+    if(delta>0)rows.splice.apply(rows,[splice.at,0].concat(splice.addedRows));
+    else if(delta<0)rows.splice(splice.at,-delta);
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
     if(delta!==0){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
     projectSettings(root,info,pin);

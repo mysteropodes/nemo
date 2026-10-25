@@ -5,7 +5,7 @@
     "regions",
     "functions"
   ],
-  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose — see T04/#1053.",
+  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose \u2014 see T04/#1053.",
   "crate": "nemo-mcp",
   "manifestPath": "nemo-mcp/Cargo.toml",
   "recorded": {
@@ -704,6 +704,22 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "#1959: measured clean source 19cb9d52539ab5799ed2db6abf69472be3b8d252, MCP tree ec32555219c28a7185e73026997f729145ea14f6; pinned cargo-llvm-cov 0.9.1 named test:coverage-rust, 458 tests/0 failed across 21 binaries. Report reports/png1959-history-19cb9d52/coverage.json SHA256 a85a7d7649c4d52332d91cbf96d8da73768f49f733e57bf019edff91afedaa12. Entry derived by the existing buildBaseline from the actual export. Only these two new source entries are added; all prior file and aggregate floors, exclusions, tool pin and historical metadata are preserved. All existing floors held; the measurement's only two violations were these missing entries. No installed acceptance is implied."
+    },
+    "nemo-mcp/src/native_object_edit_clipboard.rs": {
+      "lines": 96.15,
+      "regions": 95.08,
+      "functions": 92.85
+    },
+    "nemo-mcp/src/native_vector_bitmap_read.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "#2210 immutable bitmap-anchor reads: canonical cargo-llvm-cov 0.9.1 run 20261025T000719Z-202fad5-dirty at source202fad56 plus recorded dirtyDigest 6b8828e6f41262ac2615fbae0bc905957ad0b9da8d70d838541c8665d8e189cd; 469 tests passed across21 binaries, none failed. Raw export reports/20261025T000719Z-202fad5-dirty/coverage-rust/coverage.json SHA256 654798c21d6e871c83f67b4414394bfe1b6f9a74efcb38dd19786f706d785611. Existing buildBaseline derived these two additive entries; independent review verified them. Every prior floor, aggregate, exclusion and metadata is preserved. This is measured source coverage, not installed acceptance."
+    },
+    "nemo-mcp/src/native_vector_bitmap_read_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "#2210 immutable bitmap-anchor reads: canonical cargo-llvm-cov 0.9.1 run 20261025T000719Z-202fad5-dirty at source202fad56 plus recorded dirtyDigest 6b8828e6f41262ac2615fbae0bc905957ad0b9da8d70d838541c8665d8e189cd; 469 tests passed across21 binaries, none failed. Raw export reports/20261025T000719Z-202fad5-dirty/coverage-rust/coverage.json SHA256 654798c21d6e871c83f67b4414394bfe1b6f9a74efcb38dd19786f706d785611. Existing buildBaseline derived these two additive entries; independent review verified them. Every prior floor, aggregate, exclusion and metadata is preserved. This is measured source coverage, not installed acceptance."
     }
   },
   "nativeObjectContractRegistration": {
