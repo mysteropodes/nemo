@@ -374,8 +374,8 @@ var xformLayer=new Layer({name:'xform'});
 // layer via the color-picker popover wired in timeline.js renderLayerList.
 var LAYER_COLOR_PALETTE=['#5FA875','#B49BE6','#F0A585','#E88BAE','#E7C74C','#EE7C58','#7EA0FA','#5FD1C4'];
 function nextLayerColor(){return LAYER_COLOR_PALETTE[state.layers.length%LAYER_COLOR_PALETTE.length];}
-function createUserLayer(name){
-  n20RequireLegacyWrite('create-layer');
+function createUserLayer(name,kind){
+  n20RequireLegacyWrite(kind||'create-layer');
   arcLayer.activate();var l=new Layer({name:'user-'+userLayers.length});l.insertBelow(arcLayer);userLayers.push(l);
   var frames=[];for(var i=0;i<state.totalFrames;i++)frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
   // layerUid: stable identity for parenting (motion.js's setLayerParent/
@@ -386,7 +386,7 @@ function createUserLayer(name){
   state.layers.push({id:state.layers.length,name:name,visible:true,locked:false,frames:frames,color:nextLayerColor(),layerUid:'ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6),parentLayerUid:null});
   return state.layers.length-1;
 }
-createUserLayer('Layer 1');
+createUserLayer('Layer 1','boot-scaffold'); // CS4/#2343: the one Paper group the native UI projection requires
 // First free "Layer N" name — the old 'Layer '+length scheme produced
 // duplicates (a second layer was also named "Layer 1") and reused names
 // after renames/deletes, which read as layers "stealing" each other's

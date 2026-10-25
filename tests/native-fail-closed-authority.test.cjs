@@ -85,3 +85,44 @@ test('export.js no longer calls releaseCurrent on behalf of an export', () => {
   assert.equal(source.includes('exportReleaseNative'), false);
   assert.equal(source.split("exportNativeUnavailable('Lottie')").length - 1, 2, 'both Lottie fronts refuse');
 });
+
+// Boot level: the production surface script and app.js's own scaffold creation
+// run in a desktop realm before any admission exists (index.html load order).
+function desktopBootRealm() {
+  const realm = vm.createContext({ __TAURI__: { core: { invoke() {} } } });
+  realm.window = realm;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters/native-opacity-legacy-surface.js'), 'utf8'), realm);
+  const app = fs.readFileSync(path.join(ROOT, 'src/js/app.js'), 'utf8');
+  const start = app.indexOf('function createUserLayer(name,kind){');
+  const boot = "createUserLayer('Layer 1','boot-scaffold');";
+  const end = app.indexOf(boot, start) + boot.length;
+  assert.ok(start > 0 && end > start, 'app.js keeps the scaffold function and its boot call together');
+  Object.assign(realm, {
+    arcLayer: { activate() {} }, userLayers: [],
+    state: { layers: [], totalFrames: 3 }, nextLayerColor: () => '#5FA875',
+    Layer: class { constructor(opts) { this.name = opts.name; } insertBelow() {} },
+  });
+  vm.runInContext(app.slice(start, end), realm, { filename: 'app.js#boot-scaffold' });
+  return realm;
+}
+
+test('desktop boot creates its single scaffold layer before any admission is installed', () => {
+  const realm = desktopBootRealm();
+  assert.equal(realm.userLayers.length, 1);
+  assert.equal(realm.state.layers.length, 1);
+  assert.equal(realm.state.layers[0].name, 'Layer 1');
+});
+
+test('after the boot scaffold, desktop layer creation and a second scaffold both refuse', () => {
+  const realm = desktopBootRealm();
+  for (const call of ["createUserLayer('Layer 2')", "createUserLayer('Layer 2','boot-scaffold')"]) {
+    assert.throws(() => vm.runInContext(call, realm), (error) => error.name === 'NemoNativeReleaseRequired', call);
+  }
+  assert.equal(realm.userLayers.length, 1, 'no second Paper group');
+  assert.equal(realm.state.layers.length, 1, 'no second layer row');
+});
+
+test('browser boot keeps creating its scaffold layer (R24 behaviour unchanged)', () => {
+  assert.equal(LegacySurface.allowLegacyWrite({}, 'boot-scaffold'), true);
+  assert.equal(LegacySurface.allowLegacyWrite({}, 'create-layer'), true);
+});

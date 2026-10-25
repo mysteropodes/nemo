@@ -514,7 +514,7 @@ test('classic startup loads frozen guard modules before the production first-lay
   for (const file of sequence) vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src', file), 'utf8'), scope, { filename: file });
   const app = fs.readFileSync(path.join(ROOT, 'src/js/app.js'), 'utf8');
   vm.runInNewContext(extractFunction(app, 'nextLayerColor') + '\n' + extractFunction(app, 'createUserLayer') + '\n' +
-    app.match(/^createUserLayer\('Layer 1'\);$/m)[0], scope);
+    app.match(/^createUserLayer\('Layer 1','boot-scaffold'\);.*$/m)[0], scope);
   assert.equal(scope.state.layers.length, 1); assert.equal(scope.state.layers[0].name, 'Layer 1');
   assert.equal(scope.userLayers.length, 1);
   scope.n20AllowLegacyWrite = () => false;
