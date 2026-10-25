@@ -270,6 +270,157 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
     f.release();
 }
 
+fn subscribed_cut_fixture() -> (
+    Fixture,
+    support::Pins,
+    serde_json::Value,
+    RevisionBinding,
+    serde_json::Value,
+) {
+    let mut f = Fixture::cut_project();
+    let original_pins = f.pins.clone();
+    let before = f.saved_project();
+    let baseline_history = f.history();
+    assert_eq!(baseline_history["undoDepth"], 0);
+    assert_eq!(baseline_history["redoDepth"], 0);
+    assert_eq!(f.run().unwrap().status(), &ViewportStatus::Presented);
+    let binding: RevisionBinding = serde_json::from_value(
+        f.state
+            .revisions
+            .control(&f.state.native, RevisionControl::Binding)
+            .unwrap(),
+    )
+    .unwrap();
+    f.state
+        .revisions
+        .control(
+            &f.state.native,
+            RevisionControl::Subscribe {
+                binding: binding.clone(),
+            },
+        )
+        .unwrap();
+    let selection = |command| {
+        json!({"command":command,"contextId":"scene-root",
+        "layerUid":"L0","frame":0,"mode":"motion","strokeIds":["a","b"]})
+    };
+    let copied = f.command_named(
+        "same-owner-copy",
+        "command.document.object.clipboard.copy",
+        selection("object.clipboard.copy"),
+        true,
+    );
+    assert!(copied.response.ok);
+    assert!(copied.notification.is_none());
+    let copy_result = copied.response.result.unwrap();
+    assert_eq!(copy_result["applied"], false);
+    assert_eq!(copy_result["historyEntriesAdded"], 0);
+    assert_eq!(
+        copy_result["clipboard"]["records"],
+        json!([
+            before["drawing"]["objects"][0],
+            before["drawing"]["objects"][1]
+        ])
+    );
+    assert_eq!(f.saved_project(), before);
+    assert_eq!(f.history(), baseline_history);
+    (f, original_pins, before, binding, copy_result)
+}
+
+#[test]
+fn gpu_same_project_owner_copy_cut_keeps_later_holder_and_requires_exact_preview_ack() {
+    let (mut f, original_pins, before, binding, copy_result) = subscribed_cut_fixture();
+    let cut = f.command_named(
+        "same-owner-cut",
+        "command.document.object.clipboard.cut",
+        json!({"command":"object.clipboard.cut","contextId":"scene-root",
+            "layerUid":"L0","frame":0,"mode":"motion","strokeIds":["a","b"]}),
+        true,
+    );
+    assert!(cut.response.ok);
+    let result = cut.response.result.unwrap();
+    assert_eq!(result["applied"], true);
+    assert_eq!(result["historyEntriesAdded"], 1);
+    assert_eq!(result["clipboard"], copy_result["clipboard"]);
+    let (event, mut receiver) = cut.notification.unwrap();
+    f.refresh_for(
+        json!({"contextId":"scene-root","layerUid":"L0","strokeId":"survivor",
+        "frameScope":{"kind":"authored","frame":0}}),
+    );
+    assert_eq!(f.pins.instance, original_pins.instance);
+    assert_eq!(f.pins.document, original_pins.document);
+    assert_eq!(f.pins.generation, original_pins.generation);
+    assert_eq!(f.pins.revision, 1);
+    assert_ne!(f.pins.snapshot, original_pins.snapshot);
+    let expected = Fixture::expected_cut_project(&before);
+    assert_eq!(
+        f.saved_project(),
+        expected,
+        "only current selected records and their dependent tables change"
+    );
+    let after_history = f.history();
+    assert_eq!(after_history["undoDepth"], 1);
+    assert_eq!(after_history["redoDepth"], 0);
+    assert!(f.run().unwrap_err().contains("pending"));
+    let pins = f.pins.clone();
+    let selector = pins.selector();
+    let proof_event = serde_json::to_value(&event).unwrap();
+    f.assert_invalid_cut_proofs(&binding.subscription_id, &proof_event);
+    assert_eq!(f.calls.get(), 1, "refused proofs acquire no surface");
+    f.expected_pixel.set([255, 0, 0, 255]);
+    let proof = (binding.subscription_id.as_str(), &proof_event);
+    for _ in 0..2 {
+        let receipt = f
+            .state
+            .with_object_preview_owner_for_preview(
+                pins.generation,
+                &selector,
+                Some(proof),
+                |owner| owner.present_object_preview(&selector, output(), &mut f.gpu, &mut f.view),
+            )
+            .unwrap();
+        assert_eq!(receipt.status(), &ViewportStatus::Presented);
+        assert!(matches!(
+            receiver.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        ));
+        assert_eq!(f.saved_project(), expected);
+        assert_eq!(f.history(), after_history);
+    }
+    f.state
+        .revisions
+        .control(
+            &f.state.native,
+            RevisionControl::Acknowledge {
+                subscription_id: binding.subscription_id.clone(),
+                event: event.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(receiver.try_recv(), Ok(()));
+    assert!(f.run().unwrap_err().contains("pending"));
+    assert!(f.state.revisions.settle(&f.state.native, &event, true));
+    assert!(f
+        .state
+        .with_object_preview_owner_for_preview(pins.generation, &selector, Some(proof), |_| Ok(()))
+        .unwrap_err()
+        .contains("no pending"));
+    assert_eq!(f.run().unwrap().status(), &ViewportStatus::Presented);
+    let mut later = pins.selector();
+    later.frame = 3;
+    f.expected_pixel.set([0, 0, 255, 255]);
+    assert_eq!(
+        f.state
+            .present_object_preview(pins.generation, &later, output(), &mut f.gpu, &mut f.view)
+            .unwrap()
+            .status(),
+        &ViewportStatus::Presented
+    );
+    assert_eq!(f.saved_project(), expected);
+    assert_eq!(f.history(), after_history);
+    f.release();
+}
+
 #[test]
 fn gpu_consumer_unwind_preserves_owner_debt_without_poisoning_shared_locks() {
     let mut f = Fixture::new();

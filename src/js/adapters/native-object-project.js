@@ -20,25 +20,13 @@
     if(!Properties||typeof Properties.create!=='function')throw new Error('Native project property ports are unavailable');
     if(!Exposure||typeof Exposure.navigation!=='function'||typeof Exposure.previewScheduling!=='function')throw new Error('Native project view ports are unavailable');
     var previewFailures=new WeakMap(),view=Exposure.navigation(ports.viewMode,openDiagnostic,ports.displayFilter),phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,openingRequested=false;
-    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
+    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,revisionAttempt=null,presentationBounds=null,openExposure=null,openingCancelled=false;
+    var observation=Desktop.attemptObserver(function(){return ports.invoke.apply(ports,arguments);},openDiagnostic,
+      function(){return openAttempt;},function(){return revisionAttempt;},previewFailures),invokeTracked=observation.invoke;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){try{if(typeof ports.openDiagnostic==='function')ports.openDiagnostic(event,code);}catch(_){} }
-    function openStage(stage){if(openAttempt){openAttempt.stage=stage;openAttempt.invokeErrors=new Set();}}
-    function invokeTracked(command,args){
-      var attempt=openAttempt,stage=attempt&&attempt.stage;
-      function rejected(error){if(attempt&&openAttempt===attempt&&attempt.stage===stage)attempt.invokeErrors.add(error);throw error;}
-      var result;try{result=arguments.length>1?ports.invoke(command,args):ports.invoke(command);}catch(error){return rejected(error);}
-      return attempt&&result&&typeof result.then==='function'?result.then(function(value){return value;},rejected):result;
-    }
-    function openFailure(error){
-      if(!openAttempt)return;
-      var code='unknown',disposition='other';
-      try{var value=error&&error.code;if(['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch'].includes(value))code=value;
-        if(error&&error.details&&error.details.disposition==='notDispatched')disposition='notDispatched';}catch(_){}
-      openDiagnostic('post-bootstrap-failed','post-bootstrap-'+openAttempt.stage+':'+
-        (openAttempt.invokeErrors.has(error)?'invoke-rejected':'local-refusal')+':'+code+':'+disposition);
-      openAttempt=null;
-    }
+    function openStage(stage){observation.stage(openAttempt,stage);}
+    function openFailure(error){observation.openFailure(openAttempt,error);openAttempt=null;}
     function raw(command,request){
       if(command==='nemo_native_dispatch'){
         if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');
@@ -79,28 +67,35 @@
       subscription=freeze(Object.assign({},value));
     }
     function synchronizeRevision(event,pin,ticket,binding){
+      var attempt={stage:'admission',invokeErrors:new Set()};
+      function stage(value){observation.stage(attempt,value,'revision-stage');}
+      function failure(error){return observation.revisionFailure(attempt,error);}
       if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))
-        return Promise.reject(new Error('Native object revision subscription was replaced'));
+        return Promise.reject(failure(new Error('Native object revision subscription was replaced')));
       if(!active()||synchronizing||!sameEpoch(binding,pin)||!id(binding.subscriptionId)||
         !sameEpoch(event,pin)||!id(event.requestId)||!integer(event.fromRevision,0)||
         !integer(event.toRevision,event.fromRevision+1)||
-        info.contentRevision>event.toRevision)return Promise.reject(fence(new Error('Native object revision event is stale')));
+        info.contentRevision>event.toRevision)return Promise.reject(fence(failure(new Error('Native object revision event is stale'))));
       synchronizing=true;presentation=null;previewScheduling.clearWanted();
+      stage('queued');
       return enqueue(async function(){
+        revisionAttempt=attempt;
         if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))throw new Error('Native object revision subscription was replaced');
         guardEpoch(pin);
-        var next=await inspect();
+        stage('inspect');var next=await inspect();
         if(ticket!==subscriptionTicket||next.contentRevision!==event.toRevision)
           throw new Error('Native object revision inspection is uncorrelated');
-        if(await ports.publishRevision(next)!==true)throw new Error('Native object UI publication is unconfirmed');
-        await present(ports.frame?ports.frame():0,next,{subscriptionId:binding.subscriptionId,event:event});
+        stage('publication');if(await ports.publishRevision(next)!==true)throw new Error('Native object UI publication is unconfirmed');
+        stage('present');await present(ports.frame?ports.frame():0,next,{subscriptionId:binding.subscriptionId,event:event});
+        stage('final-projection');
         if(ticket!==subscriptionTicket||!same(info,next)||!ports.projectionReady(next))
           throw new Error('Native object revision changed before acknowledgment');
-        return freeze(Object.assign({},event));
+        stage('synchronized');return freeze(Object.assign({},event));
       }).catch(function(error){
+        failure(error);
         if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))throw error;
         throw fence(error);
-      }).finally(function(){if(ticket===subscriptionTicket)synchronizing=false;});
+      }).finally(function(){if(revisionAttempt===attempt)revisionAttempt=null;if(ticket===subscriptionTicket)synchronizing=false;});
     }
     function disposition(error){return error&&error.details&&error.details.disposition;}
     function localRefusal(message){return {code:'replacement_refused',message:message,details:{disposition:'notDispatched',retryExecution:false}};}

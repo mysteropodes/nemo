@@ -150,6 +150,40 @@ test('safe fixture observer remains optional and receives the existing bootstrap
   assert.equal(await f.ui.openPath('/x'),true);
   assert.deepEqual(observed.filter(e=>e[0].startsWith('bootstrap')).map(e=>e[0]),['bootstrap-dispatched','bootstrap-resolved']);
 });
+test('revision diagnostic storage and observer admit only closed stage and failure codes',async()=>{
+  const f=fixture(),observed=[];f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>observed.push([event,code]);
+  const accepted=[['revision-stage','final-projection'],['revision-failed','present:local-refusal:unknown:status-deferred-occluded'],
+    ['revision-failed','inspect:invoke-rejected:unavailable:none']];
+  const refused=[['revision-stage','PRIVATE /Users/secret'],['revision-failed','PRIVATE:local-refusal:unknown:none'],
+    ['revision-failed','present:PRIVATE:unknown:none'],['revision-failed','present:local-refusal:PRIVATE:none'],
+    ['revision-failed','present:local-refusal:unknown:PRIVATE'],['revision-failed','present:local-refusal:unknown:none:PRIVATE']];
+  for(const [event,code]of [...accepted,...refused])Desktop.openDiagnostic(f.root,event,code);
+  const events=await f.records();
+  assert.deepEqual(events.map(e=>[e.event,e.code]),[...accepted,...refused.map(([event])=>[event,'unknown'])]);
+  assert.deepEqual(observed,events.map(e=>[e.event,e.code]));
+  assert.doesNotMatch(JSON.stringify(events),/PRIVATE|Users|secret/);
+});
+test('attempt observer preserves invoke arguments, values and exact errors across stage retirement',async()=>{
+  let open=null,revision=null,result,thrown;const calls=[],events=[],details=new WeakMap();
+  const observer=Desktop.attemptObserver(function(){calls.push([...arguments]);if(thrown)throw thrown;return result;},
+    (event,code)=>events.push([event,code]),()=>open,()=>revision,details);
+  result={value:1};assert.strictEqual(observer.invoke('plain'),result);
+  const promise=Promise.resolve(result);result=promise;assert.strictEqual(observer.invoke('plain-promise',undefined),promise);
+  assert.deepEqual(calls,[['plain'],['plain-promise',undefined]]);
+  open={stage:'metadata',invokeErrors:new Set()};revision={stage:'inspect',invokeErrors:new Set()};
+  const error={code:'unavailable',message:'PRIVATE /secret',details:{disposition:'notDispatched'}};
+  thrown=error;assert.throws(()=>observer.invoke('sync'),caught=>caught===error);thrown=null;
+  observer.openFailure(open,error);assert.strictEqual(observer.revisionFailure(revision,error),error);
+  assert.deepEqual(events,[['post-bootstrap-failed','post-bootstrap-metadata:invoke-rejected:unavailable:notDispatched'],
+    ['revision-failed','inspect:invoke-rejected:unavailable:none']]);
+  let reject;result=new Promise((_,r)=>{reject=r;});const pending=observer.invoke('async');
+  observer.stage(open,'first-preview');observer.stage(revision,'present','revision-stage');
+  reject(error);await assert.rejects(pending,caught=>caught===error);
+  assert.equal(open.invokeErrors.size,0);assert.equal(revision.invokeErrors.size,0);
+  details.set(error,'status-deferred-occluded');observer.revisionFailure(revision,error);
+  assert.deepEqual(events.at(-1),['revision-failed','present:local-refusal:unavailable:status-deferred-occluded']);
+  assert.doesNotMatch(JSON.stringify(events),/PRIVATE|secret/);
+});
 test('file terminal records distinguish cancellation and pre-dispatch refusal without error text',async()=>{
   for(const mode of ['cancelled','refused']){
     const f=fixture(),error={message:'PRIVATE REFUSAL',details:{disposition:'notDispatched'}};

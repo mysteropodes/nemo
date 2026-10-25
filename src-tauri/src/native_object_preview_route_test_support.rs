@@ -175,6 +175,46 @@ impl Fixture {
                 decode_storage_project(&serde_json::to_vec(&document()).unwrap()).unwrap(),
             )
             .unwrap();
+        Self::from_state(state)
+    }
+    pub(super) fn cut_project() -> Self {
+        let mut drawing = document();
+        drawing["totalFrames"] = json!(4);
+        drawing["layers"][0]["timing"]["keys"] = json!([{"frame":0},{"frame":3}]);
+        drawing["layers"][0]["groups"] = json!({"contextId":"scene-root",
+            "entries":[{"gid":"pair","name":"Pair","combineMode":"none","order":["a","b"]}],
+            "members":[{"strokeId":"a","groupId":"pair"},{"strokeId":"b","groupId":"pair"}]});
+        let mut a = drawing["objects"][0].clone();
+        a["family"] = json!("editable-vector-path");
+        a["vector"] = json!({"stroke":null,"hasRealStroke":false,"strokeWidth":3,
+            "strokeCap":"round","strokeJoin":"round","miterLimit":10,"dashOffset":0,"opacity":1});
+        let mut b = a.clone();
+        b["target"]["strokeId"] = json!("b");
+        let mut survivor = drawing["objects"][0].clone();
+        survivor["target"]["strokeId"] = json!("survivor");
+        survivor["fill"] = json!({"kind":"solid","r":1,"g":0,"b":0,"a":1});
+        let mut later = a.clone();
+        later["target"]["frameScope"]["frame"] = json!(3);
+        drawing["objects"] = json!([a, b, survivor, later]);
+        drawing["propertyHolders"] = json!(["a", "b"].map(|id| json!({
+            "target":{"contextId":"scene-root","layerUid":"L0","strokeId":id},
+            "properties":[{"property":"position","static":[0,0]}]})));
+        drawing["compositionOrder"]["contexts"][0]["scopes"] = json!([
+            {"frameScope":{"kind":"authored","frame":0},"elements":[
+                {"layerUid":"L0","strokeId":"survivor","naturalPosition":0,"order":{}},
+                {"layerUid":"L0","strokeId":"a","naturalPosition":1,"order":{}},
+                {"layerUid":"L0","strokeId":"b","naturalPosition":2,"order":{}}]},
+            {"frameScope":{"kind":"authored","frame":3},"elements":[
+                {"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{}}]}]);
+        let project = json!({"format":"nemo.native-project-document","formatVersion":1,
+            "project":{"canvasW":64,"canvasH":64,"fps":24},"drawing":drawing,"viewportReference":null});
+        let state = ApplicationMcp::default();
+        state
+            .install_native_project_file(&serde_json::to_vec(&project).unwrap())
+            .unwrap();
+        Self::from_state(state)
+    }
+    fn from_state(state: ApplicationMcp) -> Self {
         let gpu = Compositor::new().unwrap();
         let mode = Rc::new(Cell::new(0));
         let calls = Rc::new(Cell::new(0));
@@ -240,6 +280,9 @@ impl Fixture {
         self.refresh();
     }
     pub(super) fn refresh(&mut self) {
+        self.refresh_for(target());
+    }
+    pub(super) fn refresh_for(&mut self, stable_target: Value) {
         let guard = self.state.native.lock().unwrap();
         let (generation, owner) = guard.active().unwrap();
         let mut p = Pins {
@@ -251,7 +294,7 @@ impl Fixture {
         };
         drop(guard);
         let read = json!({"apiVersion":2,"requestId":"preview-pins","instanceId":p.instance,"documentId":p.document,
-            "operation":"query.document.object","payload":{"atRevision":p.revision,"stableTarget":target()}});
+            "operation":"query.document.object","payload":{"atRevision":p.revision,"stableTarget":stable_target}});
         let response = dispatch_raw(&self.state, &read.to_string()).unwrap();
         assert!(response.ok);
         p.snapshot = response.result.unwrap()["documentSnapshotId"]
@@ -270,7 +313,21 @@ impl Fixture {
         )
     }
     pub(super) fn command(&self, operation: &str, payload: Value, external: bool) -> Delivery {
-        let request = json!({"apiVersion":2,"requestId":format!("preview-edit-{}",self.pins.revision),"instanceId":self.pins.instance,
+        self.command_named(
+            &format!("preview-edit-{}", self.pins.revision),
+            operation,
+            payload,
+            external,
+        )
+    }
+    pub(super) fn command_named(
+        &self,
+        request_id: &str,
+        operation: &str,
+        payload: Value,
+        external: bool,
+    ) -> Delivery {
+        let request = json!({"apiVersion":2,"requestId":request_id,"instanceId":self.pins.instance,
             "documentId":self.pins.document,"expectedRevision":self.pins.revision,"operation":operation,"payload":payload});
         self.state
             .revisions
@@ -281,6 +338,63 @@ impl Fixture {
                 external,
             )
             .unwrap()
+    }
+    pub(super) fn history(&self) -> Value {
+        let request = json!({"apiVersion":2,"requestId":"preview-history","instanceId":self.pins.instance,
+            "documentId":self.pins.document,"operation":"query.document.object.history",
+            "payload":{"atRevision":self.pins.revision,"documentSnapshotId":self.pins.snapshot}});
+        let response = dispatch_raw(&self.state, &request.to_string()).unwrap();
+        assert!(response.ok);
+        response.result.unwrap()
+    }
+    pub(super) fn saved_project(&self) -> Value {
+        let mut authority = self.state.native.lock().unwrap();
+        let owner = authority
+            .active_mut(self.pins.generation)
+            .unwrap()
+            .as_any_mut()
+            .downcast_mut::<crate::native_dispatch::NativeObjectHost>()
+            .unwrap();
+        let bytes = owner
+            .project_file_snapshot(self.pins.revision, &self.pins.snapshot)
+            .unwrap()
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+    pub(super) fn expected_cut_project(before: &Value) -> Value {
+        let mut expected = before.clone();
+        expected["drawing"]["objects"]
+            .as_array_mut()
+            .unwrap()
+            .drain(..2);
+        expected["drawing"]["propertyHolders"]
+            .as_array_mut()
+            .unwrap()
+            .remove(1);
+        expected["drawing"]["layers"][0]["groups"]["entries"] = json!([]);
+        expected["drawing"]["layers"][0]["groups"]["members"] = json!([]);
+        expected["drawing"]["compositionOrder"]["contexts"][0]["scopes"][0]["elements"] = json!([
+            {"layerUid":"L0","strokeId":"survivor","naturalPosition":0,"order":{}}]);
+        expected
+    }
+    pub(super) fn assert_invalid_cut_proofs(&self, subscription_id: &str, event: &Value) {
+        let selector = self.pins.selector();
+        let mut stale = event.clone();
+        stale["toRevision"] = json!(0);
+        for (subscriber, proof) in [("foreign", event.clone()), (subscription_id, stale)] {
+            assert!(self
+                .state
+                .with_object_preview_owner_for_preview(
+                    self.pins.generation,
+                    &selector,
+                    Some((subscriber, &proof)),
+                    |_| -> Result<(), String> {
+                        panic!("invalid proof must not borrow preview owner")
+                    }
+                )
+                .unwrap_err()
+                .contains("pending"));
+        }
     }
     pub(super) fn release(&mut self) -> NativeReleaseReceipt {
         let request = NativeReleaseRequest {

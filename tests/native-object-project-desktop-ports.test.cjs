@@ -19,6 +19,7 @@ async function bounded(promise,label,ending='settle'){let timer;try{return await
 function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   let installed=false,revision=0,generation=0,documentId=null,held=null,foreign=false,projectionRefused=false,rawAck=null,previewHold=null,replyMutation=null;
   let paletteReplyHold=null,commentsReplyHold=null;
+  let syncFault=null;
   const log=[],calls=[],classes=new Set(),styles=new Map(),transports=[],notifications=[];
   let layerRows=initialLayers.map(row=>({...row}));
   let rect={left:20.5,top:30.25,width:320.5,height:180.25};
@@ -41,10 +42,11 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
     updateUI:()=>log.push('update'),showToast:text=>log.push('toast:'+text)};
   async function invoke(command,args){
     const r=args&&(args.request||JSON.parse(args.requestJson));calls.push({command,r});
+    if(syncFault&&syncFault.command===command)throw syncFault.error;
     if(command==='nemo_native_object_client_status')return foreign?{...info(),available:true,instanceId:'foreign'}:{...info(),available:installed,instanceId:'instance'};
     if(command==='nemo_native_object_bootstrap'){installed=true;generation++;documentId='document-'+generation;revision=0;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};}
     if(command==='nemo_native_object_reference'){assert.equal(r.action.kind,'inspect');return {...info(),requestId:r.requestId};}
-    if(command==='nemo_native_object_preview'){if(previewHold)await previewHold.promise;return {status:'presented',workId:'work-'+calls.length,viewGeneration:1};}
+    if(command==='nemo_native_object_preview'){if(previewHold)await previewHold.promise;return {status:syncFault&&syncFault.status||'presented',workId:'work-'+calls.length,viewGeneration:1};}
     if(command==='nemo_native_revision_sync'){assert.equal(r.action,'acknowledge');log.push('native-ack');if(rawAck)await rawAck.promise;return null;}
     if(command==='nemo_native_dispatch'){
       log.push(r.operation);const p=r.payload;
@@ -119,6 +121,7 @@ function fixture(initialLayers=[{layerUid:'drawing',visible:true}]){
   return {root,session,open,log,calls,classes,styles,transports,notifications,info,
     layers:value=>{layerRows=value.map(row=>({...row}));},paletteReplyGate:value=>{paletteReplyHold=value;},
     commentsReplyGate:value=>{commentsReplyHold=value;},
+    syncFault:value=>{syncFault=value;},
     hold:v=>held=v,foreign:v=>foreign=v,rect:v=>rect=v,refuseProjection:v=>projectionRefused=v,ackGate:v=>rawAck=v,previewGate:v=>previewHold=v,mutateReply:v=>replyMutation=v,
     async emit(){const t=transports.at(-1),from=revision;revision++;const event={...info(),requestId:'event-'+revision,fromRevision:from,toRevision:revision};return t.synchronize(event,t.binding);}};
 }
@@ -162,6 +165,42 @@ test('projection refusal fences before UI publication and clears Main underlay',
   await assert.rejects(f.emit(),/projection is uncorrelated/);assert.equal(f.session.isIndeterminate(),true);assert.equal(f.classes.has('nemo-native-underlay'),false);
   assert.deepEqual(f.log.slice(start).filter(x=>['willProject','project','update','reference','dirty'].includes(x)),['willProject','project']);
 });
+test('revision diagnostics witness synchronization order without claiming native ACK',async()=>{
+  const f=fixture(),events=[];f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>events.push([event,code]);
+  await f.open();events.length=0;await f.emit();
+  assert.deepEqual(events.filter(e=>e[0].startsWith('revision-')),[
+    ['revision-stage','queued'],['revision-stage','inspect'],['revision-stage','publication'],
+    ['revision-stage','present'],['revision-stage','final-projection'],['revision-stage','synchronized']]);
+  assert.equal(f.session.info().contentRevision,1);assert.equal(f.session.isIndeterminate(),false);
+  assert.equal(f.log.includes('native-ack'),false); // This fixture calls the session callback, not the transport ACK.
+});
+for(const [mode,expected]of [
+  ['inspect','inspect:invoke-rejected:unavailable:none'],
+  ['publication','publication:local-refusal:unavailable:none'],
+  ['present','present:invoke-rejected:unavailable:none'],
+  ['preview-status','present:local-refusal:unknown:status-deferred-occluded'],
+  ['final-projection','final-projection:local-refusal:unknown:none']]){
+  test('revision '+mode+' diagnostic preserves original failure and fencing',async()=>{
+    const f=fixture(),events=[],original={code:'unavailable',message:'PRIVATE /Users/secret/document.json',stack:'PRIVATE STACK'};
+    f.root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>events.push([event,code]);
+    await f.open();events.length=0;const before=f.calls.length;
+    if(mode==='inspect')f.syncFault({command:'nemo_native_object_reference',error:original});
+    if(mode==='publication')f.root.updateUI=()=>{throw original;};
+    if(mode==='present')f.syncFault({command:'nemo_native_object_preview',error:original});
+    if(mode==='preview-status')f.syncFault({status:'deferred-occluded'});
+    if(mode==='final-projection')f.root.NemoNativeObjectProjectFile.projectionMatches=()=>false;
+    let caught;try{await f.emit();assert.fail('synchronization must refuse');}catch(error){caught=error;}
+    if(['inspect','publication','present'].includes(mode))assert.strictEqual(caught,original);
+    const failures=events.filter(e=>e[0]==='revision-failed');assert.equal(failures.length,1);
+    assert.equal(failures[0][1],expected);
+    assert.equal(events.some(e=>e[1]==='synchronized'),false);
+    assert.equal(f.session.isIndeterminate(),true);assert.equal(f.classes.has('nemo-native-underlay'),false);
+    assert.equal(f.transports[0].connected,false);assert.equal(f.log.includes('native-ack'),false);
+    const calls=f.calls.slice(before);assert.equal(calls.filter(c=>c.command==='nemo_native_object_reference').length,1);
+    assert.equal(calls.filter(c=>c.command==='nemo_native_object_preview').length,['inspect','publication'].includes(mode)?0:1);
+    assert.doesNotMatch(JSON.stringify(events),/PRIVATE|Users|secret|STACK/);
+  });
+}
 
 function selector(f,view={kind:'targets',offset:0,limit:8}){
   const p=f.session.info();return {instanceId:p.instanceId,documentId:p.documentId,atRevision:p.contentRevision,
