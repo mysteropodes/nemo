@@ -94,6 +94,7 @@
     unavailableInspector(root,ports,info);return true;
   }
   function restoreInspector(root){
+    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.retire(root);
     if(root.NemoNativeLayerRangeDesktop)root.NemoNativeLayerRangeDesktop.retire(root);
     retireMotion(root);
     retirePolicy(root);
@@ -117,6 +118,14 @@
     });}
     if(prior.section.parentNode===prior.panel)prior.panel.removeChild(prior.section);
     inspectors.delete(root);
+  }
+  function isFrameSelectionPending(root){var helper=root.NemoNativeFrameCellSelection;return !!(helper&&helper.isPending(root));}
+  function showRepeatDialog(root){
+    try{var helper=root.NemoNativeFrameCellSelection,controller=root.NemoNativeFrameEditController;
+    if(!helper||typeof helper.openRepeatDialog!=='function'||!controller||typeof controller.routeWriter!=='function'||!root.SM||typeof root.SM.repeatSelection!=='function')return false;
+    var sm=root.SM,writer=sm.repeatSelection;return helper.openRepeatDialog(root,function(value){return writer.call(sm,value);},
+      function(){return root.NemoNativeFrameEditController===controller&&root.SM===sm&&sm.repeatSelection===writer;});
+    }catch(_){return false;}
   }
   function settingsInspector(root,prior,ports,info){
     var controller=ports&&typeof ports.projectSettings==='function'&&ports.projectSettings();
@@ -297,6 +306,8 @@
     if(root.NemoNativeLayerRangeDesktop&&typeof root.NemoNativeLayerRangeDesktop.mount==='function')
       root.NemoNativeLayerRangeDesktop.mount(root,grid,info,Object.assign({},ports,{setKeyTimelineRows:function(layout,expected){return setKeyTimelineRows(root,layout,expected);},readMotionKeyTimelines:function(expected){return readMotionKeyTimelines(root,expected);},readMotionKeyTimeline:function(expected){return readMotionKeyTimeline(root,expected);},readSelectedMotionKeys:function(expected){return readSelectedMotionKeys(root,expected);},readLegacyMotionSelection:function(){var motion=root.SMMotion;return motion&&typeof motion.getKeySelection==='function'?motion.getKeySelection():null;},barUi:root.SMLayerInOut}));
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
+    if(root.NemoNativeFrameCellSelection)root.NemoNativeFrameCellSelection.mount(root,caption,info,Object.assign({},ports,{
+      frameEditPending:function(){var controller=root.NemoNativeFrameEditController;return !!(controller&&controller.isPending());}}));
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
       views.set(root,{list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
@@ -465,5 +476,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,showRepeatDialog:showRepeatDialog,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
 }));

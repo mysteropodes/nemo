@@ -2692,6 +2692,7 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
+        "native-frame-cell-selection.js",
         "native-object-ui.js",
         "native-layer-range-desktop.js",
         "native-layer-playhead-cut-ui.js"

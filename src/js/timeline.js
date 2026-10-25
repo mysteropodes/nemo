@@ -8976,17 +8976,14 @@ else initFillGradientButton();
 function initCycleAndPropagate(){
   var cyc=document.getElementById('btn-cycle');
   if(cyc)cyc.addEventListener('click',function(){
-    // Check the precondition BEFORE asking the question (2026-07-25 UX audit).
-    // repeatSelection already refuses with a clear message when no frame range
-    // is selected — but the prompt ran first, so the user typed a count, hit
-    // OK, and only then learned they needed a selection. Worse, cancelling the
-    // prompt returned before repeatSelection ever ran, so clicking this button
-    // with nothing selected was completely silent. Same message, raised to the
-    // point where it's actually useful.
+    // Check selection first; native WKWebView needs the ordinary DOM count form.
     if(typeof selBounds==='function'&&!selBounds()){
       showToast(SM.t('toastSelectFrameRangeFirst'));
       return;
     }
+    var native=!!window.__TAURI__,project=window.NemoNativeObjectProject,session,cutover=window.NemoNativeOpacityCutover;
+    try{session=project&&project.desktop(window);native=native||!!(session&&(session.isActive()||session.blocksLegacy&&session.blocksLegacy())||cutover&&cutover.blocksLegacy&&cutover.blocksLegacy());}catch(_){native=true;}
+    if(native){if(!window.NemoNativeObjectUI||typeof window.NemoNativeObjectUI.showRepeatDialog!=='function'||!window.NemoNativeObjectUI.showRepeatDialog(window))showToast('Native Repeat input is unavailable.');return;}
     var n=prompt('Repeter la plage selectionnee combien de fois ?','2');
     if(n===null)return;
     window.SM.repeatSelection(n);
