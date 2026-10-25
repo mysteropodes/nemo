@@ -44,12 +44,12 @@ test('head and tail insertion default names are based on native destination ordi
     next[at].layerUid='tampered';assert.equal(p.added.layerUid,'new');
   }
 });
-test('reorder replacement multiedit duplicate and mismatched prior identities refuse without mutating inputs',()=>{
+test('reorder replacement noncontiguous duplicate and mismatched prior identities refuse without mutating inputs',()=>{
   const f=fixture(),before=JSON.stringify(f);
   for(const next of [[f.metadata[1],f.metadata[0],f.metadata[2]],
     [{layerUid:'x'},f.metadata[1],f.metadata[2]],
-    [f.metadata[0],{layerUid:'x'},{layerUid:'y'},...f.metadata.slice(1)],
-    [f.metadata[0]], [f.metadata[0],{layerUid:'a'},f.metadata[2]],
+    [{layerUid:'x'},f.metadata[0],{layerUid:'y'},...f.metadata.slice(1)],
+    [f.metadata[1]], [f.metadata[0],{layerUid:'a'},f.metadata[2]],
     [f.metadata[0],{layerUid:''},f.metadata[2]], [f.metadata[0],{},f.metadata[2]],null]){
     assert.equal(Splice.plan(f.uids,f.rows,next,0,[0],0),null);
   }
@@ -74,4 +74,31 @@ test('consecutive cut undo and redo plans retain all surviving UI row objects',(
   const third=Splice.plan(f.uids,f.rows,metadata,2,[2],2);apply(f,third);
   assert.notStrictEqual(f.rows[1],copy,'redo creates a fresh detached UI projection for the returned UID');
   assert.strictEqual(f.rows[0],original[0]);assert.strictEqual(f.rows[2],original[1]);assert.strictEqual(f.rows[3],original[2]);
+});
+
+test('contiguous multirow insertion and inverse removal preserve UID identity at head middle and tail',()=>{
+  for(const at of [0,1,3]){
+    const f=fixture(),original=f.rows.slice(),array=f.rows,selection=[2,0];
+    const incoming=f.metadata.slice();incoming.splice(at,0,{layerUid:'piece-a',name:'Forme 1',visible:false},{layerUid:'piece-b'});
+    const before=JSON.stringify(f),plan=Splice.plan(f.uids,f.rows,incoming,2,selection,0);
+    assert.ok(plan);assert.equal(plan.delta,2);assert.equal(plan.at,at);
+    assert.deepEqual(plan.addedRows,[{layerUid:'piece-a',name:'Forme 1',visible:false},
+      {layerUid:'piece-b',name:'Layer '+(at+2),visible:true}]);
+    assert.equal(JSON.stringify(f),before,'planning remains detached');
+    assert.notStrictEqual(plan.addedRows[0],incoming[at]);
+    f.rows.splice(plan.at,0,...plan.addedRows);
+    assert.strictEqual(f.rows,array);
+    for(const row of original)assert.strictEqual(f.rows.find(r=>r.layerUid===row.layerUid),row);
+    assert.deepEqual(plan.selection,[incoming.findIndex(r=>r.layerUid==='c'),incoming.findIndex(r=>r.layerUid==='a')]);
+    assert.equal(plan.active,incoming.findIndex(r=>r.layerUid==='c'));assert.equal(plan.anchor,incoming.findIndex(r=>r.layerUid==='a'));
+    const undo=Splice.plan(incoming.map(r=>r.layerUid),f.rows,f.metadata,plan.active,plan.selection,plan.anchor);
+    assert.ok(undo);assert.equal(undo.delta,-2);assert.equal(undo.at,at);
+    f.rows.splice(undo.at,-undo.delta);assert.deepEqual(f.rows,original);
+    assert.deepEqual(undo.selection,selection);assert.equal(undo.active,2);assert.equal(undo.anchor,0);
+  }
+});
+test('multirow removal maps removed selection and anchor to a surviving UID neighbor',()=>{
+  const f=fixture(),p=Splice.plan(f.uids,f.rows,[f.metadata[2]],1,[0,1],1);
+  assert.ok(p);assert.equal(p.delta,-2);assert.equal(p.active,0);assert.deepEqual(p.selection,[0]);assert.equal(p.anchor,0);
+  assert.equal(Splice.plan(f.uids,f.rows,[{layerUid:'x'},f.metadata[2]],0,[0],0),null,'replacement cannot masquerade as removal');
 });
