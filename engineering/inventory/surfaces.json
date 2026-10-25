@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1ee513397fdc4183ac731ec3c93e7365e086154a",
-  "describe": "v0.7.0-alpha.4-3031-g1ee51339-dirty"
+  "head": "ec40a9c152c3e286bb3df0d4b8703fafbfd47ecd",
+  "describe": "v0.7.0-alpha.4-3043-gec40a9c1-dirty"
  },
- "inputsDigest": "2050c0c16de94ed0124c2b770a9e6898b9a0a445ce63448d6d3adb573dfb9293",
+ "inputsDigest": "1854c37ce4f6c23ff3ab1b081ce1742ee12de160cbc7b77ae37d8d287c73cb39",
  "states": [
   "inventoried",
   "characterized",
@@ -1723,7 +1723,9 @@
     "hiddenAtLoad": false,
     "functionsVisited": 114,
     "via": "variable cyc",
-    "references": []
+    "references": [
+     "src/js/adapters/native-frame-cell-selection.js:42 cycle()"
+    ]
    },
    "fixtures": [
     "keyed-props",
@@ -4810,7 +4812,7 @@
     "functionsVisited": 137,
     "via": "variable b",
     "references": [
-     "src/js/adapters/native-object-ui.js:360 setShyMode()",
+     "src/js/adapters/native-object-ui.js:364 setShyMode()",
      "src/js/motion.js:13204 setAppMode()",
      "src/js/timeline.js:1237 toggleLayerShy()"
     ]
@@ -5063,7 +5065,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 103,
+    "functionsVisited": 98,
     "via": "helper el()",
     "references": []
    },
@@ -5106,7 +5108,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 29,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -5149,7 +5151,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 79,
+    "functionsVisited": 73,
     "via": "helper el()",
     "references": []
    },
@@ -9917,7 +9919,7 @@
     "functionsVisited": 27,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:312 renderNativeObjectUiMetadata()"
+     "src/js/adapters/native-object-ui.js:316 renderNativeObjectUiMetadata()"
     ]
    },
    "fixtures": [
@@ -12259,7 +12261,7 @@
     "functionsVisited": 37,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:169 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:171 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -16350,7 +16352,7 @@
     "functionsVisited": 99,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:303 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:307 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:229 updatePlayhead()",
      "src/js/timeline.js:2843 updateUI()"
