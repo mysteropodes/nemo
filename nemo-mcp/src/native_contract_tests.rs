@@ -252,3 +252,87 @@ fn common_result_dispatch_routes_each_batch_eight_family_to_its_own_receipt_vali
         );
     }
 }
+
+fn declared_native_operations() -> Vec<String> {
+    crate::capabilities::native_catalog()
+        .descriptors()
+        .iter()
+        .flat_map(|descriptor| {
+            descriptor["operations"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+        })
+        .map(|operation| operation.as_str().expect("operation string").to_owned())
+        .collect()
+}
+
+#[test]
+fn every_declared_native_operation_has_an_explicit_request_validator() {
+    let missing: Vec<_> = declared_native_operations()
+        .into_iter()
+        .filter(|operation| !has_request_validator(operation))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "declared without a request validator: {missing:?}"
+    );
+}
+
+#[test]
+fn result_validation_is_explicit_or_pinned_unchecked() {
+    let declared = declared_native_operations();
+    let unvalidated: Vec<_> = declared
+        .iter()
+        .filter(|operation| !has_result_validator(operation))
+        .map(String::as_str)
+        .collect();
+    let mut pinned = MCP_RESULT_UNCHECKED.to_vec();
+    pinned.sort_unstable();
+    let mut actual = unvalidated.clone();
+    actual.sort_unstable();
+    assert_eq!(
+        actual, pinned,
+        "MCP_RESULT_UNCHECKED must equal the declared operations without a result validator"
+    );
+}
+
+#[test]
+fn undeclared_or_unvalidated_operations_fail_closed() {
+    let operation = "command.document.object.cs1.undeclared";
+    assert!(!has_request_validator(operation));
+    assert!(!validate_request(operation, &json!({})));
+    assert!(!validate_result(
+        operation,
+        "document",
+        &json!({}),
+        &json!({})
+    ));
+}
+
+#[test]
+fn native_catalog_sources_are_discovered_from_the_declaration_directory() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../engineering/application/capabilities-v2");
+    let mut files: Vec<String> = std::fs::read_dir(dir)
+        .expect("capabilities-v2 directory")
+        .map(|entry| {
+            entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .filter(|name| name.ends_with(".json"))
+        .collect();
+    files.sort();
+    let generated: Vec<String> = crate::capabilities::NATIVE_CAPABILITY_FILES
+        .iter()
+        .map(|name| name.to_string())
+        .collect();
+    assert_eq!(generated, files);
+    assert_eq!(
+        crate::capabilities::NATIVE_CAPABILITY_SOURCES.len(),
+        crate::capabilities::native_catalog().descriptors().len()
+    );
+}

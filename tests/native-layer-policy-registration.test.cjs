@@ -133,8 +133,9 @@ test('F06 private children retain exact ordinary ownership and the single declar
   assert.match(policy.provenance.nativeLayerPolicyOrganizationRegistration,/F06\/#2147/);
   const descriptor=read(ROOT,'engineering/application/capabilities-v2/native-layer-policy.json');
   assert.deepEqual(descriptor.operations,['command.document.object.layer.policy.edit']);
-  const sources=fs.readFileSync(path.join(ROOT,'nemo-mcp/src/capabilities.rs'),'utf8');
-  assert.equal(sources.split('capabilities-v2/native-layer-policy.json').length-1,1);
+  // CS1/#2341: nemo-mcp/build.rs embeds every capabilities-v2 file it discovers.
+  const sources=require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map(file=>path.basename(file));
+  assert.equal(sources.filter(name=>name==='native-layer-policy.json').length,1);
   const schema=read(ROOT,'engineering/application/native-transport-v2.schema.json');
   const operations=schema.$defs.Request.oneOf.flatMap(branch=>{
     const declaration=branch.allOf[1].properties.operation;return declaration.enum||[declaration.const];

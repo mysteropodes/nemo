@@ -39,10 +39,8 @@ function assertBootstrap(html) {
 }
 
 test('the descriptor is embedded exactly once and declares the three operations, none of which another descriptor declares', () => {
-  const rust = read('nemo-mcp/src/capabilities.rs');
-  const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
-  assert.ok(start >= 0);
-  const sources = [...rust.slice(start, rust.indexOf('];', start)).matchAll(/include_str!\s*\(\s*"([^"]+)"\s*\)/g)].map((match) => match[1]);
+  // CS1/#2341: nemo-mcp/build.rs discovers capabilities-v2/*.json; read the same set.
+  const sources = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => '../../engineering/application/capabilities-v2/' + path.basename(file));
   assert.equal(sources.filter((s) => s === '../../engineering/application/capabilities-v2/native-object-vector.json').length, 1);
   const descriptors = sources.map((source) => JSON.parse(fs.readFileSync(path.resolve(ROOT, 'nemo-mcp/src', source), 'utf8')));
   const operations = descriptors.flatMap((entry) => entry.operations);
@@ -108,7 +106,7 @@ test('the Rust contract and its test child are members of the MCP transport modu
   const contract = read('nemo-mcp/src/native_contract.rs');
   assert.equal(contract.split('pub(crate) mod vector;').length - 1, 1);
   assert.match(contract, /vector::VECTOR \| vector::PARAMETRIC \| vector::EFFECTS => \{\s+vector::request\(operation, payload\)/);
-  assert.match(contract, /if vector::owns\(operation\) \{\s+return vector::result\(operation, payload, result\);/);
+  assert.match(contract, /op if vector::owns\(op\) => \|o, _, p, r\| vector::result\(o, p, r\),/);
   assert.match(read('nemo-mcp/src/wire.rs'), /vector::response_matches\(request, response\)/);
   assert.match(read('nemo-mcp/src/native_request_input.rs'), /crate::native_contract::vector::VECTOR[\s\S]*crate::native_contract::vector::EFFECTS/);
   assert.match(read('nemo-mcp/src/native_object_contract.rs'), /crate::native_contract::vector::FAMILY/);

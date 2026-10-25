@@ -32,8 +32,8 @@ test('the transport schema declares the closed payload, the receipt, the revisio
 });
 
 test('the descriptor is embedded in the native catalog and the schema operations equal the descriptor operations', () => {
-  const caps = read('nemo-mcp/src/capabilities.rs');
-  assert.equal(caps.split('capabilities-v2/native-object-import.json').length, 2);
+  // CS1/#2341: nemo-mcp/build.rs embeds every capabilities-v2 file it discovers.
+  assert.equal(require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => path.basename(file)).filter((name) => name === 'native-object-import.json').length, 1);
   assert.ok(fs.existsSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object-import.json')));
   const schema = read('engineering/application/native-transport-v2.schema.json');
   assert.equal(schema.split(`"${OP}"`).length, 2, 'declared once in the Request union');
@@ -43,7 +43,7 @@ test('the nemo-mcp validators are wired: module, request arm, result arm, revisi
   const contractRs = read('nemo-mcp/src/native_contract.rs');
   assert.match(contractRs, /#\[path = "native_import_contract\.rs"\]\npub\(crate\) mod import;/);
   assert.match(contractRs, /import::OP => import::request\(payload\),/);
-  assert.match(contractRs, /if operation == import::OP \{\n\s+return import::result\(result\);/);
+  assert.match(contractRs, /import::OP => \|_, _, _, r\| import::result\(r\),/);
   assert.match(read('nemo-mcp/src/native_request_input.rs'), /crate::native_contract::import::admitted\(&self\.operation\)/);
   const wire = read('nemo-mcp/src/wire.rs');
   assert.match(wire, /#\[path = "native_wire_response_owner\.rs"\]\s*mod response_owner;/);
