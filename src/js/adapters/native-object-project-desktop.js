@@ -9,16 +9,19 @@
   // Read-only chronology for ordinary settings and their native pins. Storage is
   // bounded and fire-and-forget; a missing, failed or hung sink cannot gate work.
   function settingsDiagnostic(root,event,value){
-    if(!['input','change','intent','dispatch','metadata','acknowledged','outcome','stop','resume',
+    if(!['input','change','focus','blur','pointerdown','stale-rejected','owner','intent','dispatch','metadata','acknowledged','outcome','stop','resume',
       'preview-presented','export-request','export-result'].includes(event))return;
     try{
       function own(key){var d=value&&Object.getOwnPropertyDescriptor(value,key);return d&&Object.prototype.hasOwnProperty.call(d,'value')?d.value:undefined;}
       var row={event:event};
       [['instanceId',/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/],
         ['documentId',/^native-object-document-[0-9]+$/],
+        ['gestureDocumentId',/^native-object-document-[0-9]+$/],
         ['documentSnapshotId',/^native-object:native-object-document-[0-9]+:[0-9]+$/],
         ['requestId',/^project-[a-z-]+-[0-9]+$/]].forEach(function(pair){var v=own(pair[0]);if(typeof v==='string'&&v.length<=128&&pair[1].test(v))row[pair[0]]=v;});
-      ['contentRevision','expectedRevision','atRevision','fromRevision','toRevision','lifecycleGeneration','frame','viewGeneration'].forEach(function(key){var v=own(key);if(Number.isSafeInteger(v)&&v>=0)row[key]=v;});
+      ['contentRevision','expectedRevision','atRevision','fromRevision','toRevision','lifecycleGeneration','gestureLifecycleGeneration','frame','viewGeneration'].forEach(function(key){var v=own(key);if(Number.isSafeInteger(v)&&v>=0)row[key]=v;});
+      if(['p-cw','p-ch','proj-fps','p-cbg','btn-dims-lock'].includes(own('field')))row.field=own('field');
+      if(['input','change'].includes(own('sourceEvent')))row.sourceEvent=own('sourceEvent');
       var kind=own('kind'),status=own('status');
       if(['setCanvasSize','setFps','setCanvasBackground','setWorkArea','user','native-settings-intent','native-settings-publication'].includes(kind))row.kind=kind;
       if(['applied-presented','unchanged','superseded','unavailable','unconfirmed','applied-unconfirmed','succeeded','failed','cancelled'].includes(status))row.status=status;
@@ -274,7 +277,9 @@
         if(request.operation==='command.document.object.project.settings.edit')
           settingsDiagnostic(root,'dispatch',Object.assign({},request,{kind:request.payload.action.kind}));
         if(request.operation==='command.document.object.layer.policy.edit'){if(typeof client.editLayerPolicy!=='function')throw new Error('Native public layer policy SDK is unavailable');return client.editLayerPolicy(request);}
-        return client.dispatch(request);
+        var response=client.dispatch(request),gate=root.NemoNativeSettingsValidationGate;
+        return gate&&request.operation==='command.document.object.project.settings.edit'?
+          gate.hold(root,'settings-response',request,response):response;
       },
       openDiagnostic:function(event,code){openDiagnostic(root,event,code);},
       presented:function(info){

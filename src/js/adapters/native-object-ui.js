@@ -130,15 +130,21 @@
         var label=createNativeObjectUiText(root,'span',entry[1]);label.className='pl';row.appendChild(label);
         var saved={node:node,parent:parent,marker:marker,hidden:node.hidden,display:node.style.display,pointer:node.style.pointerEvents,events:[],gesture:null};
         parent.insertBefore(marker,node);row.appendChild(node);node.hidden=false;node.style.display='';box.appendChild(row);prior.settings.moves.push(saved);
-        function begin(){saved.gesture=Object.assign({},prior.settings.pin);}
-        function guard(event){var dimension=entry[0]==='p-cw'||entry[0]==='p-ch',value=Number(node.value);
+        function observe(event,sourceEvent){
           try{var diagnostic=root.NemoNativeObjectProjectDesktop;if(diagnostic&&diagnostic.settingsDiagnostic){
-            var session=ports.currentSession();diagnostic.settingsDiagnostic(root,event.type,Object.assign({},session&&session.info(),{
-              kind:dimension?'setCanvasSize':entry[0]==='proj-fps'?'setFps':entry[0]==='p-cbg'?'setCanvasBackground':undefined}));}}catch(_){}
+            var session=ports.currentSession();diagnostic.settingsDiagnostic(root,event,Object.assign({},session&&session.info(),{
+              field:entry[0],sourceEvent:sourceEvent,gestureDocumentId:saved.gesture&&saved.gesture.documentId,
+              gestureLifecycleGeneration:saved.gesture&&saved.gesture.lifecycleGeneration,
+              kind:entry[0]==='p-cw'||entry[0]==='p-ch'?'setCanvasSize':entry[0]==='proj-fps'?'setFps':entry[0]==='p-cbg'?'setCanvasBackground':undefined}));}}catch(_){}
+        }
+        function begin(event){saved.gesture=Object.assign({},prior.settings.pin);observe(event&&event.type);}
+        function guard(event){var dimension=entry[0]==='p-cw'||entry[0]==='p-ch',value=Number(node.value);observe(event.type);
           var invalid=dimension&&(!Number.isInteger(value)||value<1||value>4294967295||parseInt(node.value,10)!==value);
-          if(invalid||saved.gesture&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return saved.gesture[k]===prior.settings.pin[k];})){
+          var stale=saved.gesture&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return saved.gesture[k]===prior.settings.pin[k];});
+          if(stale)observe('stale-rejected',event.type);
+          if(invalid||stale){
           if(event.preventDefault)event.preventDefault();if(event.stopImmediatePropagation)event.stopImmediatePropagation();}}
-        [['pointerdown',begin,true],['focus',begin,true],['input',guard,true],['change',guard,true]].forEach(function(args){node.addEventListener.apply(node,args);saved.events.push(args);});
+        [['pointerdown',begin,true],['focus',begin,true],['blur',function(){observe('blur');},true],['input',guard,true],['change',guard,true]].forEach(function(args){node.addEventListener.apply(node,args);saved.events.push(args);});
         if(entry[0]==='p-cbg'){
           var wrap=createNativeObjectUiText(root,'div','');wrap.id='native-project-background';wrap.className='color-well';row.insertBefore(wrap,node);wrap.appendChild(node);
           wrap.addEventListener('pointerdown',begin,true);prior.settings.bg=wrap;
@@ -148,6 +154,7 @@
     }
     var before=prior.settings.pin,changed=before&&!['instanceId','documentId','lifecycleGeneration'].every(function(k){return before[k]===info[k];});
     prior.settings.pin={instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration};
+    if(changed){try{var diagnostic=root.NemoNativeObjectProjectDesktop;if(diagnostic&&diagnostic.settingsDiagnostic)diagnostic.settingsDiagnostic(root,'owner',info);}catch(_){}}
     if(changed){if(root.ColorPicker&&root.ColorPicker.close)root.ColorPicker.close();prior.settings.moves.forEach(function(saved){if(root.document.activeElement===saved.node&&saved.node.blur)saved.node.blur();});}
     prior.settings.ownerChanged=!!changed;
   }

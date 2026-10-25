@@ -22,7 +22,9 @@
   function bind(root,ports){
     return root.NemoNativeObjectInactiveProjectTabs.create(root,{
       owner:function(){var s=root.NemoNativeObjectProject.desktop(root);return s&&s.identity();},
-      invoke:function(command,args){return root.__TAURI__.core.invoke(command,args);},
+      invoke:function(command,args){var response=root.__TAURI__.core.invoke(command,args),gate=root.NemoNativeSettingsValidationGate;
+        return gate&&command==='nemo_native_object_inactive_project'?
+          gate.hold(root,'inactive-inspect',JSON.parse(args.requestJson),response):response;},
       requestId:function(){return root.crypto.randomUUID();},
       baseName:function(path){return root.SMProjectDocument.baseName(path);},notice:ports.notice,
       commit:function(meta){

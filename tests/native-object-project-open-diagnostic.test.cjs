@@ -39,6 +39,16 @@ test('settings diagnostic missing, failing and hung sinks never delay or throw t
     await turn();assert.equal(writes,fail==='missing'?0:1);
   }
 });
+test('stale change diagnostics retain the old gesture and current owner without arbitrary fields',async()=>{
+  let bytes;const root={__TAURI__:{path:{appDataDir:async()=>'/isolated'},fs:{mkdir:async()=>{},
+    writeTextFile:async(_path,value)=>{bytes=value;},rename:async()=>{}}}};
+  Desktop.settingsDiagnostic(root,'stale-rejected',{field:'proj-fps',sourceEvent:'change',documentId:'native-object-document-2',
+    lifecycleGeneration:2,gestureDocumentId:'native-object-document-1',gestureLifecycleGeneration:1,value:'PRIVATE',secret:'PRIVATE'});
+  await turn();const row=JSON.parse(bytes).events[0];
+  assert.equal(row.documentId,'native-object-document-2');assert.equal(row.gestureDocumentId,'native-object-document-1');
+  assert.equal(row.lifecycleGeneration,2);assert.equal(row.gestureLifecycleGeneration,1);assert.equal(row.sourceEvent,'change');
+  assert.equal(row.field,'proj-fps');assert.doesNotMatch(bytes,/PRIVATE|secret/);
+});
 function fixture(mode){
   let installed=false,previews=0,visible=true,pendingBytes=null;
   const writes=[],commands=[],effects=[],notices=[];
