@@ -327,6 +327,18 @@
       "sizeProfile": "Domain/application JS or TS"
     },
     {
+      "id": "nemo.lib.parityMatrix",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "parity-matrix.cjs"
+      ],
+      "publicApi": [
+        "parity-matrix.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
       "id": "nemo.lib.inventorySurfaces",
       "layer": "tooling-application",
       "dir": "scripts/nemo/lib",
@@ -347,6 +359,18 @@
       ],
       "publicApi": [
         "inventory.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.parityMatrix",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "parity-matrix.cjs"
+      ],
+      "publicApi": [
+        "parity-matrix.cjs"
       ],
       "sizeProfile": "Domain/application JS or TS"
     },
@@ -613,6 +637,18 @@
       ],
       "publicApi": [
         "inventory.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.parityMatrix",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "parity-matrix.test.cjs"
+      ],
+      "publicApi": [
+        "parity-matrix.test.cjs"
       ],
       "sizeProfile": "Test file"
     },
