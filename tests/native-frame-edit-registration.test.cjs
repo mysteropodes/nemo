@@ -80,7 +80,9 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.match(project, /get editFrames\(\)\{return FrameEdit&&typeof ports\.dispatchApplication==='function'&&subscription/);
   assert.match(project, /'nemo_native_dispatch',typeof current==='function'\);\}\n\s*function editProjectSettings/, 'the frame edit goes through the public application client only');
   // CS1/#2341: nemo-mcp/build.rs embeds every capabilities-v2 file it discovers.
-  assert.equal(require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => path.basename(file)).filter((name) => name === 'native-frame-edit.json').length, 1);
+  assert.ok(fs.existsSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-frame-edit.json')));
+  const catalog = require('../scripts/nemo/lib/capability-drift.cjs').checkNativeCatalog();
+  assert.equal(catalog.status, 'pass', catalog.reason); // unique, v2-shaped, equal to the transport union
   const contract = text('nemo-mcp/src/native_contract.rs');
   assert.match(contract, /#\[path = "native_frame_edit_contract\.rs"\]\s*pub\(crate\) mod frame_edit;/);
   assert.ok(contract.indexOf('native_frame_edit_contract.rs') < contract.indexOf('native_layer_policy_contract.rs'), 'frame_edit precedes layer_policy (rustfmt order)');

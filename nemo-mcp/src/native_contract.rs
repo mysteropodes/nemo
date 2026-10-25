@@ -160,7 +160,8 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
 }
 
 /// Declared operations whose payload the native owner validates; pinned by test
-/// to exactly the declared operations without a request validator here.
+/// to exactly the declared operations without a request validator here. Add an
+/// entry only with the owning feature's sign-off; prefer adding a validator.
 pub(crate) const MCP_REQUEST_FORWARDED: &[&str] = &[
     "command.document.apply",
     "query.document.opacity",
@@ -377,6 +378,7 @@ pub(crate) fn validate_result(
 
 /// Declared operations whose native result is forwarded without an adapter
 /// shape check; pinned by test to exactly those lacking a result validator.
+/// Add an entry only with the owning feature's sign-off; prefer a validator.
 pub(crate) const MCP_RESULT_UNCHECKED: &[&str] = &[
     "command.document.apply",
     "query.document.opacity",

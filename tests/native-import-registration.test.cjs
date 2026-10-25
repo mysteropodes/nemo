@@ -33,8 +33,9 @@ test('the transport schema declares the closed payload, the receipt, the revisio
 
 test('the descriptor is embedded in the native catalog and the schema operations equal the descriptor operations', () => {
   // CS1/#2341: nemo-mcp/build.rs embeds every capabilities-v2 file it discovers.
-  assert.equal(require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => path.basename(file)).filter((name) => name === 'native-object-import.json').length, 1);
   assert.ok(fs.existsSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object-import.json')));
+  const catalog = require('../scripts/nemo/lib/capability-drift.cjs').checkNativeCatalog();
+  assert.equal(catalog.status, 'pass', catalog.reason); // unique, v2-shaped, equal to the transport union
   const schema = read('engineering/application/native-transport-v2.schema.json');
   assert.equal(schema.split(`"${OP}"`).length, 2, 'declared once in the Request union');
 });
