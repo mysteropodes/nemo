@@ -24,7 +24,7 @@ const RUST_PROFILE = 'engineering/boundaries/profiles/rust.profile.json';
 // Rust crate edge policies (P12/#1014): one per crate whose intra-crate module graph is enforced.
 const RUST_CRATE_POLICIES = ['engineering/boundaries/profiles/geometry-wasm.edges.json', 'engineering/boundaries/profiles/nemo-desktop.edges.json', 'engineering/boundaries/profiles/native-engine.edges.json'];
 const LANES = ['quick', 'boundaries', 'surfaces'];
-const QUICK = ['doctor', 'check', 'test:unit', 'test:rust', 'test:rust-native-engine'];
+const QUICK = ['doctor', 'check', 'test:unit', 'test:rust', 'test:rust-native-engine', 'test:rust-mcp'];
 const SURFACES = ['test:integration', 'test:browser', 'test:rust-tauri', 'build:wasm', 'build:desktop', 'test:desktop'];
 
 function aggregate(needs) {

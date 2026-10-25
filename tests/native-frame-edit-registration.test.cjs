@@ -79,12 +79,15 @@ test('the SDK, the session and the MCP contract are wired to the one declaration
   assert.ok(project.split('\n').filter((line) => line.trim()).length <= 500, 'native-object-project.js stays within its 500 nonblank-line hard maximum');
   assert.match(project, /get editFrames\(\)\{return FrameEdit&&typeof ports\.dispatchApplication==='function'&&subscription/);
   assert.match(project, /'nemo_native_dispatch',typeof current==='function'\);\}\n\s*function editProjectSettings/, 'the frame edit goes through the public application client only');
-  assert.equal(count(text('nemo-mcp/src/capabilities.rs'), 'capabilities-v2/native-frame-edit.json'), 1);
+  // CS1/#2341: nemo-mcp/build.rs embeds every capabilities-v2 file it discovers.
+  assert.ok(fs.existsSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-frame-edit.json')));
+  const catalog = require('../scripts/nemo/lib/capability-drift.cjs').checkNativeCatalog();
+  assert.equal(catalog.status, 'pass', catalog.reason); // unique, v2-shaped, equal to the transport union
   const contract = text('nemo-mcp/src/native_contract.rs');
   assert.match(contract, /#\[path = "native_frame_edit_contract\.rs"\]\s*pub\(crate\) mod frame_edit;/);
   assert.ok(contract.indexOf('native_frame_edit_contract.rs') < contract.indexOf('native_layer_policy_contract.rs'), 'frame_edit precedes layer_policy (rustfmt order)');
   assert.match(contract, /op if frame_edit::declares\(op\) => frame_edit::request\(op, payload\),/);
-  assert.match(contract, /if frame_edit::declares\(operation\) \{\s*return frame_edit::result_for_operation\(operation, result\);/);
+  assert.match(contract, /op if frame_edit::declares\(op\) => \|o, _, _, r\| frame_edit::result_for_operation\(o, r\),/);
   assert.match(text('nemo-mcp/src/native_request_input.rs'), /frame_edit::declares\(&self\.operation\)[\s\S]{0,200}requires expectedRevision/);
   const wire = text('nemo-mcp/src/wire.rs');
   assert.match(wire, /#\[path = "native_wire_response_owner\.rs"\]\s*mod response_owner;/);

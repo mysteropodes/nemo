@@ -30,7 +30,10 @@ function declaredDescriptors(name = 'CAPABILITY_SOURCES') {
   return out;
 }
 const descriptors = declaredDescriptors();
-const nativeDescriptors = declaredDescriptors('NATIVE_CAPABILITY_SOURCES');
+// CS1/#2341: native v2 declarations are discovered by nemo-mcp/build.rs from
+// capabilities-v2/, sorted by file name; read that same set.
+const nativeDescriptors = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles()
+  .map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
 
 function compiledSchema(...args) {
   return execFileSync('cargo', [
