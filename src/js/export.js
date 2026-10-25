@@ -5,7 +5,11 @@
 var _exportLayer = null;
 function exportTauriAvailable(){return typeof window.__TAURI__!=='undefined';}
 function exportNativeOpacity(){var authority=window.NemoNativeOpacityCutover;return authority&&authority.blocksLegacy()?authority:null;}
-async function exportReleaseNative(kind){var authority=exportNativeOpacity();if(authority)await authority.releaseCurrent(kind);}
+// CS4/#2343: native authority is never released to the legacy writer for an
+// export. A format with no native exporter refuses (typed) instead, and the SVG
+// workflow's legacy branch may only run when no native authority is present.
+function exportNativeUnavailable(format){return exportNativeOpacity()?{ok:false,unavailable:true,error:format+' export is not available for native projects yet.'}:null;}
+async function exportRefuseRelease(kind){if(exportNativeOpacity())throw new Error(kind+' cannot release native authority to the legacy writer');}
 
 function exportEnsureLayer(){
   if(!_exportLayer){_exportLayer=new Layer({name:'__export__'});_exportLayer.visible=false;}
@@ -1207,7 +1211,7 @@ function exportSvgSequenceJob(){
 }
 function exportMainSvgWorkflow(){
   return window.NemoNativeMainSvgExport.create({authority:exportNativeOpacity,available:exportTauriAvailable,
-    range:exportFrameRange,pick:exportPickDir,release:exportReleaseNative,legacy:exportSvgSequenceJob,frame:exportFrameSVGString});
+    range:exportFrameRange,pick:exportPickDir,release:exportRefuseRelease,legacy:exportSvgSequenceJob,frame:exportFrameSVGString});
 }
 async function exportSVGSequenceToDir(dir,opts){
   return await exportMainSvgWorkflow().toDir(dir,opts);
@@ -1240,7 +1244,7 @@ async function exportProResToPath(outPath,opts){
 }
 async function exportLottieToPath(outPath,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur) — voir exportLottie (repli navigateur).'};
-  await exportReleaseNative('lottie-export');var r=exportFrameRange(opts);
+  var blocked=exportNativeUnavailable('Lottie');if(blocked)return blocked;var r=exportFrameRange(opts);
   var json=lottieBuild(r.start,r.end);
   var text=JSON.stringify(json);
   await exportWriteText(outPath,text);
@@ -1359,7 +1363,7 @@ window.SMExport={
   },
 
   exportLottie:async function(opts){
-    await exportReleaseNative('lottie-export');var r=exportFrameRange(opts);
+    var blocked=exportNativeUnavailable('Lottie');if(blocked)return blocked;var r=exportFrameRange(opts);
     var json=lottieBuild(r.start,r.end);
     var text=JSON.stringify(json);
     if(exportTauriAvailable()){

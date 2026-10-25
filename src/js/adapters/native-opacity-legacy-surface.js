@@ -19,6 +19,12 @@
     return !!(root && root.__TAURI__ && root.__TAURI__.core &&
       typeof root.__TAURI__.core.invoke === 'function');
   }
+  // CS4/#2343: on the desktop remediation host a JavaScript/Paper write is never
+  // implicit, whether or not a native document has been observed yet. A kind
+  // passes only if listed here as still legacy-owned on desktop (none today);
+  // an unmigrated operation reports unavailable instead (EXECUTION_PLAN §0).
+  var DESKTOP_LEGACY_KINDS = Object.freeze([]);
+  function desktopLegacyKind(kind) { return DESKTOP_LEGACY_KINDS.indexOf(kind) >= 0; }
   function allowLegacyWrite(root, kind, central) {
     try {
       if (central !== undefined) return typeof central === 'function' && central(kind) === true;
@@ -29,7 +35,7 @@
       // read-side fixture, but edits must not revive the JavaScript writer.
       if (!hasNativeHost(root)) return kind === 'document-import' ||
         kind === 'create-layer' && (!root.NemoApplication || (browserImportDepth.get(root) || 0) > 0);
-      return true;
+      return desktopLegacyKind(kind);
     } catch (_) { return false; }
   }
   function installBrowserReadOnlyImport(root) {
@@ -368,9 +374,12 @@
         },
         allow: function (kind) {
           var bridge = root.SMEngineBridge;
-          if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true;
-          return !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' &&
+          var guarded = !bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard') ||
+            !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' &&
             bridge.nativeEditGuard.allow(kind) === true;
+          // The guard decides first; the desktop host then never admits an
+          // implicit legacy write even before native identity is observed.
+          return guarded && (!hasNativeHost(root) || desktopLegacyKind(kind));
         },
         wrap: function (target, names, prefix, allow, admitted) {
           var targets = { global: root, timeline: root.SM, motion: root.SMMotion, script: root.SMScript, plugin: root.SMPlugin };

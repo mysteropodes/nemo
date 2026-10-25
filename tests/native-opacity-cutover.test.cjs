@@ -3413,23 +3413,21 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
     'plugin-openFile', 'plugin-loadArchive', 'plugin-loadFiles',
     'timeline-setTotalFrames', 'motion-setLayerValue']);
 
+  // CS4/#2343: the desktop host admits no implicit legacy write in either phase.
+  // With the guard no longer blocking, script and plugin entries still refuse,
+  // schedule nothing and leave both document byte images unchanged.
   nativeBlocked = false;
-  const retained = desktop.SMScript.api();
-  desktop.SMScript.run('retained timer setup');
-  desktop.SMScript.openFile();
-  desktop.SMPlugin.openFile();
-  desktop.SMPlugin.loadArchive({});
-  desktop.SMPlugin.loadFiles({});
-  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-after-extension', false), false);
-  assert.equal(events.filter(([kind]) => kind === 'activate').length, 1,
-    'page-lifetime extension exposure prevents another activation attempt');
-  retained.layer(0).set('opacity', [66]);
-  delayedScript();
-  delayedPlugin();
-  delayedArchive();
-  assert.equal(serializedDocument.layers[0].opacity, 75,
-    'retained and delayed script/plugin capabilities only run while page stays legacy');
-  assert.match(toasts.at(-1), /Reload or restart Nemo/);
+  assert.equal(desktop.SMScript.api(), false);
+  assert.equal(desktop.SMScript.run('retained timer setup'), false);
+  assert.equal(desktop.SMScript.openFile(), false);
+  assert.equal(desktop.SMPlugin.openFile(), false);
+  assert.equal(desktop.SMPlugin.loadArchive({}), false);
+  assert.equal(desktop.SMPlugin.loadFiles({}), false);
+  assert.equal(desktop.SM.setTotalFrames(99), false);
+  assert.equal(desktop.SMMotion.setLayerValue(0, 'opacity', [99]), false);
+  assert.equal(delayedScript, null); assert.equal(delayedPlugin, null); assert.equal(delayedArchive, null);
+  assert.equal(JSON.stringify(serializedDocument), documentBytes, 'no desktop extension wrote the legacy document');
+  assert.equal(JSON.stringify(paperProject), paperBytes, 'no desktop extension wrote the Paper project');
 
   assert.equal(await desktop.NemoNativeOpacityProject.importJSON('unsupported', true), false);
   assert.deepEqual(imports, []);
