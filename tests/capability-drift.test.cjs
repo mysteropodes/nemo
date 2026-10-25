@@ -82,7 +82,8 @@ test('a fresh fixture reproduces the working tree verdict (controls start green)
     for (const name of drift.CHECKS) {
       const fn = { 'capability-surface': drift.checkSurface, 'capability-schema-version': drift.checkSchemaVersion,
         'capability-ids': drift.checkIds, 'capability-examples': drift.checkExamples,
-        'capability-transport-copies': drift.checkTransportCopies, 'schema-examples': drift.checkSchemaExamples }[name];
+        'capability-transport-copies': drift.checkTransportCopies, 'schema-examples': drift.checkSchemaExamples,
+        'native-capability-catalog': drift.checkNativeCatalog }[name];
       if (!fn) continue; // capability-catalog is a receipt line, not a gate
       assert.strictEqual(fn(root).status, 'pass', `${name} did not start green: ${fn(root).reason}`);
     }
@@ -222,4 +223,101 @@ test('schema-examples reaches transport-v1, whose schemas sit under non-standard
   // 11 in operation-contract-v1 ($defs) + 7 in transport-v1 (request.properties
   // .payload) — the latter is the half a $defs-only walk missed entirely.
   assert.ok(Number(m[1]) >= 18, `expected at least 18 validated examples, got ${m[1]}`);
+});
+
+// ---- CS1/#2341: native v2 catalog discovered by nemo-mcp/build.rs --------
+function nativePath(root, name) { return path.join(root, APP, 'capabilities-v2', name); }
+
+test('native-capability-catalog fails on an operation declared by two descriptors', () => {
+  withFixture((root) => {
+    const [a, b] = drift.nativeDescriptorFiles(root).map((f) => path.basename(f));
+    const first = readJson(nativePath(root, a));
+    const second = readJson(nativePath(root, b));
+    second.operations = second.operations.concat(first.operations[0]);
+    writeJson(nativePath(root, b), second);
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, /duplicate native operation/);
+  });
+});
+
+test('native-capability-catalog fails on a descriptor that is not v2', () => {
+  withFixture((root) => {
+    const name = path.basename(drift.nativeDescriptorFiles(root)[0]);
+    const d = readJson(nativePath(root, name));
+    d.schemaVersion = 1;
+    writeJson(nativePath(root, name), d);
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, /schemaVersion\/apiVersion 2/);
+  });
+});
+
+test('native-capability-catalog fails when a declaration has no v2 transport branch', () => {
+  withFixture((root) => {
+    const name = path.basename(drift.nativeDescriptorFiles(root)[0]);
+    const d = readJson(nativePath(root, name));
+    d.operations = d.operations.concat('command.document.object.cs1.unschemed');
+    writeJson(nativePath(root, name), d);
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, /missing from the v2 transport union: command\.document\.object\.cs1\.unschemed/);
+  });
+});
+
+test('native-capability-catalog fails if capabilities.rs regrows a hand-maintained native list', () => {
+  withFixture((root) => {
+    const rust = path.join(root, RUST);
+    const src = fs.readFileSync(rust, 'utf8')
+      .replace(/include!\(concat!\(env!\("OUT_DIR"\), "\/native_capability_sources\.rs"\)\);/, 'pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[];');
+    fs.writeFileSync(rust, src);
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, /hand-maintained NATIVE_CAPABILITY_SOURCES/);
+    assert.match(r.reason, /does not include the build\.rs-generated native catalog/);
+  });
+});
+
+test('native-capability-catalog fails on a capability id declared by two descriptor files', () => {
+  withFixture((root) => {
+    const name = path.basename(drift.nativeDescriptorFiles(root)[0]);
+    const d = readJson(nativePath(root, name));
+    d.operations = ['command.document.object.cs1.duplicate-id'];
+    writeJson(nativePath(root, 'zz-cs1-duplicate-id.json'), d);
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, new RegExp('duplicate native capability id ' + d.id.replace(/\./g, '\\.')));
+  });
+});
+
+test('native-capability-catalog fails on a v2 transport operation that no descriptor declares', () => {
+  withFixture((root) => {
+    const p = path.join(root, APP, 'native-transport-v2.schema.json');
+    const schema = readJson(p);
+    const branch = JSON.parse(JSON.stringify(schema.$defs.Request.oneOf[0]));
+    branch.allOf[1].properties.operation = { const: 'query.document.cs1.stale' };
+    schema.$defs.Request.oneOf.push(branch);
+    writeJson(p, schema);
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, /v2 transport operation\(s\) with no declaration: query\.document\.cs1\.stale/);
+  });
+});
+
+test('native-capability-catalog fails on an unparsable descriptor', () => {
+  withFixture((root) => {
+    fs.writeFileSync(nativePath(root, 'zz-cs1-broken.json'), '{ not json');
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, /zz-cs1-broken\.json: invalid JSON/);
+  });
+});
+
+test('native-capability-catalog fails when the declaration directory is empty', () => {
+  withFixture((root) => {
+    for (const f of drift.nativeDescriptorFiles(root)) fs.rmSync(f);
+    const r = drift.checkNativeCatalog(root);
+    assert.strictEqual(r.status, 'fail');
+    assert.match(r.reason, /no native declarations/);
+  });
 });

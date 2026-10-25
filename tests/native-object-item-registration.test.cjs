@@ -70,9 +70,10 @@ test('the MCP crate registers the validators, the descriptors and the shared res
   for (const file of ['src/native_item_contract.rs', 'src/native_item_contract_tests.rs']) assert.equal(wholeFiles.filter((f) => f === file).length, 1, file);
   assert.match(read('nemo-mcp/src/native_contract.rs'), /#\[path = "native_item_contract\.rs"\]\npub\(crate\) mod item;/);
   assert.match(read('nemo-mcp/src/native_contract.rs'), /item::ITEM \| item::ATTACH \| item::REMOVE => item::request\(operation, payload\)/);
-  assert.match(read('nemo-mcp/src/native_contract.rs'), /if item::owns\(operation\) \{\n\s+return item::result\(operation, payload, result\);/);
-  const sources = read('nemo-mcp/src/capabilities.rs');
-  for (const file of ['native-object-item.json', 'native-object-asset.json']) assert.ok(sources.includes('capabilities-v2/' + file), file);
+  assert.match(read('nemo-mcp/src/native_contract.rs'), /op if item::owns\(op\) => \|o, _, p, r\| item::result\(o, p, r\),/);
+  // CS1/#2341: nemo-mcp/build.rs embeds every capabilities-v2 file it discovers.
+  const sources = require('../scripts/nemo/lib/capability-drift.cjs').nativeDescriptorFiles().map((file) => path.basename(file));
+  for (const file of ['native-object-item.json', 'native-object-asset.json']) assert.ok(sources.includes(file), file);
   assert.match(read('nemo-mcp/src/wire.rs'), /crate::native_contract::item::response_matches\(request, response\)/);
   for (const op of ['ITEM', 'ATTACH', 'REMOVE']) assert.match(read('nemo-mcp/src/native_request_input.rs'), new RegExp('crate::native_contract::item::' + op));
   // The relative references of the request union resolve through the schema embedded in the advertised command schema.

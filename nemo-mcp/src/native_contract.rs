@@ -149,8 +149,46 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     )
 }
 
+/// A declared operation needs a validator here or an explicit forward to its
+/// native owner (CS1/#2341). Undeclared operations pass through to the later
+/// registration check, which refuses them as `invalid_request`.
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
-    match operation {
+    request_check(operation, payload).unwrap_or_else(|| {
+        MCP_REQUEST_FORWARDED.contains(&operation)
+            || crate::capabilities::native_catalog()
+                .capability_for_operation(operation)
+                .is_none()
+    })
+}
+
+/// Declared operations whose payload the native owner validates; pinned by test
+/// to exactly the declared operations without a request validator here. Add an
+/// entry only with the owning feature's sign-off; prefer adding a validator.
+pub(crate) const MCP_REQUEST_FORWARDED: &[&str] = &[
+    "command.document.apply",
+    "query.document.opacity",
+    "query.document.revision",
+    "query.document.snapshot.acquire",
+    "transaction.begin",
+    "transaction.update",
+    "transaction.commit",
+    "transaction.cancel",
+    "transaction.status",
+    "history.undo",
+    "history.redo",
+    "job.export.png.begin",
+    "job.export.png.status",
+    "job.export.png.cancel",
+];
+
+/// Whether `operation` has an explicit request validator, independent of payload.
+#[cfg(test)]
+pub(crate) fn has_request_validator(operation: &str) -> bool {
+    request_check(operation, &Value::Null).is_some()
+}
+
+fn request_check(operation: &str, payload: &Value) -> Option<bool> {
+    Some(match operation {
         history_read::OP => history_read::request(payload),
         font::IMPORT | font::QUERY => font::request(operation, payload),
         brush::PUBLISH | brush::QUERY => brush::request(operation, payload),
@@ -208,8 +246,8 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
                         .is_some_and(bounded_identifier)
                     && frame(object.get("frame")).is_some()
             }),
-        _ => true,
-    }
+        _ => return None,
+    })
 }
 
 fn opacity_vector(value: Option<&Value>) -> bool {
@@ -320,6 +358,8 @@ fn opacity_document(value: &Value) -> bool {
     true
 }
 
+type ResultValidator = fn(&str, &str, &Value, &Value) -> bool;
+
 pub(crate) fn validate_result(
     operation: &str,
     request_document_id: &str,
@@ -332,123 +372,99 @@ pub(crate) fn validate_result(
     if !validate_request(operation, payload) {
         return false;
     }
-    if matches!(operation, font::IMPORT | font::QUERY) {
-        return font::result(operation, payload, result);
+    match result_validator(operation) {
+        Some(validator) => validator(operation, request_document_id, payload, result),
+        // Fail closed (CS1/#2341): no validator passes only if pinned unchecked.
+        None => MCP_RESULT_UNCHECKED.contains(&operation),
     }
-    if operation == property_read::OP {
-        return property_read::result(request_document_id, payload, result);
-    }
-    if matches!(operation, composition::READ | composition::EDIT) {
-        return composition::result(operation, request_document_id, payload, result);
-    }
-    if matches!(operation, palette::READ | palette::EDIT) {
-        return palette::result(operation, request_document_id, payload, result);
-    }
-    if matches!(operation, comments::READ | comments::EDIT) {
-        return comments::result(operation, request_document_id, payload, result);
-    }
-    if matches!(operation, custom_brush::READ | custom_brush::EDIT) {
-        return custom_brush::result(operation, request_document_id, payload, result);
-    }
-    if matches!(operation, workspace::READ | workspace::EDIT) {
-        return workspace::result(operation, request_document_id, payload, result);
-    }
-    if matches!(operation, perspective::READ | perspective::EDIT) {
-        return perspective::result(operation, request_document_id, payload, result);
-    }
-    if matches!(operation, shadow::READ | shadow::EDIT) {
-        return shadow::result(operation, request_document_id, payload, result);
-    }
-    if matches!(operation, guide::READ | guide::EDIT) {
-        return guide::result(operation, request_document_id, payload, result);
-    }
-    if brush::owns(operation) {
-        return brush::result(operation, payload, result);
-    }
-    if operation == text_read::OP {
-        return text_read::result(request_document_id, payload, result);
-    }
-    if operation == metadata::OP {
-        return metadata::result(request_document_id, payload, result);
-    }
-    if operation == "query.document.object" {
-        return object::result(request_document_id, payload, result);
-    }
-    if operation == "query.document.object.layer.timing" {
-        return object::timing_result(request_document_id, payload, result);
-    }
-    if operation == property_edit::OP {
-        return property_edit::result(result);
-    }
-    if operation == property_track::OP {
-        return property_track::result(result);
-    }
-    if operation == layer_policy::OP {
-        return layer_policy::result(result);
-    }
-    if operation == layer_cut::OP {
-        return layer_cut::result(result);
-    }
-    if frame_edit::declares(operation) {
-        return frame_edit::result_for_operation(operation, result);
-    }
-    if object_component::admitted(operation) {
-        return object_component::result(operation, result);
-    }
-    if object_rig::admitted(operation) {
-        return object_rig::result(operation, result);
-    }
-    if object_edit::admitted(operation) {
-        return object_edit::result(operation, result);
-    }
-    if item::owns(operation) {
-        return item::result(operation, payload, result);
-    }
-    if vector::owns(operation) {
-        return vector::result(operation, payload, result);
-    }
-    if operation == placement::OP {
-        return placement::result(result);
-    }
-    if operation == audio_track::OP {
-        return audio_track::result(result);
-    }
-    if operation == "command.document.object.project.settings.edit" {
-        return settings::result(result);
-    }
-    if operation == "command.document.object.layer.create" {
-        return object::create_result(result);
-    }
-    if operation == import::OP {
-        return import::result(result);
-    }
-    if operation == video_link::OP {
-        return video_link::result(result);
-    }
-    if operation == "command.document.object.layer.visibility.set" {
-        return object::visibility_result(result);
-    }
-    if matches!(
-        operation,
-        "command.document.object.undo" | "command.document.object.redo"
-    ) {
-        return object::history_result(result);
-    }
-    if operation == "query.diagnostics.recent" {
-        return diagnostics_result(result);
-    }
-    if operation.starts_with("query.reproduction.") || operation == "command.reproduction.opt_in" {
-        if operation == "query.reproduction.report" {
-            return reproduction::report_result(payload, result);
+}
+
+/// Declared operations whose native result is forwarded without an adapter
+/// shape check; pinned by test to exactly those lacking a result validator.
+/// Add an entry only with the owning feature's sign-off; prefer a validator.
+pub(crate) const MCP_RESULT_UNCHECKED: &[&str] = &[
+    "command.document.apply",
+    "query.document.opacity",
+    "query.document.revision",
+    "query.document.snapshot.acquire",
+    "transaction.begin",
+    "transaction.update",
+    "transaction.commit",
+    "transaction.cancel",
+    "transaction.status",
+    "history.undo",
+    "history.redo",
+    "job.export.png.begin",
+    "job.export.png.status",
+    "job.export.png.cancel",
+    "job.export.svg.begin",
+    "job.export.svg.status",
+    "job.export.svg.cancel",
+    "job.export.media.begin",
+    "job.export.media.status",
+    "job.export.media.cancel",
+];
+
+#[cfg(test)]
+pub(crate) fn has_result_validator(operation: &str) -> bool {
+    result_validator(operation).is_some()
+}
+
+fn result_validator(operation: &str) -> Option<ResultValidator> {
+    Some(match operation {
+        // Routed before request validation in validate_result; listed for routing.
+        history_read::OP => |_, _, p, r| history_read::result(p, r),
+        font::IMPORT | font::QUERY => |o, _, p, r| font::result(o, p, r),
+        property_read::OP => |_, d, p, r| property_read::result(d, p, r),
+        composition::READ | composition::EDIT => |o, d, p, r| composition::result(o, d, p, r),
+        palette::READ | palette::EDIT => |o, d, p, r| palette::result(o, d, p, r),
+        comments::READ | comments::EDIT => |o, d, p, r| comments::result(o, d, p, r),
+        custom_brush::READ | custom_brush::EDIT => |o, d, p, r| custom_brush::result(o, d, p, r),
+        workspace::READ | workspace::EDIT => |o, d, p, r| workspace::result(o, d, p, r),
+        perspective::READ | perspective::EDIT => |o, d, p, r| perspective::result(o, d, p, r),
+        shadow::READ | shadow::EDIT => |o, d, p, r| shadow::result(o, d, p, r),
+        guide::READ | guide::EDIT => |o, d, p, r| guide::result(o, d, p, r),
+        op if brush::owns(op) => |o, _, p, r| brush::result(o, p, r),
+        text_read::OP => |_, d, p, r| text_read::result(d, p, r),
+        metadata::OP => |_, d, p, r| metadata::result(d, p, r),
+        "query.document.object" => |_, d, p, r| object::result(d, p, r),
+        "query.document.object.layer.timing" => |_, d, p, r| object::timing_result(d, p, r),
+        property_edit::OP => |_, _, _, r| property_edit::result(r),
+        property_track::OP => |_, _, _, r| property_track::result(r),
+        layer_policy::OP => |_, _, _, r| layer_policy::result(r),
+        layer_cut::OP => |_, _, _, r| layer_cut::result(r),
+        op if frame_edit::declares(op) => |o, _, _, r| frame_edit::result_for_operation(o, r),
+        op if object_component::admitted(op) => |o, _, _, r| object_component::result(o, r),
+        op if object_rig::admitted(op) => |o, _, _, r| object_rig::result(o, r),
+        op if object_edit::admitted(op) => |o, _, _, r| object_edit::result(o, r),
+        op if item::owns(op) => |o, _, p, r| item::result(o, p, r),
+        op if vector::owns(op) => |o, _, p, r| vector::result(o, p, r),
+        placement::OP => |_, _, _, r| placement::result(r),
+        audio_track::OP => |_, _, _, r| audio_track::result(r),
+        "command.document.object.project.settings.edit" => |_, _, _, r| settings::result(r),
+        "command.document.object.layer.create" => |_, _, _, r| object::create_result(r),
+        import::OP => |_, _, _, r| import::result(r),
+        video_link::OP => |_, _, _, r| video_link::result(r),
+        "command.document.object.layer.visibility.set" => |_, _, _, r| object::visibility_result(r),
+        "command.document.object.undo" | "command.document.object.redo" => {
+            |_, _, _, r| object::history_result(r)
         }
-        return reproduction::validate_result(operation, result);
-    }
-    if !matches!(
-        operation,
-        "query.document.serialize" | "query.document.evaluate"
-    ) {
-        return true;
-    }
+        "query.diagnostics.recent" => |_, _, _, r| diagnostics_result(r),
+        "query.reproduction.report" => |_, _, p, r| reproduction::report_result(p, r),
+        op if op.starts_with("query.reproduction.") || op == "command.reproduction.opt_in" => {
+            |o, _, _, r| reproduction::validate_result(o, r)
+        }
+        "query.document.serialize" | "query.document.evaluate" => document_read_result,
+        _ => return None,
+    })
+}
+
+fn document_read_result(
+    operation: &str,
+    request_document_id: &str,
+    payload: &Value,
+    result: &Value,
+) -> bool {
     let selector = payload.as_object().expect("validated native read payload");
     let at_revision = revision(selector.get("atRevision")).expect("validated revision");
     match operation {
@@ -505,7 +521,7 @@ pub(crate) fn validate_result(
                         })
                     })
         }),
-        _ => true,
+        _ => false,
     }
 }
 

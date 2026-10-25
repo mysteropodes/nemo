@@ -18,63 +18,13 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/diagnostics.json"),
 ];
 
-/// Native v2 declarations are deliberately version-separated from the legacy
-/// catalog above. N16 consumes the feature-owned descriptor but does not add it
-/// to v1 discovery or turn it into another MCP tool.
-pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
-    include_str!("../../engineering/application/capabilities-v2/native-object-history.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-font-assets.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-opacity.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-layer-create.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-layer-timing.json"),
-    include_str!(
-        "../../engineering/application/capabilities-v2/native-object-property-metadata.json"
-    ),
-    include_str!("../../engineering/application/capabilities-v2/native-project-settings.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-composition.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-palette.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-guide.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-shadow.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-perspective.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-workspace.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-custom-brush.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-comments.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-project-placement.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-audio-track.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-layer-policy.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-layer-playhead-cut.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-property-track-edit.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-property-read.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-text-read.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-property-edit.json"),
-    include_str!(
-        "../../engineering/application/capabilities-v2/native-object-layer-lifecycle.json"
-    ),
-    include_str!("../../engineering/application/capabilities-v2/native-object-group.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-selection-edit.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-boolean.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-fill.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-item.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-asset.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-asset-remove.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-asset-video.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-vector.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-image-mesh.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-widget.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-rig.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-component.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-duplicator.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-frame-edit.json"),
-    include_str!(
-        "../../engineering/application/capabilities-v2/native-bitmap-brush-resources.json"
-    ),
-    include_str!("../../engineering/application/capabilities-v2/native-vector-export.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-media-export.json"),
-    include_str!("../../engineering/application/capabilities-v2/native-object-import.json"),
-];
+// Native v2 declarations are deliberately version-separated from the legacy
+// catalog above. N16 consumes the feature-owned descriptor but does not add it
+// to v1 discovery or turn it into another MCP tool. The list itself is generated
+// by build.rs from engineering/application/capabilities-v2/*.json (CS1/#2341):
+// registering a native capability is adding its descriptor file there, not
+// editing this crate. `NATIVE_CAPABILITY_FILES` names each source, same order.
+include!(concat!(env!("OUT_DIR"), "/native_capability_sources.rs"));
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CapabilityAvailability {

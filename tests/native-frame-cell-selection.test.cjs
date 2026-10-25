@@ -39,14 +39,14 @@ function selectionHarness(options={}){
 // END REUSABLE NATIVE CELL HEADER FIXTURE
 
 test('native header drag publishes all rectangular cells and visible one-based labels without touching clipboard',()=>{
-  const h=selectionHarness(),selection=h.root._sel,clip=selection.clipboard;
+  const h=selectionHarness(),selection=h.root._sel,clip=selection.clipboard;h.root._layerActiveExplicit=true;
   h.down(0);h.move(1);assert.deepEqual(selection.frames,[]);
   assert.equal(h.strip().children[0].style.width,'40px');
   assert.equal(h.strip().children[1].children[0].textContent,'1');
   assert.equal(h.strip().children[1].children[1].textContent,'2');
   h.up(1);
   assert.deepEqual(selection.frames,[{layer:0,frame:0},{layer:0,frame:1},{layer:1,frame:0},{layer:1,frame:1}]);
-  assert.equal(h.root._sel,selection);assert.equal(selection.clipboard,clip);assert.equal(selection.clipOp,'copy');
+  assert.equal(h.root._sel,selection);assert.equal(selection.clipboard,clip);assert.equal(selection.clipOp,'copy');assert.equal(h.root._layerActiveExplicit,false);
   assert.match(h.strip().attributes['aria-label'],/Selected frames 1 through 2/);
   assert.equal(h.info().contentRevision,0);
 });
@@ -58,7 +58,7 @@ test('single click and Shift-click extend the actual selected frame interval acr
 });
 test('Escape, focus loss and detached or stale gestures preserve the exact prior cell array',()=>{
   for(const fault of ['escape','blur','node-blur','owner','revision','snapshot','generation','presentation','frame','FC','rows','detached','mode','unavailable']){
-    const h=selectionHarness(),prior=[{layer:0,frame:4}];h.root._sel.frames=prior;h.down(0);
+    const h=selectionHarness(),prior=[{layer:0,frame:4}];h.root._sel.frames=prior;h.root._layerActiveExplicit=true;h.down(0);
     if(fault==='escape')h.doc.fire('keydown',{key:'Escape'});
     if(fault==='blur')h.root.fire('blur');if(fault==='node-blur')h.strip().fire('blur');
     if(fault==='owner')h.changeInfo({documentId:'foreign'});
@@ -69,14 +69,14 @@ test('Escape, focus loss and detached or stale gestures preserve the exact prior
     if(fault==='frame')h.root.state.currentFrame=1;if(fault==='FC')h.root.FC=21;
     if(fault==='rows')h.root._layerSel=[1];if(fault==='detached')h.header.replaceChildren();
     if(fault==='mode')h.root.state.appMode='animation';if(fault==='unavailable')h.setAvailable(false);
-    h.up(1);h.settle();assert.equal(h.root._sel.frames,prior,fault);assert.equal(h.info().contentRevision,fault==='revision'?1:0);
+    h.up(1);h.settle();assert.equal(h.root._sel.frames,prior,fault);assert.equal(h.root._layerActiveExplicit,true,fault);assert.equal(h.info().contentRevision,fault==='revision'?1:0);
   }
 });
 test('selection above clipboard size builds in cancellable detached chunks without a new Repeat cap',()=>{
-  const h=selectionHarness({total:5000}),prior=h.root._sel.frames;
-  h.down(0);h.up(2499);assert.equal(h.root._sel.frames,prior);assert.ok(h.tasks()>0);
+  const h=selectionHarness({total:5000}),prior=h.root._sel.frames;h.root._layerActiveExplicit=true;
+  h.down(0);h.up(2499);assert.equal(h.root._sel.frames,prior);assert.equal(h.root._layerActiveExplicit,true);assert.ok(h.tasks()>0);
   assert.equal(h.strip().attributes['aria-busy'],'true');assert.match(h.strip().children[2].textContent,/Escape cancels/);
-  h.settle();assert.equal(h.root._sel.frames.length,5000);assert.deepEqual(h.root._sel.frames[4999],{layer:1,frame:2499});
+  h.settle();assert.equal(h.root._sel.frames.length,5000);assert.equal(h.root._layerActiveExplicit,false);assert.deepEqual(h.root._sel.frames[4999],{layer:1,frame:2499});
   const keep=h.root._sel.frames;h.down(0);h.up(4999);h.root.fire('blur');h.settle();assert.equal(h.root._sel.frames,keep);
 });
 test('scroll, invalid coordinates and retired event listeners cannot publish stale selection',()=>{
@@ -150,4 +150,55 @@ test('missing/throwing pending port refuses capture and retired attached nodes n
   let stopped=false;const event={clientX:110,stopPropagation(){stopped=true;}};
   button.fire('mousedown',event);button.fire('click',event);old.fire('mousedown',event);assert.equal(stopped,false);assert.equal(Selection.isPending(h.root),false);
   h.mount();h.strip().children[4].fire('click');h.down(0);old.fire('mousedown',event);assert.equal(Selection.isPending(h.root),true);h.up(1);assert.equal(h.root._sel.frames.length,4);
+});
+
+
+test('shipped Cmd+D after native header selection reaches the wrapped frame duplicate; next native row restores layer intent',async()=>{
+  const desktopSource=fs.readFileSync(require.resolve('./native-frame-edit-desktop.test.cjs'),'utf8');
+  const make=vm.compileFunction(desktopSource.slice(0,desktopSource.indexOf("test('"))+'\nreturn harness;',['require'])(require);
+  const Desktop=require('../src/js/adapters/native-frame-edit-desktop.js');
+  const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  const UI=require('../src/js/adapters/native-object-ui.js');
+  const h=make();await h.open();const cells=selectionHarness();Selection.retire(cells.root);
+  let frameLegacy=0,layerWrites=0,last;
+  Object.assign(h.root,{document:cells.doc,FC:20,_layerSel:[0,1],_layerActiveExplicit:true,selectedPaths:[],
+    addEventListener:cells.root.addEventListener,removeEventListener:cells.root.removeEventListener,
+    NemoNativeFrameEditDesktop:Desktop,__TAURI__:{core:{invoke(){throw Error('PRIVATE WRITER');}}},
+    SM:{importJSON(){},duplicateSelectedFrames(){frameLegacy++;throw Error('PAPER FRAME WRITER');},
+      duplicateLayer(){layerWrites++;throw Error('LAYER WRITER');}}});
+  h.root.state.appMode='animation';h.root.state.activeLayerIdx=0;h.root._sel.frames=[];
+  const dispose=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>false,()=>{});
+  const wrapped=h.root.SM.duplicateSelectedFrames;h.root.SM.duplicateSelectedFrames=()=>(last=wrapped());
+  const ports={currentSession:()=>h.session,projectionReady:()=>true,frameEditPending:()=>h.controller.isPending()};
+  Selection.mount(h.root,cells.caption,h.session.info(),ports);const strip=cells.caption.children[0];
+  strip.children[4].fire('click');strip.fire('mousedown',{clientX:110});cells.doc.fire('mouseup',{clientX:130});
+  assert.equal(h.root._sel.frames.length,4);
+  const timeline=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8'),start=timeline.indexOf('function onKeyDown(event){');
+  const end=timeline.indexOf('function onKeyUp(event)',start);assert.ok(start>=0&&end>start);
+  const context={window:h.root,state:h.root.state,_sel:h.root._sel,selectedPaths:h.root.selectedPaths,
+    duplicateSelection(){throw Error('CANVAS WRITER');}};
+  vm.runInNewContext(timeline.slice(start,end),context);
+  const key={key:'d',metaKey:true,target:{tagName:'DIV'},preventDefault(){}};
+  try{
+    context.onKeyDown(key);
+    assert.equal((await last).status,'applied-presented');
+    assert.equal(h.commands().length,1);assert.equal(h.commands()[0].q.operation,'command.document.object.frames.clipboard.duplicate');
+    assert.deepEqual(h.commands()[0].q.payload,{command:'object.frames.clipboard.duplicate',layerUid:'alpha',selection:[
+      {layerUid:'alpha',frame:0},{layerUid:'alpha',frame:1},{layerUid:'beta',frame:0},{layerUid:'beta',frame:1}]});
+    assert.equal(frameLegacy,0);assert.equal(layerWrites,0);
+    // The real native row selector must reclaim row intent without changing shortcut precedence.
+    Selection.retire(h.root);
+    const uiSource=fs.readFileSync(require.resolve('./native-object-ui.test.cjs'),'utf8');
+    const view=vm.compileFunction(uiSource.slice(0,uiSource.indexOf("test('"))+'\nreturn view;',['require'])(require)();
+    h.root.document=view.document;
+    const rowSession={info:h.session.info,isActive:h.session.isActive,readPresentedObjectSession:h.session.readPresentedObjectSession};
+    const rowPorts={currentSession:()=>rowSession,projectionReady:()=>true,selectLayer(){},repaint(){return true;}};
+    assert.equal(UI.select(h.root,h.session.info(),1,false,'beta',h.session.readPresentedObjectSession(),rowPorts),true);
+    assert.equal(h.root._layerActiveExplicit,true);
+    assert.throws(()=>context.onKeyDown(key),/LAYER WRITER/);
+    assert.equal(layerWrites,1);assert.equal(h.commands().length,1);assert.equal(frameLegacy,0);
+    // Motion retains its existing layer-duplicate route even with completed frame cells.
+    h.root.state.appMode='motion';h.root._layerActiveExplicit=false;
+    assert.throws(()=>context.onKeyDown(key),/LAYER WRITER/);assert.equal(layerWrites,2);assert.equal(h.commands().length,1);
+  }finally{Selection.retire(h.root);dispose();}
 });

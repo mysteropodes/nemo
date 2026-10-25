@@ -56,6 +56,7 @@ const CHECKS = [
   'capability-examples',
   'capability-transport-copies',
   'schema-examples',
+  'native-capability-catalog',
 ];
 
 function pass(reason, extra) { return Object.assign({ status: STATUS.PASS, reason }, extra); }
@@ -67,6 +68,8 @@ function paths(root) {
   return {
     app,
     caps: path.join(app, 'capabilities'),
+    nativeCaps: path.join(app, 'capabilities-v2'),
+    nativeTransport: path.join(app, 'native-transport-v2.schema.json'),
     rust: path.join(root, 'nemo-mcp', 'src', 'capabilities.rs'),
     descriptorSchema: path.join(app, 'capability-v1.schema.json'),
     transport: path.join(app, 'transport-v1.schema.json'),
@@ -303,6 +306,55 @@ function checkSchemaExamples(root) {
   return pass(`${checked} embedded example(s) across ${files} schema file(s) validate against their own schema${tail}`);
 }
 
+// 8. Native v2 catalog (CS1/#2341). nemo-mcp/build.rs discovers every
+//    capabilities-v2/*.json file, so the gate checks what discovery would embed:
+//    v2 shape, unique ids and operations, an exact match with the v2 transport
+//    union, and that capabilities.rs did not regrow a hand-maintained list.
+function nativeDescriptorFiles(root) {
+  const p = paths(root || ROOT);
+  if (!exists(p.nativeCaps)) return [];
+  return fs.readdirSync(p.nativeCaps).filter((f) => f.endsWith('.json')).sort().map((f) => path.join(p.nativeCaps, f));
+}
+
+function checkNativeCatalog(root) {
+  root = root || ROOT;
+  const p = paths(root);
+  const files = nativeDescriptorFiles(root);
+  if (!files.length) return fail(`no native declarations in ${rel(p.nativeCaps, root)}`);
+  const problems = [], ids = new Map(), ops = new Map();
+  for (const f of files) {
+    const name = rel(f, root);
+    let d;
+    try { d = readJsonFile(f); } catch (e) { problems.push(`${name}: invalid JSON (${e.message})`); continue; }
+    if (!d || typeof d !== 'object' || d.schemaVersion !== 2 || d.apiVersion !== 2) { problems.push(`${name}: must declare schemaVersion/apiVersion 2`); continue; }
+    if (typeof d.id !== 'string' || !d.id) { problems.push(`${name}: no id`); continue; }
+    if (ids.has(d.id)) problems.push(`duplicate native capability id ${d.id} (${ids.get(d.id)}, ${name})`); else ids.set(d.id, name);
+    if (!Array.isArray(d.operations) || !d.operations.length) { problems.push(`${name}: no operations`); continue; }
+    for (const op of d.operations) {
+      if (typeof op !== 'string' || !op) problems.push(`${name}: non-string operation`);
+      else if (ops.has(op)) problems.push(`duplicate native operation ${op} (${ops.get(op)}, ${name})`);
+      else ops.set(op, name);
+    }
+  }
+  if (exists(p.nativeTransport)) {
+    const union = new Set((readJsonFile(p.nativeTransport).$defs.Request.oneOf || []).flatMap((b) => {
+      const o = b.allOf && b.allOf[1] && b.allOf[1].properties && b.allOf[1].properties.operation;
+      return !o ? [] : 'const' in o ? [o.const] : (o.enum || []);
+    }));
+    const undeclared = [...union].filter((op) => !ops.has(op)).sort();
+    const unschemed = [...ops.keys()].filter((op) => !union.has(op)).sort();
+    if (undeclared.length) problems.push(`v2 transport operation(s) with no declaration: ${undeclared.join(', ')}`);
+    if (unschemed.length) problems.push(`declared operation(s) missing from the v2 transport union: ${unschemed.join(', ')}`);
+  } else problems.push(`missing ${rel(p.nativeTransport, root)}`);
+  if (exists(p.rust)) {
+    const src = fs.readFileSync(p.rust, 'utf8');
+    if (/pub\s+const\s+NATIVE_CAPABILITY_SOURCES\s*:/.test(src)) problems.push(`${rel(p.rust, root)} declares a hand-maintained NATIVE_CAPABILITY_SOURCES; native declarations are discovered by build.rs`);
+    if (!src.includes('native_capability_sources.rs')) problems.push(`${rel(p.rust, root)} does not include the build.rs-generated native catalog`);
+  }
+  return problems.length ? fail(problems.slice(0, 8).join('; '))
+    : pass(`${files.length} native declaration(s), ${ops.size} operation(s), equal to the v2 transport union`);
+}
+
 // Produce every declared sub-check plus the catalog the receipt records.
 // Order follows CHECKS so the printed block is stable between runs.
 function capabilityChecks(root) {
@@ -320,6 +372,7 @@ function capabilityChecks(root) {
     'capability-examples': checkExamples(root),
     'capability-transport-copies': checkTransportCopies(root),
     'schema-examples': checkSchemaExamples(root),
+    'native-capability-catalog': checkNativeCatalog(root),
   };
   return { results, catalog: cat };
 }
@@ -336,6 +389,8 @@ module.exports = {
   checkExamples,
   checkTransportCopies,
   checkSchemaExamples,
+  checkNativeCatalog,
+  nativeDescriptorFiles,
   declaredSources,
   descriptorFiles,
 };
