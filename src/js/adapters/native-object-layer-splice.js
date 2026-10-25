@@ -1,4 +1,4 @@
-/* Single native layer insertion/removal plan; the existing projection applies it. */
+/* Contiguous native layer insertion/removal plan; the existing projection applies it. */
 (function(root,factory){
   var api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -13,7 +13,7 @@
       !rows.every(function(row,i){return row&&row.layerUid===previous[i];})||!Array.isArray(next)||
       !next.every(function(row){return row&&typeof row==='object';}))return null;
     var incoming=next.map(function(row){return row.layerUid;}),delta=incoming.length-previous.length;
-    if(!uniqueIds(incoming)||Math.abs(delta)>1)return null;
+    if(!uniqueIds(incoming))return null;
     var at=0;
     while(at<Math.min(previous.length,incoming.length)&&previous[at]===incoming[at])at++;
     if(delta===0){
@@ -21,7 +21,7 @@
       return Object.freeze({delta:0,at:at,added:null,active:active,selection:selection,anchor:anchor});
     }
     for(var i=at;i<Math.min(previous.length,incoming.length);i++){
-      if(delta>0?previous[i]!==incoming[i+1]:previous[i+1]!==incoming[i])return null;
+      if(delta>0?previous[i]!==incoming[i+delta]:previous[i-delta]!==incoming[i])return null;
     }
     var chosen=Array.isArray(selection)?selection:[],indices=[];
     chosen.forEach(function(index){
@@ -38,12 +38,10 @@
       mappedAnchor=Number.isInteger(anchor)&&anchor>=0&&anchor<previous.length?incoming.indexOf(previous[anchor]):-1;
       if(mappedAnchor<0)mappedAnchor=mappedActive;
     }
-    var added=null;
-    if(delta>0){
-      var layer=next[at];
-      added={layerUid:layer.layerUid,name:layer.name===undefined?'Layer '+(at+1):layer.name,visible:layer.visible!==false};
-    }
-    return Object.freeze({delta:delta,at:at,added:added,active:mappedActive,
+    var addedRows=delta>0?next.slice(at,at+delta).map(function(layer,j){
+      return {layerUid:layer.layerUid,name:layer.name===undefined?'Layer '+(at+j+1):layer.name,visible:layer.visible!==false};
+    }):[];
+    return Object.freeze({delta:delta,at:at,added:addedRows[0]||null,addedRows:addedRows,active:mappedActive,
       selection:unchanged?selection:indices,anchor:mappedAnchor});
   }
   return Object.freeze({plan:plan});

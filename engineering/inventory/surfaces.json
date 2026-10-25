@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "15800240c302b3df6ab69054cf2cd839f4bc8dcb",
-  "describe": "v0.7.0-alpha.4-3015-g15800240-dirty"
+  "head": "6597693343bc0f886cb9cb8b2b2143b51e59dca6",
+  "describe": "v0.7.0-alpha.4-3026-g65976933-dirty"
  },
- "inputsDigest": "b29a843869f25a1df119a9bc1412a7135b345dad37b387e9375e7817830b508b",
+ "inputsDigest": "7a7677fdd440afef61bbda844b9711e9a606998462c6e6eacd4a242f1acb440b",
  "states": [
   "inventoried",
   "characterized",
@@ -1003,7 +1003,7 @@
    "capability": "Add a key",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:190 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:239 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1047,7 +1047,7 @@
    "capability": "Edit easing curve…",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:194 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:243 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1089,7 +1089,7 @@
    "capability": "Camera layer — framing keys (zoom/pan) interpolated with Bézier curves",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/adapters/native-object-project-desktop.js:164 bindCameraUI()"
+    "src/js/adapters/native-object-project-desktop.js:213 bindCameraUI()"
    ],
    "events": [
     "click"
@@ -1115,7 +1115,7 @@
     "functionsVisited": 87,
     "via": "variable button",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:153 renderCameraViewLock()",
+     "src/js/adapters/native-object-project-desktop.js:202 renderCameraViewLock()",
      "src/js/motion.js:7282 action()"
     ]
    },
@@ -17455,7 +17455,7 @@
     "functionsVisited": 264,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-project-desktop.js:296 presented()",
+     "src/js/adapters/native-object-project-desktop.js:345 presented()",
      "src/js/app.js:536 updZoom()",
      "src/js/tools.js:7109 show()"
     ]

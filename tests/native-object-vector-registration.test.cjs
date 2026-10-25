@@ -75,7 +75,11 @@ test('the shared schema carries the definitions, one Request branch per operatio
   }
   const results = schema.$defs.ResponseBase.properties.result.oneOf.map((entry) => entry.$ref);
   assert.equal(results.filter((ref) => ref === '#/$defs/ObjectVectorEditResult').length, 1);
-  assert.deepEqual(schema.$defs.ObjectQueryResult.properties.object.oneOf.map((entry) => entry.$ref), ['#/$defs/ObjectRecord', '#/$defs/ObjectVectorRecord']);
+  assert.deepEqual(schema.$defs.ObjectQueryResult.properties.object.oneOf.map((entry) => entry.$ref), ['#/$defs/ObjectRecord', '#/$defs/ObjectVectorReadRecord']);
+  assert.equal(schema.$defs.ObjectVectorReadRecord.properties.vectorExt.$ref, '#/$defs/ObjectVectorReadExt');
+  assert.equal(schema.$defs.ObjectVectorReadExt.properties.bitmapBrush.$ref, '#/$defs/ObjectClipboardBitmapBrush');
+  assert.equal(schema.$defs.ObjectVectorRecord.properties.vectorExt.$ref, '#/$defs/ObjectVectorExt');
+  assert.equal(Object.hasOwn(schema.$defs.ObjectVectorExt.properties, 'bitmapBrush'), false, 'generic vector writers cannot admit bitmap anchors');
   assert.equal(schema.$defs.ObjectRecord.properties.family.const, 'closed-solid-fill-cubic-path', 'the legacy family is untouched');
 });
 
@@ -144,7 +148,7 @@ test('the SDK composes the vector contract on its one contract line and stays at
   assert.equal((sdk.match(/native-object-edit-seam\.js/g) || []).length, 1, 'the edit seam is still the one injected base');
   assert.equal((sdk.match(/native-object-item-contract\.js/g) || []).length, 1);
   assert.ok(nonblank(sdk) <= 500, 'native-application.js nonblank lines');
-  assert.match(sdk, /vectorContract\.record\(value, false\)/);
+  assert.match(sdk, /vectorContract\.readRecord\(value\)/);
   assert.match(sdk, /item \? item\.compose\(base\) : base/, 'the lane-6 composition expression is kept verbatim (native-object-item-registration.test.cjs)');
   assert.match(sdk, /, vectorContract\]\.reduce\(\(base, lane\) => \(lane \? lane\.compose\(base\) : base\), /, 'the vector contract is the last lane of the composed reduce');
 });

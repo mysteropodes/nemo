@@ -74,8 +74,11 @@ fn target(value: &Value, create: bool) -> bool {
 mod shapes;
 use shapes::{record_shape, shape};
 
+#[path = "native_vector_bitmap_read.rs"]
+mod bitmap_read;
+
 pub(crate) fn record(value: &Value) -> bool {
-    record_shape(value, false)
+    bitmap_read::record(value)
 }
 
 fn effect(value: &Value) -> bool {
@@ -225,3 +228,7 @@ pub(crate) fn response_matches(
 #[cfg(test)]
 #[path = "native_vector_contract_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_vector_bitmap_read_tests.rs"]
+mod bitmap_read_tests;

@@ -320,3 +320,41 @@ test('stored gradient mapping refuses unsupported stop counts, malformed fields 
   }
   assert.equal(Stroke.toRecord(Object.assign({},base,{fillGradient:good,isVectorBrush:true}),WHERE).ok,false);
 });
+
+test('linked fill mapper retains separate authored geometry and absent/false/true roles on the actual conversion path', () => {
+  const base = { segments: [{ point: [0,0], handleIn: [0,0], handleOut: [0,0] }, { point: [20,5], handleIn: [0,0], handleOut: [0,0] }],
+    closed: true, fillColor: '#ff0000', strokeColor: null, hasRealStroke: false, strokeWidth: 6, strokeCap: 'round', strokeJoin: 'round', opacity: 1 };
+  const primary = { ...base, isVectorBrush: true, linkedFillId: 'linked-original', isLinkedFillCompanion: false,
+    centerSegments: [{ point:[0,1], handleIn:[0,0], handleOut:[0,0], width:0.5 }, { point:[20,1], handleIn:[0,0], handleOut:[0,0], width:3 }] };
+  const companion = { ...base, linkedFillId: 'linked-original', isLinkedFillCompanion: true,
+    segments: [{ point:[-10,-10], handleIn:[0,0], handleOut:[0,0] }, { point:[40,20], handleIn:[0,0], handleOut:[0,0] }] };
+  const a=Stroke.toRecord(primary,{...WHERE,strokeId:'primary'}), b=Stroke.toRecord(companion,{...WHERE,strokeId:'companion'});
+  assert.equal(a.ok,true);assert.equal(b.ok,true);
+  assert.notDeepEqual(a.record.geometry,b.record.geometry,'the backdrop is never substituted with the ribbon contour');
+  assert.equal(a.record.vectorExt.isLinkedFillCompanion,false);assert.equal(b.record.vectorExt.isLinkedFillCompanion,true);
+  assert.equal(a.record.vectorExt.linkedFillId,b.record.vectorExt.linkedFillId);
+  for (const result of [a,b]) {
+    Contract.record(result.record);
+    const dict=Stroke.toDict(result.record);
+    assert.equal(dict.linkedFillId,'linked-original');
+    assert.equal(dict.isLinkedFillCompanion,result.record.vectorExt.isLinkedFillCompanion);
+    assert.deepEqual(Stroke.toRecord(dict,{...WHERE,strokeId:result.record.target.strokeId}).record,result.record);
+    assert.equal(result.unmapped.includes('linkedFillId'),false);
+  }
+  const noFlag={...primary};delete noFlag.isLinkedFillCompanion;
+  const absent=Stroke.toRecord(noFlag,WHERE);
+  assert.equal(absent.ok,true);assert.equal(Object.hasOwn(absent.record.vectorExt,'isLinkedFillCompanion'),false);
+  assert.equal(Object.hasOwn(Stroke.toDict(absent.record),'isLinkedFillCompanion'),false);
+  const falseOnly=Stroke.toRecord({...base,isLinkedFillCompanion:false},WHERE);
+  assert.equal(falseOnly.ok,true);assert.equal(Stroke.toDict(falseOnly.record).isLinkedFillCompanion,false);
+  Contract.record(absent.record,true);Contract.record(falseOnly.record,true);
+  for (const mutate of [r=>r.vectorExt.linkedFillId=null,r=>r.vectorExt.linkedFillId='x'.repeat(129),
+    r=>r.vectorExt.linkedFillId='bad\u0000id',r=>r.vectorExt.isLinkedFillCompanion=null,
+    r=>delete r.vectorExt.linkedFillId,r=>r.fill=null,r=>r.target.frameScope.kind='evaluated']) {
+    const bad=JSON.parse(JSON.stringify(b.record));mutate(bad);assert.throws(()=>Contract.record(bad));
+  }
+  for (const bad of [{...primary,linkedFillId:null},{...primary,isLinkedFillCompanion:null},
+    {...primary,centerSegments:[]},{...base,linkedFillId:'linked-original'},
+    {...companion,linkedFillId:''},{...companion,isVectorBrush:true,centerSegments:primary.centerSegments},
+    {...companion,fillColor:null},{...primary,linkedFillId:'x'.repeat(129)}]) assert.equal(Stroke.toRecord(bad,WHERE).ok,false);
+});

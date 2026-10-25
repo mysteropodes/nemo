@@ -355,3 +355,101 @@ fn shared_motion_admission_refuses_mask_and_multiple_parent_controls_without_pub
 
 #[path = "object_scene_vector_parent.rs"]
 mod parent_tests;
+
+// A split promotes element Position to a layer shared with differently authored frames.
+fn mixed_authored_position(position: Option<[f64; 2]>) -> Value {
+    let mut source = drawing(false);
+    let first = source["objects"][0].clone();
+    let mut later = drawing(true)["objects"][1].clone();
+    later["target"]["frameScope"]["frame"] = json!(3);
+    source["objects"] = json!([first, later]);
+    source["layers"][0]["timing"]["keys"] = json!([{"frame":0},{"frame":3}]);
+    source["propertyHolders"] = match position {
+        Some(value) => json!([{"target":{"contextId":"scene-root","layerUid":"L1"},
+            "properties":[{"property":"position","static":value}]}]),
+        None => json!([]),
+    };
+    source["compositionOrder"]["contexts"][0]["scopes"] = json!([
+        {"frameScope":{"kind":"authored","frame":0},"elements":[
+            {"layerUid":"L1","strokeId":"first","naturalPosition":0,"order":{}}]},
+        {"frameScope":{"kind":"authored","frame":3},"elements":[
+            {"layerUid":"L1","strokeId":"second","naturalPosition":0,"order":{}}]}]);
+    source
+}
+
+#[test]
+fn real_common_position_handles_absent_identity_and_nonzero_across_vector_and_legacy_keys() {
+    let mut identity_baseline = std::collections::BTreeMap::new();
+    for position in [None, Some([0., 0.]), Some([5., 7.])] {
+        let drawing = mixed_authored_position(position);
+        let owner = owner(&drawing);
+        let snapshot = owner.acquire_snapshot(0).unwrap();
+        let before = encode_storage_project(snapshot.document()).unwrap();
+        let [dx, dy] = position.unwrap_or([0., 0.]);
+        for (frame, id, x) in [(0, "first", 0.), (3, "second", 200.), (0, "first", 0.)] {
+            let packet = packet(&owner, &snapshot, frame);
+            let selector = pins(&snapshot, frame);
+            let scene = prepare_object_render_scene(&packet, &selector)
+                .unwrap_or_else(|error| panic!("position={position:?} frame={frame}: {error:?}"));
+            let prepared = prepare_object_paint_plan(&scene, &selector).unwrap();
+            assert_eq!(starts(&prepared), [(id.into(), [x + dx, dy])]);
+            let command = prepared.commands().next().unwrap();
+            let actual = command
+                .contour()
+                .segments()
+                .iter()
+                .map(|segment| (segment.point, segment.handle_in, segment.handle_out))
+                .collect::<Vec<_>>();
+            let original = drawing["objects"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|record| record["target"]["strokeId"] == id)
+                .unwrap();
+            let pair = |value: &Value| [value["x"].as_f64().unwrap(), value["y"].as_f64().unwrap()];
+            let expected = original["geometry"]["segments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|segment| {
+                    let [x, y] = pair(&segment["point"]);
+                    (
+                        [x + dx, y + dy],
+                        pair(&segment["handleIn"]),
+                        pair(&segment["handleOut"]),
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected);
+            let paint = command.paint().map(|component| component.as_f64().unwrap());
+            assert_eq!(
+                paint,
+                ["r", "g", "b", "a"].map(|key| original["fill"][key].as_f64().unwrap())
+            );
+            if position.is_none() {
+                identity_baseline.insert(frame, (actual, paint));
+            } else if position == Some([0., 0.]) {
+                assert_eq!(&(actual, paint), identity_baseline.get(&frame).unwrap());
+            }
+            assert_eq!(packet.records().len(), 1);
+            assert_eq!(prepared.commands().len(), 1);
+            assert_eq!(
+                prepared
+                    .commands()
+                    .next()
+                    .unwrap()
+                    .source()
+                    .record()
+                    .target
+                    .frame_scope
+                    .frame,
+                frame
+            );
+            assert_eq!(encode_storage_project(snapshot.document()).unwrap(), before);
+            assert_eq!(
+                (owner.content_revision(), owner.history_depths()),
+                (0, (0, 0))
+            );
+        }
+    }
+}

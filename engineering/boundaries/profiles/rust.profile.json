@@ -141,7 +141,9 @@
         "project_metadata_annotations.rs",
         "project_metadata_presets.rs",
         "project_camera_state.rs",
-        "object_bitmap_brush_record.rs"
+        "object_bitmap_brush_record.rs",
+        "object_selection_compound.rs",
+        "object_selection_compound_clones.rs"
       ],
       "publicApi": [
         "document.rs",
@@ -181,7 +183,8 @@
         "project_asset_source_wire.rs",
         "object_property_codec.rs",
         "project_metadata_wire.rs",
-        "object_bitmap_brush_codec.rs"
+        "object_bitmap_brush_codec.rs",
+        "object_linked_fill_codec.rs"
       ],
       "publicApi": [
         "codec.rs",
@@ -218,7 +221,8 @@
         "object_project_settings_revision.rs",
         "object_media_link_revision.rs",
         "object_raster_image_import_revision.rs",
-        "native_import_transaction_assets_revision.rs"
+        "native_import_transaction_assets_revision.rs",
+        "object_selection_revision.rs"
       ],
       "publicApi": [
         "revision.rs"
@@ -322,7 +326,8 @@
         "object_project_custom_brush_edit.rs",
         "object_project_comments_edit.rs",
         "object_mask_edit.rs",
-        "native_import_transaction_assets_owner.rs"
+        "native_import_transaction_assets_owner.rs",
+        "object_clipboard_provenance.rs"
       ],
       "publicApi": [
         "commands.rs"
@@ -1314,6 +1319,7 @@
         "render_vector_eval_pins.rs",
         "render_vector_eval_scene.rs",
         "object_selection_edit.rs",
+        "object_selection_clipboard_dispatch.rs",
         "object_selection_edit_atomic.rs",
         "object_selection_edit_clipboard.rs",
         "object_selection_edit_controls.rs",
@@ -1742,7 +1748,12 @@
         "native_import_transaction_assets.rs",
         "native_import_transaction_asset_controls.rs",
         "native_import_transaction_sources.rs",
-        "object_history_read.rs"
+        "object_history_read.rs",
+        "object_selection_companion_owner.rs",
+        "object_linked_fill_codec.rs",
+        "object_selection_compound.rs",
+        "object_selection_clipboard_groups.rs",
+        "object_revision_owner.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -1836,12 +1847,15 @@
         "src/native_import_contract.rs",
         "src/native_import_contract_tests.rs",
         "src/native_object_edit_contract.rs",
+        "src/native_object_edit_clipboard.rs",
         "src/native_object_edit_contract_tests.rs",
         "src/native_object_edit_receipt_tests.rs",
         "src/native_item_contract.rs",
         "src/native_item_contract_tests.rs",
         "src/native_vector_contract.rs",
         "src/native_vector_contract_shapes.rs",
+        "src/native_vector_bitmap_read.rs",
+        "src/native_vector_bitmap_read_tests.rs",
         "src/native_vector_contract_tests.rs",
         "src/native_request_bytes.rs",
         "src/native_request_spans.rs",
@@ -2143,6 +2157,7 @@
         "native_object_exposure_tests.rs",
         "native_object_preview_lifecycle_tests.rs",
         "native_object_preview_route_tests.rs",
+        "native_object_preview_route_split_tests.rs",
         "native_object_preview_route_test_support.rs",
         "native_object_desktop_preview_tests.rs",
         "native_object_desktop_preview_test_support.rs",
