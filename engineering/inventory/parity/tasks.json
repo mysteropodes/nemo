@@ -1,0 +1,2636 @@
+[
+  {
+    "task": "D01",
+    "title": "Complete ordinary native document I/O callers and saved-byte identity",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "Pinned complete document save and byte-preserving reopen; stale owner/revision/replacement refuses without changing current path or saved baseline; same-name/different-path identity remains distinct."
+  },
+  {
+    "task": "D02",
+    "title": "Extract and preserve native close/unsaved-work guard",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "Clean close requires no destructive prompt; dirty Cancel retains app/document; failed save cannot close; second close during pending decision cannot duplicate save."
+  },
+  {
+    "task": "D03",
+    "title": "Finish supported native multi-project/tab activation and close semantics",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "A modified, B opened/modified, switch A/B and close B preserve separate identities/history; failed switch/close leaves active owner unchanged; dirty tab decision has correct saved document."
+  },
+  {
+    "task": "D04",
+    "title": "Reconcile start-screen resume storage and native entry lifecycle",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "Corrupt/missing autosave and missing recent file fail visibly before document replacement; double New/Resume intent cannot publish stale completion; recents order/path remains exact."
+  },
+  {
+    "task": "D05",
+    "title": "Complete native version-history controller boundary across families",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "Restore named snapshot produces native/history/disk agreement; stale context refuses; per-path history directories do not collide; retention pruning never deletes active selected snapshot."
+  },
+  {
+    "task": "D06",
+    "title": "Migrate shared-folder publish/pull/merge to native snapshots",
+    "outcome": "A04",
+    "findings": [
+      "R04",
+      "R05",
+      "R20"
+    ],
+    "acceptance": "Two-profile fixtures publish distinct exact documents; repeated pull does not duplicate imported identities; deliberate UID collisions remap links consistently; malformed or stale incoming file changes neither document nor history."
+  },
+  {
+    "task": "D07",
+    "title": "Preserve autosave heartbeat and recovery across native documents",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "Fake-clock tick produces exactly one native committed snapshot; pending edit/replacement/closed document cannot persist stale bytes; restore after restart agrees with revision and dirty marker."
+  },
+  {
+    "task": "D08",
+    "title": "Complete cross-context application history routing",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "A→B context switch cannot undo A from B; branch edit clears redo; jump-N matches N native undo/redo outcomes and labels; replay causes no extra checkpoint; fill/transform/key compound gesture is one user action."
+  },
+  {
+    "task": "D09",
+    "title": "Extract history-panel presentation over immutable history queries",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "Row labels/time/order and disabled jump state match fixed history fixture; replacement during pending query cannot display old document history."
+  },
+  {
+    "task": "D10",
+    "title": "Admit native property metadata and holder identity model",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Roundtrip1/2/4component fields, absent/static/keyed states and element-vs-layer holders; wrong dimension/nonfinite/unknown property rejected before publication."
+  },
+  {
+    "task": "D11",
+    "title": "Implement generic native track/key/static editing and evaluation",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Fixed scalar/vector/color tracks at before/exact/between/after; toggleOFF freezes interpolated result; ON keys effective value; arbitrary-frame update preserves neighboring keys and defaults; undo/redo and stale/replay/changed-body controls."
+  },
+  {
+    "task": "D12",
+    "title": "Admit editable easing and influence semantics on generic tracks",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Independent8Newton-step and degenerate-span controls; authored zero tangent preserved;100percent influence handles cannot exchange sides; split curve preserves sampled original; save/reopen/undo are exact."
+  },
+  {
+    "task": "D13",
+    "title": "Native batch key editing, clipboard and retiming transactions",
+    "outcome": "C04",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Two tracks with equal frame numbers never collide across holders; collision/snap/negative time fixed oracles; n1/n2layer stagger anchors; cancelled/zero-distance/replayed gesture cannot create extra history; paste missing target refuses atomically."
+  },
+  {
+    "task": "D14",
+    "title": "Resolve native expression substrate async-job lifecycle boundary",
+    "outcome": "A01",
+    "findings": [
+      "R04",
+      "R18",
+      "R26"
+    ],
+    "acceptance": "Actual engine compiled dynamic import/async/generator controls; no pending guest work retained between evaluations; runtime/context heap return baseline; full supported synchronous expression remains executable."
+  },
+  {
+    "task": "D15",
+    "title": "Admit generalized native expression compile/evaluate and error fallback",
+    "outcome": "C02",
+    "findings": [
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Samecode+changedpreamble recompiles; scalar/vector/color normalize golden; runtimeerror/nonfinite/wrongdimension falls back to correct raw value without modifying source; stale revision cannot publish; independent sampling order deterministic."
+  },
+  {
+    "task": "D16",
+    "title": "Bind native expression math, sampling, looping and introspection builtins",
+    "outcome": "C02",
+    "findings": [
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Golden scalar2Dnoise/wiggle axes; loopcycle/pingpong/offset/continue before/after and keycount bounds; raw self.at does not recurse; duplicate layer names follow baseline lookup; markers/keys nearest tie behavior fixed."
+  },
+  {
+    "task": "D17",
+    "title": "Bind comp/self/mesh and compatibility expression views",
+    "outcome": "C09",
+    "findings": [
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Mesh pervertex context golden; comp dims/FPS/duration; zero/missingbounds distinctions; compatibility aliases evaluate same result as canonical builtins; mutation attempts cannot alter document."
+  },
+  {
+    "task": "D18",
+    "title": "Native expression editors, controls, pickwhip and widget linking",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Editing target replacement during pending commit cannot write wrong holder; Altcopy vs reference insertion golden; widgetaxis/pose expression points at exact native IDs; syntax error keeps code+diagnostic+raw fallback; undo/redo restores code."
+  },
+  {
+    "task": "D19",
+    "title": "Bake expressions into native optimized tracks",
+    "outcome": "C09",
+    "findings": [
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Independent expression expected framevalues; baked track reproduces tolerance at all frames and preserves endpoints; cancel/error/stale leaves original expression/tracks/history untouched; one undo restores exact expression."
+  },
+  {
+    "task": "D20",
+    "title": "Reuse and bound shape matching and resampling kernels",
+    "outcome": "C04",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Pinned line/closedpath/reversedorientation/hole/degenerate topology pairing and resample coordinates; stable tie ordering; no input mutation and native-vs-baseline outputs match."
+  },
+  {
+    "task": "D21",
+    "title": "Native tween interpolation and generated frame authority",
+    "outcome": "C04",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Fixed endpoint/midpoint shapes/styles and holes; dabs remain excluded; scrub vs export yields same evaluated geometry; sample invalidation on endpoint edit; snapshot/save never bakes transient generated content."
+  },
+  {
+    "task": "D22",
+    "title": "Native tween generate/split/regenerate and matching reassignment",
+    "outcome": "C04",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Generate/split/reassign fixed2shape fixture outputs; split endpoint continuity and authored keys preserved; undo restores exact previous correspondence/samples; no partial document on cap/error/cancel."
+  },
+  {
+    "task": "D23",
+    "title": "Implement native onion and ghost result queries with snapshot lifetime",
+    "outcome": "C04",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Keys/sample/held/blank/unexposed window fixture selects exact frames; onion must never alter active selection/document/history/export; stale frame/revision result discarded."
+  },
+  {
+    "task": "D24",
+    "title": "Extract native playback transition and read-side state adapter",
+    "outcome": "C04",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Fakeclock normal/late tick and loop-boundary exactrequested frames; stop/restart cannot publish stale generation; native unavailable rejects before legacy mutation; UI playhead and native output time agree."
+  },
+  {
+    "task": "D25",
+    "title": "Native camera track and viewport-lock semantics",
+    "outcome": "C05",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Fixed camera poses at key/intermediate frames, viewport lock and camera overlay coordinates; gizmo roundtrip; save/history/export visual oracle; invalid camera or parent cycle cannot publish."
+  },
+  {
+    "task": "D26",
+    "title": "Native markers and BPM ownership with timeline rows",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Marker create/move/delete+history and 1based/name/nearest expressions; exactbeatframes at noninteger beat period and FPS; grid aid does not mutate document; duplicate names/ties preserve baseline."
+  },
+  {
+    "task": "D27",
+    "title": "Native layer in/out, time links and batch bar editing",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Barresize/move/stagger across2parents; cycle/refusal/lock boundaries; unlink preserves visible range and frame source; atomic undo for grouped drag and keylock modes."
+  },
+  {
+    "task": "D28",
+    "title": "Native text animator descriptors and selector contributions",
+    "outcome": "C09",
+    "findings": [
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Fixed glyph/word/line selection and count/pivot/weight fixtures; enabled/disabled descriptor composition; add/delete undo and save/reopen; panel/grid same row sequence and animator keys evaluate/export identically."
+  },
+  {
+    "task": "D29",
+    "title": "Native component shape-tree and element holder consumers",
+    "outcome": "B02",
+    "findings": [
+      "R02",
+      "R12",
+      "R24"
+    ],
+    "acceptance": "Nested component entry/exit preserves selection/context; group delete/ungroup/edit targets exact ID; removed/stale object cannot rename wrong row; tree ordering matches native render order."
+  },
+  {
+    "task": "D30",
+    "title": "Native affine transform, parenting and follow-path authority",
+    "outcome": "C05",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Independent matrix-order/anchor/worldlocal vectors; two/Nparent weights; missingparent/cycle/64node behavior; followpath end/anglewrap/align; snapshot evaluation never transforms saved geometry."
+  },
+  {
+    "task": "D31",
+    "title": "Native 3D projection, layer toggle and gizmo consumers",
+    "outcome": "C05",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Fixed camera/3D points/images/segments with perspective; axis/ring hit and drag delta goldens; weightedparent projection; save/undo/render/export agree and invalid depth has exact baseline disposition."
+  },
+  {
+    "task": "D32",
+    "title": "Native geometry-motion and style track consumers",
+    "outcome": "D02",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Pervertex and meshvertex independent keys; whole-path key means everyvertex at exactframe; trimwrap/brushoutline/paramshape fixed geometry; RGBAround/clamp absentvsstatic semantics; render/export from same values."
+  },
+  {
+    "task": "D33",
+    "title": "Native component time-remap and workspace continuity",
+    "outcome": "C12",
+    "findings": [
+      "R12",
+      "R13",
+      "R16"
+    ],
+    "acceptance": "Retimed nested component held/exact/subframe policy baseline; disabling returns correct childframe; mode switch retains selection/playhead/document bytes; preview/cancel no mutation and commit has one history entry."
+  },
+  {
+    "task": "D34",
+    "title": "Native Motion canvas pointer and pickwhip transactions",
+    "outcome": "B11",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Clickvsdrag thresholds; axis-lock; multiselection; cancel/ownerreplacement midgesture; native unavailable never invokes legacy writer; parent/time pickwhip cycle rejected without partial history."
+  },
+  {
+    "task": "D35",
+    "title": "Extract Motion property registry, filters and context header UI",
+    "outcome": "B02",
+    "findings": [
+      "R02",
+      "R12",
+      "R24"
+    ],
+    "acceptance": "P/A/R/S/T/U/E/M selectionfallback and reveal fixtures; multiple revealedlayers; header listener not duplicated; localprefs persist; loadorder and public API missingmodule negativecontrol."
+  },
+  {
+    "task": "D36",
+    "title": "Extract native-bound Motion properties/parent/matte panels",
+    "outcome": "B11",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed panel row order for layer/widget/element; dropdown selection affects correct revision/holder; extra-parentremove reindexes weightfields; native unavailable cannot directly edit descriptor; one scrub one transaction."
+  },
+  {
+    "task": "D37",
+    "title": "Extract transform/expression field and key-lock presentation",
+    "outcome": "B11",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Mixedvalues scrub vs text input goldens;9anchorpositions derive pinned bounds; lock menu disabledheader/checkmarks; stale pickedholder or selection cannot commit; actual production caller/loadorder negativecontrol."
+  },
+  {
+    "task": "D38",
+    "title": "Extract elements, path/mesh/text and discrete track rows",
+    "outcome": "B11",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Panelgrid exact row sequence; wholepathkeys equal pervertexkeys; meshheader matches correct holder; colorhex edits/clamp roundtrip; discrete keys stay holdonly; delayed rowcallback cannot write removed holder."
+  },
+  {
+    "task": "D39",
+    "title": "Extract track grid, key/property selection and drag presentation",
+    "outcome": "B11",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Track SVG/diamond/connector goldens; scrollduringdrag/snap; selectionbox top/bottom rankcascade; duplicate mouseup/blur/cancel; one rAF per frame and complete listener cleanup; shared native query has no hidden writable mirror."
+  },
+  {
+    "task": "D40",
+    "title": "Extract Motion overlays, row renderers and mode bootstrap",
+    "outcome": "B11",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Motion↔Animation mode preserves sourcebytes/history/selectedIDs; independent overlaybounds/camera fixtures; render rowheight/panelgrid agreement; no duplicate globalstate/caches or retained obsoletewriter; missing module/loadorder control fails closed."
+  },
+  {
+    "task": "F01",
+    "title": "Freeze native baseline field allocation and shared stable-ID contract",
+    "outcome": "A01",
+    "findings": [
+      "R04",
+      "R18",
+      "R26"
+    ],
+    "acceptance": "Every baseline serializedfield resolves to one named raw-model owner; two concrete mixedfamily save/import fixtures include explicit no-loss expectation; no generic opaqueJSON success substitutes typed admission."
+  },
+  {
+    "task": "F02",
+    "title": "Join native project-family model codecs and complete snapshot serialization",
+    "outcome": "A04",
+    "findings": [
+      "R04",
+      "R05",
+      "R20"
+    ],
+    "acceptance": "Single mixeddocument includes every allocatedfamily, not onefamily perpassingtest; save/reopen retains all fields/references and no livehandles; malformedcrossrefs reject entirecandidate without history/resourceleak."
+  },
+  {
+    "task": "F03",
+    "title": "Admit older baseline project formats through native import normalization",
+    "outcome": "A04",
+    "findings": [
+      "R04",
+      "R05",
+      "R20"
+    ],
+    "acceptance": "Pinned original/older/singleframes/mixedmodel fixtures import withfield-by-field expected values; futureversion warning/baseline exactfailure disposition retained; unsupportedrequiredfield cannot return success/dropcontent; no currentdocumentchange on invalidimport."
+  },
+  {
+    "task": "F04",
+    "title": "Implement native editable project metadata and work-area settings",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Independent settingsfixture changesFPS/canvas/background/workarea and undo/reopen agrees; invalidranges/nonfinite/race failatomically; changingFPS follows characterizedframevsseconds behavior rather than inventedretime."
+  },
+  {
+    "task": "F05",
+    "title": "Own remaining persistent project palettes, aids and workspace records natively",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Old flatcolorPalette wraps once with exactorder/colors; namedshadowswatch preserves IDs; guide/VPworkspace/comments roundtrip; openingoldproject after another cannot leak previouspalettes/workspace; session-only flags neverenterfile."
+  },
+  {
+    "task": "F06",
+    "title": "Admit native layer kinds, hierarchy and edit-policy fields",
+    "outcome": "C01",
+    "findings": [
+      "R02",
+      "R04",
+      "R18",
+      "R24"
+    ],
+    "acceptance": "Mixeddrawing/folder/null/guide/component-kind shell roundtrips; duplicateIDs/cycles/missingfolderparent rejectedatomically; lockedordinarydrawing vs lockedcomponent timingoracle; sourceorder survives foldercollapse/nonrenderlayer."
+  },
+  {
+    "task": "F07",
+    "title": "Implement native layer rename/delete/reorder/lock/solo and folder commands",
+    "outcome": "C15",
+    "findings": [
+      "R02",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Three-layer middledelete/reorder preserves remainingobjectIDs/order and folder/linkreferences; rename duplicatebehaviorbaseline; solo/lockedbatchoracle; stale/replay/changedbody/cancel/cap keepexactsource and history."
+  },
+  {
+    "task": "F08",
+    "title": "Implement native layer duplicate and split with identity remapping",
+    "outcome": "C15",
+    "findings": [
+      "R02",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Fixedduplicate withsameframeobjectIDs assigns uniqueclonedIDs and validinternalreferences; split2shapes preservesworldgeometry/timing/groupmemberships; oneundo restores exactprestate; outsiderelationships followbaseline."
+  },
+  {
+    "task": "F09",
+    "title": "Complete native F7 blank-key mutation, including component blank overrides",
+    "outcome": "C13",
+    "findings": [
+      "R01",
+      "R02",
+      "R24"
+    ],
+    "acceptance": "Exact18baselinecontrols plusnativeownerrevision/undo/replay; activecell blankfromheld/sample/key/alreadyblank; futurekey/sample/Reference/otherlayers retained; componentblankhides span andundorestores; lockedordinarylayer refusesbeforehistory."
+  },
+  {
+    "task": "F10",
+    "title": "Implement native F6 snapshot-key and arbitrary held-span key insertion",
+    "outcome": "C13",
+    "findings": [
+      "R01",
+      "R02",
+      "R24"
+    ],
+    "acceptance": "Two selectedlayers withdifferentheldsources snapshotdifferentcorrectgeometry; existingkey skipped, lockedordinaryskipped, lockedcomponentoutertimingaccepted; componentFrame resolvedexactly; undo/redo+replay+save roundtrip.\nChart frame→componentFrame native setter uses exactmouthframe, undo/reopen retainsmap; held component timing andblankOverride never inferred from ordinary drawing geometry."
+  },
+  {
+    "task": "F11",
+    "title": "Implement native global frame insertion, removal, spans and duration edits",
+    "outcome": "C13",
+    "findings": [
+      "R01",
+      "R02",
+      "R24"
+    ],
+    "acceptance": "Selectedlocked-onlyinsertrefuses; selectedandnontargetlayers length/timinggolden; deletefirst/middle/last andrange retains>=1frame; in/out/marker strictlyafterboundary shifts; nativebytes/history atomic oncap/cancel/stale."
+  },
+  {
+    "task": "F12",
+    "title": "Implement native drawing-frame clipboard, move/shift and repeat operations",
+    "outcome": "C13",
+    "findings": [
+      "R01",
+      "R02",
+      "R24"
+    ],
+    "acceptance": "Fixed2layer6frame pasteoverlap/shiftcollision/negativeframe fixture; originalclipboardimmutable; sharedassetsnotduplicatedinRAM; copyIDrules and manualmetadata survive; oneundo restoresentirebatch; invalidtarget producesnopartialpaste."
+  },
+  {
+    "task": "F13",
+    "title": "Implement native clear-key, exposure promotion and span removal contracts",
+    "outcome": "C13",
+    "findings": [
+      "R01",
+      "R02",
+      "R24"
+    ],
+    "acceptance": "Clearakey restorespreviousholdwithoutshorteningduration; convertheld/sample snapshots exactdisplay; un-tween removesstrictinteriorsamples whilebothendpointkeys/durationpreserved; removeframes shortensglobaltimeline; repeated/noeligiblehistorymatchesbaseline."
+  },
+  {
+    "task": "F14",
+    "title": "Expose native context and target-set resolution for selection intents",
+    "outcome": "C10",
+    "findings": [
+      "R12",
+      "R13"
+    ],
+    "acceptance": "Sameelementnamein2contexts resolvesbyID/context; deleted/oldrevision/closedcontexttargetsrefuse; UIselectiondoesnotchangebytes/history; queriedtargetboundsdelegatesnativegeometry and cannotcachewritablePaperobjects."
+  },
+  {
+    "task": "F15",
+    "title": "Implement atomic native selected-object clipboard and batch edit commands",
+    "outcome": "C15",
+    "findings": [
+      "R02",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Mixedtext/path/mesh/group clipboard retainsallfieldsandassetsharing; freshIDs/internal-links valid; lockedmixedtargetbatch followsbaselineatomicity; cutoneundo andstaleclipboardpaste areexact; pointerUI notnecessaryforcoreproof."
+  },
+  {
+    "task": "F16",
+    "title": "Admit native layer matte, blend and effect-stack state and commands",
+    "outcome": "D02",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Explicitmatte+legacyfollowinglayer migrationgolden; missing/cyclicmatte/effectlink refusal; twoeffectstacks order/parameter/blob reference roundtrip; discreteblendkeys holdonly; undo exactstate; customWGSLdefinitions preservedwithoutnewshaderfeatures."
+  },
+  {
+    "task": "F17",
+    "title": "Admit native image-mesh topology, identity and static pose records",
+    "outcome": "C07",
+    "findings": [
+      "R10",
+      "R11",
+      "R13"
+    ],
+    "acceptance": "One meshsharedby120frames serializesonetopology; rest/offsetseparate; invalidtriangle/index/duplicateIDreject; importseedsfreshIDs; normalizedoutlineprefix/UV/vertexgroups surviveclone/undo/reopen; no assetduplication."
+  },
+  {
+    "task": "F18",
+    "title": "Implement native mesh deformation/edit commands and scene payload",
+    "outcome": "C07",
+    "findings": [
+      "R10",
+      "R11",
+      "R13"
+    ],
+    "acceptance": "Independent3vertexdeformation+UVandoutlineclipvectors at3frames; transformedrastercarriesdeformation; retriangulaterejectleavesrest/topologyunchanged; edit/undo/save exact; rigconsumercombinationtesteddownstreamwithoutcorecycle."
+  },
+  {
+    "task": "F19",
+    "title": "Admit native widget control-binding records and mutations",
+    "outcome": "C07",
+    "findings": [
+      "R10",
+      "R11",
+      "R13"
+    ],
+    "acceptance": "Changingaxiscontrolnameupdatesdisplaylabel; widgetconfigdoesnotcreatealternatevalue; keyedcontrolandparentanchorroundtrip/undo; widgetsneverappearinnativePNG/video/contentbounds; malformedbindingfailsexactbaseline."
+  },
+  {
+    "task": "F20",
+    "title": "Retain native per-document history and activate suspended tab state",
+    "outcome": "A03",
+    "findings": [
+      "R16",
+      "R20",
+      "R24"
+    ],
+    "acceptance": "Aedit→openB→Bedit→switchA restoresAundoandidentity; reopenBretainsBhistory; staleactivationtoken/refusedresourcecleanup cannotreplaceA; closingBclearsownedallocationswhileAframe/readerssurvive."
+  },
+  {
+    "task": "G01",
+    "title": "Freeze independent geometry and image-motion oracle vectors; reuse current Rust kernels",
+    "outcome": "D01",
+    "findings": [
+      "R05",
+      "R08",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Existing interpolation endpoints/motion-error, stroke packed-vs-JSON and synthetic point-track controls remain named and selected; no second copy of D20 or I52 tests."
+  },
+  {
+    "task": "G02",
+    "title": "Expose existing geometry operations at the admitted desktop application seam",
+    "outcome": "D01",
+    "findings": [
+      "R05",
+      "R08",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Known union/subtract/intersect/xor polygons include disjoint pieces and holes; rectangle/ellipse bounds and topmost-hit identity match fixed expectations.\nA failed/stale geometry request changes neither revision nor stored objects."
+  },
+  {
+    "task": "G03a",
+    "title": "Define immutable evaluated-scene record and projection contract",
+    "outcome": "D02",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Fixed record projection fixtures preserve fields and identity; unsupported/missing records refuse without invoking Paper scene authority."
+  },
+  {
+    "task": "G03b",
+    "title": "Integrate native scene producers with the retained paint plan",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Pinned requested-time scene output preserves original identities; viewport/export consumers receive the same evaluated record sequence."
+  },
+  {
+    "task": "G04",
+    "title": "Produce baseline masks, blends, strokes, gradients and existing effects in native composition",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Fixed pixel tiles independently distinguish normal/multiply/alpha/matte, folder subtree scoping, effect layers, stroke caps/joins and gradient stop interpolation.\nPreview and decoded export pixels agree for the same revision/time/size; editor overlays are absent."
+  },
+  {
+    "task": "G05",
+    "title": "Wire effect and path-effect inspectors to native commands",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Adding/reordering/removing two effects produces fixed order and parameter values through undo/redo and save/reopen.\nStale inspector response cannot overwrite current selection; ordinary UI/API/MCP reach the same command result."
+  },
+  {
+    "task": "G06",
+    "title": "Complete image-upload/cache accounting and retained-resource recovery",
+    "outcome": "D03",
+    "findings": [
+      "R14"
+    ],
+    "acceptance": "Low-budget fixture forces deterministic eviction without evicting in-flight resources; subsequent pixels equal the unpressured fixture.\nAttach/replace/undo/export/cancel/release returns current live ownership charges to the expected baseline; producer reservation fails before allocation.\n8192-capacity and shared-process/RSS/VRAM dispositions use the actual accepted policy rather than newly chosen limits."
+  },
+  {
+    "task": "G07",
+    "title": "Finish native viewport/engine lifecycle and desktop surface adapter",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Zero-sized/hidden/resize/restored surface has explicit safe state; stale device completion never publishes into a replacement owner.\nOne active native renderer owns its GPU resources across close/reopen and failure cleanup."
+  },
+  {
+    "task": "G08",
+    "title": "Keep editor overlays and coordinate mapping as narrow presentation modules",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Known world-to-screen-to-world vectors round-trip under pan/zoom/rotation and unequal canvas dimensions.\nSelection handles/guides remain visible in editor and absent from saved data and export."
+  },
+  {
+    "task": "G09",
+    "title": "Retire Paper change-hook render authority and unify pinned render entry points",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Same-revision repeated render/readback is deterministic and leaves history/revision unchanged.\nConcurrent requested frames serialize correctly; replacement/close cancels stale output and releases readback resources."
+  },
+  {
+    "task": "G10",
+    "title": "Adapt render queue and playback bake cache to native fixed-revision jobs",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Two queued ranges finish/cancel in order without changing editor current frame; failure leaves the next job runnable.\nEqual-size cached blits reuse backing canvas; changed revision invalidates stale frames."
+  },
+  {
+    "task": "G11",
+    "title": "Preserve existing shader catalog and native custom-effect registry",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Every shipped shader retains its ID/default parameters and validates through existing naga shader-library validation.\nMalformed custom source follows the independently characterized existing compile/error contract; valid source survives save/reopen/history and yields fixed selected pixels. No silent error-reporting product improvement is required."
+  },
+  {
+    "task": "G12",
+    "title": "Connect color/palette tools to native batch color commands",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "HSV/RGB/hex8 independent round-trip and alpha endpoints match fixed values.\nSelected/project-color replacement updates exactly matching real fills/strokes and linked companions; undo/save/reopen preserve all unmatched colors."
+  },
+  {
+    "task": "G13",
+    "title": "Move existing path-effect outputs behind native evaluation/history",
+    "outcome": "C03",
+    "findings": [
+      "R06",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Fixed seed/path produces independently expected points and unchanged source geometry; changed time/parameters produce expected output.\nUndo/redo/save/reopen and preview/export agree without baking mutation into source geometry."
+  },
+  {
+    "task": "G14",
+    "title": "Admit editable path/stroke/paint records and native geometry transactions",
+    "outcome": "C03",
+    "findings": [
+      "R06",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Fixed pressure/open-path record round-trips all handles/paint/width fields; malformed/duplicate/unresolved IDs reject atomically.\nCreate/edit/delete undo/redo and save/reopen restore exact geometry; stale/cancelled requests do not commit."
+  },
+  {
+    "task": "G15",
+    "title": "Connect Draw/Pen/Shape gesture input to native commit and cancellation",
+    "outcome": "B03",
+    "findings": [
+      "R06",
+      "R14",
+      "R19"
+    ],
+    "acceptance": "Captured fixed stylus/pen/shape traces create expected document-space points exactly once, with correct stroke IDs and paint order.\nCancel/lost capture/document switch leaves no committed geometry; locked layer denies before writes; undo restores prior frame."
+  },
+  {
+    "task": "G16",
+    "title": "Retain brush outlines/dabs/nibs and isolate preset input modules",
+    "outcome": "B03",
+    "findings": [
+      "R06",
+      "R14",
+      "R19"
+    ],
+    "acceptance": "Fixed centerline/pressure/profile produces independently expected width extrema and bounds; zero-length/cusp/dash inputs remain finite.\nPreset fork/apply preserves defaults and independent copies; menu selection produces exact next-stroke attributes."
+  },
+  {
+    "task": "G17",
+    "title": "Connect bitmap brush retained assets and baked stroke pixels",
+    "outcome": "D03",
+    "findings": [
+      "R14"
+    ],
+    "acceptance": "Synthetic asymmetric tip stamped along fixed path yields fixed alpha bounds and spacing/cusp coverage.\nTip asset and baked result survive save/reopen/undo; deleting/replacing brush resources releases only unreferenced data."
+  },
+  {
+    "task": "G18",
+    "title": "Connect fill tracing, linked regeneration and auto-paint transactions",
+    "outcome": "C17",
+    "findings": [
+      "R06",
+      "R19"
+    ],
+    "acceptance": "Captured crossing-circle lens and open-gap vectors have fixed face bounds; same-color merge preserves holes and authored order.\nEditing a wall regenerates exactly linked seeds; propagation affects only selected frames and one undo restores all affected data. Retain the independently characterized pre-existing degenerate-sliver defect rather than silently counting its repair as required migration."
+  },
+  {
+    "task": "G19",
+    "title": "Connect boolean/combine flatten and vector eraser to native geometry history",
+    "outcome": "C17",
+    "findings": [
+      "R06",
+      "R19"
+    ],
+    "acceptance": "Three disjoint union inputs retain every island; subtract/intersection/xor expected areas/holes match fixed polygon oracles.\nOne eraser sweep across multiple paths commits one history entry; cancellation/stale revision preserves all originals."
+  },
+  {
+    "task": "G20",
+    "title": "Replace selection/clipboard/transform mutation callers with native transactions",
+    "outcome": "B03",
+    "findings": [
+      "R06",
+      "R14",
+      "R19"
+    ],
+    "acceptance": "Fixed oriented/group selection yields expected bounds; move/rotate/skew/distort produce independent matrix/point results.\nCopy/paste assigns fresh identities but preserves heavy fields; cut/delete/duplicate undo/redo and save/reopen are lossless.\nStale owner, locked layer, teardown and cancelled drag commit nothing; ordinary context/keyboard/pointer routes use the same commands."
+  },
+  {
+    "task": "G21",
+    "title": "Connect subselect vertex/tangent editing and point type conversion",
+    "outcome": "B03",
+    "findings": [
+      "R06",
+      "R14",
+      "R19"
+    ],
+    "acceptance": "Known symmetric/corner/smooth edits yield fixed handle vectors in rotated/scaled parent space.\nInsert/drag/cancel/undo/save/reopen preserve point order and no stale vtxN write reaches a replacement document."
+  },
+  {
+    "task": "G22",
+    "title": "Preserve parametric shapes and their native edit handles",
+    "outcome": "C06",
+    "findings": [
+      "R19",
+      "R26"
+    ],
+    "acceptance": "Fixed rounded rectangle, pie/donut, star and polygon parameters produce expected vertices/bounds and center after nonuniform transforms.\nHandle edits undo/reopen with generator metadata intact; unsupported parameter values reject atomically."
+  },
+  {
+    "task": "G23",
+    "title": "Preserve symmetry guides and native mirrored-stroke commit",
+    "outcome": "B03",
+    "findings": [
+      "R06",
+      "R14",
+      "R19"
+    ],
+    "acceptance": "Fixed axis and radial cases yield expected reflected points and unique IDs; center/axis updates persist only when baseline declares them persistent.\nOne symmetry stroke undo removes all copies; guides never appear in export."
+  },
+  {
+    "task": "G24",
+    "title": "Connect group nesting and non-destructive combine records",
+    "outcome": "C03",
+    "findings": [
+      "R06",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Nested groups maintain selection/order and exact geometry through group/ungroup/undo/save/reopen.\nNon-destructive combine preserves originals; Flatten publishes fixed disjoint/hole geometry and one undo restores the full group."
+  },
+  {
+    "task": "G25",
+    "title": "Extract editor chrome, scrub/range and canvas-aid presentation modules",
+    "outcome": "B07",
+    "findings": [
+      "R04",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed drag/key sequences preserve scrub increments/clamp, work-area/onion bounds and frame scrub targets.\nDock/collapse/resize settings round-trip; context menu position clamps and localized asset headings refresh.\nCanvas aids change no document revision when view-only; persistent edits use their native command once."
+  },
+  {
+    "task": "G26",
+    "title": "Wire shape/history/expression/script panel presenters to native reads and commands",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Shape tree rename/visibility/reorder reflects actual native revision and remains correct after undo/reconnect.\nHistory labels/cursor derive from native history; expression panel stale result cannot overwrite newer input; scripted panel teardown releases handlers."
+  },
+  {
+    "task": "G27",
+    "title": "Admit baseline raster/media asset identity and lifecycle in native documents",
+    "outcome": "D01",
+    "findings": [
+      "R05",
+      "R08",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Mixed embedded/linked image, audio and video descriptor fixture round-trips exact asset IDs/paths/placement without silently dropping unknown content.\nReplace/remove/undo/reopen preserve shared identity and release only unreferenced resources; missing resource has explicit availability."
+  },
+  {
+    "task": "G28",
+    "title": "Adapt linked/embedded resolution, relink and bulk conversion",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Known linked/embedded media fixture resolves identical bytes; relink updates every matching reference and none of the unrelated references.\nFailed/cancelled conversion preserves original assets/files; undo/save/reopen keep mode and references consistent."
+  },
+  {
+    "task": "G29",
+    "title": "Adapt media library catalog and canvas re-insertion UI",
+    "outcome": "B08",
+    "findings": [
+      "R08",
+      "R11",
+      "R13",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Fixed catalog add/filter/remove and missing-state cases produce expected entries; one drag inserts one native object/layer at the selected target.\nCatalog and reinserted media survive history/save/reopen without aliasing mutable UI copies."
+  },
+  {
+    "task": "G30",
+    "title": "Integrate existing native video decoder into native media/evaluation ownership",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Existing decoder codec/seek/tail/indexed regressions still pass against bundled ffmpeg.\nFixed known-color/timecode clip selects expected frame at offset/seek/last-frame times; owner replacement and close cancel obsolete decode.\nVideo scene and export share pinned requested time and asset identity; resource release remains bounded."
+  },
+  {
+    "task": "G31",
+    "title": "Adapt native-video layer placement/status/bench UI",
+    "outcome": "B08",
+    "findings": [
+      "R08",
+      "R11",
+      "R13",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Import/replace/relink/attach/detach reflect native layer identity and preserve placement/offset through undo/reopen.\nStale status/seek completion cannot overwrite replacement layer; benchmark remains isolated from persistent state."
+  },
+  {
+    "task": "G32",
+    "title": "Integrate audio data and playback with native timing/resource authority",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Fixed pulse/silence clip aligns at known frame offsets in playback and exported audio; mute/gain/trim match expected samples.\nUndo/save/reopen retain audio fields; Stop/close/replacement releases playback/decode resources and prevents stale sound."
+  },
+  {
+    "task": "G34",
+    "title": "Reconcile Reference presenter to accepted native media source and full baseline modes",
+    "outcome": "B08",
+    "findings": [
+      "R08",
+      "R11",
+      "R13",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Reference layer source is visible only in intended viewport pass; native save/reopen preserves settings and asset identity.\nReference-only content never appears as authored drawing or export output; absent/unavailable media message is truthful."
+  },
+  {
+    "task": "G35",
+    "title": "Adapt SVG import output into native records without loss",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Synthetic nested SVG with transforms, compound holes, stroke/gradient/text produces fixed geometry/style/order and correct noFit dimensions.\nImport undo removes all imported records; save/reopen retains supported fields; unsupported baseline behavior is explicitly recorded rather than dropped silently."
+  },
+  {
+    "task": "G36",
+    "title": "Adapt PSD and Figma conversion/network callers to native import transactions",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Captured synthetic PSD and Figma nested-transform fixtures produce fixed layer order/placement/paint and supported text fields.\nNetwork/refused token/partial conversion never publishes half a document; import undo and save/reopen preserve every admitted field."
+  },
+  {
+    "task": "G37",
+    "title": "Preserve ABR, drop routing and vectorization through native publication",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Synthetic legacy/modern ABR buffers yield fixed tip dimensions/alpha; MIME/name routing selects expected converter.\nKnown image trace/shape-fit fixture preserves expected contours; cancelled/stale worker output inserts nothing; one import undo removes complete result."
+  },
+  {
+    "task": "G38a",
+    "title": "Admit text record, codec and holder identity",
+    "outcome": "D01",
+    "findings": [
+      "R05",
+      "R08",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Text records round-trip absent/default/explicit values, identities and style boundaries without loading fonts or rendering."
+  },
+  {
+    "task": "G38b",
+    "title": "Bind retained font/layout algorithms to native text scene output",
+    "outcome": "D01",
+    "findings": [
+      "R05",
+      "R08",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Fixed glyph/layout expected geometry and viewport/export projections agree; missing-font and text-edit history behavior remain explicit."
+  },
+  {
+    "task": "G39",
+    "title": "Bind retained motion-preset library to native track commands",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Fixed saved preset deep-copies current native values and apply creates exact tracks/history once; category/delete remains local catalog behavior; undo/reopen preserves applied tracks."
+  },
+  {
+    "task": "G40",
+    "title": "Connect rig, widget and image-mesh editors to their native model owners",
+    "outcome": "B08",
+    "findings": [
+      "R08",
+      "R11",
+      "R13",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Existing mesh fixture retains triangle-centroid-inside-outline and vertex/world-position oracle; all intended frames preserve meshId.\nRig bind/pose/widget create/drag/mesh edit yield expected geometry and one history entry; undo/reopen and export agree.\nOverlay geometry never enters saved/rendered art; stale selected mesh/rig is rejected."
+  },
+  {
+    "task": "G41",
+    "title": "Preserve live/bundled font fetching behind explicit asset adapters",
+    "outcome": "D01",
+    "findings": [
+      "R05",
+      "R08",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Captured CSS2 responses parse fixed font URLs/weights and reject malformed data; mocked transport failure preserves existing font.\nChosen font bytes/identity persist across save/reopen; delayed fetch after document close cannot publish."
+  },
+  {
+    "task": "G42",
+    "title": "Connect native pinned frames to existing raster/video/audio export encoders",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Existing export fixture exact MP4/GIF/ProRes/TIFF ffmpeg arguments remain unchanged for equivalent settings.\nFixed frames/range produce expected count/dimensions/alpha/colors and audio timing; cancel/failure preserves existing destination and cleans staging.\nExport pins revision/time and does not move playhead or mutate document; repeated clean job succeeds."
+  },
+  {
+    "task": "G43",
+    "title": "Feed native snapshots to existing SVG/Lottie exporters",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Fixed vector/keyed scene exports expected SVG paths/style/order and Lottie JSON layers/keyframe timing.\nRe-import/render fixed output within existing format capability matches independent geometry/pixel expectations; job cancel/repeat leaves editor untouched."
+  },
+  {
+    "task": "G44",
+    "title": "Adapt Rive and AE-camera export to immutable native inputs",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Fixed camera coordinates/keys yield expected JSX numbers and duration; fixed Rive-compatible geometry/keys yield expected requests.\nWrong/closed Rive endpoint fails visibly without editor mutation; actual Rive endpoint execution, if applicable to baseline acceptance, is booked by root separately."
+  },
+  {
+    "task": "G47",
+    "title": "Preserve feedback storage/transport/triage boundaries and redact task data",
+    "outcome": "D08",
+    "findings": [
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "acceptance": "Fixed action/click sequence coalesces expected entries and storage fallback order is deterministic.\nMocked publish/upload/triage honors token/explicit-action gate, sequential attachment order and failure cleanup; project switch isolates logs.\nNo credential/private-machine data enters tracked fixtures or receipts."
+  },
+  {
+    "task": "G48",
+    "title": "Connect second viewer and component preview to pinned native frames",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Locked/unlocked second viewer displays independently expected frame/time after resize and document revision change.\nComponent preview add/remove remap key updates native history; close/reopen releases resources and prevents stale frame publication."
+  },
+  {
+    "task": "G49",
+    "title": "Complete reviewed GPU engine module boundaries while retaining algorithms",
+    "outcome": "D04",
+    "findings": [
+      "R15",
+      "R23",
+      "R24",
+      "R25"
+    ],
+    "acceptance": "Existing shader and effect-layer overlay regressions run unchanged; no private cross-module deep imports or hidden global context bus.\nCurrent boundary/size/dependency negative controls reject forbidden edges and oversize modules; no ceiling increase or cosmetic minification."
+  },
+  {
+    "task": "G50",
+    "title": "Complete native video decoder module/test boundaries",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Existing real ffmpeg codec/seek/tail/cache/indexed tests retain actual selection and expected results.\nCurrent Rust profile/dependency/size gates cover every successor production/test module with meaningful negative controls."
+  },
+  {
+    "task": "G52",
+    "title": "Characterize exact dormant and known-defect dispositions before native caller migration",
+    "outcome": "A01",
+    "findings": [
+      "R04",
+      "R18",
+      "R26"
+    ],
+    "acceptance": "Read-only exact-SHA source/callsite/flag searches plus existing checked-in oracle provenance identify each named baseline case. Any additional behavioral observation becomes an explicitly booked later acceptance step; none is fabricated in this audit.\nTable separates existing defect/dormant code from a regression introduced by native migration and from actual required desktop workflow; no feature is disposed away without its required explicit decision."
+  },
+  {
+    "task": "I01",
+    "title": "Partition application state into presentation settings and authoritative snapshot readers",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "Resize and zoom preserve native document/revision identity\nAll persisted C21a fields have one named native owner; transient flags never serialize"
+  },
+  {
+    "task": "I02",
+    "title": "Replace application layer and history mirrors with native-backed adapter ports",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "One command creates one revision and history entry\nReorder preserves stable IDs and selection; rejected write leaves Paper and native data unchanged"
+  },
+  {
+    "task": "I03",
+    "title": "Join every stroke serialization field to a native owner and compatibility oracle",
+    "outcome": "A01",
+    "findings": [
+      "R04",
+      "R18",
+      "R26"
+    ],
+    "acceptance": "Field-by-field expected roundtrip fixture includes alpha, links, text roots and masks\nMissing native family becomes named predecessor with exact field list rather than successful lossy import"
+  },
+  {
+    "task": "I04",
+    "title": "Replace serP/desP and companion writeback with revision snapshot adapters",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "All I03 fields survive native encode/decode and presentation rematerialization\nHidden/unselected/compound children cannot erase authoritative content\nRetired live-Paper write routes fail before mutation"
+  },
+  {
+    "task": "I05",
+    "title": "Adapt raster serialization and cache use to native media handles",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "Linked/embedded asset identity and rotation survive save/reopen\nPresentation releases references without bypassing native lifetime/accounting\nNo JS data URL cache becomes authoritative media state"
+  },
+  {
+    "task": "I06",
+    "title": "Extract reusable affine/color/descriptor helpers with native-bound caller ports",
+    "outcome": "C05",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Independent affine fixture proves composition and pivot order\nHue preserves trailing alpha\nPure helper invocation cannot mutate document state"
+  },
+  {
+    "task": "I07",
+    "title": "Admit native duplicator and effector records with history/codec support",
+    "outcome": "C11",
+    "findings": [
+      "R07",
+      "R13"
+    ],
+    "acceptance": "All baseline mode/channel fields roundtrip; duplicate/missing path IDs reject atomically\nUndo restores pre-migration record without mutating input fixtures"
+  },
+  {
+    "task": "I08",
+    "title": "Evaluate native duplicator placements and time-offset source sampling",
+    "outcome": "C11",
+    "findings": [
+      "R07",
+      "R13"
+    ],
+    "acceptance": "Fixed descriptors have independently calculated positions/counts at first/middle/last frames\nNegative offsets, missing source, path endpoints and count bounds match baseline disposition"
+  },
+  {
+    "task": "I09",
+    "title": "Evaluate native effector influence and animated duplicator channels",
+    "outcome": "C11",
+    "findings": [
+      "R07",
+      "R13"
+    ],
+    "acceptance": "Fixed seed and channel fixtures yield identical result through preview and export\nEvaluation leaves snapshot bytes unchanged"
+  },
+  {
+    "task": "I10",
+    "title": "Route duplicator setup/convert commands through native transactions",
+    "outcome": "C16",
+    "findings": [
+      "R07",
+      "R12",
+      "R13"
+    ],
+    "acceptance": "Setup and conversion each produce one undo group\nEmpty/locked/missing-source refusal is atomic\nConverted visible geometry matches pre-conversion evaluated result"
+  },
+  {
+    "task": "I11",
+    "title": "Admit native rig identity, binds, weights and mesh association",
+    "outcome": "C14",
+    "findings": [
+      "R11",
+      "R13"
+    ],
+    "acceptance": "Bind weights are normalized and independent expected-point fixtures cover boundaries\nReload resolves stable references; invalid/dangling binds refuse before mutation"
+  },
+  {
+    "task": "I12",
+    "title": "Evaluate native rig pose, deformation and IK",
+    "outcome": "C14",
+    "findings": [
+      "R11",
+      "R13"
+    ],
+    "acceptance": "Known rest/posed fixtures produce independently expected points\nIK endpoints and degenerate bones remain bounded\nRepeated evaluation never modifies bind/rest records"
+  },
+  {
+    "task": "I13",
+    "title": "Implement rig reset, commit-frame and automatic binding command consumers",
+    "outcome": "C14",
+    "findings": [
+      "R11",
+      "R13"
+    ],
+    "acceptance": "Reset restores exact rest pose\nCommit creates expected authored frame and one history group\nUndo/redo preserves binds, geometry and stable IDs"
+  },
+  {
+    "task": "I14",
+    "title": "Admit native components, instances and exposed-property records",
+    "outcome": "C08",
+    "findings": [
+      "R09",
+      "R12",
+      "R13"
+    ],
+    "acceptance": "Context/instance/exposure roundtrip fixture preserves source identity\nMissing target and cyclic source admission cannot partially publish"
+  },
+  {
+    "task": "I15",
+    "title": "Evaluate component playback modes and linked layer timing natively",
+    "outcome": "C12",
+    "findings": [
+      "R12",
+      "R13",
+      "R16"
+    ],
+    "acceptance": "Independent timeline table covers loop/once/single/remap and negative offsets\nLinked cycles/dangling source refuse atomically\nUnlink preserves evaluated range at pinned revision"
+  },
+  {
+    "task": "I16a",
+    "title": "Produce component evaluated shapes through the scene contract",
+    "outcome": "D02",
+    "findings": [
+      "R11",
+      "R12",
+      "R18"
+    ],
+    "acceptance": "Independent CPU transform, nested visibility, source-time and override fixtures preserve the characterized baseline."
+  },
+  {
+    "task": "I16b",
+    "title": "Join component renderer/export/count conformance",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Actual preview and PNG/export use the same revision/context/frame and expected count/visibility, with characterized defects preserved."
+  },
+  {
+    "task": "I17",
+    "title": "Implement component creation, foreign import and instantiation transactions",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Multi-layer conversion preserves masks, timing, order, groups and matte references\nForeign repeated IDs remap deterministically\nUndo removes only created source/instances"
+  },
+  {
+    "task": "I18",
+    "title": "Implement release-to-layers and merge with field/order/history preservation",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Before/after evaluated frames match across representative held/tween spans\nGroups and stable references survive merge/release\nRejected incompatible media source leaves document unchanged"
+  },
+  {
+    "task": "I19",
+    "title": "Implement stroke/fill/shadow group conversion and fill propagation",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Roundtrip conversion preserves visible fill/stroke/shadow\nPropagating one channel changes only linked targets\nSingle undo restores exact group/frame IDs"
+  },
+  {
+    "task": "I20",
+    "title": "Adapt component and montage context/tab navigation",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Enter/edit/exit/reopen preserves active source and outer scene\nClosing a background tab does not save or change context\nStale context result cannot update another document"
+  },
+  {
+    "task": "I21",
+    "title": "Replace scene-change and materialization signals with revision-derived invalidation",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "New revision/context/frame invalidates only applicable presentation caches\nSame identity can reuse without returning stale data\nHidden layers cannot be erased during frame load/save"
+  },
+  {
+    "task": "I22",
+    "title": "Route ghost proxies and interpolated-frame promotion through native edit intents",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "Ghost edit changes only intended authored frame\nUnchanged display roundtrip produces no key or history entry\nHidden and component sources retain their content"
+  },
+  {
+    "task": "I23",
+    "title": "Add element/layer solo and visibility adapter semantics",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "Solo/hidden combinations match independent truth table\nExisting eye source is retained\nNo non-soloed layer loses authored content during save"
+  },
+  {
+    "task": "I24",
+    "title": "Route channel conversion and materialized reanchor through native drawing intents",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "Conversion preserves linked IDs and unaffected channels\nRejected lock/source cases are mutation-free"
+  },
+  {
+    "task": "I25",
+    "title": "Adapt frame insertion, F6/F7, clear, span removal and duplication callers",
+    "outcome": "A05",
+    "findings": [
+      "R18",
+      "R19",
+      "R20",
+      "R22"
+    ],
+    "acceptance": "Each F6/F7/insert/remove/clear/bake/duplicate action matches fixed frame/content table\nAdd/blank core is never inferred from timing read support\nNo second implementation of UI C19 wiring"
+  },
+  {
+    "task": "I26",
+    "title": "Complete native application/bootstrap routing and remove obsolete writable opacity facade",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Legacy writable entry deliberately fails without mutation\nSame native request across adapters returns same document/revision result\nNo new transport architecture"
+  },
+  {
+    "task": "I27",
+    "title": "Complete public declaration/schema/SDK glue for document, layer, frame and animation operations",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "For every admitted operation catalog example validates and dispatches to same handler\nUnknown/stale/duplicate/bounds failures are consistent across adapters\nNo semantic operation implementation charged here"
+  },
+  {
+    "task": "I28",
+    "title": "Complete public declaration/schema/SDK glue for scene, drawing, media and export operations",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "Every declared command/job is callable or explicitly unavailable according to final admitted contract\nCancellation/terminal/handle identity projections retain source semantics\nNo private kernel advertised as completed public capability"
+  },
+  {
+    "task": "I29",
+    "title": "Add cross-adapter public contract and mutation-policy negative controls",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "Deliberate absent/duplicate/stale feature declaration fails normal validation\nStale or wrong-instance mutation changes neither history nor document\nInterrupted retry returns reconciled result or explicit indeterminate state"
+  },
+  {
+    "task": "I30",
+    "title": "Characterize and bind public script reads and object identity",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "Fixture exercises every read and returns detached values in frame units\nStale layer handle cannot silently refer to reordered different layer\nCharacterization explicitly records current unsandboxed behavior without inventing new security product"
+  },
+  {
+    "task": "I31",
+    "title": "Migrate public layer, frame, selection and composition script mutations",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "Representative script for each mutating method reaches same native handler as ordinary UI\nUndo/save/reopen preserves results\nNo script mutation writes state.layers or native shadow copies"
+  },
+  {
+    "task": "I32",
+    "title": "Migrate public effect, track and expression script operations",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "Expression failure and property/effect bounds match shared API\nSet/key/hold/clear and expression-enable fixtures survive history and save\nNo duplicate expression engine"
+  },
+  {
+    "task": "I33",
+    "title": "Preserve script run, undo grouping and asynchronous bridge behavior",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "One successful run is one undo group; failure atomicity follows characterized baseline\nPromise completion cannot mutate replaced document\nReturn expressions and explicit return retain baseline results"
+  },
+  {
+    "task": "I34",
+    "title": "Migrate plugin host lifecycle and bridge through the native script API",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "Fixture plugin reads/edits/undoes via same native handlers as script\nMalformed manifest and closed/replaced document cannot issue stray writes\nCurrent security limitations are explicitly dispositioned; no invented sandbox acceptance"
+  },
+  {
+    "task": "I35",
+    "title": "Admit storyboard graph, montage and shot timing records",
+    "outcome": "C08",
+    "findings": [
+      "R09",
+      "R12",
+      "R13"
+    ],
+    "acceptance": "Graph and nested source references survive roundtrip\nInvalid connection/missing source rejected atomically\nDeclared baseline defects retain exact fixture disposition"
+  },
+  {
+    "task": "I36",
+    "title": "Evaluate and wire storyboard montage composition",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Independent cut/hold/source frame table matches preview and exported result\nThumbnail count/query does not mutate scene\nEdit/exit/reenter keeps source identity"
+  },
+  {
+    "task": "I37",
+    "title": "Migrate cross-project transplant through native import transactions",
+    "outcome": "A06",
+    "findings": [
+      "R05",
+      "R20"
+    ],
+    "acceptance": "Two same-ID source projects import without collision or silent field loss\nCancel/error leaves target unchanged\nUndo removes only transplanted content"
+  },
+  {
+    "task": "I38",
+    "title": "Adapt onboarding/tutorial document operations and preserve unavailable lessons",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Each available lesson drives real ordinary controls/native mutations\nUnavailable rotoscopy lesson is not counted as completed product functionality\nClosing lesson cannot write stale/replaced document"
+  },
+  {
+    "task": "I39",
+    "title": "Extract timeline support, taxonomy and graph-editor presentation boundaries",
+    "outcome": "B11",
+    "findings": [
+      "R02",
+      "R18",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Independent pixel-to-frame/row checks remain stable at zoom levels\nGraph edits call one native command and survive undo\nRead-only taxonomy cannot become a writer"
+  },
+  {
+    "task": "I40",
+    "title": "Preserve updater behavior and boundary without publishing a release",
+    "outcome": "D08",
+    "findings": [
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "acceptance": "Mocked available/no-update/failure paths produce expected UI\nNo release/deploy/network publication is part of remediation check"
+  },
+  {
+    "task": "I41",
+    "title": "Bind Lottie preview to native snapshot/export adapter",
+    "outcome": "D05",
+    "findings": [
+      "R08",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Preview receives explicit pinned snapshot/result\nClosing disposes player and late result cannot update replaced preview"
+  },
+  {
+    "task": "I42",
+    "title": "Migrate lip-sync chart/key application through native component keys",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Fixed audio features generate expected mouth table\nL and W/Q remain manual baseline behavior\nApplying chart is undoable and preserves settings after reopen"
+  },
+  {
+    "task": "I43",
+    "title": "Characterize Kitsu baseline and separate service defects from native admission",
+    "outcome": "D08",
+    "findings": [
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "acceptance": "Exact source fixture proves default fps/shot behavior and secret-free session lifetime\nExisting unexercised server limitation remains explicit; no live network acceptance claim"
+  },
+  {
+    "task": "I44",
+    "title": "Route Kitsu shot/project mutation and working-file artifacts to native services",
+    "outcome": "D08",
+    "findings": [
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "acceptance": "Mocked opening yields correct native project settings with no shadow writer\nAE artifact passed intact to existing publication adapter\nFailure cannot reset unrelated active project"
+  },
+  {
+    "task": "I45",
+    "title": "Preserve local P2P contact model and defer absent live transport",
+    "outcome": "D08",
+    "findings": [
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "acceptance": "Add/remove survives reload\nNo contact action mutates project/revision or claims remote synchronization\nNo P2P/Buzz transport implementation added"
+  },
+  {
+    "task": "I46",
+    "title": "Bind vectorization readiness and worker result admission for desktop",
+    "outcome": "D06",
+    "findings": [
+      "R05",
+      "R09",
+      "R13",
+      "R20",
+      "R21"
+    ],
+    "acceptance": "Worker result is validated before atomic native insertion\nUnavailable worker leaves original document unchanged\nBrowser compatibility remains R24"
+  },
+  {
+    "task": "I47",
+    "title": "Reconcile desktop shell/build metadata and bundled sidecar provenance",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Declared sidecar/source identity matches selected candidate metadata\nUnexpected missing/unstamped input fails preflight\nRoot owns actual full build/install/final tests"
+  },
+  {
+    "task": "I48",
+    "title": "Reconcile developer CLI/module boundaries and focused test entry points",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Forbidden import/global/cycle and absent registration controls fail\nNormal documented command covers exact desktop modules\nNo hosted product build/workflow dispatch"
+  },
+  {
+    "task": "I49",
+    "title": "Reconcile non-code/vendor/generated/assets provenance and desktop build support",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Frozen source-set has explicit provenance disposition for each covered path\nHandwritten controls cannot escape by vendor/data labeling\nNo browser/deployment acceptance is invented"
+  },
+  {
+    "task": "I50",
+    "title": "Reconcile complete packet/field/consumer evidence into canonical scope admission",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Zero unmatched packets/fields/surfaces\nEach baseline defect has exact evidence rather than unavailable-as-complete\nRoot owns final global reconciliation/promotion"
+  },
+  {
+    "task": "I51",
+    "title": "Resolve Rust-MCP coverage floor findings for current public adapters",
+    "outcome": "D07",
+    "findings": [
+      "R03",
+      "R17",
+      "R18",
+      "R21"
+    ],
+    "acceptance": "No lowered floors or hidden exclusions\nEach exact finding has passing tested behavior or reviewed policy disposition\nRoot owns final full coverage run"
+  },
+  {
+    "task": "I52",
+    "title": "Route motion tracker frame reads and result application through native media/track ports",
+    "outcome": "D08",
+    "findings": [
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "acceptance": "Known synthetic translation produces same expected keys via native application\nFailed/missing frame or cancel changes no track\nSource/target revision replacement invalidates late result"
+  },
+  {
+    "task": "I53",
+    "title": "Route local remote-snapshot merge and revision ghosts through native import transaction",
+    "outcome": "A04",
+    "findings": [
+      "R04",
+      "R05",
+      "R20"
+    ],
+    "acceptance": "Identical snapshot produces no content mutation\nConflict fixture retains both declared local/remote versions and attribution\nInvalid imported field rejects before partial merge"
+  },
+  {
+    "task": "U01",
+    "title": "Partition editor bootstrap and retain safe initialization",
+    "outcome": "B01",
+    "findings": [
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fresh storage migration is idempotent and preserves existing nemo keys\nPaper install restores real DOM constructors\nStartup resolves one SM namespace before consumers and preserves frozen flag values"
+  },
+  {
+    "task": "U02",
+    "title": "Separate settings, profile and sync-folder presentation",
+    "outcome": "B01",
+    "findings": [
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Modal reopen and tab switch preserve values\nMalformed or denied storage preserves documented result\nSync-folder choose/unset and update-list operations preserve exact native adapter result and current error state"
+  },
+  {
+    "task": "U03",
+    "title": "Separate translation runtime from dictionary data",
+    "outcome": "B01",
+    "findings": [
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed English/French key pairs and missing-key fallback match current source\nLanguage switching refreshes mounted settings/Labs/help widgets\nDictionary hash/key set remain identical unless a separately characterized defect is admitted"
+  },
+  {
+    "task": "U04",
+    "title": "Retain shortcut registry and extract remap/menu dispatch UI",
+    "outcome": "B04",
+    "findings": [
+      "R13",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Default and remapped keys invoke the same action as their menu item\nConflict/reserved-key/reset/malformed JSON cases retain accepted registry semantics\nEach menu action has a native or presentation-only target; no legacy writer re-entry"
+  },
+  {
+    "task": "U05",
+    "title": "Partition keyboard focus, mode and clipboard arbitration",
+    "outcome": "B04",
+    "findings": [
+      "R13",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Input/contenteditable suppress app undo and clipboard while global Save still routes\nMotion key selection beats canvas selection which beats frame selection; paste follows last clipboard kind\nF6 and F7 remain distinct native commands; denied commands cannot call legacy writer\nRepeated mount/dispose creates exactly one listener"
+  },
+  {
+    "task": "U06",
+    "title": "Extract temporary tool holds and ordinary brush/tool controls",
+    "outcome": "B04",
+    "findings": [
+      "R13",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Keyup/blur/cancel restores previous tool exactly once\nBrush-size controls reflect the same default and active-selection policy\nFlyout outside-click cleanup and tool badges survive remap\nSelected brush styling changes only through one native command"
+  },
+  {
+    "task": "U07",
+    "title": "Extract timeline projection, selection and scroll layout",
+    "outcome": "B05",
+    "findings": [
+      "R02",
+      "R16",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Motion playhead aligns diamond centers while Animation 2D aligns cell edges\nScroll/resize preserves viewport and selected-cell classes\nRerender cannot mutate native content or invent held cells\nStale metadata does not select a different layer/frame"
+  },
+  {
+    "task": "U08",
+    "title": "Complete stopped selected-layer timing presenter source review/integration",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Selected-layer authored/held/blank/unexposed cells and caption match canonical timed fixture\nLayer switch, stale session/revision and rerender cannot repaint mismatched metadata\nCandidate preserves the native writer denial and eye selection route"
+  },
+  {
+    "task": "U09",
+    "title": "Wire frame-grid drags, held-span trims and clipboard callers",
+    "outcome": "B05",
+    "findings": [
+      "R02",
+      "R16",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed multi-layer selection move/copy/cut/paste keeps content identity and expected empty cells\nSingle-key ripple and span shrink return exact timing arrays and one history entry\nPointer cancel changes no content; stale revision commit refuses\nUndo/redo and save/reopen use W02 independent fixtures through actual grid command"
+  },
+  {
+    "task": "U10",
+    "title": "Wire layer lifecycle, duplicate/split and folder command callers",
+    "outcome": "B05",
+    "findings": [
+      "R02",
+      "R16",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Add activates only after accepted caller policy, separately from #2041 private source\nDuplicate/split preserve stable IDs and remap relationship/mesh/rig references using native results\nFolder collapse is view-only; folder membership/name/lock survive history/save\nUnsupported layer kinds reject without partial edit"
+  },
+  {
+    "task": "U11",
+    "title": "Extract layer row/tree renderer and drag reorder presenter",
+    "outcome": "B05",
+    "findings": [
+      "R02",
+      "R16",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed folder/tree and render-order fixture produces expected rows and badges\nReorder/cancel and stale UID cases preserve selection/content correctly\nEye reuses accepted native visibility route and does not write legacy state\nColor label/multi-select changes follow declared metadata owner"
+  },
+  {
+    "task": "U12",
+    "title": "Wire parent, follow-path, time-link and matte pickers",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "A/B parent weights, self/descendant exclusion, time-link offsets and matte sources match fixed relation fixture\nCancel or invalid cycle leaves revision unchanged\nUndo/redo/reopen restores chosen native relation and row label"
+  },
+  {
+    "task": "U13",
+    "title": "Extract timeline transport and document-timing controls over native ports",
+    "outcome": "B05",
+    "findings": [
+      "R02",
+      "R16",
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed-clock forward/wrap/nonloop/pingpong/single-frame cases match independent sequence and audio-loop count\nWork-area/FPS/duration fields reflect native receipt and reject malformed/stale input\nNo saveAllLayerFrames or JS-owned timing mutation on native transport route"
+  },
+  {
+    "task": "U14",
+    "title": "Extract properties context router and presentation helpers",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Fixed no-selection/stroke/text/component/mixed/locked cases show exact expected sections and values\nRead-only context refresh creates no content revision\nMissing family capability shows exact unavailable state without stale values"
+  },
+  {
+    "task": "U15",
+    "title": "Wire stroke/fill/style inspectors and selection paint commands",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Default-only edits do not mutate existing objects\nSelection paint/width/profile/smoothing changes match serialized native fixture after undo/redo/reopen\nHex alpha, disabled gradient join and vector-brush fields preserve documented values\nCanceled preview restores the native snapshot; render/export compare same style"
+  },
+  {
+    "task": "U16",
+    "title": "Wire shape geometry, masks and point/boolean controls",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Independent rectangle corner, ellipse arc, star point and mask fixture yields expected geometry\nBoolean/align/point-type commit one transaction and preserve ID/history\nSelection and locked-state guards prevent stale or partial edits"
+  },
+  {
+    "task": "U17",
+    "title": "Replace ghost-proxy transform writers with native selection intents",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Move/scale/rotate scrub, numeric commit, cancel and no-op have fixed matrix/geometry oracles\nHeld-frame selection targets the correct authored native source\nNo duplicate or mutated Paper proxy reaches persistence\nSave/history/render parity is exercised through family consumer fixtures"
+  },
+  {
+    "task": "U18",
+    "title": "Wire blend and matte preview/commit dropdowns",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Hover preview followed by Escape/click-outside restores original pixels and revision\nChosen blend/matte mode commits once and survives undo/reopen\nLayer switch during popover cannot apply to the new layer"
+  },
+  {
+    "task": "U19",
+    "title": "Wire tween span/easing displays and curve edit intents",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Fixed curve control points produce expected SVG and interpolated samples\nMulti-selection edits each tween pair once and retain overshoot handles\nCurve popover cancel has no native edit; dormant/unwired edit entry is characterized against fixed baseline\nHistory/reload uses authoritative native easing records"
+  },
+  {
+    "task": "U20",
+    "title": "Extract ordinary onion and ghost controls with local view settings",
+    "outcome": "B06",
+    "findings": [
+      "R12",
+      "R15",
+      "R18",
+      "R19"
+    ],
+    "acceptance": "Fixed previous/next ghost samples and tint/shift settings match expected overlay\nReset/reopen/revision-view transitions cleanly dispose overlays\nView-only changes produce zero content revisions; bake goes through native transaction"
+  },
+  {
+    "task": "U21",
+    "title": "Extract text popover and in-place editing session UI",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Create/edit/cancel/resize and layer switch have exact text/style/box oracles\nEnter/Escape/focus behavior commits or cancels once\nNo temporary text node or raster snapshot becomes alternate persisted owner"
+  },
+  {
+    "task": "U22",
+    "title": "Wire text commit, typography, bake and character actions",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "Fixed text/fonts/alignment/wrapping fixture yields expected layout/characters\nFont-load rejection does not create partial layer content\nTypography edit and character split preserve identity/history/reload and output pixels"
+  },
+  {
+    "task": "U23",
+    "title": "Wire component, footage and lip-sync panels",
+    "outcome": "B08",
+    "findings": [
+      "R08",
+      "R11",
+      "R13",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Nested symbol/frame-strip fixture preserves correct outer/inner frame identity\nComponent speed/placement/single-frame and lip-sync changes use native history\nFootage range/seek UI matches media receipt and stale session cancels"
+  },
+  {
+    "task": "U24",
+    "title": "Wire duplicator inspector and effectors",
+    "outcome": "B08",
+    "findings": [
+      "R08",
+      "R11",
+      "R13",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Fixed source-pool/distribution/effectors fixture reflects expected selected values\nCommit/cancel and source removal cannot reference stale layers\nRepeated UI refresh changes no content; accepted command produces expected native clones/history"
+  },
+  {
+    "task": "U25",
+    "title": "Wire rig, combine-group, motion-blur and shy panels",
+    "outcome": "B08",
+    "findings": [
+      "R08",
+      "R11",
+      "R13",
+      "R19",
+      "R24"
+    ],
+    "acceptance": "Rig setup/bind/pose mode shows exact controls and rejects invalid/locked targets\nCombine-group edit has one native history entry and expected member identities\nMotion-blur/shy controls reflect native flags without hidden Paper writes"
+  },
+  {
+    "task": "U26",
+    "title": "Separate document serialization/import facades and residual editing reexports",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "All baseline fields use W01 lossless codec fixture; facade cannot silently drop unknown admitted fields\nCalling snapshot/getState never creates a revision or materializes Paper frames\nImport replaces native owner only after validated receipt\nDelete/repeat/extend rejects unavailable target and uses one native transaction"
+  },
+  {
+    "task": "U27",
+    "title": "Extract ordinary export modal and native job presentation",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "PNG ordinary modal uses pinned revision with no saveAllLayerFrames\nEach admitted format passes UI options to matching native job and reports actual availability\nCancel/retry/staging failure restores modal state and retains existing output\nShared installed export sweep covers ordinary picker and decoded output"
+  },
+  {
+    "task": "U28",
+    "title": "Extract workspace rails, view fitting and toolbar preferences",
+    "outcome": "B07",
+    "findings": [
+      "R04",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fresh/reopened workspace restores local toolbar/rail state and active tab correctly\nFit/zoom/rulers/alpha toggle changes view without content revision\nToolbar mandatory buttons remain visible; missing stored IDs are tolerated\nAutosave/session restoration uses native W01 document entry"
+  },
+  {
+    "task": "U29",
+    "title": "Extract feedback/comment/collaborator presentation",
+    "outcome": "B07",
+    "findings": [
+      "R04",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed entries produce expected inbox tags/avatar stack/triage filters without sending messages\nOpen/close/popover recording cleanup is deterministic\nComment edit persists only through declared owner; debug/screenshots never leak into project export\nNetwork failure retains exact existing UI outcome"
+  },
+  {
+    "task": "U30",
+    "title": "Partition Labs registry, settings list and floating strip",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Toggle/reset fires lifecycle once and persists the exact per-install flag\nRegistry list translates labels after i18n without module-order globals\nNew/Open disables enabled Labs as baseline requires\nNo Labs fan-out mutates Paper document content after native cutover"
+  },
+  {
+    "task": "U31",
+    "title": "Retain Labs view-only aids and local markers",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Each aid leaves contentRevision and serialized native document unchanged\nRoll and xsheet read authored/held/blank timing through same native query\nMarker project keys remain isolated and decoration survives header rerender\nDisable removes all extra overlays/listeners without touching drawing pixels"
+  },
+  {
+    "task": "U32",
+    "title": "Retain 3D reference viewer and ordinary OBJ entry",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Known OBJ produces expected triangle count and view controls\nClosing/replacing viewer releases GL/listener resources\nOpening reference produces no native document revision or project file payload\nFetch/parse failures preserve exact baseline outcome"
+  },
+  {
+    "task": "U33",
+    "title": "Migrate Labs predictive/sculpt/french-curve/trim commits",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed line/circle/rectangle recognition, sculpt radius/smooth, guided line/ellipse and knife intersection fixtures produce expected geometry\nPreview/cancel changes no content; accepted commit changes native revision exactly once\nUndo/redo/save/reload/render/export use same committed native strokes\nNative cutover cannot invoke original Paper mutation callbacks"
+  },
+  {
+    "task": "U34",
+    "title": "Migrate Labs multiframe draw, move-to-layer and pose stamping",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Multiframe fixed selection writes exactly selected frames and one history item\nMove preserves stroke/linked-fill identity without source duplicates\nPose stamp remaps stroke and brush-group identities and applies offset independently on each stamp\nReject locked/component/stale targets atomically; undo/reopen restores exact documents"
+  },
+  {
+    "task": "U35",
+    "title": "Migrate Labs ping-pong, exposure retime and interval actions",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Fixed A/B/C ping-pong produces exact baseline sequence\nOnes/twos/threes retime yields expected held/source timing without content aliasing\nN eased intervals produce independently calculated frames and endpoints\nEach action is one undoable native transaction and persists through reopen"
+  },
+  {
+    "task": "U36",
+    "title": "Migrate Labs speed lines, boil, path bake and reference fill",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Seeded radial/boil fixture yields exact expected stroke/frame counts and coordinates\nFollow-path independently sampled positions match native baked keys\nReference fill encloses expected region from visible native layers without modifying wall objects\nCancel/failure is atomic; undo/reload/render/export reflects committed output"
+  },
+  {
+    "task": "U37",
+    "title": "Disposition dormant Labs without activating prototypes",
+    "outcome": "B09",
+    "findings": [
+      "R19",
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Startup script graph excludes the twelve dormant paths\nCurrent ordinary timeline zoom remains reachable\nTimelapse descriptor/lifecycle tests preserve #1033 accepted boundary without startup addition\nEach dormant file has exact retained-source disposition and no desktop functionality acceptance claim"
+  },
+  {
+    "task": "U38",
+    "title": "Close UI module ports, load order and legacy retirement",
+    "outcome": "B10",
+    "findings": [
+      "R17",
+      "R18",
+      "R20",
+      "R21",
+      "R24"
+    ],
+    "acceptance": "All assigned UI source responsibilities have a coherent adopted-profile module or exact retained data/dormant disposition\nMoved feature modules pass size/boundary rules without raising ceilings or meaningless fragmentation\nNegative controls reject hidden writer, missing registration, stale route and wrong load order\nFull-source/final package gates remain shared central tasks"
+  },
+  {
+    "task": "U39",
+    "title": "Retain confirmation adapter and desktop-only fallback disposition",
+    "outcome": "B01",
+    "findings": [
+      "R22",
+      "R24"
+    ],
+    "acceptance": "Native confirm resolve true/false/error routes match adapter contract\nCancellation invokes no destructive native command\nR24 browser branch retains source fixture but is absent from current desktop acceptance claims"
+  },
+  {
+    "task": "X01",
+    "title": "Review and publish frozen held-frame integration",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#2050 local53524680; preserve16authorblobs and independently review Root5metadata; publication remains pending"
+  },
+  {
+    "task": "X02",
+    "title": "Run held-frame native, GPU and decoded PNG gates",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#2050 threehostcases, eightframepixelmatrix, neighborroutes, quick/currentfbe-boundaries/inventory; measuredneighborpipeline207s, changedhostcompilation additional"
+  },
+  {
+    "task": "X03",
+    "title": "Integrate and release held-frame delivery",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "PR2052 normalprotectedreview/metadataapproval/merge/treeidentity and explicitclaimsrelease"
+  },
+  {
+    "task": "X04",
+    "title": "Review timing UI and apply its four metadata files",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#2058 clean44b2f3f/PR2060;140focusedJSPASS; exactsource+appmetadatareview pending"
+  },
+  {
+    "task": "X05",
+    "title": "Run final timing UI checks",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#2058 quick/currentbaseboundaries/inventory; historicalquick157.22s, no new source feature estimated"
+  },
+  {
+    "task": "X06",
+    "title": "Integrate and release timing UI",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "PR2060 normalprotectedreview/metadataapproval/merge/claimsrelease"
+  },
+  {
+    "task": "X07",
+    "title": "Regenerate ordinary PNG fixture with authored timing",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#1959 fixture2103bytes lacks timing; explicit authorintent+nativeencoder+actualhash+fixedbyte/pixeloracles and candidatepolicy update"
+  },
+  {
+    "task": "X08",
+    "title": "Resolve ordinary native picker execution method",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#1959/#1573/#1864 prior helper sheet/childownership refusals; bounded actual visible-control method and identity/effect checks required before new runtime attempts"
+  },
+  {
+    "task": "X09",
+    "title": "Build and preflight combined temporal candidate variants",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "Sameintegratedsource; P38diagnostic and defaultproduction variants required; warmbuilds69.257-84.316s each exclude preflight/review"
+  },
+  {
+    "task": "X10",
+    "title": "Accept installed P38 populated-tab safety workflow",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#1645 READY/Aopen/Bopen/distinctrows/unchangedA/visibleunavailablealert/Bclose/finalAonly; isolatednewgrant+observations"
+  },
+  {
+    "task": "X11",
+    "title": "Accept ordinary two-frame PNG export and cancellation",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#1959 ordinary Open/SaveAs/cancel/export; exact2decodedPNGs, pixels, identity/history/savebytes, noresidue"
+  },
+  {
+    "task": "X12",
+    "title": "Accept installed playback minimize and restore",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#1573 actualPlay/minimize/restore/Play/Stop with visible0/10/20 and identity/publicationfences"
+  },
+  {
+    "task": "X13",
+    "title": "Accept ordinary Reference persistence and export exclusion",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#1864 attach/replace/undo/redo/SaveAs/reopen/viewport and exportexclusion through ordinaryUI"
+  },
+  {
+    "task": "X14",
+    "title": "Accept timing and visibility through ordinary desktop controls",
+    "outcome": "A02",
+    "findings": [
+      "R16",
+      "R23",
+      "R24"
+    ],
+    "acceptance": "#2058/#1996 selectedlayer/frame0/6/7/12/20, stale/revision/selectioncontrols, actualeye/history/persistence/render consumers"
+  },
+  {
+    "task": "X15",
+    "title": "Accept actual installed Codex and Claude clients",
+    "outcome": "A08",
+    "findings": [
+      "R24",
+      "R25"
+    ],
+    "acceptance": "#1049/#1996 discovery/edit/history/reconnect/save/reopen on actualidentifiedclients; currentCyrill-ownedF03coordination retained"
+  },
+  {
+    "task": "X16",
+    "title": "Reconcile final fields and complete consumer matrix",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "P03 exactbaseline responsibility→source→persistedfield→requiredconsumer→receipt join, no unavailablefeature credited"
+  },
+  {
+    "task": "X17",
+    "title": "Execute combined cross-family native regression matrix",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Interleavedhistory/save/load/selection/animation/render/export and acceptedfamilies with fixedindependentoracles; focusedper-tasktests separatelycharged"
+  },
+  {
+    "task": "X18",
+    "title": "Execute full required installed desktop family sweep",
+    "outcome": "A08",
+    "findings": [
+      "R24",
+      "R25"
+    ],
+    "acceptance": "AllrequiredordinaryUI/consumer cells from completedtaskmapping, exactcandidate and package; engineeringallocation15families*10min+30minsetup/review, not measured successfulrun"
+  },
+  {
+    "task": "X19",
+    "title": "Accept bounded baseline workloads and recovery",
+    "outcome": "A08",
+    "findings": [
+      "R24",
+      "R25"
+    ],
+    "acceptance": "R19#921 baselineplayback/render/export/resource no-regression/recovery, exactexistinglimits; no new performance campaign"
+  },
+  {
+    "task": "X20",
+    "title": "Run final coverage, boundaries, schema and negative controls",
+    "outcome": "A07",
+    "findings": [
+      "R01",
+      "R02",
+      "R03",
+      "R22",
+      "R23",
+      "R26"
+    ],
+    "acceptance": "Actualpolicy includingRustMCPcoveragefloor findings; sourcefixesownedby mappedtasks; no loweredfloor or skip"
+  },
+  {
+    "task": "X21",
+    "title": "Accept clean clone and fresh-agent onboarding",
+    "outcome": "A08",
+    "findings": [
+      "R24",
+      "R25"
+    ],
+    "acceptance": "P32#1034 cleanclone documentedlocalvalidation/installedidentity; originalCyrillownership/handoff is externalprerequisite"
+  },
+  {
+    "task": "X22",
+    "title": "Close final P03/P33 acceptance mapping",
+    "outcome": "A09",
+    "findings": [
+      "R26"
+    ],
+    "acceptance": "Everyrequiredcell accepted/exactbaseline-defectdisposition, no source-only closure; updateProject2 linkedreceipts"
+  },
+  {
+    "task": "X23",
+    "title": "Prepare final protected promotion",
+    "outcome": "A09",
+    "findings": [
+      "R26"
+    ],
+    "acceptance": "Operationalmainpreservation and sourcecomparison; normalPR with exactcandidate/acceptancereceipts"
+  },
+  {
+    "task": "X24",
+    "title": "Obtain final human acceptance",
+    "outcome": "A09",
+    "findings": [
+      "R26"
+    ],
+    "acceptance": "Executionplansection9 humanacceptance; duration externallycontrolled, noappointmentverified"
+  },
+  {
+    "task": "X25",
+    "title": "Perform approved promotion and final readback",
+    "outcome": "A09",
+    "findings": [
+      "R26"
+    ],
+    "acceptance": "Normalprotectedpromotion/main/tree/board/claimsrelease readback after actualapproval"
+  }
+]
