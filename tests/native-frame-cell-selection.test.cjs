@@ -16,6 +16,7 @@ function selectionHarness(options={}){
     setAttribute(k,v){n.attributes[k]=String(v);},focus(){},
     getBoundingClientRect:()=>({left:100,top:0,width:400,height:20})};return n;}
   const doc=node(),header=node(),caption=node(),wrap=node(),cycle=node(),tasks=new Map();let serial=0;
+  doc.body=node();
   cycle.disabled=options.cycleDisabled===true;cycle.title='Original Cycle';
   header.appendChild(caption);caption.textContent='Frame 1 / '+(options.total||6);wrap.clientWidth=400;wrap.scrollLeft=0;
   doc.getElementById=id=>id==='frame-hdr'?header:id==='fg-wrap'?wrap:id==='btn-cycle'?cycle:null;doc.createElement=node;

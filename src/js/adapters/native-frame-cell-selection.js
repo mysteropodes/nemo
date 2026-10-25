@@ -28,26 +28,30 @@
     w.node&&w.node.parentNode===w.caption&&header.contains(w.caption);}
   function cellsEqual(cells,values){return Array.isArray(cells)&&cells.length===values.length&&
     cells.every(function(cell,i){return cell&&cell.layer===values[i][0]&&cell.frame===values[i][1];});}
-  function current(root,w,c){
+  function sourceCurrent(root,w,c){
     var p=presented(root,w.ports,c.info),selection=rows(root,c.info);
-    return w.capture===c&&connected(root,w)&&p&&p.session===c.session&&p.shown===c.presentation&&
+    return connected(root,w)&&p&&p.session===c.session&&p.shown===c.presentation&&
       same(w.info,c.info)&&root.FC===c.fc&&root.state.currentFrame===c.frame&&root.state.appMode===c.mode&&
       root.state.activeSymbolId==null&&root.state.activeCompositionId==null&&root._sel===c.selection&&
       root._sel.frames===c.frames&&cellsEqual(root._sel.frames,c.cells)&&JSON.stringify(selection)===c.rows&&
       w.node.getBoundingClientRect().left===c.left;
   }
+  function current(root,w,c){return w.capture===c&&sourceCurrent(root,w,c);}
   function status(w,text){w.status.textContent=text;w.status.hidden=!text;w.node.setAttribute('aria-busy',text?'true':'false');}
-  function pending(root){var w=works.get(root);return !!(w&&w.capture);}
+  function pending(root){var w=works.get(root);return !!(w&&(w.capture||w.dialog));}
   function cycle(root,w){
     var button=root.document.getElementById('btn-cycle');
-    if(w.cycle&&(!w.capture||w.cycle.node!==button)){
+    if(w.cycle&&(!(w.capture||w.dialog)||w.cycle.node!==button)){
       w.cycle.node.disabled=w.cycle.disabled;w.cycle.node.title=w.cycle.title;w.cycle=null;
     }
-    if(w.capture&&button){if(!w.cycle)w.cycle={node:button,disabled:button.disabled,title:button.title};
+    if((w.capture||w.dialog)&&button){if(!w.cycle)w.cycle={node:button,disabled:button.disabled,title:button.title};
       button.disabled=true;button.title='Finish or cancel the frame selection first';}
   }
   function mode(w,on){w.enabled=on;if(w.button){w.button.textContent=on?'Done selecting':'Select frames';w.button.setAttribute('aria-pressed',String(on));}}
+  function dismiss(root,w){var d=w.dialog;if(!d)return;w.dialog=null;d.done=true;
+    if(d.overlay.parentNode)d.overlay.parentNode.removeChild(d.overlay);cycle(root,w);}
   function cancel(root,exit){var w=works.get(root);if(!w)return;w.capture=null;if(exit)mode(w,false);
+    dismiss(root,w);
     cycle(root,w);
     if(w.timer!==null){(root.clearTimeout||clearTimeout)(w.timer);w.timer=null;}
     if(w.node){status(w,'');paint(root,w);}}
@@ -90,7 +94,7 @@
   }
   function down(root,w,event){
     // The ordinary #frame-hdr bubble handler remains the ruler scrub owner.
-    if(works.get(root)!==w||event.button!==0||!w.enabled)return;
+    if(works.get(root)!==w||event.button!==0||!w.enabled||w.dialog)return;
     event.preventDefault();event.stopPropagation();cancel(root);
     var p=presented(root,w.ports,w.info),chosen=rows(root,w.info),selection=root._sel;
     if(!p||!connected(root,w)||!chosen||!selection||!Array.isArray(selection.frames)||
@@ -142,7 +146,7 @@
       function listen(target,name,callback,capture){target.addEventListener(name,callback,capture);w.listeners.push([target,name,callback,capture]);}
       listen(root.document,'mousemove',function(e){move(root,w,e);});
       listen(root.document,'mouseup',function(e){up(root,w,e);});
-      listen(root.document,'keydown',function(e){if(e.key==='Escape'&&(w.capture||w.enabled)){e.preventDefault();e.stopPropagation();cancel(root,true);}},true);
+      listen(root.document,'keydown',function(e){if(e.key==='Escape'&&(w.capture||w.enabled||w.dialog)){e.preventDefault();e.stopPropagation();cancel(root,true);}},true);
       listen(root.document,'visibilitychange',function(){if(root.document.hidden)cancel(root,true);});
       if(root.addEventListener){listen(root,'blur',function(){cancel(root,true);});listen(root,'pagehide',function(){retire(root);});}
       var wrap=root.document.getElementById('fg-wrap');if(wrap)listen(wrap,'scroll',function(){if(w.capture)cancel(root);else paint(root,w);});
@@ -172,5 +176,36 @@
     node.addEventListener('blur',function(){if(works.get(root)===w&&w.node===node&&w.capture)cancel(root);});
     status(w,'');paint(root,w);return true;
   }
-  return Object.freeze({mount:mount,retire:retire,isPending:pending});
+  function openRepeatDialog(root,accept,isCurrent){
+    var w=works.get(root);try{
+    var p=w&&presented(root,w.ports,w.info),chosen=w&&rows(root,w.info),s=root._sel;
+    if(!w||!p||!connected(root,w)||w.capture||w.dialog||!chosen||!s||!Array.isArray(s.frames)||!s.frames.length||typeof accept!=='function'||typeof isCurrent!=='function'||isCurrent()!==true)return false;
+    if(!Number.isFinite(root.FC)||root.FC<=0||!s.frames.every(function(v){return v&&Number.isSafeInteger(v.layer)&&v.layer>=0&&v.layer<w.info.layers.length&&
+      Number.isSafeInteger(v.frame)&&v.frame>=0&&v.frame<w.info.totalFrames;}))return false;
+    var d={info:Object.assign({},w.info),session:p.session,presentation:p.shown,fc:root.FC,left:w.node.getBoundingClientRect().left,
+      frame:root.state.currentFrame,mode:root.state.appMode,selection:s,frames:s.frames,
+      cells:s.frames.map(function(v){return [v.layer,v.frame];}),rows:JSON.stringify(chosen),done:false};
+    var overlay=root.document.createElement('div'),form=root.document.createElement('form'),heading=root.document.createElement('h2');
+    var label=root.document.createElement('label'),input=root.document.createElement('input'),repeat=root.document.createElement('button'),close=root.document.createElement('button');
+    overlay.className='native-repeat-dialog-overlay';Object.assign(overlay.style,{position:'fixed',inset:'0',display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,.4)',zIndex:'20000'});
+    form.setAttribute('role','dialog');form.setAttribute('aria-modal','true');form.setAttribute('aria-label','Repeat selected frames');
+    Object.assign(form.style,{background:'var(--panel2)',color:'var(--text)',border:'1px solid var(--border2)',borderRadius:'8px',padding:'18px',display:'flex',gap:'12px',alignItems:'center',flexWrap:'wrap',maxWidth:'360px'});
+    heading.textContent='Repeat selected frames';heading.style.width='100%';heading.style.fontSize='15px';
+    label.textContent='Repetitions';label.setAttribute('for','native-repeat-count');input.id='native-repeat-count';input.type='text';input.inputMode='numeric';input.value='2';
+    input.setAttribute('aria-label','Repetitions');input.style.width='90px';repeat.type='submit';repeat.textContent='Repeat';close.type='button';close.textContent='Cancel';
+    d.overlay=overlay;w.dialog=d;cycle(root,w);[heading,label,input,repeat,close].forEach(function(n){form.appendChild(n);});overlay.appendChild(form);root.document.body.appendChild(overlay);
+    function commit(e){e.preventDefault();e.stopPropagation();if(d.done||works.get(root)!==w||w.dialog!==d)return;
+      var valid=false;try{valid=sourceCurrent(root,w,d)&&!w.capture&&root.document.body.contains(overlay)&&isCurrent()===true;}catch(_){}
+      if(!valid){dismiss(root,w);if(root.showToast)root.showToast('Repeat refused: the document or selection changed.');return;}
+      var value=input.value;dismiss(root,w);try{Promise.resolve(accept(value)).catch(function(){if(root.showToast)root.showToast('Repeat was not confirmed.');});}
+      catch(_){if(root.showToast)root.showToast('Repeat was not confirmed.');}
+    }
+    form.addEventListener('submit',commit);repeat.addEventListener('click',commit);
+    close.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();if(works.get(root)===w&&w.dialog===d)dismiss(root,w);});
+    input.addEventListener('keydown',function(e){if(e.key==='Enter')commit(e);else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(works.get(root)===w&&w.dialog===d)dismiss(root,w);}});
+    overlay.addEventListener('click',function(e){if(e.target===overlay&&works.get(root)===w&&w.dialog===d)dismiss(root,w);});
+    if(typeof input.focus==='function')input.focus();if(typeof input.select==='function')input.select();return true;
+    }catch(_){if(w&&works.get(root)===w)dismiss(root,w);return false;}
+  }
+  return Object.freeze({mount:mount,retire:retire,isPending:pending,openRepeatDialog:openRepeatDialog});
 }));

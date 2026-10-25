@@ -138,7 +138,7 @@ test('moving a key on another layer preserves the active-layer prefix in the exa
   assert.equal(h.root.state.activeLayerIdx,1);
 });
 
-test('ordinary Cycle button prompt crosses the real legacy wrapper with baseline count parsing and cancellation',async()=>{
+test('browser Cycle prompt retains baseline count parsing and cancellation through the real wrapped writer',async()=>{
   const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
   const source=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8');
   const start=source.indexOf('function initCycleAndPropagate(){');
@@ -149,7 +149,7 @@ test('ordinary Cycle button prompt crosses the real legacy wrapper with baseline
     h.root.NemoNativeFrameEditDesktop=Desktop;h.root.SM={importJSON(){},repeatSelection(){legacy++;}};
     const dispose=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>false,()=>{});
     const wrapped=h.root.SM.repeatSelection;h.root.SM.repeatSelection=value=>(pending=wrapped(value));
-    const context={window:h.root,selBounds:()=>({minF:1,maxF:2}),prompt:()=>input,
+    const context={window:{SM:h.root.SM},selBounds:()=>({minF:1,maxF:2}),prompt:()=>input,
       document:{getElementById:id=>id==='btn-cycle'?{addEventListener:(event,fn)=>{assert.equal(event,'click');click=fn;}}:null}};
     vm.runInNewContext(body+'\ninitCycleAndPropagate();',context);click();
     if(want===null)assert.equal(pending,undefined);
@@ -540,7 +540,7 @@ test('Project queued guard grants only its own current presentation lease and re
   }
 });
 
-test('ordinary native header selection reaches the original Cycle prompt from empty cells and Cancel keeps the selection',async()=>{
+test('header selection reaches the unchanged browser Cycle branch and pending input cannot dispatch old cells',async()=>{
   const Selection=require('../src/js/adapters/native-frame-cell-selection.js'),Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
   const fixture=fs.readFileSync(require.resolve('./native-frame-cell-selection.test.cjs'),'utf8');
   const a=fixture.indexOf('// BEGIN REUSABLE NATIVE CELL HEADER FIXTURE'),b=fixture.indexOf('// END REUSABLE NATIVE CELL HEADER FIXTURE');
@@ -561,7 +561,7 @@ test('ordinary native header selection reaches the original Cycle prompt from em
     h.root.NemoNativeFrameEditDesktop=Desktop;h.root.SM={importJSON(){},repeatSelection(){legacy++;}};
     const dispose=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>false,()=>{});
     const wrapped=h.root.SM.repeatSelection;h.root.SM.repeatSelection=value=>(pending=wrapped(value));
-    const context={window:h.root,_sel:h.root._sel,
+    const context={window:{SM:h.root.SM},_sel:h.root._sel,
       prompt:()=>{prompts++;return input==='pending'?'2':input;},document:{getElementById:id=>id==='btn-cycle'?{addEventListener:(event,fn)=>{click=fn;}}:null}};
     vm.runInNewContext(bounds+'\n'+body+'\ninitCycleAndPropagate();',context);
     if(input==='pending'){

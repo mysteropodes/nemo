@@ -119,6 +119,13 @@
     inspectors.delete(root);
   }
   function isFrameSelectionPending(root){var helper=root.NemoNativeFrameCellSelection;return !!(helper&&helper.isPending(root));}
+  function showRepeatDialog(root){
+    try{var helper=root.NemoNativeFrameCellSelection,controller=root.NemoNativeFrameEditController;
+    if(!helper||typeof helper.openRepeatDialog!=='function'||!controller||typeof controller.routeWriter!=='function'||!root.SM||typeof root.SM.repeatSelection!=='function')return false;
+    var sm=root.SM,writer=sm.repeatSelection;return helper.openRepeatDialog(root,function(value){return writer.call(sm,value);},
+      function(){return root.NemoNativeFrameEditController===controller&&root.SM===sm&&sm.repeatSelection===writer;});
+    }catch(_){return false;}
+  }
   function settingsInspector(root,prior,ports,info){
     var controller=ports&&typeof ports.projectSettings==='function'&&ports.projectSettings();
     if(!controller||typeof controller.edit!=='function')return;
@@ -467,5 +474,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,isFrameSelectionPending:isFrameSelectionPending,showRepeatDialog:showRepeatDialog,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts,bindMotion:bindMotion,readSelectedMotionKeys:readSelectedMotionKeys,paintMotionInspector:paintMotionInspector,routeMotionShortcut:routeMotionShortcut});
 }));
