@@ -1479,6 +1479,7 @@
         "object_frame_clipboard_repeat_timing.rs",
         "object_frame_clipboard_repeat_wire.rs",
         "object_frame_clipboard_repeat_history.rs",
+        "object_frame_clipboard_repeat_project.rs",
         "object_frame_clipboard_repeat_rows.rs",
         "object_frame_clipboard_repeat_controls.rs",
         "object_frame_clipboard_repeat_edges.rs",

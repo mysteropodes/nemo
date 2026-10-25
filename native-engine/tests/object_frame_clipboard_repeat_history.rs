@@ -21,6 +21,9 @@ mod edges;
 #[cfg(feature = "evaluation")]
 #[path = "object_frame_clipboard_repeat_exposure.rs"]
 mod exposure;
+#[cfg(feature = "project_media_codec")]
+#[path = "object_frame_clipboard_repeat_project.rs"]
+mod project;
 #[path = "object_frame_clipboard_repeat_rows.rs"]
 pub(crate) mod rows;
 
@@ -130,9 +133,9 @@ fn every_oracle_row_matches_through_the_dispatcher_undo_redo_and_reopen() {
 
 /// The growth is the baseline's `max(total, maxF + 1 + span * clamp(times))`, computed natively by `grown_total`; the
 /// work-area out point the baseline also moves is `needed - 1` exactly when the timeline grew, which is the value the
-/// project-settings owner will owe (not document content, so not applied here).
+/// project revision also publishes (these rows deliberately retain bare drawing inputs).
 #[test]
-fn native_growth_and_the_owed_work_area_value_follow_the_baseline() {
+fn native_growth_and_the_project_work_area_value_follow_the_baseline() {
     let mut grew = 0;
     for row in &rows() {
         let (_, _, first, last) = row.bounds();

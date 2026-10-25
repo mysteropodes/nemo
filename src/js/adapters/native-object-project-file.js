@@ -21,11 +21,11 @@
   function pinSettings(pin,info){settingsKeys.forEach(function(k){if(has(info,k))pin[k]=info[k];else delete pin[k];});return pin;}
   function projectSettings(root,info,previous){
     var s=root.state,defaults={canvasBg:'#ffffff',waIn:0,waOut:info.totalFrames-1};
-    s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;
+    s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;s.totalFrames=info.totalFrames;
     ['canvasBg','waIn','waOut'].forEach(function(k){
       if(has(info,k))s[k]=info[k];else if(!previous||has(previous,k))s[k]=defaults[k];
     });
-    root._waIn=s.waIn;root._waOut=s.waOut;
+    root._totalF=s.totalFrames;root._waIn=s.waIn;root._waOut=s.waOut;
   }
   function projectionMatches(root,info){
     var pin=projections.get(root),rows=root.state&&root.state.layers;
@@ -79,7 +79,8 @@
   }
   function refreshLayerTable(root,info){
     var pin=projections.get(root),s=root.state,rows=s&&s.layers;
-    if(!pin||!info||!['instanceId','documentId','lifecycleGeneration','totalFrames'].every(function(k){return pin[k]===info[k];})||
+    if(!pin||!info||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===info[k];})||
+      !s||s.totalFrames!==pin.totalFrames||
       !Array.isArray(rows)||rows.length!==pin.layerUids.length||!pin.layerUids.every(function(uid,i){return rows[i]&&rows[i].layerUid===uid&&
         parentValue(rows[i])===pin.layerParents[i];}))return false;
     validateSettings(info);
@@ -98,6 +99,11 @@
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
     if(delta!==0){s.activeLayerIdx=splice.active;root._layerSel=splice.selection;root._layerSelAnchor=splice.anchor;}
     projectSettings(root,info,pin);
+    // Duration edits and their Undo can shorten the timeline. Keep the UI playhead valid
+    // before the native session requests the next presentation; drawing bytes stay native.
+    if(info.totalFrames!==pin.totalFrames){
+      s.currentFrame=Math.max(0,Math.min(info.totalFrames-1,s.currentFrame));root._curFrame=s.currentFrame;
+    }
     projections.set(root,pinSettings(Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
       contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId,layerParents:next.map(parentValue)}),info));
     return true;

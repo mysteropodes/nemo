@@ -29,7 +29,7 @@
     if(name==='removeTweenSpan')return {kind:'removeTween',layer:args[0],from:args[1],to:args[2]};
     if(name==='moveKeyframe')return {kind:'moveKey',layer:args[0],from:args[1],to:args[2]};
     if(name==='extendExposure')return {kind:'extendExposure',count:args[0]};
-    if(name==='repeatSelection')return {kind:'repeatSelection',times:args[0]};
+    if(name==='repeatSelection')return {kind:'repeatSelection',times:Math.max(1,Math.min(50,parseInt(args[0],10)||1))};
     if(name==='moveFrames')return {kind:'moveFrames',selection:args[0],layer:args[1],frame:args[2]};
     if(name==='shiftLayerFrames')return {unsupported:true};
     return {kind:shared[name]||({deleteSelectedFrames:'deleteFrames',duplicateKeyframe:'duplicateKey'})[name]||name};
@@ -39,7 +39,8 @@
     if(!root.NemoNativeFrameEditIntent||typeof root.NemoNativeFrameEditIntent.create!=='function')
       throw new Error('Native frame edit intent is unavailable');
     function current(){return root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);}
-    function available(session,info){return !!(session&&session===current()&&session.isActive()&&
+    function selectionPending(){try{var ui=root.NemoNativeObjectUI;return !!(ui&&ui.isFrameSelectionPending&&ui.isFrameSelectionPending(root));}catch(_){return true;}}
+    function available(session,info){return !!(!selectionPending()&&session&&session===current()&&session.isActive()&&
       root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true);}
     function nativeMode(){
       try{
@@ -127,14 +128,23 @@
     }
     function notice(result){
       var status=result&&result.status;
-      if(status==='applied-presented'||status==='unchanged')return;
-      var message=status==='unavailable'?'Native frame editing is unavailable.':
+      var complete=status==='applied-presented'||status==='unchanged',message;
+      if(result&&result.code==='frame_selection_pending')message='Finish or cancel the frame selection first.';
+      else if(complete){
+        if(!Number.isSafeInteger(result.cycledLayers)||!Number.isSafeInteger(result.skippedComponentLayers))return;
+        message=result.cycledLayers===0?'No drawing layers to repeat.':
+          status==='unchanged'?'Repeat left the drawing layers unchanged.':
+          'Repeated '+result.cycledLayers+' drawing layer'+(result.cycledLayers===1?'':'s')+'.';
+        if(result.skippedComponentLayers)message+=' Skipped '+result.skippedComponentLayers+' component layer'+
+          (result.skippedComponentLayers===1?'':'s')+'.';
+      }else message=status==='unavailable'?'Native frame editing is unavailable.':
         status==='refused'?'Native frame edit was refused.':
         status==='busy'?'A native frame edit is already pending.':
         'Native frame edit was not confirmed. Wait for synchronization.';
       try{if(typeof root.showToast==='function')root.showToast(message);}catch(_){}
     }
     async function run(action){
+      if(selectionPending()){var blocked=Object.freeze({status:'busy',code:'frame_selection_pending'});notice(blocked);return blocked;}
       var before=capture(),result=await intent.run(action);
       if(mayNavigate(before,result)&&typeof root.goToFrame==='function'){
         try{await root.goToFrame(result.playhead);}catch(_){notice();}

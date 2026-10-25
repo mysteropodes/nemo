@@ -13,9 +13,9 @@ const P='command.document.object.';
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 function harness(options={}){
-  let active=false,revision=0,total=12,hold=null,preview='presented',ownerOverride=null;
+  let active=false,revision=0,total=options.total||12,hold=null,preview='presented',ownerOverride=null;
   const calls=[],navigation=[],notices=[];
-  const state={currentFrame:2,activeLayerIdx:1,totalFrames:12,layers:[{layerUid:'alpha'},{layerUid:'beta'}]};
+  const state={currentFrame:2,activeLayerIdx:1,totalFrames:total,layers:[{layerUid:'alpha'},{layerUid:'beta'}]};
   const root={state,_layerSel:[1],_sel:{frames:[{layer:0,frame:1},{layer:1,frame:2}]},
     NemoNativeFrameEditIntent:Intent,NemoNativeApplicationAdapter:SDK,showToast:m=>notices.push(m)};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
@@ -44,7 +44,7 @@ function harness(options={}){
     }
     const reply={apiVersion:2,requestId:q.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,
       ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
-    if(q.operation===P+'frames.repeat')Object.assign(reply.result,{cycledLayers:2,skippedComponentLayers:0});
+    if(q.operation===P+'frames.repeat')Object.assign(reply.result,options.repeatCounts||{cycledLayers:2,skippedComponentLayers:0});
     if(/frames\.clipboard\.(copy|cut)$/.test(q.operation))reply.result.clipboard=options.packet===null?null:
       options.packet?structuredClone(options.packet):{instanceId:'instance',documentId:'document',cells:[{relLayer:0,relFrame:0,keyframe:true,records:[],orderElements:[]}]};
     if(q.operation===P+'frames.move')reply.result.selection=applied?structuredClone(options.moveSelection===undefined?[{layerUid:'alpha',frame:3},{layerUid:'beta',frame:4}]:options.moveSelection):null;
@@ -136,6 +136,45 @@ test('moving a key on another layer preserves the active-layer prefix in the exa
   assert.equal(h.commands()[0].q.operation,P+'layer.key.move');
   assert.deepEqual({...h.commands()[0].q.payload},{command:'object.layer.key.move',layerUid:'alpha',activeLayerUid:'beta',from:1,to:4});
   assert.equal(h.root.state.activeLayerIdx,1);
+});
+
+test('browser Cycle prompt retains baseline count parsing and cancellation through the real wrapped writer',async()=>{
+  const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  const source=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8');
+  const start=source.indexOf('function initCycleAndPropagate(){');
+  const body=source.slice(start,source.indexOf("if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCycleAndPropagate)",start));
+  for(const [input,want] of [['2',2],['2.9 rounds',2],['0',1],['-8',1],['999',50],['invalid',1],['',1],[null,null]]){
+    const h=harness();await h.open();let click,pending,legacy=0;
+    h.root.__TAURI__={core:{invoke(){throw Error('Unexpected private writer');}}};
+    h.root.NemoNativeFrameEditDesktop=Desktop;h.root.SM={importJSON(){},repeatSelection(){legacy++;}};
+    const dispose=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>false,()=>{});
+    const wrapped=h.root.SM.repeatSelection;h.root.SM.repeatSelection=value=>(pending=wrapped(value));
+    const context={window:{SM:h.root.SM},selBounds:()=>({minF:1,maxF:2}),prompt:()=>input,
+      document:{getElementById:id=>id==='btn-cycle'?{addEventListener:(event,fn)=>{assert.equal(event,'click');click=fn;}}:null}};
+    vm.runInNewContext(body+'\ninitCycleAndPropagate();',context);click();
+    if(want===null)assert.equal(pending,undefined);
+    else{
+      assert.equal((await pending).status,'applied-presented',String(input));
+      assert.equal(h.commands()[0].q.payload.times,want,String(input));
+    }
+    assert.equal(h.commands().length,want===null?0:1);assert.equal(legacy,0);dispose();
+  }
+});
+
+test('repeat feedback distinguishes drawing cycles, component skips, semantic no-op and failed confirmation',async()=>{
+  for(const [options,expected] of [
+    [{repeatCounts:{cycledLayers:1,skippedComponentLayers:2}},'Repeated 1 drawing layer. Skipped 2 component layers.'],
+    [{repeatCounts:{cycledLayers:0,skippedComponentLayers:2}},'No drawing layers to repeat. Skipped 2 component layers.'],
+    [{noop:true,repeatCounts:{cycledLayers:1,skippedComponentLayers:0}},'Repeat left the drawing layers unchanged.'],
+    [{noop:true,repeatCounts:{cycledLayers:0,skippedComponentLayers:1}},'No drawing layers to repeat. Skipped 1 component layer.']
+  ]){
+    const h=harness(options);await h.open();await h.controller.routeWriter('timeline','repeatSelection',['2']).result;
+    assert.deepEqual(h.notices,[expected]);
+  }
+  for(const options of [{refusal:true},{badAck:true}]){
+    const h=harness(options);await h.open();await h.controller.routeWriter('timeline','repeatSelection',['2']).result;
+    assert.equal(h.notices.length,1);assert.doesNotMatch(h.notices[0],/Repeated|Skipped|No drawing/);
+  }
 });
 
 test('public Shift stays unavailable without any legacy or native write',async()=>{
@@ -498,5 +537,47 @@ test('Project queued guard grants only its own current presentation lease and re
     assert.equal(g.commands().length,0);assert.equal(g.session.info().contentRevision,0);
     assert.equal(checked,['frame-before','projection','extra-pending'].includes(fault)?0:1);
     if(lease)assert.equal(lease.readPresentedObjectSession(),null);
+  }
+});
+
+test('header selection reaches the unchanged browser Cycle branch and pending input cannot dispatch old cells',async()=>{
+  const Selection=require('../src/js/adapters/native-frame-cell-selection.js'),Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
+  const fixture=fs.readFileSync(require.resolve('./native-frame-cell-selection.test.cjs'),'utf8');
+  const a=fixture.indexOf('// BEGIN REUSABLE NATIVE CELL HEADER FIXTURE'),b=fixture.indexOf('// END REUSABLE NATIVE CELL HEADER FIXTURE');
+  assert.ok(a>=0&&b>a);const make=vm.compileFunction(fixture.slice(a,b)+'\nreturn selectionHarness;',['assert','Selection'])(assert,Selection);
+  const source=fs.readFileSync(require.resolve('../src/js/timeline.js'),'utf8'),start=source.indexOf('function initCycleAndPropagate(){');
+  const body=source.slice(start,source.indexOf("if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCycleAndPropagate)",start));
+  const boundsStart=source.indexOf('function selBounds(){'),bounds=source.slice(boundsStart,source.indexOf('\n}',boundsStart)+2);
+  for(const input of ['2',null,'pending']){
+    const h=harness({total:input==='pending'?2048:12,repeatCounts:{cycledLayers:1,skippedComponentLayers:1}});await h.open();
+    const ui=make();Selection.retire(ui.root);h.root.document=ui.doc;h.root.FC=20;h.root._layerSel=[0,1];h.root._sel.frames=[];
+    h.root.NemoNativeFrameCellSelection=Selection;h.root.NemoNativeObjectUI=require('../src/js/adapters/native-object-ui.js');
+    h.root.setTimeout=ui.root.setTimeout;h.root.clearTimeout=ui.root.clearTimeout;
+    Selection.mount(h.root,ui.caption,h.session.info(),{currentSession:()=>h.session,projectionReady:()=>true,frameEditPending:()=>h.controller.isPending()});
+    const strip=ui.caption.children[0];strip.children[4].fire('click');strip.fire('mousedown',{clientX:110});ui.doc.fire('mousemove',{clientX:130});ui.doc.fire('mouseup',{clientX:130});
+    const cells=h.root._sel.frames;assert.deepEqual(cells,[{layer:0,frame:0},{layer:0,frame:1},{layer:1,frame:0},{layer:1,frame:1}]);
+    assert.match(strip.attributes['aria-label'],/Selected frames 1 through 2/);assert.equal(h.commands().length,0);
+    let click,pending,legacy=0,prompts=0;h.root.__TAURI__={core:{invoke(){throw Error('PRIVATE WRITER');}}};
+    h.root.NemoNativeFrameEditDesktop=Desktop;h.root.SM={importJSON(){},repeatSelection(){legacy++;}};
+    const dispose=Surface.desktopPorts(h.root,{}).surface.wrap('timeline',[],'timeline-',()=>false,()=>{});
+    const wrapped=h.root.SM.repeatSelection;h.root.SM.repeatSelection=value=>(pending=wrapped(value));
+    const context={window:{SM:h.root.SM},_sel:h.root._sel,
+      prompt:()=>{prompts++;return input==='pending'?'2':input;},document:{getElementById:id=>id==='btn-cycle'?{addEventListener:(event,fn)=>{click=fn;}}:null}};
+    vm.runInNewContext(bounds+'\n'+body+'\ninitCycleAndPropagate();',context);
+    if(input==='pending'){
+      strip.fire('mousedown',{clientX:110});ui.doc.fire('mouseup',{clientX:100+1024.5*20});
+      assert.equal(Selection.isPending(h.root),true);assert.equal(h.root._sel.frames,cells);assert.equal(ui.cycle.disabled,true);
+      click();assert.equal((await pending).code,'frame_selection_pending');assert.equal(h.commands().length,0);
+      assert.match(h.notices.at(-1),/Finish or cancel/);ui.settle();assert.equal(h.root._sel.frames.length,2050);assert.equal(ui.cycle.disabled,false);
+      const completed=h.root._sel.frames,gate=h.hold();click();assert.equal(h.controller.isPending(),true);
+      strip.fire('mousedown',{clientX:130});ui.doc.fire('mouseup',{clientX:130});assert.equal(h.root._sel.frames,completed);assert.equal(Selection.isPending(h.root),false);
+      gate.resolve();assert.equal((await pending).status,'applied-presented');assert.equal(h.commands().length,1);assert.equal(h.commands()[0].q.payload.toFrame,1024);
+      assert.equal(legacy,0);dispose();Selection.retire(h.root);continue;
+    }
+    click();assert.equal(prompts,1);
+    if(input===null){assert.equal(pending,undefined);assert.equal(h.root._sel.frames,cells);assert.equal(h.commands().length,0);}
+    else{assert.equal((await pending).status,'applied-presented');assert.equal(h.commands().length,1);
+      assert.deepEqual(h.commands()[0].q.payload,{command:'object.frames.repeat',fromLayerUid:'alpha',toLayerUid:'beta',fromFrame:0,toFrame:1,times:2});}
+    assert.equal(legacy,0);dispose();Selection.retire(h.root);
   }
 });
