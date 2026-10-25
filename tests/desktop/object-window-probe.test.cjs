@@ -7,20 +7,29 @@ const path = require('node:path');
 const script = fs.readFileSync(path.join(__dirname, 'object-window-probe-bootstrap.js'), 'utf8');
 const config = { runId: '11111111-1111-4111-8111-111111111111', pid: 42, taskKey: 'a'.repeat(64), sourceSha: 'b'.repeat(40) };
 async function scenario(options = {}) {
-  const calls = [], phases = []; let revision = 0, previews = 0, release = false, resume, statusCalls = 0;
+  const calls = [], phases = []; let revision = 0, previews = 0, release = false, resume, statusCalls = 0, sourceDocument;
   const invoke = async (name, args) => {
     calls.push({ name, args });
     if (name === 'nemo_task_runtime') return { pid: options.foreign ? 43 : 42, taskKey: config.taskKey, windows: ['main'] };
     if (name === 'nemo_test_object_window_probe') { const payload = JSON.parse(args.payloadJson); phases.push(payload); if (payload.phase === options.blockAt) await new Promise(resolve => { resume = resolve; }); return; }
     if (name === 'nemo_mcp_identity') return { instanceId: 'owned-instance' };
-    if (name === 'nemo_native_object_bootstrap') { const request = JSON.parse(args.requestJson); assert.equal(request.instanceId, 'owned-instance'); return { instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: 0 }; }
+    if (name === 'nemo_native_object_bootstrap') { const request = JSON.parse(args.requestJson); assert.equal(request.instanceId, 'owned-instance'); sourceDocument = JSON.parse(request.documentJson); return { instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: 0 }; }
     if (name === 'nemo_native_object_client_status') { statusCalls++; if (options.failStatusAlways || (options.failFirstStatus && statusCalls === 1) || (options.failStatusAfterEdit && revision > 0)) throw new Error('status unavailable'); return { available: true, instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: revision, lifecycleGeneration: 7 }; }
     if (name === 'nemo_native_object_dispatch') {
       const request = JSON.parse(args.requestJson);
       assert.equal(request.instanceId, 'owned-instance'); assert.equal(request.documentId, 'owned-doc');
       if (options.failRead && request.operation === 'query.document.object') throw new Error('query unavailable');
       if (request.operation.startsWith('command.')) { assert.equal(request.expectedRevision, revision); revision++; }
-      return { ok: true, instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: revision, result: { documentSnapshotId: 'snapshot-' + revision } };
+      const result = { documentSnapshotId: 'snapshot-' + revision };
+      if (request.operation === 'query.document.object') {
+        const record = sourceDocument.objects.find(object => object.target.strokeId === request.payload.stableTarget.strokeId);
+        result.object = structuredClone(record);
+        if (record.target.strokeId === 'a' && (revision === 1 || revision === 3)) result.object.fill = { kind: 'solid', r: 1, g: 0, b: 0, a: 1 };
+        if (options.corruptRecord === record.target.strokeId && revision === 1) result.object.geometry.segments[0].point.x += 1;
+      }
+      const response = { apiVersion: 2, requestId: request.requestId, ok: true, instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: revision, result };
+      if (options.corruptCorrelation && revision === 1) response[options.corruptCorrelation] = options.corruptCorrelation === 'contentRevision' ? revision + 1 : 'foreign';
+      return response;
     }
     if (name === 'nemo_native_object_preview') {
       const request = JSON.parse(args.requestJson); assert.equal(request.contentRevision, revision); assert.equal(request.documentSnapshotId, 'snapshot-' + revision);
@@ -47,10 +56,28 @@ test('fixed original-window scenario uses actual pins and exact blue/red/history
   const bootstrap = JSON.parse(result.calls.find(c => c.name === 'nemo_native_object_bootstrap').args.requestJson);
   const document = JSON.parse(bootstrap.documentJson);
   assert.equal(document.formatVersion, 2); assert.deepEqual(document.objects[0].fill, { kind: 'solid', r: 0, g: 0, b: 1, a: 1 });
+  assert.equal(document.objects.length, 2); assert.equal(document.objects[1].target.strokeId, 'b');
+  assert.deepEqual(document.objects[1].fill, { kind: 'solid', r: 0, g: 1, b: 0, a: 1 });
+  const reads = result.calls.filter(c => c.name === 'nemo_native_object_dispatch').map(c => JSON.parse(c.args.requestJson)).filter(r => r.operation === 'query.document.object');
+  assert.deepEqual(reads.map(r => [r.payload.atRevision, r.payload.stableTarget.strokeId]), [[0, 'a'], [0, 'b'], [1, 'a'], [1, 'b'], [2, 'a'], [2, 'b'], [3, 'a'], [3, 'b']]);
   const changes = result.calls.filter(c => c.name === 'nemo_native_object_dispatch').map(c => JSON.parse(c.args.requestJson)).filter(r => r.operation.startsWith('command.'));
   assert.deepEqual(changes.map(r => r.operation), ['command.document.object.fill.set', 'command.document.object.undo', 'command.document.object.redo']);
   assert.deepEqual(changes[0].payload.fill, { kind: 'solid', r: 1, g: 0, b: 0, a: 1 });
   assert.equal(result.calls.filter(c => c.name === 'nemo_native_object_bootstrap').length, 1);
+});
+test('corrupt target or unchanged sibling geometry cannot earn the next visual checkpoint', async () => {
+  for (const corruptRecord of ['a', 'b']) {
+    const result = await scenario({ corruptRecord });
+    assert.deepEqual(result.phases.map(p => p.phase), ['ready', 'blue', 'failed']);
+    assert.equal(result.release, true); assert.equal(result.previews, 1);
+  }
+});
+test('every response identity and exact revision must correlate before a checkpoint', async () => {
+  for (const corruptCorrelation of ['apiVersion', 'requestId', 'instanceId', 'documentId', 'contentRevision']) {
+    const result = await scenario({ corruptCorrelation });
+    assert.deepEqual(result.phases.map(p => p.phase), ['ready', 'blue', 'failed']);
+    assert.equal(result.release, true); assert.equal(result.previews, 1);
+  }
 });
 test('deferred frame retries use the same source pins and never reinstall owner', async () => {
   const result = await scenario({ defer: true }); assert.equal(result.previews, 5);

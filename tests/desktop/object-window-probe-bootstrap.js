@@ -19,6 +19,17 @@
         scopes: [{ frameScope: { kind: 'authored', frame: 0 }, elements: [{ layerUid: 'L0', strokeId: 'a', naturalPosition: 0, order: {} }] }] }],
       migration: 'explicit-plan-required', referencePolicy: 'unresolved' }
   };
+  const sibling = JSON.parse(JSON.stringify(document.objects[0]));
+  sibling.target.strokeId = 'b';
+  sibling.fill = { kind: 'solid', r: 0, g: 1, b: 0, a: 1 };
+  sibling.geometry.segments.forEach(segment => { segment.point.x += 144; });
+  document.objects.push(sibling);
+  document.compositionOrder.contexts[0].scopes[0].elements.push({ layerUid: 'L0', strokeId: 'b', naturalPosition: 1, order: {} });
+  function canonical(value) {
+    if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+    if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';
+    return JSON.stringify(value);
+  }
   let invoke, instanceId, pins, cleanupIdentity, releaseRequest, closed = false, ordinal = 0;
   const check = value => { if (!value) throw new Error('fixed scenario refused'); };
   async function checkpoint(phase, status, frame) {
@@ -27,22 +38,31 @@
     if (phase === 'failed') payload.cleanupSucceeded = closed;
     await invoke('nemo_test_object_window_probe', { payloadJson: JSON.stringify(payload) });
   }
-  async function current() {
+  async function current(expectedRevision) {
     const status = await invoke('nemo_native_object_client_status');
     check(status.available === true && status.instanceId === instanceId && status.documentId === cleanupIdentity.documentId &&
-      Number.isSafeInteger(status.contentRevision) && status.contentRevision >= cleanupIdentity.contentRevision && Number.isSafeInteger(status.lifecycleGeneration));
+      status.contentRevision === expectedRevision && Number.isSafeInteger(status.lifecycleGeneration) &&
+      (!pins || status.lifecycleGeneration === pins.lifecycleGeneration));
     cleanupIdentity.contentRevision = status.contentRevision;
     pins = status;
-    const read = await dispatch('query.document.object', { atRevision: pins.contentRevision, stableTarget: target }, false);
-    check(typeof read.result.documentSnapshotId === 'string');
-    pins.documentSnapshotId = read.result.documentSnapshotId;
+    for (let index = 0; index < document.objects.length; index++) {
+      const expected = JSON.parse(JSON.stringify(document.objects[index]));
+      if (index === 0 && (expectedRevision === 1 || expectedRevision === 3)) expected.fill = { kind: 'solid', r: 1, g: 0, b: 0, a: 1 };
+      const read = await dispatch('query.document.object', { atRevision: expectedRevision, stableTarget: expected.target }, false);
+      check(typeof read.result.documentSnapshotId === 'string' && read.result.documentSnapshotId.length > 0 &&
+        canonical(read.result.object) === canonical(expected));
+      if (index === 0) pins.documentSnapshotId = read.result.documentSnapshotId;
+      else check(read.result.documentSnapshotId === pins.documentSnapshotId);
+    }
   }
   async function dispatch(operation, payload, mutation) {
     const request = { apiVersion: 2, requestId: 'object-probe-' + config.runId + '-' + (++ordinal),
       instanceId, documentId: pins.documentId, operation, payload };
     if (mutation) request.expectedRevision = pins.contentRevision;
     const result = await invoke('nemo_native_object_dispatch', { requestJson: JSON.stringify(request) });
-    check(result.ok === true && result.instanceId === instanceId && result.documentId === cleanupIdentity.documentId);
+    check(result.ok === true && result.apiVersion === request.apiVersion && result.requestId === request.requestId &&
+      result.instanceId === instanceId && result.documentId === cleanupIdentity.documentId &&
+      result.contentRevision === pins.contentRevision + (mutation ? 1 : 0));
     if (mutation) {
       check(Number.isSafeInteger(result.contentRevision) && result.contentRevision >= cleanupIdentity.contentRevision);
       cleanupIdentity.contentRevision = result.contentRevision;
@@ -97,14 +117,14 @@
       check(bootstrap.instanceId === instanceId && typeof bootstrap.documentId === 'string' && bootstrap.documentId.length > 0 &&
         Number.isSafeInteger(bootstrap.contentRevision) && bootstrap.contentRevision >= 0);
       cleanupIdentity = { instanceId, documentId: bootstrap.documentId, contentRevision: bootstrap.contentRevision };
-      await current(); check(pins.contentRevision === 0); await checkpoint('blue', 'presented', await present());
+      await current(0); await checkpoint('blue', 'presented', await present());
       await dispatch('command.document.object.fill.set', { command: 'object.fill.set', stableTarget: target,
         fill: { kind: 'solid', r: 1, g: 0, b: 0, a: 1 } }, true);
-      await current(); check(pins.contentRevision === 1); await checkpoint('red', 'presented', await present());
+      await current(1); await checkpoint('red', 'presented', await present());
       await dispatch('command.document.object.undo', { command: 'object.undo' }, true);
-      await current(); check(pins.contentRevision === 2); await checkpoint('undo', 'presented', await present());
+      await current(2); await checkpoint('undo', 'presented', await present());
       await dispatch('command.document.object.redo', { command: 'object.redo' }, true);
-      await current(); check(pins.contentRevision === 3); await checkpoint('redo', 'presented', await present());
+      await current(3); await checkpoint('redo', 'presented', await present());
       await release(); await checkpoint('released', 'succeeded');
     } catch (_) {
       if (invoke) {

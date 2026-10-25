@@ -208,7 +208,10 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
         "query.document.object.serialize",
         "command.document.object.layer.visibility.set",
         "command.document.object.project.settings.edit",
-        "command.document.object.layer.policy.edit"
+        "command.document.object.layer.policy.edit",
+        "command.document.object.project.placement.edit",
+        "command.document.object.audio.track.edit",
+        "command.document.object.layer.cut"
     ]);
     assert_eq!(status["operations"], operations);
     for flag in ["publicCapabilityAvailable", "mcpAvailable"] {
