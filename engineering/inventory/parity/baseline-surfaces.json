@@ -3931,7 +3931,7 @@
       "source": "src/index.html:334"
     },
     {
-      "id": "dom:align-toolbar>button:alignbottom",
+      "id": "dom:align-toolbar>button[data-align=bottom]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align bottom",
@@ -3941,7 +3941,7 @@
       "source": "src/index.html:424"
     },
     {
-      "id": "dom:align-toolbar>button:aligncenterh",
+      "id": "dom:align-toolbar>button[data-align=centerH]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align center horizontally",
@@ -3951,7 +3951,7 @@
       "source": "src/index.html:419"
     },
     {
-      "id": "dom:align-toolbar>button:aligncenterv",
+      "id": "dom:align-toolbar>button[data-align=centerV]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align center vertically",
@@ -3961,7 +3961,7 @@
       "source": "src/index.html:423"
     },
     {
-      "id": "dom:align-toolbar>button:alignleft",
+      "id": "dom:align-toolbar>button[data-align=left]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align left",
@@ -3971,7 +3971,7 @@
       "source": "src/index.html:418"
     },
     {
-      "id": "dom:align-toolbar>button:alignright",
+      "id": "dom:align-toolbar>button[data-align=right]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align right",
@@ -3981,7 +3981,7 @@
       "source": "src/index.html:420"
     },
     {
-      "id": "dom:align-toolbar>button:aligntop",
+      "id": "dom:align-toolbar>button[data-align=top]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align top",
@@ -3991,7 +3991,7 @@
       "source": "src/index.html:422"
     },
     {
-      "id": "dom:align-toolbar>button:distributehorizontal",
+      "id": "dom:align-toolbar>button[data-distribute=horizontal]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Distribute horizontally",
@@ -4001,7 +4001,7 @@
       "source": "src/index.html:431"
     },
     {
-      "id": "dom:align-toolbar>button:distributevertical",
+      "id": "dom:align-toolbar>button[data-distribute=vertical]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Distribute vertically",
@@ -4011,7 +4011,7 @@
       "source": "src/index.html:432"
     },
     {
-      "id": "dom:app-mode-switch>button:modeanim2d",
+      "id": "dom:app-mode-switch>button[data-mode=anim2d]",
       "kind": "dom",
       "area": "animation-rigs-expressions",
       "capability": "2D Animation",
@@ -4021,7 +4021,7 @@
       "source": "src/index.html:138"
     },
     {
-      "id": "dom:app-mode-switch>button:modemotion",
+      "id": "dom:app-mode-switch>button[data-mode=motion]",
       "kind": "dom",
       "area": "animation-rigs-expressions",
       "capability": "Motion — property keyframes (position/rotation/scale/opacity)",
@@ -4031,7 +4031,7 @@
       "source": "src/index.html:139"
     },
     {
-      "id": "dom:app-mode-switch>button:storyboardfrozentitle",
+      "id": "dom:app-mode-switch>button[data-mode=storyboard]",
       "kind": "dom",
       "area": "animation-rigs-expressions",
       "capability": "StoryBoard — in development, not yet available in this build",
@@ -4041,7 +4041,7 @@
       "source": "src/index.html:137"
     },
     {
-      "id": "dom:comment-fb-tags>button",
+      "id": "dom:comment-fb-tags>button[data-tag=bug]",
       "kind": "dom",
       "area": "project-lifecycle-integrations",
       "capability": "🐞",
@@ -4051,17 +4051,7 @@
       "source": "src/index.html:2072"
     },
     {
-      "id": "dom:comment-fb-tags>button#2",
-      "kind": "dom",
-      "area": "project-lifecycle-integrations",
-      "capability": "⚡",
-      "handler": [
-        "src/js/timeline.js:7847 initCommentPopover()"
-      ],
-      "source": "src/index.html:2073"
-    },
-    {
-      "id": "dom:comment-fb-tags>button#3",
+      "id": "dom:comment-fb-tags>button[data-tag=idea]",
       "kind": "dom",
       "area": "project-lifecycle-integrations",
       "capability": "💡",
@@ -4071,7 +4061,17 @@
       "source": "src/index.html:2074"
     },
     {
-      "id": "dom:comment-fb-tags>button#4",
+      "id": "dom:comment-fb-tags>button[data-tag=perf]",
+      "kind": "dom",
+      "area": "project-lifecycle-integrations",
+      "capability": "⚡",
+      "handler": [
+        "src/js/timeline.js:7847 initCommentPopover()"
+      ],
+      "source": "src/index.html:2073"
+    },
+    {
+      "id": "dom:comment-fb-tags>button[data-tag=polish]",
       "kind": "dom",
       "area": "project-lifecycle-integrations",
       "capability": "✨",
@@ -4081,7 +4081,7 @@
       "source": "src/index.html:2075"
     },
     {
-      "id": "dom:p-cap-grp>button:capbutt",
+      "id": "dom:p-cap-grp>button[data-value=butt]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Butt",
@@ -4091,7 +4091,7 @@
       "source": "src/index.html:959"
     },
     {
-      "id": "dom:p-cap-grp>button:capround",
+      "id": "dom:p-cap-grp>button[data-value=round]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Round",
@@ -4101,7 +4101,7 @@
       "source": "src/index.html:958"
     },
     {
-      "id": "dom:p-cap-grp>button:capsquare",
+      "id": "dom:p-cap-grp>button[data-value=square]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Square",
@@ -4111,7 +4111,7 @@
       "source": "src/index.html:960"
     },
     {
-      "id": "dom:p-fillbrushmode-grp>button:placementabove",
+      "id": "dom:p-fillbrushmode-grp>button[data-value=above]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Above — on top of existing fills",
@@ -4121,7 +4121,7 @@
       "source": "src/index.html:1171"
     },
     {
-      "id": "dom:p-fillbrushmode-grp>button:placementbelow",
+      "id": "dom:p-fillbrushmode-grp>button[data-value=below]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Below — behind existing fills (background patch)",
@@ -4131,7 +4131,7 @@
       "source": "src/index.html:1172"
     },
     {
-      "id": "dom:p-fillbrushmode-grp>button:placementmerge",
+      "id": "dom:p-fillbrushmode-grp>button[data-value=merge]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Merge — unite with any existing fill it overlaps",
@@ -4141,7 +4141,7 @@
       "source": "src/index.html:1173"
     },
     {
-      "id": "dom:p-join-grp>button:joinbevel",
+      "id": "dom:p-join-grp>button[data-value=bevel]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Bevel",
@@ -4151,7 +4151,7 @@
       "source": "src/index.html:965"
     },
     {
-      "id": "dom:p-join-grp>button:joinmiter",
+      "id": "dom:p-join-grp>button[data-value=miter]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Miter",
@@ -4161,7 +4161,7 @@
       "source": "src/index.html:964"
     },
     {
-      "id": "dom:p-join-grp>button:joinround",
+      "id": "dom:p-join-grp>button[data-value=round]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Round",
@@ -4171,7 +4171,7 @@
       "source": "src/index.html:963"
     },
     {
-      "id": "dom:p-paintorder-grp>button:paintorderfillfirst",
+      "id": "dom:p-paintorder-grp>button[data-value=fillFirst]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill in front of Stroke",
@@ -4181,7 +4181,7 @@
       "source": "src/index.html:969"
     },
     {
-      "id": "dom:p-paintorder-grp>button:paintorderstrokefirst",
+      "id": "dom:p-paintorder-grp>button[data-value=strokeFirst]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Stroke in front of Fill",
@@ -4231,77 +4231,7 @@
       "source": "src/index.html:1857"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane",
-      "kind": "dom",
-      "area": "preferences-workspace",
-      "capability": "",
-      "handler": [
-        "src/js/timeline.js:8976 initSettingsModal()"
-      ],
-      "source": "src/index.html:1767"
-    },
-    {
-      "id": "dom:settings-modal>div:settings-pane#2",
-      "kind": "dom",
-      "area": "preferences-workspace",
-      "capability": "",
-      "handler": [
-        "src/js/timeline.js:8976 initSettingsModal()"
-      ],
-      "source": "src/index.html:1798"
-    },
-    {
-      "id": "dom:settings-modal>div:settings-pane#3",
-      "kind": "dom",
-      "area": "preferences-workspace",
-      "capability": "",
-      "handler": [
-        "src/js/timeline.js:8976 initSettingsModal()"
-      ],
-      "source": "src/index.html:1823"
-    },
-    {
-      "id": "dom:settings-modal>div:settings-pane#4",
-      "kind": "dom",
-      "area": "preferences-workspace",
-      "capability": "",
-      "handler": [
-        "src/js/timeline.js:8976 initSettingsModal()"
-      ],
-      "source": "src/index.html:1849"
-    },
-    {
-      "id": "dom:settings-modal>div:settings-pane#5",
-      "kind": "dom",
-      "area": "preferences-workspace",
-      "capability": "",
-      "handler": [
-        "src/js/timeline.js:8976 initSettingsModal()"
-      ],
-      "source": "src/index.html:1866"
-    },
-    {
-      "id": "dom:settings-modal>div:settings-pane#6",
-      "kind": "dom",
-      "area": "preferences-workspace",
-      "capability": "",
-      "handler": [
-        "src/js/timeline.js:8976 initSettingsModal()"
-      ],
-      "source": "src/index.html:1880"
-    },
-    {
-      "id": "dom:settings-modal>div:settings-pane#7",
-      "kind": "dom",
-      "area": "preferences-workspace",
-      "capability": "",
-      "handler": [
-        "src/js/timeline.js:8976 initSettingsModal()"
-      ],
-      "source": "src/index.html:1888"
-    },
-    {
-      "id": "dom:settings-modal>div:settings-pane#8",
+      "id": "dom:settings-modal>div[data-pane=about]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4311,7 +4241,77 @@
       "source": "src/index.html:1896"
     },
     {
-      "id": "dom:settings-tabs>button:settingstababout",
+      "id": "dom:settings-modal>div[data-pane=collab]",
+      "kind": "dom",
+      "area": "preferences-workspace",
+      "capability": "",
+      "handler": [
+        "src/js/timeline.js:8976 initSettingsModal()"
+      ],
+      "source": "src/index.html:1823"
+    },
+    {
+      "id": "dom:settings-modal>div[data-pane=feedback]",
+      "kind": "dom",
+      "area": "preferences-workspace",
+      "capability": "",
+      "handler": [
+        "src/js/timeline.js:8976 initSettingsModal()"
+      ],
+      "source": "src/index.html:1849"
+    },
+    {
+      "id": "dom:settings-modal>div[data-pane=figma]",
+      "kind": "dom",
+      "area": "preferences-workspace",
+      "capability": "",
+      "handler": [
+        "src/js/timeline.js:8976 initSettingsModal()"
+      ],
+      "source": "src/index.html:1866"
+    },
+    {
+      "id": "dom:settings-modal>div[data-pane=general]",
+      "kind": "dom",
+      "area": "preferences-workspace",
+      "capability": "",
+      "handler": [
+        "src/js/timeline.js:8976 initSettingsModal()"
+      ],
+      "source": "src/index.html:1767"
+    },
+    {
+      "id": "dom:settings-modal>div[data-pane=labs]",
+      "kind": "dom",
+      "area": "preferences-workspace",
+      "capability": "",
+      "handler": [
+        "src/js/timeline.js:8976 initSettingsModal()"
+      ],
+      "source": "src/index.html:1888"
+    },
+    {
+      "id": "dom:settings-modal>div[data-pane=shortcuts]",
+      "kind": "dom",
+      "area": "preferences-workspace",
+      "capability": "",
+      "handler": [
+        "src/js/timeline.js:8976 initSettingsModal()"
+      ],
+      "source": "src/index.html:1880"
+    },
+    {
+      "id": "dom:settings-modal>div[data-pane=updates]",
+      "kind": "dom",
+      "area": "preferences-workspace",
+      "capability": "",
+      "handler": [
+        "src/js/timeline.js:8976 initSettingsModal()"
+      ],
+      "source": "src/index.html:1798"
+    },
+    {
+      "id": "dom:settings-tabs>button[data-tab=about]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "About",
@@ -4321,7 +4321,7 @@
       "source": "src/index.html:1764"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabcollab",
+      "id": "dom:settings-tabs>button[data-tab=collab]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Collaboration",
@@ -4331,7 +4331,7 @@
       "source": "src/index.html:1759"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabfeedback",
+      "id": "dom:settings-tabs>button[data-tab=feedback]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Feedback",
@@ -4341,7 +4341,7 @@
       "source": "src/index.html:1760"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabfigma",
+      "id": "dom:settings-tabs>button[data-tab=figma]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Figma",
@@ -4351,7 +4351,7 @@
       "source": "src/index.html:1761"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabgeneral",
+      "id": "dom:settings-tabs>button[data-tab=general]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "General",
@@ -4361,7 +4361,7 @@
       "source": "src/index.html:1757"
     },
     {
-      "id": "dom:settings-tabs>button:settingstablabs",
+      "id": "dom:settings-tabs>button[data-tab=labs]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Labs",
@@ -4371,7 +4371,7 @@
       "source": "src/index.html:1763"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabshortcuts",
+      "id": "dom:settings-tabs>button[data-tab=shortcuts]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Shortcuts",
@@ -4381,7 +4381,7 @@
       "source": "src/index.html:1762"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabupdates",
+      "id": "dom:settings-tabs>button[data-tab=updates]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Updates",
@@ -4391,7 +4391,7 @@
       "source": "src/index.html:1758"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=ellipse]:toolellipse",
+      "id": "dom:shape-tool-stack>button[data-tool=ellipse]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Ellipse",
@@ -4401,7 +4401,7 @@
       "source": "src/index.html:214"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=line]:toolline",
+      "id": "dom:shape-tool-stack>button[data-tool=line]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)",
@@ -4411,7 +4411,7 @@
       "source": "src/index.html:213"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=rect]:toolrect",
+      "id": "dom:shape-tool-stack>button[data-tool=rect]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Rectangle",
@@ -4421,7 +4421,7 @@
       "source": "src/index.html:212"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=speechbubble]:toolspeechbubble",
+      "id": "dom:shape-tool-stack>button[data-tool=speechbubble]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Speech bubble — rounded rect with an auto tail, drag to size (D)",
@@ -4431,7 +4431,7 @@
       "source": "src/index.html:215"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=star]:toolstar",
+      "id": "dom:shape-tool-stack>button[data-tool=star]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)",
@@ -4441,7 +4441,7 @@
       "source": "src/index.html:216"
     },
     {
-      "id": "dom:symbol-tabs>div:scenetab",
+      "id": "dom:symbol-tabs>div[data-sym=]",
       "kind": "dom",
       "area": "unclassified",
       "capability": "Scene",
@@ -4451,37 +4451,7 @@
       "source": "src/index.html:2128"
     },
     {
-      "id": "dom:text-props-sec>button:aligncenteropt",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Center",
-      "handler": [
-        "src/js/timeline.js:8802"
-      ],
-      "source": "src/index.html:572"
-    },
-    {
-      "id": "dom:text-props-sec>button:alignleftopt",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Left",
-      "handler": [
-        "src/js/timeline.js:8802"
-      ],
-      "source": "src/index.html:571"
-    },
-    {
-      "id": "dom:text-props-sec>button:alignrightopt",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Right",
-      "handler": [
-        "src/js/timeline.js:8802"
-      ],
-      "source": "src/index.html:573"
-    },
-    {
-      "id": "dom:text-props-sec>button:b",
+      "id": "dom:text-props-sec>button[data-flag=bold]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "B",
@@ -4491,7 +4461,7 @@
       "source": "src/index.html:576"
     },
     {
-      "id": "dom:text-props-sec>button:i",
+      "id": "dom:text-props-sec>button[data-flag=italic]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "I",
@@ -4501,7 +4471,7 @@
       "source": "src/index.html:577"
     },
     {
-      "id": "dom:text-props-sec>button:s",
+      "id": "dom:text-props-sec>button[data-flag=strike]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "S",
@@ -4511,67 +4481,7 @@
       "source": "src/index.html:579"
     },
     {
-      "id": "dom:text-props-sec>button:tpcasecap",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Ab",
-      "handler": [
-        "src/js/timeline.js:8811"
-      ],
-      "source": "src/index.html:585"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpcaselower",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "aa",
-      "handler": [
-        "src/js/timeline.js:8811"
-      ],
-      "source": "src/index.html:584"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpcasenone",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Aa",
-      "handler": [
-        "src/js/timeline.js:8811"
-      ],
-      "source": "src/index.html:582"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpcaseupper",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "AA",
-      "handler": [
-        "src/js/timeline.js:8811"
-      ],
-      "source": "src/index.html:583"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpwidthauto",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Auto width",
-      "handler": [
-        "src/js/timeline.js:8817"
-      ],
-      "source": "src/index.html:604"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpwidthfixed",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Fixed width",
-      "handler": [
-        "src/js/timeline.js:8817"
-      ],
-      "source": "src/index.html:605"
-    },
-    {
-      "id": "dom:text-props-sec>button:u",
+      "id": "dom:text-props-sec>button[data-flag=underline]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "U",
@@ -4581,7 +4491,97 @@
       "source": "src/index.html:578"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=draw]:tooldraw",
+      "id": "dom:text-props-sec>button[data-val=auto]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Auto width",
+      "handler": [
+        "src/js/timeline.js:8817"
+      ],
+      "source": "src/index.html:604"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=capitalize]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Ab",
+      "handler": [
+        "src/js/timeline.js:8811"
+      ],
+      "source": "src/index.html:585"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=center]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Center",
+      "handler": [
+        "src/js/timeline.js:8802"
+      ],
+      "source": "src/index.html:572"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=fixed]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Fixed width",
+      "handler": [
+        "src/js/timeline.js:8817"
+      ],
+      "source": "src/index.html:605"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=left]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Left",
+      "handler": [
+        "src/js/timeline.js:8802"
+      ],
+      "source": "src/index.html:571"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=lower]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "aa",
+      "handler": [
+        "src/js/timeline.js:8811"
+      ],
+      "source": "src/index.html:584"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=none]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Aa",
+      "handler": [
+        "src/js/timeline.js:8811"
+      ],
+      "source": "src/index.html:582"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=right]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Right",
+      "handler": [
+        "src/js/timeline.js:8802"
+      ],
+      "source": "src/index.html:573"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=upper]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "AA",
+      "handler": [
+        "src/js/timeline.js:8811"
+      ],
+      "source": "src/index.html:583"
+    },
+    {
+      "id": "dom:tools-panel>button[data-tool=draw]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Brush",
@@ -4591,7 +4591,7 @@
       "source": "src/index.html:184"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=eraser]:tooleraser",
+      "id": "dom:tools-panel>button[data-tool=eraser]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Eraser (E in Animation 2D — Motion mode reserves E to reveal Effects)",
@@ -4601,7 +4601,7 @@
       "source": "src/index.html:222"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=eyedropper]:tooleyedropper",
+      "id": "dom:tools-panel>button[data-tool=eyedropper]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Eyedropper",
@@ -4611,7 +4611,7 @@
       "source": "src/index.html:224"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=fill]:toolfill",
+      "id": "dom:tools-panel>button[data-tool=fill]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill",
@@ -4621,7 +4621,7 @@
       "source": "src/index.html:223"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=fillbrush]:toolfillbrush",
+      "id": "dom:tools-panel>button[data-tool=fillbrush]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill Brush",
@@ -4631,7 +4631,7 @@
       "source": "src/index.html:186"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=fsselect]:toolfsselect",
+      "id": "dom:tools-panel>button[data-tool=fsselect]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill/Stroke Select — click a fill or a stroke segment to select it independently (M in Animation 2D — Motion mode reserves M to reveal Mattes)",
@@ -4641,7 +4641,7 @@
       "source": "src/index.html:182"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=hand]:toolhand",
+      "id": "dom:tools-panel>button[data-tool=hand]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Hand",
@@ -4651,7 +4651,7 @@
       "source": "src/index.html:231"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=pen]:toolpen",
+      "id": "dom:tools-panel>button[data-tool=pen]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Pen",
@@ -4661,7 +4661,7 @@
       "source": "src/index.html:185"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=rig]:toolrig",
+      "id": "dom:tools-panel>button[data-tool=rig]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Rig — 3 steps in the panel: 1. Draw (click=anchor, drag=curve) 2. Assign (link shapes to bones) 3. Move (drag an anchor to pose) (S in Animation 2D — Motion mode reserves S for Scale)",
@@ -4671,7 +4671,7 @@
       "source": "src/index.html:195"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=rotate]:toolrotate",
+      "id": "dom:tools-panel>button[data-tool=rotate]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Rotate canvas",
@@ -4681,7 +4681,7 @@
       "source": "src/index.html:233"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=select]:toolselect",
+      "id": "dom:tools-panel>button[data-tool=select]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Select",
@@ -4691,7 +4691,7 @@
       "source": "src/index.html:175"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=subselect]:toolsubselect",
+      "id": "dom:tools-panel>button[data-tool=subselect]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Subselect (nodes)",
@@ -4701,7 +4701,7 @@
       "source": "src/index.html:176"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=text]:tooltext",
+      "id": "dom:tools-panel>button[data-tool=text]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Text",
@@ -4711,7 +4711,7 @@
       "source": "src/index.html:220"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=zoom]:toolzoom",
+      "id": "dom:tools-panel>button[data-tool=zoom]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Zoom",
@@ -4721,7 +4721,7 @@
       "source": "src/index.html:232"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorbc",
+      "id": "dom:xform-anchor-grid>button[data-key=bc]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Bottom-center",
@@ -4731,7 +4731,7 @@
       "source": "src/index.html:464"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorbl",
+      "id": "dom:xform-anchor-grid>button[data-key=bl]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Bottom-left",
@@ -4741,7 +4741,7 @@
       "source": "src/index.html:463"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorbr",
+      "id": "dom:xform-anchor-grid>button[data-key=br]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Bottom-right",
@@ -4751,7 +4751,7 @@
       "source": "src/index.html:465"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchormc",
+      "id": "dom:xform-anchor-grid>button[data-key=mc]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Center",
@@ -4761,7 +4761,7 @@
       "source": "src/index.html:461"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorml",
+      "id": "dom:xform-anchor-grid>button[data-key=ml]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Middle-left",
@@ -4771,7 +4771,7 @@
       "source": "src/index.html:460"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchormr",
+      "id": "dom:xform-anchor-grid>button[data-key=mr]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Middle-right",
@@ -4781,7 +4781,7 @@
       "source": "src/index.html:462"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchortc",
+      "id": "dom:xform-anchor-grid>button[data-key=tc]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Top-center",
@@ -4791,7 +4791,7 @@
       "source": "src/index.html:458"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchortl",
+      "id": "dom:xform-anchor-grid>button[data-key=tl]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Top-left",
@@ -4801,7 +4801,7 @@
       "source": "src/index.html:457"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchortr",
+      "id": "dom:xform-anchor-grid>button[data-key=tr]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Top-right",
@@ -5421,6 +5421,26 @@
       "source": "src/js/labs/command-palette.js:35"
     },
     {
+      "id": "menu:layer-inout.js:buildBar:aligner-a-droite-out",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "Aligner à droite (out)",
+      "handler": [
+        "src/js/layer-inout.js:1575 buildBar()"
+      ],
+      "source": "src/js/layer-inout.js:1575"
+    },
+    {
+      "id": "menu:layer-inout.js:buildBar:aligner-a-gauche-in",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "Aligner à gauche (in)",
+      "handler": [
+        "src/js/layer-inout.js:1573 buildBar()"
+      ],
+      "source": "src/js/layer-inout.js:1573"
+    },
+    {
       "id": "menu:layer-inout.js:buildBar:aligner-au-centre",
       "kind": "menu",
       "area": "animation-rigs-expressions",
@@ -5431,37 +5451,7 @@
       "source": "src/js/layer-inout.js:1574"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:aligner-droite-out",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "Aligner à droite (out)",
-      "handler": [
-        "src/js/layer-inout.js:1575 buildBar()"
-      ],
-      "source": "src/js/layer-inout.js:1575"
-    },
-    {
-      "id": "menu:layer-inout.js:buildBar:aligner-gauche-in",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "Aligner à gauche (in)",
-      "handler": [
-        "src/js/layer-inout.js:1573 buildBar()"
-      ],
-      "source": "src/js/layer-inout.js:1573"
-    },
-    {
-      "id": "menu:layer-inout.js:buildBar:chelonner-stagger",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "Échelonner (stagger)…",
-      "handler": [
-        "src/js/layer-inout.js:1577 buildBar()"
-      ],
-      "source": "src/js/layer-inout.js:1577"
-    },
-    {
-      "id": "menu:layer-inout.js:buildBar:distribuer-uniform-ment",
+      "id": "menu:layer-inout.js:buildBar:distribuer-uniformement",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Distribuer uniformément",
@@ -5469,6 +5459,16 @@
         "src/js/layer-inout.js:1576 buildBar()"
       ],
       "source": "src/js/layer-inout.js:1576"
+    },
+    {
+      "id": "menu:layer-inout.js:buildBar:echelonner-stagger",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "Échelonner (stagger)…",
+      "handler": [
+        "src/js/layer-inout.js:1577 buildBar()"
+      ],
+      "source": "src/js/layer-inout.js:1577"
     },
     {
       "id": "menu:layer-inout.js:buildBar:inverser-l-ordre-flip",
@@ -5481,7 +5481,7 @@
       "source": "src/js/layer-inout.js:1578"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:inverser-la-s-lection",
+      "id": "menu:layer-inout.js:buildBar:inverser-la-selection",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Inverser la sélection",
@@ -5491,7 +5491,7 @@
       "source": "src/js/layer-inout.js:1581"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps",
+      "id": "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps-a",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Parent in Time — lier le temps à…",
@@ -5501,7 +5501,7 @@
       "source": "src/js/layer-inout.js:1564"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:r-initialiser-pleine-dur-e",
+      "id": "menu:layer-inout.js:buildBar:reinitialiser-pleine-duree",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Réinitialiser (pleine durée)",
@@ -5511,7 +5511,7 @@
       "source": "src/js/layer-inout.js:1557"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:s-lectionner-1-sur-2",
+      "id": "menu:layer-inout.js:buildBar:selectionner-1-sur-2",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Sélectionner 1 sur 2",
@@ -5521,7 +5521,7 @@
       "source": "src/js/layer-inout.js:1579"
     },
     {
-      "id": "menu:markers.js:buildEl:aller-ce-rep-re",
+      "id": "menu:markers.js:buildEl:aller-a-ce-repere",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Aller à ce repère",
@@ -5531,7 +5531,7 @@
       "source": "src/js/markers.js:146"
     },
     {
-      "id": "menu:markers.js:buildEl:renommer-le-rep-re",
+      "id": "menu:markers.js:buildEl:renommer-le-repere",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Renommer le repère…",
@@ -5541,7 +5541,7 @@
       "source": "src/js/markers.js:145"
     },
     {
-      "id": "menu:markers.js:buildEl:supprimer-le-rep-re",
+      "id": "menu:markers.js:buildEl:supprimer-le-repere",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Supprimer le repère",
@@ -5551,7 +5551,7 @@
       "source": "src/js/markers.js:148"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:ajouter-un-rep-re-ici-frame",
+      "id": "menu:markers.js:initRulerMenu:ajouter-un-repere-ici-frame",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Ajouter un repère ici (frame ",
@@ -5561,7 +5561,7 @@
       "source": "src/js/markers.js:198"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:ajouter-un-rep-re-nomm",
+      "id": "menu:markers.js:initRulerMenu:ajouter-un-repere-nomme",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Ajouter un repère nommé…",
@@ -5581,7 +5581,7 @@
       "source": "src/js/markers.js:207"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:r-duire-la-composition-la-zone-de-travail",
+      "id": "menu:markers.js:initRulerMenu:reduire-la-composition-a-la-zone-de-travail",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Réduire la composition à la zone de travail",
@@ -5591,7 +5591,7 @@
       "source": "src/js/markers.js:208"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:rep-re-pr-c-dent-maj",
+      "id": "menu:markers.js:initRulerMenu:repere-precedent-maj",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Repère précédent  (Maj+←)",
@@ -5601,7 +5601,7 @@
       "source": "src/js/markers.js:205"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:rep-re-suivant-maj",
+      "id": "menu:markers.js:initRulerMenu:repere-suivant-maj",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Repère suivant  (Maj+→)",
@@ -5611,7 +5611,7 @@
       "source": "src/js/markers.js:204"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:supprimer-tous-les-rep-res",
+      "id": "menu:markers.js:initRulerMenu:supprimer-tous-les-reperes",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Supprimer tous les repères",
@@ -5981,6 +5981,16 @@
       "source": "src/js/motion.js:8000"
     },
     {
+      "id": "menu:motion.js:openExtraMatteMenu#2",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "  ",
+      "handler": [
+        "src/js/motion.js:8009 openExtraMatteMenu()"
+      ],
+      "source": "src/js/motion.js:8009"
+    },
+    {
       "id": "menu:motion.js:openExtraMatteMenu:mattemenumodehdr",
       "kind": "menu",
       "area": "animation-rigs-expressions",
@@ -6011,16 +6021,6 @@
       "source": "src/js/motion.js:7997"
     },
     {
-      "id": "menu:motion.js:openExtraMatteMenu#2",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "  ",
-      "handler": [
-        "src/js/motion.js:8009 openExtraMatteMenu()"
-      ],
-      "source": "src/js/motion.js:8009"
-    },
-    {
       "id": "menu:motion.js:openExtraParentMenu:menuremovethisparent",
       "kind": "menu",
       "area": "animation-rigs-expressions",
@@ -6039,6 +6039,16 @@
         "src/js/motion.js:7925 openMatteConfigMenu()"
       ],
       "source": "src/js/motion.js:7925"
+    },
+    {
+      "id": "menu:motion.js:openMatteConfigMenu#2",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "  ",
+      "handler": [
+        "src/js/motion.js:7942 openMatteConfigMenu()"
+      ],
+      "source": "src/js/motion.js:7942"
     },
     {
       "id": "menu:motion.js:openMatteConfigMenu:mattemenumodehdr",
@@ -6069,16 +6079,6 @@
         "src/js/motion.js:7919 openMatteConfigMenu()"
       ],
       "source": "src/js/motion.js:7919"
-    },
-    {
-      "id": "menu:motion.js:openMatteConfigMenu#2",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "  ",
-      "handler": [
-        "src/js/motion.js:7942 openMatteConfigMenu()"
-      ],
-      "source": "src/js/motion.js:7942"
     },
     {
       "id": "menu:motion.js:renderDiscreteKeyGridRow:ctxdeletethiskey",
@@ -6601,7 +6601,7 @@
       "source": "src/js/select-bridge.js:3088"
     },
     {
-      "id": "menu:select-bridge.js:onContext:arri-re-plan",
+      "id": "menu:select-bridge.js:onContext:arriere-plan",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Arrière-plan",
@@ -6701,7 +6701,7 @@
       "source": "src/js/select-bridge.js:3048"
     },
     {
-      "id": "menu:select-bridge.js:onContext:exposer-l-opacit-comme-propri-t-de-component",
+      "id": "menu:select-bridge.js:onContext:exposer-l-opacite-comme-propriete-de-component",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Exposer l\\'opacité comme propriété de Component…",
@@ -6711,7 +6711,7 @@
       "source": "src/js/select-bridge.js:3269"
     },
     {
-      "id": "menu:select-bridge.js:onContext:exposer-la-visibilit-comme-propri-t-de-component",
+      "id": "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Exposer la visibilité comme propriété de Component…",
@@ -6761,7 +6761,7 @@
       "source": "src/js/select-bridge.js:3087"
     },
     {
-      "id": "menu:select-bridge.js:onContext:sugg-rer-la-forme-pour",
+      "id": "menu:select-bridge.js:onContext:suggerer-la-forme-pour",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Suggérer la forme pour « ",
@@ -6841,7 +6841,7 @@
       "source": "src/js/shapes-panel.js:869"
     },
     {
-      "id": "menu:storyboard.js:renderSound:d-tacher-du-montage",
+      "id": "menu:storyboard.js:renderSound:detacher-du-montage",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Détacher du montage",
@@ -6881,7 +6881,7 @@
       "source": "src/js/storyboard.js:1214"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:d-tacher-du-montage",
+      "id": "menu:storyboard.js:wireModuleMenu:detacher-du-montage",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Détacher du montage",
@@ -6891,7 +6891,7 @@
       "source": "src/js/storyboard.js:975"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:d-tacher-du-montage#2",
+      "id": "menu:storyboard.js:wireModuleMenu:detacher-du-montage#2",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Détacher du montage",
@@ -6901,7 +6901,7 @@
       "source": "src/js/storyboard.js:988"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:diter-l-animation",
+      "id": "menu:storyboard.js:wireModuleMenu:editer-l-animation",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Éditer l’animation",
@@ -6921,7 +6921,7 @@
       "source": "src/js/storyboard.js:985"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:r-initialiser-le-retiming",
+      "id": "menu:storyboard.js:wireModuleMenu:reinitialiser-le-retiming",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Réinitialiser le retiming",
@@ -6971,7 +6971,7 @@
       "source": "src/js/storyboard.js:990"
     },
     {
-      "id": "menu:storyboard.js:wireSpace:aucun-composant-cr-ez-en-un-en-animation-2d",
+      "id": "menu:storyboard.js:wireSpace:aucun-composant-creez-en-un-en-animation-2d",
       "kind": "menu",
       "area": "storyboard",
       "capability": "(Aucun composant — créez-en un en Animation 2D)",
@@ -7801,86 +7801,6 @@
       "source": "src/js/nemo-plugin.js:218"
     },
     {
-      "id": "sdk:nemo-script.activeLayer",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "activeLayer",
-      "handler": [
-        "src/js/nemo-script.js:432 activeLayer"
-      ],
-      "source": "src/js/nemo-script.js:432"
-    },
-    {
-      "id": "sdk:nemo-script.addLayer",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "addLayer",
-      "handler": [
-        "src/js/nemo-script.js:433 addLayer"
-      ],
-      "source": "src/js/nemo-script.js:433"
-    },
-    {
-      "id": "sdk:nemo-script.addPivot",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "addPivot",
-      "handler": [
-        "src/js/nemo-script.js:442 addPivot"
-      ],
-      "source": "src/js/nemo-script.js:442"
-    },
-    {
-      "id": "sdk:nemo-script.camera.keys",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "camera.keys",
-      "handler": [
-        "src/js/nemo-script.js:616 camera.keys"
-      ],
-      "source": "src/js/nemo-script.js:616"
-    },
-    {
-      "id": "sdk:nemo-script.comp.beat",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.beat",
-      "handler": [
-        "src/js/nemo-script.js:542 comp.beat"
-      ],
-      "source": "src/js/nemo-script.js:542"
-    },
-    {
-      "id": "sdk:nemo-script.comp.beats",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.beats",
-      "handler": [
-        "src/js/nemo-script.js:545 comp.beats"
-      ],
-      "source": "src/js/nemo-script.js:545"
-    },
-    {
-      "id": "sdk:nemo-script.comp.setWorkArea",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.setWorkArea",
-      "handler": [
-        "src/js/nemo-script.js:522 comp.setWorkArea"
-      ],
-      "source": "src/js/nemo-script.js:522"
-    },
-    {
-      "id": "sdk:nemo-script.comp.trimToWorkArea",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.trimToWorkArea",
-      "handler": [
-        "src/js/nemo-script.js:529 comp.trimToWorkArea"
-      ],
-      "source": "src/js/nemo-script.js:529"
-    },
-    {
       "id": "sdk:nemo-script.Effect.enabled",
       "kind": "sdk",
       "area": "project-lifecycle-integrations",
@@ -7959,46 +7879,6 @@
         "src/js/nemo-script.js:201 Effect.type"
       ],
       "source": "src/js/nemo-script.js:201"
-    },
-    {
-      "id": "sdk:nemo-script.goToFrame",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "goToFrame",
-      "handler": [
-        "src/js/nemo-script.js:451 goToFrame"
-      ],
-      "source": "src/js/nemo-script.js:451"
-    },
-    {
-      "id": "sdk:nemo-script.help",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "help",
-      "handler": [
-        "src/js/nemo-script.js:468 help"
-      ],
-      "source": "src/js/nemo-script.js:468"
-    },
-    {
-      "id": "sdk:nemo-script.isKeyframe",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "isKeyframe",
-      "handler": [
-        "src/js/nemo-script.js:452 isKeyframe"
-      ],
-      "source": "src/js/nemo-script.js:452"
-    },
-    {
-      "id": "sdk:nemo-script.layer",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "layer",
-      "handler": [
-        "src/js/nemo-script.js:422 layer"
-      ],
-      "source": "src/js/nemo-script.js:422"
     },
     {
       "id": "sdk:nemo-script.Layer.addEffect",
@@ -8369,6 +8249,126 @@
         "src/js/nemo-script.js:56 Layer.visible"
       ],
       "source": "src/js/nemo-script.js:56"
+    },
+    {
+      "id": "sdk:nemo-script.activeLayer",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "activeLayer",
+      "handler": [
+        "src/js/nemo-script.js:432 activeLayer"
+      ],
+      "source": "src/js/nemo-script.js:432"
+    },
+    {
+      "id": "sdk:nemo-script.addLayer",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "addLayer",
+      "handler": [
+        "src/js/nemo-script.js:433 addLayer"
+      ],
+      "source": "src/js/nemo-script.js:433"
+    },
+    {
+      "id": "sdk:nemo-script.addPivot",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "addPivot",
+      "handler": [
+        "src/js/nemo-script.js:442 addPivot"
+      ],
+      "source": "src/js/nemo-script.js:442"
+    },
+    {
+      "id": "sdk:nemo-script.camera.keys",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "camera.keys",
+      "handler": [
+        "src/js/nemo-script.js:616 camera.keys"
+      ],
+      "source": "src/js/nemo-script.js:616"
+    },
+    {
+      "id": "sdk:nemo-script.comp.beat",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.beat",
+      "handler": [
+        "src/js/nemo-script.js:542 comp.beat"
+      ],
+      "source": "src/js/nemo-script.js:542"
+    },
+    {
+      "id": "sdk:nemo-script.comp.beats",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.beats",
+      "handler": [
+        "src/js/nemo-script.js:545 comp.beats"
+      ],
+      "source": "src/js/nemo-script.js:545"
+    },
+    {
+      "id": "sdk:nemo-script.comp.setWorkArea",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.setWorkArea",
+      "handler": [
+        "src/js/nemo-script.js:522 comp.setWorkArea"
+      ],
+      "source": "src/js/nemo-script.js:522"
+    },
+    {
+      "id": "sdk:nemo-script.comp.trimToWorkArea",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.trimToWorkArea",
+      "handler": [
+        "src/js/nemo-script.js:529 comp.trimToWorkArea"
+      ],
+      "source": "src/js/nemo-script.js:529"
+    },
+    {
+      "id": "sdk:nemo-script.goToFrame",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "goToFrame",
+      "handler": [
+        "src/js/nemo-script.js:451 goToFrame"
+      ],
+      "source": "src/js/nemo-script.js:451"
+    },
+    {
+      "id": "sdk:nemo-script.help",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "help",
+      "handler": [
+        "src/js/nemo-script.js:468 help"
+      ],
+      "source": "src/js/nemo-script.js:468"
+    },
+    {
+      "id": "sdk:nemo-script.isKeyframe",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "isKeyframe",
+      "handler": [
+        "src/js/nemo-script.js:452 isKeyframe"
+      ],
+      "source": "src/js/nemo-script.js:452"
+    },
+    {
+      "id": "sdk:nemo-script.layer",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "layer",
+      "handler": [
+        "src/js/nemo-script.js:422 layer"
+      ],
+      "source": "src/js/nemo-script.js:422"
     },
     {
       "id": "sdk:nemo-script.layers",

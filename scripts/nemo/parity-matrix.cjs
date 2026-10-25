@@ -35,7 +35,7 @@ function freezeBaseline(sha) {
     const tar = execFileSync('git', ['archive', sha, 'src'], { cwd: ROOT, maxBuffer: 1 << 30 });
     execFileSync('tar', ['-x', '-C', tmp], { input: tar });
     const rows = require('./inventory.cjs').build({ root: tmp }).rows.map(lib.baselineRow);
-    rows.sort((a, b) => a.id.localeCompare(b.id));
+    rows.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     return { schema: 'nemo.parity-baseline/1', baseline: sha, generator: 'scripts/nemo/inventory.cjs (stable IDs)', rows };
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
@@ -43,7 +43,7 @@ function freezeBaseline(sha) {
 function refreshOwners(tasks) {
   const out = execFileSync('gh', ['issue', 'list', '--repo', 'mysteropodes/nemo', '--state', 'all',
     '--limit', '3000', '--json', 'number,title,state,body,labels'], { cwd: ROOT, maxBuffer: 1 << 30, encoding: 'utf8' });
-  return lib.ownersFromIssues(JSON.parse(out), tasks.map((t) => t.task));
+  return lib.ownersSnapshot(JSON.parse(out), tasks.map((t) => t.task), new Date().toISOString().slice(0, 10));
 }
 
 function outputs() {

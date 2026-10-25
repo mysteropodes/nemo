@@ -2,6 +2,7 @@
   "schema": "nemo.parity-matrix/1",
   "baseline": "1065e9d8d9c48e66d9b44bb4de446e8f4e887040",
   "baselineStatus": "proposed — pending Ilya and Cyrill approval (CS9 #2344 / PR #2352)",
+  "ownersSnapshotAt": "2026-10-25",
   "counts": {
     "surfaces": 903,
     "tasks": 228,
@@ -9,9 +10,9 @@
       "unmapped": 903
     },
     "taskStatus": {
-      "owners-closed": 41,
+      "issues-closed": 41,
       "unowned": 113,
-      "owners-open": 74
+      "issues-open": 74
     }
   },
   "surfaces": [
@@ -3976,7 +3977,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:alignbottom",
+      "id": "dom:align-toolbar>button[data-align=bottom]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align bottom",
@@ -3986,7 +3987,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:aligncenterh",
+      "id": "dom:align-toolbar>button[data-align=centerH]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align center horizontally",
@@ -3996,7 +3997,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:aligncenterv",
+      "id": "dom:align-toolbar>button[data-align=centerV]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align center vertically",
@@ -4006,7 +4007,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:alignleft",
+      "id": "dom:align-toolbar>button[data-align=left]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align left",
@@ -4016,7 +4017,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:alignright",
+      "id": "dom:align-toolbar>button[data-align=right]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align right",
@@ -4026,7 +4027,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:aligntop",
+      "id": "dom:align-toolbar>button[data-align=top]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Align top",
@@ -4036,7 +4037,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:distributehorizontal",
+      "id": "dom:align-toolbar>button[data-distribute=horizontal]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Distribute horizontally",
@@ -4046,7 +4047,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:align-toolbar>button:distributevertical",
+      "id": "dom:align-toolbar>button[data-distribute=vertical]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Distribute vertically",
@@ -4056,7 +4057,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:app-mode-switch>button:modeanim2d",
+      "id": "dom:app-mode-switch>button[data-mode=anim2d]",
       "kind": "dom",
       "area": "animation-rigs-expressions",
       "capability": "2D Animation",
@@ -4066,7 +4067,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:app-mode-switch>button:modemotion",
+      "id": "dom:app-mode-switch>button[data-mode=motion]",
       "kind": "dom",
       "area": "animation-rigs-expressions",
       "capability": "Motion — property keyframes (position/rotation/scale/opacity)",
@@ -4076,7 +4077,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:app-mode-switch>button:storyboardfrozentitle",
+      "id": "dom:app-mode-switch>button[data-mode=storyboard]",
       "kind": "dom",
       "area": "animation-rigs-expressions",
       "capability": "StoryBoard — in development, not yet available in this build",
@@ -4086,7 +4087,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:comment-fb-tags>button",
+      "id": "dom:comment-fb-tags>button[data-tag=bug]",
       "kind": "dom",
       "area": "project-lifecycle-integrations",
       "capability": "🐞",
@@ -4096,17 +4097,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:comment-fb-tags>button#2",
-      "kind": "dom",
-      "area": "project-lifecycle-integrations",
-      "capability": "⚡",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:comment-fb-tags>button#3",
+      "id": "dom:comment-fb-tags>button[data-tag=idea]",
       "kind": "dom",
       "area": "project-lifecycle-integrations",
       "capability": "💡",
@@ -4116,7 +4107,17 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:comment-fb-tags>button#4",
+      "id": "dom:comment-fb-tags>button[data-tag=perf]",
+      "kind": "dom",
+      "area": "project-lifecycle-integrations",
+      "capability": "⚡",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:comment-fb-tags>button[data-tag=polish]",
       "kind": "dom",
       "area": "project-lifecycle-integrations",
       "capability": "✨",
@@ -4126,7 +4127,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-cap-grp>button:capbutt",
+      "id": "dom:p-cap-grp>button[data-value=butt]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Butt",
@@ -4136,7 +4137,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-cap-grp>button:capround",
+      "id": "dom:p-cap-grp>button[data-value=round]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Round",
@@ -4146,7 +4147,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-cap-grp>button:capsquare",
+      "id": "dom:p-cap-grp>button[data-value=square]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Square",
@@ -4156,7 +4157,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-fillbrushmode-grp>button:placementabove",
+      "id": "dom:p-fillbrushmode-grp>button[data-value=above]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Above — on top of existing fills",
@@ -4166,7 +4167,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-fillbrushmode-grp>button:placementbelow",
+      "id": "dom:p-fillbrushmode-grp>button[data-value=below]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Below — behind existing fills (background patch)",
@@ -4176,7 +4177,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-fillbrushmode-grp>button:placementmerge",
+      "id": "dom:p-fillbrushmode-grp>button[data-value=merge]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Merge — unite with any existing fill it overlaps",
@@ -4186,7 +4187,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-join-grp>button:joinbevel",
+      "id": "dom:p-join-grp>button[data-value=bevel]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Bevel",
@@ -4196,7 +4197,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-join-grp>button:joinmiter",
+      "id": "dom:p-join-grp>button[data-value=miter]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Miter",
@@ -4206,7 +4207,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-join-grp>button:joinround",
+      "id": "dom:p-join-grp>button[data-value=round]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Round",
@@ -4216,7 +4217,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-paintorder-grp>button:paintorderfillfirst",
+      "id": "dom:p-paintorder-grp>button[data-value=fillFirst]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill in front of Stroke",
@@ -4226,7 +4227,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:p-paintorder-grp>button:paintorderstrokefirst",
+      "id": "dom:p-paintorder-grp>button[data-value=strokeFirst]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Stroke in front of Fill",
@@ -4276,7 +4277,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane",
+      "id": "dom:settings-modal>div[data-pane=about]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4286,7 +4287,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane#2",
+      "id": "dom:settings-modal>div[data-pane=collab]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4296,7 +4297,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane#3",
+      "id": "dom:settings-modal>div[data-pane=feedback]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4306,7 +4307,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane#4",
+      "id": "dom:settings-modal>div[data-pane=figma]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4316,7 +4317,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane#5",
+      "id": "dom:settings-modal>div[data-pane=general]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4326,7 +4327,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane#6",
+      "id": "dom:settings-modal>div[data-pane=labs]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4336,7 +4337,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane#7",
+      "id": "dom:settings-modal>div[data-pane=shortcuts]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4346,7 +4347,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-modal>div:settings-pane#8",
+      "id": "dom:settings-modal>div[data-pane=updates]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "",
@@ -4356,7 +4357,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstababout",
+      "id": "dom:settings-tabs>button[data-tab=about]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "About",
@@ -4366,7 +4367,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabcollab",
+      "id": "dom:settings-tabs>button[data-tab=collab]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Collaboration",
@@ -4376,7 +4377,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabfeedback",
+      "id": "dom:settings-tabs>button[data-tab=feedback]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Feedback",
@@ -4386,7 +4387,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabfigma",
+      "id": "dom:settings-tabs>button[data-tab=figma]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Figma",
@@ -4396,7 +4397,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabgeneral",
+      "id": "dom:settings-tabs>button[data-tab=general]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "General",
@@ -4406,7 +4407,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstablabs",
+      "id": "dom:settings-tabs>button[data-tab=labs]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Labs",
@@ -4416,7 +4417,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabshortcuts",
+      "id": "dom:settings-tabs>button[data-tab=shortcuts]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Shortcuts",
@@ -4426,7 +4427,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:settings-tabs>button:settingstabupdates",
+      "id": "dom:settings-tabs>button[data-tab=updates]",
       "kind": "dom",
       "area": "preferences-workspace",
       "capability": "Updates",
@@ -4436,7 +4437,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=ellipse]:toolellipse",
+      "id": "dom:shape-tool-stack>button[data-tool=ellipse]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Ellipse",
@@ -4446,7 +4447,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=line]:toolline",
+      "id": "dom:shape-tool-stack>button[data-tool=line]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)",
@@ -4456,7 +4457,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=rect]:toolrect",
+      "id": "dom:shape-tool-stack>button[data-tool=rect]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Rectangle",
@@ -4466,7 +4467,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=speechbubble]:toolspeechbubble",
+      "id": "dom:shape-tool-stack>button[data-tool=speechbubble]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Speech bubble — rounded rect with an auto tail, drag to size (D)",
@@ -4476,7 +4477,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:shape-tool-stack>button[data-tool=star]:toolstar",
+      "id": "dom:shape-tool-stack>button[data-tool=star]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)",
@@ -4486,7 +4487,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:symbol-tabs>div:scenetab",
+      "id": "dom:symbol-tabs>div[data-sym=]",
       "kind": "dom",
       "area": "unclassified",
       "capability": "Scene",
@@ -4496,37 +4497,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:text-props-sec>button:aligncenteropt",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Center",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:alignleftopt",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Left",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:alignrightopt",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Right",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:b",
+      "id": "dom:text-props-sec>button[data-flag=bold]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "B",
@@ -4536,7 +4507,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:text-props-sec>button:i",
+      "id": "dom:text-props-sec>button[data-flag=italic]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "I",
@@ -4546,7 +4517,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:text-props-sec>button:s",
+      "id": "dom:text-props-sec>button[data-flag=strike]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "S",
@@ -4556,67 +4527,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:text-props-sec>button:tpcasecap",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Ab",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpcaselower",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "aa",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpcasenone",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Aa",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpcaseupper",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "AA",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpwidthauto",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Auto width",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:tpwidthfixed",
-      "kind": "dom",
-      "area": "drawing-selection",
-      "capability": "Fixed width",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "dom:text-props-sec>button:u",
+      "id": "dom:text-props-sec>button[data-flag=underline]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "U",
@@ -4626,7 +4537,97 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=draw]:tooldraw",
+      "id": "dom:text-props-sec>button[data-val=auto]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Auto width",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=capitalize]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Ab",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=center]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Center",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=fixed]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Fixed width",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=left]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Left",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=lower]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "aa",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=none]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Aa",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=right]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "Right",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:text-props-sec>button[data-val=upper]",
+      "kind": "dom",
+      "area": "drawing-selection",
+      "capability": "AA",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "dom:tools-panel>button[data-tool=draw]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Brush",
@@ -4636,7 +4637,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=eraser]:tooleraser",
+      "id": "dom:tools-panel>button[data-tool=eraser]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Eraser (E in Animation 2D — Motion mode reserves E to reveal Effects)",
@@ -4646,7 +4647,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=eyedropper]:tooleyedropper",
+      "id": "dom:tools-panel>button[data-tool=eyedropper]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Eyedropper",
@@ -4656,7 +4657,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=fill]:toolfill",
+      "id": "dom:tools-panel>button[data-tool=fill]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill",
@@ -4666,7 +4667,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=fillbrush]:toolfillbrush",
+      "id": "dom:tools-panel>button[data-tool=fillbrush]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill Brush",
@@ -4676,7 +4677,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=fsselect]:toolfsselect",
+      "id": "dom:tools-panel>button[data-tool=fsselect]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Fill/Stroke Select — click a fill or a stroke segment to select it independently (M in Animation 2D — Motion mode reserves M to reveal Mattes)",
@@ -4686,7 +4687,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=hand]:toolhand",
+      "id": "dom:tools-panel>button[data-tool=hand]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Hand",
@@ -4696,7 +4697,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=pen]:toolpen",
+      "id": "dom:tools-panel>button[data-tool=pen]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Pen",
@@ -4706,7 +4707,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=rig]:toolrig",
+      "id": "dom:tools-panel>button[data-tool=rig]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Rig — 3 steps in the panel: 1. Draw (click=anchor, drag=curve) 2. Assign (link shapes to bones) 3. Move (drag an anchor to pose) (S in Animation 2D — Motion mode reserves S for Scale)",
@@ -4716,7 +4717,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=rotate]:toolrotate",
+      "id": "dom:tools-panel>button[data-tool=rotate]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Rotate canvas",
@@ -4726,7 +4727,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=select]:toolselect",
+      "id": "dom:tools-panel>button[data-tool=select]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Select",
@@ -4736,7 +4737,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=subselect]:toolsubselect",
+      "id": "dom:tools-panel>button[data-tool=subselect]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Subselect (nodes)",
@@ -4746,7 +4747,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=text]:tooltext",
+      "id": "dom:tools-panel>button[data-tool=text]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Text",
@@ -4756,7 +4757,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:tools-panel>button[data-tool=zoom]:toolzoom",
+      "id": "dom:tools-panel>button[data-tool=zoom]",
       "kind": "dom",
       "area": "drawing-selection",
       "capability": "Zoom",
@@ -4766,7 +4767,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorbc",
+      "id": "dom:xform-anchor-grid>button[data-key=bc]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Bottom-center",
@@ -4776,7 +4777,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorbl",
+      "id": "dom:xform-anchor-grid>button[data-key=bl]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Bottom-left",
@@ -4786,7 +4787,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorbr",
+      "id": "dom:xform-anchor-grid>button[data-key=br]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Bottom-right",
@@ -4796,7 +4797,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchormc",
+      "id": "dom:xform-anchor-grid>button[data-key=mc]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Center",
@@ -4806,7 +4807,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchorml",
+      "id": "dom:xform-anchor-grid>button[data-key=ml]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Middle-left",
@@ -4816,7 +4817,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchormr",
+      "id": "dom:xform-anchor-grid>button[data-key=mr]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Middle-right",
@@ -4826,7 +4827,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchortc",
+      "id": "dom:xform-anchor-grid>button[data-key=tc]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Top-center",
@@ -4836,7 +4837,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchortl",
+      "id": "dom:xform-anchor-grid>button[data-key=tl]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Top-left",
@@ -4846,7 +4847,7 @@
       "status": "unmapped"
     },
     {
-      "id": "dom:xform-anchor-grid>button:anchortr",
+      "id": "dom:xform-anchor-grid>button[data-key=tr]",
       "kind": "dom",
       "area": "timeline-layers-frames",
       "capability": "Top-right",
@@ -5466,6 +5467,26 @@
       "status": "unmapped"
     },
     {
+      "id": "menu:layer-inout.js:buildBar:aligner-a-droite-out",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "Aligner à droite (out)",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "menu:layer-inout.js:buildBar:aligner-a-gauche-in",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "Aligner à gauche (in)",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
       "id": "menu:layer-inout.js:buildBar:aligner-au-centre",
       "kind": "menu",
       "area": "animation-rigs-expressions",
@@ -5476,40 +5497,20 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:aligner-droite-out",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "Aligner à droite (out)",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "menu:layer-inout.js:buildBar:aligner-gauche-in",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "Aligner à gauche (in)",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "menu:layer-inout.js:buildBar:chelonner-stagger",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "Échelonner (stagger)…",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "menu:layer-inout.js:buildBar:distribuer-uniform-ment",
+      "id": "menu:layer-inout.js:buildBar:distribuer-uniformement",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Distribuer uniformément",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "menu:layer-inout.js:buildBar:echelonner-stagger",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "Échelonner (stagger)…",
       "tasks": [],
       "capabilityId": null,
       "disposition": null,
@@ -5526,7 +5527,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:inverser-la-s-lection",
+      "id": "menu:layer-inout.js:buildBar:inverser-la-selection",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Inverser la sélection",
@@ -5536,7 +5537,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps",
+      "id": "menu:layer-inout.js:buildBar:parent-in-time-lier-le-temps-a",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Parent in Time — lier le temps à…",
@@ -5546,7 +5547,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:r-initialiser-pleine-dur-e",
+      "id": "menu:layer-inout.js:buildBar:reinitialiser-pleine-duree",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Réinitialiser (pleine durée)",
@@ -5556,7 +5557,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:layer-inout.js:buildBar:s-lectionner-1-sur-2",
+      "id": "menu:layer-inout.js:buildBar:selectionner-1-sur-2",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Sélectionner 1 sur 2",
@@ -5566,7 +5567,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:buildEl:aller-ce-rep-re",
+      "id": "menu:markers.js:buildEl:aller-a-ce-repere",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Aller à ce repère",
@@ -5576,7 +5577,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:buildEl:renommer-le-rep-re",
+      "id": "menu:markers.js:buildEl:renommer-le-repere",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Renommer le repère…",
@@ -5586,7 +5587,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:buildEl:supprimer-le-rep-re",
+      "id": "menu:markers.js:buildEl:supprimer-le-repere",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Supprimer le repère",
@@ -5596,7 +5597,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:ajouter-un-rep-re-ici-frame",
+      "id": "menu:markers.js:initRulerMenu:ajouter-un-repere-ici-frame",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Ajouter un repère ici (frame ",
@@ -5606,7 +5607,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:ajouter-un-rep-re-nomm",
+      "id": "menu:markers.js:initRulerMenu:ajouter-un-repere-nomme",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Ajouter un repère nommé…",
@@ -5626,7 +5627,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:r-duire-la-composition-la-zone-de-travail",
+      "id": "menu:markers.js:initRulerMenu:reduire-la-composition-a-la-zone-de-travail",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Réduire la composition à la zone de travail",
@@ -5636,7 +5637,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:rep-re-pr-c-dent-maj",
+      "id": "menu:markers.js:initRulerMenu:repere-precedent-maj",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Repère précédent  (Maj+←)",
@@ -5646,7 +5647,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:rep-re-suivant-maj",
+      "id": "menu:markers.js:initRulerMenu:repere-suivant-maj",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Repère suivant  (Maj+→)",
@@ -5656,7 +5657,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:markers.js:initRulerMenu:supprimer-tous-les-rep-res",
+      "id": "menu:markers.js:initRulerMenu:supprimer-tous-les-reperes",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Supprimer tous les repères",
@@ -6026,6 +6027,16 @@
       "status": "unmapped"
     },
     {
+      "id": "menu:motion.js:openExtraMatteMenu#2",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "  ",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
       "id": "menu:motion.js:openExtraMatteMenu:mattemenumodehdr",
       "kind": "menu",
       "area": "animation-rigs-expressions",
@@ -6056,16 +6067,6 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:motion.js:openExtraMatteMenu#2",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "  ",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
       "id": "menu:motion.js:openExtraParentMenu:menuremovethisparent",
       "kind": "menu",
       "area": "animation-rigs-expressions",
@@ -6077,6 +6078,16 @@
     },
     {
       "id": "menu:motion.js:openMatteConfigMenu",
+      "kind": "menu",
+      "area": "animation-rigs-expressions",
+      "capability": "  ",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "menu:motion.js:openMatteConfigMenu#2",
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "  ",
@@ -6110,16 +6121,6 @@
       "kind": "menu",
       "area": "animation-rigs-expressions",
       "capability": "Matte layer:",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "menu:motion.js:openMatteConfigMenu#2",
-      "kind": "menu",
-      "area": "animation-rigs-expressions",
-      "capability": "  ",
       "tasks": [],
       "capabilityId": null,
       "disposition": null,
@@ -6646,7 +6647,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:select-bridge.js:onContext:arri-re-plan",
+      "id": "menu:select-bridge.js:onContext:arriere-plan",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Arrière-plan",
@@ -6746,7 +6747,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:select-bridge.js:onContext:exposer-l-opacit-comme-propri-t-de-component",
+      "id": "menu:select-bridge.js:onContext:exposer-l-opacite-comme-propriete-de-component",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Exposer l\\'opacité comme propriété de Component…",
@@ -6756,7 +6757,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:select-bridge.js:onContext:exposer-la-visibilit-comme-propri-t-de-component",
+      "id": "menu:select-bridge.js:onContext:exposer-la-visibilite-comme-propriete-de-compone",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Exposer la visibilité comme propriété de Component…",
@@ -6806,7 +6807,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:select-bridge.js:onContext:sugg-rer-la-forme-pour",
+      "id": "menu:select-bridge.js:onContext:suggerer-la-forme-pour",
       "kind": "menu",
       "area": "drawing-selection",
       "capability": "Suggérer la forme pour « ",
@@ -6886,7 +6887,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:storyboard.js:renderSound:d-tacher-du-montage",
+      "id": "menu:storyboard.js:renderSound:detacher-du-montage",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Détacher du montage",
@@ -6926,7 +6927,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:d-tacher-du-montage",
+      "id": "menu:storyboard.js:wireModuleMenu:detacher-du-montage",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Détacher du montage",
@@ -6936,7 +6937,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:d-tacher-du-montage#2",
+      "id": "menu:storyboard.js:wireModuleMenu:detacher-du-montage#2",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Détacher du montage",
@@ -6946,7 +6947,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:diter-l-animation",
+      "id": "menu:storyboard.js:wireModuleMenu:editer-l-animation",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Éditer l’animation",
@@ -6966,7 +6967,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:storyboard.js:wireModuleMenu:r-initialiser-le-retiming",
+      "id": "menu:storyboard.js:wireModuleMenu:reinitialiser-le-retiming",
       "kind": "menu",
       "area": "storyboard",
       "capability": "Réinitialiser le retiming",
@@ -7016,7 +7017,7 @@
       "status": "unmapped"
     },
     {
-      "id": "menu:storyboard.js:wireSpace:aucun-composant-cr-ez-en-un-en-animation-2d",
+      "id": "menu:storyboard.js:wireSpace:aucun-composant-creez-en-un-en-animation-2d",
       "kind": "menu",
       "area": "storyboard",
       "capability": "(Aucun composant — créez-en un en Animation 2D)",
@@ -7846,86 +7847,6 @@
       "status": "unmapped"
     },
     {
-      "id": "sdk:nemo-script.activeLayer",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "activeLayer",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.addLayer",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "addLayer",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.addPivot",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "addPivot",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.camera.keys",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "camera.keys",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.comp.beat",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.beat",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.comp.beats",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.beats",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.comp.setWorkArea",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.setWorkArea",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.comp.trimToWorkArea",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "comp.trimToWorkArea",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
       "id": "sdk:nemo-script.Effect.enabled",
       "kind": "sdk",
       "area": "project-lifecycle-integrations",
@@ -8000,46 +7921,6 @@
       "kind": "sdk",
       "area": "project-lifecycle-integrations",
       "capability": "type (get property)",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.goToFrame",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "goToFrame",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.help",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "help",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.isKeyframe",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "isKeyframe",
-      "tasks": [],
-      "capabilityId": null,
-      "disposition": null,
-      "status": "unmapped"
-    },
-    {
-      "id": "sdk:nemo-script.layer",
-      "kind": "sdk",
-      "area": "project-lifecycle-integrations",
-      "capability": "layer",
       "tasks": [],
       "capabilityId": null,
       "disposition": null,
@@ -8410,6 +8291,126 @@
       "kind": "sdk",
       "area": "project-lifecycle-integrations",
       "capability": "visible (get/set property)",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.activeLayer",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "activeLayer",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.addLayer",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "addLayer",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.addPivot",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "addPivot",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.camera.keys",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "camera.keys",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.comp.beat",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.beat",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.comp.beats",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.beats",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.comp.setWorkArea",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.setWorkArea",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.comp.trimToWorkArea",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "comp.trimToWorkArea",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.goToFrame",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "goToFrame",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.help",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "help",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.isKeyframe",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "isKeyframe",
+      "tasks": [],
+      "capabilityId": null,
+      "disposition": null,
+      "status": "unmapped"
+    },
+    {
+      "id": "sdk:nemo-script.layer",
+      "kind": "sdk",
+      "area": "project-lifecycle-integrations",
+      "capability": "layer",
       "tasks": [],
       "capabilityId": null,
       "disposition": null,
@@ -9078,7 +9079,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D02",
@@ -9091,7 +9092,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D03",
@@ -9176,7 +9177,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D13",
@@ -9205,7 +9206,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D16",
@@ -9218,7 +9219,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D17",
@@ -9255,7 +9256,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D21",
@@ -9268,7 +9269,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D22",
@@ -9281,7 +9282,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D23",
@@ -9294,7 +9295,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D24",
@@ -9307,7 +9308,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D25",
@@ -9324,7 +9325,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D26",
@@ -9337,7 +9338,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D27",
@@ -9358,7 +9359,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D29",
@@ -9379,7 +9380,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "D31",
@@ -9392,7 +9393,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D32",
@@ -9417,7 +9418,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D33",
@@ -9430,7 +9431,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D34",
@@ -9455,7 +9456,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "D36",
@@ -9508,7 +9509,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "F02",
@@ -9521,7 +9522,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "F03",
@@ -9542,7 +9543,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F04",
@@ -9555,7 +9556,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "F05",
@@ -9584,7 +9585,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "F07",
@@ -9605,7 +9606,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "F08",
@@ -9630,7 +9631,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "F09",
@@ -9659,7 +9660,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F10",
@@ -9688,7 +9689,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F11",
@@ -9709,7 +9710,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F12",
@@ -9730,7 +9731,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F13",
@@ -9751,7 +9752,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F14",
@@ -9780,7 +9781,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "F16",
@@ -9805,7 +9806,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F17",
@@ -9850,7 +9851,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F18",
@@ -9883,7 +9884,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F19",
@@ -9912,7 +9913,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "F20",
@@ -9953,7 +9954,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G02",
@@ -9978,7 +9979,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G03a",
@@ -10003,7 +10004,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G03b",
@@ -10024,7 +10025,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G04",
@@ -10045,7 +10046,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G05",
@@ -10078,7 +10079,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G07",
@@ -10107,7 +10108,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G08",
@@ -10128,7 +10129,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G09",
@@ -10145,7 +10146,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G10",
@@ -10170,7 +10171,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G12",
@@ -10211,7 +10212,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G14",
@@ -10244,7 +10245,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G15",
@@ -10257,7 +10258,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G16",
@@ -10270,7 +10271,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G17",
@@ -10291,7 +10292,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G18",
@@ -10308,7 +10309,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G19",
@@ -10333,7 +10334,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G20",
@@ -10354,7 +10355,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G22",
@@ -10387,7 +10388,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G23",
@@ -10400,7 +10401,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G24",
@@ -10425,7 +10426,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G25",
@@ -10474,7 +10475,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G28",
@@ -10491,7 +10492,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G29",
@@ -10516,7 +10517,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G31",
@@ -10541,7 +10542,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G34",
@@ -10574,7 +10575,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G36",
@@ -10603,7 +10604,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G37",
@@ -10632,7 +10633,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G38a",
@@ -10661,7 +10662,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G38b",
@@ -10686,7 +10687,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G39",
@@ -10723,7 +10724,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "G42",
@@ -10740,7 +10741,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G43",
@@ -10761,7 +10762,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G44",
@@ -10782,7 +10783,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G47",
@@ -10807,7 +10808,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G49",
@@ -10828,7 +10829,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G50",
@@ -10845,7 +10846,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "G52",
@@ -10866,7 +10867,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I02",
@@ -10879,7 +10880,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I03",
@@ -10892,7 +10893,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I04",
@@ -10905,7 +10906,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I05",
@@ -10918,7 +10919,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I06",
@@ -10947,7 +10948,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "I08",
@@ -10960,7 +10961,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "I09",
@@ -10973,7 +10974,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "I10",
@@ -10998,7 +10999,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I12",
@@ -11035,7 +11036,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I13",
@@ -11052,7 +11053,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I14",
@@ -11069,7 +11070,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "I15",
@@ -11082,7 +11083,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "I16a",
@@ -11103,7 +11104,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I16b",
@@ -11124,7 +11125,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I17",
@@ -11145,7 +11146,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "I18",
@@ -11174,7 +11175,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I19",
@@ -11191,7 +11192,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I20",
@@ -11208,7 +11209,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I21",
@@ -11221,7 +11222,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I22",
@@ -11234,7 +11235,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I23",
@@ -11247,7 +11248,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I24",
@@ -11260,7 +11261,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I25",
@@ -11273,7 +11274,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I26",
@@ -11294,7 +11295,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I28",
@@ -11307,7 +11308,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I29",
@@ -11320,7 +11321,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I30",
@@ -11333,7 +11334,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I31",
@@ -11346,7 +11347,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I32",
@@ -11359,7 +11360,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I33",
@@ -11372,7 +11373,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I34",
@@ -11385,7 +11386,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I35",
@@ -11402,7 +11403,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "I36",
@@ -11419,7 +11420,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I37",
@@ -11472,7 +11473,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I42",
@@ -11489,7 +11490,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I43",
@@ -11538,7 +11539,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "I47",
@@ -11615,7 +11616,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "U03",
@@ -11628,7 +11629,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "U04",
@@ -11849,7 +11850,7 @@
           "state": "closed"
         }
       ],
-      "status": "owners-closed"
+      "status": "issues-closed"
     },
     {
       "task": "U31",
@@ -11902,7 +11903,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "U37",
@@ -12083,7 +12084,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "X20",
@@ -12104,7 +12105,7 @@
           "state": "open"
         }
       ],
-      "status": "owners-open"
+      "status": "issues-open"
     },
     {
       "task": "X22",

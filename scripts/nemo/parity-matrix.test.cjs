@@ -35,6 +35,8 @@ test('issue task IDs come from title lists, ranges, NEMO prefixes and IDs lines;
   assert.deepEqual(lib.issueTaskIds({ title: '[NEMO:D01-G41A] fonts' }).sort(), ['D01', 'G41', 'G41a']);
   assert.deepEqual(lib.issueTaskIds({ title: 'x', body: '**IDs: G14, G22, G13.**' }).sort(), ['G13', 'G14', 'G22']);
   assert.deepEqual(lib.issueTaskIds({ title: 'mentions F09 in prose only' }), []);
+  // Agent names collide with task IDs ("Author **D03**"); only an **IDs:** line declares tasks.
+  assert.deepEqual(lib.issueTaskIds({ title: 'x', body: 'Author **D03**, reviewer **D02**' }), []);
   const owners = lib.ownersFromIssues([
     { number: 1, title: 'leaf (F09)', state: 'CLOSED', labels: [] },
     { number: 2, title: 'parent (F09, G43)', state: 'OPEN', labels: [{ name: 'remediation:parent' }] },
@@ -43,16 +45,16 @@ test('issue task IDs come from title lists, ranges, NEMO prefixes and IDs lines;
 });
 
 test('surface and task status follow mapping, ownership and closure', () => {
-  const owners = { F09: [{ issue: 1, state: 'closed' }], G43: [{ issue: 2, state: 'open' }] };
+  const owners = { owners: { F09: [{ issue: 1, state: 'closed' }], G43: [{ issue: 2, state: 'open' }] } };
   const mapping = { surfaces: { 'dom:#a': { tasks: ['F09'] }, 'dom:#b': { tasks: ['F09', 'G43'] }, 'dom:#c': { disposition: 'baseline defect: x' } } };
   const m = lib.buildMatrix({ config, tasks, baseline, mapping, owners });
-  assert.deepEqual(m.surfaces.map((s) => s.status), ['owners-closed', 'owners-open', 'disposition']);
-  assert.deepEqual(m.tasks.map((t) => [t.task, t.status, t.surfaces]), [['F09', 'owners-closed', 2], ['G43', 'owners-open', 1]]);
-  const none = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: ['G43'] } } }, owners: {} });
+  assert.deepEqual(m.surfaces.map((s) => s.status), ['issues-closed', 'issues-open', 'disposition']);
+  assert.deepEqual(m.tasks.map((t) => [t.task, t.status, t.surfaces]), [['F09', 'issues-closed', 2], ['G43', 'issues-open', 1]]);
+  const none = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: ['G43'] } } }, owners: { owners: {} } });
   assert.deepEqual(none.surfaces.map((s) => s.status), ['unowned', 'unmapped', 'unmapped']);
 });
 
 test('the CSV reader keeps quoted commas, quotes and newlines inside one field', () => {
-  const rows = lib.parseCsv('task,title\nF09,"a, ""b""\nc"\nG43,d\n');
+  const rows = lib.parseCsv('\uFEFFtask,title\nF09,"a, ""b""\nc"\nG43,d\n');
   assert.deepEqual(rows, [{ task: 'F09', title: 'a, "b"\nc' }, { task: 'G43', title: 'd' }]);
 });
