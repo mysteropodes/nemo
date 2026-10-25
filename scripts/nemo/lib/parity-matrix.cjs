@@ -101,7 +101,7 @@ function validate({ tasks, baseline, mapping }) {
     if (!surfaceIds.has(id)) problems.push(`mapping names unknown baseline surface ${id}`);
     const ts = Array.isArray(m.tasks) ? m.tasks : [];
     for (const t of ts) if (!taskIds.has(t)) problems.push(`mapping for ${id} names unknown task ${t}`);
-    if (!ts.length && !m.disposition) problems.push(`mapping for ${id} needs tasks or a disposition`);
+    if (!ts.length && !m.disposition && m.noTask !== true) problems.push(`mapping for ${id} needs tasks, a disposition or noTask`);
     if (m.disposition !== undefined && (typeof m.disposition !== 'string' || !m.disposition.trim())) {
       problems.push(`mapping for ${id} has an empty disposition`);
     }
@@ -112,6 +112,8 @@ function validate({ tasks, baseline, mapping }) {
 function surfaceStatus(m, owners) {
   if (!m) return 'unmapped';
   if (m.disposition) return 'disposition';
+  // A baseline surface that no original task covers is a gap in the task contract.
+  if (m.noTask === true && !(m.tasks || []).length) return 'no-task';
   const states = m.tasks.flatMap((t) => (owners[t] || []).map((o) => o.state));
   if (m.tasks.some((t) => !(owners[t] || []).length)) return 'unowned';
   return states.every((s) => s === 'closed') ? 'issues-closed' : 'issues-open';
@@ -123,7 +125,7 @@ function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot }) {
     const m = (mapping.surfaces || {})[r.id];
     return { id: r.id, kind: r.kind, area: r.area, capability: r.capability,
       tasks: m ? (m.tasks || []) : [], capabilityId: m && m.capability || null,
-      disposition: m && m.disposition || null, status: surfaceStatus(m, owners) };
+      disposition: m && m.disposition || null, confidence: m && m.confidence || null, status: surfaceStatus(m, owners) };
   });
   const bySurfaceTask = new Map();
   for (const s of surfaces) for (const t of s.tasks) bySurfaceTask.set(t, (bySurfaceTask.get(t) || 0) + 1);
@@ -134,7 +136,8 @@ function buildMatrix({ config, tasks, baseline, mapping, owners: snapshot }) {
   });
   const count = (rows) => rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
   return { schema: SCHEMA, baseline: config.baseline, baselineStatus: config.baselineStatus, ownersSnapshotAt: snapshot.snapshotAt || null,
-    counts: { surfaces: surfaces.length, tasks: taskRows.length, surfaceStatus: count(surfaces), taskStatus: count(taskRows) },
+    counts: { surfaces: surfaces.length, tasks: taskRows.length, surfaceStatus: count(surfaces), taskStatus: count(taskRows),
+      mappingConfidence: surfaces.reduce((acc, s) => { if (s.confidence) acc[s.confidence] = (acc[s.confidence] || 0) + 1; return acc; }, {}) },
     surfaces, tasks: taskRows };
 }
 
@@ -151,7 +154,8 @@ function renderMarkdown(matrix) {
     'Do not edit by hand: curate `mapping.json`, refresh `owners.json`, then regenerate.',
     `Owners snapshot: ${matrix.ownersSnapshotAt || 'unknown'}. An owner is a non-parent issue declaring the task ID (title list or range, \`[NEMO:…]\` prefix or \`**IDs:**\` line); parent-only or prose mentions are not ownership. \`issues-closed\` means every declaring issue is closed, not that the task is accepted.`, '',
     `- Surfaces: ${matrix.counts.surfaces} (${line(matrix.counts.surfaceStatus)})`,
-    `- Tasks: ${matrix.counts.tasks} (${line(matrix.counts.taskStatus)})`, '',
+    `- Tasks: ${matrix.counts.tasks} (${line(matrix.counts.taskStatus)})`,
+    `- Mapping confidence: ${line(matrix.counts.mappingConfidence) || 'none recorded'} (medium/low rows need human review)`, '',
     '| Outcome | Tasks | Tasks with no owning issue |', '|---|---:|---|',
     ...Object.keys(byOutcome).sort().map((k) => `| ${k} | ${byOutcome[k].tasks} | ${byOutcome[k].unowned.join(', ') || '—'} |`),
     '',

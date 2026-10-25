@@ -22,7 +22,7 @@ test('the committed matrix is valid and up to date (`parity-matrix.cjs --check`)
 test('validate rejects unknown surfaces, unknown tasks, empty mappings and duplicates', () => {
   const mapping = { surfaces: { 'dom:#zz': { tasks: ['F09'] }, 'dom:#a': { tasks: ['Q99'] }, 'dom:#b': {}, 'dom:#c': { disposition: ' ' } } };
   const problems = lib.validate({ tasks, baseline: { rows: [...baseline.rows, { id: 'dom:#a' }] }, mapping });
-  for (const pattern of [/unknown baseline surface dom:#zz/, /unknown task Q99/, /dom:#b needs tasks or a disposition/,
+  for (const pattern of [/unknown baseline surface dom:#zz/, /unknown task Q99/, /dom:#b needs tasks, a disposition or noTask/,
     /dom:#c has an empty disposition/, /duplicate baseline surface dom:#a/]) {
     assert.ok(problems.some((p) => pattern.test(p)), pattern + ' in ' + problems.join(' | '));
   }
@@ -52,6 +52,8 @@ test('surface and task status follow mapping, ownership and closure', () => {
   assert.deepEqual(m.tasks.map((t) => [t.task, t.status, t.surfaces]), [['F09', 'issues-closed', 2], ['G43', 'issues-open', 1]]);
   const none = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: ['G43'] } } }, owners: { owners: {} } });
   assert.deepEqual(none.surfaces.map((s) => s.status), ['unowned', 'unmapped', 'unmapped']);
+  const gap = lib.buildMatrix({ config, tasks, baseline, mapping: { surfaces: { 'dom:#a': { tasks: [], noTask: true } } }, owners: { owners: {} } });
+  assert.equal(gap.surfaces[0].status, 'no-task', 'a surface no original task covers is reported as a contract gap');
 });
 
 test('the CSV reader keeps quoted commas, quotes and newlines inside one field', () => {
