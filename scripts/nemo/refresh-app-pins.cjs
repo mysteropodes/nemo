@@ -9,7 +9,7 @@
 //   bootstrap / profiles / exclusionSupport   sha256 + git blob of each pinned file
 // Policy, membership, exclusions and thresholds stay human-owned and untouched.
 //
-//   node scripts/nemo/refresh-app-pins.cjs [<commit>]   rewrite pins (commit the source first)
+//   node scripts/nemo/refresh-app-pins.cjs              rewrite pins for HEAD (commit the source first)
 //   node scripts/nemo/refresh-app-pins.cjs --check      list drifted pins, exit 1 if any
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -20,11 +20,15 @@ const { discoverSourcePaths } = require('./lib/boundaries-discovery.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const POLICY = 'engineering/boundaries/profiles/app-js.coverage.json';
 
-function refreshedPolicy(root, commit) {
-  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+// The gate reads trees at HEAD and blobs/digest from the working tree, so pins are
+// only consistent for a committed, clean HEAD: anything else is refused.
+function refreshedPolicy(root, commit, git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()) {
   const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
   const raw = fs.readFileSync(path.join(root, POLICY), 'utf8');
   const policy = JSON.parse(raw), pv = policy.provenance;
+  if (git('rev-parse', commit) !== git('rev-parse', 'HEAD')) throw new Error('refresh-app-pins: commit the source and refresh at HEAD');
+  const pinned = [pv.bootstrap, ...(pv.profiles || []), ...(pv.exclusionSupport || [])].filter(Boolean).map((r) => r.path);
+  if (git('status', '--porcelain', '--', policy.scope.sourceRoot, ...pinned)) throw new Error('refresh-app-pins: source or pinned files are uncommitted');
   const sourcePaths = discoverSourcePaths({ root, sourceRoots: [policy.scope.sourceRoot], extensions: policy.scope.sourceKinds });
   const pinFile = (record) => {
     const bytes = fs.readFileSync(path.join(root, record.path));
@@ -55,8 +59,10 @@ function driftedPins(before, after) {
 
 function main() {
   const args = process.argv.slice(2);
-  const commit = execFileSync('git', ['rev-parse', args.find((a) => !a.startsWith('--')) || 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  const { raw, text } = refreshedPolicy(ROOT, commit);
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+  let result;
+  try { result = refreshedPolicy(ROOT, commit); } catch (error) { console.error(error.message); process.exit(1); }
+  const { raw, text } = result;
   if (args.includes('--check')) {
     const drift = driftedPins(raw, text);
     if (drift.length) { console.error('app-js coverage pins drifted: ' + drift.join(', ') + ' — run node scripts/nemo/refresh-app-pins.cjs'); process.exit(1); }
