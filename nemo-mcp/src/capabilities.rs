@@ -18,12 +18,12 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/diagnostics.json"),
 ];
 
-/// Native v2 declarations are deliberately version-separated from the legacy
-/// catalog above. N16 consumes the feature-owned descriptor but does not add it
-/// to v1 discovery or turn it into another MCP tool. The list itself is generated
-/// by build.rs from engineering/application/capabilities-v2/*.json (CS1/#2341):
-/// registering a native capability is adding its descriptor file there, not
-/// editing this crate. `NATIVE_CAPABILITY_FILES` names each source, same order.
+// Native v2 declarations are deliberately version-separated from the legacy
+// catalog above. N16 consumes the feature-owned descriptor but does not add it
+// to v1 discovery or turn it into another MCP tool. The list itself is generated
+// by build.rs from engineering/application/capabilities-v2/*.json (CS1/#2341):
+// registering a native capability is adding its descriptor file there, not
+// editing this crate. `NATIVE_CAPABILITY_FILES` names each source, same order.
 include!(concat!(env!("OUT_DIR"), "/native_capability_sources.rs"));
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

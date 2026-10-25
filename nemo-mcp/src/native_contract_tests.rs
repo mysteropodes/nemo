@@ -268,14 +268,20 @@ fn declared_native_operations() -> Vec<String> {
 }
 
 #[test]
-fn every_declared_native_operation_has_an_explicit_request_validator() {
-    let missing: Vec<_> = declared_native_operations()
+fn request_validation_is_explicit_or_pinned_forwarded() {
+    let mut actual: Vec<_> = declared_native_operations()
         .into_iter()
         .filter(|operation| !has_request_validator(operation))
         .collect();
-    assert!(
-        missing.is_empty(),
-        "declared without a request validator: {missing:?}"
+    actual.sort_unstable();
+    let mut pinned: Vec<_> = MCP_REQUEST_FORWARDED
+        .iter()
+        .map(|op| op.to_string())
+        .collect();
+    pinned.sort_unstable();
+    assert_eq!(
+        actual, pinned,
+        "MCP_REQUEST_FORWARDED must equal the declared operations without a request validator"
     );
 }
 
@@ -298,12 +304,31 @@ fn result_validation_is_explicit_or_pinned_unchecked() {
 }
 
 #[test]
-fn undeclared_or_unvalidated_operations_fail_closed() {
-    let operation = "command.document.object.cs1.undeclared";
-    assert!(!has_request_validator(operation));
-    assert!(!validate_request(operation, &json!({})));
+fn forwarded_and_undeclared_operations_route_as_documented() {
+    // A newly declared operation with neither a validator nor a forward is caught
+    // by request_validation_is_explicit_or_pinned_forwarded; this pins the rest.
+    let declared = declared_native_operations();
+    let forwarded = declared
+        .iter()
+        .find(|op| MCP_REQUEST_FORWARDED.contains(&op.as_str()))
+        .expect("a forwarded operation");
+    assert!(!has_request_validator(forwarded));
+    assert!(validate_request(forwarded, &json!({})));
+    assert!(!MCP_REQUEST_FORWARDED.contains(&"command.document.object.cs1.unlisted"));
+    // Undeclared operations are left to the registration check.
+    assert!(validate_request(
+        "command.document.object.cs1.unlisted",
+        &json!({})
+    ));
+    assert!(crate::capabilities::native_catalog()
+        .capability_for_operation("command.document.object.cs1.unlisted")
+        .is_none());
+    // Results: no validator and not pinned unchecked is refused.
+    assert!(!has_result_validator(
+        "command.document.object.cs1.unlisted"
+    ));
     assert!(!validate_result(
-        operation,
+        "command.document.object.cs1.unlisted",
         "document",
         &json!({}),
         &json!({})

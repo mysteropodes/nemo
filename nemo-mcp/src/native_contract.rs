@@ -147,13 +147,39 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     )
 }
 
-/// Fail closed (CS1/#2341): a declared operation with no request validator is
-/// refused, never accepted with an unchecked payload.
+/// A declared operation needs a validator here or an explicit forward to its
+/// native owner (CS1/#2341). Undeclared operations pass through to the later
+/// registration check, which refuses them as `invalid_request`.
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
-    request_check(operation, payload).unwrap_or(false)
+    request_check(operation, payload).unwrap_or_else(|| {
+        MCP_REQUEST_FORWARDED.contains(&operation)
+            || crate::capabilities::native_catalog()
+                .capability_for_operation(operation)
+                .is_none()
+    })
 }
 
+/// Declared operations whose payload the native owner validates; pinned by test
+/// to exactly the declared operations without a request validator here.
+pub(crate) const MCP_REQUEST_FORWARDED: &[&str] = &[
+    "command.document.apply",
+    "query.document.opacity",
+    "query.document.revision",
+    "query.document.snapshot.acquire",
+    "transaction.begin",
+    "transaction.update",
+    "transaction.commit",
+    "transaction.cancel",
+    "transaction.status",
+    "history.undo",
+    "history.redo",
+    "job.export.png.begin",
+    "job.export.png.status",
+    "job.export.png.cancel",
+];
+
 /// Whether `operation` has an explicit request validator, independent of payload.
+#[cfg(test)]
 pub(crate) fn has_request_validator(operation: &str) -> bool {
     request_check(operation, &Value::Null).is_some()
 }
@@ -351,8 +377,30 @@ pub(crate) fn validate_result(
 
 /// Declared operations whose native result is forwarded without an adapter
 /// shape check; pinned by test to exactly those lacking a result validator.
-pub(crate) const MCP_RESULT_UNCHECKED: &[&str] = &[];
+pub(crate) const MCP_RESULT_UNCHECKED: &[&str] = &[
+    "command.document.apply",
+    "query.document.opacity",
+    "query.document.revision",
+    "query.document.snapshot.acquire",
+    "transaction.begin",
+    "transaction.update",
+    "transaction.commit",
+    "transaction.cancel",
+    "transaction.status",
+    "history.undo",
+    "history.redo",
+    "job.export.png.begin",
+    "job.export.png.status",
+    "job.export.png.cancel",
+    "job.export.svg.begin",
+    "job.export.svg.status",
+    "job.export.svg.cancel",
+    "job.export.media.begin",
+    "job.export.media.status",
+    "job.export.media.cancel",
+];
 
+#[cfg(test)]
 pub(crate) fn has_result_validator(operation: &str) -> bool {
     result_validator(operation).is_some()
 }
