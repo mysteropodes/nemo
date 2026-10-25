@@ -80,10 +80,25 @@ test('standard nonisolated runtime never reads a control file',async()=>{
 });
 test('pending readiness persistence leaves the real response Promise untouched',async()=>{
   const f=fixture();let writes=0;
-  const runtime={...f.runtime,dataDir:'/owned/tauri-data',processEnvironment:{NEMO_REPORT_DIR:'/owned/reports'}};
+  const runtime={...f.runtime,dataDir:'/owned/tauri-data',processEnvironment:{tempDir:'/owned/tmp',NEMO_REPORT_DIR:'/owned/reports'}};
   const root={__TAURI__:{core:{invoke:async()=>runtime},fs:{stat:async()=>({isFile:true,size:100}),
     readTextFile:async()=>JSON.stringify(f.config),writeTextFile:()=>{writes++;return new Promise(()=>{});},rename:async()=>{}}}};
   Gate.install(root);await turn();assert.equal(writes,1);
   const promise=Promise.resolve(f.value);assert.equal(Gate.hold(root,'settings-response',f.request,promise),promise);
   assert.equal(await promise,f.value);
+});
+test('installation uses only the exact owned temporary scope and refuses sibling or foreign roots',async()=>{
+  const f=fixture(),base={...f.runtime,dataDir:'/owned/tauri-data'};
+  for(const env of [{tempDir:'/owned/reports',NEMO_REPORT_DIR:'/owned/reports'},
+    {tempDir:'/other/tmp',NEMO_REPORT_DIR:'/owned/reports'},
+    {tempDir:'/owned/tmp',NEMO_REPORT_DIR:'/other/reports'}]){
+    let reads=0;const root={__TAURI__:{core:{invoke:async()=>({...base,processEnvironment:env})},fs:{stat:async()=>{reads++;}}}};
+    await Gate.install(root).ready;assert.equal(reads,0);
+  }
+  const paths=[],root={__TAURI__:{core:{invoke:async()=>({...base,processEnvironment:{tempDir:'/owned/tmp',NEMO_REPORT_DIR:'/owned/reports'}})},
+    fs:{stat:async p=>{paths.push(p);return {isFile:true,size:100};},readTextFile:async p=>{paths.push(p);return JSON.stringify(f.config);},
+      writeTextFile:async p=>{paths.push(p);},rename:async(a,b)=>{paths.push(a,b);}}}};
+  await Gate.install(root).ready;
+  assert.equal(paths.length,5);assert.ok(paths.every(p=>p.startsWith('/owned/tmp/settings-validation')));
+  assert.equal(paths.at(-1),'/owned/tmp/settings-validation.json');
 });

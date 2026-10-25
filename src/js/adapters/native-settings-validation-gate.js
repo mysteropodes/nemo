@@ -67,9 +67,9 @@
       var api=root.__TAURI__;if(!api||!api.core||!api.fs)return;
       var runtime=await api.core.invoke('nemo_task_runtime');
       if(!runtime||runtime.isolated!==true||runtime.ownerTokenConfigured!==true)return;
-      var dir=runtime.processEnvironment&&runtime.processEnvironment.NEMO_REPORT_DIR;
+      var env=runtime.processEnvironment,dir=env&&env.tempDir;
       if(typeof runtime.dataDir!=='string'||!runtime.dataDir.endsWith('/tauri-data')||
-         dir!==runtime.dataDir.slice(0,-11)+'/reports')return;
+         dir!==runtime.dataDir.slice(0,-11)+'/tmp'||env.NEMO_REPORT_DIR!==runtime.dataDir.slice(0,-11)+'/reports')return;
       async function read(name){var file=dir+'/'+name,stat=await api.fs.stat(file);
         if(!stat.isFile||stat.size>4096)throw new Error('Validation packet refused');
         return JSON.parse(await api.fs.readTextFile(file));}
